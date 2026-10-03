@@ -14,7 +14,8 @@ import { useToast } from '@/components/ui/toast'
 import { parseAmountToCents } from '@/lib/utils'
 import { formatMoney } from '@/lib/money'
 import { useTranslation } from '@/contexts/language-context'
-import { displayDate } from '@/lib/date-format'
+import { displayDate, displayDayMonth } from '@/lib/date-format'
+import { exemptUntilFromDateInput, todayIso } from '@/lib/subscription-console'
 
 interface Props {
   tenant: Tenant
@@ -58,6 +59,17 @@ export interface BillingExemptSubscription {
   billingExempt?: boolean
   billingExemptSince?: string | null
   billingExemptReason?: string | null
+  billingExemptUntil?: string | null
+}
+
+/** O selo "Isento até dd/mm" — ou nulo quando a isenção não tem data de fim. */
+export function exemptUntilLabel(
+  subscription: { billingExempt?: boolean; billingExemptUntil?: string | null } | null | undefined,
+  t: (key: 'platform.subscription.exempt.untilBadge', vars: { date: string }) => string
+): string | null {
+  if (subscription?.billingExempt !== true || !subscription.billingExemptUntil) return null
+  const date = displayDayMonth(subscription.billingExemptUntil)
+  return date ? t('platform.subscription.exempt.untilBadge', { date }) : null
 }
 
 /**
@@ -82,8 +94,11 @@ export function BillingExemptControl({
   const switchId = useId()
   const titleId = useId()
   const reasonId = useId()
+  const untilId = useId()
+  const untilHintId = useId()
   const [confirming, setConfirming] = useState<boolean | null>(null)
   const [reason, setReason] = useState('')
+  const [untilDay, setUntilDay] = useState('')
   const [busy, setBusy] = useState(false)
 
   const exempt = subscription?.billingExempt === true
@@ -94,6 +109,7 @@ export function BillingExemptControl({
   const fechar = useCallback(() => {
     setConfirming(null)
     setReason('')
+    setUntilDay('')
   }, [])
 
   useEffect(() => {
@@ -107,11 +123,18 @@ export function BillingExemptControl({
 
   const enviar = async () => {
     if (confirming === null) return
+    // A data de fim só existe ao ligar; vazia é "até alguém desligar".
+    const until = confirming ? exemptUntilFromDateInput(untilDay) : null
+    if (until === undefined) {
+      toast.error(t('platform.subscription.exempt.untilInvalid'))
+      return
+    }
     setBusy(true)
     try {
       const res = await platformAPI.setBillingExempt(tenantId, {
         exempt: confirming,
-        reason: reason.trim() || undefined
+        reason: reason.trim() || undefined,
+        ...(until ? { until } : {})
       })
       if (res.success && res.data) {
         const canceled = res.data.canceledCharges ?? 0
@@ -126,6 +149,8 @@ export function BillingExemptControl({
         await onChanged()
       } else if (res.code === 'not_billable') {
         toast.error(t('platform.subscription.exempt.notBillable'))
+      } else if (res.code === 'invalid_until') {
+        toast.error(t('platform.subscription.exempt.untilInvalid'))
       } else {
         toast.error(res.message || t('platform.saveFailed'))
       }
@@ -157,6 +182,9 @@ export function BillingExemptControl({
               ? t('platform.subscription.exempt.since', { date: formatDate(subscription.billingExemptSince) })
               : t('platform.subs.exempt')}
           </span>
+          {exemptUntilLabel(subscription, t) && (
+            <span className="modern-badge-info ml-1">{exemptUntilLabel(subscription, t)}</span>
+          )}
           {subscription?.billingExemptReason && (
             <p className="text-muted-foreground [overflow-wrap:anywhere]">{subscription.billingExemptReason}</p>
           )}
@@ -195,6 +223,25 @@ export function BillingExemptControl({
                   maxLength={255}
                 />
               </div>
+              {confirming && (
+                <div>
+                  <label htmlFor={untilId} className="mb-1 block text-sm font-medium">
+                    {t('platform.subscription.exempt.until')}
+                  </label>
+                  <input
+                    id={untilId}
+                    type="date"
+                    value={untilDay}
+                    min={todayIso()}
+                    onChange={(e) => setUntilDay(e.target.value)}
+                    className="modern-input w-full"
+                    aria-describedby={untilHintId}
+                  />
+                  <p id={untilHintId} className="mt-1 text-xs text-muted-foreground">
+                    {t('platform.subscription.exempt.untilHint')}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border p-5">
               <button type="button" className="modern-button-secondary" onClick={fechar} disabled={busy}>
@@ -383,7 +430,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
             {t(STATUS_LABEL_KEYS[subscription.status])}
           </span>
           {subscription.billingExempt && (
-            <span className="modern-badge-info">{t('platform.subs.exempt')}</span>
+            <span className="modern-badge-info">{exemptUntilLabel(subscription, t) ?? t('platform.subs.exempt')}</span>
           )}
           {subscription.reason === 'trial_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>

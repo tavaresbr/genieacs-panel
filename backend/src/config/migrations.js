@@ -1475,6 +1475,14 @@ const SUBSCRIPTION_BILLING_EXEMPT_COLUMNS = [
   ['billing_exempt_reason', (t) => t.string('billing_exempt_reason', 255).nullable()]
 ];
 
+/**
+ * A coluna da 0091 — ver a migração. Nula é "até alguém desligar", como era
+ * antes dela existir.
+ */
+const SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS = [
+  ['billing_exempt_until', (t) => t.timestamp('billing_exempt_until').nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -5073,6 +5081,28 @@ export const migrations = [
       await db.schema.alterTable('wa_conversations', (t) => {
         for (const add of missing) add(t);
         t.index(['tenant_id', 'assigned_user_id', 'closed_at'], 'wa_conversations_assigned_idx');
+      });
+    }
+  },
+  {
+    /**
+     * A isenção de cobrança com data de fim: `billing_exempt_until` é até
+     * quando ela vale. Passado o instante, o agendador desliga a isenção pelo
+     * mesmo caminho do console (ver `SubscriptionService.endExpiredBillingExempt`).
+     * Nula nas linhas que já existem: a isenção de antes desta coluna é "até
+     * alguém desligar", e continua sendo.
+     */
+    id: '0091_subscription_billing_exempt_until',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
       });
     }
   }

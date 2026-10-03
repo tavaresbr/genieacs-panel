@@ -193,6 +193,21 @@ export function isBillingExempt(subscription: { billingExempt?: boolean } | null
   return subscription?.billingExempt === true
 }
 
+/**
+ * O dia do campo "Isento até" como o instante que vai ao servidor: o fim
+ * daquele dia (`endOfDayIso` — "isento até 10/10" inclui o dia 10). Vazio é
+ * `null` ("até alguém desligar"); um dia ilegível ou que já acabou é
+ * `undefined` — a tela recusa antes de enviar, como o servidor faria (400).
+ */
+export function exemptUntilFromDateInput(day: string, now: Date = new Date()): string | null | undefined {
+  const valor = day.trim()
+  if (!valor) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return undefined
+  const fim = endOfDayIso(valor)
+  if (!fim || new Date(fim).getTime() <= now.getTime()) return undefined
+  return fim
+}
+
 export interface RowFilter {
   /** Vazio é "todos". */
   statuses: readonly SubscriptionConsoleStatus[]

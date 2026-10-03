@@ -453,11 +453,14 @@ class PlatformBillingController {
   }
 
   /**
-   * `PUT /tenants/:id/subscription/billing-exempt` — `{ exempt, reason? }`:
+   * `PUT /tenants/:id/subscription/billing-exempt` — `{ exempt, reason?, until? }`:
    * liga ou desliga o "isento de cobrança" (ver
-   * `SubscriptionService.setBillingExempt`).
+   * `SubscriptionService.setBillingExempt`). `until` é a data de fim (ISO,
+   * no futuro, senão 400 `invalid_until`), ou nulo/ausente para "até alguém
+   * desligar"; só com `exempt: true` (400 `until_requires_exempt`). Já
+   * isento, um `until` diferente muda só a data (`untilChanged: true`).
    *
-   * Responde `{ subscription, canceledCharges, failedCharges, alreadyInState }`
+   * Responde `{ subscription, canceledCharges, failedCharges, alreadyInState, untilChanged }`
    * (`failedCharges` é quantas ficaram em aberto), com
    * `subscription` no MESMO formato de `GET /tenants/:id/subscription`
    * (`subscriptionView`), para a tela trocar o que mostra sem perguntar de
@@ -480,6 +483,10 @@ class PlatformBillingController {
       if (reason.length > 255) {
         return res.status(400).json(createErrorResponse('reason must be at most 255 characters'));
       }
+      if (body.until !== undefined && body.until !== null
+        && (typeof body.until !== 'string' || !body.until.trim() || Number.isNaN(Date.parse(body.until)))) {
+        return res.status(400).json(createErrorResponse('until must be an ISO date-time', null, 'invalid_until'));
+      }
 
       const tenant = await tenantOr404(req, res);
       if (!tenant) return undefined;
@@ -491,6 +498,7 @@ class PlatformBillingController {
           tenantId: tenant.id,
           exempt: body.exempt,
           reason: reason || null,
+          until: body.until,
           actorUserId: req.user?.userId ?? null
         });
       } catch (error) {
@@ -504,6 +512,9 @@ class PlatformBillingController {
         const detail = {
           exempt: body.exempt,
           reason: reason || null,
+          until: resultado.subscription?.billing_exempt_until
+            ? new Date(resultado.subscription.billing_exempt_until).toISOString() : null,
+          ...(resultado.untilChanged ? { untilChanged: true, untilBefore: resultado.untilBefore ?? null } : {}),
           statusBefore: resultado.statusBefore,
           statusAfter: resultado.statusAfter,
           canceledCharges: resultado.canceledCharges,
@@ -524,14 +535,16 @@ class PlatformBillingController {
       }
 
       return res.json(createResponse(
-        body.exempt ? 'Billing exemption enabled' : 'Billing exemption disabled',
+        resultado.untilChanged ? 'Billing exemption end date updated'
+          : (body.exempt ? 'Billing exemption enabled' : 'Billing exemption disabled'),
         {
           subscription: await subscriptionView(tenant),
           canceledCharges: resultado.canceledCharges,
           // As que ficaram em aberto (o gateway recusou, ou estavam ocupadas):
           // a tela avisa, e a varredura do agendador tenta de novo.
           failedCharges: resultado.failedCharges.length,
-          alreadyInState: resultado.alreadyInState
+          alreadyInState: resultado.alreadyInState,
+          untilChanged: Boolean(resultado.untilChanged)
         }
       ));
     } catch (error) {

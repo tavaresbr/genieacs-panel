@@ -1528,6 +1528,8 @@ export interface SubscriptionView {
   billingExempt?: boolean
   billingExemptSince?: string | null
   billingExemptReason?: string | null
+  /** Até quando a isenção vale (ISO), ou nulo: até alguém desligar. */
+  billingExemptUntil?: string | null
 }
 
 /**
@@ -1642,6 +1644,8 @@ export interface SubscriptionConsoleSubscription {
   billingExempt?: boolean
   billingExemptSince?: string | null
   billingExemptReason?: string | null
+  /** Até quando a isenção vale (ISO), ou nulo: até alguém desligar. */
+  billingExemptUntil?: string | null
 }
 
 /** Uma linha da aba Assinaturas: o provedor, a assinatura, o gateway e o boleto em aberto. */
@@ -1957,7 +1961,7 @@ export const platformAPI = {
    * `subscription` é o MESMO corpo de `getSubscription` — a tela troca o que
    * mostra sem perguntar de novo.
    */
-  setBillingExempt: (tenantId: number, payload: { exempt: boolean; reason?: string }) =>
+  setBillingExempt: (tenantId: number, payload: { exempt: boolean; reason?: string; until?: string | null }) =>
     apiClient.requestWithBody<{
       subscription: {
         tenant: { id: number; slug: string; name: string }
@@ -1968,6 +1972,7 @@ export const platformAPI = {
       canceledCharges: number
       failedCharges: number
       alreadyInState: boolean
+      untilChanged?: boolean
     }>(
       'PUT', `/platform/tenants/${tenantId}/subscription/billing-exempt`, payload
     ),

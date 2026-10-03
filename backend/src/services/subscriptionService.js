@@ -2,6 +2,8 @@ import Plan from '../models/Plan.js';
 import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
 import BillingCharge from '../models/BillingCharge.js';
+import AuditLog from '../models/AuditLog.js';
+import PlatformAudit from '../models/PlatformAudit.js';
 import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
@@ -196,6 +198,12 @@ const ESTADOS_ISENTAVEIS = new Set(['trial', 'active', 'past_due', 'suspended'])
 function aoSegundo(data) {
   return new Date(Math.floor(data.getTime() / 1000) * 1000);
 }
+
+/**
+ * O motivo que o fim automático da isenção grava no extrato e nas trilhas:
+ * a data de fim (`billing_exempt_until`) chegou. Ver `endExpiredBillingExempt`.
+ */
+export const BILLING_EXEMPT_EXPIRED_REASON = 'billing_exempt_expired';
 
 /** Uma recusa de `setBillingExempt`, com o status HTTP e o código que a tela lê. */
 export class BillingExemptError extends Error {
@@ -496,6 +504,9 @@ class SubscriptionService {
     return {
       billingExempt: Boolean(subscription?.billing_exempt_at),
       billingExemptSince: isoOf(subscription?.billing_exempt_at),
+      // Até quando (nulo é "até alguém desligar"). O provedor também vê: é a
+      // data em que a cobrança volta para ele.
+      billingExemptUntil: subscription?.billing_exempt_at ? isoOf(subscription?.billing_exempt_until) : null,
       billingExemptReason: withReason && subscription?.billing_exempt_at
         ? (subscription.billing_exempt_reason ?? null)
         : null
@@ -1058,34 +1069,93 @@ class SubscriptionService {
    * e a cobrança do período atual que a própria isenção cancelou é reaberta
    * para a emissão (`ChargeIssuingService.reopenExemptCanceled`).
    *
+   * ## Com data de fim (`until`)
+   *
+   * `until` é até quando a isenção vale: uma data no futuro (senão 400
+   * `invalid_until`), ou nulo para "até alguém desligar". Só cabe ao ligar
+   * (`until_requires_exempt` ao desligar), e desligar limpa a coluna. Ligar
+   * quem já está isento com OUTRO `until` muda só a data (`billing_exempt.updated`
+   * no extrato, `untilChanged: true`); sem `until` (indefinido) não muda nada.
+   * Passada a data, o agendador desliga pelo caminho de cima
+   * (`endExpiredBillingExempt`, com `source: 'scheduler'` e `expiredBy`).
+   *
    * ## Uma linha no extrato, e idempotente
    *
    * `billing_exempt.enabled`/`disabled`, sem referência externa (nulos não
    * colidem no índice único). Pedir o estado em que já está não grava nada e
-   * responde `alreadyInState: true`.
+   * responde `alreadyInState: true`. A gravação é condicional ao estado lido
+   * (`Subscription.changeBillingExemptIf`): duas chamadas que desligam a mesma
+   * isenção ao mesmo tempo gravam uma linha só, e a segunda responde
+   * `alreadyInState: true`.
    *
    * @returns {Promise<{ subscription: object, canceledCharges: number,
    *   alreadyInState: boolean, failedCharges: number[], reopenedCharge: boolean,
    *   statusBefore: string, statusAfter: string }>}
    */
   static async setBillingExempt({
-    tenantId, exempt, reason = null, actorUserId = null, now = new Date()
+    tenantId, exempt, reason = null, until = undefined, actorUserId = null,
+    source = 'console', expiredBy = null, now = new Date()
   }) {
     const ligar = Boolean(exempt);
     const motivo = reason === null || reason === undefined ? null : (String(reason).trim().slice(0, 255) || null);
+    // `undefined` é "não mexer na data"; `null` é "sem data de fim".
+    let ate;
+    if (until === null) ate = null;
+    else if (until !== undefined) {
+      const lida = asDate(until);
+      if (!lida) throw new BillingExemptError(400, 'invalid_until', 'until must be an ISO date-time');
+      ate = aoSegundo(lida);
+      if (!ligar) throw new BillingExemptError(400, 'until_requires_exempt', 'until only applies when exempt is true');
+      if (ate.getTime() <= now.getTime()) {
+        throw new BillingExemptError(400, 'invalid_until', 'until must be in the future');
+      }
+    }
     return runInTenant(tenantId, async () => {
       const before = await Subscription.forTenant(tenantId);
       if (!before) throw new BillingExemptError(404, 'subscription_not_found', 'Subscription not found');
       const jaIsento = Boolean(before.billing_exempt_at);
+      const ateAntes = asDate(before.billing_exempt_until);
       const semMudanca = {
         subscription: before,
         canceledCharges: 0,
         failedCharges: [],
         reopenedCharge: false,
         alreadyInState: true,
+        untilChanged: false,
         statusBefore: before.status,
         statusAfter: before.status
       };
+      // O fim automático só desliga a isenção cuja data já passou — a que o
+      // console estendeu ou tornou sem fim no meio do caminho fica.
+      if (expiredBy && (!jaIsento || !ateAntes || ateAntes.getTime() > expiredBy.getTime())) return semMudanca;
+
+      if (ligar && jaIsento) {
+        // Já isento: só a data de fim pode mudar.
+        if (ate === undefined) return semMudanca;
+        if ((ate?.getTime() ?? null) === (ateAntes ? aoSegundo(ateAntes).getTime() : null)) return semMudanca;
+        const subscription = await getDb().transaction(async (trx) => {
+          const mudou = await Subscription.changeBillingExemptIf(
+            tenantId, { wasExempt: true }, { billing_exempt_until: ate }, trx
+          );
+          if (!mudou) return null;
+          await BillingEvent.record({
+            subscriptionId: before.id,
+            type: BILLING_EVENT_TYPES.BILLING_EXEMPT_UPDATED,
+            createdBy: actorUserId,
+            detail: { untilFrom: isoOf(ateAntes), untilTo: isoOf(ate) }
+          }, trx);
+          return Subscription.forTenant(tenantId, trx);
+        });
+        if (!subscription) return { ...semMudanca, subscription: await Subscription.forTenant(tenantId) };
+        cache.invalidate();
+        return {
+          ...semMudanca,
+          subscription,
+          alreadyInState: false,
+          untilChanged: true,
+          untilBefore: isoOf(ateAntes)
+        };
+      }
       if (ligar === jaIsento) return semMudanca;
       if (ligar && !ESTADOS_ISENTAVEIS.has(before.status)) {
         throw new BillingExemptError(409, 'not_billable', `A ${before.status} subscription cannot be exempted from billing`);
@@ -1094,14 +1164,19 @@ class SubscriptionService {
       const { default: ChargeIssuingService } = await import('./chargeIssuingService.js');
       const patch = {};
       const detalhe = { reason: motivo, statusBefore: before.status };
+      if (source !== 'console') detalhe.source = source;
       if (ligar) {
         patch.billing_exempt_at = aoSegundo(now);
         patch.billing_exempt_reason = motivo;
+        patch.billing_exempt_until = ate ?? null;
+        if (ate) detalhe.until = ate.toISOString();
         if (before.status === 'past_due' || before.status === 'suspended') patch.status = 'active';
       } else {
         patch.billing_exempt_at = null;
         patch.billing_exempt_reason = null;
+        patch.billing_exempt_until = null;
         detalhe.exemptSince = isoOf(before.billing_exempt_at);
+        if (ateAntes) detalhe.exemptUntil = isoOf(ateAntes);
         // O prazo vivo, pela mesma coluna que a cortesia (`setDeadlines`) usa.
         const coluna = before.status === 'trial' ? 'trial_ends_at' : 'renews_at';
         const prazo = asDate(before[coluna]);
@@ -1134,15 +1209,20 @@ class SubscriptionService {
       if (patch.status) detalhe.statusAfter = patch.status;
 
       const subscription = await getDb().transaction(async (trx) => {
-        const depois = await Subscription.upsertForTenant(tenantId, patch, trx);
+        // Condicional ao que se leu: quem perde a corrida não grava nada.
+        const mudou = await Subscription.changeBillingExemptIf(
+          tenantId, { wasExempt: jaIsento, expiredBy }, patch, trx
+        );
+        if (!mudou) return null;
         await BillingEvent.record({
           subscriptionId: before.id,
           type: ligar ? BILLING_EVENT_TYPES.BILLING_EXEMPT_ENABLED : BILLING_EVENT_TYPES.BILLING_EXEMPT_DISABLED,
           createdBy: actorUserId,
           detail: detalhe
         }, trx);
-        return depois;
+        return Subscription.forTenant(tenantId, trx);
       });
+      if (!subscription) return { ...semMudanca, subscription: await Subscription.forTenant(tenantId) };
       cache.invalidate();
 
       let cancelamento = { canceled: 0, failed: [] };
@@ -1179,10 +1259,85 @@ class SubscriptionService {
         failedCharges: cancelamento.failed,
         reopenedCharge: reaberta,
         alreadyInState: false,
+        untilChanged: false,
         statusBefore: before.status,
         statusAfter: subscription?.status ?? before.status
       };
     });
+  }
+
+  /**
+   * O fim automático da isenção com data de fim: passado o
+   * `billing_exempt_until`, desliga pelo MESMO caminho do console
+   * (`setBillingExempt({ exempt: false })`) — o prazo que ganha `LEAD_DAYS`
+   * se já venceu, o `past_due` que volta a `active`, a cobrança do período
+   * que a isenção cancelou e volta à emissão. Chamado pelo agendador, por
+   * provedor, antes da emissão (`schedulerService.runJobs`): assim a mesma
+   * volta já emite a fatura que a isenção segurava.
+   *
+   * Sem ator: o extrato leva `source: 'scheduler'` e o motivo
+   * `BILLING_EXEMPT_EXPIRED_REASON`; as duas trilhas (a da plataforma e a do
+   * provedor, `actorKind: 'system'`) também. Idempotente e seguro com duas
+   * voltas sobrepostas: a gravação é condicional à isenção ainda ligada e à
+   * data ainda vencida (`Subscription.changeBillingExemptIf`), e só quem
+   * desligou grava as trilhas.
+   *
+   * @returns {Promise<{ ended: boolean, reason?: string, until?: string|null,
+   *   reopenedCharge?: boolean, renewsAt?: string|null }>}
+   */
+  static async endExpiredBillingExempt({ tenant = null, tenantId = null, now = new Date() } = {}) {
+    const id = tenantId ?? tenant?.id ?? currentTenantId();
+    if (!id) return { ended: false, reason: 'no_tenant' };
+    const sub = await Subscription.forTenant(id);
+    if (!sub?.billing_exempt_at) return { ended: false, reason: 'not_exempt' };
+    const ate = asDate(sub.billing_exempt_until);
+    if (!ate) return { ended: false, reason: 'no_end_date' };
+    if (ate.getTime() > now.getTime()) return { ended: false, reason: 'not_yet', until: ate.toISOString() };
+
+    const resultado = await this.setBillingExempt({
+      tenantId: id,
+      exempt: false,
+      reason: BILLING_EXEMPT_EXPIRED_REASON,
+      actorUserId: null,
+      source: 'scheduler',
+      expiredBy: now,
+      now
+    });
+    // Outra volta (ou o console) desligou primeiro: ela gravou as trilhas.
+    if (resultado.alreadyInState) return { ended: false, reason: 'already_ended' };
+
+    const detail = {
+      exempt: false,
+      source: 'scheduler',
+      reason: BILLING_EXEMPT_EXPIRED_REASON,
+      exemptUntil: ate.toISOString(),
+      statusBefore: resultado.statusBefore,
+      statusAfter: resultado.statusAfter,
+      canceledCharges: 0,
+      ...(resultado.reopenedCharge ? { reopenedCharge: true } : {}),
+      renewsAt: isoOf(resultado.subscription?.renews_at)
+    };
+    // A linha do provedor dá à trilha da plataforma o nome e o slug; o
+    // agendador já a tem na mão (`forEachTenant`).
+    const linha = tenant?.slug ? tenant : ((await getDb()('tenants').where({ id }).first()) ?? { id });
+    await PlatformAudit.record({
+      action: PlatformAudit.ACTIONS.SUBSCRIPTION_BILLING_EXEMPT_CHANGED,
+      tenant: linha,
+      detail
+    });
+    await runInTenant(id, () => AuditLog.record({
+      action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+      actorKind: 'system',
+      subjectType: 'subscription',
+      subjectId: id,
+      detail: { ...detail, platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_BILLING_EXEMPT_CHANGED }
+    }));
+    return {
+      ended: true,
+      until: ate.toISOString(),
+      reopenedCharge: resultado.reopenedCharge,
+      renewsAt: isoOf(resultado.subscription?.renews_at)
+    };
   }
 
   /**

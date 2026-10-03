@@ -138,6 +138,15 @@ export function displayDateTime(value: DateInput): string | null {
 }
 
 /**
+ * For code outside React: day and month only (`formatDayMonth`) in the
+ * provider's order, or `null` when there is nothing to show.
+ */
+export function displayDayMonth(value: DateInput): string | null {
+  const date = toDate(value)
+  return date ? formatDayMonth(date, activeDateFormat, getIntlLocale()) : null
+}
+
+/**
  * Day and month only, for the compact stamps (a message, a conversation, a
  * chart axis), in the provider's order: 02/10, 10/02, 10-02 or 02.10.
  */
