@@ -2547,6 +2547,8 @@ const fr: Dictionary = {
   'whatsapp.botReport.hourlyHint': 'Montre les heures où il manque du monde. Fuseau : {timezone}.',
   'whatsapp.botReport.requestsCount': '{count} demandes',
   'whatsapp.alerts.title': 'Alertes techniques',
+  'whatsapp.alerts.viewResults': "Pannes massives",
+  'whatsapp.alerts.viewConfig': "Configuration",
   'whatsapp.alerts.description': 'Ce que le panneau surveille, et qui il réveille. Cela va à l’équipe, jamais à un abonné.',
   'whatsapp.alerts.enable': 'Surveiller le réseau',
   'whatsapp.alerts.interval': 'Analyser toutes les (secondes)',

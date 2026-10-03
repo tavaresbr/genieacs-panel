@@ -2735,6 +2735,8 @@ const zhCN: Dictionary = {
   'whatsapp.botReport.hourlyHint': '显示人手不足的时段。时区：{timezone}。',
   'whatsapp.botReport.requestsCount': '{count} 个请求',
   'whatsapp.alerts.title': '技术告警',
+  'whatsapp.alerts.viewResults': "大规模中断",
+  'whatsapp.alerts.viewConfig': "设置",
   'whatsapp.alerts.description': '面板监控哪些指标，以及在异常时通知谁。这些消息只发给团队，绝不会发给用户。',
   'whatsapp.alerts.enable': '监控全网设备',
   'whatsapp.alerts.interval': '扫描间隔（秒）',

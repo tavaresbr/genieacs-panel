@@ -12,6 +12,7 @@ import {
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
@@ -1037,6 +1038,13 @@ function RequeueFailedButton() {
  * responderia 403. As demais ele lê; o que ele não pode escrever é recusado
  * pelo servidor com uma frase que diz isso.
  */
+/** As duas vistas da aba de alertas: o resultado (quedas) e a configuração. */
+type AlertView = 'results' | 'config'
+const ALERT_VIEWS: [AlertView, TranslationKey][] = [
+  ['results', 'whatsapp.alerts.viewResults'],
+  ['config', 'whatsapp.alerts.viewConfig']
+]
+
 const TABS = [
   ['inbox', 'whatsapp.inbox.title', 'whatsapp.read'],
   ['contacts', 'whatsapp.contacts.title', 'whatsapp.read'],
@@ -1068,6 +1076,7 @@ export default function WhatsAppPage() {
   const { t } = useTranslation()
   const { can } = useAuth()
   const [tab, setTab] = useState<TabId>('inbox')
+  const [alertsView, setAlertsView] = useState<AlertView>('results')
   // The thread Contacts handed over, and a counter that remounts the inbox for
   // each hand-over so it opens that thread even when it was already on screen.
   // The Contacts page (its own menu entry) hands one over through the route.
@@ -1155,8 +1164,25 @@ export default function WhatsAppPage() {
             continuaria montando um painel cujas requisições todas falham. */}
         {tab === 'alerts' && can('whatsapp.config') && (
           <>
-            <OutagePanel />
-            <AlertsPanel />
+            {/* O que os alertas acharam de um lado, como eles vigiam do outro:
+                juntos, o formulário empurrava as quedas para fora da tela. */}
+            <div className="tab-rail mb-4" role="tablist" aria-label={t('whatsapp.alerts.title')}>
+              {ALERT_VIEWS.map(([id, labelKey]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="tab-button"
+                  data-active={alertsView === id}
+                  role="tab"
+                  aria-selected={alertsView === id}
+                  data-testid={`wa-alerts-view-${id}`}
+                  onClick={() => setAlertsView(id)}
+                >
+                  {t(labelKey)}
+                </button>
+              ))}
+            </div>
+            {alertsView === 'results' ? <OutagePanel /> : <AlertsPanel />}
           </>
         )}
       </div>

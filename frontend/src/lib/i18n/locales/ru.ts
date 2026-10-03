@@ -2743,6 +2743,8 @@ const ru: Dictionary = {
   'whatsapp.botReport.hourlyHint': 'Показывает часы, когда не хватает людей. Часовой пояс: {timezone}.',
   'whatsapp.botReport.requestsCount': '{count} запросов',
   'whatsapp.alerts.title': 'Технические оповещения',
+  'whatsapp.alerts.viewResults': "Массовые аварии",
+  'whatsapp.alerts.viewConfig': "Настройки",
   'whatsapp.alerts.description': 'За чем следит панель и кого она вызывает. Оповещения идут команде и никогда не отправляются абонентам.',
   'whatsapp.alerts.enable': 'Следить за сетью',
   'whatsapp.alerts.interval': 'Проверять каждые (секунды)',

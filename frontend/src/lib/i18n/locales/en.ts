@@ -2737,6 +2737,8 @@ const en = {
   'whatsapp.botReport.hourlyHint': 'Shows the hours when you are short of people. Time zone: {timezone}.',
   'whatsapp.botReport.requestsCount': '{count} requests',
   'whatsapp.alerts.title': 'Technical alerts',
+  'whatsapp.alerts.viewResults': "Mass outages",
+  'whatsapp.alerts.viewConfig': "Settings",
   'whatsapp.alerts.description': 'What the panel watches, and who it wakes. These go to the team, never to a subscriber.',
   'whatsapp.alerts.enable': 'Watch the fleet',
   'whatsapp.alerts.interval': 'Scan every (seconds)',

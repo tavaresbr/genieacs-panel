@@ -2578,6 +2578,8 @@ const ja: Dictionary = {
   'whatsapp.botReport.hourlyHint': '人手が足りない時間帯を示します。タイムゾーン: {timezone}。',
   'whatsapp.botReport.requestsCount': '{count} 件の依頼',
   'whatsapp.alerts.title': '技術アラート',
+  'whatsapp.alerts.viewResults': "大規模障害",
+  'whatsapp.alerts.viewConfig': "設定",
   'whatsapp.alerts.ontOffline': 'ONT がオフライン',
   'whatsapp.alerts.rxPowerLow': '光信号が劣化',
   'whatsapp.alerts.temperatureHigh': '温度が高い',
