@@ -15,17 +15,23 @@ const LEVEL_COLORS: Record<OccupancyLevel, string> = {
   free: '#22c55e',
   unknown: '#94a3b8'
 }
-const FILTERS = ['all', 'over', 'full', 'almost', 'free', 'unknown'] as const
+const FILTERS = ['all', 'over', 'full', 'almost', 'free', 'unknown', 'weak'] as const
+const WEAK_COLOR = '#f59e0b'
+const NO_WEAK: Set<string> = new Set()
 type Filter = typeof FILTERS[number]
 
 export function BoxOccupancyView<T extends OccupancyNode>({
-  nodes, edges, outageIds, onSelect, fileName
+  nodes, edges, outageIds, weakIds = NO_WEAK, onSelect, onBulkLink, fileName
 }: {
   nodes: T[]
   edges: OccupancyEdge[]
   /** Caixas com provável rompimento agora — marcadas na lista. */
   outageIds: Set<string>
+  /** Caixas com vários clientes de sinal fraco agora (`weakBoxes`). */
+  weakIds?: Set<string>
   onSelect: (node: T) => void
+  /** "Ligar clientes às caixas" — só para quem edita o mapa. */
+  onBulkLink?: () => void
   fileName: string
 }) {
   const { t } = useTranslation()
@@ -33,15 +39,18 @@ export function BoxOccupancyView<T extends OccupancyNode>({
   const [query, setQuery] = useState('')
   const rows = useMemo(() => allBoxOccupancy(nodes, edges), [edges, nodes])
   const counts = useMemo(() => {
-    const result: Record<Filter, number> = { all: rows.length, over: 0, full: 0, almost: 0, free: 0, unknown: 0 }
-    for (const row of rows) result[row.level] += 1
+    const result: Record<Filter, number> = { all: rows.length, over: 0, full: 0, almost: 0, free: 0, unknown: 0, weak: 0 }
+    for (const row of rows) {
+      result[row.level] += 1
+      if (weakIds.has(row.box.node_id)) result.weak += 1
+    }
     return result
-  }, [rows])
+  }, [rows, weakIds])
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase()
-    return rows.filter((row) => (filter === 'all' || row.level === filter)
+    return rows.filter((row) => (filter === 'all' || (filter === 'weak' ? weakIds.has(row.box.node_id) : row.level === filter))
       && (!term || row.box.name.toLowerCase().includes(term) || row.box.node_id.toLowerCase().includes(term)))
-  }, [filter, query, rows])
+  }, [filter, query, rows, weakIds])
   const totals = useMemo(() => rows.reduce((sum, row) => ({
     used: sum.used + row.used,
     capacity: sum.capacity + (row.capacity ?? 0),
@@ -74,6 +83,11 @@ export function BoxOccupancyView<T extends OccupancyNode>({
         <div className="flex flex-wrap items-center gap-2">
           <input type="search" className="modern-input min-h-9 w-48 text-sm" placeholder={t('map.boxes.search')} aria-label={t('map.boxes.search')}
             value={query} onChange={(event) => setQuery(event.target.value)} />
+          {onBulkLink && (
+            <button type="button" className="modern-button min-h-9" onClick={onBulkLink} title={t('map.link.hint')}>
+              <Icon name="signal" size={16} />{t('map.link.button')}
+            </button>
+          )}
           <button type="button" className="modern-button-secondary min-h-9" disabled={!visible.length} onClick={download}>
             <Icon name="document" size={16} />{t('map.boxes.export')}
           </button>
@@ -83,8 +97,9 @@ export function BoxOccupancyView<T extends OccupancyNode>({
         {FILTERS.map((value) => (
           <button key={value} type="button" onClick={() => setFilter(value)}
             className={`modern-badge ${filter === value ? 'ring-2 ring-primary' : ''}`}>
-            {value !== 'all' && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLORS[value] }} />}
-            {value === 'all' ? t('map.boxes.all') : levelLabel(value)} {counts[value]}
+            {value === 'weak' && <span style={{ color: WEAK_COLOR }}><Icon name="signal" size={13} /></span>}
+            {value !== 'all' && value !== 'weak' && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLORS[value] }} />}
+            {value === 'all' ? t('map.boxes.all') : value === 'weak' ? t('map.weak.filter') : levelLabel(value)} {counts[value]}
           </button>
         ))}
       </div>
@@ -121,6 +136,11 @@ export function BoxOccupancyView<T extends OccupancyNode>({
                   {outageIds.has(row.box.node_id) && (
                     <span className="mt-1 flex items-center gap-1 text-xs font-semibold" style={{ color: LEVEL_COLORS.over }}>
                       <Icon name="warning" size={13} />{t('map.boxes.outageNow')}
+                    </span>
+                  )}
+                  {weakIds.has(row.box.node_id) && (
+                    <span className="mt-1 flex items-center gap-1 text-xs font-semibold" style={{ color: WEAK_COLOR }}>
+                      <Icon name="signal" size={13} />{t('map.weak.filter')}
                     </span>
                   )}
                 </td>

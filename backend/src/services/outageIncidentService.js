@@ -14,6 +14,10 @@ const t = (chave, vars) => translate(DEFAULT_LOCALE, chave, vars);
 
 /** Quanto tempo um incidente resolvido continua na tela. */
 const RECENTES_MS = 24 * 60 * 60 * 1000;
+/** Os períodos que o quadro oferece, em dias. */
+const PERIODOS_DIAS = [1, 7, 30, 90];
+/** Teto da lista: 90 dias de uma rede ruim não podem virar milhares de cartões. */
+const LIST_LIMIT = 200;
 
 /** O número que fala com o assinante: o do atendimento, e na falta o padrão. */
 async function contaDeEnvio() {
@@ -249,12 +253,41 @@ class OutageIncidentService {
     return this.get(incidentId);
   }
 
-  /** Abertos, e os resolvidos nas últimas 24 h, com as contagens. */
-  static async list() {
-    const desde = new Date(Date.now() - RECENTES_MS);
-    const rows = await tdb('outage_incidents')
-      .where((q) => q.where({ status: 'open' }).orWhere('resolved_at', '>=', desde))
-      .orderBy('started_at', 'desc');
+  /**
+   * Os incidentes, com as contagens. Sem filtro: os abertos e os resolvidos
+   * nas últimas 24 h — o que o quadro sempre mostrou.
+   *
+   * - `days` (1, 7, 30 ou 90): até onde olhar para trás. Um incidente aberto
+   *   aparece seja qual for o período — ele está acontecendo agora.
+   * - `status`: `open` ou `resolved`.
+   * - `search`: parte do nome (ou do id) do ponto do mapa.
+   * - `notified`: `pending` (ainda ninguém avisado) ou `sent`.
+   */
+  static async list({ days, status, search, notified } = {}) {
+    const dias = PERIODOS_DIAS.includes(Number(days)) ? Number(days) : 1;
+    const desde = new Date(Date.now() - dias * RECENTES_MS);
+    const query = tdb('outage_incidents');
+    if (status === 'open') query.where({ status: 'open' });
+    else if (status === 'resolved') query.whereNot({ status: 'open' }).where('resolved_at', '>=', desde);
+    else query.where((q) => q.where({ status: 'open' }).orWhere('resolved_at', '>=', desde));
+
+    // Como a busca da caixa de entrada: os curingas do LIKE saem do termo,
+    // e um termo que só tinha curingas não acha nada.
+    if (String(search ?? '').trim()) {
+      const termo = WaConversation.likeTerm(search).slice(0, 100);
+      query.where((q) => {
+        if (!termo) {
+          q.whereRaw('1 = 0');
+          return;
+        }
+        q.whereRaw("lower(coalesce(node_name, '')) like ?", [`%${termo}%`])
+          .orWhereRaw('lower(node_id) like ?', [`%${termo}%`]);
+      });
+    }
+    if (notified === 'pending') query.whereNull('notice_sent_at');
+    else if (notified === 'sent') query.whereNotNull('notice_sent_at');
+
+    const rows = await query.orderBy('started_at', 'desc').limit(LIST_LIMIT);
     return Promise.all(rows.map((row) => this.present(row)));
   }
 

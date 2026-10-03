@@ -23,6 +23,7 @@ import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
 import { SatisfactionPanel } from '@/components/whatsapp/satisfaction-panel'
+import { ResponseTimePanel } from '@/components/whatsapp/response-time-panel'
 import { MaintenancePanel } from '@/components/maintenance/maintenance-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { OutagePanel } from '@/components/outages/outage-panel'
@@ -30,6 +31,7 @@ import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthBell } from '@/components/whatsapp/health-strip'
 import { AvailabilityToggle } from '@/components/whatsapp/assignment'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
+import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation } from 'react-router'
@@ -641,6 +643,30 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
   // No celular, lista OU conversa; no computador, as duas (`lib/wa-inbox-pane.ts`).
   const panes = inboxPanes(conversation !== null)
+  // Teclado do iPhone: o Safari não encolhe a página, só a `visualViewport`
+  // (`lib/wa-keyboard.ts`). Com o teclado aberto o cartão passa a caber na
+  // parte visível, com a caixa de escrever logo acima dele. Só no celular.
+  const [keyboardHeight, setKeyboardHeight] = useState<number | null>(null)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
+    let last: number | null = null
+    const update = () => {
+      const next = visibleHeightWithKeyboard({ innerHeight: window.innerHeight, vvHeight: vv.height })
+      if (next === last) return
+      last = next
+      setKeyboardHeight(next)
+      // A barra fixa e as abas voltam ao topo da área visível.
+      if (next !== null) window.scrollTo(0, 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
 
   return (
     <section className="space-y-5">
@@ -679,6 +705,9 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                 ? 'lg:grid-cols-[1fr_minmax(16rem,20rem)] min-[1200px]:grid-cols-[minmax(14rem,17rem)_1fr_minmax(16rem,19rem)] xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]'
                 : 'lg:grid-cols-[minmax(17rem,22rem)_1fr]'
             }`}
+            // Sem a área segura (o teclado cobre o indicador de home) e sem o
+            // `min-h`, que impediria o cartão de encolher.
+            style={keyboardHeight !== null ? { height: `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
           >
             <div className={`${showSgpPanel && conversation ? 'hidden min-[1200px]:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">
@@ -1140,6 +1169,7 @@ export default function WhatsAppPage() {
         {tab === 'botReport' && (
           <div className="grid gap-8">
             <BotReportPanel />
+            <ResponseTimePanel />
             <SatisfactionPanel />
           </div>
         )}

@@ -4313,6 +4313,25 @@ export interface BotConfig {
   distribution: { enabled: boolean }
 }
 
+/** Quanto o cliente espera por gente: `GET /whatsapp/response-time-report`. Tempos em segundos. */
+export interface ResponseTimeReport {
+  days: 7 | 30 | 90
+  timezone: string
+  /** Com horário de atendimento, os números principais contam só as esperas que começaram dentro dele. */
+  hoursEnabled: boolean
+  answered: number
+  medianSeconds: number | null
+  p90Seconds: number | null
+  averageSeconds: number | null
+  /** Fração respondida em até 5, 15 e 60 min. */
+  within: Array<{ seconds: number; rate: number | null }>
+  outsideHours: { answered: number; medianSeconds: number | null }
+  byAgent: Array<{ userId: number | null; name: string | null; answered: number; medianSeconds: number | null }>
+  /** 24 posições, pela hora em que o cliente começou a esperar. */
+  byHour: Array<{ answered: number; medianSeconds: number | null }>
+  waitingNow: { count: number; oldestSince: string | null }
+}
+
 /** A pesquisa de satisfação: `GET /whatsapp/satisfaction-report`. */
 export interface SatisfactionReport {
   days: 7 | 30 | 90
@@ -4374,6 +4393,9 @@ export const whatsappAPI = {
 
   getBotReport: (days: 7 | 30 | 90) =>
     apiClient.get<BotReport>(`/whatsapp/bot-report?days=${days}`),
+
+  getResponseTimeReport: (days: 7 | 30 | 90) =>
+    apiClient.get<ResponseTimeReport>(`/whatsapp/response-time-report?days=${days}`),
 
   getSatisfactionReport: (days: 7 | 30 | 90) =>
     apiClient.get<SatisfactionReport>(`/whatsapp/satisfaction-report?days=${days}`),
@@ -4933,8 +4955,28 @@ export const maintenanceAPI = {
   conclude: (id: number) => apiClient.post<MaintenanceWindowDetail>(`/whatsapp/maintenances/${id}/conclude`, {}),
 }
 
+/** Os filtros do quadro "Quedas em massa". */
+export interface OutageFilters {
+  /** 1, 7, 30 ou 90 dias para trás; um incidente aberto aparece em qualquer período. */
+  days?: 1 | 7 | 30 | 90
+  status?: '' | 'open' | 'resolved'
+  /** Parte do nome do ponto do mapa. */
+  search?: string
+  /** `pending`: ninguém avisado ainda. */
+  notified?: '' | 'pending' | 'sent'
+}
+
 export const outagesAPI = {
-  list: () => apiClient.get<{ incidents: OutageIncident[] }>('/whatsapp/outages'),
+  /** Sem filtro: abertos e resolvidos nas últimas 24 h. */
+  list: (filters: OutageFilters = {}) => {
+    const query = new URLSearchParams()
+    if (filters.days && filters.days !== 1) query.set('days', String(filters.days))
+    if (filters.status) query.set('status', filters.status)
+    if (filters.search?.trim()) query.set('search', filters.search.trim())
+    if (filters.notified) query.set('notified', filters.notified)
+    const suffix = query.toString()
+    return apiClient.get<{ incidents: OutageIncident[] }>(`/whatsapp/outages${suffix ? `?${suffix}` : ''}`)
+  },
   get: (id: number) => apiClient.get<OutageIncidentDetail>(`/whatsapp/outages/${id}`),
   setEta: (id: number, eta: string) => apiClient.requestWithBody<OutageIncidentDetail>('PATCH', `/whatsapp/outages/${id}`, { eta }),
   /** Avisa quem ainda não foi avisado. `body` vazio usa o texto padrão. */
