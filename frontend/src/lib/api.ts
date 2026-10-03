@@ -4926,3 +4926,53 @@ export const publicAPI = {
     devicesEstimate?: number | null; message?: string; planCode?: string | null; website?: string
   }) => apiClient.post<{ ok: boolean }>('/public/leads', payload),
 }
+
+/** Um mês do relatório de receita: o que entrou e o que voltou nele. */
+export interface RevenueMonth {
+  /** `YYYY-MM`, em UTC. */
+  month: string
+  receivedCents: number
+  refundedCents: number
+  /** Cobranças pagas no mês. */
+  count: number
+}
+
+/** Uma linha "por plano" do relatório: as ativas pagantes e o recebido no período. */
+export interface RevenuePlanRow {
+  planId: number | null
+  name: string | null
+  activeCount: number
+  mrrCents: number
+  receivedCents: number
+}
+
+/**
+ * O relatório de receita do console (`GET /platform/reports/revenue`).
+ * Recebido e estornado são do período; MRR e em aberto são de agora.
+ */
+export interface RevenueReport {
+  from: string
+  to: string
+  mrrCents: number
+  activeCount: number
+  receivedCents: number
+  refundedCents: number
+  openCents: number
+  overdueCents: number
+  overdueTenants: number
+  monthly: RevenueMonth[]
+  byPlan: RevenuePlanRow[]
+  discountCents: number
+}
+
+/** Os relatórios do console: a receita, e a planilha das cobranças do período. */
+export const platformReportsAPI = {
+  revenue: (range: { from: string; to: string }) =>
+    apiClient.get<RevenueReport>(
+      `/platform/reports/revenue?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+    ),
+  revenueCsv: (range: { from: string; to: string }) =>
+    apiClient.getBlob(
+      `/platform/reports/revenue.csv?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+    ),
+}
