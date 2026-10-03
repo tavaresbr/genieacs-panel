@@ -1,5 +1,6 @@
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
+import BillingInvoice from './BillingInvoice.js';
 
 /**
  * A cobrança que o painel emitiu a um provedor.
@@ -110,7 +111,8 @@ class BillingCharge {
    * o bilhete que a ganha.
    */
   static async open({
-    subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null
+    subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null,
+    planId = null, couponId = null
   }) {
     return tinsertReturningId('billing_charges', {
       // A linha nasce JÁ garrada por quem a inseriu — ver `claim`. Sem isto,
@@ -124,7 +126,11 @@ class BillingCharge {
       currency: String(currency || 'BRL').toUpperCase().slice(0, 3),
       provider: String(provider).slice(0, 32),
       status: 'pending',
-      due_date: dueDate
+      due_date: dueDate,
+      // Com que plano e cupom este valor foi calculado (0093) — ver
+      // `BILLING_CHARGE_PRICING_COLUMNS`.
+      plan_id: planId ?? null,
+      coupon_id: couponId ?? null
     });
   }
 
@@ -254,7 +260,9 @@ class BillingCharge {
    *
    * @returns {Promise<boolean>}
    */
-  static async resetForReissue(id, { amountCents, currency, holdUntil = null }) {
+  static async resetForReissue(id, {
+    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined
+  }) {
     const linha = await BillingCharge.findById(id);
     if (!linha) return false;
     const anteriores = BillingCharge.supersededOf(linha);
@@ -289,6 +297,10 @@ class BillingCharge {
       // O valor novo é o preço de um plano: o desconto dado à cobrança velha
       // pelo console não passa para a reemitida.
       amount_overridden_at: null,
+      // O plano e o cupom do preço novo (0093), quando quem reprecifica os
+      // diz; sem eles (a reabertura da isenção, que mantém o valor), ficam.
+      ...(planId !== undefined ? { plan_id: planId } : {}),
+      ...(couponId !== undefined ? { coupon_id: couponId } : {}),
       updated_at: new Date()
     });
     return changed > 0;
@@ -401,7 +413,7 @@ class BillingCharge {
    * a página do gateway de uma cobrança paga para conferir o recibo, que é
    * exatamente o que a tela do provedor não deve convidar a fazer.
    */
-  static presentForConsole(row) {
+  static presentForConsole(row, invoiceRow = null) {
     if (!row) return null;
     return {
       id: row.id,
@@ -424,7 +436,9 @@ class BillingCharge {
       superseded: BillingCharge.supersededOf(row).map((item) => ({
         gatewayChargeId: String(item.id),
         amountCents: Number(item.amountCents)
-      }))
+      })),
+      // A NFS-e desta cobrança, quando há — lida por quem chama (`forCharges`).
+      invoice: BillingInvoice.presentForConsole(invoiceRow)
     };
   }
 
@@ -442,7 +456,7 @@ class BillingCharge {
    * pagou: de que período é, quanto, até quando, em que pé está, e onde se
    * paga.
    */
-  static present(row) {
+  static present(row, invoiceRow = null) {
     if (!row) return null;
     return {
       id: row.id,
@@ -455,7 +469,9 @@ class BillingCharge {
       // botão que leva a uma página do gateway dizendo que não há o que pagar —
       // e, pior, convida a pagar de novo.
       invoiceUrl: OPEN_CHARGE_STATUSES.includes(row.status) ? (row.invoice_url ?? null) : null,
-      createdAt: row.created_at ?? null
+      createdAt: row.created_at ?? null,
+      // A nota fiscal (NFS-e) desta cobrança: estado, número e PDF — sem o erro.
+      invoice: BillingInvoice.present(invoiceRow)
     };
   }
 }

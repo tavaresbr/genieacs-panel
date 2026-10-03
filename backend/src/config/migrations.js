@@ -1475,6 +1475,14 @@ const SUBSCRIPTION_BILLING_EXEMPT_COLUMNS = [
   ['billing_exempt_reason', (t) => t.string('billing_exempt_reason', 255).nullable()]
 ];
 
+/**
+ * A coluna da 0091 — ver a migração. Nula é "até alguém desligar", como era
+ * antes dela existir.
+ */
+const SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS = [
+  ['billing_exempt_until', (t) => t.timestamp('billing_exempt_until').nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -1482,6 +1490,46 @@ const BILLING_TABLES = [
   // Depois de `subscriptions`: a ordem desta lista é a ordem das chaves
   // estrangeiras, e é ela que o export e a exclusão de provedor percorrem.
   ['billing_charges', billingChargesTable]
+];
+
+/**
+ * A nota fiscal de serviço (NFS-e) de uma cobrança paga, emitida pela Asaas.
+ *
+ * Uma linha por cobrança — o índice único em `charge_id` é a idempotência: o
+ * webhook reentregue, a baixa do console e o clique repetido no "emitir nota"
+ * chegam todos à mesma linha, e nunca a uma segunda nota para o mesmo
+ * dinheiro. A linha nasce `pending` no pagamento (sem falar com a Asaas, que
+ * pode estar fora do ar) e é o agendador que a leva adiante, com `attempts` e
+ * `next_attempt_at` espaçando a insistência como na emissão da cobrança.
+ */
+const billingInvoicesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('charge_id').unsigned().notNullable()
+    .references('id').inTable('billing_charges').onDelete('CASCADE');
+  // O id da nota na Asaas (`inv_…`). Nulo até a criação voltar.
+  t.string('external_id', 64);
+  // pending | scheduled | authorized | error | canceling | canceled
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.string('number', 64);
+  t.string('pdf_url', 512);
+  t.string('xml_url', 512);
+  t.string('error', 500);
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.timestamp('next_attempt_at');
+  t.timestamp('issued_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['charge_id'], 'billing_invoices_charge_uq');
+  // O agendador pergunta "o que está pendente ou agendado" por provedor.
+  t.index(['tenant_id', 'status'], 'billing_invoices_status_idx');
+  // O webhook acha a linha pelo id da Asaas, antes de saber o provedor.
+  t.index(['external_id'], 'billing_invoices_external_idx');
+};
+
+const BILLING_INVOICE_TABLES = [
+  ['billing_invoices', billingInvoicesTable]
 ];
 
 /**
@@ -1892,6 +1940,83 @@ const WA_AGENT_TABLES = [
   ['wa_agents', waAgentsTable]
 ];
 
+/**
+ * Os cupons de desconto da assinatura (0093). Da PLATAFORMA, como `plans`: um
+ * cupom é do catálogo comercial do deploy inteiro, e um provedor o resgata —
+ * não tem o seu. Por isso sem `tenant_id`, e só o console escreve aqui.
+ *
+ * `code` único e sempre em maiúsculas (quem grava normaliza). `value` é o
+ * percentual inteiro (1–99: o de 100% é recusado na criação, porque a fatura
+ * de valor zero seria um caminho de dinheiro novo) ou centavos. `duration`:
+ * `once` (só a 1ª fatura), `repeating` (`duration_cycles` faturas) ou
+ * `forever`. `plan_ids` é uma lista JSON opcional dos planos em que ele vale.
+ * `redemptions` sobe por atualização condicional, nunca por leitura e escrita
+ * — é ela que segura o `max_redemptions` sob corrida.
+ */
+const couponsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('code', 32).notNullable().unique();
+  t.string('kind', 16).notNullable();
+  t.integer('value').unsigned().notNullable();
+  t.string('duration', 16).notNullable();
+  t.integer('duration_cycles').unsigned();
+  t.integer('max_redemptions').unsigned();
+  t.integer('redemptions').unsigned().notNullable().defaultTo(0);
+  t.timestamp('valid_until').nullable();
+  t.text('plan_ids');
+  t.boolean('active').notNullable().defaultTo(true);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
+/**
+ * Quem já resgatou cada cupom (0093): uma linha por provedor por cupom. É ela
+ * que impede o mesmo provedor de resgatar o mesmo cupom de novo depois de
+ * gastá-lo — `subscriptions.coupon_id` some quando o último ciclo é consumido,
+ * e sem esta memória o código voltaria a valer. Do PROVEDOR (escopada): diz
+ * que descontos ele recebeu, e some junto com ele. Gravada na mesma transação
+ * que sobe `coupons.redemptions`, e desfeita junto quando a aplicação falha.
+ */
+const couponRedemptionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('coupon_id').unsigned().notNullable()
+    .references('id').inTable('coupons').onDelete('CASCADE');
+  t.timestamp('redeemed_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['coupon_id', 'tenant_id'], 'coupon_redemptions_coupon_tenant_uq');
+};
+
+const COUPON_TABLES = [
+  ['coupons', couponsTable],
+  ['coupon_redemptions', couponRedemptionsTable]
+];
+
+/**
+ * Com que plano e com que cupom cada cobrança saiu (0093), gravados na emissão
+ * e na reprecificação. É o que diz, no pagamento, se a fatura paga carregava o
+ * desconto (para gastar o ciclo do cupom só então) e se pagou a descida
+ * agendada (para não comparar preços que o cupom pode ter igualado). Nulas na
+ * cobrança feita à mão ou anterior a elas — aí a conferência volta ao preço.
+ */
+const BILLING_CHARGE_PRICING_COLUMNS = [
+  ['plan_id', (t) => t.integer('plan_id').unsigned().nullable()],
+  ['coupon_id', (t) => t.integer('coupon_id').unsigned().nullable()]
+];
+
+/**
+ * O cupom na assinatura (0093). Sem `.references`, pelo motivo de
+ * `pending_plan_id`: acrescentar chave estrangeira a uma tabela que já existe
+ * é recriá-la no SQLite, e quem escreve a coluna acabou de ler o cupom.
+ * `coupon_cycles_left` nulo é o `forever`; `coupon_applied_at` é quando foi
+ * aplicado, e volta junto quando um estorno devolve o ciclo que o tirou.
+ */
+const SUBSCRIPTION_COUPON_COLUMNS = [
+  ['coupon_id', (t) => t.integer('coupon_id').unsigned().nullable()],
+  ['coupon_cycles_left', (t) => t.integer('coupon_cycles_left').unsigned().nullable()],
+  ['coupon_applied_at', (t) => t.timestamp('coupon_applied_at').nullable()]
+];
+
 /** A conversa com dono: quem atende, desde quando, e desde quando espera um. */
 const WA_ASSIGNMENT_COLUMNS = [
   ['assigned_user_id', (t) => t.integer('assigned_user_id').unsigned().nullable()],
@@ -2162,6 +2287,44 @@ const INITIAL_TABLES = [
 ];
 
 /**
+ * Os lembretes de cobrança que a plataforma mandou ao provedor — ver
+ * `subscriptionNoticeService.js` (migração 0092).
+ *
+ * Substitui a marca única `subscriptions.expiry_warned_for`: a régua tem três
+ * etapas por prazo (`before`, `due`, `after`), e uma coluna só lembra de uma.
+ * Esta tabela é o histórico que o console mostra E a trava: o índice único
+ * `(tenant_id, due_at, step)` é o que faz "uma vez por etapa por prazo" valer
+ * com duas passadas ao mesmo tempo — a segunda esbarra no índice e não manda.
+ *
+ * `due_at` é a DATA do prazo (ISO, no fuso da cobrança), e não o instante,
+ * pela mesma razão de `billing_charges.period_end`: a chave entra num índice
+ * único, e um timestamp não sobrevive igual aos três bancos (o MySQL trunca
+ * para segundos). Um prazo mexido em algumas horas continua sendo o mesmo dia,
+ * e não reabre etapa já mandada.
+ *
+ * `sent_at` nulo é a linha tomada por uma passada que ainda está mandando;
+ * `claimed_until` é até quando — vencido, outra passada a retoma, para um
+ * processo que morreu no meio não deixar a etapa presa para sempre.
+ */
+const subscriptionReminderSendsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('due_at', 10).notNullable();
+  t.string('step', 8).notNullable(); // before | due | after
+  // Por onde saiu, separado por vírgula: `email`, `whatsapp` ou os dois.
+  t.string('channels', 32);
+  t.timestamp('sent_at');
+  t.timestamp('claimed_until');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'due_at', 'step'], 'subscription_reminder_sends_step_uq');
+};
+
+const SUBSCRIPTION_REMINDER_TABLES = [
+  ['subscription_reminder_sends', subscriptionReminderSendsTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -2192,7 +2355,10 @@ export const SCHEMA_TABLES = [
   ...DUNNING_TABLES,
   ...SATISFACTION_TABLES,
   ...WA_AGENT_TABLES,
-  ...WA_META_TEMPLATE_TABLES
+  ...WA_META_TEMPLATE_TABLES,
+  ...BILLING_INVOICE_TABLES,
+  ...COUPON_TABLES,
+  ...SUBSCRIPTION_REMINDER_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5107,11 +5273,100 @@ export const migrations = [
   },
   {
     /**
+     * A isenção de cobrança com data de fim: `billing_exempt_until` é até
+     * quando ela vale. Passado o instante, o agendador desliga a isenção pelo
+     * mesmo caminho do console (ver `SubscriptionService.endExpiredBillingExempt`).
+     * Nula nas linhas que já existem: a isenção de antes desta coluna é "até
+     * alguém desligar", e continua sendo.
+     */
+    id: '0091_subscription_billing_exempt_until',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** A régua de lembretes de cobrança — ver `subscriptionReminderSendsTable`. */
+    id: '0092_subscription_reminder_sends',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('subscription_reminder_sends');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of SUBSCRIPTION_REMINDER_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /** Os cupons de desconto — ver `couponsTable` e `SUBSCRIPTION_COUPON_COLUMNS`. */
+    id: '0093_coupons',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('coupons'))) return false;
+      // Criada depois da primeira versão desta migração: o banco de quem já a
+      // rodou precisa ganhá-la também.
+      if (await db.schema.hasTable('tenants') && !(await db.schema.hasTable('coupon_redemptions'))) return false;
+      if (await db.schema.hasTable('billing_charges')
+        && (await missingColumns(db, 'billing_charges', BILLING_CHARGE_PRICING_COLUMNS)).length) return false;
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_COUPON_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      for (const [nome, construtor] of COUPON_TABLES) {
+        // A memória dos resgates aponta para `tenants`; sem ela, nada a criar.
+        // eslint-disable-next-line no-await-in-loop -- uma leitura só
+        if (nome === 'coupon_redemptions' && !(await db.schema.hasTable('tenants'))) continue;
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+      if (await db.schema.hasTable('billing_charges')) {
+        const faltam = await missingColumns(db, 'billing_charges', BILLING_CHARGE_PRICING_COLUMNS);
+        if (faltam.length) {
+          await db.schema.alterTable('billing_charges', (t) => {
+            for (const add of faltam) add(t);
+          });
+        }
+      }
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_COUPON_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** A NFS-e de cada cobrança paga, pela Asaas — ver `billingInvoicesTable`. */
+    id: '0094_billing_invoices',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return true;
+      return db.schema.hasTable('billing_invoices');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return;
+      for (const [nome, construtor] of BILLING_INVOICE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
      * Cabeçalho de mídia e botão de URL dinâmica nos modelos da Meta — ver
      * `WA_META_TEMPLATE_MEDIA_COLUMNS`. A cópia antiga fica com o formato vazio
      * e continua "não suportada" até a próxima sincronização.
      */
-    id: '0091_wa_meta_template_media',
+    id: '0095_wa_meta_template_media',
     async isApplied(db) {
       for (const [table, columns] of WA_META_MEDIA_COLUMN_TABLES) {
         if (!(await db.schema.hasTable(table))) continue;

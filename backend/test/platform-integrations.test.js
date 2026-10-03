@@ -128,8 +128,9 @@ describe('a leitura', () => {
     const res = await platform('/integrations/asaas');
     assert.equal(res.status, 200);
     assert.deepEqual(Object.keys(res.body.data).sort(), [
-      'apiKeyConfigured', 'apiKeySource', 'environment', 'updatedAt',
-      'webhookTokenConfigured', 'webhookTokenSource', 'webhookUrl'
+      'apiKeyConfigured', 'apiKeySource', 'environment', 'issPercent', 'municipalServiceCode',
+      'municipalServiceId', 'municipalServiceName', 'nfseEnabled', 'observations', 'retainIss',
+      'serviceDescription', 'updatedAt', 'webhookTokenConfigured', 'webhookTokenSource', 'webhookUrl'
     ]);
     assert.equal(res.body.data.apiKeyConfigured, true);
     assert.equal(res.body.data.apiKeySource, 'env');

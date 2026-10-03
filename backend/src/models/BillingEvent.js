@@ -32,7 +32,16 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   // único `(tenant_id, external_id)` não colide em nulo, e ligar e desligar
   // várias vezes é o uso esperado, não uma reentrega.
   BILLING_EXEMPT_ENABLED: 'billing_exempt.enabled',
-  BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled'
+  BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled',
+  // A data de fim de uma isenção que continua ligada mudou (o console
+  // estendeu, encurtou ou tirou a data). O fim em si é `disabled`.
+  BILLING_EXEMPT_UPDATED: 'billing_exempt.updated',
+  // Um cupom de desconto entrou ou saiu da assinatura (0093) — pelo provedor
+  // ou pelo console. O consumo de um ciclo não tem linha própria: viaja no
+  // `detail` do pagamento que o gastou (`coupon`), e a devolução no do
+  // estorno (`couponRestored`).
+  COUPON_APPLIED: 'coupon.applied',
+  COUPON_REMOVED: 'coupon.removed'
 });
 
 class BillingEvent {
@@ -66,6 +75,23 @@ class BillingEvent {
       detail: detail === null || detail === undefined ? null : JSON.stringify(detail).slice(0, 4000)
     }, trx);
     return true;
+  }
+
+  /**
+   * Quanto os pagamentos com estas referências de fato trouxeram — ou nulo,
+   * quando o extrato não tem nenhum. O aceite da diferença
+   * (`<referência>:accepted`) é gravado com zero e não entra; o estorno é
+   * outro tipo de evento e também não.
+   */
+  static async receivedFor(externalIds) {
+    const ids = [...new Set((externalIds || []).filter(Boolean).map((id) => String(id).slice(0, 128)))];
+    if (!ids.length) return null;
+    const linhas = await tdb('billing_events')
+      .where({ type: BILLING_EVENT_TYPES.PAYMENT_RECORDED })
+      .whereIn('external_id', ids)
+      .select('amount_cents');
+    if (!linhas.length) return null;
+    return linhas.reduce((soma, linha) => soma + (Number(linha.amount_cents) || 0), 0);
   }
 
   /** Do mais recente para o mais antigo. */

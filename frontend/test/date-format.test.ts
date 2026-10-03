@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   displayDate,
   formatDateValue,
+  displayDayMonth,
   formatDayMonth,
   isoDay,
   setActiveDateFormat,
@@ -58,5 +59,17 @@ describe('formato da data', () => {
     expect(isoDay('2026-05-02 00:00:00')).toBe('2026-05-02')
     expect(isoDay('02/05/2026')).toBeNull()
     expect(isoDay(null)).toBeNull()
+  })
+})
+
+describe('displayDayMonth', () => {
+  it('dia e mês na ordem do provedor, e nulo para vazio', () => {
+    setActiveDateFormat('dd/MM/yyyy')
+    expect(displayDayMonth(new Date(2026, 9, 10, 23, 59, 59))).toBe('10/10')
+    expect(displayDayMonth('2026-10-02')).toBe('02/10')
+    setActiveDateFormat('MM/dd/yyyy')
+    expect(displayDayMonth('2026-10-02')).toBe('10/02')
+    expect(displayDayMonth(null)).toBeNull()
+    expect(displayDayMonth('nada')).toBeNull()
   })
 })

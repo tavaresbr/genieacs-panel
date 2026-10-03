@@ -2,6 +2,9 @@ import Plan from '../models/Plan.js';
 import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
 import BillingCharge from '../models/BillingCharge.js';
+import AuditLog from '../models/AuditLog.js';
+import PlatformAudit from '../models/PlatformAudit.js';
+import Coupon, { parseCouponPlanIds } from '../models/Coupon.js';
 import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
@@ -74,6 +77,15 @@ const avisosDeBloqueio = new Map();
  */
 const PAID_PERIOD_DAYS = 30;
 
+/**
+ * O menor valor que um cupom deixa uma fatura ter: R$ 5,00, o mínimo que o
+ * Asaas aceita numa cobrança. Sem piso, um desconto grande daria uma fatura
+ * que o gateway recusa — ou, no limite, uma de valor zero, que exigiria um
+ * caminho de dinheiro que não existe (período pago sem pagamento). Um plano
+ * que já custa menos que o piso fica com o preço dele: o cupom não sobe preço.
+ */
+export const COUPON_FLOOR_CENTS = 500;
+
 /** Os dias que um pagamento compra neste plano, ou a reserva. */
 function periodoDoPlano(plano) {
   const dias = Number(plano?.period_days);
@@ -100,7 +112,7 @@ function periodoDoPlano(plano) {
  * não é a da referência: comparar centavos de moedas diferentes não é uma
  * conferência frouxa, é uma conta errada.
  */
-async function valorPedido({ externalId, plano, currency }) {
+async function valorPedido({ externalId, plano, currency, precoDoPlano = null }) {
   const moedaPaga = String(currency || '').toUpperCase();
 
   // 1a. A cobrança que NUNCA chegou ao gateway, marcada paga à mão pelo
@@ -123,8 +135,18 @@ async function valorPedido({ externalId, plano, currency }) {
       if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
       // `overridden`: o valor foi mudado à mão pelo console (0078) e não é o
       // preço de plano nenhum — ver o destino da descida em `recordPayment`.
+      // `planId`/`couponId`: com que plano e cupom ela foi emitida (0093),
+      // quando a linha o diz — nulo `planId` é cobrança feita à mão ou de
+      // antes das colunas, e aí só o valor responde.
+      const temPreco = cobranca.plan_id !== null && cobranca.plan_id !== undefined;
       return {
-        cents: Math.floor(valor), motivo: null, fonte: 'charge', overridden: Boolean(cobranca.amount_overridden_at)
+        cents: Math.floor(valor),
+        motivo: null,
+        fonte: 'charge',
+        overridden: Boolean(cobranca.amount_overridden_at),
+        planId: temPreco ? Number(cobranca.plan_id) : null,
+        couponId: temPreco && cobranca.coupon_id !== null && cobranca.coupon_id !== undefined
+          ? Number(cobranca.coupon_id) : null
       };
     }
   }
@@ -156,7 +178,10 @@ async function valorPedido({ externalId, plano, currency }) {
     }
   }
 
-  const preco = Number(plano?.price_cents);
+  // O preço que a emissão teria pedido: o do plano com o cupom, quando há um
+  // (`precoDoPlano`, ver `effectivePriceCents`) — senão o pagamento manual do
+  // valor com desconto seria chamado de "pago a menos".
+  const preco = precoDoPlano ?? Number(plano?.price_cents);
   if (!Number.isFinite(preco) || preco <= 0) return { cents: null, motivo: 'nothing_asked', fonte: null };
   const moedaPlano = String(plano?.currency || '').toUpperCase();
   if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
@@ -196,6 +221,12 @@ const ESTADOS_ISENTAVEIS = new Set(['trial', 'active', 'past_due', 'suspended'])
 function aoSegundo(data) {
   return new Date(Math.floor(data.getTime() / 1000) * 1000);
 }
+
+/**
+ * O motivo que o fim automático da isenção grava no extrato e nas trilhas:
+ * a data de fim (`billing_exempt_until`) chegou. Ver `endExpiredBillingExempt`.
+ */
+export const BILLING_EXEMPT_EXPIRED_REASON = 'billing_exempt_expired';
 
 /** Uma recusa de `setBillingExempt`, com o status HTTP e o código que a tela lê. */
 export class BillingExemptError extends Error {
@@ -333,44 +364,37 @@ class SubscriptionService {
   }
 
   /**
-   * O prazo que está para vencer e ainda não foi avisado, ou nulo.
+   * A etapa da régua de lembretes em que o provedor está agora, ou nulo.
    *
-   * Um provedor tem no máximo um prazo vivo: `trial_ends_at` enquanto está em
-   * teste, `renews_at` depois que pagou. `suspended` e `canceled` não têm prazo
-   * nenhum — já estão parados, e avisar quem já foi bloqueado é ruído.
+   * Substitui o aviso único de antes (`expiry_warned_for`): três etapas por
+   * prazo, relativas a ele — `renews_at`, ou `trial_ends_at` no teste:
    *
-   * A janela vale também depois de vencer: quem passou do prazo sem ver o aviso
-   * precisa receber um, e é justamente o caso em que o painel já está recusando
-   * escrita. A marca `expiry_warned_for` guarda o prazo avisado, então um
-   * segundo aviso só sai quando o prazo MUDA — e um pagamento que empurra
-   * `renews_at` recomeça o ciclo sozinho.
+   *   before  de `REMINDER_BEFORE_DAYS` dias antes até o prazo;
+   *   due     do prazo até `REMINDER_AFTER_DAYS` dias depois;
+   *   after   de lá até `REMINDER_AFTER_UNTIL_DAYS` dias depois do prazo, e
+   *           só enquanto ninguém pagou (`past_due`).
    *
-   * **A janela acompanha o período**, desde que o período passou a ser do plano
-   * (migração 0046). Sete dias é a medida certa de um plano mensal e é pouco
-   * para um anual: a fatura é doze vezes maior, passa por aprovação de alguém
-   * que não é quem opera o painel, e uma semana não é tempo de conseguir isso.
-   * Um doze avos do período, com piso de uma semana e teto de um mês — trinta
-   * dias vira sete, trezentos e sessenta e cinco vira trinta, e nada entre os
-   * dois surpreende. O teto existe porque avisar com dois meses de antecedência
-   * não é aviso, é ruído que se esquece antes de vencer.
+   * É só a etapa da janela de AGORA: uma etapa que passou sem sair (o
+   * agendador parado, o SMTP fora) não sai atrasada. Mandar "vence em cinco
+   * dias" para quem já venceu seria pior que não mandar nada. Se já foi
+   * mandada, quem responde é `subscription_reminder_sends`, não esta função.
+   *
+   * Sem lembrete para quem não tem o que pagar: isento de cobrança, plano de
+   * graça (ou sem plano), e `suspended`/`canceled`, que são decisões de gente —
+   * e a gente que as tomou já falou com o cliente. Depois de pago o prazo
+   * muda (`renews_at` anda), e a régua recomeça sozinha no prazo novo.
    */
-  static WARN_WINDOW_DAYS = 7;
+  static REMINDER_BEFORE_DAYS = 5;
 
-  static WARN_WINDOW_MAX_DAYS = 30;
+  static REMINDER_AFTER_DAYS = 3;
 
-  /** Quantos dias antes do prazo o aviso sai, neste plano. */
-  static warnWindowDays(plano) {
-    const periodo = periodoDoPlano(plano);
-    return Math.min(
-      this.WARN_WINDOW_MAX_DAYS,
-      Math.max(this.WARN_WINDOW_DAYS, Math.ceil(periodo / 12))
-    );
-  }
+  static REMINDER_AFTER_UNTIL_DAYS = 10;
 
-  static pendingExpiryNotice(subscription, now = new Date(), plano = null) {
+  static pendingReminder(subscription, now = new Date(), plano = null) {
     if (!subscription) return null;
-    // Isento de cobrança: não há prazo a avisar nem fatura a pagar.
+    // Isento de cobrança: não há prazo a lembrar nem fatura a pagar.
     if (subscription.billing_exempt_at) return null;
+    if (!(Number(plano?.price_cents ?? 0) > 0)) return null;
     const stored = STATUSES.includes(subscription.status) ? subscription.status : 'suspended';
     if (stored !== 'trial' && stored !== 'active' && stored !== 'past_due') return null;
 
@@ -381,24 +405,31 @@ class SubscriptionService {
       : asDate(subscription.renews_at) ?? asDate(subscription.trial_ends_at);
     if (!prazo) return null;
 
-    // Sem plano em mãos, a janela é a do piso: quem chama sem passá-lo recebe o
-    // comportamento de antes, que é o certo para o teste — `trial_days` já é do
-    // plano e o prazo de teste não escala com o período pago.
-    const dias = stored === 'trial' ? this.WARN_WINDOW_DAYS : this.warnWindowDays(plano);
-    const janela = now.getTime() + dias * DAY_MS;
-    if (prazo.getTime() > janela) return null;
-
-    const avisado = asDate(subscription.expiry_warned_for);
-    if (avisado && avisado.getTime() === prazo.getTime()) return null;
+    const desde = now.getTime() - prazo.getTime();
+    let step = null;
+    if (desde >= -this.REMINDER_BEFORE_DAYS * DAY_MS && desde < 0) step = 'before';
+    else if (desde >= 0 && desde < this.REMINDER_AFTER_DAYS * DAY_MS) step = 'due';
+    else if (desde >= this.REMINDER_AFTER_DAYS * DAY_MS && desde < this.REMINDER_AFTER_UNTIL_DAYS * DAY_MS) {
+      // "Ainda não pagou": o estado que vale, e não o gravado.
+      if (this.effectiveStatus(subscription, now).status === 'past_due') step = 'after';
+    }
+    if (!step) return null;
 
     return {
       kind: stored === 'trial' ? 'trial' : 'renewal',
+      step,
       deadline: prazo,
-      expired: prazo.getTime() <= now.getTime()
+      expired: desde >= 0
     };
   }
 
-  /** Anota que o aviso daquele prazo saiu. Idempotente por construção. */
+  /**
+   * Anota que o aviso daquele prazo saiu. Idempotente por construção.
+   *
+   * A régua de lembretes (0092) não a lê — a memória dela é
+   * `subscription_reminder_sends` —, mas continua a gravá-la, para quem ler a
+   * coluna saber qual foi o último prazo avisado.
+   */
   static async markExpiryWarned(deadline) {
     const tenantId = currentTenantId();
     await Subscription.upsertForTenant(tenantId, { expiry_warned_for: asDate(deadline) });
@@ -439,7 +470,9 @@ class SubscriptionService {
     // mostram ao lado do plano atual — e uma consulta a mais só para quem tem
     // uma, que é quase ninguém.
     const pendingPlan = subscription?.pending_plan_id ? await Plan.findById(subscription.pending_plan_id) : null;
-    return cache.set({ subscription, plan, pendingPlan });
+    // O cupom (0093) pela mesma razão: a tela mostra o preço com desconto.
+    const coupon = subscription?.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+    return cache.set({ subscription, plan, pendingPlan, coupon });
   }
 
   /** Esquece a leitura de UM provedor — a que o console acabou de mudar. */
@@ -458,7 +491,7 @@ class SubscriptionService {
    * também o que a porta da assinatura põe no corpo do 402, e ali a pergunta
    * é "por que parei", não "quanto custa".
    */
-  static present({ subscription, plan, pendingPlan = null }, opcoes = {}) {
+  static present({ subscription, plan, pendingPlan = null, coupon = null }, opcoes = {}) {
     if (!subscription) return null;
     // O segundo argumento já foi só `now`; continua aceito assim.
     const { now = new Date(), withExemptReason = false } = opcoes instanceof Date ? { now: opcoes } : (opcoes ?? {});
@@ -477,7 +510,142 @@ class SubscriptionService {
       renewsAt: subscription.renews_at ?? null,
       canceledAt: subscription.canceled_at ?? null,
       pendingPlan: this.presentPendingPlan(subscription, pendingPlan),
+      coupon: this.presentCoupon(subscription, plan, coupon),
       ...this.presentBillingExempt(subscription, { withReason: withExemptReason })
+    };
+  }
+
+  // ── Cupom de desconto (0093) ─────────────────────────────────────────
+
+  /**
+   * Se o cupom `coupon` vale para a fatura de `plan` desta assinatura.
+   *
+   * Vale quando é o cupom DA assinatura, ainda tem ciclo (o `forever` não
+   * conta ciclo) e o plano está na lista dele, quando ele tem lista. A
+   * validade, o teto de resgates e o `active` NÃO entram: são regras do
+   * RESGATE. Quem já resgatou fica com o desconto que resgatou — desativar um
+   * cupom fecha a porta para os próximos, não tira de quem entrou.
+   *
+   * O plano conta a cada fatura, e não só na aplicação: a descida para um
+   * plano fora da lista faz o cupom parar de valer ali (e voltar a valer se o
+   * provedor voltar a um plano da lista, enquanto houver ciclo).
+   */
+  static couponApplies(subscription, plan, coupon) {
+    if (!subscription?.coupon_id || !coupon || !plan) return false;
+    if (Number(coupon.id) !== Number(subscription.coupon_id)) return false;
+    if (coupon.duration !== 'forever') {
+      const restantes = Number(subscription.coupon_cycles_left);
+      if (!Number.isFinite(restantes) || restantes <= 0) return false;
+    }
+    const planos = parseCouponPlanIds(coupon.plan_ids);
+    return planos === null || planos.includes(Number(plan.id));
+  }
+
+  /**
+   * `priceCents` com o desconto de `coupon`, respeitando o piso
+   * (`COUPON_FLOOR_CENTS`). Percentual arredonda o DESCONTO para baixo: o
+   * centavo que sobra fica com quem cobra, e a conta é a mesma em toda tela.
+   */
+  static priceWithCoupon(priceCents, coupon) {
+    const preco = Math.floor(Number(priceCents));
+    if (!Number.isFinite(preco) || preco <= 0) return 0;
+    if (!coupon || preco <= COUPON_FLOOR_CENTS) return preco;
+    const valor = Math.floor(Number(coupon.value));
+    if (!Number.isFinite(valor) || valor <= 0) return preco;
+    const desconto = coupon.kind === 'percent' ? Math.floor((preco * valor) / 100) : valor;
+    return Math.max(COUPON_FLOOR_CENTS, preco - desconto);
+  }
+
+  /**
+   * O preço da fatura de `plan` para esta assinatura, com o cupom já lido —
+   * a versão síncrona de `effectivePriceCents`, para quem lista muitas
+   * assinaturas de uma vez com os cupons em mãos.
+   */
+  static priceFor(subscription, plan, coupon) {
+    const preco = Math.max(0, Math.floor(Number(plan?.price_cents ?? 0)) || 0);
+    return this.couponApplies(subscription, plan, coupon) ? this.priceWithCoupon(preco, coupon) : preco;
+  }
+
+  /**
+   * O preço que a fatura de `plan` vai pedir a esta assinatura: o do plano,
+   * com o cupom dela quando ele vale (`couponApplies`), nunca abaixo do piso.
+   *
+   * É a ÚNICA conta de preço da cobrança: a emissão (`issueCurrent`, inclusive
+   * o preço da descida agendada), a reprecificação da fatura em aberto
+   * (`reprecificarCobranca`), o "pagar agora" e a conferência do pagamento
+   * leem daqui. O valor mudado à mão pelo console numa cobrança (0078) vence
+   * isto — quem decide isso é quem lê a cobrança.
+   *
+   * Assíncrona porque lê o cupom; `{ coupon }` poupa a leitura a quem já o
+   * tem (nulo é "sem cupom").
+   */
+  static async effectivePriceCents(subscription, plan, { coupon } = {}) {
+    if (!subscription?.coupon_id) return this.priceFor(subscription, plan, null);
+    const cupom = coupon !== undefined ? coupon : await Coupon.findById(subscription.coupon_id);
+    return this.priceFor(subscription, plan, cupom);
+  }
+
+  /**
+   * O que a cobrança de `plan` grava sobre o próprio preço (0093): o plano e
+   * o cupom com que ele foi calculado — `couponId` nulo quando o cupom não
+   * vale ali. É o que o pagamento lê depois (`recordPayment`) para saber se a
+   * fatura paga carregava o desconto e qual plano ela pagou.
+   */
+  static chargePricing(subscription, plan, coupon) {
+    return {
+      planId: plan?.id ? Number(plan.id) : null,
+      couponId: this.couponApplies(subscription, plan, coupon) ? Number(coupon.id) : null
+    };
+  }
+
+  /**
+   * Se a cobrança paga do período da descida agendada pagou o plano AGENDADO
+   * — `true`, `false`, ou nulo quando não dá para dizer.
+   *
+   * O plano gravado na cobrança (`planId`, 0093) é a resposta. Sem ele (a
+   * cobrança feita à mão, ou de antes da coluna), pelo valor: o que casa com
+   * o preço de um plano e não com o do outro decide; os dois iguais (o cupom
+   * levou os dois ao piso) é nulo. Nenhum casando, contra o preço de TABELA
+   * do atual quando o cupom não vale nos dois — com ele valendo só num, o
+   * preço com desconto do atual pode ficar abaixo do agendado, e "menos que o
+   * atual" deixaria de querer dizer "pagou o barato".
+   */
+  static paidScheduledPlan({ planId = null, cents = null, subscription, current, scheduled, coupon = null }) {
+    if (!scheduled) return null;
+    if (planId !== null && planId !== undefined) return Number(planId) === Number(scheduled.id);
+    if (cents === null || cents === undefined || !current) return null;
+    const precoAtual = this.priceFor(subscription, current, coupon);
+    const precoAgendado = this.priceFor(subscription, scheduled, coupon);
+    if (precoAtual === precoAgendado) return null;
+    if (cents === precoAgendado) return true;
+    if (cents === precoAtual) return false;
+    const nosDois = this.couponApplies(subscription, current, coupon) === this.couponApplies(subscription, scheduled, coupon);
+    const referencia = nosDois ? precoAtual : Math.max(0, Math.floor(Number(current.price_cents ?? 0)) || 0);
+    return cents < referencia;
+  }
+
+  /**
+   * O cupom como a tela e o console o leem — ou nulo. `priceCents` é o preço
+   * que a próxima fatura do plano atual vai pedir; `appliesToPlan` diz se o
+   * cupom vale no plano de agora (um cupom restrito a outros planos fica na
+   * assinatura, sem desconto, até o provedor voltar a um deles ou ele sair).
+   */
+  static presentCoupon(subscription, plan, coupon) {
+    if (!subscription?.coupon_id || !coupon || Number(coupon.id) !== Number(subscription.coupon_id)) return null;
+    const restantes = subscription.coupon_cycles_left;
+    return {
+      id: Number(coupon.id),
+      code: coupon.code,
+      kind: coupon.kind,
+      value: Number(coupon.value),
+      duration: coupon.duration,
+      durationCycles: coupon.duration_cycles === null || coupon.duration_cycles === undefined
+        ? null : Number(coupon.duration_cycles),
+      cyclesLeft: restantes === null || restantes === undefined ? null : Number(restantes),
+      planIds: parseCouponPlanIds(coupon.plan_ids),
+      appliesToPlan: this.couponApplies(subscription, plan, coupon),
+      priceCents: this.priceFor(subscription, plan, coupon),
+      appliedAt: isoOf(subscription.coupon_applied_at)
     };
   }
 
@@ -496,6 +664,9 @@ class SubscriptionService {
     return {
       billingExempt: Boolean(subscription?.billing_exempt_at),
       billingExemptSince: isoOf(subscription?.billing_exempt_at),
+      // Até quando (nulo é "até alguém desligar"). O provedor também vê: é a
+      // data em que a cobrança volta para ele.
+      billingExemptUntil: subscription?.billing_exempt_at ? isoOf(subscription?.billing_exempt_until) : null,
       billingExemptReason: withReason && subscription?.billing_exempt_at
         ? (subscription.billing_exempt_reason ?? null)
         : null
@@ -1058,34 +1229,93 @@ class SubscriptionService {
    * e a cobrança do período atual que a própria isenção cancelou é reaberta
    * para a emissão (`ChargeIssuingService.reopenExemptCanceled`).
    *
+   * ## Com data de fim (`until`)
+   *
+   * `until` é até quando a isenção vale: uma data no futuro (senão 400
+   * `invalid_until`), ou nulo para "até alguém desligar". Só cabe ao ligar
+   * (`until_requires_exempt` ao desligar), e desligar limpa a coluna. Ligar
+   * quem já está isento com OUTRO `until` muda só a data (`billing_exempt.updated`
+   * no extrato, `untilChanged: true`); sem `until` (indefinido) não muda nada.
+   * Passada a data, o agendador desliga pelo caminho de cima
+   * (`endExpiredBillingExempt`, com `source: 'scheduler'` e `expiredBy`).
+   *
    * ## Uma linha no extrato, e idempotente
    *
    * `billing_exempt.enabled`/`disabled`, sem referência externa (nulos não
    * colidem no índice único). Pedir o estado em que já está não grava nada e
-   * responde `alreadyInState: true`.
+   * responde `alreadyInState: true`. A gravação é condicional ao estado lido
+   * (`Subscription.changeBillingExemptIf`): duas chamadas que desligam a mesma
+   * isenção ao mesmo tempo gravam uma linha só, e a segunda responde
+   * `alreadyInState: true`.
    *
    * @returns {Promise<{ subscription: object, canceledCharges: number,
    *   alreadyInState: boolean, failedCharges: number[], reopenedCharge: boolean,
    *   statusBefore: string, statusAfter: string }>}
    */
   static async setBillingExempt({
-    tenantId, exempt, reason = null, actorUserId = null, now = new Date()
+    tenantId, exempt, reason = null, until = undefined, actorUserId = null,
+    source = 'console', expiredBy = null, now = new Date()
   }) {
     const ligar = Boolean(exempt);
     const motivo = reason === null || reason === undefined ? null : (String(reason).trim().slice(0, 255) || null);
+    // `undefined` é "não mexer na data"; `null` é "sem data de fim".
+    let ate;
+    if (until === null) ate = null;
+    else if (until !== undefined) {
+      const lida = asDate(until);
+      if (!lida) throw new BillingExemptError(400, 'invalid_until', 'until must be an ISO date-time');
+      ate = aoSegundo(lida);
+      if (!ligar) throw new BillingExemptError(400, 'until_requires_exempt', 'until only applies when exempt is true');
+      if (ate.getTime() <= now.getTime()) {
+        throw new BillingExemptError(400, 'invalid_until', 'until must be in the future');
+      }
+    }
     return runInTenant(tenantId, async () => {
       const before = await Subscription.forTenant(tenantId);
       if (!before) throw new BillingExemptError(404, 'subscription_not_found', 'Subscription not found');
       const jaIsento = Boolean(before.billing_exempt_at);
+      const ateAntes = asDate(before.billing_exempt_until);
       const semMudanca = {
         subscription: before,
         canceledCharges: 0,
         failedCharges: [],
         reopenedCharge: false,
         alreadyInState: true,
+        untilChanged: false,
         statusBefore: before.status,
         statusAfter: before.status
       };
+      // O fim automático só desliga a isenção cuja data já passou — a que o
+      // console estendeu ou tornou sem fim no meio do caminho fica.
+      if (expiredBy && (!jaIsento || !ateAntes || ateAntes.getTime() > expiredBy.getTime())) return semMudanca;
+
+      if (ligar && jaIsento) {
+        // Já isento: só a data de fim pode mudar.
+        if (ate === undefined) return semMudanca;
+        if ((ate?.getTime() ?? null) === (ateAntes ? aoSegundo(ateAntes).getTime() : null)) return semMudanca;
+        const subscription = await getDb().transaction(async (trx) => {
+          const mudou = await Subscription.changeBillingExemptIf(
+            tenantId, { wasExempt: true }, { billing_exempt_until: ate }, trx
+          );
+          if (!mudou) return null;
+          await BillingEvent.record({
+            subscriptionId: before.id,
+            type: BILLING_EVENT_TYPES.BILLING_EXEMPT_UPDATED,
+            createdBy: actorUserId,
+            detail: { untilFrom: isoOf(ateAntes), untilTo: isoOf(ate) }
+          }, trx);
+          return Subscription.forTenant(tenantId, trx);
+        });
+        if (!subscription) return { ...semMudanca, subscription: await Subscription.forTenant(tenantId) };
+        cache.invalidate();
+        return {
+          ...semMudanca,
+          subscription,
+          alreadyInState: false,
+          untilChanged: true,
+          untilBefore: isoOf(ateAntes)
+        };
+      }
       if (ligar === jaIsento) return semMudanca;
       if (ligar && !ESTADOS_ISENTAVEIS.has(before.status)) {
         throw new BillingExemptError(409, 'not_billable', `A ${before.status} subscription cannot be exempted from billing`);
@@ -1094,14 +1324,19 @@ class SubscriptionService {
       const { default: ChargeIssuingService } = await import('./chargeIssuingService.js');
       const patch = {};
       const detalhe = { reason: motivo, statusBefore: before.status };
+      if (source !== 'console') detalhe.source = source;
       if (ligar) {
         patch.billing_exempt_at = aoSegundo(now);
         patch.billing_exempt_reason = motivo;
+        patch.billing_exempt_until = ate ?? null;
+        if (ate) detalhe.until = ate.toISOString();
         if (before.status === 'past_due' || before.status === 'suspended') patch.status = 'active';
       } else {
         patch.billing_exempt_at = null;
         patch.billing_exempt_reason = null;
+        patch.billing_exempt_until = null;
         detalhe.exemptSince = isoOf(before.billing_exempt_at);
+        if (ateAntes) detalhe.exemptUntil = isoOf(ateAntes);
         // O prazo vivo, pela mesma coluna que a cortesia (`setDeadlines`) usa.
         const coluna = before.status === 'trial' ? 'trial_ends_at' : 'renews_at';
         const prazo = asDate(before[coluna]);
@@ -1134,15 +1369,20 @@ class SubscriptionService {
       if (patch.status) detalhe.statusAfter = patch.status;
 
       const subscription = await getDb().transaction(async (trx) => {
-        const depois = await Subscription.upsertForTenant(tenantId, patch, trx);
+        // Condicional ao que se leu: quem perde a corrida não grava nada.
+        const mudou = await Subscription.changeBillingExemptIf(
+          tenantId, { wasExempt: jaIsento, expiredBy }, patch, trx
+        );
+        if (!mudou) return null;
         await BillingEvent.record({
           subscriptionId: before.id,
           type: ligar ? BILLING_EVENT_TYPES.BILLING_EXEMPT_ENABLED : BILLING_EVENT_TYPES.BILLING_EXEMPT_DISABLED,
           createdBy: actorUserId,
           detail: detalhe
         }, trx);
-        return depois;
+        return Subscription.forTenant(tenantId, trx);
       });
+      if (!subscription) return { ...semMudanca, subscription: await Subscription.forTenant(tenantId) };
       cache.invalidate();
 
       let cancelamento = { canceled: 0, failed: [] };
@@ -1179,10 +1419,85 @@ class SubscriptionService {
         failedCharges: cancelamento.failed,
         reopenedCharge: reaberta,
         alreadyInState: false,
+        untilChanged: false,
         statusBefore: before.status,
         statusAfter: subscription?.status ?? before.status
       };
     });
+  }
+
+  /**
+   * O fim automático da isenção com data de fim: passado o
+   * `billing_exempt_until`, desliga pelo MESMO caminho do console
+   * (`setBillingExempt({ exempt: false })`) — o prazo que ganha `LEAD_DAYS`
+   * se já venceu, o `past_due` que volta a `active`, a cobrança do período
+   * que a isenção cancelou e volta à emissão. Chamado pelo agendador, por
+   * provedor, antes da emissão (`schedulerService.runJobs`): assim a mesma
+   * volta já emite a fatura que a isenção segurava.
+   *
+   * Sem ator: o extrato leva `source: 'scheduler'` e o motivo
+   * `BILLING_EXEMPT_EXPIRED_REASON`; as duas trilhas (a da plataforma e a do
+   * provedor, `actorKind: 'system'`) também. Idempotente e seguro com duas
+   * voltas sobrepostas: a gravação é condicional à isenção ainda ligada e à
+   * data ainda vencida (`Subscription.changeBillingExemptIf`), e só quem
+   * desligou grava as trilhas.
+   *
+   * @returns {Promise<{ ended: boolean, reason?: string, until?: string|null,
+   *   reopenedCharge?: boolean, renewsAt?: string|null }>}
+   */
+  static async endExpiredBillingExempt({ tenant = null, tenantId = null, now = new Date() } = {}) {
+    const id = tenantId ?? tenant?.id ?? currentTenantId();
+    if (!id) return { ended: false, reason: 'no_tenant' };
+    const sub = await Subscription.forTenant(id);
+    if (!sub?.billing_exempt_at) return { ended: false, reason: 'not_exempt' };
+    const ate = asDate(sub.billing_exempt_until);
+    if (!ate) return { ended: false, reason: 'no_end_date' };
+    if (ate.getTime() > now.getTime()) return { ended: false, reason: 'not_yet', until: ate.toISOString() };
+
+    const resultado = await this.setBillingExempt({
+      tenantId: id,
+      exempt: false,
+      reason: BILLING_EXEMPT_EXPIRED_REASON,
+      actorUserId: null,
+      source: 'scheduler',
+      expiredBy: now,
+      now
+    });
+    // Outra volta (ou o console) desligou primeiro: ela gravou as trilhas.
+    if (resultado.alreadyInState) return { ended: false, reason: 'already_ended' };
+
+    const detail = {
+      exempt: false,
+      source: 'scheduler',
+      reason: BILLING_EXEMPT_EXPIRED_REASON,
+      exemptUntil: ate.toISOString(),
+      statusBefore: resultado.statusBefore,
+      statusAfter: resultado.statusAfter,
+      canceledCharges: 0,
+      ...(resultado.reopenedCharge ? { reopenedCharge: true } : {}),
+      renewsAt: isoOf(resultado.subscription?.renews_at)
+    };
+    // A linha do provedor dá à trilha da plataforma o nome e o slug; o
+    // agendador já a tem na mão (`forEachTenant`).
+    const linha = tenant?.slug ? tenant : ((await getDb()('tenants').where({ id }).first()) ?? { id });
+    await PlatformAudit.record({
+      action: PlatformAudit.ACTIONS.SUBSCRIPTION_BILLING_EXEMPT_CHANGED,
+      tenant: linha,
+      detail
+    });
+    await runInTenant(id, () => AuditLog.record({
+      action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+      actorKind: 'system',
+      subjectType: 'subscription',
+      subjectId: id,
+      detail: { ...detail, platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_BILLING_EXEMPT_CHANGED }
+    }));
+    return {
+      ended: true,
+      until: ate.toISOString(),
+      reopenedCharge: resultado.reopenedCharge,
+      renewsAt: isoOf(resultado.subscription?.renews_at)
+    };
   }
 
   /**
@@ -1288,6 +1603,10 @@ class SubscriptionService {
     const plano = planoAgendado && !descidaBloqueada ? planoAgendado : planoAtual;
     const dias = periodDays ?? periodoDoPlano(plano);
 
+    // O cupom (0093): o preço que a fatura deste período pediu já tem o
+    // desconto, e é contra ele que se confere quando não há cobrança.
+    const cupom = before.coupon_id ? await Coupon.findById(before.coupon_id) : null;
+
     // A conferência do valor, que é o que separa "recebi dinheiro" de "esta
     // conta está paga".
     //
@@ -1307,7 +1626,9 @@ class SubscriptionService {
     // `renews_at` — e `past_due` deixa ler e para de deixar escrever, que é
     // onde alguém que pagou a menos deve ficar: visível, avisado e recuperável,
     // não trancado do lado de fora.
-    const pedido = await valorPedido({ externalId, plano, currency });
+    const pedido = await valorPedido({
+      externalId, plano, currency, precoDoPlano: this.priceFor(before, plano, cupom)
+    });
     const faltou = pedido.cents !== null && amount < pedido.cents;
     const underpaid = faltou && !allowUnderpayment;
     if (pedido.motivo === 'currency_mismatch') {
@@ -1339,16 +1660,29 @@ class SubscriptionService {
     //     vai para a renovação SEGUINTE — tenta de novo lá, pela mesma regra.
     let destinoDaDescida = null;
     if (reactivates && planoAgendado) {
-      const precoAtual = Number(planoAtual?.price_cents ?? 0);
+      // Qual plano a cobrança paga cobrou: o gravado nela (0093), ou, sem
+      // ele, pelo valor (`paidScheduledPlan`) — com o cupom, que pode ter
+      // levado os dois planos ao mesmo preço, a comparação de valores sozinha
+      // adiaria a descida para sempre.
+      //
       // A cobrança com valor mudado à mão pelo console (o desconto) não diz
-      // nada sobre QUAL plano foi pago: menos que o preço do atual ali é
-      // abatimento, não o preço do barato. Aí vale o plano que a cobrança
-      // teria pedido sem o desconto — o agendado, se a descida cabe no uso;
-      // o atual, se não cabe —, que é a mesma resposta de quando não há
-      // cobrança nenhuma.
-      const pagoBarato = pedido.cents !== null && !pedido.overridden
-        ? pedido.cents < precoAtual
-        : plano === planoAgendado;
+      // nada sobre QUAL plano foi pago pelo VALOR: menos que o preço do atual
+      // ali é abatimento, não o preço do barato. Aí vale o plano gravado nela,
+      // ou o que a cobrança teria pedido sem o desconto — o agendado, se a
+      // descida cabe no uso; o atual, se não cabe —, que é a mesma resposta de
+      // quando não há cobrança nenhuma (o valor esperado ali É o do `plano`).
+      const pelaCobranca = pedido.fonte === 'charge' || pedido.fonte === 'superseded_charge';
+      const veredito = pelaCobranca
+        ? this.paidScheduledPlan({
+          planId: pedido.planId ?? null,
+          cents: pedido.overridden ? null : pedido.cents,
+          subscription: before,
+          current: planoAtual,
+          scheduled: planoAgendado,
+          coupon: cupom
+        })
+        : null;
+      const pagoBarato = veredito ?? (plano === planoAgendado);
       destinoDaDescida = pagoBarato ? 'lock' : 'postpone';
     }
     const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();
@@ -1374,8 +1708,33 @@ class SubscriptionService {
     const statusAfter = patch.status ?? before.status;
     const renewsAt = patch.renews_at ?? before.renews_at ?? null;
 
+    // O ciclo do cupom que ESTE pagamento gasta: só quando ele estende o
+    // período (é a fatura com desconto sendo paga), só nos cupons que contam
+    // ciclo, e só se o cupom vale no plano do período pago — a fatura de um
+    // plano fora da lista saiu sem desconto, e não gastou nada.
+    //
+    // E só se a fatura paga CARREGAVA o desconto: a cobrança com valor mudado
+    // à mão pelo console não é a do cupom; a emitida com o cupom gravado nela
+    // (0093) diz por si; sem essa marca, o valor pedido tem de ser o preço
+    // com o cupom — a fatura velha de preço cheio, paga depois de o console
+    // aplicar o cupom a um suspenso, não gasta o ciclo que não descontou.
+    let faturaComCupom = false;
+    if (cupom && !pedido.overridden) {
+      if (pedido.fonte === 'charge' && pedido.planId !== null && pedido.planId !== undefined) {
+        faturaComCupom = Number(pedido.couponId) === Number(cupom.id);
+      } else {
+        faturaComCupom = this.couponApplies(before, plano, cupom)
+          && (pedido.cents === null || pedido.cents === this.priceFor(before, plano, cupom));
+      }
+    }
+    const gastaCupom = reactivates && cupom && cupom.duration !== 'forever' && faturaComCupom;
+
     try {
       const subscription = await getDb().transaction(async (trx) => {
+        // Dentro da transação do evento: a reentrega do mesmo pagamento morre
+        // no índice único do evento logo abaixo, e o ciclo gasto aqui volta
+        // junto no rollback — o cupom é consumido uma vez por pagamento.
+        const consumo = gastaCupom ? await Subscription.consumeCouponCycle(tenantId, cupom.id, trx) : null;
         await BillingEvent.record({
           subscriptionId: before.id,
           type: BILLING_EVENT_TYPES.PAYMENT_RECORDED,
@@ -1407,7 +1766,10 @@ class SubscriptionService {
             expectedCents: pedido.cents,
             ...(pedido.motivo ? { amountCheck: pedido.motivo } : {}),
             ...(underpaid ? { underpaid: true, shortfallCents: pedido.cents - amount } : {}),
-            ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {})
+            ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {}),
+            // O ciclo do cupom que este pagamento gastou, para o estorno o
+            // devolver (`reversePayment`) — e, se o zerou, o cupom inteiro.
+            ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {})
           }
         }, trx);
         // Na mesma transação do pagamento: um período novo que começasse no
@@ -1590,6 +1952,11 @@ class SubscriptionService {
 
     try {
       const subscription = await getDb().transaction(async (trx) => {
+        // O ciclo do cupom que o pagamento gastou volta com o dinheiro — na
+        // mesma transação da marca do estorno, então o segundo estorno do
+        // mesmo pagamento (o webhook depois do console) não devolve outro.
+        const gastou = quemEstendeu?.coupon?.id ? quemEstendeu.coupon : null;
+        const devolucao = gastou ? await Subscription.restoreCouponCycle(tenantId, gastou, trx) : null;
         await BillingEvent.record({
           subscriptionId: before.id,
           type: BILLING_EVENT_TYPES.PAYMENT_REFUNDED,
@@ -1610,7 +1977,8 @@ class SubscriptionService {
               ? Math.round(((prazo.getTime() - patch.renews_at.getTime()) / DAY_MS) * 1000) / 1000
               : 0,
             basis,
-            ...(patch.pending_plan_locked_at === null ? { pendingUnlocked: true } : {})
+            ...(patch.pending_plan_locked_at === null ? { pendingUnlocked: true } : {}),
+            ...(devolucao ? { couponRestored: { id: Number(gastou.id), code: gastou.code ?? null, ...devolucao } } : {})
           }
         }, trx);
         return Object.keys(patch).length

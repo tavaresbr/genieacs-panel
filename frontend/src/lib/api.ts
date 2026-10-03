@@ -1340,6 +1340,18 @@ export interface AsaasIntegration {
   /** O endereço que se cola na Asaas. Montado pelo backend a partir do deploy. */
   webhookUrl: string
   updatedAt: string | null
+  /**
+   * A NFS-e pela Asaas: ligada, o pagamento confirmado de uma cobrança põe a
+   * nota na fila. Opcionais porque servidores antigos não mandam os campos.
+   */
+  nfseEnabled?: boolean
+  serviceDescription?: string | null
+  municipalServiceId?: string | null
+  municipalServiceCode?: string | null
+  municipalServiceName?: string | null
+  issPercent?: number
+  retainIss?: boolean
+  observations?: string | null
 }
 
 /**
@@ -1350,6 +1362,33 @@ export interface AsaasIntegrationUpdate {
   environment?: 'sandbox' | 'production'
   apiKey?: string
   webhookToken?: string
+  nfseEnabled?: boolean
+  serviceDescription?: string
+  municipalServiceId?: string
+  municipalServiceCode?: string
+  municipalServiceName?: string
+  issPercent?: number
+  retainIss?: boolean
+  observations?: string
+}
+
+/** O estado da NFS-e de uma cobrança. */
+export type InvoiceStatus = 'pending' | 'scheduled' | 'authorized' | 'error' | 'canceling' | 'canceled'
+
+/** A NFS-e como o provedor a vê: número e links só quando emitida. */
+export interface TenantInvoiceView {
+  status: InvoiceStatus
+  number: string | null
+  pdfUrl: string | null
+  xmlUrl: string | null
+  issuedAt: string | null
+}
+
+/** A NFS-e como o console a vê: com o último erro e as tentativas. */
+export interface InvoiceConsoleView extends TenantInvoiceView {
+  id: number
+  error: string | null
+  attempts: number
 }
 
 export interface AsaasConnectionTest {
@@ -1562,6 +1601,10 @@ export interface SubscriptionView {
   billingExempt?: boolean
   billingExemptSince?: string | null
   billingExemptReason?: string | null
+  /** Até quando a isenção vale (ISO), ou nulo: até alguém desligar. */
+  billingExemptUntil?: string | null
+  /** O cupom de desconto na assinatura. Opcional: servidores antigos não mandam. */
+  coupon?: SubscriptionCoupon | null
 }
 
 /**
@@ -1632,6 +1675,8 @@ export interface TenantChargeView {
   dueDate: string | null
   invoiceUrl: string | null
   createdAt: string | null
+  /** A nota fiscal desta cobrança. Opcional: servidores antigos não mandam. */
+  invoice?: TenantInvoiceView | null
 }
 
 /**
@@ -1654,6 +1699,8 @@ export interface ChargeConsoleView {
   createdAt: string | null
   updatedAt: string | null
   superseded: { gatewayChargeId: string; amountCents: number }[]
+  /** A NFS-e desta cobrança. Opcional: servidores antigos não mandam. */
+  invoice?: InvoiceConsoleView | null
 }
 
 /** A assinatura resumida de uma linha da aba Assinaturas do console. */
@@ -1676,6 +1723,52 @@ export interface SubscriptionConsoleSubscription {
   billingExempt?: boolean
   billingExemptSince?: string | null
   billingExemptReason?: string | null
+  /** Até quando a isenção vale (ISO), ou nulo: até alguém desligar. */
+  billingExemptUntil?: string | null
+  /** O cupom de desconto. Opcional: servidores antigos não mandam. */
+  coupon?: SubscriptionCoupon | null
+}
+
+export type CouponKind = 'percent' | 'fixed'
+export type CouponDuration = 'once' | 'repeating' | 'forever'
+
+/**
+ * O cupom de desconto aplicado a uma assinatura. `priceCents` é o que a
+ * próxima fatura do plano atual pede, já com o desconto e o piso;
+ * `appliesToPlan` falso é o cupom restrito a outros planos (fica, sem
+ * desconto). `cyclesLeft` nulo é o `forever`.
+ */
+export interface SubscriptionCoupon {
+  id: number
+  code: string
+  kind: CouponKind
+  /** Percentual (1–99) ou centavos. */
+  value: number
+  duration: CouponDuration
+  durationCycles: number | null
+  cyclesLeft: number | null
+  planIds: number[] | null
+  appliesToPlan: boolean
+  priceCents: number
+  appliedAt: string | null
+}
+
+/** Um cupom do catálogo, como a aba Cupons do console o lê. */
+export interface CouponView {
+  id: number
+  code: string
+  kind: CouponKind
+  value: number
+  duration: CouponDuration
+  durationCycles: number | null
+  maxRedemptions: number | null
+  redemptions: number
+  validUntil: string | null
+  planIds: number[] | null
+  active: boolean
+  createdAt: string | null
+  /** Quantas assinaturas têm o cupom aplicado agora. */
+  inUse: number
 }
 
 /** Uma linha da aba Assinaturas: o provedor, a assinatura, o gateway e o boleto em aberto. */
@@ -1706,6 +1799,22 @@ export interface BillingEventView {
   externalId: string | null
   detail: Record<string, unknown> | null
   at: string
+  /** No pagamento: a cobrança que ele quitou e a NFS-e dela. Opcionais. */
+  chargeId?: number | null
+  invoice?: InvoiceConsoleView | null
+}
+
+/**
+ * Um lembrete de cobrança que a plataforma mandou ao provedor (0092): a etapa
+ * da régua, o prazo a que ela se refere (data ISO) e por onde saiu.
+ */
+export type SubscriptionReminderStep = 'before' | 'due' | 'after'
+
+export interface SubscriptionReminderView {
+  dueAt: string
+  step: SubscriptionReminderStep
+  channels: string[]
+  sentAt: string
 }
 
 /** The codes a 402 carries. Stable: the block screen picks its wording by them. */
@@ -1957,7 +2066,13 @@ export const platformAPI = {
     apiClient.requestWithBody<{ lead: Lead }>('PATCH', `/platform/leads/${id}`, payload),
 
   getSubscription: (tenantId: number) =>
-    apiClient.get<{ subscription: SubscriptionView | null; planId: number | null; events: BillingEventView[] }>(
+    apiClient.get<{
+      subscription: SubscriptionView | null
+      planId: number | null
+      events: BillingEventView[]
+      /** Os lembretes de cobrança já mandados, do mais recente para trás. */
+      reminders?: SubscriptionReminderView[]
+    }>(
       `/platform/tenants/${tenantId}/subscription`
     ),
 
@@ -1991,7 +2106,7 @@ export const platformAPI = {
    * `subscription` é o MESMO corpo de `getSubscription` — a tela troca o que
    * mostra sem perguntar de novo.
    */
-  setBillingExempt: (tenantId: number, payload: { exempt: boolean; reason?: string }) =>
+  setBillingExempt: (tenantId: number, payload: { exempt: boolean; reason?: string; until?: string | null }) =>
     apiClient.requestWithBody<{
       subscription: {
         tenant: { id: number; slug: string; name: string }
@@ -2002,6 +2117,7 @@ export const platformAPI = {
       canceledCharges: number
       failedCharges: number
       alreadyInState: boolean
+      untilChanged?: boolean
     }>(
       'PUT', `/platform/tenants/${tenantId}/subscription/billing-exempt`, payload
     ),
@@ -2067,6 +2183,16 @@ export const platformAPI = {
   reissueCharge: (tenantId: number, chargeId: number) =>
     apiClient.post<{ charge: ChargeConsoleView }>(
       `/platform/tenants/${tenantId}/charges/${chargeId}/reissue`, {}
+    ),
+
+  /**
+   * Põe na fila a NFS-e de uma cobrança paga — ou outra no lugar da que deu
+   * erro ou foi cancelada. 202; 409 `not_paid`, `no_gateway_payment`,
+   * `nfse_disabled`, `invoice_exists`, `busy`; 404 `not_found`.
+   */
+  issueChargeInvoice: (tenantId: number, chargeId: number) =>
+    apiClient.post<{ charge: ChargeConsoleView; invoice: InvoiceConsoleView }>(
+      `/platform/tenants/${tenantId}/charges/${chargeId}/invoice`, {}
     ),
 
   getUsage: (tenantId: number) =>
@@ -2165,7 +2291,45 @@ export const platformAPI = {
     apiClient.post<{ admin: PlatformAdminView }>('/platform/admins', payload),
 
   removeAdmin: (userId: number) =>
-    apiClient.delete<{ userId: number }>(`/platform/admins/${userId}`)
+    apiClient.delete<{ userId: number }>(`/platform/admins/${userId}`),
+
+  // ── Os cupons de desconto ───────────────────────────────────────────
+  listCoupons: () =>
+    apiClient.get<{ coupons: CouponView[] }>('/platform/coupons'),
+
+  /** Recusa o de 100% (`coupon_full_discount`) e o código repetido (409 `coupon_code_taken`). */
+  createCoupon: (payload: {
+    code: string; kind: CouponKind; value: number; duration: CouponDuration; durationCycles?: number | null
+    maxRedemptions?: number | null; validUntil?: string | null; planIds?: number[] | null; active?: boolean
+  }) =>
+    apiClient.post<{ coupon: CouponView }>('/platform/coupons', payload),
+
+  /** Só as portas do resgate mudam; código, desconto e duração são fixos. */
+  updateCoupon: (id: number, payload: Partial<{ active: boolean; validUntil: string | null; maxRedemptions: number | null }>) =>
+    apiClient.requestWithBody<{ coupon: CouponView }>('PATCH', `/platform/coupons/${id}`, payload),
+
+  /** Apaga o nunca resgatado; o resgatado é desativado (`deactivated: true`). */
+  deleteCoupon: (id: number) =>
+    apiClient.delete<{ deleted: boolean; deactivated: boolean; coupon: CouponView | null }>(`/platform/coupons/${id}`),
+
+  /**
+   * Aplica (`code`, substituindo o que houver) ou tira (`null`) o cupom de um
+   * provedor. 409 `coupon_invalid`, `coupon_expired`, `coupon_exhausted`,
+   * `coupon_plan_mismatch`, `coupon_already_applied`; 502 `gateway_failed`
+   * (o console reaplica mesmo a quem já resgatou o cupom — sem contar outro resgate)
+   * quando a fatura em aberto não pôde ser cancelada (nada muda).
+   */
+  setSubscriptionCoupon: (tenantId: number, code: string | null) =>
+    apiClient.requestWithBody<{
+      subscription: {
+        tenant: { id: number; slug: string; name: string }
+        subscription: SubscriptionView | null
+        planId: number | null
+        events: BillingEventView[]
+      }
+      charge: 'none' | 'reissued'
+      changed: boolean
+    }>('PUT', `/platform/tenants/${tenantId}/subscription/coupon`, { code })
 }
 
 /** The provider's own plan, state and usage — the "plan and usage" screen, and what the block screen reads. */
@@ -2205,7 +2369,17 @@ export const subscriptionAPI = {
    * olha `response.ok`, não o número, então os dois chegam iguais aqui.
    */
   payNow: () =>
-    apiClient.post<{ charge: TenantChargeView }>('/tenant/charges/pay', {})
+    apiClient.post<{ charge: TenantChargeView }>('/tenant/charges/pay', {}),
+
+  /**
+   * "Tenho um cupom": aplica o código à assinatura e devolve a mesma tela de
+   * `current()`, com `subscription.coupon`. 409 na recusa: `coupon_invalid`
+   * (inexistente, inativo, vencido, esgotado ou de outro plano — a rota do
+   * provedor não diz qual), `coupon_already_applied` e `coupon_already_used`
+   * (este provedor já resgatou o cupom).
+   */
+  applyCoupon: (code: string) =>
+    apiClient.post<SubscriptionUsage>('/tenant/subscription/coupon', { code })
 }
 
 export const usersAPI = {
@@ -5126,4 +5300,56 @@ export const publicAPI = {
     name: string; company?: string; email?: string; phone?: string; city?: string
     devicesEstimate?: number | null; message?: string; planCode?: string | null; website?: string
   }) => apiClient.post<{ ok: boolean }>('/public/leads', payload),
+}
+
+/** Um mês do relatório de receita: o que entrou e o que voltou nele. */
+export interface RevenueMonth {
+  /** `YYYY-MM`, em UTC. */
+  month: string
+  receivedCents: number
+  refundedCents: number
+  /** Cobranças pagas no mês. */
+  count: number
+}
+
+/** Uma linha "por plano" do relatório: as ativas pagantes e o recebido no período. */
+export interface RevenuePlanRow {
+  planId: number | null
+  name: string | null
+  activeCount: number
+  mrrCents: number
+  receivedCents: number
+}
+
+/**
+ * O relatório de receita do console (`GET /platform/reports/revenue`).
+ * Recebido e estornado são do período; MRR e em aberto são de agora.
+ */
+export interface RevenueReport {
+  from: string
+  to: string
+  mrrCents: number
+  activeCount: number
+  receivedCents: number
+  refundedCents: number
+  openCents: number
+  overdueCents: number
+  overdueTenants: number
+  monthly: RevenueMonth[]
+  byPlan: RevenuePlanRow[]
+  discountCents: number
+  /** O desconto é estimado contra o preço de hoje dos planos (o da época não é gravado). */
+  discountApproximate?: boolean
+}
+
+/** Os relatórios do console: a receita, e a planilha das cobranças do período. */
+export const platformReportsAPI = {
+  revenue: (range: { from: string; to: string }) =>
+    apiClient.get<RevenueReport>(
+      `/platform/reports/revenue?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+    ),
+  revenueCsv: (range: { from: string; to: string }) =>
+    apiClient.getBlob(
+      `/platform/reports/revenue.csv?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+    ),
 }

@@ -141,7 +141,16 @@ export const SCOPED_TABLES = new Set([
   // motivo das duas acima, e com uma consequência a mais: ela carrega o link de
   // pagamento, que é endereço para o dinheiro de UM provedor. Uma listagem sem
   // filtro entregaria a um ISP o boleto do vizinho.
-  'billing_charges'
+  'billing_charges',
+  // A nota fiscal de cada cobrança paga: o número e o PDF de um provedor só.
+  'billing_invoices',
+  // Os lembretes de cobrança mandados ao provedor (0092). Do provedor, como a
+  // cobrança de que falam.
+  'subscription_reminder_sends',
+  // Os cupons que ESTE provedor já resgatou (0093) — a memória que impede o
+  // mesmo cupom de valer duas vezes para ele. O cupom é do catálogo (`coupons`,
+  // compartilhada); o resgate é do provedor, e some junto com ele.
+  'coupon_redemptions'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -198,7 +207,10 @@ export const SHARED_TABLES = new Set([
   'plans',
   // Os pedidos de demonstração da página pública. Da plataforma: quem pede
   // ainda não é provedor, e só o console os lê.
-  'leads'
+  'leads',
+  // Os cupons de desconto. Do catálogo comercial, como `plans`: o provedor
+  // resgata um cupom da plataforma, e só o console escreve nesta tabela.
+  'coupons'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

@@ -57,6 +57,107 @@ const API_KEY_MAX = 1024;
 const WEBHOOK_TOKEN_MAX = 255;
 
 /**
+ * A NFS-e: o que vai em cada nota que a Asaas emite por um pagamento
+ * confirmado. Nada aqui é segredo — é o cadastro fiscal do serviço que a
+ * plataforma vende —, então mora no blob em claro, ao lado do ambiente.
+ *
+ * Os tetos são os da tela, folgados para o que as prefeituras pedem: a
+ * descrição do serviço é texto livre que sai impresso na nota, e o código
+ * municipal é curto (`01.07`, `1.07`, `010701`…).
+ */
+export const NFSE_FIELDS = Object.freeze([
+  'nfseEnabled', 'serviceDescription', 'municipalServiceId', 'municipalServiceCode',
+  'municipalServiceName', 'issPercent', 'retainIss', 'observations'
+]);
+const NFSE_TEXT_LIMITS = Object.freeze({
+  serviceDescription: 1000,
+  municipalServiceId: 64,
+  municipalServiceCode: 64,
+  municipalServiceName: 255,
+  observations: 1000
+});
+
+/** A configuração da nota quando nada foi gravado: desligada e vazia. */
+export const NFSE_DEFAULTS = Object.freeze({
+  nfseEnabled: false,
+  serviceDescription: null,
+  municipalServiceId: null,
+  municipalServiceCode: null,
+  municipalServiceName: null,
+  issPercent: 0,
+  retainIss: false,
+  observations: null
+});
+
+/** O bloco `nfse` guardado, completo e com os tipos certos — nunca lança. */
+function nfseGuardada(stored) {
+  const bruto = stored?.nfse && typeof stored.nfse === 'object' ? stored.nfse : {};
+  const texto = (valor, max) => (typeof valor === 'string' && valor.trim() ? valor.trim().slice(0, max) : null);
+  const iss = Number(bruto.issPercent);
+  return {
+    nfseEnabled: bruto.nfseEnabled === true,
+    serviceDescription: texto(bruto.serviceDescription, NFSE_TEXT_LIMITS.serviceDescription),
+    municipalServiceId: texto(bruto.municipalServiceId, NFSE_TEXT_LIMITS.municipalServiceId),
+    municipalServiceCode: texto(bruto.municipalServiceCode, NFSE_TEXT_LIMITS.municipalServiceCode),
+    municipalServiceName: texto(bruto.municipalServiceName, NFSE_TEXT_LIMITS.municipalServiceName),
+    issPercent: Number.isFinite(iss) && iss >= 0 && iss <= 100 ? iss : 0,
+    retainIss: bruto.retainIss === true,
+    observations: texto(bruto.observations, NFSE_TEXT_LIMITS.observations)
+  };
+}
+
+/**
+ * O que o patch muda na configuração da nota, validado — ou nada.
+ *
+ * Mesmo contrato dos segredos: campo ausente não é tocado; texto vazio ou nulo
+ * apaga. Ligar exige o mínimo que a Asaas exige para agendar uma nota — a
+ * descrição do serviço e o serviço municipal (pelo id OU pelo código) —, e a
+ * conferência é sobre o resultado da mescla: ligar numa gravação e preencher
+ * noutra não pode deixar a emissão ligada sem o que emitir.
+ */
+function nfseDoPatch(patch, anterior) {
+  const presentes = NFSE_FIELDS.filter((campo) => patch[campo] !== undefined);
+  if (!presentes.length) return undefined;
+  const proxima = { ...anterior };
+  for (const campo of presentes) {
+    const valor = patch[campo];
+    if (campo === 'nfseEnabled' || campo === 'retainIss') {
+      if (typeof valor !== 'boolean') {
+        throw new AsaasSettingsError(`${campo} must be a boolean`, { code: 'invalid_nfse' });
+      }
+      proxima[campo] = valor;
+    } else if (campo === 'issPercent') {
+      const numero = valor === null || valor === '' ? 0 : Number(valor);
+      if (!Number.isFinite(numero) || numero < 0 || numero > 100) {
+        throw new AsaasSettingsError('issPercent must be a number between 0 and 100', { code: 'invalid_nfse' });
+      }
+      // Duas casas: é o que a prefeitura imprime, e o que a Asaas aceita.
+      proxima.issPercent = Math.round(numero * 100) / 100;
+    } else {
+      if (valor !== null && typeof valor !== 'string') {
+        throw new AsaasSettingsError(`${campo} must be a string`, { code: 'invalid_nfse' });
+      }
+      const aparado = valor === null ? '' : valor.trim();
+      if (aparado.length > NFSE_TEXT_LIMITS[campo]) {
+        throw new AsaasSettingsError(`${campo} is too long`, { code: 'invalid_nfse' });
+      }
+      proxima[campo] = aparado || null;
+    }
+  }
+  if (proxima.nfseEnabled) {
+    if (!proxima.serviceDescription) {
+      throw new AsaasSettingsError('serviceDescription is required to issue invoices', { code: 'invalid_nfse' });
+    }
+    if (!proxima.municipalServiceId && !proxima.municipalServiceCode) {
+      throw new AsaasSettingsError(
+        'municipalServiceId or municipalServiceCode is required to issue invoices', { code: 'invalid_nfse' }
+      );
+    }
+  }
+  return proxima;
+}
+
+/**
  * Quanto tempo o blob lido fica em memória.
  *
  * Curto de propósito: o job de emissão pergunta por isto a cada provedor, a
@@ -162,6 +263,7 @@ async function resolver() {
     apiKeySource,
     webhookToken,
     webhookTokenSource,
+    nfse: nfseGuardada(stored),
     updatedAt: stored?.updatedAt ?? null
   };
 }
@@ -175,8 +277,14 @@ export async function readPublic() {
     apiKeySource: efetivo.apiKeySource,
     webhookTokenConfigured: Boolean(efetivo.webhookToken),
     webhookTokenSource: efetivo.webhookTokenSource,
+    ...efetivo.nfse,
     updatedAt: efetivo.updatedAt
   };
+}
+
+/** A configuração da NFS-e que vale agora — ver `NFSE_FIELDS`. */
+export async function effectiveNfseConfig() {
+  return (await resolver()).nfse;
 }
 
 /** A chave com que o painel CHAMA o gateway, ou nulo. */
@@ -255,13 +363,19 @@ export async function save(patch = {}) {
   }
 
   const anterior = stored ?? {};
+  const nfseAnterior = nfseGuardada(anterior);
+  const nfse = nfseDoPatch(patch, nfseAnterior);
   const proximo = {
     v: 1,
     environment: ENVIRONMENTS.includes(anterior.environment) ? anterior.environment : null,
     apiKey: anterior.apiKey ?? null,
     webhookToken: anterior.webhookToken ?? null,
+    // O bloco da nota só é gravado quando existe: um blob de antes dela
+    // continua sem ele, e a leitura devolve os padrões.
+    ...(anterior.nfse ? { nfse: nfseAnterior } : {}),
     updatedAt: anterior.updatedAt ?? null
   };
+  if (nfse !== undefined) proximo.nfse = nfse;
   if (environment !== undefined) proximo.environment = environment;
   if (apiKey !== undefined) proximo.apiKey = apiKey ? selar(apiKey) : null;
   if (webhookToken !== undefined) proximo.webhookToken = webhookToken ? selar(webhookToken) : null;
@@ -275,7 +389,8 @@ export async function save(patch = {}) {
     changed: {
       environment: environment !== undefined && environment !== anterior.environment,
       apiKey: apiKey !== undefined,
-      webhookToken: webhookToken !== undefined
+      webhookToken: webhookToken !== undefined,
+      nfse: nfse !== undefined && JSON.stringify(nfse) !== JSON.stringify(nfseAnterior)
     }
   };
 }
@@ -297,6 +412,7 @@ export default {
   effectiveWebhookToken,
   effectiveEnvironment,
   effectiveBaseUrl,
+  effectiveNfseConfig,
   save,
   generateWebhookToken,
   invalidateAsaasSettings

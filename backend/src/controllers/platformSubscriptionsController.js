@@ -1,7 +1,10 @@
 import Tenant from '../models/Tenant.js';
 import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
+import Coupon from '../models/Coupon.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
+import BillingInvoice from '../models/BillingInvoice.js';
+import BillingInvoiceService, { InvoiceRequestError } from '../services/billing/billingInvoiceService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import BillingEvent from '../models/BillingEvent.js';
 import SubscriptionService from '../services/subscriptionService.js';
@@ -101,6 +104,13 @@ function responderRecusa(res, error) {
     // API encaminha campo nomeado num erro, não o `data` inteiro.
     ...error.extra
   });
+}
+
+/** Uma cobrança como o console a vê, com a NFS-e dela — lida no escopo do dono. */
+async function chargeView(tenantId, row) {
+  if (!row) return null;
+  const nota = await runInTenant(tenantId, () => BillingInvoice.forCharge(row.id));
+  return BillingCharge.presentForConsole(row, nota);
 }
 
 /** A recusa de `ChargeIssuingService.followDeadline`, no mesmo formato das outras. */
@@ -242,6 +252,13 @@ async function fecharPeloRegistro(evento, { cobranca, externalId, allowUnderpaym
     }
   }
   await BillingCharge.update(cobranca.id, { status: 'paid', last_error: null, issuing_until: null });
+  // A NFS-e, como na baixa comum: a cobrança paga agora — inclusive a que
+  // fechou aceitando um pagamento a menos — tem nota, do valor que de fato
+  // entrou (ver `billingInvoiceService`). Idempotente: a reentrega que já
+  // tinha enfileirado não abre outra.
+  if (cobranca.gateway_charge_id) {
+    await BillingInvoiceService.enqueueForCharge({ ...cobranca, status: 'paid' });
+  }
   return {
     cobranca,
     externalId,
@@ -314,6 +331,9 @@ class PlatformSubscriptionsController {
         (await Subscription.listWithPlans()).map((row) => [Number(row.tenant_id), row])
       );
       const planos = new Map((await Plan.list()).map((plan) => [Number(plan.id), plan]));
+      // Os cupons (0093), numa leitura só: a linha mostra o selo e o preço com
+      // desconto (`effectivePriceCents`, na versão que recebe o cupom pronto).
+      const cupons = new Map((await Coupon.list()).map((cupom) => [Number(cupom.id), cupom]));
       const ids = new Set(tenants.map((tenant) => Number(tenant.id)));
 
       // A mais recente em aberto de cada um (a lista vem por `period_end`
@@ -350,6 +370,9 @@ class PlatformSubscriptionsController {
             trialEndsAt: sub.trial_ends_at ?? null,
             renewsAt: sub.renews_at ?? null,
             pendingPlan: SubscriptionService.presentPendingPlan(sub, pendente),
+            coupon: SubscriptionService.presentCoupon(
+              sub, planos.get(Number(sub.plan_id)) ?? null, sub.coupon_id ? cupons.get(Number(sub.coupon_id)) ?? null : null
+            ),
             ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra
@@ -407,9 +430,12 @@ class PlatformSubscriptionsController {
       // Vinte e quatro: dois anos de um plano mensal, que é o horizonte em que
       // alguém ainda pergunta "esse mês foi pago?". Mais que isso é histórico,
       // e o histórico mora no extrato.
-      const linhas = await runInTenant(tenant.id, () => BillingCharge.listRecent({ limit: 24 }));
+      const { linhas, notas } = await runInTenant(tenant.id, async () => {
+        const lidas = await BillingCharge.listRecent({ limit: 24 });
+        return { linhas: lidas, notas: await BillingInvoice.forCharges(lidas.map((row) => row.id)) };
+      });
       return res.json(createResponse('Charges retrieved', {
-        charges: linhas.map((row) => BillingCharge.presentForConsole(row))
+        charges: linhas.map((row) => BillingCharge.presentForConsole(row, notas.get(Number(row.id)) || null))
       }));
     } catch (error) {
       console.error('List charges error:', error);
@@ -631,6 +657,12 @@ class PlatformSubscriptionsController {
               });
             }
             await BillingCharge.update(cobranca.id, { status: 'paid', last_error: null, issuing_until: null });
+            // A NFS-e na fila — só a da cobrança que passou pelo gateway (a
+            // baixa sem id lá não tem pagamento da Asaas a que a nota aponte).
+            // Sem falar com a Asaas aqui, e sem poder derrubar a baixa.
+            if (cobranca.gateway_charge_id) {
+              await BillingInvoiceService.enqueueForCharge({ ...cobranca, status: 'paid' });
+            }
             return {
               cobranca,
               externalId,
@@ -670,7 +702,7 @@ class PlatformSubscriptionsController {
         }
       });
       return res.json(createResponse('Charge settled', {
-        charge: BillingCharge.presentForConsole(resultado.charge),
+        charge: await chargeView(tenant.id, resultado.charge),
         subscription: SubscriptionService.present(resultado.state, { withExemptReason: true }),
         duplicate: resultado.duplicate,
         acceptedUnderpayment: resultado.acceptedUnderpayment
@@ -1002,8 +1034,11 @@ class PlatformSubscriptionsController {
             }
 
             await BillingCharge.update(cobranca.id, { status: 'refunded', issuing_until: null });
+            // A NFS-e do dinheiro que voltou, cancelada. Nunca lança: a falha
+            // fica no log e na linha da nota, e o estorno segue.
+            const nota = await BillingInvoiceService.cancelForCharge(cobranca.id);
             return {
-              cobranca, estorno, atGateway, charge: await BillingCharge.findById(cobranca.id)
+              cobranca, estorno, atGateway, invoiceCancel: nota, charge: await BillingCharge.findById(cobranca.id)
             };
           } finally {
             await BillingCharge.release(cobranca.id);
@@ -1033,11 +1068,14 @@ class PlatformSubscriptionsController {
           atGateway: resultado.atGateway,
           reference: estorno.reference ?? null,
           alreadyRefunded,
-          reason
+          reason,
+          ...(resultado.invoiceCancel?.reason !== 'no_invoice'
+            ? { invoiceCanceled: Boolean(resultado.invoiceCancel?.canceled) }
+            : {})
         }
       });
       return res.json(createResponse('Charge refunded', {
-        charge: BillingCharge.presentForConsole(resultado.charge),
+        charge: await chargeView(tenant.id, resultado.charge),
         subscription: await subscriptionView(tenant),
         renewsAtBefore: estorno.renewsAtBefore,
         renewsAtAfter: estorno.renewsAtAfter,
@@ -1134,6 +1172,57 @@ class PlatformSubscriptionsController {
     } catch (error) {
       console.error('Reissue charge error:', error);
       return res.status(500).json(createErrorResponse('Failed to reissue the charge', error.message));
+    }
+  }
+
+  /**
+   * `POST /api/platform/tenants/:id/charges/:chargeId/invoice` — emitir a
+   * NFS-e de uma cobrança paga, ou emitir de novo a que deu erro ou foi
+   * cancelada.
+   *
+   * Só põe na fila (202): quem fala com a Asaas é o agendador, na próxima
+   * passada, com a mesma garra e as mesmas tentativas da emissão automática.
+   * Uma segunda porta que chamasse a Asaas daqui seria a que pede a segunda
+   * nota do mesmo pagamento numa corrida com ele.
+   *
+   * 409: `not_paid`, `no_gateway_payment` (baixa sem gateway), `nfse_disabled`,
+   * `invoice_exists` (com `invoiceStatus`) e `busy`. 404 `not_found`.
+   */
+  static async issueInvoice(req, res) {
+    try {
+      const chargeId = parseId(req.params?.chargeId);
+      if (!chargeId) return res.status(400).json(createErrorResponse('Invalid charge id'));
+      const tenant = await tenantOr404(req, res);
+      if (!tenant) return undefined;
+
+      let resultado;
+      try {
+        resultado = await runInTenant(tenant.id, async () => {
+          const cobranca = await BillingCharge.findById(chargeId);
+          const pedido = await BillingInvoiceService.requestForCharge(cobranca);
+          return { cobranca, ...pedido };
+        });
+      } catch (error) {
+        if (error instanceof InvoiceRequestError) return responderRecusa(res, error);
+        throw error;
+      }
+
+      await recordBoth(req, tenant, {
+        platformAction: PlatformAudit.ACTIONS.CHARGE_INVOICE_REQUESTED,
+        detail: {
+          chargeId: resultado.cobranca.id,
+          periodEnd: resultado.cobranca.period_end,
+          amountCents: Number(resultado.cobranca.amount_cents),
+          invoiceStatusBefore: resultado.statusBefore
+        }
+      });
+      return res.status(202).json(createResponse('Invoice queued', {
+        charge: BillingCharge.presentForConsole(resultado.cobranca, resultado.invoice),
+        invoice: BillingInvoice.presentForConsole(resultado.invoice)
+      }));
+    } catch (error) {
+      console.error('Issue invoice error:', error);
+      return res.status(500).json(createErrorResponse('Failed to queue the invoice', error.message));
     }
   }
 }
