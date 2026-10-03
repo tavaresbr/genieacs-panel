@@ -2133,6 +2133,44 @@ const INITIAL_TABLES = [
 ];
 
 /**
+ * Os lembretes de cobrança que a plataforma mandou ao provedor — ver
+ * `subscriptionNoticeService.js` (migração 0092).
+ *
+ * Substitui a marca única `subscriptions.expiry_warned_for`: a régua tem três
+ * etapas por prazo (`before`, `due`, `after`), e uma coluna só lembra de uma.
+ * Esta tabela é o histórico que o console mostra E a trava: o índice único
+ * `(tenant_id, due_at, step)` é o que faz "uma vez por etapa por prazo" valer
+ * com duas passadas ao mesmo tempo — a segunda esbarra no índice e não manda.
+ *
+ * `due_at` é a DATA do prazo (ISO, no fuso da cobrança), e não o instante,
+ * pela mesma razão de `billing_charges.period_end`: a chave entra num índice
+ * único, e um timestamp não sobrevive igual aos três bancos (o MySQL trunca
+ * para segundos). Um prazo mexido em algumas horas continua sendo o mesmo dia,
+ * e não reabre etapa já mandada.
+ *
+ * `sent_at` nulo é a linha tomada por uma passada que ainda está mandando;
+ * `claimed_until` é até quando — vencido, outra passada a retoma, para um
+ * processo que morreu no meio não deixar a etapa presa para sempre.
+ */
+const subscriptionReminderSendsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('due_at', 10).notNullable();
+  t.string('step', 8).notNullable(); // before | due | after
+  // Por onde saiu, separado por vírgula: `email`, `whatsapp` ou os dois.
+  t.string('channels', 32);
+  t.timestamp('sent_at');
+  t.timestamp('claimed_until');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'due_at', 'step'], 'subscription_reminder_sends_step_uq');
+};
+
+const SUBSCRIPTION_REMINDER_TABLES = [
+  ['subscription_reminder_sends', subscriptionReminderSendsTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -2163,7 +2201,8 @@ export const SCHEMA_TABLES = [
   ...DUNNING_TABLES,
   ...SATISFACTION_TABLES,
   ...WA_AGENT_TABLES,
-  ...WA_META_TEMPLATE_TABLES
+  ...WA_META_TEMPLATE_TABLES,
+  ...SUBSCRIPTION_REMINDER_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5074,6 +5113,21 @@ export const migrations = [
         for (const add of missing) add(t);
         t.index(['tenant_id', 'assigned_user_id', 'closed_at'], 'wa_conversations_assigned_idx');
       });
+    }
+  },
+  {
+    /** A régua de lembretes de cobrança — ver `subscriptionReminderSendsTable`. */
+    id: '0092_subscription_reminder_sends',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('subscription_reminder_sends');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of SUBSCRIPTION_REMINDER_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

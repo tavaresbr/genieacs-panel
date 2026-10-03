@@ -333,44 +333,37 @@ class SubscriptionService {
   }
 
   /**
-   * O prazo que está para vencer e ainda não foi avisado, ou nulo.
+   * A etapa da régua de lembretes em que o provedor está agora, ou nulo.
    *
-   * Um provedor tem no máximo um prazo vivo: `trial_ends_at` enquanto está em
-   * teste, `renews_at` depois que pagou. `suspended` e `canceled` não têm prazo
-   * nenhum — já estão parados, e avisar quem já foi bloqueado é ruído.
+   * Substitui o aviso único de antes (`expiry_warned_for`): três etapas por
+   * prazo, relativas a ele — `renews_at`, ou `trial_ends_at` no teste:
    *
-   * A janela vale também depois de vencer: quem passou do prazo sem ver o aviso
-   * precisa receber um, e é justamente o caso em que o painel já está recusando
-   * escrita. A marca `expiry_warned_for` guarda o prazo avisado, então um
-   * segundo aviso só sai quando o prazo MUDA — e um pagamento que empurra
-   * `renews_at` recomeça o ciclo sozinho.
+   *   before  de `REMINDER_BEFORE_DAYS` dias antes até o prazo;
+   *   due     do prazo até `REMINDER_AFTER_DAYS` dias depois;
+   *   after   de lá até `REMINDER_AFTER_UNTIL_DAYS` dias depois do prazo, e
+   *           só enquanto ninguém pagou (`past_due`).
    *
-   * **A janela acompanha o período**, desde que o período passou a ser do plano
-   * (migração 0046). Sete dias é a medida certa de um plano mensal e é pouco
-   * para um anual: a fatura é doze vezes maior, passa por aprovação de alguém
-   * que não é quem opera o painel, e uma semana não é tempo de conseguir isso.
-   * Um doze avos do período, com piso de uma semana e teto de um mês — trinta
-   * dias vira sete, trezentos e sessenta e cinco vira trinta, e nada entre os
-   * dois surpreende. O teto existe porque avisar com dois meses de antecedência
-   * não é aviso, é ruído que se esquece antes de vencer.
+   * É só a etapa da janela de AGORA: uma etapa que passou sem sair (o
+   * agendador parado, o SMTP fora) não sai atrasada. Mandar "vence em cinco
+   * dias" para quem já venceu seria pior que não mandar nada. Se já foi
+   * mandada, quem responde é `subscription_reminder_sends`, não esta função.
+   *
+   * Sem lembrete para quem não tem o que pagar: isento de cobrança, plano de
+   * graça (ou sem plano), e `suspended`/`canceled`, que são decisões de gente —
+   * e a gente que as tomou já falou com o cliente. Depois de pago o prazo
+   * muda (`renews_at` anda), e a régua recomeça sozinha no prazo novo.
    */
-  static WARN_WINDOW_DAYS = 7;
+  static REMINDER_BEFORE_DAYS = 5;
 
-  static WARN_WINDOW_MAX_DAYS = 30;
+  static REMINDER_AFTER_DAYS = 3;
 
-  /** Quantos dias antes do prazo o aviso sai, neste plano. */
-  static warnWindowDays(plano) {
-    const periodo = periodoDoPlano(plano);
-    return Math.min(
-      this.WARN_WINDOW_MAX_DAYS,
-      Math.max(this.WARN_WINDOW_DAYS, Math.ceil(periodo / 12))
-    );
-  }
+  static REMINDER_AFTER_UNTIL_DAYS = 10;
 
-  static pendingExpiryNotice(subscription, now = new Date(), plano = null) {
+  static pendingReminder(subscription, now = new Date(), plano = null) {
     if (!subscription) return null;
-    // Isento de cobrança: não há prazo a avisar nem fatura a pagar.
+    // Isento de cobrança: não há prazo a lembrar nem fatura a pagar.
     if (subscription.billing_exempt_at) return null;
+    if (!(Number(plano?.price_cents ?? 0) > 0)) return null;
     const stored = STATUSES.includes(subscription.status) ? subscription.status : 'suspended';
     if (stored !== 'trial' && stored !== 'active' && stored !== 'past_due') return null;
 
@@ -381,24 +374,31 @@ class SubscriptionService {
       : asDate(subscription.renews_at) ?? asDate(subscription.trial_ends_at);
     if (!prazo) return null;
 
-    // Sem plano em mãos, a janela é a do piso: quem chama sem passá-lo recebe o
-    // comportamento de antes, que é o certo para o teste — `trial_days` já é do
-    // plano e o prazo de teste não escala com o período pago.
-    const dias = stored === 'trial' ? this.WARN_WINDOW_DAYS : this.warnWindowDays(plano);
-    const janela = now.getTime() + dias * DAY_MS;
-    if (prazo.getTime() > janela) return null;
-
-    const avisado = asDate(subscription.expiry_warned_for);
-    if (avisado && avisado.getTime() === prazo.getTime()) return null;
+    const desde = now.getTime() - prazo.getTime();
+    let step = null;
+    if (desde >= -this.REMINDER_BEFORE_DAYS * DAY_MS && desde < 0) step = 'before';
+    else if (desde >= 0 && desde < this.REMINDER_AFTER_DAYS * DAY_MS) step = 'due';
+    else if (desde >= this.REMINDER_AFTER_DAYS * DAY_MS && desde < this.REMINDER_AFTER_UNTIL_DAYS * DAY_MS) {
+      // "Ainda não pagou": o estado que vale, e não o gravado.
+      if (this.effectiveStatus(subscription, now).status === 'past_due') step = 'after';
+    }
+    if (!step) return null;
 
     return {
       kind: stored === 'trial' ? 'trial' : 'renewal',
+      step,
       deadline: prazo,
-      expired: prazo.getTime() <= now.getTime()
+      expired: desde >= 0
     };
   }
 
-  /** Anota que o aviso daquele prazo saiu. Idempotente por construção. */
+  /**
+   * Anota que o aviso daquele prazo saiu. Idempotente por construção.
+   *
+   * A régua de lembretes (0092) não a lê — a memória dela é
+   * `subscription_reminder_sends` —, mas continua a gravá-la, para quem ler a
+   * coluna saber qual foi o último prazo avisado.
+   */
   static async markExpiryWarned(deadline) {
     const tenantId = currentTenantId();
     await Subscription.upsertForTenant(tenantId, { expiry_warned_for: asDate(deadline) });

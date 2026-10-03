@@ -1,6 +1,7 @@
 import Plan, { PLAN_LIMIT_COLUMNS, parsePlanFeatures } from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import BillingEvent from '../models/BillingEvent.js';
+import SubscriptionReminderSend from '../models/SubscriptionReminderSend.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import AuditLog from '../models/AuditLog.js';
@@ -193,6 +194,9 @@ async function recordBoth(req, tenant, { platformAction, detail, tenantDetail = 
 async function subscriptionView(tenant) {
   const state = await runInTenant(tenant.id, () => SubscriptionService.current());
   const events = await runInTenant(tenant.id, () => BillingEvent.listRecent({ limit: 50 }));
+  // Os lembretes de cobrança que já saíram (0092), só para ler: o console
+  // responde "ele foi avisado?" sem abrir o log do SMTP.
+  const reminders = await runInTenant(tenant.id, () => SubscriptionReminderSend.listSent({ limit: 30 }));
   return {
     tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
     subscription: SubscriptionService.present(state, { withExemptReason: true }),
@@ -206,7 +210,8 @@ async function subscriptionView(tenant) {
       externalId: event.external_id,
       detail: event.detail ? JSON.parse(event.detail) : null,
       at: event.created_at
-    }))
+    })),
+    reminders
   };
 }
 

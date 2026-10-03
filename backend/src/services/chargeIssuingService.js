@@ -21,8 +21,8 @@ import SubscriptionService from './subscriptionService.js';
  * não paga no mesmo dia em que recebe. Emitir no vencimento é emitir atrasado:
  * o provedor é bloqueado enquanto o dinheiro está a caminho. `LEAD_DAYS` é essa
  * folga, e é um parâmetro comercial próprio — deliberadamente NÃO é
- * `warnWindowDays`, que responde outra pergunta (quanto antes uma PESSOA
- * precisa ser avisada) e muda por outros motivos.
+ * `SubscriptionService.REMINDER_BEFORE_DAYS`, que responde outra pergunta
+ * (quanto antes uma PESSOA precisa ser lembrada) e muda por outros motivos.
  *
  * ## A memória, e por que ela é uma linha e não uma marca
  *
