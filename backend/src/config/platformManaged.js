@@ -2,6 +2,7 @@ import { IS_SAAS } from './edition.js';
 import { currentTenantId } from './tenantContext.js';
 import { getDb } from './database.js';
 import GenieAcsConnection from '../models/GenieAcsConnection.js';
+import { normalizedAcsOrigin, sameAcsAsAny } from '../services/genieacs/acsIdentity.js';
 
 /**
  * A fronteira entre o que a plataforma configura e o que o provedor configura.
@@ -72,14 +73,6 @@ export async function platformManagesGenieAcsCurrentTenant() {
   return (await GenieAcsConnection.ownership()) !== 'own';
 }
 
-function origemDe(url) {
-  try {
-    return url ? new URL(String(url).trim()).origin : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Se a origem de `url` já é o ACS de outro provedor (ou o da plataforma).
  *
@@ -87,15 +80,18 @@ function origemDe(url) {
  * endereço de um vizinho, o painel passaria a tratar os dois como um ACS
  * compartilhado, e o vizinho sem tag de equipamentos deixaria de ver a frota
  * dele. Dividir um ACS é decisão da plataforma, pelo console.
+ *
+ * "O mesmo ACS" é o de `sameAcsAsAny`: o IP no lugar do nome, maiúsculas, o
+ * ponto final, a porta padrão por extenso ou outro nome DNS para o mesmo
+ * servidor não escapam da recusa.
  */
 export async function genieAcsOriginTakenByAnotherTenant(url) {
-  const origem = origemDe(url);
-  if (!origem) return false;
+  if (!normalizedAcsOrigin(url)) return false;
   // tenant-scope-exempt: comparar com o ACS dos outros provedores é o trabalho
   // desta leitura; nada dela volta para quem pergunta além do sim/não.
   const rows = await getDb()('settings')
     .where({ key: 'genieAcsUrl' })
     .whereNot('tenant_id', currentTenantId())
     .select('value');
-  return rows.some((row) => origemDe(row.value) === origem);
+  return sameAcsAsAny(url, rows.map((row) => row.value));
 }

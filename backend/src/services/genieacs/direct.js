@@ -6,6 +6,7 @@ import { TranslatableError } from '../../i18n/index.js';
 import GenieAcsEgress from '../genieacsEgress.js';
 import GenieAcsAuthService from '../genieacsAuthService.js';
 import { withAcsSlot } from './concurrency.js';
+import { sameAcsAsAny } from './acsIdentity.js';
 
 /**
  * O modo `direct`: o painel fala HTTP com a NBI do provedor.
@@ -74,14 +75,6 @@ const COMPARTILHADO_TTL_MS = 30_000;
 /** Esquece o que se sabe sobre ACS compartilhado — o console chama ao mudar endereço ou tag. */
 export function forgetSharedAcs() {
   compartilhado.clear();
-}
-
-function origemDe(url) {
-  try {
-    return url ? new URL(String(url).trim()).origin : null;
-  } catch {
-    return null;
-  }
 }
 
 const naoEncontrado = () => new TranslatableError('device.notFound', null, { status: 404, code: 'device_not_found' });
@@ -260,12 +253,18 @@ class DirectConnector {
     return (await this.sharesAcs()) ? UNASSIGNED_SCOPE_TAG : null;
   }
 
-  /** Outro provedor (não a plataforma) aponta para a mesma origem de GenieACS que este? */
+  /**
+   * Outro provedor (não a plataforma) aponta para o mesmo GenieACS que este?
+   *
+   * "O mesmo" é o de `sameAcsAsAny`: origem normalizada igual ou os mesmos
+   * `ip:porta` — o IP no lugar do nome, ou um segundo nome DNS, não fazem do
+   * ACS de todos um ACS só deste.
+   */
   static async sharesAcs() {
     const id = currentTenantId();
     const guardado = compartilhado.get(id);
     if (guardado && guardado.expiresAt > Date.now()) return guardado.value;
-    const minha = origemDe(await this.baseUrl());
+    const minha = await this.baseUrl();
     let value = false;
     if (minha) {
       // tenant-scope-exempt: a pergunta é justamente se OUTRO provedor usa o
@@ -283,7 +282,7 @@ class DirectConnector {
           .where('tenant_genieacs_connections.mode', 'agent')
           .select('tenant_genieacs_connections.tenant_id'))
         .select('value');
-      value = rows.some((row) => origemDe(row.value) === minha);
+      value = await sameAcsAsAny(minha, rows.map((row) => row.value));
     }
     compartilhado.set(id, { value, expiresAt: Date.now() + COMPARTILHADO_TTL_MS });
     return value;
