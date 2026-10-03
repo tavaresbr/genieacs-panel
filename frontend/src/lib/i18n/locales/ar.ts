@@ -2716,6 +2716,8 @@ const ar: Dictionary = {
   'whatsapp.botReport.hourlyHint': 'يُظهر الساعات التي ينقص فيها الموظفون. المنطقة الزمنية: {timezone}.',
   'whatsapp.botReport.requestsCount': '{count} طلبات',
   'whatsapp.alerts.title': 'التنبيهات الفنية',
+  'whatsapp.alerts.viewResults': "الانقطاعات الجماعية",
+  'whatsapp.alerts.viewConfig': "الإعدادات",
   'whatsapp.alerts.description': 'ما تراقبه اللوحة، ومن تُنبّهه. تصل هذه التنبيهات إلى الفريق، ولا تُرسل إلى المشتركين أبدًا.',
   'whatsapp.alerts.enable': 'مراقبة الشبكة',
   'whatsapp.alerts.interval': 'الفحص كل (بالثواني)',

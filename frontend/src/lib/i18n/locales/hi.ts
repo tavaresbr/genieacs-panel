@@ -2716,6 +2716,8 @@ const hi: Dictionary = {
   'whatsapp.botReport.hourlyHint': 'दिखाता है कि किन घंटों में लोग कम हैं। समय क्षेत्र: {timezone}।',
   'whatsapp.botReport.requestsCount': '{count} अनुरोध',
   'whatsapp.alerts.title': 'तकनीकी चेतावनियाँ',
+  'whatsapp.alerts.viewResults': "सामूहिक आउटेज",
+  'whatsapp.alerts.viewConfig': "सेटिंग्स",
   'whatsapp.alerts.description': 'पैनल किस पर नज़र रखता है और किसे जगाता है। ये टीम को जाती हैं, ग्राहक को कभी नहीं।',
   'whatsapp.alerts.enable': 'नेटवर्क पर नज़र रखें',
   'whatsapp.alerts.interval': 'हर कितने समय पर जाँचें (सेकंड)',

@@ -2740,6 +2740,8 @@ const ko: Dictionary = {
   'whatsapp.botReport.hourlyHint': '인력이 부족한 시간대를 보여 줍니다. 시간대: {timezone}.',
   'whatsapp.botReport.requestsCount': '요청 {count}건',
   'whatsapp.alerts.title': '기술 알림',
+  'whatsapp.alerts.viewResults': "대규모 장애",
+  'whatsapp.alerts.viewConfig': "설정",
   'whatsapp.alerts.description': '패널이 감시하는 항목과 알림을 받을 담당자입니다. 알림은 팀에만 전달되며 가입자에게는 발송되지 않습니다.',
   'whatsapp.alerts.enable': '전체 장비 감시',
   'whatsapp.alerts.interval': '검사 주기 (초)',

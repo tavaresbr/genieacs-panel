@@ -2741,6 +2741,8 @@ const it: Dictionary = {
   'whatsapp.botReport.hourlyHint': 'Mostra le ore in cui manca personale. Fuso orario: {timezone}.',
   'whatsapp.botReport.requestsCount': '{count} richieste',
   'whatsapp.alerts.title': 'Avvisi tecnici',
+  'whatsapp.alerts.viewResults': "Guasti di massa",
+  'whatsapp.alerts.viewConfig': "Configurazione",
   'whatsapp.alerts.description': 'Ciò che il pannello sorveglia e chi sveglia. Questi vanno al team, mai a un abbonato.',
   'whatsapp.alerts.enable': 'Sorvegliare la rete',
   'whatsapp.alerts.interval': 'Scansione ogni (secondi)',

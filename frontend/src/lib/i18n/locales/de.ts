@@ -2618,6 +2618,8 @@ const de: Dictionary = {
   'whatsapp.botReport.hourlyHint': 'Zeigt die Stunden, in denen Personal fehlt. Zeitzone: {timezone}.',
   'whatsapp.botReport.requestsCount': '{count} Anfragen',
   'whatsapp.alerts.title': 'Technische Warnungen',
+  'whatsapp.alerts.viewResults': "Massenausfälle",
+  'whatsapp.alerts.viewConfig': "Einstellungen",
   'whatsapp.alerts.description': 'Was das Panel überwacht und wen es weckt. Das geht an das Team, nie an einen Teilnehmer.',
   'whatsapp.alerts.enable': 'Netz überwachen',
   'whatsapp.alerts.interval': 'Prüfen alle (Sekunden)',

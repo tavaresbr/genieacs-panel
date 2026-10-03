@@ -2735,6 +2735,8 @@ const ptBR: Dictionary = {
   'whatsapp.botReport.hourlyHint': 'Mostra os horários em que falta gente. Fuso: {timezone}.',
   'whatsapp.botReport.requestsCount': '{count} pedidos',
   'whatsapp.alerts.title': 'Alertas técnicos',
+  'whatsapp.alerts.viewResults': "Quedas em massa",
+  'whatsapp.alerts.viewConfig': "Configuração",
   'whatsapp.alerts.description': 'O que o painel vigia e quem ele acorda. Isto vai para a equipe, nunca para um assinante.',
   'whatsapp.alerts.enable': 'Vigiar a rede',
   'whatsapp.alerts.interval': 'Varrer a cada (segundos)',
