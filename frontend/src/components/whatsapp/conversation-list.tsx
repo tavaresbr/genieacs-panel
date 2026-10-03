@@ -1,5 +1,6 @@
 'use client'
 
+import { TagChip } from '@/components/whatsapp/tags'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation } from '@/lib/api'
@@ -152,6 +153,7 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                     {t('whatsapp.inbox.optedOut')}
                   </span>
                 )}
+                {(conversation.tags ?? []).map((tag) => <TagChip key={tag.id} tag={tag} />)}
                 {conversation.assignedTo ? (
                   <span className="modern-badge" title={t('whatsapp.assign.agent')}>
                     <Icon name="contacts" size={12} />

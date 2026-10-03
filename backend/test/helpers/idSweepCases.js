@@ -73,6 +73,31 @@ export const casos = [
     tabela: 'users'
   },
   {
+    chave: 'tag',
+    label: 'PATCH /api/whatsapp/tags/:id',
+    method: 'PATCH',
+    path: (id) => `/api/whatsapp/tags/${id}`,
+    body: { name: 'Renomeada' },
+    tabela: 'wa_tags'
+  },
+  {
+    chave: 'tag',
+    label: 'DELETE /api/whatsapp/tags/:id',
+    method: 'DELETE',
+    path: (id) => `/api/whatsapp/tags/${id}`,
+    tabela: 'wa_tags'
+  },
+  {
+    chave: 'conversation',
+    label: 'PUT /api/whatsapp/conversations/:id/tags',
+    method: 'PUT',
+    path: (id) => `/api/whatsapp/conversations/${id}/tags`,
+    body: { tagIds: [] },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
     chave: 'template',
     label: 'PUT /api/whatsapp/templates/:id',
     method: 'PUT',

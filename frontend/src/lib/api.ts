@@ -436,6 +436,13 @@ class ApiClient {
     })
   }
 
+  async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
   async delete<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'DELETE',
@@ -4389,8 +4396,23 @@ export interface WhatsAppConversation {
   assignedTo?: string | null
   /** Desde quando espera um atendente (a fila da distribuição); null fora dela. */
   waitingSince?: string | null
+  /** As etiquetas da conversa, em ordem de nome. */
+  tags?: WhatsAppTag[]
   createdAt: string | null
   updatedAt: string | null
+}
+
+/** Uma etiqueta de conversa; a cor é uma da paleta dos números (`WA_ACCOUNT_COLORS`). */
+export interface WhatsAppTag {
+  id: number
+  name: string
+  color: string
+}
+
+/** `GET /whatsapp/tags/report`: por etiqueta, marcadas no período e abertas agora. */
+export interface TagsReport {
+  days: 7 | 30 | 90
+  tags: Array<WhatsAppTag & { taggedInPeriod: number; openNow: number }>
 }
 
 /** Alguém da equipe que atende o WhatsApp: `GET /whatsapp/agents`. */
@@ -4976,6 +4998,8 @@ export const whatsappAPI = {
     status?: 'open' | 'noreply' | 'closed' | 'all'
     /** 'me': só as minhas; 'unassigned': sem atendente. */
     assignee?: 'me' | 'unassigned'
+    /** Só as conversas com esta etiqueta. */
+    tag?: number
   } = {}) => {
     const query = new URLSearchParams()
     if (params.limit) query.set('limit', String(params.limit))
@@ -4983,6 +5007,7 @@ export const whatsappAPI = {
     if (params.search) query.set('search', params.search)
     if (params.status) query.set('status', params.status)
     if (params.assignee) query.set('assignee', params.assignee)
+    if (params.tag) query.set('tag', String(params.tag))
     const suffix = query.toString()
     return apiClient.get<WhatsAppConversation[]>(`/whatsapp/conversations${suffix ? `?${suffix}` : ''}`)
   },
@@ -4996,6 +5021,25 @@ export const whatsappAPI = {
   /** Assumir (o próprio id), transferir para um colega, ou `null` para soltar. */
   assignConversation: (conversationId: number, userId: number | null) =>
     apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/assign`, { userId }),
+
+  listTags: () =>
+    apiClient.get<WhatsAppTag[]>('/whatsapp/tags'),
+
+  tagsReport: (days: 7 | 30 | 90) =>
+    apiClient.get<TagsReport>(`/whatsapp/tags/report?days=${days}`),
+
+  createTag: (tag: { name: string; color: string }) =>
+    apiClient.post<WhatsAppTag>('/whatsapp/tags', tag),
+
+  updateTag: (id: number, patch: { name?: string; color?: string }) =>
+    apiClient.patch<WhatsAppTag>(`/whatsapp/tags/${id}`, patch),
+
+  deleteTag: (id: number) =>
+    apiClient.delete<null>(`/whatsapp/tags/${id}`),
+
+  /** Troca o conjunto inteiro de etiquetas da conversa. */
+  setConversationTags: (conversationId: number, tagIds: number[]) =>
+    apiClient.put<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/tags`, { tagIds }),
 
   listAgents: () =>
     apiClient.get<WhatsAppAgent[]>('/whatsapp/agents'),

@@ -139,6 +139,9 @@ class CustomerErasureService {
       wa_satisfaction: conversaIds.length
         ? await contar('wa_satisfaction', (q) => q.whereIn('conversation_id', conversaIds))
         : 0,
+      wa_conversation_tags: conversaIds.length
+        ? await contar('wa_conversation_tags', (q) => q.whereIn('conversation_id', conversaIds))
+        : 0,
       wa_broadcast_recipients: (telefones.length || contratos.length)
         ? await contar('wa_broadcast_recipients', (q) => q.where((w) => {
           if (telefones.length) w.whereIn('phone_e164', telefones);
@@ -207,6 +210,7 @@ class CustomerErasureService {
       if (conversaIds.length) {
         await tdb('wa_bot_events', trx).whereIn('conversation_id', conversaIds).del();
         await tdb('wa_satisfaction', trx).whereIn('conversation_id', conversaIds).del();
+        await tdb('wa_conversation_tags', trx).whereIn('conversation_id', conversaIds).del();
         await tdb('wa_messages', trx).whereIn('conversation_id', conversaIds).del();
         await tdb('wa_conversations', trx).whereIn('id', conversaIds).del();
       }

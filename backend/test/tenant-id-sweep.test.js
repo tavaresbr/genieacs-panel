@@ -151,6 +151,8 @@ async function semear(tenantId, slug) {
 
     // O mesmo número nos dois: uma pessoa pode ser assinante dos dois
     // provedores e ter pedido silêncio a um só.
+    alvo.tag = await semearLinha('wa_tags', { name: `Etiqueta ${slug}`, color: 'blue' });
+
     alvo.optOut = await semearLinha('wa_opt_outs', {
       wa_phone_e164: '5511900000001', origin: 'customer', created_at: new Date()
     });

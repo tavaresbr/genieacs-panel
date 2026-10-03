@@ -81,6 +81,11 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   // above takes vars at all.
   attachment_too_large: 'whatsapp.error.attachmentTooLarge',
   attachment_type_not_allowed: 'whatsapp.error.attachmentTypeNotAllowed',
+  tag_name_taken: 'whatsapp.tags.nameTaken',
+  too_many_tags: 'whatsapp.tags.tooMany',
+  invalid_tag: 'whatsapp.tags.invalid',
+  invalid_tag_color: 'whatsapp.tags.invalid',
+  tag_not_found: 'whatsapp.tags.notFound',
   attachment_content_mismatch: 'whatsapp.error.attachmentContentMismatch',
   attachment_not_allowed: 'whatsapp.error.attachmentNotAllowed',
   attachment_empty: 'whatsapp.error.attachmentEmpty',

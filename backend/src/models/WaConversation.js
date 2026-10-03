@@ -100,9 +100,14 @@ class WaConversation {
    * query and hands the result down; matching it here would mean a join per row.
    */
   static async listRecent({
-    limit = 50, offset = 0, status = 'open', search = '', searchContracts = [], searchContactIds = [], assignee = null
+    limit = 50, offset = 0, status = 'open', search = '', searchContracts = [], searchContactIds = [], assignee = null, tagId = null
   } = {}) {
     const query = tdb('wa_conversations');
+
+    // Uma etiqueta: subconsulta no vínculo, também escopada, e não junção.
+    if (tagId) {
+      query.whereIn('id', tdb('wa_conversation_tags').where({ tag_id: tagId }).select('conversation_id'));
+    }
 
     // "Minhas" e "Sem atendente": um recorte por cima de qualquer pilha.
     if (assignee === 'unassigned') query.whereNull('assigned_user_id');
