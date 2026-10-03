@@ -24,6 +24,9 @@ import { OutageHistoryView } from '@/components/map/outage-history-view'
 import { PlaceClientDialog, type PlaceClientTarget } from '@/components/map/place-client-dialog'
 import { UnmappedDialog } from '@/components/map/unmapped-dialog'
 import { BulkPlaceDialog } from '@/components/map/bulk-place-dialog'
+import { BulkLinkDialog } from '@/components/map/bulk-link-dialog'
+import { FeasibilityDialog } from '@/components/map/feasibility-dialog'
+import { weakBoxes } from '@/lib/nearest-box'
 import { BOX_TYPES, NEARBY_METERS, boxOccupancy, capacityOf } from '@/lib/box-occupancy'
 import 'leaflet/dist/leaflet.css'
 import { MaintenanceForm } from '@/components/maintenance/maintenance-panel'
@@ -518,6 +521,9 @@ export default function NetworkMap() {
   const [mapView, setMapView] = useState<'map' | 'list' | 'boxes' | 'outages'>('map')
   const [unmappedOpen, setUnmappedOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [feasibilityOpen, setFeasibilityOpen] = useState(false)
+  const [weakExpanded, setWeakExpanded] = useState(false)
   const [placeTarget, setPlaceTarget] = useState<PlaceClientTarget | null>(null)
   // `?place=<pppoe>` vem do botão "Colocar no mapa" da tela do equipamento.
   const [searchParams, setSearchParams] = useSearchParams()
@@ -659,6 +665,8 @@ export default function NetworkMap() {
 
   const liveByNode = useMemo(() => new Map((live?.items ?? []).map((item) => [item.node_id, item])), [live])
   const outageByBox = useMemo(() => new Map((live?.outages ?? []).map((outage) => [outage.node_id, outage])), [live])
+  // Caixas com vários clientes de sinal fraco: costuma ser a caixa, não a casa.
+  const weak = useMemo(() => weakBoxes(nodes, edges, liveByNode), [edges, liveByNode, nodes])
   // A lista de logins é o que decide se vale perguntar ao ACS: mudar só a
   // posição de um ponto não pede releitura.
   const pppoeKey = useMemo(() => nodes.filter((node) => node.pppoe).map((node) => `${node.node_id}=${node.pppoe}`).sort().join('|'), [nodes])
@@ -985,6 +993,9 @@ export default function NetworkMap() {
             <button type="button" className="modern-button-secondary" onClick={() => setUnmappedOpen(true)} title={t('map.unmapped.hint')}>
               <Icon name="devices" size={17} />{t('map.unmapped.button')}
             </button>
+            <button type="button" className="modern-button-secondary" disabled={!nodes.length} onClick={() => setFeasibilityOpen(true)} title={t('map.feasibility.hint')}>
+              <Icon name="search" size={17} />{t('map.feasibility.button')}
+            </button>
             {canEditMap && <button type="button" className="modern-button-secondary" onClick={() => setImportOpen(true)}><Icon name="document" size={17} />{t('map.import.button')}</button>}
             <button type="button" className="modern-button-secondary" disabled={!nodes.length} onClick={exportKml} title={t('map.export.hint')}>
               <Icon name="external" size={17} />{t('map.export.button')}
@@ -1039,6 +1050,33 @@ export default function NetworkMap() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {weak.length > 0 && (
+          <div className="mb-3 rounded-[var(--radius)] border-2 p-3" style={{ borderColor: LIVE_COLORS.weak, background: `${LIVE_COLORS.weak}14` }}>
+            <button type="button" className="flex w-full items-center gap-2 text-start font-semibold" style={{ color: LIVE_COLORS.weak }}
+              aria-expanded={weak.length <= 3 || weakExpanded} onClick={() => setWeakExpanded((value) => !value)}>
+              <Icon name="signal" size={18} />{t('map.weak.title', { count: weak.length })}
+              {weak.length > 3 && <span className="ms-auto text-xs font-normal text-muted-foreground">{t(weakExpanded ? 'map.weak.collapse' : 'map.weak.expand')}</span>}
+            </button>
+            {(weak.length <= 3 || weakExpanded) && (
+              <ul className="mt-2 space-y-1">
+                {weak.map((entry) => (
+                  <li key={entry.box.node_id} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-semibold">{entry.box.name}</span>
+                    <span className="text-muted-foreground">
+                      {t('map.weak.line', { weak: entry.weak, measured: entry.measured })}
+                      {entry.averageRx !== null ? ` · ${t('map.weak.average', { rx: entry.averageRx.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}` : ''}
+                    </span>
+                    <button type="button" className="font-semibold text-primary hover:underline" onClick={() => focusBox(entry.box.node_id)}>
+                      {t('map.outage.show')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">{t('map.weak.hint')}</p>
           </div>
         )}
 
@@ -1162,6 +1200,8 @@ export default function NetworkMap() {
           </section>
           {mapView === 'boxes' && (
             <BoxOccupancyView nodes={nodes} edges={edges} outageIds={new Set(outageByBox.keys())} onSelect={(node) => setSelectedNode(node)}
+              weakIds={new Set(weak.map((entry) => entry.box.node_id))}
+              onBulkLink={canEditMap ? () => setLinkOpen(true) : undefined}
               fileName={kmlFileName(tenant?.slug || tenantName).replace(/^topologia-/, 'ocupacao-').replace(/\.kml$/, '.csv')} />
           )}
           {mapView === 'outages' && <OutageHistoryView onSelectBox={(nodeId) => focusBox(nodeId)} />}
@@ -1274,9 +1314,23 @@ export default function NetworkMap() {
               setBulkOpen(false)
               toast.success(t('map.bulk.done', { count: created }))
               hasCenteredAssetsRef.current = false
+              // Os pontos entram sem cabo: em seguida, a prévia de ligar cada um à caixa.
+              void loadData(false).then(() => { if (created > 0) setLinkOpen(true) })
+              void loadLive()
+            }} />
+        )}
+        {linkOpen && (
+          <BulkLinkDialog nodes={nodes} edges={edges} edgeIds={edges.map((edge) => edge.edge_id)} onClose={() => setLinkOpen(false)}
+            onDone={(created) => {
+              setLinkOpen(false)
+              toast.success(t('map.link.done', { count: created }))
               void loadData(false)
               void loadLive()
             }} />
+        )}
+        {feasibilityOpen && (
+          <FeasibilityDialog nodes={nodes} edges={edges} center={mapCenter} onClose={() => setFeasibilityOpen(false)}
+            onShowBox={(nodeId) => { setFeasibilityOpen(false); focusBox(nodeId) }} />
         )}
         {placeTarget && (
           <PlaceClientDialog target={placeTarget} nodes={nodes} edges={edges} edgeIds={edges.map((edge) => edge.edge_id)}
