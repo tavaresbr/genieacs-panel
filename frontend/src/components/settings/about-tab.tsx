@@ -42,6 +42,9 @@ export function AboutTab({ appName }: { appName: string }) {
   const { t, locale, formatDateTime } = useTranslation()
   const { user, can } = useAuth()
   const { tenant, providerName, isSaas } = useTenant()
+  // O da sessão: no host compartilhado o `TenantProvider` lê o PRIMEIRO
+  // provedor, e esta linha diria o identificador de outro.
+  const providerSlug = user?.tenant?.slug || tenant?.slug
   const [health, setHealth] = useState<Health | null>(null)
   const [healthError, setHealthError] = useState(false)
   const [checking, setChecking] = useState(false)
@@ -165,9 +168,9 @@ export function AboutTab({ appName }: { appName: string }) {
         <h2 className="section-heading">{t('settings.about.sessionTitle')}</h2>
         <dl className="mt-3 divide-y divide-border">
           {providerName && <Linha rotulo={t('settings.about.provider')}>{providerName}</Linha>}
-          {tenant?.slug && (
+          {providerSlug && (
             <Linha rotulo={t('settings.about.providerId')}>
-              <span className="font-mono">{tenant.slug}</span>
+              <span className="font-mono">{providerSlug}</span>
             </Linha>
           )}
           <Linha rotulo={t('settings.about.user')}>{user?.username ?? '—'}</Linha>

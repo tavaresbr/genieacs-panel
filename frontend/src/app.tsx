@@ -86,8 +86,12 @@ function onboardingDismissedLocally(slug: string | null | undefined): boolean {
 }
 
 function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const { tenant, isSaas } = useTenant()
+  // O espelho do "já vi" é do provedor da SESSÃO: no host compartilhado o
+  // `tenant` acima é o do primeiro provedor, e a chave dele faria o B herdar
+  // o "já vi" do A (ou o A gravar no lugar do B).
+  const sessionSlug = user?.tenant?.slug ?? null
   const location = useLocation()
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(isSaas ? null : false)
 
@@ -101,10 +105,11 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
     // O "já vi" mora no provedor (servidor); o navegador guarda só um espelho,
     // para não esperar a rede a cada página. '1' é o valor de antes, gravado
     // só aqui: sobe para o servidor uma vez e vira '2', já sincronizado.
-    const key = onboardingDismissKey(tenant.slug)
+    // Sem o slug da sessão não há espelho: a pergunta vai direto ao servidor.
+    const key = sessionSlug ? onboardingDismissKey(sessionSlug) : null
     let local: string | null = null
-    try { local = localStorage.getItem(key) } catch {}
-    if (local === '1') {
+    if (key) { try { local = localStorage.getItem(key) } catch {} }
+    if (key && local === '1') {
       void settingsAPI.dismissOnboarding('wizard').then((res) => {
         if (res.success) { try { localStorage.setItem(key, '2') } catch {} }
       }).catch(() => {})
@@ -118,7 +123,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       if (cancelled) return
       const url = res.success && res.data ? String((res.data as { genieAcsUrl?: string }).genieAcsUrl ?? '') : ''
       const dismissed = Boolean(onboarding?.success && onboarding.data?.wizardDone)
-      if (dismissed) { try { localStorage.setItem(key, '2') } catch {} }
+      if (dismissed && key) { try { localStorage.setItem(key, '2') } catch {} }
       // A decisão mora em `needsGenieAcsOnboarding`, testada sem DOM: uma regra
       // escrita dentro de um `useEffect` é uma regra que ninguém verifica.
       setNeedsOnboarding(res.success && needsGenieAcsOnboarding({
@@ -126,7 +131,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       }))
     })
     return () => { cancelled = true }
-  }, [isSaas, tenant, can])
+  }, [isSaas, tenant, sessionSlug, can])
 
   if (needsOnboarding === null) return <PageFallback />
   // A decisão acima é tomada uma vez por sessão; concluir ou pular o assistente

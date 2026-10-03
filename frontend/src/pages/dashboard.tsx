@@ -6,6 +6,7 @@ import { devicesAPI, sgpAPI, type SgpFleetOverview } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
 import { readDashboardSnapshot, writeDashboardSnapshot } from '@/lib/dashboard-snapshot'
+import { sessionOwner } from '@/lib/session-owner'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { useToast } from '@/components/ui/toast'
@@ -123,7 +124,7 @@ function pieData(
  */
 export default function DashboardPage() {
   const { user } = useAuth()
-  const owner = user ? `${user.tenant?.slug ?? '-'}:${user.id}` : null
+  const owner = sessionOwner(user)
   return <DashboardView key={owner ?? 'anon'} owner={owner} />
 }
 

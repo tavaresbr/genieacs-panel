@@ -540,7 +540,10 @@ export default function NetworkMap() {
   const [liveError, setLiveError] = useState<string | null>(null)
   const searchMarkerRef = useRef<any>(null)
   const { isDarkMode } = useTheme()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
+  // O slug da sessão, não o do `TenantProvider`: no host compartilhado aquele
+  // é o do primeiro provedor, e o arquivo sairia com o nome de outro.
+  const providerSlug = user?.tenant?.slug || tenant?.slug
   const { t, formatTime } = useTranslation()
   const toast = useToast()
   // A tela abre com `map.read`, que o `viewer` tem; desenhar e apagar é
@@ -853,7 +856,7 @@ export default function NetworkMap() {
     const url = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = kmlFileName(tenant?.slug || tenantName)
+    link.download = kmlFileName(providerSlug || tenantName)
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -1162,7 +1165,7 @@ export default function NetworkMap() {
           </section>
           {mapView === 'boxes' && (
             <BoxOccupancyView nodes={nodes} edges={edges} outageIds={new Set(outageByBox.keys())} onSelect={(node) => setSelectedNode(node)}
-              fileName={kmlFileName(tenant?.slug || tenantName).replace(/^topologia-/, 'ocupacao-').replace(/\.kml$/, '.csv')} />
+              fileName={kmlFileName(providerSlug || tenantName).replace(/^topologia-/, 'ocupacao-').replace(/\.kml$/, '.csv')} />
           )}
           {mapView === 'outages' && <OutageHistoryView onSelectBox={(nodeId) => focusBox(nodeId)} />}
           {loading && (

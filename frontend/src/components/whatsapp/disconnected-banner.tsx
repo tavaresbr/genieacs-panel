@@ -7,10 +7,11 @@ import { useTranslation } from '@/contexts/language-context'
 import { Icon } from '@/components/ui/icon'
 import { whatsappAPI } from '@/lib/api'
 import { downAccounts, downSignature, type DownAccount } from '@/lib/wa-down-accounts'
+import { WA_DOWN_DISMISSED_KEY } from '@/lib/session-owner'
 
 /** Um minuto, como o sino de saúde: a lista de números é uma consulta só. */
 const POLL_MS = 60_000
-const DISMISS_KEY = 'wa-down-dismissed'
+const DISMISS_KEY = WA_DOWN_DISMISSED_KEY
 
 function readDismissed(): string {
   try {
