@@ -33,6 +33,7 @@ import {
   FIRMWARE_FILE_TYPE,
   compatibleFirmware,
   currentFirmwareVersion,
+  filesOwnedBy,
   firmwareCatalog,
   isInstalledVersion
 } from './firmwareFiles.js';
@@ -44,6 +45,7 @@ import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { connectorFor } from './genieacs/connector.js';
+import { UNASSIGNED_SCOPE_TAG } from './genieacs/direct.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
@@ -2400,13 +2402,35 @@ class DeviceService {
     return { results: normalizados, file: arquivo };
   }
 
-  /** Todos os firmwares do GenieACS que dizem o modelo — a lista do lote. */
-  static async listFirmwareCatalog() {
+  /**
+   * Os arquivos de firmware do GenieACS que este provedor pode ver e usar.
+   *
+   * Com o ACS só dele (`scopeTag()` nulo), a coleção inteira, como sempre. Num
+   * ACS compartilhado, a coleção `files` é de todos os provedores: só passam
+   * os arquivos com o prefixo da tag dele no nome (`firmwareOwner`). Os sem
+   * dono — enviados antes desta regra — ficam escondidos de todo provedor; só
+   * a plataforma os vê, no próprio GenieACS. Sem tag ainda (a tag "sem dono"),
+   * nenhum.
+   *
+   * É por aqui que passam a lista da ficha, a do lote E a conferência antes de
+   * mandar o `download` (`upgradeFirmware`, `runBatch`): um arquivo de outro
+   * provedor não aparece e, pedido pelo nome, é "não serve" — nunca "é de
+   * outro", para não confirmar que o nome existe.
+   */
+  static async fetchScopedFirmwareFiles() {
+    const connector = await connectorFor();
+    const tag = (await connector.scopeTag?.()) ?? null;
+    if (tag === UNASSIGNED_SCOPE_TAG) return [];
     const files = await this.fetchGenieAcsCollection('files', {
       query: JSON.stringify({ 'metadata.fileType': FIRMWARE_FILE_TYPE }),
       limit: 500
     });
-    return firmwareCatalog(files);
+    return filesOwnedBy(files, tag, { unassignedTag: UNASSIGNED_SCOPE_TAG });
+  }
+
+  /** Todos os firmwares do GenieACS que dizem o modelo — a lista do lote. */
+  static async listFirmwareCatalog() {
+    return firmwareCatalog(await this.fetchScopedFirmwareFiles());
   }
 
   /**
@@ -2426,10 +2450,7 @@ class DeviceService {
       oui: row?._deviceId?._OUI ?? null,
       productClass: row?._deviceId?._ProductClass ?? null
     };
-    const files = await this.fetchGenieAcsCollection('files', {
-      query: JSON.stringify({ 'metadata.fileType': FIRMWARE_FILE_TYPE }),
-      limit: 500
-    });
+    const files = await this.fetchScopedFirmwareFiles();
     const { compatible, otherModels } = compatibleFirmware(files, device);
     const current = currentFirmwareVersion(row);
     return {
