@@ -36,7 +36,7 @@ const stub = {
     },
     {
       id: '13', name: 'promo_imagem', language: 'pt_BR', status: 'APPROVED', category: 'MARKETING',
-      components: [{ type: 'HEADER', format: 'IMAGE' }, { type: 'BODY', text: 'Oferta' }]
+      components: [{ type: 'HEADER', format: 'LOCATION' }, { type: 'BODY', text: 'Oferta' }]
     },
     {
       id: '14', name: 'em_analise', language: 'pt_BR', status: 'PENDING', category: 'UTILITY',

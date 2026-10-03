@@ -45,6 +45,9 @@ class WaMetaTemplate {
         param_count: Number(row.paramCount) || 0,
         param_format: row.paramFormat === 'named' ? 'named' : 'positional',
         supported: Boolean(row.supported),
+        header_format: String(row.headerFormat || 'NONE').slice(0, 12),
+        header_param_count: Number(row.headerParamCount) || 0,
+        buttons_json: JSON.stringify(Array.isArray(row.buttons) ? row.buttons : []),
         components_json: JSON.stringify(row.components ?? []),
         synced_at: now
       };

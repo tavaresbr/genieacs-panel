@@ -88,9 +88,12 @@ describe('leitura dos modelos da Meta', () => {
     assert.equal(fatura.status, 'APPROVED');
   });
 
-  test('mídia no cabeçalho, parâmetro nomeado e autenticação ficam fora do seletor', () => {
-    assert.deepEqual(modelos.slice(1).map((m) => m.supported), [false, false, false]);
+  test('mídia no cabeçalho entra; parâmetro nomeado e autenticação ficam fora do seletor', () => {
+    assert.deepEqual(modelos.slice(1).map((m) => m.supported), [true, false, false]);
+    assert.equal(modelos[1].headerFormat, 'IMAGE');
     assert.equal(modelos[2].paramFormat, 'named');
+    assert.equal(modelos[0].headerFormat, 'NONE');
+    assert.deepEqual(modelos[0].buttons, []);
   });
 
   test('aceita a lista na raiz', () => {

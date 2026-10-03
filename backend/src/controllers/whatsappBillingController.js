@@ -106,7 +106,9 @@ class WhatsAppBillingController {
         category: body.category,
         metaTemplateName: body.metaTemplateName,
         metaLanguage: body.metaLanguage,
-        metaParams: body.metaParams
+        metaParams: body.metaParams,
+        metaHeader: body.metaHeader,
+        metaButtonParam: body.metaButtonParam
       });
       return res.status(201).json(createResponse(req.t('whatsapp.templates.created'), template));
     } catch (error) {
@@ -124,7 +126,9 @@ class WhatsAppBillingController {
         active: body.active,
         metaTemplateName: body.metaTemplateName,
         metaLanguage: body.metaLanguage,
-        metaParams: body.metaParams
+        metaParams: body.metaParams,
+        metaHeader: body.metaHeader,
+        metaButtonParam: body.metaButtonParam
       });
       return res.json(createResponse(req.t('whatsapp.templates.updated'), template));
     } catch (error) {

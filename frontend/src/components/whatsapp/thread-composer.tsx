@@ -591,9 +591,23 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
   )
 }
 
+/** O nome do documento pelo fim do link, quando ele tem extensão. */
+function filenameFromLink(link: string): string | undefined {
+  try {
+    const last = decodeURIComponent(new URL(link).pathname.split('/').pop() ?? '')
+    return /^[^.]+\.[A-Za-z0-9]{2,5}$/.test(last) ? last.slice(0, 80) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const HTTPS_LINK = /^https:\/\/\S+$/i
+
 /**
  * O modelo aprovado que o atendente manda quando a janela de 24 h fechou:
- * escolhe o modelo, preenche cada `{{n}}` e vê o texto como vai sair.
+ * escolhe o modelo, preenche cada `{{n}}` e vê o texto como vai sair. Modelo
+ * com mídia no cabeçalho pede o link (https) do arquivo; cabeçalho de texto
+ * com variável pede o texto; botão de URL dinâmica pede o final da URL.
  */
 function MetaTemplatePicker({
   templates,
@@ -608,11 +622,35 @@ function MetaTemplatePicker({
   const [open, setOpen] = useState(false)
   const [chosenId, setChosenId] = useState<number | null>(null)
   const [params, setParams] = useState<string[]>([])
+  const [headerValue, setHeaderValue] = useState('')
+  const [buttonParams, setButtonParams] = useState<Record<number, string>>({})
   const chosen = templates.find((m) => m.id === chosenId) ?? null
   const preview = chosen
     ? chosen.bodyText.replace(/\{\{\s*(\d+)\s*\}\}/g, (all, n: string) => params[Number(n) - 1] || all)
     : ''
+  const mediaType = chosen && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(chosen.headerFormat)
+    ? (chosen.headerFormat.toLowerCase() as 'image' | 'video' | 'document')
+    : null
+  const textHeader = Boolean(chosen && chosen.headerFormat === 'TEXT' && chosen.headerParamCount > 0)
+  const dynamicButtons = chosen ? chosen.buttons.filter((b) => b.urlHasParam) : []
+  const headerOk = mediaType ? HTTPS_LINK.test(headerValue.trim()) : textHeader ? Boolean(headerValue.trim()) : true
   const ready = Boolean(chosen) && params.length === chosen!.paramCount && params.every((p) => p.trim())
+    && headerOk && dynamicButtons.every((b) => (buttonParams[b.index] ?? '').trim())
+
+  const payload = (): MetaTemplatePayload => {
+    const out: MetaTemplatePayload = { name: chosen!.name, language: chosen!.language, params: params.map((p) => p.trim()) }
+    const link = headerValue.trim()
+    if (mediaType) {
+      const filename = mediaType === 'document' ? filenameFromLink(link) : undefined
+      out.header = { type: mediaType, link, ...(filename ? { filename } : {}) }
+    } else if (textHeader) {
+      out.header = { type: 'text', params: [link] }
+    }
+    if (dynamicButtons.length) {
+      out.buttons = dynamicButtons.map((b) => ({ index: b.index, param: (buttonParams[b.index] ?? '').trim() }))
+    }
+    return out
+  }
 
   if (!open) {
     return (
@@ -638,6 +676,8 @@ function MetaTemplatePicker({
           const m = templates.find((x) => x.id === id)
           setChosenId(id)
           setParams(Array.from({ length: m?.paramCount ?? 0 }, () => ''))
+          setHeaderValue('')
+          setButtonParams({})
         }}
       >
         <option value="">{t('whatsapp.metaTemplates.pick')}</option>
@@ -647,6 +687,19 @@ function MetaTemplatePicker({
       </select>
       {chosen && (
         <>
+          {(mediaType || textHeader) && (
+            <input
+              type={mediaType ? 'url' : 'text'}
+              inputMode={mediaType ? 'url' : undefined}
+              className="modern-input"
+              aria-label={mediaType ? t('whatsapp.metaTemplates.headerLinkLabel') : t('whatsapp.metaTemplates.headerTextLabel')}
+              placeholder={mediaType
+                ? `${t('whatsapp.metaTemplates.headerLinkLabel')} — https://`
+                : t('whatsapp.metaTemplates.headerTextLabel')}
+              value={headerValue}
+              onChange={(event) => setHeaderValue(event.target.value)}
+            />
+          )}
           {params.map((value, i) => (
             <input
               key={i}
@@ -656,18 +709,30 @@ function MetaTemplatePicker({
               onChange={(event) => setParams((c) => c.map((v, j) => (j === i ? event.target.value : v)))}
             />
           ))}
+          {dynamicButtons.map((b) => (
+            <input
+              key={`button-${b.index}`}
+              className="modern-input"
+              aria-label={t('whatsapp.metaTemplates.buttonParamLabel')}
+              placeholder={t('whatsapp.metaTemplates.buttonParamLabel')}
+              value={buttonParams[b.index] ?? ''}
+              onChange={(event) => setButtonParams((c) => ({ ...c, [b.index]: event.target.value }))}
+            />
+          ))}
           <p className="whitespace-pre-wrap break-words rounded border border-border bg-background/60 px-2 py-1.5 text-foreground">{preview}</p>
           <div className="flex gap-2">
             <button
               type="button"
               className="modern-button min-h-9 px-3 py-1 text-xs"
               disabled={!ready || busy}
-              onClick={() => void onSend({ name: chosen.name, language: chosen.language, params: params.map((p) => p.trim()) })
+              onClick={() => void onSend(payload())
                 .then((ok) => {
                   if (!ok) return
                   setOpen(false)
                   setChosenId(null)
                   setParams([])
+                  setHeaderValue('')
+                  setButtonParams({})
                 })}
             >
               {t('whatsapp.metaTemplates.sendTemplate')}

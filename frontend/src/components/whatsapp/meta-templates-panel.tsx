@@ -15,6 +15,12 @@ import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 
 const NOTICE_KEYS: MetaNoticeKey[] = ['maintenance', 'outage', 'alert']
 
+/** Se o modelo pede mais que o corpo: mídia no cabeçalho, variável no cabeçalho ou sufixo de botão. */
+export const needsExtras = (m: WhatsAppMetaTemplate) =>
+  ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(m.headerFormat)
+  || (m.headerFormat === 'TEXT' && m.headerParamCount > 0)
+  || m.buttons.some((b) => b.urlHasParam)
+
 /** A chave de um modelo no `<select>`: nome e idioma, que juntos o identificam. */
 export const metaKey = (m: { name: string; language: string }) => `${m.name}|${m.language}`
 
@@ -71,8 +77,9 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
 
   const account = accounts.find((a) => a.id === accountId) ?? null
   // Um aviso é texto livre: só serve modelo com no máximo um parâmetro, que
-  // recebe o aviso inteiro.
-  const forNotices = useMemo(() => templates.filter((m) => m.usable && m.paramCount <= 1), [templates])
+  // recebe o aviso inteiro — e sem cabeçalho de mídia/variável nem botão
+  // dinâmico, que o aviso não teria de onde preencher.
+  const forNotices = useMemo(() => templates.filter((m) => m.usable && m.paramCount <= 1 && !needsExtras(m)), [templates])
 
   const sync = async () => {
     if (!accountId) return
@@ -177,6 +184,20 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
                 <span className="text-xs text-muted-foreground">
                   {t('whatsapp.metaTemplates.params', { count: m.paramCount })}
                 </span>
+                {m.headerFormat !== 'NONE' && (
+                  <span className="modern-badge-info">
+                    {t('whatsapp.metaTemplates.headerBadge', { format: t(`whatsapp.metaTemplates.headerFormat.${m.headerFormat}`) })}
+                  </span>
+                )}
+                {m.buttons.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('whatsapp.metaTemplates.buttonsBadge', {
+                      list: m.buttons
+                        .map((b) => (b.urlHasParam ? t('whatsapp.metaTemplates.buttonDynamic') : b.type))
+                        .join(', ')
+                    })}
+                  </span>
+                )}
               </div>
               {m.bodyText && (
                 <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">
