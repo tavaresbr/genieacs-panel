@@ -6,6 +6,7 @@ import BillingCharge from '../models/BillingCharge.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import BillingEvent from '../models/BillingEvent.js';
 import { effectiveWebhookToken } from '../services/billing/asaasSettingsService.js';
+import BillingInvoiceService from '../services/billing/billingInvoiceService.js';
 
 /**
  * A entrega do gateway de pagamento: o provedor pagou, e o painel volta a
@@ -122,6 +123,20 @@ async function marcarCobrancaPaga(gatewayChargeId) {
 }
 
 /**
+ * A NFS-e da cobrança paga, NA FILA — e só na fila: a Asaas não é chamada
+ * dentro desta entrega (ver `billingInvoiceService`). Idempotente pela
+ * cobrança, então a reentrega não enfileira duas; e nunca lança.
+ */
+async function enfileirarNota(gatewayChargeId) {
+  try {
+    const cobranca = await BillingCharge.byGatewayId(gatewayChargeId);
+    if (cobranca?.status === 'paid') await BillingInvoiceService.enqueueForCharge(cobranca);
+  } catch (error) {
+    console.warn(`Billing webhook: could not queue the invoice: ${error.message}`);
+  }
+}
+
+/**
  * De que estado a cobrança pode ir para cada um dos estados do ciclo.
  *
  * O gateway reentrega e não garante ordem, e é contra isso que esta tabela
@@ -193,6 +208,7 @@ class BillingWebhookController {
       let reversal;
       if (ciclo.status === 'refunded') {
         reversal = await BillingWebhookController.desfazerPeriodo(tenantId, ciclo.externalId);
+        BillingWebhookController.cancelarNota(tenantId, ciclo.externalId);
       }
       return res.json({ success: true, code, ...(reversal ? { reversal } : {}) });
     } catch (error) {
@@ -236,6 +252,24 @@ class BillingWebhookController {
     }
   }
 
+  /**
+   * A nota da cobrança estornada, cancelada FORA desta entrega.
+   *
+   * Sem `await`, de propósito: o cancelamento é uma chamada à Asaas, e o
+   * webhook não espera por ela (a mesma regra da emissão). O escopo viaja com
+   * a promessa, e a falha fica no log e na linha da nota — nunca no estorno.
+   */
+  static cancelarNota(tenantId, externalId) {
+    const pendente = runInTenant(tenantId, async () => {
+      const cobranca = await BillingCharge.byGatewayId(externalId);
+      if (cobranca) await BillingInvoiceService.cancelForCharge(cobranca.id);
+    }).catch((error) => {
+      console.error(`Billing webhook: could not cancel the invoice of ${externalId}: ${error.message}`);
+    });
+    BillingWebhookController.pendingInvoiceWork = pendente;
+    return pendente;
+  }
+
   static async receive(req, res) {
     const esperado = await tokenConfigurado();
     if (!esperado) {
@@ -250,6 +284,13 @@ class BillingWebhookController {
       // mesma para credencial errada, ausente e malformada.
       console.warn('Rejected a billing webhook delivery: invalid access token');
       return res.status(401).json({ success: false, code: 'invalid_token' });
+    }
+
+    // A nota fiscal tem eventos próprios, sem pagamento no corpo: atualizam a
+    // linha que a Asaas nomeia, e nota desconhecida é ignorada — 200 sempre.
+    if (/^INVOICE_/.test(String(req.body?.event ?? ''))) {
+      const code = await BillingInvoiceService.applyWebhook(req.body);
+      return res.json({ success: true, code });
     }
 
     const leitura = AsaasBillingProvider.interpretar(req.body);
@@ -349,6 +390,9 @@ class BillingWebhookController {
         if (!resultado.duplicate && !resultado.underpaid) {
           await marcarCobrancaPaga(leitura.externalId);
         }
+        // Na reentrega também: a fila é idempotente, e a primeira entrega pode
+        // ter caído antes de enfileirar. Só a cobrança PAGA entra.
+        if (!resultado.underpaid) await enfileirarNota(leitura.externalId);
         return resultado;
       });
 

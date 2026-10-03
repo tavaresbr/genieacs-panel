@@ -115,6 +115,22 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
                   {t('charges.period')}: {formatDate(charge.periodEnd) ?? charge.periodEnd}
                   {formatDate(charge.dueDate) && ` · ${t('charges.dueDate')}: ${formatDate(charge.dueDate)}`}
                 </p>
+                {/* A nota fiscal emitida: o número e o PDF, para o financeiro do provedor. */}
+                {charge.invoice?.pdfUrl && (
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    {charge.invoice.number && (
+                      <span className="text-muted-foreground">{t('nfse.number', { number: charge.invoice.number })}</span>
+                    )}
+                    <a
+                      href={charge.invoice.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {t('nfse.pdf')}
+                    </a>
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {/* Um status que este frontend ainda não conhece (backend mais novo)

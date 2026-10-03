@@ -13,6 +13,8 @@ import {
 import { useToast } from '@/components/ui/toast'
 import { parseAmountToCents } from '@/lib/utils'
 import { formatMoney } from '@/lib/money'
+import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
+import { canIssueInvoiceForEvent } from '@/lib/invoice'
 import { useTranslation } from '@/contexts/language-context'
 import { displayDate } from '@/lib/date-format'
 
@@ -568,6 +570,21 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
                   {event.externalId && <span className="ml-2 font-mono text-xs text-muted-foreground">{event.externalId}</span>}
                 </span>
                 <span className="text-muted-foreground">{formatDate(event.at)}</span>
+                {/* A nota fiscal do pagamento que quitou uma cobrança do painel. */}
+                {event.type === 'payment.recorded' && event.chargeId ? (
+                  <span className="flex w-full flex-wrap items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">{t('nfse.column')}:</span>
+                    <InvoiceSummary invoice={event.invoice} />
+                    {canIssueInvoiceForEvent(event) && (
+                      <IssueInvoiceButton
+                        tenantId={tenantId}
+                        chargeId={event.chargeId}
+                        reissue={Boolean(event.invoice)}
+                        onDone={load}
+                      />
+                    )}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>

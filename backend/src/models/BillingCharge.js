@@ -1,5 +1,6 @@
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
+import BillingInvoice from './BillingInvoice.js';
 
 /**
  * A cobrança que o painel emitiu a um provedor.
@@ -401,7 +402,7 @@ class BillingCharge {
    * a página do gateway de uma cobrança paga para conferir o recibo, que é
    * exatamente o que a tela do provedor não deve convidar a fazer.
    */
-  static presentForConsole(row) {
+  static presentForConsole(row, invoiceRow = null) {
     if (!row) return null;
     return {
       id: row.id,
@@ -424,7 +425,9 @@ class BillingCharge {
       superseded: BillingCharge.supersededOf(row).map((item) => ({
         gatewayChargeId: String(item.id),
         amountCents: Number(item.amountCents)
-      }))
+      })),
+      // A NFS-e desta cobrança, quando há — lida por quem chama (`forCharges`).
+      invoice: BillingInvoice.presentForConsole(invoiceRow)
     };
   }
 
@@ -442,7 +445,7 @@ class BillingCharge {
    * pagou: de que período é, quanto, até quando, em que pé está, e onde se
    * paga.
    */
-  static present(row) {
+  static present(row, invoiceRow = null) {
     if (!row) return null;
     return {
       id: row.id,
@@ -455,7 +458,9 @@ class BillingCharge {
       // botão que leva a uma página do gateway dizendo que não há o que pagar —
       // e, pior, convida a pagar de novo.
       invoiceUrl: OPEN_CHARGE_STATUSES.includes(row.status) ? (row.invoice_url ?? null) : null,
-      createdAt: row.created_at ?? null
+      createdAt: row.created_at ?? null,
+      // A nota fiscal (NFS-e) desta cobrança: estado, número e PDF — sem o erro.
+      invoice: BillingInvoice.present(invoiceRow)
     };
   }
 }

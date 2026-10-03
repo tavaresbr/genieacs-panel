@@ -19,6 +19,7 @@ import SubscriptionNoticeService from './subscriptionNoticeService.js';
 import MaintenanceService from './maintenanceService.js';
 import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
+import BillingInvoiceService from './billing/billingInvoiceService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -315,6 +316,14 @@ class SchedulerService {
         console.warn(`Could not issue the subscription charge: ${error.message}`);
         return { issued: false, reason: 'error' };
       });
+
+    // A NFS-e das cobranças pagas que a fila guardou (ver
+    // `billingInvoiceService`): pedir as pendentes e consultar as agendadas.
+    // Sem cadência própria — a espera de cada nota mora na linha dela.
+    summary.invoices = await BillingInvoiceService.processDue().catch((error) => {
+      console.warn(`Invoice pass failed: ${error.message}`);
+      return { error: error.message };
+    });
 
     const provisioningConfig = await ProvisioningService.getConfig();
     if (

@@ -12,11 +12,13 @@ import {
   type SubscriptionStatus
 } from '@/lib/api'
 import { BillingExemptControl, STATUS_LABEL_KEYS, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
 import { copyToClipboard, parseAmountToCents } from '@/lib/utils'
+import { canIssueInvoice } from '@/lib/invoice'
 import {
   CHARGE_STATUS_LABEL_KEYS,
   CONSOLE_STATUS_LABEL_KEYS,
@@ -694,6 +696,8 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
                 context={{ gateway: row.gateway, subscription: row.subscription }}
                 onAction={(kind) => setDialog({ kind, charge })}
                 onCopy={(url) => void copiar(url)}
+                tenantId={tenantId}
+                onInvoiceQueued={recarregar}
               />
             ))}
           </ul>
@@ -760,13 +764,17 @@ function ChargeItem({
   charge,
   context,
   onAction,
-  onCopy
+  onCopy,
+  tenantId,
+  onInvoiceQueued
 }: {
   charge: ChargeConsoleView
   /** A linha decide parte das ações: gateway, prazo e estado da assinatura. */
   context: ChargeContext
   onAction: (kind: ChargeDialogKind) => void
   onCopy: (url: string) => void
+  tenantId: number
+  onInvoiceQueued: () => void | Promise<void>
 }) {
   const { t } = useTranslation()
   const acoes = chargeActions(charge, context)
@@ -802,6 +810,13 @@ function ChargeItem({
       {charge.lastError && (
         <p className="text-xs text-destructive [overflow-wrap:anywhere]">
           {t('platform.subs.lastError', { error: charge.lastError })}
+        </p>
+      )}
+      {/* A nota fiscal: só da cobrança paga, ou de qualquer uma que já tenha nota. */}
+      {(charge.status === 'paid' || charge.invoice) && (
+        <p className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">{t('nfse.column')}:</span>
+          <InvoiceSummary invoice={charge.invoice} />
         </p>
       )}
       {charge.superseded.length > 0 && (
@@ -852,6 +867,14 @@ function ChargeItem({
             <Icon name="x" size={16} />
             {t('platform.subs.cancelCharge')}
           </button>
+        )}
+        {canIssueInvoice(charge) && (
+          <IssueInvoiceButton
+            tenantId={tenantId}
+            chargeId={charge.id}
+            reissue={Boolean(charge.invoice)}
+            onDone={onInvoiceQueued}
+          />
         )}
         {acoes.refund && (
           <button type="button" className="modern-button-secondary text-destructive" onClick={() => onAction('refund')}>

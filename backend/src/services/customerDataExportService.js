@@ -68,6 +68,7 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   subscriptions: 'assinatura do provedor conosco',
   billing_events: 'extrato do provedor conosco',
   billing_charges: 'as cobranças que a plataforma emitiu ao provedor',
+  billing_invoices: 'as notas fiscais das cobranças pagas pelo provedor',
   outage_events: 'rompimentos por caixa do mapa — só a caixa e contagens, nenhum assinante',
   outage_incidents: 'quedas em massa por nó do mapa — quem foi atingido sai em outage_incident_devices',
   maintenance_windows: 'manutenções programadas por nó do mapa — quem foi avisado sai em maintenance_window_devices'

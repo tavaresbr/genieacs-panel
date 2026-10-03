@@ -7,6 +7,7 @@ import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import BillingCharge from '../models/BillingCharge.js';
+import BillingInvoice from '../models/BillingInvoice.js';
 import DeviceService from '../services/deviceService.js';
 import SelfBillingService, { SelfBillingError } from '../services/selfBillingService.js';
 import ChargeIssuingService from '../services/chargeIssuingService.js';
@@ -526,8 +527,9 @@ class TenantController {
   static async listCharges(req, res) {
     try {
       const cobrancas = await BillingCharge.listRecent({ limit: 24 });
+      const notas = await BillingInvoice.forCharges(cobrancas.map((linha) => linha.id));
       return res.json(createResponse(req.t('charges.retrieved'), {
-        charges: cobrancas.map((linha) => BillingCharge.present(linha))
+        charges: cobrancas.map((linha) => BillingCharge.present(linha, notas.get(Number(linha.id)) || null))
       }));
     } catch (error) {
       console.error('List charges error:', error);

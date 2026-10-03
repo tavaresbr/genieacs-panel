@@ -9,6 +9,8 @@ import { manualBilling } from '../services/billing/manualBillingProvider.js';
 import { ChargeFollowError } from '../services/chargeIssuingService.js';
 import DeviceService from '../services/deviceService.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { tdb } from '../config/database.js';
+import BillingInvoice from '../models/BillingInvoice.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 /**
@@ -192,7 +194,10 @@ async function recordBoth(req, tenant, { platformAction, detail, tenantDetail = 
  */
 async function subscriptionView(tenant) {
   const state = await runInTenant(tenant.id, () => SubscriptionService.current());
-  const events = await runInTenant(tenant.id, () => BillingEvent.listRecent({ limit: 50 }));
+  const { events, notaDoEvento } = await runInTenant(tenant.id, async () => {
+    const lidos = await BillingEvent.listRecent({ limit: 50 });
+    return { events: lidos, notaDoEvento: await notasDoExtrato(lidos) };
+  });
   return {
     tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
     subscription: SubscriptionService.present(state, { withExemptReason: true }),
@@ -205,9 +210,47 @@ async function subscriptionView(tenant) {
       provider: event.provider,
       externalId: event.external_id,
       detail: event.detail ? JSON.parse(event.detail) : null,
-      at: event.created_at
+      at: event.created_at,
+      // A cobrança que este pagamento quitou e a NFS-e dela — nulos fora do
+      // pagamento, ou quando ele não tem cobrança do painel por trás.
+      chargeId: notaDoEvento.get(event.id)?.chargeId ?? null,
+      invoice: BillingInvoice.presentForConsole(notaDoEvento.get(event.id)?.invoice ?? null)
     }))
   };
+}
+
+/**
+ * Para cada pagamento do extrato, a cobrança que ele quitou e a nota dela.
+ *
+ * O pagamento guarda a referência com que entrou (`external_id`): o id da
+ * cobrança no gateway, ou `charge:<id>` na baixa sem gateway. É por ela que
+ * se acha a cobrança — no escopo do provedor, que quem chama já abriu.
+ */
+async function notasDoExtrato(events) {
+  const pagamentos = events.filter((event) => event.type === 'payment.recorded' && event.external_id);
+  if (!pagamentos.length) return new Map();
+  const doGateway = [];
+  const locais = [];
+  for (const event of pagamentos) {
+    const local = /^charge:(\d+)$/.exec(event.external_id);
+    if (local) locais.push(Number(local[1]));
+    else doGateway.push(event.external_id);
+  }
+  const cobrancas = await tdb('billing_charges').where((q) => {
+    q.whereIn('id', locais.length ? locais : [0]);
+    if (doGateway.length) q.orWhereIn('gateway_charge_id', doGateway);
+  }).select('id', 'gateway_charge_id');
+  const porGateway = new Map(cobrancas.filter((c) => c.gateway_charge_id).map((c) => [c.gateway_charge_id, c.id]));
+  const ids = new Set(cobrancas.map((c) => Number(c.id)));
+  const notas = await BillingInvoice.forCharges([...ids]);
+  const mapa = new Map();
+  for (const event of pagamentos) {
+    const local = /^charge:(\d+)$/.exec(event.external_id);
+    const chargeId = local ? Number(local[1]) : porGateway.get(event.external_id);
+    if (!chargeId || !ids.has(Number(chargeId))) continue;
+    mapa.set(event.id, { chargeId: Number(chargeId), invoice: notas.get(Number(chargeId)) || null });
+  }
+  return mapa;
 }
 
 class PlatformBillingController {

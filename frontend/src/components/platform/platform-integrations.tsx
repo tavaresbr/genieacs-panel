@@ -8,6 +8,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { copyToClipboard, formatRelativeTime } from '@/lib/utils'
 import { absoluteWebhookUrl } from '@/lib/webhook-url'
+import { parsePercent } from '@/lib/subscription-console'
 
 /**
  * As integrações da PLATAFORMA — os serviços de terceiro com que o SaaS cobra
@@ -39,6 +40,15 @@ const EVENTOS_ASAAS = [
   'PAYMENT_OVERDUE',
   'PAYMENT_DELETED',
   'PAYMENT_REFUNDED'
+]
+
+/** Os eventos da nota fiscal, para quem ligou a NFS-e. Nomes da Asaas. */
+const EVENTOS_NFSE = [
+  'INVOICE_AUTHORIZED',
+  'INVOICE_ERROR',
+  'INVOICE_CANCELED',
+  'INVOICE_CANCELLATION_DENIED',
+  'INVOICE_UPDATED'
 ]
 
 /** De onde veio o valor que vale — o painel ou a variável de ambiente. */
@@ -319,6 +329,8 @@ function AsaasCard() {
         </div>
       </div>
 
+      <NfseSection info={info} onSaved={setInfo} />
+
       <div className="mt-6 border-t border-border pt-5">
         <h3 className="text-sm font-semibold text-foreground">{t('integrations.asaas.stepsTitle')}</h3>
         <ol className="mt-2 list-decimal space-y-1.5 ps-5 text-sm text-muted-foreground">
@@ -331,8 +343,187 @@ function AsaasCard() {
           </li>
           <li>{t('integrations.asaas.step5')}</li>
         </ol>
+        {info.nfseEnabled && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t('nfse.webhookEvents')}{' '}
+            <span className="break-words font-mono text-xs text-foreground">{EVENTOS_NFSE.join(', ')}</span>
+          </p>
+        )}
       </div>
     </section>
+  )
+}
+
+/** O formulário da NFS-e, como texto: o que está na tela antes de salvar. */
+interface NfseForm {
+  nfseEnabled: boolean
+  serviceDescription: string
+  municipalServiceId: string
+  municipalServiceCode: string
+  municipalServiceName: string
+  issPercent: string
+  retainIss: boolean
+  observations: string
+}
+
+function nfseFormOf(info: AsaasIntegration): NfseForm {
+  return {
+    nfseEnabled: Boolean(info.nfseEnabled),
+    serviceDescription: info.serviceDescription ?? '',
+    municipalServiceId: info.municipalServiceId ?? '',
+    municipalServiceCode: info.municipalServiceCode ?? '',
+    municipalServiceName: info.municipalServiceName ?? '',
+    issPercent: String(info.issPercent ?? 0),
+    retainIss: Boolean(info.retainIss),
+    observations: info.observations ?? ''
+  }
+}
+
+/**
+ * A NFS-e pela Asaas: ligada, todo pagamento confirmado de uma cobrança com
+ * pagamento no gateway põe a nota na fila do agendador. Salva à parte da
+ * chave — e o backend recusa ligar sem a descrição e o serviço municipal.
+ */
+function NfseSection({ info, onSaved }: { info: AsaasIntegration; onSaved: (dados: AsaasIntegration) => void }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [form, setForm] = useState<NfseForm>(() => nfseFormOf(info))
+  const [saving, setSaving] = useState(false)
+
+  const original = nfseFormOf(info)
+  const mudou = JSON.stringify(form) !== JSON.stringify(original)
+  const iss = parsePercent(form.issPercent)
+  const issValido = iss !== null && iss <= 100
+  const faltaObrigatorio = form.nfseEnabled
+    && (!form.serviceDescription.trim() || (!form.municipalServiceId.trim() && !form.municipalServiceCode.trim()))
+
+  const campo = <K extends keyof NfseForm>(nome: K, valor: NfseForm[K]) => setForm((atual) => ({ ...atual, [nome]: valor }))
+
+  const salvar = async () => {
+    if (!mudou || saving || !issValido || faltaObrigatorio) return
+    setSaving(true)
+    try {
+      const res = await platformAPI.saveAsaasIntegration({
+        nfseEnabled: form.nfseEnabled,
+        serviceDescription: form.serviceDescription.trim(),
+        municipalServiceId: form.municipalServiceId.trim(),
+        municipalServiceCode: form.municipalServiceCode.trim(),
+        municipalServiceName: form.municipalServiceName.trim(),
+        issPercent: iss ?? 0,
+        retainIss: form.retainIss,
+        observations: form.observations.trim()
+      })
+      if (res.success && res.data) {
+        onSaved(res.data)
+        setForm(nfseFormOf(res.data))
+        toast.success(t('integrations.saved'))
+      } else {
+        toast.error(res.message || t('platform.saveFailed'))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-6 space-y-4 border-t border-border pt-5">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{t('nfse.title')}</h3>
+        <p className="field-hint mt-1">{t('nfse.description')}</p>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={form.nfseEnabled}
+          onChange={(e) => campo('nfseEnabled', e.target.checked)}
+        />
+        {t('nfse.enabled')}
+      </label>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <label htmlFor="nfse-description" className="field-label">{t('nfse.serviceDescription')}</label>
+          <textarea
+            id="nfse-description"
+            rows={2}
+            maxLength={1000}
+            value={form.serviceDescription}
+            onChange={(e) => campo('serviceDescription', e.target.value)}
+            className="modern-input w-full"
+          />
+        </div>
+        <div>
+          <label htmlFor="nfse-service-id" className="field-label">{t('nfse.municipalServiceId')}</label>
+          <input
+            id="nfse-service-id"
+            type="text"
+            maxLength={64}
+            value={form.municipalServiceId}
+            onChange={(e) => campo('municipalServiceId', e.target.value)}
+            className="modern-input w-full font-mono"
+          />
+        </div>
+        <div>
+          <label htmlFor="nfse-service-code" className="field-label">{t('nfse.municipalServiceCode')}</label>
+          <input
+            id="nfse-service-code"
+            type="text"
+            maxLength={64}
+            value={form.municipalServiceCode}
+            onChange={(e) => campo('municipalServiceCode', e.target.value)}
+            className="modern-input w-full font-mono"
+          />
+        </div>
+        <p className="field-hint md:col-span-2">{t('nfse.municipalServiceHint')}</p>
+        <div>
+          <label htmlFor="nfse-service-name" className="field-label">{t('nfse.municipalServiceName')}</label>
+          <input
+            id="nfse-service-name"
+            type="text"
+            maxLength={255}
+            value={form.municipalServiceName}
+            onChange={(e) => campo('municipalServiceName', e.target.value)}
+            className="modern-input w-full"
+          />
+        </div>
+        <div>
+          <label htmlFor="nfse-iss" className="field-label">{t('nfse.issPercent')}</label>
+          <input
+            id="nfse-iss"
+            type="text"
+            inputMode="decimal"
+            value={form.issPercent}
+            onChange={(e) => campo('issPercent', e.target.value)}
+            className="modern-input w-full"
+            aria-invalid={!issValido}
+          />
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.retainIss} onChange={(e) => campo('retainIss', e.target.checked)} />
+            {t('nfse.retainIss')}
+          </label>
+        </div>
+        <div className="md:col-span-2">
+          <label htmlFor="nfse-observations" className="field-label">{t('nfse.observations')}</label>
+          <textarea
+            id="nfse-observations"
+            rows={2}
+            maxLength={1000}
+            value={form.observations}
+            onChange={(e) => campo('observations', e.target.value)}
+            className="modern-input w-full"
+          />
+          <p className="field-hint">{t('nfse.observationsHint')}</p>
+        </div>
+      </div>
+      {faltaObrigatorio && <p className="text-sm text-destructive">{t('nfse.requiredHint')}</p>}
+      <button
+        type="button"
+        className="modern-button"
+        disabled={!mudou || saving || !issValido || faltaObrigatorio}
+        onClick={() => void salvar()}
+      >
+        {saving ? t('common.saving') : t('common.save')}
+      </button>
+    </div>
   )
 }
 

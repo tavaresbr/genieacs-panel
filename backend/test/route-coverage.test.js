@@ -168,6 +168,7 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/charges/:chargeId/cancel', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/charges/:chargeId/reissue', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/charges/:chargeId/refund', 'plano de controle; prova em platform-charge-refund.test.js — inclusive a de que a cobrança do vizinho responde 404'],
+  ['POST /api/platform/tenants/:id/charges/:chargeId/invoice', 'plano de controle; prova em billing-invoices.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/impersonate', 'plano de controle; prova em impersonation.test.js — inclusive a de que a própria personificação não alcança esta rota'],
   // A exportação vista de cima. O id é de um PROVEDOR, e olhá-lo pelo id é o
   // trabalho do console — mas esta é a rota do console que mais se parece com
@@ -378,7 +379,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // linha em `DO_CONSOLE` e mais uma aqui. O id é de PROVEDOR visto de cima, e
   // a prova de que o gesto só mexe no provedor da URL (e de que a caixa da
   // plataforma responde 404) está em platform-billing-exempt.test.js. São 62.
-  const TETO_DE_EXCECOES = 62;
+  //
+  // E a NFS-e de uma cobrança paga (`POST .../charges/:chargeId/invoice`),
+  // pedida da tela de Assinaturas e do Extrato. Mesmo pedágio: uma linha em
+  // `DO_CONSOLE` e mais uma aqui; a prova de que a cobrança do vizinho
+  // responde 404 está em billing-invoices.test.js. São 63.
+  const TETO_DE_EXCECOES = 63;
 
 
   /**
@@ -419,6 +425,7 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/charges/:chargeId/cancel',
     'POST /api/platform/tenants/:id/charges/:chargeId/reissue',
     'POST /api/platform/tenants/:id/charges/:chargeId/refund',
+    'POST /api/platform/tenants/:id/charges/:chargeId/invoice',
     'GET /api/platform/tenants/:id/export',
     'GET /api/platform/tenants/:id/genieacs',
     'PUT /api/platform/tenants/:id/genieacs',
