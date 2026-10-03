@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { AssigneeControl } from '@/components/whatsapp/assignment'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
@@ -173,6 +174,13 @@ export function ConversationThread({
                 {t('whatsapp.inbox.optedOut')}
               </span>
             )}
+            {conversation.waitingSince && !conversation.assignedUserId && (
+              <span className="modern-badge-warning" title={t('whatsapp.assign.waitingHint')}>
+                <Icon name="contacts" size={12} />
+                {t('whatsapp.assign.waiting')}
+              </span>
+            )}
+            <AssigneeControl conversation={conversation} onChange={onLinked} />
             {closed && (
               <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
                 <Icon name="check" size={12} />

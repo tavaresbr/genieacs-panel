@@ -664,6 +664,8 @@ export default {
   // WhatsApp — 收件匣與自助服務機器人（第三階段）
   'whatsapp.error.conversationNotFound': '找不到該對話',
   'whatsapp.conversationClosed': '對話已結束',
+  'whatsapp.conversationAssigned': '對話負責人已更新',
+  'whatsapp.error.invalidAssignee': '請選擇負責回覆 WhatsApp 的團隊成員。',
   'whatsapp.conversationReopened': '對話已重新開啟',
   'whatsapp.conversationStatusFailed': '無法更新對話',
   'whatsapp.error.invalidConversationStatus': '對話只能是開啟或結束狀態',

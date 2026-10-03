@@ -53,6 +53,7 @@ import { timestampMs } from '../utils/helpers.js';
 /** As tabelas escopadas que não guardam dado de assinante, e por quê. */
 const SEM_DADO_DE_ASSINANTE = Object.freeze({
   settings: 'configuração do provedor',
+  wa_agents: 'disponibilidade da equipe no WhatsApp',
   app_state: 'relógios dos jobs do provedor',
   vendors: 'catálogo de fabricantes',
   wifi_security_config: 'política de WiFi do provedor',

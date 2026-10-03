@@ -662,6 +662,8 @@ export default {
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversación no encontrada',
   'whatsapp.conversationClosed': 'Conversación cerrada',
+  'whatsapp.conversationAssigned': 'Agente de la conversación actualizado',
+  'whatsapp.error.invalidAssignee': 'Elija a alguien del equipo que atiende WhatsApp.',
   'whatsapp.conversationReopened': 'Conversación reabierta',
   'whatsapp.conversationStatusFailed': 'No se pudo actualizar la conversación',
   'whatsapp.error.invalidConversationStatus': 'Una conversación está abierta o cerrada',

@@ -445,6 +445,16 @@ export const casos = [
   },
   {
     chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/assign',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/assign`,
+    body: { userId: null },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
     label: 'POST /api/whatsapp/conversations/:id/status',
     method: 'POST',
     path: (id) => `/api/whatsapp/conversations/${id}/status`,

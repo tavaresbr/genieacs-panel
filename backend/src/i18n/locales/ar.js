@@ -663,6 +663,8 @@ export default {
   'whatsapp.error.lookupTermRequired': 'اكتب CPF/CNPJ أو رقم عقد للبحث في SGP',
   'whatsapp.error.conversationNotFound': 'المحادثة غير موجودة',
   'whatsapp.conversationClosed': 'أُنهيت المحادثة',
+  'whatsapp.conversationAssigned': 'تم تحديث موظف المحادثة',
+  'whatsapp.error.invalidAssignee': 'اختر شخصًا من الفريق يرد على واتساب.',
   'whatsapp.conversationReopened': 'أُعيد فتح المحادثة',
   'whatsapp.conversationStatusFailed': 'تعذّر تحديث المحادثة',
   'whatsapp.error.invalidConversationStatus': 'المحادثة إمّا مفتوحة أو منتهية',

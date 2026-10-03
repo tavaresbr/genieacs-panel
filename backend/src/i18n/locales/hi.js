@@ -666,6 +666,8 @@ export default {
   // WhatsApp — इनबॉक्स और स्व-सेवा बॉट (चरण 3)
   'whatsapp.error.conversationNotFound': 'बातचीत नहीं मिली',
   'whatsapp.conversationClosed': 'बातचीत बंद कर दी गई',
+  'whatsapp.conversationAssigned': 'बातचीत का एजेंट अपडेट किया गया',
+  'whatsapp.error.invalidAssignee': 'टीम में से कोई ऐसा व्यक्ति चुनें जो WhatsApp पर जवाब देता है।',
   'whatsapp.conversationReopened': 'बातचीत फिर से खोली गई',
   'whatsapp.conversationStatusFailed': 'बातचीत अपडेट नहीं हो सकी',
   'whatsapp.error.invalidConversationStatus': 'बातचीत या तो खुली होती है या बंद',

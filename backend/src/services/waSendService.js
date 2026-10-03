@@ -20,6 +20,7 @@ import {
 import { decidirEnvioCloud } from '../utils/wa/waJanelaMeta.js';
 import { destinoWa, normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { sign as signMediaToken } from '../utils/wa/waMediaToken.js';
+import WaAssignmentService from './waAssignmentService.js';
 
 /** De quanto em quanto tempo um número fora do ar pode ser reconsultado no Evolution. */
 const LIVE_CHECK_MS = 30_000;
@@ -160,6 +161,8 @@ class WaSendService {
     // gente (`engaged_at` nulo) — ela vive em "Sem resposta", e é lá que o
     // envio automático a ordena.
     const humano = source === 'operator';
+    // Quem responde uma conversa sem dono passa a ser o dono dela.
+    if (humano && !note && userId) await WaAssignmentService.claimOnReply(conversation, userId, { now });
     if (humano) {
       await WaConversation.update(conversation.id, {
         last_message_at: now,

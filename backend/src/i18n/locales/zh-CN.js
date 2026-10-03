@@ -665,6 +665,8 @@ export default {
   // WhatsApp — 收件箱与自助服务机器人（第三阶段）
   'whatsapp.error.conversationNotFound': '找不到该会话',
   'whatsapp.conversationClosed': '会话已结束',
+  'whatsapp.conversationAssigned': '会话负责人已更新',
+  'whatsapp.error.invalidAssignee': '请选择负责回复 WhatsApp 的团队成员。',
   'whatsapp.conversationReopened': '会话已重新打开',
   'whatsapp.conversationStatusFailed': '无法更新该会话',
   'whatsapp.error.invalidConversationStatus': '会话只有进行中或已结束两种状态',

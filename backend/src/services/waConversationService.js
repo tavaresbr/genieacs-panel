@@ -7,6 +7,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
+import WaAssignmentService from './waAssignmentService.js';
 import { tdb } from '../config/database.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
@@ -251,6 +252,9 @@ class WaConversationService {
       closedAt: row.closed_at || null,
       // Só enquanto vale: uma pausa vencida é um bot que já voltou a falar, e
       // o selo "pediu atendente" nela seria um aviso sobre o passado.
+      assignedUserId: row.assigned_user_id ? Number(row.assigned_user_id) : null,
+      assignedTo: extra.assignedTo ?? null,
+      waitingSince: row.waiting_since || null,
       botPausedUntil: row.bot_paused_until && new Date(row.bot_paused_until).getTime() > Date.now()
         ? new Date(row.bot_paused_until).toISOString()
         : null,
@@ -297,9 +301,10 @@ class WaConversationService {
    * started — a list nobody can read past its first hundred rows. Closing is
    * still not deletion, so `closed` and `all` are one parameter away.
    */
-  static async list({ limit = 50, offset = 0, search = '', status = 'open' } = {}) {
+  static async list({ limit = 50, offset = 0, search = '', status = 'open', assignee = null, userId = null } = {}) {
     const term = String(search ?? '').trim();
     const rows = await WaConversation.listRecent({
+      assignee: assignee === 'me' ? { userId } : (assignee === 'unassigned' ? 'unassigned' : null),
       limit: Math.min(Math.max(Number(limit) || 50, 1), 200),
       offset: Math.max(Number(offset) || 0, 0),
       status: ['open', 'noreply', 'closed', 'all'].includes(status) ? status : 'open',
@@ -328,8 +333,10 @@ class WaConversationService {
       for (const link of links) names.set(link.contract, link.client_name);
     }
     const blocked = await WaOptOut.activePhones(rows.map((r) => r.wa_phone_e164));
+    const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
 
     return rows.map((row) => this.publicConversation(row, {
+      assignedTo: row.assigned_user_id ? atendentes.get(Number(row.assigned_user_id)) ?? null : null,
       clientName: row.contract
         ? names.get(row.contract) ?? null
         : (row.sgp_contact_id ? contactNames.get(Number(row.sgp_contact_id)) ?? null : null),
@@ -361,7 +368,9 @@ class WaConversationService {
       : (conversation.contract
         ? await SgpContact.getByContract(conversation.contract)
         : (conversation.sgp_contact_id ? await SgpContact.getById(conversation.sgp_contact_id) : null));
+    const atendentes = await WaAssignmentService.names([conversation.assigned_user_id]);
     return this.publicConversation(conversation, {
+      assignedTo: conversation.assigned_user_id ? atendentes.get(Number(conversation.assigned_user_id)) ?? null : null,
       clientName: link?.client_name ?? contact?.client_name ?? null,
       optedOut: await WaOptOut.isActive({
         waPhone: conversation.wa_phone_e164,
@@ -386,7 +395,9 @@ class WaConversationService {
     // change nothing; letting them through keeps the route idempotent, which is
     // what a double-click on the button deserves.
     const updated = await WaConversation.update(conversation.id, {
-      closed_at: closing ? new Date() : null
+      closed_at: closing ? new Date() : null,
+      // Encerrada não espera ninguém: sai da fila da distribuição.
+      ...(closing ? { waiting_since: null } : {})
     });
     // Encerrar de verdade (não o segundo clique) é o momento da pesquisa de
     // satisfação. Ela decide sozinha se pergunta e nunca lança.

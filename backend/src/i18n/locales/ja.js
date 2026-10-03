@@ -657,6 +657,8 @@ export default {
   // WhatsApp — 受信箱とセルフサービスのボット (第 3 段階)
   'whatsapp.error.conversationNotFound': '会話が見つかりません',
   'whatsapp.conversationClosed': '会話を完了にしました',
+  'whatsapp.conversationAssigned': '会話の担当者を更新しました',
+  'whatsapp.error.invalidAssignee': 'WhatsAppに対応するチームメンバーを選んでください。',
   'whatsapp.conversationReopened': '会話を再開しました',
   'whatsapp.conversationStatusFailed': '会話を更新できませんでした',
   'whatsapp.error.invalidConversationStatus': '会話は「対応中」か「完了」のどちらかです',
