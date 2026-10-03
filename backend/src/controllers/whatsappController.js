@@ -167,6 +167,25 @@ class WhatsAppController {
     }
   }
 
+  /**
+   * Troca o token da Meta de um número oficial (delete + create da instância
+   * com o mesmo nome e o mesmo webhook). A chave admin só vem do corpo no
+   * self-host; num servidor gerenciado ela é da configuração.
+   */
+  static async updateMetaToken(req, res) {
+    try {
+      const { account } = await EvolutionInstanceService.updateCloudToken(req.params?.id, {
+        metaToken: req.body?.metaToken,
+        adminKey: req.body?.adminKey
+      });
+      return res.json(createResponse(req.t('whatsapp.metaTokenUpdated'), {
+        account: WhatsAppConfigService.publicAccount(account)
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
   static async listMetaTemplates(req, res) {
     try {
       const templates = await WaMetaTemplateService.list({

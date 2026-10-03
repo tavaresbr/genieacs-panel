@@ -249,6 +249,22 @@ O create enviado ao servidor:
 - A consulta "este número tem WhatsApp?" usa um número por QR; sem nenhum,
   `409 not_supported_cloud`.
 
+**Trocar o token.** `POST /api/whatsapp/accounts/:id/meta-token` com
+`{ "metaToken": "<token novo>", "adminKey": "<chave global, só no self-host>" }`
+(permissão `whatsapp.config`). O v2 não tem rota para trocar o token de uma
+instância `WHATSAPP-BUSINESS` — nela o token é a `apikey` —, então o painel
+apaga (`DELETE /instance/delete/<name>`, chave admin) e cria de novo com o
+**mesmo** `instanceName`, os mesmos Phone Number ID e WABA ID e o **mesmo**
+`?t=` no webhook: conversas, linha e URL do webhook não mudam. Um 404 no delete
+é tolerado (é a retentativa depois de um create que falhou), então repetir a
+ação é seguro. Qualquer falha grava `last_error` e a linha **nunca** é apagada;
+o token antigo só é substituído depois do create aceito. Recusas, todas antes
+de falar com o servidor quando possível: `409 not_cloud` (número QR),
+`400 invalid_meta_credentials` (token fora do formato), `400 admin_key_missing`
+(self-host sem chave); depois do delete, `409 cloud_instance_still_exists` se o
+servidor ainda segura o nome (tentar de novo em segundos). No sucesso o estado
+é conferido na Graph e os modelos aprovados são sincronizados de novo.
+
 **Entrada.** A Meta não chama o painel: ela chama `<servidor Evolution>/webhook/meta`,
 configurado pelo provedor no app dele na Meta, e o servidor repassa ao
 webhook do painel no formato de sempre (`messages.upsert`, `messages.update`).

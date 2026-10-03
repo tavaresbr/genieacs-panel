@@ -4461,6 +4461,15 @@ export const whatsappAPI = {
   syncMetaTemplates: (accountId: number) =>
     apiClient.post<WhatsAppMetaTemplate[]>(`/whatsapp/accounts/${accountId}/templates/sync`, {}),
 
+  // Token da Meta vencido ou revogado: o servidor recria a instância com o
+  // mesmo nome e o mesmo webhook. A chave admin só vai no self-host — num
+  // servidor gerenciado ela é da configuração, e nem aparece na tela.
+  updateMetaToken: (id: number, metaToken: string, adminKey?: string) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-token`, {
+      metaToken,
+      ...(adminKey ? { adminKey } : {})
+    }),
+
   listMetaTemplates: (params: { accountId?: number; usable?: boolean } = {}) => {
     const query = new URLSearchParams()
     if (params.accountId) query.set('accountId', String(params.accountId))

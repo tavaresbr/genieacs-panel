@@ -43,6 +43,9 @@ router.get('/accounts/:id/qr', authenticateToken, requirePermission('whatsapp.co
 // Modelos aprovados da Meta (número oficial): buscar na Meta é configuração;
 // listar serve a quem responde fora da janela de 24 h.
 router.post('/accounts/:id/templates/sync', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.syncMetaTemplates);
+// Token da Meta vencido ou revogado: a instância é recriada no servidor com o
+// mesmo nome e o mesmo webhook, só com o token novo.
+router.post('/accounts/:id/meta-token', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMetaToken);
 router.get('/meta-templates', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listMetaTemplates);
 router.get('/accounts/:id/status', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getStatus);
 router.post('/accounts/:id/restart', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.restartAccount);

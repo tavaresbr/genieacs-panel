@@ -49,6 +49,25 @@ function assertNotCloud(account) {
   }
 }
 
+/**
+ * O espelho do de cima: ações que só existem num número oficial (trocar o
+ * token da Meta). Num número QR não há token da Meta para trocar — a chave da
+ * instância é do próprio painel —, e recriar a instância ali desparearia o
+ * celular.
+ */
+function assertCloud(account) {
+  if (!WhatsAppAccount.isCloud(account)) {
+    throw new WaError('whatsapp.error.notCloud', { code: 'not_cloud', status: 409 });
+  }
+}
+
+/**
+ * O que o v2 responde a um delete de instância que já não existe. Tolerado na
+ * troca de token: é o caso da segunda tentativa depois de um create que falhou
+ * com a instância já apagada.
+ */
+const NOT_FOUND = /not found|does not exist/i;
+
 /** How much of a server message is kept in `last_error` / `serverError`. */
 const FAILURE_TEXT_LIMIT = 300;
 
@@ -470,6 +489,106 @@ class EvolutionInstanceService {
       account = await WhatsAppAccount.getById(account.id);
     }
     return { account, qr: null, pending: false };
+  }
+
+  /**
+   * Troca o token permanente da Meta de um número oficial.
+   *
+   * O Evolution v2 não tem rota para trocar o token de uma instância
+   * WHATSAPP-BUSINESS: nela o token da Meta É a apikey da instância, fixada no
+   * create. O único caminho é apagar e criar de novo — com o MESMO `name`
+   * (conversas, linha do painel e tudo que referencia a instância pelo nome
+   * continuam valendo), os mesmos Phone Number ID e WABA ID, e o MESMO `?t=`
+   * no webhook, para a URL que o painel aceita não mudar.
+   *
+   * A ordem das conferências é a do id sweep e a de "token inválido não fala
+   * com o servidor": 404, depois 409 de número QR, depois 400 de formato — e
+   * só então a configuração e a rede. A linha NUNCA é apagada: qualquer falha
+   * fica em `last_error`, e repetir a ação é seguro porque o delete tolera a
+   * instância que já não existe.
+   */
+  static async updateCloudToken(id, { metaToken, adminKey } = {}) {
+    const account = await this.loadAccount(id);
+    assertCloud(account);
+    const token = String(metaToken ?? '').trim();
+    if (!META_TOKEN.test(token)) {
+      throw new WaError('whatsapp.error.invalidMetaCredentials', { code: 'invalid_meta_credentials', status: 400 });
+    }
+    const config = await this.requireConfig({ requireWebhook: true });
+    // Do alvo só se aproveita a CHAVE: a instância mora em `account.base_url`,
+    // e um servidor gerenciado trocado depois do create não a levou junto.
+    const target = this.resolveTarget(config, { baseUrl: account.base_url, adminKey });
+    const client = new EvolutionClient({
+      baseUrl: account.base_url,
+      allowedHosts: config.allowedHosts,
+      adminKey: target.adminKey,
+      flavor: 'v2'
+    });
+
+    // O `?t=` de hoje, para o webhook não mudar. Linha antiga ou corrompida sem
+    // token decifrável ganha um novo, gravado junto no fim — a URL muda, mas
+    // é o mesmo token que o painel passa a aceitar.
+    let webhookToken = WhatsAppConfigService.decryptWebhookToken(account);
+    const regenerated = !webhookToken;
+    if (regenerated) webhookToken = randomToken();
+    const webhookUrl = webhookUrlWithToken(config.webhookBaseUrl, webhookToken);
+
+    let created;
+    try {
+      // Sem chave admin no self-host o `keyFor` recusa aqui (`admin_key_missing`),
+      // antes de qualquer requisição sair.
+      const deleted = await client.send(deleteRequest('v2', account.name, account.instance_id));
+      // Falha no delete: nada mudou no servidor, a instância segue com o token
+      // antigo. 404 é a retentativa depois de um create que não vingou.
+      if (!deleted.ok && deleted.status !== 404 && !NOT_FOUND.test(bodyText(deleted.data))) {
+        throw httpError(deleted);
+      }
+      created = await client.send(createBusinessInstanceRequest({
+        name: account.name,
+        metaToken: token,
+        phoneNumberId: account.meta_phone_number_id,
+        wabaId: account.meta_waba_id,
+        webhookUrl
+      }));
+      if (!created.ok) {
+        // O servidor ainda segura o nome: o delete não chegou a valer. Sem
+        // retentativa automática — o operador tenta de novo em segundos.
+        if (ALREADY_EXISTS.test(bodyText(created.data))) {
+          throw new WaError('whatsapp.error.cloudInstanceStillExists', {
+            code: 'cloud_instance_still_exists',
+            status: 409
+          });
+        }
+        throw httpError(created);
+      }
+    } catch (error) {
+      await WhatsAppAccount.update(account.id, { last_error: describeFailure(error) });
+      throw error;
+    }
+
+    let updated = await WhatsAppAccount.update(account.id, {
+      ...WhatsAppConfigService.encryptInstanceToken(readApiKey(created.data) || token),
+      ...(regenerated ? WhatsAppConfigService.encryptWebhookToken(webhookToken) : {}),
+      instance_id: readInstanceId(created.data) || account.instance_id,
+      last_error: null,
+      status: 'connecting'
+    });
+
+    // Mesmo pós-create do `createCloudAccount`: estado pela Graph e modelos
+    // aprovados de novo (o token novo pode enxergar outra WABA). Falha aqui fica
+    // gravada e não desfaz a troca.
+    try {
+      updated = (await this.checkStatus(updated.id)).account;
+    } catch (error) {
+      updated = await WhatsAppAccount.update(updated.id, { last_error: describeFailure(error) });
+    }
+    try {
+      const { default: WaMetaTemplateService } = await import('./waMetaTemplateService.js');
+      await WaMetaTemplateService.sync(updated.id);
+    } catch {
+      // melhor esforço, como na criação
+    }
+    return { account: await WhatsAppAccount.getById(updated.id) };
   }
 
   /** The server's own id for an instance it says it already has. */

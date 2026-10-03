@@ -56,6 +56,11 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   cloud_requires_v2: 'whatsapp.error.cloudRequiresV2',
   invalid_meta_credentials: 'whatsapp.error.invalidMetaCredentials',
   not_applicable_cloud: 'whatsapp.error.notApplicableCloud',
+  not_cloud: 'whatsapp.error.notCloud',
+  cloud_instance_still_exists: 'whatsapp.error.cloudInstanceStillExists',
+  // Trocar o token no self-host recria a instância com a chave global do
+  // servidor, que a tela pede só para isso.
+  admin_key_missing: 'settings.whatsapp.test.config.adminKeyMissing',
   not_supported_cloud: 'whatsapp.error.notSupportedCloud',
   invalid_cloud_callback_url: 'whatsapp.error.invalidCloudCallbackUrl',
   meta_templates_cloud_only: 'whatsapp.error.metaTemplatesCloudOnly',
@@ -543,6 +548,8 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
   const [creating, setCreating] = useState(false)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
+  /** O formulário de "Atualizar token" aberto num número oficial, um por vez. */
+  const [tokenEdit, setTokenEdit] = useState<{ id: number; metaToken: string; adminKey: string } | null>(null)
   const emptyForm = {
     kind: 'baileys' as 'baileys' | 'cloud',
     label: '',
@@ -690,6 +697,33 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
       setBusyId(null)
     }
   }, [load, t, toast])
+
+  /**
+   * Troca o token da Meta. Na falha a linha continua (o servidor grava o
+   * motivo em `last_error`), então a lista é relida para mostrá-lo; o
+   * formulário fica aberto para a pessoa tentar de novo sem colar tudo outra vez.
+   */
+  const saveMetaToken = useCallback(async (account: WhatsAppAccount) => {
+    if (!tokenEdit || tokenEdit.id !== account.id) return
+    setBusyId(account.id)
+    try {
+      const res = await whatsappAPI.updateMetaToken(
+        account.id,
+        tokenEdit.metaToken.trim(),
+        managed ? undefined : tokenEdit.adminKey.trim() || undefined
+      )
+      if (!res.success) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        await load()
+        return
+      }
+      toast.success(t('whatsapp.cloud.tokenUpdated'))
+      setTokenEdit(null)
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }, [load, managed, t, toast, tokenEdit])
 
   const saveEdit = useCallback(async (account: WhatsAppAccount) => {
     setBusyId(account.id)
@@ -1142,6 +1176,22 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                         {t('whatsapp.cloud.checkStatus')}
                       </button>
                     )}
+                    {/* Token vencido ou revogado na Meta: a troca recria a
+                        instância no servidor, por isso fica atrás de um
+                        formulário e não é um clique só. */}
+                    {cloud && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        disabled={busy}
+                        aria-expanded={tokenEdit?.id === account.id}
+                        onClick={() => setTokenEdit((current) =>
+                          current?.id === account.id ? null : { id: account.id, metaToken: '', adminKey: '' })}
+                      >
+                        <Icon name="lock" size={16} />
+                        {t('whatsapp.cloud.updateToken')}
+                      </button>
+                    )}
                     {!cloud && account.status === 'connected' && (
                       <>
                         <button
@@ -1193,6 +1243,64 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                       <Icon name="trash" size={16} />
                       {t('whatsapp.actions.delete')}
                     </button>
+                  </div>
+                )}
+
+                {cloud && tokenEdit?.id === account.id && (
+                  <div className="mt-3 space-y-4 rounded-md border border-border p-4">
+                    <div>
+                      <label htmlFor={`wa-meta-token-${account.id}`} className="field-label">
+                        {t('whatsapp.cloud.token')}
+                      </label>
+                      <input
+                        id={`wa-meta-token-${account.id}`}
+                        type="password"
+                        autoComplete="off"
+                        className="modern-input w-full"
+                        value={tokenEdit.metaToken}
+                        onChange={(event) => {
+                          const metaToken = event.target.value
+                          setTokenEdit((c) => (c ? { ...c, metaToken } : c))
+                        }}
+                      />
+                      <p className="field-hint">{t('whatsapp.cloud.updateTokenHint')}</p>
+                    </div>
+                    {!managed && (
+                      <div>
+                        <label htmlFor={`wa-meta-admin-key-${account.id}`} className="field-label">
+                          {t('settings.whatsapp.adminKey')}
+                        </label>
+                        <input
+                          id={`wa-meta-admin-key-${account.id}`}
+                          type="password"
+                          autoComplete="off"
+                          className="modern-input w-full"
+                          value={tokenEdit.adminKey}
+                          onChange={(event) => {
+                            const adminKey = event.target.value
+                            setTokenEdit((c) => (c ? { ...c, adminKey } : c))
+                          }}
+                        />
+                        <p className="field-hint">{t('settings.whatsapp.adminKeyHint')}</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        className="modern-button"
+                        disabled={busy || !tokenEdit.metaToken.trim()}
+                        onClick={() => void saveMetaToken(account)}
+                      >
+                        {busy ? t('common.saving') : t('common.save')}
+                      </button>
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        onClick={() => setTokenEdit(null)}
+                      >
+                        {t('common.cancel')}
+                      </button>
+                    </div>
                   </div>
                 )}
 
