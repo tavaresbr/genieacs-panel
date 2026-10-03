@@ -326,9 +326,23 @@ WhatsApp, e o painel **sincroniza** a lista (`wa_meta_templates`, por número).
 | `GET /api/whatsapp/meta-templates?accountId=&usable=1` | `whatsapp.read` | lista; `usable` = `APPROVED` e formato suportado |
 | `GET/PUT /api/whatsapp/meta-notice-bindings` | `campaigns.read` / `campaigns.manage` | modelo de cada aviso automático (`maintenance`, `outage`, `alert`) |
 
-Suportado = corpo com parâmetros posicionais; cabeçalho com mídia ou
-variável, botão com URL dinâmica, parâmetro nomeado e AUTHENTICATION ficam
-de fora do seletor.
+Suportado = corpo com parâmetros posicionais, e:
+
+- cabeçalho ausente, de mídia (`IMAGE`, `VIDEO`, `DOCUMENT`, enviada por
+  link) ou de texto com no máximo uma variável;
+- botão de URL com o sufixo dinâmico `{{1}}` no fim da URL, no máximo um
+  botão assim por modelo.
+
+Ficam de fora do seletor: cabeçalho `LOCATION`, parâmetro nomeado (no corpo
+ou no cabeçalho), sufixo no meio da URL, dois botões dinâmicos e
+AUTHENTICATION.
+
+Cada modelo sincronizado traz `headerFormat` (`NONE`, `TEXT`, `IMAGE`,
+`VIDEO`, `DOCUMENT`, `LOCATION`), `headerParamCount` e `buttons`
+(`[{index, type, urlHasParam}]`), guardados em `wa_meta_templates`
+(`header_format`, `header_param_count`, `buttons_json` — migration `0091`).
+Uma cópia sincronizada antes da `0091` continua "não suportada" até a próxima
+sincronização.
 
 **Ligações.**
 
@@ -336,13 +350,56 @@ de fora do seletor.
   `metaParams` — a lista ordenada das nossas variáveis que preenchem `{{1}}`,
   `{{2}}`…; `texto` é o texto inteiro já renderizado. Conferido ao salvar
   (`meta_param_mismatch`, `meta_template_unavailable`). A régua, a cobrança
-  avulsa e a campanha montam a foto `{name, language, params}` por
-  destinatário (`wa_broadcast_recipients.meta_template`); variável vazia pula
-  o destinatário como `templateIncomplete`.
-- Aviso automático: um modelo de até um parâmetro, que recebe o aviso inteiro.
+  avulsa e a campanha montam a foto `{name, language, params, header?,
+  buttons?}` por destinatário (`wa_broadcast_recipients.meta_template`);
+  variável vazia pula o destinatário como `templateIncomplete`.
+- Cabeçalho do modelo (`metaHeader`, coluna `meta_header`):
+  `{source, value}`, obrigatório quando o modelo tem cabeçalho de mídia ou de
+  texto com variável (`meta_header_mismatch`):
+  - `variable` — uma variável da categoria; na mídia, o valor é o link (ex.
+    `link_boleto` → documento com `filename` `boleto.pdf`, ou o nome do fim
+    do link quando ele tem extensão). Link vazio ou que não é `https` conta
+    como variável vazia;
+  - `url` — um endereço `https` fixo, conferido ao salvar;
+  - `attachment` — o anexo da campanha, resolvido no envio como
+    `publicMediaUrl(webhookBaseUrl, id da mensagem)`; mensagem sem anexo
+    falha com `meta_header_missing` (sem endereço público, `no_public_url`).
+  O cabeçalho de texto aceita só `variable`.
+- Botão dinâmico (`metaButtonParam`, colunas `meta_button_param` e
+  `meta_button_index`): a variável que completa a URL, obrigatória quando o
+  modelo tem o botão (`meta_button_mismatch`). O índice do botão no modelo é
+  guardado na ligação, porque a Meta identifica o botão pela posição.
+- O que o modelo escolhido não pede é descartado ao salvar.
+- Aviso automático: um modelo de até um parâmetro, que recebe o aviso
+  inteiro, sem cabeçalho de mídia/variável nem botão dinâmico.
 - Atendente: `POST /conversations/:id/messages` aceita `metaTemplate`
-  `{name, language, params}`, conferido contra o número que envia; a conversa
-  mostra o texto do modelo preenchido.
+  `{name, language, params, header?, buttons?}`, conferido contra o número
+  que envia (o cabeçalho e os botões que o modelo pede, nem mais nem menos;
+  `meta_template_unavailable`); a conversa mostra o texto do modelo
+  preenchido. `header` é `{type: 'image'|'video'|'document', link,
+  filename?}` ou `{type: 'text', params: [texto]}`; `buttons` é
+  `[{index, param}]`.
+
+Na fila (`wa_messages.meta_template`) o link da mídia só passa se for
+`https` (sem usuário/senha, até 1024 caracteres) e o `filename` é cortado a
+80 caracteres, sem caminho nem caractere de controle.
+
+O corpo enviado a `POST /message/sendTemplate/{instância}` segue a Cloud
+API, que o Evolution repassa à Meta:
+
+```json
+{
+  "number": "5593…", "name": "boleto_documento", "language": "pt_BR",
+  "components": [
+    { "type": "header", "parameters": [{ "type": "document", "document": { "link": "https://…", "filename": "boleto.pdf" } }] },
+    { "type": "body", "parameters": [{ "type": "text", "text": "Maria" }] },
+    { "type": "button", "sub_type": "url", "index": "1", "parameters": [{ "type": "text", "text": "23790001" }] }
+  ]
+}
+```
+
+Imagem e vídeo: `{type: 'image', image: {link}}` / `{type: 'video', video:
+{link}}`.
 
 O envio decide pela janela: aberta, texto; fechada, o modelo, se houver.
 

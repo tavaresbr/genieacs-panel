@@ -9,8 +9,12 @@ import { ATTACHMENT_TYPES } from '../config/waAttachmentTypes.js';
 import { safeContentType } from './waMediaFile.js';
 import { clientForAccount } from './evolutionClient.js';
 import {
+  normalizeMetaButtons,
+  normalizeMetaHeader,
   readMetaError,
   readSentId,
+  sanitizeMetaFilename,
+  sanitizeMetaLink,
   sanitizeMetaParam,
   sendAudioRequest,
   sendMediaRequest,
@@ -206,7 +210,8 @@ class WaSendService {
     const decisao = cloudDecision(account, conversation, modelo);
     if (decisao === 'refuse') throw windowClosed();
     if (decisao === 'template') {
-      const { data } = await sendCloud(() => client.sendOrThrow(sendTemplateRequest(account.name, number, modelo)));
+      const pronto = resolveTemplateHeader(modelo, message, config);
+      const { data } = await sendCloud(() => client.sendOrThrow(sendTemplateRequest(account.name, number, pronto)));
       return { accountId: account.id, externalId: readSentId(data), sentAs: 'template' };
     }
     const externalId = WhatsAppAccount.isCloud(account)
@@ -347,7 +352,9 @@ async function sendCloud(fn) {
 
 /**
  * O modelo da Meta como ele vai para a fila: nome, idioma e os parâmetros já
- * prontos, na ordem do `{{1}}`, `{{2}}`… Qualquer coisa fora disso é ignorada.
+ * prontos, na ordem do `{{1}}`, `{{2}}`…, mais o cabeçalho (mídia só por link
+ * https, nome de arquivo curto; ou a marca `attachment`, resolvida no envio) e
+ * os sufixos dos botões de URL dinâmica. Qualquer coisa fora disso é ignorada.
  */
 export function normalizeMetaTemplate(input) {
   if (!input || typeof input !== 'object') return null;
@@ -355,7 +362,38 @@ export function normalizeMetaTemplate(input) {
   const language = String(input.language ?? '').trim().slice(0, 16);
   if (!/^[a-z0-9_]+$/.test(name) || !/^[A-Za-z]{2,3}(_[A-Za-z0-9]{2,8})?$/.test(language)) return null;
   const params = (Array.isArray(input.params) ? input.params : []).slice(0, 20).map(sanitizeMetaParam);
-  return { name, language, params };
+  const header = normalizeMetaHeader(input.header);
+  const buttons = normalizeMetaButtons(input.buttons);
+  return {
+    name,
+    language,
+    params,
+    ...(header ? { header } : {}),
+    ...(buttons.length ? { buttons } : {})
+  };
+}
+
+/**
+ * O cabeçalho `attachment` vira o link do anexo DESTA mensagem — o mesmo
+ * endereço assinado que o envio de mídia comum usa. Sem anexo, sem endereço
+ * público ou com endereço que não é https, recusa: a Meta não aceita modelo
+ * de mídia sem a mídia.
+ */
+function resolveTemplateHeader(modelo, message, config) {
+  if (modelo?.header?.source !== 'attachment') return modelo;
+  if (!message.attachment_path) {
+    throw new WaError('whatsapp.error.metaHeaderMissing', { code: 'meta_header_missing', status: 409 });
+  }
+  const url = publicMediaUrl(config?.webhookBaseUrl, message.id);
+  if (!url) throw new WaError('whatsapp.error.noPublicUrl', { code: 'no_public_url', status: 409 });
+  const link = sanitizeMetaLink(url);
+  if (!link) throw new WaError('whatsapp.error.metaHeaderMissing', { code: 'meta_header_missing', status: 409 });
+  const header = { type: modelo.header.type, link };
+  if (header.type === 'document') {
+    const filename = sanitizeMetaFilename(message.attachment_name);
+    if (filename) header.filename = filename;
+  }
+  return { ...modelo, header };
 }
 
 function parseMetaTemplate(raw) {

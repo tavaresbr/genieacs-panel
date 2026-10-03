@@ -3697,8 +3697,31 @@ export interface WhatsAppTemplate {
   metaLanguage?: string | null
   /** Nossas variáveis, na ordem de `{{1}}`, `{{2}}`… (`texto` = o texto inteiro). */
   metaParams?: string[]
+  /** De onde vem o cabeçalho do modelo da Meta (mídia ou texto com variável). */
+  metaHeader?: MetaHeaderBinding | null
+  /** A variável que completa a URL do botão dinâmico do modelo da Meta. */
+  metaButtonParam?: string | null
   createdAt: string | null
   updatedAt: string | null
+}
+
+/**
+ * A origem do cabeçalho na ligação de um modelo do painel: o anexo da
+ * campanha, uma variável (o link, ex. `link_boleto`, ou o texto do cabeçalho)
+ * ou uma URL https fixa.
+ */
+export interface MetaHeaderBinding {
+  source: 'attachment' | 'variable' | 'url'
+  value: string | null
+}
+
+export type MetaHeaderFormat = 'NONE' | 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'LOCATION' | 'UNKNOWN'
+
+/** Um botão do modelo; `urlHasParam` = URL com `{{1}}`, que pede o sufixo no envio. */
+export interface WhatsAppMetaTemplateButton {
+  index: number
+  type: string
+  urlHasParam: boolean
 }
 
 /** Um modelo (template) da conta WABA de um número oficial, sincronizado da Meta. */
@@ -3712,6 +3735,10 @@ export interface WhatsAppMetaTemplate {
   bodyText: string
   paramCount: number
   paramFormat: 'positional' | 'named'
+  headerFormat: MetaHeaderFormat
+  /** Variáveis no cabeçalho de texto (no máximo 1). */
+  headerParamCount: number
+  buttons: WhatsAppMetaTemplateButton[]
   supported: boolean
   /** Aprovado e com formato que o painel sabe enviar. */
   usable: boolean
@@ -3726,6 +3753,10 @@ export interface MetaTemplatePayload {
   name: string
   language: string
   params: string[]
+  /** Mídia por link https, ou o texto do cabeçalho com a sua variável. */
+  header?: { type: 'image' | 'video' | 'document'; link: string; filename?: string } | { type: 'text'; params: string[] }
+  /** O sufixo de cada botão de URL dinâmica, pelo índice do botão no modelo. */
+  buttons?: { index: number; param: string }[]
 }
 
 export interface WhatsAppOptOut {
@@ -4443,6 +4474,8 @@ export const whatsappAPI = {
     metaTemplateName?: string
     metaLanguage?: string
     metaParams?: string[]
+    metaHeader?: MetaHeaderBinding | null
+    metaButtonParam?: string | null
   }) =>
     apiClient.post<WhatsAppTemplate>('/whatsapp/templates', payload),
 
@@ -4454,6 +4487,8 @@ export const whatsappAPI = {
     metaTemplateName: string
     metaLanguage: string
     metaParams: string[]
+    metaHeader: MetaHeaderBinding | null
+    metaButtonParam: string | null
   }>) =>
     apiClient.put<WhatsAppTemplate>(`/whatsapp/templates/${id}`, patch),
 

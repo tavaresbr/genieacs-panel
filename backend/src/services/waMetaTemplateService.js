@@ -2,7 +2,13 @@ import AppState from '../models/AppState.js';
 import WaMetaTemplate from '../models/WaMetaTemplate.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { WaError } from './whatsappConfigService.js';
-import { findMetaTemplatesRequest, readMetaTemplates, sanitizeMetaParam } from '../utils/wa/evolutionApi.js';
+import {
+  findMetaTemplatesRequest,
+  readMetaTemplates,
+  sanitizeMetaFilename,
+  sanitizeMetaLink,
+  sanitizeMetaParam
+} from '../utils/wa/evolutionApi.js';
 
 /** O texto inteiro já renderizado, em uma linha — vale para qualquer modelo. */
 export const TEXTO_COMPLETO = 'texto';
@@ -24,6 +30,50 @@ function lerParams(raw) {
   } catch {
     return [];
   }
+}
+
+function lerJson(raw, padrao) {
+  if (!raw) return padrao;
+  try {
+    return JSON.parse(raw) ?? padrao;
+  } catch {
+    return padrao;
+  }
+}
+
+/** Formatos de cabeçalho que saem por link de mídia. */
+const MIDIA = new Set(['IMAGE', 'VIDEO', 'DOCUMENT']);
+/** Origens do cabeçalho de mídia na ligação de um modelo do painel. */
+const ORIGENS = new Set(['attachment', 'variable', 'url']);
+
+/** Os botões guardados de um modelo da Meta: `[{index, type, urlHasParam}]`. */
+export function metaButtons(row) {
+  const lista = lerJson(row?.buttons_json, []);
+  return (Array.isArray(lista) ? lista : []).map((b) => ({
+    index: Number(b?.index) || 0,
+    type: String(b?.type ?? ''),
+    urlHasParam: Boolean(b?.urlHasParam)
+  }));
+}
+
+/** O formato do cabeçalho de um modelo guardado (`NONE` sem cabeçalho). */
+export function metaHeaderFormat(row) {
+  return String(row?.header_format || 'NONE').toUpperCase();
+}
+
+/**
+ * O nome do documento no cabeçalho: o do fim do link quando ele tem extensão;
+ * senão um nome pela variável (`link_boleto` → `boleto.pdf`).
+ */
+export function metaFilename(variavel, link) {
+  try {
+    const ultimo = decodeURIComponent(new URL(link).pathname.split('/').pop() || '');
+    if (/^[^.]+\.[A-Za-z0-9]{2,5}$/.test(ultimo)) return sanitizeMetaFilename(ultimo);
+  } catch {
+    // link já conferido; sem nome no caminho, cai no padrão abaixo
+  }
+  const base = String(variavel || '').replace(/^link_/, '').replace(/[^A-Za-z0-9_-]/g, '') || 'documento';
+  return `${base}.pdf`;
 }
 
 /**
@@ -88,6 +138,9 @@ class WaMetaTemplateService {
       bodyText: row.body_text || '',
       paramCount: Number(row.param_count) || 0,
       paramFormat: row.param_format === 'named' ? 'named' : 'positional',
+      headerFormat: metaHeaderFormat(row),
+      headerParamCount: Number(row.header_param_count) || 0,
+      buttons: metaButtons(row),
       supported: Boolean(row.supported),
       usable: row.status === 'APPROVED' && Boolean(row.supported),
       syncedAt: row.synced_at || null
@@ -110,12 +163,33 @@ class WaMetaTemplateService {
   /**
    * Confere a ligação de um modelo do painel a um modelo da Meta.
    *
+   * Além do corpo, o modelo pode pedir:
+   *
+   *   - cabeçalho de mídia: uma origem — `attachment` (o anexo da campanha,
+   *     resolvido no envio), `variable` (uma variável com o link, ex.
+   *     `link_boleto`) ou `url` (um endereço https fixo);
+   *   - cabeçalho de texto com variável: a variável que o preenche;
+   *   - botão de URL dinâmica: a variável que completa o fim da URL.
+   *
+   * O que o modelo não pede é descartado, para uma ligação trocada de modelo
+   * não carregar a origem do anterior.
+   *
    * @param {string[]} variaveis as variáveis que a categoria do modelo aceita
-   * @returns {Promise<{ meta_template_name: string|null, meta_language: string|null, meta_params: string|null }>}
+   * @returns {Promise<{ meta_template_name: string|null, meta_language: string|null, meta_params: string|null,
+   *   meta_header: string|null, meta_button_param: string|null, meta_button_index: number|null }>}
    */
-  static async validateMapping({ metaTemplateName, metaLanguage, metaParams }, variaveis) {
+  static async validateMapping({ metaTemplateName, metaLanguage, metaParams, metaHeader, metaButtonParam }, variaveis) {
     const nome = String(metaTemplateName ?? '').trim();
-    if (!nome) return { meta_template_name: null, meta_language: null, meta_params: null };
+    if (!nome) {
+      return {
+        meta_template_name: null,
+        meta_language: null,
+        meta_params: null,
+        meta_header: null,
+        meta_button_param: null,
+        meta_button_index: null
+      };
+    }
     const modelo = await this.requireUsable(nome, metaLanguage);
     const params = (Array.isArray(metaParams) ? metaParams : []).map((v) => String(v ?? '').trim());
     const aceitas = new Set([...variaveis, TEXTO_COMPLETO]);
@@ -126,14 +200,58 @@ class WaMetaTemplateService {
         vars: { count: Number(modelo.param_count) }
       });
     }
-    return { meta_template_name: modelo.name, meta_language: modelo.language, meta_params: JSON.stringify(params) };
+    const header = this.validateHeader(modelo, metaHeader, variaveis);
+    const dinamico = metaButtons(modelo).find((b) => b.urlHasParam) ?? null;
+    let botao = null;
+    if (dinamico) {
+      botao = String(metaButtonParam ?? '').trim();
+      if (!variaveis.includes(botao)) {
+        throw new WaError('whatsapp.error.metaButtonMismatch', { code: 'meta_button_mismatch', status: 400 });
+      }
+    }
+    return {
+      meta_template_name: modelo.name,
+      meta_language: modelo.language,
+      meta_params: JSON.stringify(params),
+      meta_header: header ? JSON.stringify(header) : null,
+      meta_button_param: botao,
+      meta_button_index: dinamico ? dinamico.index : null
+    };
+  }
+
+  /** A origem do cabeçalho conferida contra o modelo, ou `null` se ele não pede. */
+  static validateHeader(modelo, metaHeader, variaveis) {
+    const formato = metaHeaderFormat(modelo);
+    const recusa = () => new WaError('whatsapp.error.metaHeaderMismatch', { code: 'meta_header_mismatch', status: 400 });
+    const source = String(metaHeader?.source ?? '').trim();
+    const value = String(metaHeader?.value ?? '').trim();
+    if (formato === 'TEXT' && Number(modelo.header_param_count) > 0) {
+      // Cabeçalho é curto (60 caracteres): o texto inteiro não serve ali.
+      if (source !== 'variable' || !variaveis.includes(value)) throw recusa();
+      return { source, value, type: 'text' };
+    }
+    if (!MIDIA.has(formato)) return null;
+    const type = formato.toLowerCase();
+    if (!ORIGENS.has(source)) throw recusa();
+    if (source === 'attachment') return { source, value: null, type };
+    if (source === 'variable') {
+      if (!variaveis.includes(value)) throw recusa();
+      return { source, value, type };
+    }
+    const link = sanitizeMetaLink(value);
+    if (!link) throw recusa();
+    return { source, value: link, type };
   }
 
   /**
-   * A foto do modelo Meta para UMA mensagem: nome, idioma e os parâmetros já
-   * preenchidos. `null` quando o modelo do painel não aponta para nenhum;
-   * `{ incomplete }` quando falta o valor de uma variável — a mesma regra do
-   * texto, que não sai com buraco.
+   * A foto do modelo Meta para UMA mensagem: nome, idioma, os parâmetros já
+   * preenchidos e, quando o modelo pede, o cabeçalho e o sufixo do botão.
+   * `null` quando o modelo do painel não aponta para nenhum; `{ incomplete }`
+   * quando falta o valor de uma variável — a mesma regra do texto, que não sai
+   * com buraco. Um link de variável que não é https conta como faltando.
+   *
+   * Origem `attachment` vai como `{ type, source: 'attachment' }`: o link do
+   * anexo é assinado por mensagem e por quinze minutos, e só existe no envio.
    */
   static buildPayload(waTemplate, vars = {}, renderedBody = '') {
     if (!waTemplate?.meta_template_name) return null;
@@ -145,8 +263,41 @@ class WaMetaTemplateService {
       if (!limpo) vazias.push(nome);
       return limpo;
     });
+    const header = this.buildHeader(lerJson(waTemplate.meta_header, null), vars, vazias);
+    let buttons = null;
+    if (waTemplate.meta_button_param) {
+      const sufixo = sanitizeMetaParam(vars[waTemplate.meta_button_param]);
+      if (!sufixo) vazias.push(waTemplate.meta_button_param);
+      buttons = [{ index: Number(waTemplate.meta_button_index) || 0, param: sufixo }];
+    }
     if (vazias.length) return { incomplete: vazias };
-    return { name: waTemplate.meta_template_name, language: waTemplate.meta_language, params };
+    return {
+      name: waTemplate.meta_template_name,
+      language: waTemplate.meta_language,
+      params,
+      ...(header ? { header } : {}),
+      ...(buttons ? { buttons } : {})
+    };
+  }
+
+  static buildHeader(ligacao, vars, vazias) {
+    if (!ligacao || typeof ligacao !== 'object') return null;
+    const { source, value, type } = ligacao;
+    if (type === 'text') {
+      const texto = sanitizeMetaParam(vars[value]);
+      if (!texto) vazias.push(value);
+      return { type, params: [texto] };
+    }
+    if (!['image', 'video', 'document'].includes(type)) return null;
+    if (source === 'attachment') return { type, source: 'attachment' };
+    const link = sanitizeMetaLink(source === 'variable' ? vars[value] : value);
+    if (!link) {
+      vazias.push(source === 'variable' ? value : 'url');
+      return null;
+    }
+    return type === 'document'
+      ? { type, link, filename: metaFilename(source === 'variable' ? value : '', link) }
+      : { type, link };
   }
 
   // ── Avisos automáticos ─────────────────────────────────────────────
@@ -184,7 +335,9 @@ class WaMetaTemplateService {
       }
       // eslint-disable-next-line no-await-in-loop -- três chaves
       const modelo = await this.requireUsable(b.name, b.language);
-      if (Number(modelo.param_count) > 1) {
+      // O aviso só tem o texto: modelo que pede cabeçalho ou sufixo de botão
+      // não teria de onde tirar o resto.
+      if (Number(modelo.param_count) > 1 || this.needsExtras(modelo)) {
         throw new WaError('whatsapp.error.metaParamMismatch', {
           code: 'meta_param_mismatch', status: 400, vars: { count: 1 }
         });
@@ -202,15 +355,41 @@ class WaMetaTemplateService {
     return { name: b.name, language: b.language, params: b.paramCount ? [sanitizeMetaParam(body)] : [] };
   }
 
-  /** O modelo de um envio do operador, conferido contra o número que vai enviar. */
+  /** Se o modelo pede mais que o corpo: cabeçalho de mídia ou com variável, ou sufixo de botão. */
+  static needsExtras(row) {
+    const formato = metaHeaderFormat(row);
+    return MIDIA.has(formato)
+      || (formato === 'TEXT' && Number(row.header_param_count) > 0)
+      || metaButtons(row).some((b) => b.urlHasParam);
+  }
+
+  /**
+   * O modelo de um envio do operador, conferido contra o número que vai enviar:
+   * os parâmetros do corpo, o cabeçalho que o modelo pede (mídia do mesmo tipo,
+   * por link — o atendente não usa a origem `attachment`) e o sufixo de cada
+   * botão dinâmico, nem mais nem menos.
+   */
   static async checkForAccount(account, metaTemplate) {
     if (!metaTemplate) return null;
     const row = await WaMetaTemplate.find(account.id, metaTemplate.name, metaTemplate.language);
+    const recusa = () => new WaError('whatsapp.error.metaTemplateUnavailable', { code: 'meta_template_unavailable', status: 400 });
     if (!row || row.status !== 'APPROVED' || !row.supported
       || metaTemplate.params.length !== Number(row.param_count)
       || metaTemplate.params.some((p) => !p)) {
-      throw new WaError('whatsapp.error.metaTemplateUnavailable', { code: 'meta_template_unavailable', status: 400 });
+      throw recusa();
     }
+    const formato = metaHeaderFormat(row);
+    const header = metaTemplate.header ?? null;
+    if (MIDIA.has(formato)) {
+      if (!header || header.type !== formato.toLowerCase() || !header.link) throw recusa();
+    } else if (formato === 'TEXT' && Number(row.header_param_count) > 0) {
+      if (header?.type !== 'text' || header.params.length !== 1) throw recusa();
+    } else if (header) {
+      throw recusa();
+    }
+    const pedidos = metaButtons(row).filter((b) => b.urlHasParam).map((b) => b.index).sort((a, b) => a - b);
+    const enviados = (metaTemplate.buttons ?? []).map((b) => b.index);
+    if (pedidos.join(',') !== enviados.join(',')) throw recusa();
     return row;
   }
 
