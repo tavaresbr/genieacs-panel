@@ -7,7 +7,9 @@ import assert from 'node:assert/strict';
 
 import {
   createBusinessInstanceRequest,
+  createMetaTemplateRequest,
   findMetaTemplatesRequest,
+  readCreatedTemplate,
   readMetaError,
   readMetaTemplates,
   sanitizeMetaParam,
@@ -18,6 +20,7 @@ import { lerFalhaDeEnvio, lerRecibo } from '../src/utils/wa/waRecibo.js';
 
 const { isPermanentFailure } = await import('../src/services/waSendFailure.js');
 const { WaError } = await import('../src/services/whatsappConfigService.js');
+const { validateMetaTemplateInput } = await import('../src/services/waMetaTemplateService.js');
 
 describe('payloads da integração WHATSAPP-BUSINESS', () => {
   test('o create leva o token, o Phone Number ID e a WABA, sem QR', () => {
@@ -163,5 +166,98 @@ describe('recibos da API oficial', () => {
     assert.deepEqual(falha.ids, ['wamid.2']);
     assert.match(falha.errorText, /131047/);
     assert.equal(lerFalhaDeEnvio({ data: { keyId: 'wamid.2', status: 'DELIVERED' } }), null);
+  });
+});
+
+describe('criar modelo na Meta: o pedido', () => {
+  test('só corpo, sem variável: sem example, pela chave da instância', () => {
+    const r = createMetaTemplateRequest('oficial x', {
+      name: 'aviso_geral', category: 'UTILITY', language: 'pt_BR', bodyText: 'Aviso do provedor', examples: []
+    });
+    assert.equal(r.path, '/template/create/oficial%20x');
+    assert.equal(r.method, 'POST');
+    assert.equal(r.key, 'instance');
+    assert.equal(r.body.allowCategoryChange, true);
+    assert.deepEqual(r.body.components, [{ type: 'BODY', text: 'Aviso do provedor' }]);
+  });
+
+  test('corpo com variáveis leva uma linha de exemplo; cabeçalho, rodapé e botões na ordem', () => {
+    const r = createMetaTemplateRequest('oficial', {
+      name: 'fatura',
+      category: 'UTILITY',
+      language: 'pt_BR',
+      bodyText: 'Olá {{1}}, vence {{2}}.',
+      examples: ['Ana', '10/10'],
+      headerText: 'Sua fatura',
+      footerText: 'Provedor X',
+      buttons: [
+        { type: 'URL', text: 'Pagar', url: 'https://pague.test/x' },
+        { type: 'QUICK_REPLY', text: 'Já paguei' }
+      ]
+    });
+    assert.deepEqual(r.body.components.map((c) => c.type), ['HEADER', 'BODY', 'FOOTER', 'BUTTONS']);
+    assert.deepEqual(r.body.components[0], { type: 'HEADER', format: 'TEXT', text: 'Sua fatura' });
+    assert.deepEqual(r.body.components[1].example, { body_text: [['Ana', '10/10']] });
+    assert.deepEqual(r.body.components[3].buttons, [
+      { type: 'URL', text: 'Pagar', url: 'https://pague.test/x' },
+      { type: 'QUICK_REPLY', text: 'Já paguei' }
+    ]);
+  });
+
+  test('a resposta da criação vem na raiz ou em data', () => {
+    assert.deepEqual(readCreatedTemplate({ id: 99, status: 'pending', category: 'utility' }),
+      { id: '99', status: 'PENDING', category: 'UTILITY' });
+    assert.deepEqual(readCreatedTemplate({ data: { id: '7', status: 'APPROVED' } }),
+      { id: '7', status: 'APPROVED', category: null });
+    assert.deepEqual(readCreatedTemplate(null), { id: null, status: null, category: null });
+  });
+});
+
+describe('criar modelo na Meta: a validação', () => {
+  const base = { name: 'aviso', category: 'UTILITY', language: 'pt_BR', bodyText: 'Oi {{1}}', examples: ['Ana'] };
+  const campo = (input) => {
+    try {
+      validateMetaTemplateInput(input);
+    } catch (error) {
+      assert.ok(error instanceof WaError);
+      assert.equal(error.code, 'invalid_meta_template');
+      assert.equal(error.status, 400);
+      return error.details.field;
+    }
+    return null;
+  };
+
+  test('normaliza nome, categoria, idioma e variáveis', () => {
+    const m = validateMetaTemplateInput({
+      name: '  Aviso Fatura ', category: 'marketing', language: '', bodyText: ' Oi {{ 1 }} ', examples: ['Ana\nSilva']
+    });
+    assert.equal(m.name, 'aviso_fatura');
+    assert.equal(m.category, 'MARKETING');
+    assert.equal(m.language, 'pt_BR');
+    assert.equal(m.bodyText, 'Oi {{1}}');
+    assert.deepEqual(m.examples, ['Ana · Silva']);
+    assert.equal(m.paramCount, 1);
+    assert.equal(m.headerText, null);
+    assert.deepEqual(m.buttons, []);
+  });
+
+  test('aponta o campo errado', () => {
+    assert.equal(campo({ ...base, name: 'aviso-fatura!' }), 'name');
+    assert.equal(campo({ ...base, category: 'AUTHENTICATION' }), 'category');
+    assert.equal(campo({ ...base, language: 'portugues' }), 'language');
+    assert.equal(campo({ ...base, bodyText: '' }), 'bodyText');
+    assert.equal(campo({ ...base, bodyText: 'x'.repeat(1025) }), 'bodyText');
+    assert.equal(campo({ ...base, bodyText: 'Oi {{1}} e {{3}}', examples: ['a', 'b', 'c'] }), 'variables');
+    assert.equal(campo({ ...base, bodyText: 'Oi {{nome}}', examples: ['a'] }), 'variables');
+    assert.equal(campo({ ...base, examples: [] }), 'examples');
+    assert.equal(campo({ ...base, examples: ['  '] }), 'examples');
+    assert.equal(campo({ ...base, headerText: 'Olá {{1}}' }), 'headerText');
+    assert.equal(campo({ ...base, footerText: 'x'.repeat(61) }), 'footerText');
+    const botao = { type: 'QUICK_REPLY', text: 'Ok' };
+    assert.equal(campo({ ...base, buttons: [botao, botao, botao, botao] }), 'buttons');
+    assert.equal(campo({ ...base, buttons: [{ type: 'URL', text: 'Pagar', url: 'http://inseguro.test' }] }), 'buttons');
+    assert.equal(campo({ ...base, buttons: [{ type: 'PHONE_NUMBER', text: 'Ligar' }] }), 'buttons');
+    assert.equal(campo({ ...base, buttons: [{ type: 'QUICK_REPLY', text: 'x'.repeat(26) }] }), 'buttons');
+    assert.equal(campo({ ...base, footerText: 'x'.repeat(60), buttons: [botao] }), null);
   });
 });

@@ -241,6 +241,18 @@ export const casos = [
     controleSoNaoAchou: true
   },
   {
+    // Criar modelo na Meta. A conta é carregada antes de validar o corpo, então
+    // o id do vizinho dá 404 mesmo com corpo válido; no controle, o número
+    // semeado (por QR) dá 409 `meta_templates_cloud_only` — achado, recusado.
+    chave: 'account',
+    label: 'POST /api/whatsapp/accounts/:id/templates',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/accounts/${id}/templates`,
+    body: { name: 'aviso_vizinho', category: 'UTILITY', language: 'pt_BR', bodyText: 'Olá' },
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
     chave: 'account',
     label: 'POST /api/whatsapp/accounts/:id/webhook/probe',
     method: 'POST',

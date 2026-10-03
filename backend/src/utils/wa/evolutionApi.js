@@ -422,6 +422,87 @@ export function findMetaTemplatesRequest(name) {
 }
 
 /**
+ * Pede à Meta (pelo servidor Evolution) um modelo novo na conta WABA do número.
+ *
+ * O servidor repassa o corpo à Graph API (`POST /{waba}/message_templates`)
+ * quase sem tocar, então o formato é o da Meta: `components` com HEADER, BODY,
+ * FOOTER e BUTTONS, nessa ordem. Só o que o painel sabe ENVIAR depois entra
+ * aqui — cabeçalho de texto sem variável, corpo com `{{n}}` posicionais e
+ * botões sem URL dinâmica —, para o modelo criado aqui sair `supported` na
+ * sincronização em vez de ficar visível e inútil.
+ *
+ * `example.body_text` é obrigatório na Meta quando o corpo tem variável (a
+ * revisão recusa sem exemplo) e proibido quando não tem; vai uma linha só, com
+ * um valor por variável. `allowCategoryChange` deixa a Meta reclassificar
+ * (UTILITY que parece promoção vira MARKETING) em vez de recusar o modelo.
+ *
+ * Recebe o modelo já validado (`validateMetaTemplateInput`): o builder não
+ * confere nada, só monta.
+ *
+ * @param {string} instanceName
+ * @param {{ name: string, category: string, language: string, bodyText: string,
+ *           examples?: string[], headerText?: string, footerText?: string,
+ *           buttons?: { type: 'URL'|'QUICK_REPLY', text: string, url?: string }[] }} t
+ * @returns {EvoRequest}
+ */
+export function createMetaTemplateRequest(instanceName, t) {
+  const components = [];
+  if (t.headerText) components.push({ type: 'HEADER', format: 'TEXT', text: t.headerText });
+  const corpo = { type: 'BODY', text: t.bodyText };
+  const examples = Array.isArray(t.examples) ? t.examples : [];
+  if (/\{\{\s*\d+\s*\}\}/.test(String(t.bodyText ?? '')) && examples.length) {
+    corpo.example = { body_text: [examples.map((v) => String(v))] };
+  }
+  components.push(corpo);
+  if (t.footerText) components.push({ type: 'FOOTER', text: t.footerText });
+  const buttons = Array.isArray(t.buttons) ? t.buttons : [];
+  if (buttons.length) {
+    components.push({
+      type: 'BUTTONS',
+      buttons: buttons.map((b) => (b.type === 'URL'
+        ? { type: 'URL', text: b.text, url: b.url }
+        : { type: 'QUICK_REPLY', text: b.text }))
+    });
+  }
+  return {
+    path: `/template/create/${enc(instanceName)}`,
+    method: 'POST',
+    key: 'instance',
+    body: {
+      name: t.name,
+      category: t.category,
+      allowCategoryChange: true,
+      language: t.language,
+      components
+    }
+  };
+}
+
+/**
+ * O que a Meta devolve ao criar: `{ id, status, category }` — o status quase
+ * sempre PENDING (a revisão leva de minutos a horas), e a categoria pode vir
+ * trocada quando `allowCategoryChange` deixou a Meta reclassificar. O servidor
+ * ora repassa na raiz, ora embrulha em `data`; os dois servem.
+ *
+ * @returns {{ id: string|null, status: string|null, category: string|null }}
+ */
+export function readCreatedTemplate(data) {
+  const raw = data && typeof data === 'object' ? data : {};
+  const inner = raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data) ? raw.data : null;
+  const pick = (campo) => {
+    const v = raw[campo] ?? inner?.[campo];
+    return v === undefined || v === null || v === '' ? null : String(v);
+  };
+  const status = pick('status');
+  const category = pick('category');
+  return {
+    id: pick('id'),
+    status: status ? status.toUpperCase() : null,
+    category: category ? category.toUpperCase() : null
+  };
+}
+
+/**
  * Envio de modelo aprovado — o único envio que a Meta aceita fora da janela de
  * 24 horas desde a última mensagem do cliente.
  *

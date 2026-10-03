@@ -61,6 +61,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   meta_templates_cloud_only: 'whatsapp.error.metaTemplatesCloudOnly',
   meta_template_unavailable: 'whatsapp.error.metaTemplateUnavailable',
   meta_param_mismatch: 'whatsapp.error.metaParamMismatch',
+  invalid_meta_template: 'whatsapp.error.invalidMetaTemplate',
   // Both reachable only from the inbox, and both were missing until the screen
   // that provokes them was built: an unknown code degrades to the generic
   // failure, which is not wrong but tells the operator nothing.

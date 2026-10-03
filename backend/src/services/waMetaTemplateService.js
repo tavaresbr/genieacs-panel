@@ -2,7 +2,13 @@ import AppState from '../models/AppState.js';
 import WaMetaTemplate from '../models/WaMetaTemplate.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { WaError } from './whatsappConfigService.js';
-import { findMetaTemplatesRequest, readMetaTemplates, sanitizeMetaParam } from '../utils/wa/evolutionApi.js';
+import {
+  createMetaTemplateRequest,
+  findMetaTemplatesRequest,
+  readCreatedTemplate,
+  readMetaTemplates,
+  sanitizeMetaParam
+} from '../utils/wa/evolutionApi.js';
 
 /** O texto inteiro já renderizado, em uma linha — vale para qualquer modelo. */
 export const TEXTO_COMPLETO = 'texto';
@@ -26,13 +32,109 @@ function lerParams(raw) {
   }
 }
 
+// ── Criação de modelo na Meta ────────────────────────────────────────
+//
+// Os limites são os da Meta (nome em minúsculas com `_`, corpo de até 1024,
+// cabeçalho e rodapé de até 60, até três botões de até 25 caracteres) somados
+// ao que o painel sabe enviar: variáveis só posicionais e só no corpo, botão
+// de URL fixa. Conferir aqui poupa a ida à Meta para uma recusa que já se sabe
+// e devolve o CAMPO errado ao formulário, coisa que o erro da Graph API, em
+// inglês e às vezes genérico, não faz.
+
+export const META_TEMPLATE_CATEGORIES = Object.freeze(['UTILITY', 'MARKETING']);
+const META_BUTTON_TYPES = new Set(['URL', 'QUICK_REPLY']);
+const META_NAME = /^[a-z0-9_]{1,512}$/;
+const META_LANGUAGE = /^[a-z]{2,3}(_[A-Z]{2})?$/;
+
+function recusa(field) {
+  return new WaError('whatsapp.error.invalidMetaTemplate', {
+    code: 'invalid_meta_template',
+    status: 400,
+    details: { field },
+    vars: { field }
+  });
+}
+
+/**
+ * Confere e normaliza o modelo que o operador quer criar. Pura: nada de banco
+ * nem de rede, para a recusa sair antes de qualquer pedido ao servidor.
+ *
+ * @returns {{ name: string, category: string, language: string, bodyText: string,
+ *             examples: string[], headerText: string|null, footerText: string|null,
+ *             buttons: { type: 'URL'|'QUICK_REPLY', text: string, url?: string }[],
+ *             paramCount: number }}
+ */
+export function validateMetaTemplateInput(input) {
+  const i = input && typeof input === 'object' ? input : {};
+
+  // Nome: a Meta só aceita minúsculas, dígitos e `_`. Espaço vira `_` para o
+  // operador poder digitar "aviso fatura" sem errar.
+  const name = String(i.name ?? '').trim().toLowerCase().replace(/\s+/g, '_');
+  if (!META_NAME.test(name)) throw recusa('name');
+
+  const category = String(i.category ?? '').trim().toUpperCase();
+  // AUTHENTICATION fica de fora de propósito: exige botão de código e o
+  // painel não envia esse tipo.
+  if (!META_TEMPLATE_CATEGORIES.includes(category)) throw recusa('category');
+
+  const language = String(i.language ?? '').trim() || 'pt_BR';
+  if (!META_LANGUAGE.test(language)) throw recusa('language');
+
+  // `{{ 1 }}` vira `{{1}}`: a Meta só reconhece a forma colada.
+  const bodyText = String(i.bodyText ?? '').trim().replace(/\{\{\s*(\d+)\s*\}\}/g, '{{$1}}');
+  if (!bodyText || bodyText.length > 1024) throw recusa('bodyText');
+
+  // Variáveis: só `{{1}}`, `{{2}}`… e sem pular número — a Meta recusa
+  // `{{1}} {{3}}` e o envio do painel monta os parâmetros pela posição.
+  if (/\{\{\s*[A-Za-z_][\w]*\s*\}\}/.test(bodyText)) throw recusa('variables');
+  const usados = [...bodyText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => Number(m[1]));
+  const paramCount = usados.length ? Math.max(...usados) : 0;
+  const distintos = new Set(usados);
+  for (let n = 1; n <= paramCount; n += 1) {
+    if (!distintos.has(n)) throw recusa('variables');
+  }
+  if (distintos.has(0)) throw recusa('variables');
+
+  const brutos = Array.isArray(i.examples) ? i.examples : [];
+  const examples = brutos.map((v) => sanitizeMetaParam(v));
+  if (examples.length !== paramCount || examples.some((v) => !v)) throw recusa('examples');
+
+  const headerText = String(i.headerText ?? '').trim() || null;
+  if (headerText && (headerText.length > 60 || /\{\{/.test(headerText))) throw recusa('headerText');
+
+  const footerText = String(i.footerText ?? '').trim() || null;
+  if (footerText && footerText.length > 60) throw recusa('footerText');
+
+  const brutosBotoes = Array.isArray(i.buttons) ? i.buttons : [];
+  if (brutosBotoes.length > 3) throw recusa('buttons');
+  const buttons = brutosBotoes.map((b) => {
+    const type = String(b?.type ?? '').trim().toUpperCase();
+    const text = String(b?.text ?? '').trim();
+    if (!META_BUTTON_TYPES.has(type) || !text || text.length > 25) throw recusa('buttons');
+    if (type === 'QUICK_REPLY') return { type, text };
+    const url = String(b?.url ?? '').trim();
+    let ok = false;
+    try {
+      ok = new URL(url).protocol === 'https:' && !/\{\{/.test(url);
+    } catch {
+      ok = false;
+    }
+    if (!ok) throw recusa('buttons');
+    return { type, text, url };
+  });
+
+  return { name, category, language, bodyText, examples, headerText, footerText, buttons, paramCount };
+}
+
 /**
  * Os modelos (templates) aprovados da Meta e o que liga o painel a eles.
  *
  * Num número oficial, fora da janela de 24 h só sai modelo aprovado. O painel
- * não cria modelo na Meta — o provedor cria e aprova lá —; ele SINCRONIZA a
- * lista e deixa cada modelo do painel (cobrança, campanha) e cada aviso
- * automático (manutenção, queda, alerta) apontar para um deles. Quem decide se
+ * SINCRONIZA a lista da Meta e deixa cada modelo do painel (cobrança, campanha)
+ * e cada aviso automático (manutenção, queda, alerta) apontar para um deles.
+ * Também pode PEDIR um modelo novo (`create`) — mas quem aprova é a Meta: o
+ * modelo nasce PENDING e só vira utilizável quando a revisão passa e uma
+ * sincronização traz o APPROVED. Quem decide se
  * a mensagem sai como texto ou como modelo é o envio (`waSendService`), pela
  * janela da conversa.
  */
@@ -60,6 +162,51 @@ class WaMetaTemplateService {
       await WhatsAppAccount.update(account.id, { meta_templates_error: falha(error) });
       throw error;
     }
+  }
+
+  /**
+   * Pede à Meta um modelo novo na conta WABA do número.
+   *
+   * A ordem importa: primeiro a conta (404 para id de fora, 409 para número
+   * por QR — a varredura de ids depende de nenhuma validação vir antes), depois
+   * o corpo, e só então a rede. Recusa de validação nunca chega ao servidor.
+   *
+   * Depois de criar, sincroniza: a lista local passa a ter o modelo PENDING com
+   * o id da linha. Se a sincronização falhar (a Meta às vezes demora a listar o
+   * que acabou de aceitar), o modelo criado não se perde — devolve-se o mínimo
+   * que se sabe, e a próxima sincronização traz a linha.
+   */
+  static async create(accountId, input) {
+    const { account, EvolutionInstanceService } = await this.requireCloudAccount(accountId);
+    const modelo = validateMetaTemplateInput(input);
+    const config = await EvolutionInstanceService.requireConfig();
+    const client = EvolutionInstanceService.clientFor(account, config);
+    const result = await client.sendOrThrow(createMetaTemplateRequest(account.name, modelo));
+    const created = readCreatedTemplate(result.data);
+
+    let rows = [];
+    try {
+      rows = await this.sync(account.id);
+    } catch {
+      rows = [];
+    }
+    const linha = rows.find((r) => r.name === modelo.name && r.language === modelo.language);
+    if (linha) return linha;
+    return {
+      id: null,
+      accountId: account.id,
+      name: modelo.name,
+      language: modelo.language,
+      category: created.category || modelo.category,
+      status: created.status || 'PENDING',
+      bodyText: modelo.bodyText,
+      paramCount: modelo.paramCount,
+      paramFormat: 'positional',
+      supported: true,
+      usable: false,
+      syncedAt: null,
+      metaId: created.id
+    };
   }
 
   /** Os modelos de um número, ou de todos os números oficiais do provedor. */
