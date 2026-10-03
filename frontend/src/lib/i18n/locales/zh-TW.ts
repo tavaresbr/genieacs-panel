@@ -2083,6 +2083,7 @@ const zhTW: Dictionary = {
   "settings.whatsapp.test.license.ok": "有效。",
   "settings.whatsapp.test.license.required": "伺服器因缺少授權而拒絕一切。請在其自帶的 manager 中啟用：{detail}",
   "settings.whatsapp.test.adminKey.ok": "已接受。伺服器上的實例數：{detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "已接受。",
   "settings.whatsapp.test.adminKey.unauthorized": "伺服器拒絕了已儲存的管理金鑰。",
   "settings.whatsapp.test.adminKey.httpError": "伺服器對實例清單請求回傳了錯誤（{detail}）。",
   "settings.whatsapp.test.roundTrip.reached": "已抵達：該位址能到達本面板。",

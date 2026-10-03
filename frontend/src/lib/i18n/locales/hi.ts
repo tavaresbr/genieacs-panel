@@ -2063,6 +2063,7 @@ const hi: Dictionary = {
   "settings.whatsapp.test.license.ok": "सक्रिय।",
   "settings.whatsapp.test.license.required": "लाइसेंस न होने से सर्वर सब कुछ अस्वीकार करता है। उसके अपने मैनेजर में सक्रिय करें: {detail}",
   "settings.whatsapp.test.adminKey.ok": "स्वीकृत। सर्वर पर इंस्टेंस: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "स्वीकृत।",
   "settings.whatsapp.test.adminKey.unauthorized": "सर्वर ने सहेजी गई एडमिन कुंजी अस्वीकार कर दी।",
   "settings.whatsapp.test.adminKey.httpError": "इंस्टेंस सूची पर सर्वर ने त्रुटि ({detail}) के साथ उत्तर दिया।",
   "settings.whatsapp.test.roundTrip.reached": "पहुँचा: पता इस पैनल तक जाता है।",

@@ -2089,6 +2089,7 @@ const ru: Dictionary = {
   "settings.whatsapp.test.license.ok": "Активна.",
   "settings.whatsapp.test.license.required": "Сервер отказывает во всём из-за отсутствия лицензии. Активируйте её в его собственном менеджере: {detail}",
   "settings.whatsapp.test.adminKey.ok": "Принят. Инстансов на сервере: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "Принят.",
   "settings.whatsapp.test.adminKey.unauthorized": "Сервер отклонил сохранённый админ-ключ.",
   "settings.whatsapp.test.adminKey.httpError": "Сервер ответил ошибкой ({detail}) на запрос списка инстансов.",
   "settings.whatsapp.test.roundTrip.reached": "Дошло: адрес достигает этой панели.",

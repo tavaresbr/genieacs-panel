@@ -2082,6 +2082,7 @@ const ja: Dictionary = {
   "settings.whatsapp.test.license.ok": "有効です。",
   "settings.whatsapp.test.license.required": "ライセンスがないためサーバーがすべてを拒否しています。サーバー自身のマネージャーで有効化してください: {detail}",
   "settings.whatsapp.test.adminKey.ok": "受理されました。サーバー上のインスタンス数: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "受理されました。",
   "settings.whatsapp.test.adminKey.unauthorized": "サーバーが保存済みの管理キーを拒否しました。",
   "settings.whatsapp.test.adminKey.httpError": "インスタンス一覧に対してサーバーがエラー（{detail}）を返しました。",
   "settings.whatsapp.test.roundTrip.reached": "到達しました：このアドレスはこのパネルに届きます。",

@@ -16,6 +16,7 @@ import {
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/contexts/auth-context'
+import { sessionOwner } from '@/lib/session-owner'
 import { useTranslation } from '@/contexts/language-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl } from '@/lib/sgp'
 import { isoDay } from '@/lib/date-format'
@@ -76,7 +77,7 @@ export default function ContactDetailPage() {
     const iso = isoDay(value)
     return iso ? formatDate(iso) : (value || '—')
   }
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<ContactProfile | null>(null)
@@ -111,7 +112,7 @@ export default function ContactDetailPage() {
         toast.error(res.message || t('api.requestFailed'))
         return
       }
-      navigate('/whatsapp', { state: { conversation: res.data } })
+      navigate('/whatsapp', { state: { conversation: res.data, owner: sessionOwner(user) } })
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -489,6 +490,7 @@ function SendInvoiceModal({ contactKey, invoiceId, onClose }: { contactKey: stri
   const { t } = useTranslation()
   const toast = useToast()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [preview, setPreview] = useState<ContactInvoiceMessage | null>(null)
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -560,7 +562,7 @@ function SendInvoiceModal({ contactKey, invoiceId, onClose }: { contactKey: stri
             {sent ? t('common.close') : t('common.cancel')}
           </button>
           {sent ? (
-            <button type="button" className="modern-button" onClick={() => navigate('/whatsapp', { state: { conversation: sent.conversation } })}>
+            <button type="button" className="modern-button" onClick={() => navigate('/whatsapp', { state: { conversation: sent.conversation, owner: sessionOwner(user) } })}>
               <Icon name="chat" size={16} /> {t('contacts.profile.openConversation')}
             </button>
           ) : (

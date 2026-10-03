@@ -34,6 +34,7 @@ import { AvailabilityToggle } from '@/components/whatsapp/assignment'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
+import { sessionOwner } from '@/lib/session-owner'
 import { useLocation } from 'react-router'
 import { firstName, type QuickReply } from '@/lib/quick-replies'
 import { metaWindowFor } from '@/lib/wa-meta-window'
@@ -260,6 +261,22 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
       const res = await whatsappAPI.listMessages(id, { limit: MESSAGE_PAGE })
       if (!alive.current || selectedIdRef.current !== id) return
       if (!res.success || !res.data) {
+        // A conversa não existe para esta sessão — apagada, ou de outro
+        // provedor, vinda de um `state` de navegação antigo. Manter o cabeçalho
+        // dela seria mostrar um nome que o servidor acabou de dizer não ser
+        // deste provedor; tentar de novo com espera só repetiria o 404.
+        if (res.code === 'conversation_not_found') {
+          selectedIdRef.current = null
+          threadStampRef.current = null
+          threadFailures.current = 0
+          threadBlockedUntil.current = 0
+          setConversation(null)
+          setMessages([])
+          setHasOlder(false)
+          setSelectedId(null)
+          if (!silent) toast.error(whatsappErrorMessage(t, res.code))
+          return
+        }
         threadFailures.current += 1
         threadBlockedUntil.current = Date.now()
           + (2 ** Math.min(threadFailures.current, BACKOFF_CAP) - 1) * THREAD_POLL_MS
@@ -1074,14 +1091,21 @@ type TabId = (typeof TABS)[number][0]
  */
 export default function WhatsAppPage() {
   const { t } = useTranslation()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const [tab, setTab] = useState<TabId>('inbox')
   const [alertsView, setAlertsView] = useState<AlertView>('results')
   // The thread Contacts handed over, and a counter that remounts the inbox for
   // each hand-over so it opens that thread even when it was already on screen.
   // The Contacts page (its own menu entry) hands one over through the route.
+  //
+  // O `state` tem dono: o histórico do navegador guarda o de quem navegou, e
+  // sair, entrar em outro provedor e apertar "Voltar" o entregava de novo — a
+  // conversa do provedor A aberta na sessão do B. Sem dono igual ao desta
+  // sessão, ele é ignorado.
   const location = useLocation()
-  const routed = (location.state as { conversation?: WhatsAppConversation } | null)?.conversation ?? null
+  const routedState = location.state as { conversation?: WhatsAppConversation; owner?: string } | null
+  const owner = sessionOwner(user)
+  const routed = owner !== null && routedState?.owner === owner ? routedState.conversation ?? null : null
   const [handOver, setHandOver] = useState<{ conversation: WhatsAppConversation; seq: number } | null>(
     routed ? { conversation: routed, seq: 1 } : null
   )

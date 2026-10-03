@@ -4,7 +4,7 @@ import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollme
 import type { LiveStatus } from '@/lib/map-status'
 import { offlineMessageKey } from '@/lib/genieacs-agent'
 import { formatRelativeTime } from '@/lib/utils'
-import { clearDashboardSnapshot } from '@/lib/dashboard-snapshot'
+import { clearSessionScopedStorage } from '@/lib/session-owner'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -243,6 +243,16 @@ class ApiClient {
   private token: string | null = null
   private refreshToken: string | null = null
   private refreshPromise: Promise<boolean> | null = null
+  /**
+   * Quantas vezes a sessão desta aba mudou de dono.
+   *
+   * Um refresh que sai antes de um logout/login e volta depois não pode
+   * gravar nada: os tokens dele são da sessão anterior, e `setTokens` os
+   * colocaria por cima da nova — o provedor A de volta na aba onde o B acabou
+   * de entrar. Sobe em `clearTokens`, `setTabTokens` e `beginSession`; nunca no
+   * `setTokens` que o próprio refresh chama.
+   */
+  private sessionEpoch = 0
   /** Se a sessão desta aba é só dela — ver `storedSession`. */
   private tabScoped = false
 
@@ -376,6 +386,7 @@ class ApiClient {
     if (!this.refreshToken) return false
     if (this.refreshPromise) return this.refreshPromise
 
+    const epoch = this.sessionEpoch
     this.refreshPromise = (async () => {
       try {
         const response = await fetch(`${this.baseURL}/api/auth/refresh`, {
@@ -384,6 +395,9 @@ class ApiClient {
           body: JSON.stringify({ refreshToken: this.refreshToken }),
         })
         const data = await response.json()
+        // A sessão mudou enquanto a resposta vinha: ela é de outra sessão, e
+        // nem renovar nem derrubar cabe a ela.
+        if (epoch !== this.sessionEpoch) return false
         if (!response.ok || !data.success || !data.data?.token || !data.data?.refreshToken) {
           this.clearTokens()
           return false
@@ -391,10 +405,13 @@ class ApiClient {
         this.setTokens(data.data.token, data.data.refreshToken)
         return true
       } catch {
+        if (epoch !== this.sessionEpoch) return false
         this.clearTokens()
         return false
       } finally {
-        this.refreshPromise = null
+        // Só a própria: com a sessão trocada, o lugar já foi esvaziado por
+        // quem trocou e pode ser de um refresh da sessão nova.
+        if (epoch === this.sessionEpoch) this.refreshPromise = null
       }
     })()
 
@@ -550,6 +567,19 @@ class ApiClient {
   }
 
   /**
+   * Grava os tokens de uma sessão NOVA — login, convite aceito, setup, MFA.
+   *
+   * É `setTokens` com uma diferença: avisa que a sessão mudou, para que um
+   * refresh da sessão anterior ainda no ar seja descartado quando voltar.
+   * O refresh em si continua chamando `setTokens`, que não mexe na contagem.
+   */
+  beginSession(token: string, refreshToken?: string) {
+    this.sessionEpoch++
+    this.refreshPromise = null
+    this.setTokens(token, refreshToken)
+  }
+
+  /**
    * Adota uma sessão que vive SÓ nesta aba.
    *
    * É o que a personificação usa. Não passa por `clearTokens` de propósito:
@@ -559,6 +589,8 @@ class ApiClient {
    * limpeza prestava.
    */
   setTabTokens(token: string) {
+    this.sessionEpoch++
+    this.refreshPromise = null
     this.tabScoped = true
     this.token = token
     this.refreshToken = null
@@ -566,7 +598,7 @@ class ApiClient {
       sessionStorage.setItem('token', token)
       sessionStorage.removeItem('refreshToken')
       // A aba nova herdou o `sessionStorage` da aba do console.
-      clearDashboardSnapshot()
+      clearSessionScopedStorage()
     }
   }
 
@@ -574,13 +606,15 @@ class ApiClient {
     // Uma sessão de aba se apaga só da gaveta da aba: sair da personificação —
     // ou ela expirar — não pode derrubar a sessão do console na aba de trás.
     const eraDaAba = this.tabScoped
+    this.sessionEpoch++
+    this.refreshPromise = null
     this.token = null
     this.refreshToken = null
     this.tabScoped = false
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('token')
       sessionStorage.removeItem('refreshToken')
-      clearDashboardSnapshot()
+      clearSessionScopedStorage()
       if (!eraDaAba) {
         localStorage.removeItem('token')
         localStorage.removeItem('refreshToken')
@@ -639,7 +673,7 @@ export interface MfaRecoveryCodes extends MfaFreshSession {
 
 async function comSessaoNova<T extends MfaFreshSession>(pedido: Promise<ApiResponse<T>>): Promise<ApiResponse<T>> {
   const res = await pedido
-  if (res.success && res.data?.token) apiClient.setTokens(res.data.token, res.data.refreshToken)
+  if (res.success && res.data?.token) apiClient.beginSession(res.data.token, res.data.refreshToken)
   return res
 }
 

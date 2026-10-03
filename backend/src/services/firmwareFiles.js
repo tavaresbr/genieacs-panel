@@ -16,6 +16,47 @@
 
 export const FIRMWARE_FILE_TYPE = '1 Firmware Upgrade Image';
 
+/**
+ * De quem é o arquivo, num GenieACS que vários provedores usam.
+ *
+ * A coleção `files` é uma só para o ACS inteiro, e a NBI do GenieACS só guarda
+ * quatro campos de metadado (`fileType`, `oui`, `productClass`, `version`) —
+ * não há campo livre onde anotar o dono. O dono vai então no NOME do arquivo:
+ * `<tag do provedor>--<nome>` (ex.: `alfa--F670L_V2.bin`). A tag só tem letras,
+ * dígitos e `_` (`DEVICE_SCOPE_TAG_PATTERN`), então o que vem antes do primeiro
+ * `--` é a tag inteira, sem ambiguidade entre `alfa` e `alfa_2`.
+ *
+ * Arquivo sem prefixo num ACS compartilhado — os enviados antes desta regra,
+ * ou por quem subiu sem prefixo pela tela do GenieACS — não é de provedor
+ * nenhum: fica escondido de todos e só a plataforma, no próprio GenieACS, o
+ * vê. Mostrá-lo a todos era justamente o vazamento; renomeá-lo com o prefixo
+ * certo o devolve ao provedor dono.
+ *
+ * Com o ACS só do provedor (`scopeTag()` nulo) nada disto se aplica.
+ */
+export const FIRMWARE_OWNER_SEPARATOR = '--';
+
+/** A tag dona do arquivo, pelo prefixo do nome; `null` quando não tem. */
+export function firmwareOwner(file) {
+  const nome = String(file?._id ?? file?.id ?? '');
+  const corte = nome.indexOf(FIRMWARE_OWNER_SEPARATOR);
+  if (corte <= 0) return null;
+  const tag = nome.slice(0, corte);
+  return /^[A-Za-z0-9_]{1,64}$/.test(tag) ? tag : null;
+}
+
+/**
+ * Só os arquivos do provedor de `tag`. `tag` nulo (ACS só dele): todos.
+ * A tag "sem dono" (`unassignedTag`) não é dona de nada, nem de um arquivo
+ * que por acaso tenha o nome dela no prefixo.
+ */
+export function filesOwnedBy(files, tag, { unassignedTag = null } = {}) {
+  const lista = Array.isArray(files) ? files : [];
+  if (tag === null || tag === undefined || tag === '') return lista;
+  if (unassignedTag && tag === unassignedTag) return [];
+  return lista.filter((file) => firmwareOwner(file) === tag);
+}
+
 const igual = (a, b) => String(a ?? '').trim().toUpperCase() === String(b ?? '').trim().toUpperCase();
 const vazio = (value) => String(value ?? '').trim() === '';
 

@@ -16,6 +16,7 @@ import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { DeviceDiagnosticsCard } from '@/components/device-diagnostics-card'
 import { DeviceFirmwareCard } from '@/components/device-firmware-card'
 import { useAuth } from '@/contexts/auth-context'
+import { sessionOwner } from '@/lib/session-owner'
 import { CustomerLgpd } from '@/components/customer-lgpd'
 import { WifiStatusFilterControl } from '@/components/wifi-status-filter'
 import { filterWifiByStatus, type WifiStatusFilter } from '@/lib/wifi-filter'
@@ -801,7 +802,7 @@ export default function DeviceDetailPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [rebooting, setRebooting] = useState(false)
   const [irreversibleAction, setIrreversibleAction] = useState<IrreversibleAction | null>(null)
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   // Revelar a senha do portal é `customers.secrets`, e mexer no CPE é
   // `devices.write` — capacidades distintas na matriz porque quem reinicia uma
   // ONT não precisa, por consequência, ler o segredo de um assinante. As duas
@@ -1431,7 +1432,7 @@ export default function DeviceDetailPage() {
         toast.error(res.message || t('api.requestFailed'))
         return
       }
-      navigate('/whatsapp', { state: { conversation: res.data } })
+      navigate('/whatsapp', { state: { conversation: res.data, owner: sessionOwner(user) } })
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {

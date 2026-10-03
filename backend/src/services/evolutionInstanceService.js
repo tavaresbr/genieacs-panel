@@ -904,7 +904,11 @@ class EvolutionInstanceService {
         if (listed.ok) {
           const instancias = readInstances(flavor, listed.data);
           nomesNoServidor = new Set(instancias.map((i) => i.name));
-          add('adminKey', 'ok', instancias.length);
+          // Na SaaS a chave é a da plataforma, e a listagem traz os números de
+          // TODOS os provedores. A contagem diria a este quantos números os
+          // outros têm — então sai só o veredito, sem o detalhe.
+          if (config.platformManaged) add('adminKey', 'ok');
+          else add('adminKey', 'ok', instancias.length);
         } else {
           add('adminKey', 'http_error', listed.status);
         }
@@ -944,11 +948,19 @@ class EvolutionInstanceService {
     // admin global do servidor e pode listar tudo com um curl — então a
     // contagem não concede nada —, mas imprimir na tela o nome da instância de
     // um vizinho é outra coisa, e não é necessária para o diagnóstico.
+    //
+    // Na SaaS nem a contagem sai: quem roda o teste é o provedor, a chave é da
+    // plataforma, e ele NÃO pode listar o servidor por conta própria.
     if (!nomesNoServidor) {
       add('instances', 'skipped');
     } else {
       const doPainel = (await WhatsAppAccount.getAll()).map((linha) => linha.name);
-      const orfas = [...nomesNoServidor].filter((nome) => !doPainel.includes(nome)).length;
+      // Servidor da plataforma: o que está lá sem linha aqui é, quase sempre,
+      // número de OUTRO provedor. "Órfã" ali não é aviso, é vazamento — então
+      // só a metade que é deste provedor (faltando) é conferida.
+      const orfas = config.platformManaged
+        ? 0
+        : [...nomesNoServidor].filter((nome) => !doPainel.includes(nome)).length;
       const faltando = doPainel.filter((nome) => !nomesNoServidor.has(nome)).length;
       if (orfas && faltando) add('instances', 'both');
       else if (faltando) add('instances', 'missing', faltando);
