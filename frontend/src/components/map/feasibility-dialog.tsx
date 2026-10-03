@@ -3,7 +3,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { Icon } from '@/components/ui/icon'
 import { LocationPicker } from '@/components/location-picker'
 import { MapAddressSearch } from '@/components/map-address-search'
-import { allBoxOccupancy, type OccupancyEdge, type OccupancyNode } from '@/lib/box-occupancy'
+import { allBoxOccupancy, BOX_TYPES, type OccupancyEdge, type OccupancyNode } from '@/lib/box-occupancy'
 import { DROP_LIMITS, FEASIBILITY_DEFAULT_METERS, feasibility, type Point } from '@/lib/nearest-box'
 
 /**
@@ -28,6 +28,15 @@ export function FeasibilityDialog<T extends OccupancyNode>({ nodes, edges, cente
   const [point, setPoint] = useState<Point | null>(null)
   const [maxMeters, setMaxMeters] = useState<number>(FEASIBILITY_DEFAULT_METERS)
   const rows = useMemo(() => allBoxOccupancy(nodes, edges), [edges, nodes])
+  // O mapa da consulta abre no meio das caixas, não no centro salvo do mapa.
+  const start = useMemo<[number, number]>(() => {
+    const boxes = nodes.filter((node) => BOX_TYPES.has(node.type))
+    if (!boxes.length) return center
+    return [
+      boxes.reduce((sum, node) => sum + node.latitude, 0) / boxes.length,
+      boxes.reduce((sum, node) => sum + node.longitude, 0) / boxes.length
+    ]
+  }, [center, nodes])
   const result = useMemo(() => (point ? feasibility(point, rows, maxMeters) : null), [maxMeters, point, rows])
   const nearest = result?.boxes[0]
   const style = result ? VERDICT_STYLE[result.verdict] : null
@@ -42,7 +51,7 @@ export function FeasibilityDialog<T extends OccupancyNode>({ nodes, edges, cente
         </div>
         <p className="mb-3 text-sm text-muted-foreground">{t('map.feasibility.hint')}</p>
         <MapAddressSearch className="relative mb-3 w-full" onPick={(place) => setPoint({ lat: place.lat, lng: place.lng })} />
-        <LocationPicker lat={point?.lat ?? null} lng={point?.lng ?? null} fallback={center} fallbackZoom={15} onChange={(lat, lng) => setPoint({ lat, lng })} />
+        <LocationPicker lat={point?.lat ?? null} lng={point?.lng ?? null} fallback={start} fallbackZoom={16} onChange={(lat, lng) => setPoint({ lat, lng })} />
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           <label htmlFor="feasibility-limit" className="font-semibold">{t('map.feasibility.limit')}</label>
           <select id="feasibility-limit" className="modern-input w-auto" value={maxMeters} onChange={(event) => setMaxMeters(Number(event.target.value))}>
