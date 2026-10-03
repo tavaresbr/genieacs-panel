@@ -103,6 +103,9 @@ const helmetOptions = {
         'https://tile.openstreetmap.org',
         'https://mt1.google.com'
       ],
+      // Áudio do WhatsApp: o arquivo chega com o token no cabeçalho e vira um
+      // blob em memória, que é o que o `<audio>` toca (e a prévia da gravação).
+      mediaSrc: ["'self'", 'blob:'],
       connectSrc: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
@@ -112,17 +115,21 @@ const helmetOptions = {
   }
 };
 
-function configureSecurity(target) {
+/**
+ * O painel usa o microfone (gravar áudio no WhatsApp), e só ele, só na
+ * própria origem. O portal do assinante não tem por que pedir.
+ */
+const PANEL_PERMISSIONS = 'camera=(), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()';
+const PORTAL_PERMISSIONS = 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()';
+
+function configureSecurity(target, permissions) {
   target.disable('x-powered-by');
   if (TRUST_PROXY !== null) {
     target.set('trust proxy', TRUST_PROXY);
   }
   target.use(helmet(helmetOptions));
   target.use((req, res, next) => {
-    res.setHeader(
-      'Permissions-Policy',
-      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()'
-    );
+    res.setHeader('Permissions-Policy', permissions);
     if (req.path.startsWith('/api/')) {
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Pragma', 'no-cache');
@@ -131,8 +138,8 @@ function configureSecurity(target) {
   });
 }
 
-configureSecurity(app);
-configureSecurity(portalApp);
+configureSecurity(app, PANEL_PERMISSIONS);
+configureSecurity(portalApp, PORTAL_PERMISSIONS);
 
 function isAllowedOrigin(req, origin) {
   if (!origin) return true;

@@ -273,3 +273,25 @@ describe('isClipboardPlaceholderName', () => {
     expect(isClipboardPlaceholderName('image-2.png')).toBe(false)
   })
 })
+
+describe('planSend com áudio', () => {
+  const isAudio = (f: string) => f.endsWith('.webm')
+
+  it('o áudio não leva legenda: o texto vai antes, como mensagem própria', () => {
+    expect(planSend({ body: 'Segue o áudio', files: ['voz.webm'], isAudio })).toEqual([
+      { body: 'Segue o áudio', file: null },
+      { body: '', file: 'voz.webm' }
+    ])
+  })
+
+  it('com uma foto junto, o texto vai de legenda da foto', () => {
+    expect(planSend({ body: 'Olha', files: ['voz.webm', 'foto.jpg'], isAudio })).toEqual([
+      { body: '', file: 'voz.webm' },
+      { body: 'Olha', file: 'foto.jpg' }
+    ])
+  })
+
+  it('áudio sem texto é só o áudio', () => {
+    expect(planSend({ body: ' ', files: ['voz.webm'], isAudio })).toEqual([{ body: '', file: 'voz.webm' }])
+  })
+})

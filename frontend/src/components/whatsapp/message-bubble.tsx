@@ -6,6 +6,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { whatsappAPI, type WhatsAppMessage } from '@/lib/api'
 import type { TranslationKey } from '@/lib/i18n'
 import { formatDayMonth, getActiveDateFormat, toDate } from '@/lib/date-format'
+import { isAudioType } from '@/lib/wa-audio'
 
 type DeliveryStatus = NonNullable<WhatsAppMessage['deliveryStatus']>
 
@@ -78,6 +79,9 @@ function Attachment({ message }: { message: WhatsAppMessage }) {
   const { t } = useTranslation()
   const attachment = message.attachment
   const inline = isInlineImage(attachment?.type ?? null)
+  const audio = isAudioType(attachment?.type ?? null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [cannotPlay, setCannotPlay] = useState(false)
 
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [gone, setGone] = useState(false)
@@ -128,9 +132,60 @@ function Attachment({ message }: { message: WhatsAppMessage }) {
     }
   }, [attachment?.name, message.id, remember])
 
+  /**
+   * Ouvir aqui mesmo. O arquivo só é buscado no clique — uma conversa com
+   * trinta áudios não baixa trinta áudios para desenhar a tela —, e vira um
+   * `<audio>` com o blob já em memória, o que deixa avançar e voltar sem o
+   * servidor precisar responder por pedaços.
+   */
+  const listen = useCallback(async () => {
+    const mime = attachment?.type || ''
+    if (document.createElement('audio').canPlayType(mime) === '' && document.createElement('audio').canPlayType(mime.split(';')[0]) === '') {
+      setCannotPlay(true)
+      return
+    }
+    setBusy(true)
+    try {
+      const result = await whatsappAPI.fetchAttachment(message.id)
+      if (!result.success || !result.blob) return setGone(true)
+      setAudioUrl(remember(result.blob))
+    } finally {
+      setBusy(false)
+    }
+  }, [attachment?.type, message.id, remember])
+
   if (!attachment) return null
 
   const label = attachment.name || t('whatsapp.inbox.attachment')
+
+  if (audio && !gone) {
+    return (
+      <span className="mt-2 flex max-w-full flex-wrap items-center gap-2">
+        {audioUrl ? (
+          <audio controls autoPlay src={audioUrl} className="h-10 w-72 max-w-full" aria-label={label} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => { void listen() }}
+            disabled={busy || cannotPlay}
+            className="modern-button-secondary flex min-h-9 items-center gap-1.5 px-3 py-1.5 text-xs"
+          >
+            <Icon name={busy ? 'refresh' : 'play'} size={14} className={`shrink-0 ${busy ? 'animate-spin' : ''}`} />
+            <span className="font-semibold">{t('whatsapp.audio.play')}</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => { void download() }}
+          className="text-xs text-muted-foreground underline"
+          title={label}
+        >
+          {t('whatsapp.inbox.attachmentDownload')}
+        </button>
+        {cannotPlay && <span className="w-full text-xs text-muted-foreground">{t('whatsapp.audio.cannotPlay')}</span>}
+      </span>
+    )
+  }
 
   if (gone) {
     return (

@@ -27,6 +27,8 @@ import {
   type QuickReplyVars
 } from '@/lib/quick-replies'
 import type { MetaWindow } from '@/lib/wa-meta-window'
+import { isAudioType } from '@/lib/wa-audio'
+import { VoiceRecorder, canRecordAudio } from '@/components/whatsapp/voice-recorder'
 
 export interface ComposerAttachment {
   url: string
@@ -122,6 +124,8 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
   const [working, setWorking] = useState(false)
   const [progress, setProgress] = useState<{ n: number; total: number } | null>(null)
   const [dragging, setDragging] = useState(false)
+  // Lido uma vez: o navegador não ganha nem perde microfone com a aba aberta.
+  const [canRecord] = useState(canRecordAudio)
   const boxRef = useRef<HTMLTextAreaElement>(null)
   // Respostas rápidas: abrem com "/" no começo da caixa ou pelo botão.
   // `dismissedFor` guarda o texto em que o Esc fechou a lista, para ela não
@@ -227,7 +231,8 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
       // Já passou por `attachmentRefusal`, então o tipo resolve.
       const type = resolveAttachmentType(file) ?? file.type
       let preview: string | null = null
-      if (isPreviewable(type)) {
+      // A miniatura da foto, ou o player do áudio para ouvir antes de mandar.
+      if (isPreviewable(type) || isAudioType(type)) {
         preview = URL.createObjectURL(file)
         previews.current.add(preview)
       }
@@ -288,7 +293,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
     // the operator presses it.
     if (empty || busy || windowBlocked) return
 
-    const steps = planSend({ body, files: items })
+    const steps = planSend({ body, files: items, isAudio: (item) => isAudioType(item.type) })
     const total = steps.length
     setWorking(true)
     try {
@@ -480,19 +485,23 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               <li
                 key={item.id}
                 data-testid="composer-attachment"
-                className="flex w-60 max-w-full items-center gap-2 rounded-md border border-border bg-background/50 p-1.5 text-xs text-foreground"
+                className={`flex ${isAudioType(item.type) ? 'w-80' : 'w-60'} max-w-full items-center gap-2 rounded-md border border-border bg-background/50 p-1.5 text-xs text-foreground`}
               >
-                {item.preview ? (
+                {item.preview && isAudioType(item.type) ? (
+                  <audio controls preload="metadata" src={item.preview} className="h-9 min-w-0 flex-1" aria-label={item.file.name} />
+                ) : item.preview ? (
                   <img src={item.preview} alt="" className="size-10 shrink-0 rounded object-cover" />
                 ) : (
                   <span className="flex size-10 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
                     <Icon name="document" size={18} />
                   </span>
                 )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium" title={item.file.name}>{item.file.name}</span>
-                  <span className="block text-muted-foreground">{formatFileSize(item.file.size)}</span>
-                </span>
+                {!isAudioType(item.type) && (
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium" title={item.file.name}>{item.file.name}</span>
+                    <span className="block text-muted-foreground">{formatFileSize(item.file.size)}</span>
+                  </span>
+                )}
                 <button
                   type="button"
                   className="icon-button size-10 shrink-0 lg:size-6"
@@ -527,7 +536,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           <p className="field-hint hidden max-w-md sm:block">{t('whatsapp.inbox.noteHint')}</p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <input
             ref={fileRef}
             type="file"
@@ -562,6 +571,12 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               <Icon name="chat" size={16} />
               <span className="hidden sm:inline">{t('whatsapp.quickReplies.button')}</span>
             </button>
+          )}
+          {canRecord && !isNote && (
+            <VoiceRecorder
+              disabled={busy || items.length >= MAX_ATTACHMENTS_PER_SEND}
+              onRecorded={(file) => addFiles([file])}
+            />
           )}
           <button
             type="button"

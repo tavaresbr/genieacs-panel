@@ -45,7 +45,11 @@ export const ATTACHMENT_TYPES = Object.freeze([
   { type: 'application/zip', extensions: ['.zip'], kind: 'document' },
   { type: 'video/mp4', extensions: ['.mp4'], kind: 'video' },
   { type: 'audio/ogg', extensions: ['.ogg', '.oga'], kind: 'audio' },
-  { type: 'audio/mpeg', extensions: ['.mp3'], kind: 'audio' }
+  { type: 'audio/mpeg', extensions: ['.mp3'], kind: 'audio' },
+  // O que os navegadores gravam: o Chrome em WebM/Opus, o Safari em MP4/AAC.
+  // Vão pela rota de voz do Evolution v2, que converte para OGG/Opus.
+  { type: 'audio/webm', extensions: ['.webm'], kind: 'audio' },
+  { type: 'audio/mp4', extensions: ['.m4a'], kind: 'audio' }
 ]);
 
 /**
@@ -58,6 +62,7 @@ export const ATTACHMENT_TYPE_ALIASES = Object.freeze({
   'image/heif': 'image/heic',
   'application/x-zip-compressed': 'application/zip',
   'audio/mp3': 'audio/mpeg',
+  'audio/x-m4a': 'audio/mp4',
   'application/csv': 'text/csv'
 });
 

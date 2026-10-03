@@ -144,6 +144,13 @@ describe('sniffAttachment — os primeiros bytes contra o tipo declarado', () =>
     assert.equal(matchesDeclaredType(Buffer.from('GIF88a'), 'image/gif'), false);
   });
 
+  it('knows a browser recording by its bytes: WebM by EBML, M4A by ftyp', () => {
+    assert.equal(matchesDeclaredType(SAMPLES['audio/webm'], 'audio/webm'), true);
+    assert.equal(matchesDeclaredType(SAMPLES['audio/ogg'], 'audio/webm'), false);
+    assert.equal(matchesDeclaredType(SAMPLES['audio/mp4'], 'audio/mp4'), true);
+    assert.equal(matchesDeclaredType(Buffer.from('OggS\0\0\0\0'), 'audio/mp4'), false);
+  });
+
   it('accepts MP3 by frame sync as well as by ID3 tag', () => {
     assert.equal(matchesDeclaredType(Buffer.from([0xff, 0xfb, 0x90, 0x00]), 'audio/mpeg'), true);
     assert.equal(matchesDeclaredType(Buffer.from([0xff, 0x1b, 0x90, 0x00]), 'audio/mpeg'), false);

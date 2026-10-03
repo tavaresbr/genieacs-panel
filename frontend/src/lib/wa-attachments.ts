@@ -46,7 +46,9 @@ export const ATTACHMENT_TYPES: readonly AttachmentTypeRow[] = Object.freeze([
   { type: 'application/zip', extensions: ['.zip'], kind: 'document' },
   { type: 'video/mp4', extensions: ['.mp4'], kind: 'video' },
   { type: 'audio/ogg', extensions: ['.ogg', '.oga'], kind: 'audio' },
-  { type: 'audio/mpeg', extensions: ['.mp3'], kind: 'audio' }
+  { type: 'audio/mpeg', extensions: ['.mp3'], kind: 'audio' },
+  { type: 'audio/webm', extensions: ['.webm'], kind: 'audio' },
+  { type: 'audio/mp4', extensions: ['.m4a'], kind: 'audio' }
 ])
 
 /** Nomes que navegadores e sistemas dão ao mesmo tipo. Só nessa direção. */
@@ -56,6 +58,7 @@ export const ATTACHMENT_TYPE_ALIASES: Readonly<Record<string, string>> = Object.
   'image/heif': 'image/heic',
   'application/x-zip-compressed': 'application/zip',
   'audio/mp3': 'audio/mpeg',
+  'audio/x-m4a': 'audio/mp4',
   'application/csv': 'text/csv'
 })
 
@@ -141,10 +144,21 @@ export interface SendStep<F> {
  * assinante lendo a mesma coisa dez vezes. Sem arquivo, é uma mensagem de
  * texto só; sem nada, não há envio.
  */
-export function planSend<F>({ body, files }: { body: string; files: readonly F[] }): SendStep<F>[] {
+export function planSend<F>({ body, files, isAudio }: {
+  body: string
+  files: readonly F[]
+  /**
+   * Áudio não leva legenda: a mensagem de voz do WhatsApp não tem onde pôr
+   * texto, e o servidor a descartaria. O texto vai no primeiro arquivo que não
+   * é áudio — ou, se todos forem, numa mensagem própria antes deles.
+   */
+  isAudio?: (file: F) => boolean
+}): SendStep<F>[] {
   const text = body.trim()
   if (files.length === 0) return text ? [{ body: text, file: null }] : []
-  return files.map((file, index) => ({ body: index === 0 ? text : '', file }))
+  const comLegenda = isAudio ? files.findIndex((file) => !isAudio(file)) : 0
+  const passos = files.map((file, index) => ({ body: index === comLegenda ? text : '', file }))
+  return text && comLegenda === -1 ? [{ body: text, file: null }, ...passos] : passos
 }
 
 /** O `accept` do seletor: tipos e extensões, porque cada sistema filtra por um. */
