@@ -143,7 +143,10 @@ export const SCOPED_TABLES = new Set([
   // filtro entregaria a um ISP o boleto do vizinho.
   'billing_charges',
   // A nota fiscal de cada cobrança paga: o número e o PDF de um provedor só.
-  'billing_invoices'
+  'billing_invoices',
+  // Os lembretes de cobrança mandados ao provedor (0092). Do provedor, como a
+  // cobrança de que falam.
+  'subscription_reminder_sends'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

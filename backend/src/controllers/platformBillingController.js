@@ -1,6 +1,7 @@
 import Plan, { PLAN_LIMIT_COLUMNS, parsePlanFeatures } from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import BillingEvent from '../models/BillingEvent.js';
+import SubscriptionReminderSend from '../models/SubscriptionReminderSend.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import AuditLog from '../models/AuditLog.js';
@@ -201,6 +202,9 @@ async function subscriptionView(tenant) {
     const lidos = await BillingEvent.listRecent({ limit: 50 });
     return { events: lidos, notaDoEvento: await notasDoExtrato(lidos) };
   });
+  // Os lembretes de cobrança que já saíram (0092), só para ler: o console
+  // responde "ele foi avisado?" sem abrir o log do SMTP.
+  const reminders = await runInTenant(tenant.id, () => SubscriptionReminderSend.listSent({ limit: 30 }));
   return {
     tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
     subscription: SubscriptionService.present(state, { withExemptReason: true }),
@@ -218,7 +222,8 @@ async function subscriptionView(tenant) {
       // pagamento, ou quando ele não tem cobrança do painel por trás.
       chargeId: notaDoEvento.get(event.id)?.chargeId ?? null,
       invoice: BillingInvoice.presentForConsole(notaDoEvento.get(event.id)?.invoice ?? null)
-    }))
+    })),
+    reminders
   };
 }
 

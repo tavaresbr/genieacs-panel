@@ -9,6 +9,7 @@ import {
   type SubscriptionConsoleRow,
   type SubscriptionConsoleStatus,
   type SubscriptionConsoleSummary,
+  type SubscriptionReminderView,
   type SubscriptionStatus
 } from '@/lib/api'
 import { BillingExemptControl, STATUS_LABEL_KEYS, exemptUntilLabel, statusBadgeClass } from '@/components/platform/tenant-plan'
@@ -545,6 +546,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
 
   const [charges, setCharges] = useState<ChargeConsoleView[]>([])
   const [events, setEvents] = useState<BillingEventView[]>([])
+  const [reminders, setReminders] = useState<SubscriptionReminderView[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -564,6 +566,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
       setError(cobrancas.message || '')
     }
     setEvents(assinatura.success && assinatura.data ? assinatura.data.events : [])
+    setReminders(assinatura.success && assinatura.data ? assinatura.data.reminders ?? [] : [])
     setLoading(false)
   }, [tenantId])
 
@@ -744,6 +747,9 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
         </div>
       )}
 
+      {/* Lembretes de cobrança mandados (somente leitura) */}
+      {reminders.length > 0 && <ReminderList reminders={reminders} />}
+
       {dialog?.kind === 'status' && (
         <StatusDialog tenantId={tenantId} status={dialog.status} onClose={fechar} onDone={recarregar} />
       )}
@@ -775,6 +781,50 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
           onDone={recarregar}
         />
       )}
+    </div>
+  )
+}
+
+const REMINDER_STEP_KEYS = {
+  before: 'platform.subs.reminders.step.before',
+  due: 'platform.subs.reminders.step.due',
+  after: 'platform.subs.reminders.step.after'
+} as const
+
+const REMINDER_CHANNEL_KEYS: Record<string, 'platform.subs.reminders.channel.email' | 'platform.subs.reminders.channel.whatsapp'> = {
+  email: 'platform.subs.reminders.channel.email',
+  whatsapp: 'platform.subs.reminders.channel.whatsapp'
+}
+
+/**
+ * Os lembretes de cobrança que a régua já mandou a este provedor: responde
+ * "ele foi avisado?" sem abrir o log do SMTP. Só leitura — a régua é do
+ * agendador.
+ */
+function ReminderList({ reminders }: { reminders: SubscriptionReminderView[] }) {
+  const { t, formatDateTime } = useTranslation()
+  return (
+    <div className="rounded-md border border-border bg-card">
+      <h4 className="px-3 pt-3 text-sm font-semibold text-foreground">{t('platform.subs.reminders.title')}</h4>
+      <ul className="divide-y divide-border">
+        {reminders.map((reminder) => (
+          <li
+            key={`${reminder.dueAt}:${reminder.step}`}
+            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="modern-badge">{t(REMINDER_STEP_KEYS[reminder.step])}</span>
+              <span className="text-muted-foreground">{t('platform.subs.reminders.dueAt', { date: formatDay(reminder.dueAt) })}</span>
+              <span className="text-muted-foreground">
+                {reminder.channels
+                  .map((canal) => (REMINDER_CHANNEL_KEYS[canal] ? t(REMINDER_CHANNEL_KEYS[canal]) : canal))
+                  .join(' · ')}
+              </span>
+            </span>
+            <span className="text-muted-foreground">{formatDateTime(reminder.sentAt)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

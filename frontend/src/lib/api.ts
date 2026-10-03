@@ -1770,6 +1770,19 @@ export interface BillingEventView {
   invoice?: InvoiceConsoleView | null
 }
 
+/**
+ * Um lembrete de cobrança que a plataforma mandou ao provedor (0092): a etapa
+ * da régua, o prazo a que ela se refere (data ISO) e por onde saiu.
+ */
+export type SubscriptionReminderStep = 'before' | 'due' | 'after'
+
+export interface SubscriptionReminderView {
+  dueAt: string
+  step: SubscriptionReminderStep
+  channels: string[]
+  sentAt: string
+}
+
 /** The codes a 402 carries. Stable: the block screen picks its wording by them. */
 export const SUBSCRIPTION_GATE_CODES = [
   'subscription_past_due',
@@ -2019,7 +2032,13 @@ export const platformAPI = {
     apiClient.requestWithBody<{ lead: Lead }>('PATCH', `/platform/leads/${id}`, payload),
 
   getSubscription: (tenantId: number) =>
-    apiClient.get<{ subscription: SubscriptionView | null; planId: number | null; events: BillingEventView[] }>(
+    apiClient.get<{
+      subscription: SubscriptionView | null
+      planId: number | null
+      events: BillingEventView[]
+      /** Os lembretes de cobrança já mandados, do mais recente para trás. */
+      reminders?: SubscriptionReminderView[]
+    }>(
       `/platform/tenants/${tenantId}/subscription`
     ),
 

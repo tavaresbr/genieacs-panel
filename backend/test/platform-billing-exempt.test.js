@@ -248,7 +248,7 @@ describe('ligar a isenção', () => {
     assert.equal(depois.billing_exempt_reason, 'parceria comercial');
     assert.equal(SubscriptionService.effectiveStatus(depois).status, 'active');
     assert.equal(SubscriptionService.decide(depois, { method: 'POST' }).allowed, true, 'o gate libera');
-    assert.equal(SubscriptionService.pendingExpiryNotice(depois, new Date(), plano), null, 'nenhum aviso de vencimento');
+    assert.equal(SubscriptionService.pendingReminder(depois, new Date(), plano), null, 'nenhum lembrete de cobrança');
 
     const eventos = (await eventosDe(beta)).filter((e) => e.type === 'billing_exempt.enabled');
     assert.equal(eventos.length, 1);
