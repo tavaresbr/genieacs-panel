@@ -4867,8 +4867,28 @@ export const maintenanceAPI = {
   conclude: (id: number) => apiClient.post<MaintenanceWindowDetail>(`/whatsapp/maintenances/${id}/conclude`, {}),
 }
 
+/** Os filtros do quadro "Quedas em massa". */
+export interface OutageFilters {
+  /** 1, 7, 30 ou 90 dias para trás; um incidente aberto aparece em qualquer período. */
+  days?: 1 | 7 | 30 | 90
+  status?: '' | 'open' | 'resolved'
+  /** Parte do nome do ponto do mapa. */
+  search?: string
+  /** `pending`: ninguém avisado ainda. */
+  notified?: '' | 'pending' | 'sent'
+}
+
 export const outagesAPI = {
-  list: () => apiClient.get<{ incidents: OutageIncident[] }>('/whatsapp/outages'),
+  /** Sem filtro: abertos e resolvidos nas últimas 24 h. */
+  list: (filters: OutageFilters = {}) => {
+    const query = new URLSearchParams()
+    if (filters.days && filters.days !== 1) query.set('days', String(filters.days))
+    if (filters.status) query.set('status', filters.status)
+    if (filters.search?.trim()) query.set('search', filters.search.trim())
+    if (filters.notified) query.set('notified', filters.notified)
+    const suffix = query.toString()
+    return apiClient.get<{ incidents: OutageIncident[] }>(`/whatsapp/outages${suffix ? `?${suffix}` : ''}`)
+  },
   get: (id: number) => apiClient.get<OutageIncidentDetail>(`/whatsapp/outages/${id}`),
   setEta: (id: number, eta: string) => apiClient.requestWithBody<OutageIncidentDetail>('PATCH', `/whatsapp/outages/${id}`, { eta }),
   /** Avisa quem ainda não foi avisado. `body` vazio usa o texto padrão. */
