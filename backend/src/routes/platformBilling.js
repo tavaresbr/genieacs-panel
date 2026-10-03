@@ -34,5 +34,7 @@ router.post('/tenants/:id/charges/:chargeId/settle', ...guard, PlatformSubscript
 router.post('/tenants/:id/charges/:chargeId/cancel', ...guard, PlatformSubscriptionsController.cancel);
 router.post('/tenants/:id/charges/:chargeId/reissue', ...guard, PlatformSubscriptionsController.reissue);
 router.post('/tenants/:id/charges/:chargeId/refund', ...guard, PlatformSubscriptionsController.refund);
+// A NFS-e da cobrança paga: emitir, ou emitir de novo a que falhou.
+router.post('/tenants/:id/charges/:chargeId/invoice', ...guard, PlatformSubscriptionsController.issueInvoice);
 
 export default router;

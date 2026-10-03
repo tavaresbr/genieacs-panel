@@ -82,6 +82,9 @@ class PlatformAudit {
     // "pagou, e devolvemos" — e é a segunda que alguém procura quando o
     // provedor pergunta por que voltou a dever.
     CHARGE_REFUNDED: 'charge.refunded',
+    // O console pediu a NFS-e de uma cobrança paga — a primeira, ou outra no
+    // lugar da que deu erro ou foi cancelada.
+    CHARGE_INVOICE_REQUESTED: 'charge.invoice_requested',
     // O console ligou ou desligou o "isento de cobrança" de um provedor: ativo
     // sem gerar fatura, até alguém desligar. Ação própria porque é a resposta
     // a "por que este provedor não paga?", e ela precisa de uma linha que diga

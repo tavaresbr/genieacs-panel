@@ -1306,6 +1306,18 @@ export interface AsaasIntegration {
   /** O endereço que se cola na Asaas. Montado pelo backend a partir do deploy. */
   webhookUrl: string
   updatedAt: string | null
+  /**
+   * A NFS-e pela Asaas: ligada, o pagamento confirmado de uma cobrança põe a
+   * nota na fila. Opcionais porque servidores antigos não mandam os campos.
+   */
+  nfseEnabled?: boolean
+  serviceDescription?: string | null
+  municipalServiceId?: string | null
+  municipalServiceCode?: string | null
+  municipalServiceName?: string | null
+  issPercent?: number
+  retainIss?: boolean
+  observations?: string | null
 }
 
 /**
@@ -1316,6 +1328,33 @@ export interface AsaasIntegrationUpdate {
   environment?: 'sandbox' | 'production'
   apiKey?: string
   webhookToken?: string
+  nfseEnabled?: boolean
+  serviceDescription?: string
+  municipalServiceId?: string
+  municipalServiceCode?: string
+  municipalServiceName?: string
+  issPercent?: number
+  retainIss?: boolean
+  observations?: string
+}
+
+/** O estado da NFS-e de uma cobrança. */
+export type InvoiceStatus = 'pending' | 'scheduled' | 'authorized' | 'error' | 'canceled'
+
+/** A NFS-e como o provedor a vê: número e links só quando emitida. */
+export interface TenantInvoiceView {
+  status: InvoiceStatus
+  number: string | null
+  pdfUrl: string | null
+  xmlUrl: string | null
+  issuedAt: string | null
+}
+
+/** A NFS-e como o console a vê: com o último erro e as tentativas. */
+export interface InvoiceConsoleView extends TenantInvoiceView {
+  id: number
+  error: string | null
+  attempts: number
 }
 
 export interface AsaasConnectionTest {
@@ -1600,6 +1639,8 @@ export interface TenantChargeView {
   dueDate: string | null
   invoiceUrl: string | null
   createdAt: string | null
+  /** A nota fiscal desta cobrança. Opcional: servidores antigos não mandam. */
+  invoice?: TenantInvoiceView | null
 }
 
 /**
@@ -1622,6 +1663,8 @@ export interface ChargeConsoleView {
   createdAt: string | null
   updatedAt: string | null
   superseded: { gatewayChargeId: string; amountCents: number }[]
+  /** A NFS-e desta cobrança. Opcional: servidores antigos não mandam. */
+  invoice?: InvoiceConsoleView | null
 }
 
 /** A assinatura resumida de uma linha da aba Assinaturas do console. */
@@ -1676,6 +1719,9 @@ export interface BillingEventView {
   externalId: string | null
   detail: Record<string, unknown> | null
   at: string
+  /** No pagamento: a cobrança que ele quitou e a NFS-e dela. Opcionais. */
+  chargeId?: number | null
+  invoice?: InvoiceConsoleView | null
 }
 
 /** The codes a 402 carries. Stable: the block screen picks its wording by them. */
@@ -2038,6 +2084,16 @@ export const platformAPI = {
   reissueCharge: (tenantId: number, chargeId: number) =>
     apiClient.post<{ charge: ChargeConsoleView }>(
       `/platform/tenants/${tenantId}/charges/${chargeId}/reissue`, {}
+    ),
+
+  /**
+   * Põe na fila a NFS-e de uma cobrança paga — ou outra no lugar da que deu
+   * erro ou foi cancelada. 202; 409 `not_paid`, `no_gateway_payment`,
+   * `nfse_disabled`, `invoice_exists`, `busy`; 404 `not_found`.
+   */
+  issueChargeInvoice: (tenantId: number, chargeId: number) =>
+    apiClient.post<{ charge: ChargeConsoleView; invoice: InvoiceConsoleView }>(
+      `/platform/tenants/${tenantId}/charges/${chargeId}/invoice`, {}
     ),
 
   getUsage: (tenantId: number) =>

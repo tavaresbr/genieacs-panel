@@ -4,6 +4,7 @@ import { BILLING_WEBHOOK_PATH } from '../config/billingWebhookPath.js';
 import { panelBaseDomain } from '../middleware/tenantResolver.js';
 import {
   AsaasSettingsError,
+  NFSE_FIELDS,
   generateWebhookToken,
   readPublic,
   save
@@ -88,14 +89,21 @@ class PlatformIntegrationsController {
     }
   }
 
-  /** `PUT /api/platform/integrations/asaas` — `{ environment?, apiKey?, webhookToken? }` */
+  /**
+   * `PUT /api/platform/integrations/asaas` — `{ environment?, apiKey?,
+   * webhookToken?, nfseEnabled?, serviceDescription?, municipalServiceId?,
+   * municipalServiceCode?, municipalServiceName?, issPercent?, retainIss?,
+   * observations? }`. 400 `invalid_nfse` quando a nota não fecha.
+   */
   static async updateAsaas(req, res) {
     try {
       const corpo = req.body ?? {};
+      const nfse = Object.fromEntries(NFSE_FIELDS.map((campo) => [campo, corpo[campo]]));
       const { changed } = await save({
         environment: corpo.environment,
         apiKey: corpo.apiKey,
-        webhookToken: corpo.webhookToken
+        webhookToken: corpo.webhookToken,
+        ...nfse
       });
       const atual = await presentAsaas();
 
@@ -105,7 +113,9 @@ class PlatformIntegrationsController {
           integration: 'asaas',
           environment: atual.environment,
           apiKeyChanged: changed.apiKey,
-          webhookTokenChanged: changed.webhookToken
+          webhookTokenChanged: changed.webhookToken,
+          // A nota não é segredo: vai inteira, para a trilha dizer quem ligou.
+          ...(changed.nfse ? { nfseChanged: true, nfseEnabled: atual.nfseEnabled } : {})
         }
       });
       if (!registrada) console.warn('Asaas integration changed without a platform trail line');

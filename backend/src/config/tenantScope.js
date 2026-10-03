@@ -141,7 +141,9 @@ export const SCOPED_TABLES = new Set([
   // motivo das duas acima, e com uma consequência a mais: ela carrega o link de
   // pagamento, que é endereço para o dinheiro de UM provedor. Uma listagem sem
   // filtro entregaria a um ISP o boleto do vizinho.
-  'billing_charges'
+  'billing_charges',
+  // A nota fiscal de cada cobrança paga: o número e o PDF de um provedor só.
+  'billing_invoices'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

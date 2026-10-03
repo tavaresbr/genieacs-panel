@@ -423,7 +423,77 @@ export async function createCustomer(payload) {
   return { customerId };
 }
 
+/**
+ * A nota como o painel a guarda, lida de qualquer resposta de `/invoices`.
+ *
+ * Os campos que a tela mostra e nada mais: o resto do corpo (impostos,
+ * dados do tomador) é da Asaas e mora lá.
+ */
+function notaDe(resposta, idPedido = null) {
+  const texto = (valor, max) => (valor === null || valor === undefined || valor === ''
+    ? null
+    : String(valor).slice(0, max));
+  return {
+    id: String(resposta?.id ?? idPedido ?? '').trim(),
+    status: resposta?.status ? String(resposta.status).toUpperCase() : null,
+    number: texto(resposta?.number, 64),
+    pdfUrl: texto(resposta?.pdfUrl, 512),
+    xmlUrl: texto(resposta?.xmlUrl, 512),
+    statusDescription: texto(resposta?.statusDescription, 500)
+  };
+}
+
+/**
+ * Agenda a NFS-e de um pagamento — `POST /invoices`.
+ *
+ * O corpo vem montado por quem chama (`billingInvoiceService`, a partir da
+ * configuração de Integrações): este arquivo é transporte, como em
+ * `createCustomer`. O valor entra em centavos e sai em reais, pelo mesmo
+ * ponto único de conversão das cobranças.
+ *
+ * @returns {Promise<{ id: string, status: string|null, number: string|null,
+ *   pdfUrl: string|null, xmlUrl: string|null, statusDescription: string|null }>}
+ */
+export async function createInvoice({ valueCents, ...payload }) {
+  const resposta = await chamar('/invoices', {
+    payload: { ...payload, value: paraReais(valueCents) }
+  });
+  const nota = notaDe(resposta);
+  if (!nota.id) throw new AsaasError('gateway created an invoice without an id', { code: 'bad_response' });
+  return nota;
+}
+
+/** Pede a emissão da nota agendada agora — `POST /invoices/{id}/authorize`. */
+export async function authorizeInvoice(invoiceId) {
+  return notaDe(await chamar(`/invoices/${idNoCaminho(invoiceId)}/authorize`, { payload: {} }), invoiceId);
+}
+
+/** A nota como a Asaas a vê agora — `GET /invoices/{id}`. */
+export async function getInvoice(invoiceId) {
+  return notaDe(await chamar(`/invoices/${idNoCaminho(invoiceId)}`, { method: 'GET' }), invoiceId);
+}
+
+/**
+ * As notas que a Asaas tem para um pagamento — `GET /invoices?payment=…`.
+ *
+ * É a pergunta que se faz antes de pedir de novo a nota cuja criação pode
+ * ter dado certo com a resposta perdida no caminho.
+ */
+export async function listInvoicesForPayment(paymentId) {
+  const id = String(paymentId ?? '').trim();
+  if (!id) throw new AsaasError('no gateway payment id', { code: 'bad_request' });
+  const resposta = await chamar(`/invoices?payment=${encodeURIComponent(id)}&limit=20`, { method: 'GET' });
+  const lista = Array.isArray(resposta?.data) ? resposta.data : [];
+  return lista.map((item) => notaDe(item)).filter((nota) => nota.id);
+}
+
+/** Cancela a nota — `POST /invoices/{id}/cancel`. A recusa sobe como está. */
+export async function cancelInvoice(invoiceId) {
+  return notaDe(await chamar(`/invoices/${idNoCaminho(invoiceId)}/cancel`, { payload: {} }), invoiceId);
+}
+
 export default {
   createCharge, cancelCharge, getCharge, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
-  createCustomer, testConnection, apiKey, baseUrl, AsaasError
+  createCustomer, testConnection, apiKey, baseUrl, AsaasError,
+  createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment
 };

@@ -1493,6 +1493,46 @@ const BILLING_TABLES = [
 ];
 
 /**
+ * A nota fiscal de serviço (NFS-e) de uma cobrança paga, emitida pela Asaas.
+ *
+ * Uma linha por cobrança — o índice único em `charge_id` é a idempotência: o
+ * webhook reentregue, a baixa do console e o clique repetido no "emitir nota"
+ * chegam todos à mesma linha, e nunca a uma segunda nota para o mesmo
+ * dinheiro. A linha nasce `pending` no pagamento (sem falar com a Asaas, que
+ * pode estar fora do ar) e é o agendador que a leva adiante, com `attempts` e
+ * `next_attempt_at` espaçando a insistência como na emissão da cobrança.
+ */
+const billingInvoicesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('charge_id').unsigned().notNullable()
+    .references('id').inTable('billing_charges').onDelete('CASCADE');
+  // O id da nota na Asaas (`inv_…`). Nulo até a criação voltar.
+  t.string('external_id', 64);
+  // pending | scheduled | authorized | error | canceled
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.string('number', 64);
+  t.string('pdf_url', 512);
+  t.string('xml_url', 512);
+  t.string('error', 500);
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.timestamp('next_attempt_at');
+  t.timestamp('issued_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['charge_id'], 'billing_invoices_charge_uq');
+  // O agendador pergunta "o que está pendente ou agendado" por provedor.
+  t.index(['tenant_id', 'status'], 'billing_invoices_status_idx');
+  // O webhook acha a linha pelo id da Asaas, antes de saber o provedor.
+  t.index(['external_id'], 'billing_invoices_external_idx');
+};
+
+const BILLING_INVOICE_TABLES = [
+  ['billing_invoices', billingInvoicesTable]
+];
+
+/**
  * Os assinantes do SGP que o painel conhece SEM uma ONT.
  *
  * `sgp_links` é chaveada pelo aparelho: é o espelho do contrato de cada ONT, e
@@ -2171,7 +2211,8 @@ export const SCHEMA_TABLES = [
   ...DUNNING_TABLES,
   ...SATISFACTION_TABLES,
   ...WA_AGENT_TABLES,
-  ...WA_META_TEMPLATE_TABLES
+  ...WA_META_TEMPLATE_TABLES,
+  ...BILLING_INVOICE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5104,6 +5145,21 @@ export const migrations = [
       await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** A NFS-e de cada cobrança paga, pela Asaas — ver `billingInvoicesTable`. */
+    id: '0094_billing_invoices',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return true;
+      return db.schema.hasTable('billing_invoices');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return;
+      for (const [nome, construtor] of BILLING_INVOICE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];
