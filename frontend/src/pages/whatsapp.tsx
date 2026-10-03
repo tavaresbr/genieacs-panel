@@ -12,6 +12,7 @@ import {
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
@@ -24,6 +25,7 @@ import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
 import { SatisfactionPanel } from '@/components/whatsapp/satisfaction-panel'
 import { MetaUsagePanel } from '@/components/whatsapp/meta-usage-panel'
+import { ResponseTimePanel } from '@/components/whatsapp/response-time-panel'
 import { MaintenancePanel } from '@/components/maintenance/maintenance-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { OutagePanel } from '@/components/outages/outage-panel'
@@ -31,7 +33,9 @@ import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthBell } from '@/components/whatsapp/health-strip'
 import { AvailabilityToggle } from '@/components/whatsapp/assignment'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
+import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
+import { sessionOwner } from '@/lib/session-owner'
 import { useLocation } from 'react-router'
 import { firstName, type QuickReply } from '@/lib/quick-replies'
 import { metaWindowFor } from '@/lib/wa-meta-window'
@@ -258,6 +262,22 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
       const res = await whatsappAPI.listMessages(id, { limit: MESSAGE_PAGE })
       if (!alive.current || selectedIdRef.current !== id) return
       if (!res.success || !res.data) {
+        // A conversa não existe para esta sessão — apagada, ou de outro
+        // provedor, vinda de um `state` de navegação antigo. Manter o cabeçalho
+        // dela seria mostrar um nome que o servidor acabou de dizer não ser
+        // deste provedor; tentar de novo com espera só repetiria o 404.
+        if (res.code === 'conversation_not_found') {
+          selectedIdRef.current = null
+          threadStampRef.current = null
+          threadFailures.current = 0
+          threadBlockedUntil.current = 0
+          setConversation(null)
+          setMessages([])
+          setHasOlder(false)
+          setSelectedId(null)
+          if (!silent) toast.error(whatsappErrorMessage(t, res.code))
+          return
+        }
         threadFailures.current += 1
         threadBlockedUntil.current = Date.now()
           + (2 ** Math.min(threadFailures.current, BACKOFF_CAP) - 1) * THREAD_POLL_MS
@@ -625,6 +645,30 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
   // No celular, lista OU conversa; no computador, as duas (`lib/wa-inbox-pane.ts`).
   const panes = inboxPanes(conversation !== null)
+  // Teclado do iPhone: o Safari não encolhe a página, só a `visualViewport`
+  // (`lib/wa-keyboard.ts`). Com o teclado aberto o cartão passa a caber na
+  // parte visível, com a caixa de escrever logo acima dele. Só no celular.
+  const [keyboardHeight, setKeyboardHeight] = useState<number | null>(null)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
+    let last: number | null = null
+    const update = () => {
+      const next = visibleHeightWithKeyboard({ innerHeight: window.innerHeight, vvHeight: vv.height })
+      if (next === last) return
+      last = next
+      setKeyboardHeight(next)
+      // A barra fixa e as abas voltam ao topo da área visível.
+      if (next !== null) window.scrollTo(0, 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
 
   return (
     <section className="space-y-5">
@@ -663,6 +707,9 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                 ? 'lg:grid-cols-[1fr_minmax(16rem,20rem)] min-[1200px]:grid-cols-[minmax(14rem,17rem)_1fr_minmax(16rem,19rem)] xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]'
                 : 'lg:grid-cols-[minmax(17rem,22rem)_1fr]'
             }`}
+            // Sem a área segura (o teclado cobre o indicador de home) e sem o
+            // `min-h`, que impediria o cartão de encolher.
+            style={keyboardHeight !== null ? { height: `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
           >
             <div className={`${showSgpPanel && conversation ? 'hidden min-[1200px]:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">
@@ -1009,6 +1056,13 @@ function RequeueFailedButton() {
  * responderia 403. As demais ele lê; o que ele não pode escrever é recusado
  * pelo servidor com uma frase que diz isso.
  */
+/** As duas vistas da aba de alertas: o resultado (quedas) e a configuração. */
+type AlertView = 'results' | 'config'
+const ALERT_VIEWS: [AlertView, TranslationKey][] = [
+  ['results', 'whatsapp.alerts.viewResults'],
+  ['config', 'whatsapp.alerts.viewConfig']
+]
+
 const TABS = [
   ['inbox', 'whatsapp.inbox.title', 'whatsapp.read'],
   ['contacts', 'whatsapp.contacts.title', 'whatsapp.read'],
@@ -1038,13 +1092,21 @@ type TabId = (typeof TABS)[number][0]
  */
 export default function WhatsAppPage() {
   const { t } = useTranslation()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const [tab, setTab] = useState<TabId>('inbox')
+  const [alertsView, setAlertsView] = useState<AlertView>('results')
   // The thread Contacts handed over, and a counter that remounts the inbox for
   // each hand-over so it opens that thread even when it was already on screen.
   // The Contacts page (its own menu entry) hands one over through the route.
+  //
+  // O `state` tem dono: o histórico do navegador guarda o de quem navegou, e
+  // sair, entrar em outro provedor e apertar "Voltar" o entregava de novo — a
+  // conversa do provedor A aberta na sessão do B. Sem dono igual ao desta
+  // sessão, ele é ignorado.
   const location = useLocation()
-  const routed = (location.state as { conversation?: WhatsAppConversation } | null)?.conversation ?? null
+  const routedState = location.state as { conversation?: WhatsAppConversation; owner?: string } | null
+  const owner = sessionOwner(user)
+  const routed = owner !== null && routedState?.owner === owner ? routedState.conversation ?? null : null
   const [handOver, setHandOver] = useState<{ conversation: WhatsAppConversation; seq: number } | null>(
     routed ? { conversation: routed, seq: 1 } : null
   )
@@ -1117,6 +1179,7 @@ export default function WhatsAppPage() {
         {tab === 'botReport' && (
           <div className="grid gap-8">
             <BotReportPanel />
+            <ResponseTimePanel />
             <SatisfactionPanel />
             <MetaUsagePanel />
           </div>
@@ -1127,8 +1190,25 @@ export default function WhatsAppPage() {
             continuaria montando um painel cujas requisições todas falham. */}
         {tab === 'alerts' && can('whatsapp.config') && (
           <>
-            <OutagePanel />
-            <AlertsPanel />
+            {/* O que os alertas acharam de um lado, como eles vigiam do outro:
+                juntos, o formulário empurrava as quedas para fora da tela. */}
+            <div className="tab-rail mb-4" role="tablist" aria-label={t('whatsapp.alerts.title')}>
+              {ALERT_VIEWS.map(([id, labelKey]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="tab-button"
+                  data-active={alertsView === id}
+                  role="tab"
+                  aria-selected={alertsView === id}
+                  data-testid={`wa-alerts-view-${id}`}
+                  onClick={() => setAlertsView(id)}
+                >
+                  {t(labelKey)}
+                </button>
+              ))}
+            </div>
+            {alertsView === 'results' ? <OutagePanel /> : <AlertsPanel />}
           </>
         )}
       </div>

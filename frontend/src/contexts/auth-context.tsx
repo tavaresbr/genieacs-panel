@@ -10,7 +10,7 @@ import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
-import { clearDashboardSnapshot } from '@/lib/dashboard-snapshot'
+import { clearSessionScopedStorage } from '@/lib/session-owner'
 import { setActiveDateFormat } from '@/lib/date-format'
 
 interface AuthContextType {
@@ -163,8 +163,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           user: User
         }
         // Entrar em outro provedor não passa por `clearTokens`.
-        clearDashboardSnapshot()
-        apiClient.setTokens(token, refreshToken)
+        clearSessionScopedStorage()
+        apiClient.beginSession(token, refreshToken)
 
         setUser(user)
         setIsAuthenticated(true)
@@ -195,7 +195,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           refreshToken: string
           user: User
         }
-        apiClient.setTokens(token, refreshToken)
+        apiClient.beginSession(token, refreshToken)
         setUser(user)
         setIsAuthenticated(true)
         setNeedsSetup(false)
@@ -240,7 +240,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       apiClient.setTabTokens(token)
     } else {
       apiClient.clearTokens()
-      apiClient.setTokens(token, refreshToken)
+      apiClient.beginSession(token, refreshToken)
     }
     setUser(next)
     setIsAuthenticated(true)

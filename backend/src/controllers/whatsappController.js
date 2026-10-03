@@ -4,6 +4,7 @@ import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
 import WaBotReportService from '../services/waBotReportService.js';
 import WaSatisfactionService from '../services/waSatisfactionService.js';
+import WaResponseTimeService from '../services/waResponseTimeService.js';
 import WaHealthService from '../services/waHealthService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -39,6 +40,18 @@ class WhatsAppController {
       return res.json(createResponse(
         req.t('whatsapp.configLoaded'),
         await WaBotReportService.report({ days: Number(req.query?.days) })
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `GET /api/whatsapp/response-time-report?days=` — quanto o cliente espera por gente. */
+  static async getResponseTimeReport(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('whatsapp.configLoaded'),
+        await WaResponseTimeService.report({ days: Number(req.query?.days) })
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');
