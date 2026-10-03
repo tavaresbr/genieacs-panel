@@ -11,7 +11,7 @@ import {
   type SubscriptionConsoleSummary,
   type SubscriptionStatus
 } from '@/lib/api'
-import { BillingExemptControl, STATUS_LABEL_KEYS, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { BillingExemptControl, STATUS_LABEL_KEYS, exemptUntilLabel, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -356,7 +356,7 @@ function StatusBadge({ row }: { row: SubscriptionRow }) {
       </span>
       {isBillingExempt(row.subscription) && (
         <span className="modern-badge-info" title={row.subscription.billingExemptReason ?? undefined}>
-          {t('platform.subs.exempt')}
+          {exemptUntilLabel(row.subscription, t) ?? t('platform.subs.exempt')}
         </span>
       )}
     </span>

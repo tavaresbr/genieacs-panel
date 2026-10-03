@@ -306,6 +306,15 @@ class SchedulerService {
       return { applied: false, reason: 'error' };
     });
 
+    // O fim da isenção com data de fim, também antes da emissão: desligada
+    // aqui, a mesma volta já emite a fatura que ela segurava (ver
+    // `SubscriptionService.endExpiredBillingExempt`).
+    summary.billingExemptEnded = await SubscriptionService.endExpiredBillingExempt({ tenant })
+      .catch((error) => {
+        console.warn(`Could not end the expired billing exemption: ${error.message}`);
+        return { ended: false, reason: 'error' };
+      });
+
     // A mesma contagem de ONTs vai à emissão: é ela que decide se a cobrança
     // da renovação já sai pelo preço da descida agendada (ver `issueCurrent`).
     summary.chargeIssued = await ChargeIssuingService.issueCurrent({

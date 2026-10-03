@@ -17,6 +17,8 @@ const { resetDeploymentSharing } = await import('../src/services/genieacsEgress.
 const { attachLocale } = await import('../src/middleware/locale.js');
 const { resolveTenant } = await import('../src/middleware/tenantResolver.js');
 const { default: platformBillingRoutes } = await import('../src/routes/platformBilling.js');
+const { BILLING_EXEMPT_EXPIRED_REASON } = await import('../src/services/subscriptionService.js');
+const { default: SchedulerService } = await import('../src/services/schedulerService.js');
 
 /**
  * O "isento de cobrança": o console marca um provedor para ficar ativo sem
@@ -200,7 +202,7 @@ beforeEach(async () => {
     await Subscription.upsertForTenant(tenantId, {
       plan_id: plano.id, status: 'active', renews_at: new Date(agora + 10 * DAY), trial_ends_at: null,
       canceled_at: null, pending_plan_id: null, pending_plan_at: null, pending_plan_locked_at: null,
-      billing_exempt_at: null, billing_exempt_reason: null
+      billing_exempt_at: null, billing_exempt_reason: null, billing_exempt_until: null
     });
     await SubscriptionService.invalidate(tenantId);
   }
@@ -598,5 +600,217 @@ describe('a porta', () => {
   it('só o provedor da URL: o vizinho não é isentado', async () => {
     assert.equal((await isentar(beta, { exempt: true })).status, 200);
     assert.equal((await assinaturaDe(gama)).billing_exempt_at, null);
+  });
+});
+
+describe('isenção com data de fim', () => {
+  const futuro = (dias) => new Date(Date.now() + dias * DAY);
+
+  it('liga com `until`, e as visões (console, lista e provedor) mostram a data', async () => {
+    const ate = futuro(30);
+    const res = await isentar(beta, { exempt: true, reason: 'cortesia', until: ate.toISOString() });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(seg(res.body.data.subscription.subscription.billingExemptUntil), seg(ate));
+    assert.equal(seg((await assinaturaDe(beta)).billing_exempt_until), seg(ate));
+
+    const [evento] = (await eventosDe(beta)).filter((e) => e.type === 'billing_exempt.enabled');
+    assert.equal(seg(JSON.parse(evento.detail).until), seg(ate));
+    const [trilha] = await trilhaDe(beta);
+    assert.equal(seg(JSON.parse(trilha.detail).until), seg(ate));
+
+    const lista = await platform('/subscriptions');
+    const linhaBeta = lista.body.data.rows.find((r) => r.tenant.id === beta);
+    const linhaGama = lista.body.data.rows.find((r) => r.tenant.id === gama);
+    assert.equal(seg(linhaBeta.subscription.billingExemptUntil), seg(ate));
+    assert.equal(linhaGama.subscription.billingExemptUntil, null);
+
+    const uso = await runInTenant(beta, () => SubscriptionService.usage());
+    assert.equal(seg(uso.subscription.billingExemptUntil), seg(ate), 'o provedor vê até quando');
+    assert.equal(uso.subscription.billingExemptReason, null);
+  });
+
+  it('sem `until`, a isenção não tem fim e a visão diz nulo', async () => {
+    const res = await isentar(beta, { exempt: true });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.subscription.subscription.billingExemptUntil, null);
+    assert.equal((await assinaturaDe(beta)).billing_exempt_until, null);
+  });
+
+  it('recusa com 400 a data passada, a inválida e a data ao desligar', async () => {
+    const casos = [
+      { exempt: true, until: new Date(Date.now() - 60_000).toISOString() },
+      { exempt: true, until: 'amanhã' },
+      { exempt: true, until: 5 },
+      { exempt: true, until: '' },
+      { exempt: false, until: futuro(3).toISOString() }
+    ];
+    for (const body of casos) {
+      const res = await isentar(beta, body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+    }
+    const passada = await isentar(beta, { exempt: true, until: new Date(Date.now() - 60_000).toISOString() });
+    assert.equal(passada.body.code, 'invalid_until');
+    const desligando = await isentar(beta, { exempt: false, until: futuro(3).toISOString() });
+    assert.equal(desligando.body.code, 'until_requires_exempt');
+    assert.equal((await assinaturaDe(beta)).billing_exempt_at, null);
+    assert.equal((await trilhaDe(beta)).length, 0);
+  });
+
+  it('já isento, outro `until` muda só a data; o mesmo, ou nenhum, não grava nada', async () => {
+    const primeira = futuro(10);
+    assert.equal((await isentar(beta, { exempt: true, reason: 'primeira', until: primeira.toISOString() })).status, 200);
+    const desde = (await assinaturaDe(beta)).billing_exempt_at;
+
+    const segunda = futuro(40);
+    const res = await isentar(beta, { exempt: true, reason: 'ignorado', until: segunda.toISOString() });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.alreadyInState, false);
+    assert.equal(res.body.data.untilChanged, true);
+    assert.equal(seg(res.body.data.subscription.subscription.billingExemptUntil), seg(segunda));
+    const depois = await assinaturaDe(beta);
+    assert.equal(seg(depois.billing_exempt_until), seg(segunda));
+    assert.equal(seg(depois.billing_exempt_at), seg(desde), 'desde quando não muda');
+    assert.equal(depois.billing_exempt_reason, 'primeira', 'o motivo não muda');
+    const [atualizada] = (await eventosDe(beta)).filter((e) => e.type === 'billing_exempt.updated');
+    assert.ok(atualizada);
+    assert.equal(seg(JSON.parse(atualizada.detail).untilFrom), seg(primeira));
+    assert.equal(seg(JSON.parse(atualizada.detail).untilTo), seg(segunda));
+    const trilhas = await trilhaDe(beta);
+    assert.equal(trilhas.length, 2);
+    assert.equal(JSON.parse(trilhas[1].detail).untilChanged, true);
+
+    for (const body of [{ exempt: true, until: segunda.toISOString() }, { exempt: true }]) {
+      const igual = await isentar(beta, body);
+      assert.equal(igual.body.data.alreadyInState, true, JSON.stringify(body));
+    }
+    assert.equal((await trilhaDe(beta)).length, 2);
+
+    // Nulo explícito tira a data: "até alguém desligar".
+    const semFim = await isentar(beta, { exempt: true, until: null });
+    assert.equal(semFim.body.data.untilChanged, true);
+    const final = await assinaturaDe(beta);
+    assert.equal(final.billing_exempt_until, null);
+    assert.ok(final.billing_exempt_at, 'continua isento');
+  });
+
+  it('desligar à mão limpa a data', async () => {
+    assert.equal((await isentar(beta, { exempt: true, until: futuro(5).toISOString() })).status, 200);
+    const res = await isentar(beta, { exempt: false });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.subscription.subscription.billingExemptUntil, null);
+    assert.equal((await assinaturaDe(beta)).billing_exempt_until, null);
+  });
+
+  it('o fim automático desliga como o console: prazo +LEAD_DAYS, extrato e trilhas sem ator', async () => {
+    await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() + 3 * DAY) });
+    assert.equal((await isentar(beta, { exempt: true, reason: 'por um mês', until: futuro(1).toISOString() })).status, 200);
+
+    // Antes da data: nada.
+    const cedo = await SubscriptionService.endExpiredBillingExempt({ tenantId: beta });
+    assert.equal(cedo.ended, false);
+    assert.equal(cedo.reason, 'not_yet');
+
+    // A data passou, e o prazo também (a isenção durou mais que o ciclo).
+    await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() - 2 * DAY) });
+    const depoisDaData = new Date(Math.floor((Date.now() + 2 * DAY) / 1000) * 1000);
+    const fim = await SubscriptionService.endExpiredBillingExempt({ tenantId: beta, now: depoisDaData });
+    assert.equal(fim.ended, true, JSON.stringify(fim));
+
+    const depois = await assinaturaDe(beta);
+    assert.equal(depois.billing_exempt_at, null);
+    assert.equal(depois.billing_exempt_until, null);
+    assert.equal(depois.billing_exempt_reason, null);
+    const lead = ChargeIssuingService.LEAD_DAYS * DAY;
+    assert.equal(seg(depois.renews_at), seg(depoisDaData.getTime() + lead), 'o prazo ganha LEAD_DAYS a partir de agora');
+
+    const [evento] = (await eventosDe(beta)).filter((e) => e.type === 'billing_exempt.disabled');
+    const detalhe = JSON.parse(evento.detail);
+    assert.equal(detalhe.source, 'scheduler');
+    assert.equal(detalhe.reason, BILLING_EXEMPT_EXPIRED_REASON);
+    assert.ok(detalhe.exemptUntil);
+    assert.equal(evento.created_by, null, 'sem ator');
+
+    const trilhas = await trilhaDe(beta);
+    assert.equal(trilhas.length, 2);
+    const auto = JSON.parse(trilhas[1].detail);
+    assert.equal(trilhas[1].actor_user_id, null);
+    assert.equal(auto.exempt, false);
+    assert.equal(auto.source, 'scheduler');
+    assert.equal(auto.reason, BILLING_EXEMPT_EXPIRED_REASON);
+    const doProvedor = await getDb()('audit_log').where({ tenant_id: beta, action: 'subscription.changed' })
+      .orderBy('id', 'desc').first();
+    assert.equal(doProvedor.actor_kind, 'system');
+    assert.equal(JSON.parse(doProvedor.detail).source, 'scheduler');
+
+    recebidas = [];
+    const emissao = await runInTenant(beta, () => ChargeIssuingService.issueCurrent({ now: depoisDaData }));
+    assert.equal(emissao.issued, true, JSON.stringify(emissao));
+
+    // Idempotente: outra volta não faz nada.
+    const deNovo = await SubscriptionService.endExpiredBillingExempt({ tenantId: beta, now: depoisDaData });
+    assert.equal(deNovo.ended, false);
+    assert.equal((await eventosDe(beta)).filter((e) => e.type === 'billing_exempt.disabled').length, 1);
+    assert.equal((await trilhaDe(beta)).length, 2);
+  });
+
+  it('o fim automático reabre a cobrança do período que a isenção cancelou', async () => {
+    await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() + 3 * DAY) });
+    const emitida = await abrirCobranca(beta, { gatewayChargeId: 'pay_reaberta' });
+    assert.equal((await isentar(beta, { exempt: true, until: futuro(1).toISOString() })).status, 200);
+    assert.equal((await cobrancaDe(beta, emitida)).status, 'canceled');
+
+    const depoisDaData = new Date(Date.now() + DAY + 60_000);
+    const fim = await SubscriptionService.endExpiredBillingExempt({ tenantId: beta, now: depoisDaData });
+    assert.equal(fim.ended, true);
+    assert.equal(fim.reopenedCharge, true);
+    const reaberta = await cobrancaDe(beta, emitida);
+    assert.equal(reaberta.status, 'pending');
+    assert.equal(reaberta.gateway_charge_id, null);
+    assert.equal(JSON.parse((await trilhaDe(beta)).slice(-1)[0].detail).reopenedCharge, true);
+  });
+
+  it('duas voltas sobrepostas desligam uma vez só', async () => {
+    assert.equal((await isentar(beta, { exempt: true, until: futuro(1).toISOString() })).status, 200);
+    const depoisDaData = new Date(Date.now() + 2 * DAY);
+    const resultados = await Promise.all([
+      SubscriptionService.endExpiredBillingExempt({ tenantId: beta, now: depoisDaData }),
+      SubscriptionService.endExpiredBillingExempt({ tenantId: beta, now: depoisDaData })
+    ]);
+    assert.equal(resultados.filter((r) => r.ended).length, 1, JSON.stringify(resultados));
+    assert.equal((await eventosDe(beta)).filter((e) => e.type === 'billing_exempt.disabled').length, 1);
+    assert.equal((await trilhaDe(beta)).length, 2, 'a ligação e um fim');
+  });
+
+  it('a data que o console estendeu no meio do caminho não é encerrada pela leitura velha', async () => {
+    assert.equal((await isentar(beta, { exempt: true, until: futuro(1).toISOString() })).status, 200);
+    const depoisDaData = new Date(Date.now() + 2 * DAY);
+    // A condição da gravação (`billing_exempt_until <= agora`) é o que segura
+    // a data estendida entre a leitura do agendador e a escrita.
+    const lida = await assinaturaDe(beta);
+    await Subscription.upsertForTenant(beta, { billing_exempt_until: new Date(Date.now() + 10 * DAY) });
+    const mudou = await Subscription.changeBillingExemptIf(
+      beta, { wasExempt: true, expiredBy: depoisDaData }, { billing_exempt_at: null, billing_exempt_until: null }
+    );
+    assert.equal(mudou, false);
+    assert.ok(lida.billing_exempt_at);
+    assert.ok((await assinaturaDe(beta)).billing_exempt_at, 'continua isento');
+    const r = await SubscriptionService.endExpiredBillingExempt({ tenantId: beta, now: depoisDaData });
+    assert.equal(r.ended, false);
+  });
+
+  it('o agendador encerra a isenção vencida antes de emitir, na mesma volta', async () => {
+    await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() + 2 * DAY) });
+    assert.equal((await isentar(beta, { exempt: true, until: futuro(1).toISOString() })).status, 200);
+    // Vencida: a data de fim já passou (gravada à mão no passado).
+    await Subscription.upsertForTenant(beta, {
+      billing_exempt_until: new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000)
+    });
+    const linha = await getDb()('tenants').where({ id: beta }).first();
+    recebidas = [];
+    const resumo = await runInTenant(beta, () => SchedulerService.runJobs({ tenant: linha }));
+    assert.equal(resumo.billingExemptEnded.ended, true, JSON.stringify(resumo.billingExemptEnded));
+    assert.equal(resumo.chargeIssued.issued, true, JSON.stringify(resumo.chargeIssued));
+    assert.equal((await assinaturaDe(beta)).billing_exempt_at, null);
+    assert.equal(recebidas.filter((r) => r.method === 'POST' && r.path === '/payments').length, 1);
   });
 });

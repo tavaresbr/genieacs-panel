@@ -107,6 +107,28 @@ class Subscription {
     return changed > 0;
   }
 
+  /**
+   * Grava uma mudança do "isento de cobrança" — só se a isenção ainda está
+   * como se leu (`wasExempt`) e, no fim automático (`expiredBy`), só se o
+   * `billing_exempt_until` gravado já passou daquele instante.
+   *
+   * Condicional pelo mesmo motivo de `applyPendingPlan`: duas voltas do
+   * agendador (ou o agendador e o console) podem desligar a mesma isenção no
+   * mesmo minuto, e sem a condição as duas gravariam a sua linha no extrato e
+   * reabririam a cobrança. Quem muda a linha é quem desligou; o outro recebe
+   * `false` e não grava nada.
+   */
+  static async changeBillingExemptIf(tenantId, { wasExempt, expiredBy = null }, patch, db = getDb()) {
+    if (!tenantId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const query = db('subscriptions').where({ tenant_id: tenantId });
+    if (wasExempt) query.whereNotNull('billing_exempt_at');
+    else query.whereNull('billing_exempt_at');
+    if (expiredBy) query.whereNotNull('billing_exempt_until').where('billing_exempt_until', '<=', expiredBy);
+    const changed = await query.update({ ...patch, updated_at: new Date() });
+    return changed > 0;
+  }
+
   /** A do provedor em escopo — o caminho que um controlador do próprio provedor usaria. */
   static async createCurrent(row) {
     await tinsert('subscriptions', row);

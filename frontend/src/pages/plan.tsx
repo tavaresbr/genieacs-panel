@@ -29,7 +29,7 @@ import {
   planChangeKind,
   resourceLabelKey
 } from '@/lib/plan-options'
-import { displayDate } from '@/lib/date-format'
+import { displayDate, displayDayMonth } from '@/lib/date-format'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -216,6 +216,8 @@ export default function PlanPage() {
   // Isento: não vence nem recebe fatura. Some o prazo, o aviso de vencido e o
   // "pagar agora"; fica a nota.
   const isento = isBillingExempt(subscription)
+  // Até quando (dd/mm), quando a isenção tem data de fim.
+  const isentoAte = isento ? displayDayMonth(subscription?.billingExemptUntil) : null
   const venceu = !isento && expirou(subscription?.renewsAt)
   const pendente = subscription?.pendingPlan ?? null
   const pendenteBloqueio = pendingBlockedDetail(pendente)
@@ -266,7 +268,7 @@ export default function PlanPage() {
               {isento && (
                 <p role="status" className="mt-3 flex items-start gap-2 text-sm text-foreground">
                   <Icon name="info" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
-                  {t('plan.billingExemptNote')}
+                  {isentoAte ? t('plan.billingExemptUntilNote', { date: isentoAte }) : t('plan.billingExemptNote')}
                 </p>
               )}
               <dl className="mt-4 space-y-2 text-sm">

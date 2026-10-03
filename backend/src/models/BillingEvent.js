@@ -32,7 +32,10 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   // único `(tenant_id, external_id)` não colide em nulo, e ligar e desligar
   // várias vezes é o uso esperado, não uma reentrega.
   BILLING_EXEMPT_ENABLED: 'billing_exempt.enabled',
-  BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled'
+  BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled',
+  // A data de fim de uma isenção que continua ligada mudou (o console
+  // estendeu, encurtou ou tirou a data). O fim em si é `disabled`.
+  BILLING_EXEMPT_UPDATED: 'billing_exempt.updated'
 });
 
 class BillingEvent {

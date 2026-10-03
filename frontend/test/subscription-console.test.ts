@@ -9,6 +9,7 @@ import {
   endOfDayIso,
   deadlineOf,
   exemptCount,
+  exemptUntilFromDateInput,
   filterRows,
   gatewayBadge,
   isBillingExempt,
@@ -382,5 +383,26 @@ describe('centsToInput', () => {
   it('escreve centavos como se digita', () => {
     expect(centsToInput(19990)).toBe('199,90')
     expect(centsToInput(5)).toBe('0,05')
+  })
+})
+
+describe('exemptUntilFromDateInput', () => {
+  const agora = new Date(2026, 9, 3, 12, 0, 0)
+
+  it('vazio é sem data de fim', () => {
+    expect(exemptUntilFromDateInput('', agora)).toBeNull()
+    expect(exemptUntilFromDateInput('   ', agora)).toBeNull()
+  })
+
+  it('o dia escolhido vira o fim daquele dia, no fuso de quem escolheu', () => {
+    const iso = exemptUntilFromDateInput('2026-10-10', agora)
+    expect(iso).toBe(new Date(2026, 9, 10, 23, 59, 59).toISOString())
+    expect(exemptUntilFromDateInput('2026-10-03', agora)).toBe(new Date(2026, 9, 3, 23, 59, 59).toISOString())
+  })
+
+  it('o dia que já acabou ou ilegível é recusado antes de enviar', () => {
+    expect(exemptUntilFromDateInput('2026-10-02', agora)).toBeUndefined()
+    expect(exemptUntilFromDateInput('10/10/2026', agora)).toBeUndefined()
+    expect(exemptUntilFromDateInput('amanhã', agora)).toBeUndefined()
   })
 })
