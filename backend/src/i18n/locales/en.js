@@ -854,6 +854,7 @@ export default {
   'coupon.exhausted': 'This coupon has reached its usage limit',
   'coupon.planMismatch': 'This coupon does not apply to your plan',
   'coupon.alreadyApplied': 'A coupon is already applied to this subscription',
+  'coupon.alreadyUsed': 'You have already used this coupon',
   'coupon.applied': 'Coupon {code} applied',
   'coupon.applyFailed': 'Failed to apply the coupon',
 

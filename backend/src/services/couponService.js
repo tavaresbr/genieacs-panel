@@ -3,9 +3,10 @@ import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import Tenant from '../models/Tenant.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
+import CouponRedemption from '../models/CouponRedemption.js';
 import SubscriptionService from './subscriptionService.js';
 import SelfBillingService, { SelfBillingError } from './selfBillingService.js';
-import { getDb } from '../config/database.js';
+import { getDb, isUniqueViolation } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
 
 /**
@@ -27,6 +28,21 @@ import { runInTenant } from '../config/tenantContext.js';
  * gateway ANTES de gravar e para tudo se o gateway recusar. Qualquer recusa
  * depois do resgate devolve o resgate (`Coupon.unredeem`): um cupom que não
  * chegou a valer não gasta vaga.
+ *
+ * ## Um resgate por provedor
+ *
+ * O resgate grava, na mesma transação do contador, a linha de
+ * `coupon_redemptions` do provedor — e é ela que impede o provedor de digitar
+ * de novo o cupom que já gastou (`coupon_already_used`): o `coupon_id` da
+ * assinatura some no último ciclo, a memória fica. O console pode reaplicar
+ * por cima dela (é decisão comercial de gente), e aí não conta outro resgate:
+ * o provedor já ocupa a vaga dele.
+ *
+ * ## O que a rota do provedor diz
+ *
+ * Só "cupom inválido" para vencido, esgotado, inativo ou de outro plano: a
+ * tela do provedor não é lugar de sondar o catálogo (quais códigos existem,
+ * quais já acabaram). O console continua com o código detalhado.
  */
 
 /** Os estados em que o provedor mexe na própria assinatura — os de `SelfBillingService`. */
@@ -41,21 +57,29 @@ export const COUPON_ERRORS = Object.freeze({
   expired: () => recusa('coupon.expired', 'coupon_expired'),
   exhausted: () => recusa('coupon.exhausted', 'coupon_exhausted'),
   planMismatch: () => recusa('coupon.planMismatch', 'coupon_plan_mismatch'),
-  alreadyApplied: () => recusa('coupon.alreadyApplied', 'coupon_already_applied')
+  alreadyApplied: () => recusa('coupon.alreadyApplied', 'coupon_already_applied'),
+  alreadyUsed: () => recusa('coupon.alreadyUsed', 'coupon_already_used')
 });
+
+/** As recusas que, na rota do provedor, viram só `coupon_invalid` — ver o topo. */
+const RECUSAS_SONDAVEIS = new Set(['coupon_expired', 'coupon_exhausted', 'coupon_plan_mismatch']);
 
 /** Um instante sem os milissegundos: o MySQL guarda ao segundo. */
 function aoSegundo(data) {
   return new Date(Math.floor(data.getTime() / 1000) * 1000);
 }
 
-/** Por que um cupom ativo não pode ser resgatado agora — ou nulo. */
-function motivoDeNaoResgatar(cupom, now) {
+/**
+ * Por que um cupom ativo não pode ser resgatado agora — ou nulo. `semTeto`:
+ * a reaplicação do console a quem já resgatou, que não toma vaga nova.
+ */
+function motivoDeNaoResgatar(cupom, now, { semTeto = false } = {}) {
   if (!cupom || !cupom.active) return COUPON_ERRORS.invalid();
   const validade = cupom.valid_until ? new Date(cupom.valid_until) : null;
   if (validade && !Number.isNaN(validade.getTime()) && validade.getTime() <= now.getTime()) {
     return COUPON_ERRORS.expired();
   }
+  if (semTeto) return null;
   const teto = cupom.max_redemptions === null || cupom.max_redemptions === undefined
     ? null : Number(cupom.max_redemptions);
   if (teto !== null && Number(cupom.redemptions ?? 0) >= teto) return COUPON_ERRORS.exhausted();
@@ -94,6 +118,9 @@ class CouponService {
     tenantId, code, actorUserId = null, source = 'provider', countDevices = null, now = new Date()
   }) {
     const doConsole = source === 'console';
+    // A rota do provedor não diferencia o cupom vencido, esgotado ou de outro
+    // plano do inexistente (ver o topo).
+    const recusar = (erro) => (!doConsole && erro && RECUSAS_SONDAVEIS.has(erro.code) ? COUPON_ERRORS.invalid() : erro);
     return runInTenant(tenantId, async () => {
       const tenant = await Tenant.findById(tenantId);
       if (!tenant || tenant.kind === 'platform') {
@@ -112,16 +139,39 @@ class CouponService {
       if (antes.coupon_id && (Number(antes.coupon_id) === Number(cupom.id) || !doConsole)) {
         throw COUPON_ERRORS.alreadyApplied();
       }
-      const motivo = motivoDeNaoResgatar(cupom, now);
-      if (motivo) throw motivo;
+      // Este provedor já resgatou este cupom um dia (e gastou, ou o console o
+      // tirou): o provedor não o resgata de novo; o console pode reaplicar,
+      // sem contar outro resgate.
+      const jaResgatou = await CouponRedemption.exists(cupom.id);
+      if (jaResgatou && !doConsole) throw COUPON_ERRORS.alreadyUsed();
+      const motivo = motivoDeNaoResgatar(cupom, now, { semTeto: jaResgatou });
+      if (motivo) throw recusar(motivo);
       const plano = antes.plan_id ? await Plan.findById(antes.plan_id) : null;
       const planos = parseCouponPlanIds(cupom.plan_ids);
-      if (planos !== null && !(plano && planos.includes(Number(plano.id)))) throw COUPON_ERRORS.planMismatch();
+      if (planos !== null && !(plano && planos.includes(Number(plano.id)))) throw recusar(COUPON_ERRORS.planMismatch());
 
-      // O resgate, atômico. Perdeu (a última vaga foi de outro, desativaram
-      // no meio, venceu agora): a releitura diz qual das três.
-      if (!(await Coupon.redeem(cupom.id, now))) {
-        throw motivoDeNaoResgatar(await Coupon.findById(cupom.id), now) ?? COUPON_ERRORS.exhausted();
+      // O resgate, atômico: o contador e a linha do provedor na mesma
+      // transação. Perdeu a vaga (a última foi de outro, desativaram no meio,
+      // venceu agora): a releitura diz qual das três. Perdeu a linha (outra
+      // aplicação deste provedor resgatou no meio): é o "já usado".
+      let contado = false;
+      if (!jaResgatou) {
+        let resgatou;
+        try {
+          resgatou = await getDb().transaction(async (trx) => {
+            if (!(await Coupon.redeem(cupom.id, now, trx))) return false;
+            await CouponRedemption.record(cupom.id, { at: aoSegundo(now) }, trx);
+            return true;
+          });
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+          if (!doConsole) throw COUPON_ERRORS.alreadyUsed();
+          resgatou = null;
+        }
+        if (resgatou === false) {
+          throw recusar(motivoDeNaoResgatar(await Coupon.findById(cupom.id), now) ?? COUPON_ERRORS.exhausted());
+        }
+        contado = resgatou === true;
       }
 
       const ciclos = ciclosDe(cupom);
@@ -159,7 +209,13 @@ class CouponService {
           }
         });
       } catch (error) {
-        await Coupon.unredeem(cupom.id);
+        // O resgate que não chegou a valer volta inteiro: a vaga e a linha.
+        if (contado) {
+          await getDb().transaction(async (trx) => {
+            await Coupon.unredeem(cupom.id, trx);
+            await CouponRedemption.remove(cupom.id, trx);
+          });
+        }
         throw error;
       } finally {
         SubscriptionService.cache.invalidate();

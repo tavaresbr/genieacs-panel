@@ -166,7 +166,11 @@ export function PlatformRevenue() {
               <Kpi label={t('platform.revenue.overdue')} value={formatMoney(report.overdueCents, MOEDA)}
                 hint={t('platform.revenue.overdueHint', { count: report.overdueTenants })}
                 tone={report.overdueCents > 0 ? 'danger' : undefined} />
-              <Kpi label={t('platform.revenue.discount')} value={formatMoney(report.discountCents, MOEDA)} />
+              {/* Aproximado: o preço de tabela da época do pagamento não é
+                  gravado, e a conta usa o de hoje (ver `revenueReportService`). */}
+              <Kpi label={t('platform.revenue.discount')} value={formatMoney(report.discountCents, MOEDA)}
+                hint={report.discountApproximate === false ? undefined : t('platform.revenue.discountApprox')}
+                title={report.discountApproximate === false ? undefined : t('platform.revenue.discountApproxHint')} />
             </div>
           </section>
 
@@ -214,14 +218,22 @@ export function PlatformRevenue() {
   )
 }
 
-function Kpi({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'danger' }) {
+function Kpi({ label, value, hint, tone, title }: {
+  label: string
+  value: string
+  hint?: string
+  tone?: 'danger'
+  /** A explicação ao passar o mouse (e lida pelo leitor de tela, pelo `title`). */
+  title?: string
+}) {
   return (
-    <div className="modern-card p-3">
+    <div className="modern-card p-3" title={title}>
       <p className="metric-label">{label}</p>
       <p className={`mt-1 font-mono text-lg font-semibold tabular-nums ${tone === 'danger' ? 'text-destructive' : 'text-foreground'}`}>
         {value}
       </p>
       {hint && <p className="field-hint">{hint}</p>}
+      {title && <p className="sr-only">{title}</p>}
     </div>
   )
 }

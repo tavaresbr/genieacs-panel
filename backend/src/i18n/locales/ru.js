@@ -855,6 +855,7 @@ export default {
   'coupon.exhausted': 'Купон исчерпал лимит использований',
   'coupon.planMismatch': 'Этот купон не действует для вашего тарифа',
   'coupon.alreadyApplied': 'К этой подписке уже применён купон',
+  'coupon.alreadyUsed': 'Вы уже использовали этот купон',
   'coupon.applied': 'Купон {code} применён',
   'coupon.applyFailed': 'Не удалось применить купон',
 

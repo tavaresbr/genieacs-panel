@@ -252,6 +252,13 @@ async function fecharPeloRegistro(evento, { cobranca, externalId, allowUnderpaym
     }
   }
   await BillingCharge.update(cobranca.id, { status: 'paid', last_error: null, issuing_until: null });
+  // A NFS-e, como na baixa comum: a cobrança paga agora — inclusive a que
+  // fechou aceitando um pagamento a menos — tem nota, do valor que de fato
+  // entrou (ver `billingInvoiceService`). Idempotente: a reentrega que já
+  // tinha enfileirado não abre outra.
+  if (cobranca.gateway_charge_id) {
+    await BillingInvoiceService.enqueueForCharge({ ...cobranca, status: 'paid' });
+  }
   return {
     cobranca,
     externalId,

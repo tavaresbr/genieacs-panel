@@ -55,6 +55,7 @@ describe('coupon', () => {
 
   it('reconhece as recusas do cupom', () => {
     expect(isCouponRefusal('coupon_exhausted')).toBe(true)
+    expect(isCouponRefusal('coupon_already_used')).toBe(true)
     expect(isCouponRefusal('busy')).toBe(false)
     expect(isCouponRefusal(undefined)).toBe(false)
   })

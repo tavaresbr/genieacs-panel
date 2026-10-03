@@ -854,6 +854,7 @@ export default {
   'coupon.exhausted': 'このクーポンは利用上限に達しています',
   'coupon.planMismatch': 'このクーポンはご利用のプランには適用されません',
   'coupon.alreadyApplied': 'このサブスクリプションにはすでにクーポンが適用されています',
+  'coupon.alreadyUsed': 'このクーポンはすでに使用済みです',
   'coupon.applied': 'クーポン {code} を適用しました',
   'coupon.applyFailed': 'クーポンを適用できませんでした',
 

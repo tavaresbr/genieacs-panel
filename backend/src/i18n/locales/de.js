@@ -855,6 +855,7 @@ export default {
   'coupon.exhausted': 'Dieser Gutschein hat sein Nutzungslimit erreicht',
   'coupon.planMismatch': 'Dieser Gutschein gilt nicht für Ihren Tarif',
   'coupon.alreadyApplied': 'Auf dieses Abonnement ist bereits ein Gutschein angewendet',
+  'coupon.alreadyUsed': 'Sie haben diesen Gutschein bereits verwendet',
   'coupon.applied': 'Gutschein {code} angewendet',
   'coupon.applyFailed': 'Der Gutschein konnte nicht angewendet werden',
 

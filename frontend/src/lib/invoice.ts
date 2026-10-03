@@ -15,6 +15,7 @@ export const INVOICE_STATUS_LABEL_KEYS: Record<InvoiceStatus, TranslationKey> = 
   scheduled: 'nfse.status.scheduled',
   authorized: 'nfse.status.authorized',
   error: 'nfse.status.error',
+  canceling: 'nfse.status.canceling',
   canceled: 'nfse.status.canceled'
 }
 
@@ -25,9 +26,25 @@ export function invoiceStatusKey(status: string): TranslationKey | null {
 
 export function invoiceBadgeClass(status: string) {
   if (status === 'authorized') return 'modern-badge-success'
-  if (status === 'pending' || status === 'scheduled') return 'modern-badge-warning'
+  if (status === 'pending' || status === 'scheduled' || status === 'canceling') return 'modern-badge-warning'
   if (status === 'error') return 'modern-badge-error'
   return 'modern-badge'
+}
+
+/**
+ * O endereço do PDF/XML da nota, só se for `https:` — ou nulo.
+ *
+ * O backend já recusa outro esquema ao gravar; a tela confere de novo porque
+ * é ela que põe o endereço num `href`, e um `javascript:` ali seria código
+ * rodando no painel.
+ */
+export function safeInvoiceUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    return new URL(url).protocol === 'https:' ? url : null
+  } catch {
+    return null
+  }
 }
 
 /** Os estados de que o console pode pedir outra nota para a mesma cobrança. */

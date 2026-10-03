@@ -853,6 +853,7 @@ export default {
   'coupon.exhausted': 'Este cupom atingiu o limite de usos',
   'coupon.planMismatch': 'Este cupom não vale para o seu plano',
   'coupon.alreadyApplied': 'Esta assinatura já tem um cupom aplicado',
+  'coupon.alreadyUsed': 'Você já usou este cupom',
   'coupon.applied': 'Cupom {code} aplicado',
   'coupon.applyFailed': 'Falha ao aplicar o cupom',
 

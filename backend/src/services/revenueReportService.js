@@ -27,7 +27,21 @@ import { toCsvWith } from '../utils/csv.js';
  * provedor por período —, então lê-se a linha crua e o mês sai daqui, de um
  * jeito só para os três bancos.
  *
- * ## Quando uma cobrança "aconteceu"
+ * ## O dinheiro vem do extrato, não das cobranças
+ *
+ * Recebido e estornado são somados dos EVENTOS (`billing_events`): cada
+ * `payment.recorded` pelo seu `amount_cents` e pelo seu `created_at`, cada
+ * `payment.refunded` idem. É o extrato que sabe de todo dinheiro — a baixa
+ * manual do console sem cobrança nenhuma, o pagamento de uma cobrança criada
+ * à mão no gateway e que nunca teve linha aqui, o pagamento a menos (que
+ * entra pelo que veio, e não pelo que se pediu). Não há dupla contagem: cada
+ * pagamento é UM evento (a idempotência por referência de `recordPayment`), o
+ * aceite da diferença (`<ref>:accepted`) é gravado com zero e não conta como
+ * pagamento, e o estorno é um evento só (`<ref>:refund`) com o valor do
+ * pagamento que desfez. As cobranças continuam respondendo o que só elas
+ * sabem: o em aberto, o vencido e as linhas da planilha.
+ *
+ * ## Quando uma cobrança "aconteceu" (a planilha)
  *
  * `billing_charges` não tem `paid_at`. O instante do pagamento é o do evento
  * `payment.recorded` do extrato com a referência da cobrança — o id no
@@ -232,6 +246,19 @@ export function indexarEventos(eventos) {
   return { pagamentos, estornos };
 }
 
+/** O `detail` de um evento, lido — ou nulo. */
+function detalheDe(evento) {
+  const bruto = evento?.detail;
+  if (!bruto) return null;
+  if (typeof bruto === 'object') return bruto;
+  try {
+    const lido = JSON.parse(bruto);
+    return lido && typeof lido === 'object' ? lido : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Os dias de um período do plano (trinta quando o plano não diz). */
 function diasDoPlano(plan) {
   return SubscriptionService.periodDaysOf(plan);
@@ -247,16 +274,20 @@ function diasDoPlano(plan) {
  *   cobrança e com preço efetivo acima de zero — trial não paga ainda,
  *   `past_due` já não está pagando, isento e plano grátis não pagam nunca. O
  *   preço do período vira mensal por `× 30 / period_days`.
- * - **Recebido**: cobranças pagas ou estornadas (o dinheiro entrou) com o
- *   pagamento no período. **Estornado**: as estornadas com o estorno no
+ * - **Recebido**: os pagamentos do extrato com o evento no período, pelo valor
+ *   que entrou; por plano, o plano que o pagamento pagou (`detail.planId`)
+ *   ou, sem ele, o de agora. **Estornado**: os estornos do extrato no
  *   período. Recebido não desconta estorno: são dois números, e o líquido é a
  *   diferença.
  * - **Em aberto**: TODAS as em aberto agora (`pending`, `failed`,
  *   `overdue`), de qualquer período, incluindo as vencidas; **vencido** é a parte delas
  *   que o gateway chamou de `overdue` ou que passou do vencimento — a mesma
  *   regra da tela de Assinaturas.
- * - **Desconto**: nas pagas do período, quanto o preço do plano passava do
- *   valor cobrado (cupom ou valor mexido à mão).
+ * - **Desconto** (APROXIMADO, e a tela diz): nos pagamentos do período que
+ *   não foram estornados, quanto o preço de HOJE do plano pago passa do valor
+ *   que se pediu (`detail.expectedCents` — cupom ou valor mexido à mão). O
+ *   preço de tabela da época não é gravado em lugar nenhum; se o plano mudou
+ *   de preço, a conta erra pela diferença.
  */
 export function aggregateRevenue({
   range, now = new Date(), tenants, subscriptions, plans, prices, charges, events
@@ -303,7 +334,6 @@ export function aggregateRevenue({
 
   const mensal = new Map(range.months.map((m) => [m, { month: m, receivedCents: 0, refundedCents: 0, count: 0 }]));
   const dentro = (ms) => ms !== null && ms >= range.startMs && ms < range.endMs;
-  const indice = indexarEventos(events);
 
   let receivedCents = 0;
   let refundedCents = 0;
@@ -312,35 +342,61 @@ export function aggregateRevenue({
   let discountCents = 0;
   const inadimplentes = new Set();
 
+  // Os pagamentos que já voltaram (a qualquer tempo): não dão desconto a ninguém.
+  const estornados = new Set();
+  for (const evento of events) {
+    if (evento.type !== BILLING_EVENT_TYPES.PAYMENT_REFUNDED) continue;
+    const ref = detalheDe(evento)?.reference
+      ?? (String(evento.external_id ?? '').endsWith(':refund') ? String(evento.external_id).slice(0, -':refund'.length) : null);
+    if (ref) estornados.add(`${Number(evento.tenant_id)}|${ref}`);
+  }
+
+  for (const evento of events) {
+    const tenantId = Number(evento.tenant_id);
+    if (!provedores.has(tenantId)) continue;
+    const ms = instanteMs(evento.created_at);
+    if (!dentro(ms)) continue;
+    const valor = Number(evento.amount_cents) || 0;
+    const mes = mensal.get(mesUtc(ms));
+    if (evento.type === BILLING_EVENT_TYPES.PAYMENT_REFUNDED) {
+      refundedCents += valor;
+      if (mes) mes.refundedCents += valor;
+      continue;
+    }
+    if (evento.type !== BILLING_EVENT_TYPES.PAYMENT_RECORDED) continue;
+    // O aceite da diferença é um evento de valor zero que só destrava o
+    // período: não é um segundo pagamento.
+    const aceite = String(evento.external_id ?? '').endsWith(':accepted');
+    const detalhe = detalheDe(evento);
+    const sub = assinaturaPorId.get(Number(evento.subscription_id)) || assinaturaPorProvedor.get(tenantId) || null;
+    const planoId = detalhe?.planId ?? sub?.plan_id ?? null;
+    const plano = planoId === null || planoId === undefined ? null : planos.get(Number(planoId)) ?? null;
+    receivedCents += valor;
+    if (mes) {
+      mes.receivedCents += valor;
+      if (!aceite) mes.count += 1;
+    }
+    if (valor) linhaDoPlano(plano ? plano.id : null).receivedCents += valor;
+    if (!aceite && plano && !estornados.has(`${tenantId}|${evento.external_id}`)) {
+      const cheio = Number(plano.price_cents) || 0;
+      const esperado = detalhe?.expectedCents;
+      const pedido = esperado === null || esperado === undefined || !Number.isFinite(Number(esperado))
+        ? valor : Number(esperado);
+      if (pedido < cheio) discountCents += cheio - pedido;
+    }
+  }
+
   for (const charge of charges) {
     const tenantId = Number(charge.tenant_id);
     if (!provedores.has(tenantId)) continue;
     const valor = Number(charge.amount_cents) || 0;
-    const datas = datasDaCobranca(charge, indice);
-    const sub = assinaturaPorId.get(Number(charge.subscription_id)) || assinaturaPorProvedor.get(tenantId) || null;
-    const plano = sub ? planos.get(Number(sub.plan_id)) : null;
-
-    if ((charge.status === 'paid' || charge.status === 'refunded') && dentro(datas.paidAtMs)) {
-      receivedCents += valor;
-      const mes = mensal.get(mesUtc(datas.paidAtMs));
-      if (mes) { mes.receivedCents += valor; mes.count += 1; }
-      linhaDoPlano(plano ? plano.id : null).receivedCents += valor;
-      if (charge.status === 'paid' && plano) {
-        const cheio = Number(plano.price_cents) || 0;
-        if (valor < cheio) discountCents += cheio - valor;
-      }
-    }
-    if (charge.status === 'refunded' && dentro(datas.refundedAtMs)) {
-      refundedCents += valor;
-      const mes = mensal.get(mesUtc(datas.refundedAtMs));
-      if (mes) mes.refundedCents += valor;
-    }
     // Em aberto é fotografia de AGORA, e não do período: a pergunta é "quanto
     // temos a receber", e uma cobrança velha esquecida em aberto é dinheiro a
     // receber como as outras — a mesma conta da tela de Assinaturas.
     if (OPEN_CHARGE_STATUSES.includes(charge.status)) {
+      const vencimento = isoDateOf(charge.due_date);
       openCents += valor;
-      if (charge.status === 'overdue' || (datas.dueDate && datas.dueDate < hoje)) {
+      if (charge.status === 'overdue' || (vencimento && vencimento < hoje)) {
         overdueCents += valor;
         inadimplentes.add(tenantId);
       }
@@ -364,7 +420,10 @@ export function aggregateRevenue({
     overdueTenants: inadimplentes.size,
     monthly: [...mensal.values()],
     byPlan,
-    discountCents
+    discountCents,
+    // O desconto é estimado contra o preço de HOJE do plano (ver acima): a
+    // tela o rotula assim.
+    discountApproximate: true
   };
 }
 
@@ -380,11 +439,12 @@ async function carregar() {
       'gateway_charge_id', 'superseded_charges', 'period_end', 'created_at', 'updated_at'
     )
     .orderBy('id', 'asc'));
-  // tenant-scope-exempt: idem — os pagamentos e estornos que datam as cobranças.
-  const events = await runUnscoped('the console revenue report dates every provider\'s payments', () => getDb()('billing_events')
+  // tenant-scope-exempt: idem — os pagamentos e estornos, que são o dinheiro
+  // do relatório e que datam as cobranças da planilha. Com os sem referência:
+  // a marca manual do console também é dinheiro que entrou.
+  const events = await runUnscoped('the console revenue report reads every provider\'s payments', () => getDb()('billing_events')
     .whereIn('type', [BILLING_EVENT_TYPES.PAYMENT_RECORDED, BILLING_EVENT_TYPES.PAYMENT_REFUNDED])
-    .whereNotNull('external_id')
-    .select('tenant_id', 'type', 'external_id', 'created_at'));
+    .select('tenant_id', 'subscription_id', 'type', 'external_id', 'amount_cents', 'detail', 'created_at'));
   return { tenants, subscriptions, plans, charges, events };
 }
 

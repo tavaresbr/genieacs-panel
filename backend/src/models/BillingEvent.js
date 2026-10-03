@@ -77,6 +77,23 @@ class BillingEvent {
     return true;
   }
 
+  /**
+   * Quanto os pagamentos com estas referências de fato trouxeram — ou nulo,
+   * quando o extrato não tem nenhum. O aceite da diferença
+   * (`<referência>:accepted`) é gravado com zero e não entra; o estorno é
+   * outro tipo de evento e também não.
+   */
+  static async receivedFor(externalIds) {
+    const ids = [...new Set((externalIds || []).filter(Boolean).map((id) => String(id).slice(0, 128)))];
+    if (!ids.length) return null;
+    const linhas = await tdb('billing_events')
+      .where({ type: BILLING_EVENT_TYPES.PAYMENT_RECORDED })
+      .whereIn('external_id', ids)
+      .select('amount_cents');
+    if (!linhas.length) return null;
+    return linhas.reduce((soma, linha) => soma + (Number(linha.amount_cents) || 0), 0);
+  }
+
   /** Do mais recente para o mais antigo. */
   static async listRecent({ limit = 50 } = {}) {
     return tdb('billing_events')

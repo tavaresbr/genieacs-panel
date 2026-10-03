@@ -1510,7 +1510,7 @@ const billingInvoicesTable = (db) => (t) => {
     .references('id').inTable('billing_charges').onDelete('CASCADE');
   // O id da nota na Asaas (`inv_…`). Nulo até a criação voltar.
   t.string('external_id', 64);
-  // pending | scheduled | authorized | error | canceled
+  // pending | scheduled | authorized | error | canceling | canceled
   t.string('status', 16).notNullable().defaultTo('pending');
   t.string('number', 64);
   t.string('pdf_url', 512);
@@ -1940,8 +1940,39 @@ const couponsTable = (db) => (t) => {
   t.timestamp('updated_at').defaultTo(db.fn.now());
 };
 
+/**
+ * Quem já resgatou cada cupom (0093): uma linha por provedor por cupom. É ela
+ * que impede o mesmo provedor de resgatar o mesmo cupom de novo depois de
+ * gastá-lo — `subscriptions.coupon_id` some quando o último ciclo é consumido,
+ * e sem esta memória o código voltaria a valer. Do PROVEDOR (escopada): diz
+ * que descontos ele recebeu, e some junto com ele. Gravada na mesma transação
+ * que sobe `coupons.redemptions`, e desfeita junto quando a aplicação falha.
+ */
+const couponRedemptionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('coupon_id').unsigned().notNullable()
+    .references('id').inTable('coupons').onDelete('CASCADE');
+  t.timestamp('redeemed_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['coupon_id', 'tenant_id'], 'coupon_redemptions_coupon_tenant_uq');
+};
+
 const COUPON_TABLES = [
-  ['coupons', couponsTable]
+  ['coupons', couponsTable],
+  ['coupon_redemptions', couponRedemptionsTable]
+];
+
+/**
+ * Com que plano e com que cupom cada cobrança saiu (0093), gravados na emissão
+ * e na reprecificação. É o que diz, no pagamento, se a fatura paga carregava o
+ * desconto (para gastar o ciclo do cupom só então) e se pagou a descida
+ * agendada (para não comparar preços que o cupom pode ter igualado). Nulas na
+ * cobrança feita à mão ou anterior a elas — aí a conferência volta ao preço.
+ */
+const BILLING_CHARGE_PRICING_COLUMNS = [
+  ['plan_id', (t) => t.integer('plan_id').unsigned().nullable()],
+  ['coupon_id', (t) => t.integer('coupon_id').unsigned().nullable()]
 ];
 
 /**
@@ -5253,13 +5284,29 @@ export const migrations = [
     id: '0093_coupons',
     async isApplied(db) {
       if (!(await db.schema.hasTable('coupons'))) return false;
+      // Criada depois da primeira versão desta migração: o banco de quem já a
+      // rodou precisa ganhá-la também.
+      if (await db.schema.hasTable('tenants') && !(await db.schema.hasTable('coupon_redemptions'))) return false;
+      if (await db.schema.hasTable('billing_charges')
+        && (await missingColumns(db, 'billing_charges', BILLING_CHARGE_PRICING_COLUMNS)).length) return false;
       if (!(await db.schema.hasTable('subscriptions'))) return true;
       return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_COUPON_COLUMNS)).length === 0;
     },
     async up(db) {
       for (const [nome, construtor] of COUPON_TABLES) {
-        // eslint-disable-next-line no-await-in-loop -- uma tabela só
+        // A memória dos resgates aponta para `tenants`; sem ela, nada a criar.
+        // eslint-disable-next-line no-await-in-loop -- uma leitura só
+        if (nome === 'coupon_redemptions' && !(await db.schema.hasTable('tenants'))) continue;
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
         await createTableIfMissing(db, nome, construtor(db));
+      }
+      if (await db.schema.hasTable('billing_charges')) {
+        const faltam = await missingColumns(db, 'billing_charges', BILLING_CHARGE_PRICING_COLUMNS);
+        if (faltam.length) {
+          await db.schema.alterTable('billing_charges', (t) => {
+            for (const add of faltam) add(t);
+          });
+        }
       }
       if (!(await db.schema.hasTable('subscriptions'))) return;
       const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_COUPON_COLUMNS);

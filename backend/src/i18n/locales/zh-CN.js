@@ -854,6 +854,7 @@ export default {
   'coupon.exhausted': '此优惠券已达到使用上限',
   'coupon.planMismatch': '此优惠券不适用于您的套餐',
   'coupon.alreadyApplied': '此订阅已应用优惠券',
+  'coupon.alreadyUsed': '您已使用过此优惠券',
   'coupon.applied': '已应用优惠券 {code}',
   'coupon.applyFailed': '应用优惠券失败',
 

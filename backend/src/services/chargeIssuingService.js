@@ -623,6 +623,9 @@ class ChargeIssuingService {
     }
 
     const moeda = planoDoPeriodo.currency || 'BRL';
+    // Com que plano e cupom este preço saiu (0093), gravados na linha — ver
+    // `SubscriptionService.chargePricing`.
+    const precificacao = SubscriptionService.chargePricing(subscription, planoDoPeriodo, cupom);
     const garraAte = new Date(now.getTime() + this.CLAIM_MS);
     let existente = await BillingCharge.forPeriod(periodo);
     if (existente) {
@@ -633,7 +636,9 @@ class ChargeIssuingService {
       if (manual && existente.status === 'canceled') {
         const minha = await BillingCharge.claim(existente.id, { until: garraAte, now, unissued: false });
         if (!minha) return { issued: false, reason: 'raced', charge: existente };
-        const reaberta = await BillingCharge.resetForReissue(existente.id, { amountCents: preco, currency: moeda });
+        const reaberta = await BillingCharge.resetForReissue(existente.id, {
+          amountCents: preco, currency: moeda, ...precificacao
+        });
         if (!reaberta) await BillingCharge.release(existente.id);
         existente = await BillingCharge.findById(existente.id);
       }
@@ -706,6 +711,13 @@ class ChargeIssuingService {
         patch.amount_cents = preco;
         patch.currency = String(moeda).toUpperCase().slice(0, 3);
       }
+      // O plano e o cupom do preço que vai ao gateway — também quando o valor
+      // não mudou (dois planos no mesmo preço, o cupom no piso). Na de valor
+      // mudado à mão fica o que a linha diz: o valor não é o de plano nenhum.
+      if (!existente.amount_overridden_at) {
+        if (Number(existente.plan_id ?? 0) !== Number(precificacao.planId ?? 0)) patch.plan_id = precificacao.planId;
+        if (Number(existente.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0)) patch.coupon_id = precificacao.couponId;
+      }
       if (Object.keys(patch).length) await BillingCharge.update(existente.id, patch);
     }
 
@@ -721,7 +733,8 @@ class ChargeIssuingService {
           currency: moeda,
           provider: provider.name,
           dueDate: vencimentoDoGateway,
-          claimUntil: garraAte
+          claimUntil: garraAte,
+          ...precificacao
         });
       } catch (error) {
         // Duas passadas se cruzaram e a outra ganhou. O índice único é quem

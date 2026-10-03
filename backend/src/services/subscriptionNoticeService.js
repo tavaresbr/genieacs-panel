@@ -10,6 +10,7 @@ import { PRODUCT_NAME } from '../config/brand.js';
 import PlatformNotifyService from './platformNotifyService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import SubscriptionReminderSend from '../models/SubscriptionReminderSend.js';
+import SelfBillingService from './selfBillingService.js';
 
 /**
  * Os lembretes que chegam ANTES do bloqueio — e depois dele.
@@ -133,7 +134,9 @@ class SubscriptionNoticeService {
 
     let canais = [];
     try {
-      canais = await this.deliver({ tenant, pendente, dueAt, para, fone, transporte, now, plan });
+      canais = await this.deliver({
+        tenant, pendente, dueAt, para, fone, transporte, now, plan, subscription
+      });
     } catch (error) {
       await SubscriptionReminderSend.release(garra).catch(() => {});
       throw error;
@@ -156,14 +159,28 @@ class SubscriptionNoticeService {
   }
 
   /** Monta e manda a mensagem; devolve os canais por onde ela saiu. */
-  static async deliver({ tenant, pendente, dueAt, para, fone, transporte, now, plan }) {
+  static async deliver({
+    tenant, pendente, dueAt, para, fone, transporte, now, plan, subscription = null
+  }) {
     // A cobrança em aberto, se o painel já emitiu uma: é dela o link de pagar
     // e o valor de fato cobrado (que pode ser o da descida agendada, ou o que
     // o console mudou à mão). Sem ela, o preço do plano e o endereço do painel.
     const cobranca = await BillingCharge.currentOpen().catch(() => null);
     const paraPagar = cobranca?.invoice_url || null;
-    const centavos = cobranca ? Number(cobranca.amount_cents) : Number(plan?.price_cents ?? 0);
-    const moeda = cobranca?.currency || plan?.currency || 'BRL';
+    // Sem cobrança, o que a emissão pediria: o plano da fatura deste prazo (o
+    // da descida agendada, quando é para ele) com o cupom da assinatura.
+    let centavos;
+    let moeda;
+    if (cobranca) {
+      centavos = Number(cobranca.amount_cents);
+      moeda = cobranca.currency || plan?.currency || 'BRL';
+    } else {
+      const daFatura = (subscription && await SelfBillingService.invoicePlanFor(subscription).catch(() => null)) || plan;
+      centavos = subscription
+        ? await SubscriptionService.effectivePriceCents(subscription, daFatura)
+        : Number(daFatura?.price_cents ?? 0);
+      moeda = daFatura?.currency || plan?.currency || 'BRL';
+    }
 
     const dias = Math.max(0, Math.ceil(Math.abs(pendente.deadline.getTime() - now.getTime()) / 86_400_000));
     const vars = {

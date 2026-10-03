@@ -20,12 +20,36 @@ export const INVOICE_STATUSES = Object.freeze([
   'authorized',
   /** A prefeitura (ou a Asaas) recusou — ou as tentativas acabaram. Reemitir pelo console. */
   'error',
+  /**
+   * O estorno pediu o cancelamento e a Asaas ainda não o confirmou (recusou,
+   * ou estava fora do ar). O agendador insiste, pelo `next_attempt_at`.
+   */
+  'canceling',
   /** Cancelada — pelo estorno da cobrança, ou no painel da Asaas. */
   'canceled'
 ]);
 
 /** Os estados de que o console pode pedir uma nota nova para a mesma cobrança. */
 export const REISSUABLE_INVOICE_STATUSES = Object.freeze(['error', 'canceled']);
+
+/**
+ * Um endereço de PDF/XML da nota, só se for `https:` — ou nulo.
+ *
+ * Vem da Asaas (resposta e webhook) e vai parar num `href` do console e da
+ * tela do provedor: um `javascript:` ou um `http:` ali seria o painel
+ * entregando o link de outro. Na gravação e na apresentação, para as linhas
+ * gravadas antes da regra.
+ */
+export function safeInvoiceUrl(valor, max = 512) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  const bruto = String(valor).trim();
+  if (!bruto || bruto.length > max) return null;
+  try {
+    return new URL(bruto).protocol === 'https:' ? bruto : null;
+  } catch {
+    return null;
+  }
+}
 
 const texto = (valor, max) => (valor === null || valor === undefined || valor === ''
   ? null
@@ -91,6 +115,23 @@ class BillingInvoice {
   }
 
   /**
+   * Grava só se a linha ainda está no estado lido (`status`, um ou vários) e,
+   * com `token`, ainda segura a garra que esta passada pôs (`claim`). É o que
+   * impede a passada de pisar no estorno que chegou no meio dela: se o
+   * estorno marcou a linha, nada muda aqui e quem chamou relê.
+   */
+  static async updateIf(id, { status, token = undefined, externalId = undefined }, patch) {
+    const consulta = tdb('billing_invoices').where({ id });
+    if (Array.isArray(status)) consulta.whereIn('status', status);
+    else if (status !== undefined) consulta.where({ status });
+    if (token !== undefined) consulta.where({ next_attempt_at: token });
+    if (externalId === null) consulta.whereNull('external_id');
+    else if (externalId !== undefined) consulta.where({ external_id: externalId });
+    const changed = await consulta.update({ ...patch, updated_at: new Date() });
+    return changed > 0;
+  }
+
+  /**
    * Devolve à fila a nota que deu erro ou foi cancelada — a MESMA linha, para
    * que o índice único continue impedindo duas notas vivas da mesma cobrança.
    * Condicional ao estado lido: se o webhook a mudou no meio, nada muda.
@@ -119,13 +160,19 @@ class BillingInvoice {
    * processos, ou o agendador e um clique do console) pediriam DUAS notas para
    * o mesmo pagamento — e nota fiscal emitida não se apaga, se cancela, com
    * prazo e às vezes com a prefeitura dizendo não.
+   *
+   * @returns {Promise<Date|null>} a marca da garra — o `next_attempt_at`
+   *   gravado, arredondado ao segundo para casar no MySQL (que guarda ao
+   *   segundo) — que as gravações seguintes da passada exigem
+   *   (`updateIf({ token })`); ou nulo, quando outra passada a tem.
    */
   static async claim(linha, { until, now = new Date() }) {
+    const marca = new Date(Math.ceil(until.getTime() / 1000) * 1000);
     const changed = await tdb('billing_invoices')
       .where({ id: linha.id, status: linha.status })
       .where((livre) => livre.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
-      .update({ next_attempt_at: until, updated_at: new Date() });
-    return changed > 0;
+      .update({ next_attempt_at: marca, updated_at: new Date() });
+    return changed > 0 ? marca : null;
   }
 
   /** As linhas que o agendador deve levar adiante agora, deste provedor. */
@@ -144,8 +191,8 @@ class BillingInvoice {
       id: row.id,
       status: row.status,
       number: row.number ?? null,
-      pdfUrl: row.pdf_url ?? null,
-      xmlUrl: row.xml_url ?? null,
+      pdfUrl: safeInvoiceUrl(row.pdf_url),
+      xmlUrl: safeInvoiceUrl(row.xml_url),
       error: row.error ?? null,
       attempts: Number(row.attempts ?? 0),
       issuedAt: row.issued_at ?? null
@@ -162,8 +209,8 @@ class BillingInvoice {
     return {
       status: row.status,
       number: emitida ? (row.number ?? null) : null,
-      pdfUrl: emitida ? (row.pdf_url ?? null) : null,
-      xmlUrl: emitida ? (row.xml_url ?? null) : null,
+      pdfUrl: emitida ? safeInvoiceUrl(row.pdf_url) : null,
+      xmlUrl: emitida ? safeInvoiceUrl(row.xml_url) : null,
       issuedAt: emitida ? (row.issued_at ?? null) : null
     };
   }

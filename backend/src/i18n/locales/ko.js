@@ -857,6 +857,7 @@ export default {
   'coupon.exhausted': '이 쿠폰은 사용 한도에 도달했습니다',
   'coupon.planMismatch': '이 쿠폰은 현재 요금제에 적용되지 않습니다',
   'coupon.alreadyApplied': '이 구독에는 이미 쿠폰이 적용되어 있습니다',
+  'coupon.alreadyUsed': '이미 사용한 쿠폰입니다',
   'coupon.applied': '쿠폰 {code}이(가) 적용되었습니다',
   'coupon.applyFailed': '쿠폰을 적용하지 못했습니다',
 

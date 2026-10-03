@@ -17,7 +17,7 @@ import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge
 import { canIssueInvoiceForEvent } from '@/lib/invoice'
 import { useTranslation } from '@/contexts/language-context'
 import { displayDate, displayDayMonth } from '@/lib/date-format'
-import { exemptUntilFromDateInput, todayIso } from '@/lib/subscription-console'
+import { exemptUntilFromDateInput, todayIso, toIsoDay } from '@/lib/subscription-console'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 
 interface Props {
@@ -103,6 +103,12 @@ export function BillingExemptControl({
   const [reason, setReason] = useState('')
   const [untilDay, setUntilDay] = useState('')
   const [busy, setBusy] = useState(false)
+  // Já isento: mudar (ou tirar) só a data de fim, sem desligar e religar.
+  const editUntilId = useId()
+  const noEndId = useId()
+  const [editingUntil, setEditingUntil] = useState(false)
+  const [newUntilDay, setNewUntilDay] = useState('')
+  const [noEnd, setNoEnd] = useState(false)
 
   const exempt = subscription?.billingExempt === true
   // Cancelada não tem o que isentar (o backend responde `not_billable`); a
@@ -162,6 +168,39 @@ export function BillingExemptControl({
     }
   }
 
+  const abrirData = () => {
+    // O dia no fuso de quem vê, o mesmo em que `exemptUntilFromDateInput` lê
+    // o campo (a data de fim é o fim do dia escolhido).
+    const ate = subscription?.billingExemptUntil ? new Date(subscription.billingExemptUntil) : null
+    setNewUntilDay(ate && !Number.isNaN(ate.getTime()) ? toIsoDay(ate) : '')
+    setNoEnd(!subscription?.billingExemptUntil)
+    setEditingUntil(true)
+  }
+
+  const salvarData = async () => {
+    const until = noEnd ? null : exemptUntilFromDateInput(newUntilDay)
+    // Sem a caixa "sem data de fim", um dia é obrigatório (vazio seria tirar a data sem dizer).
+    if (until === undefined || (!noEnd && until === null)) {
+      toast.error(t('platform.subscription.exempt.untilInvalid'))
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await platformAPI.setBillingExempt(tenantId, { exempt: true, until })
+      if (res.success && res.data) {
+        toast.success(t('platform.subscription.exempt.untilUpdated'))
+        setEditingUntil(false)
+        await onChanged()
+      } else if (res.code === 'invalid_until') {
+        toast.error(t('platform.subscription.exempt.untilInvalid'))
+      } else {
+        toast.error(res.message || t('platform.saveFailed'))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="mt-3 border-t border-border pt-3">
       <label htmlFor={switchId} className={`flex items-start gap-2 text-sm ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
@@ -190,6 +229,54 @@ export function BillingExemptControl({
           )}
           {subscription?.billingExemptReason && (
             <p className="text-muted-foreground [overflow-wrap:anywhere]">{subscription.billingExemptReason}</p>
+          )}
+          {!editingUntil ? (
+            <button
+              type="button"
+              className="text-xs font-medium text-primary underline-offset-2 hover:underline disabled:opacity-60"
+              onClick={abrirData}
+              disabled={busy}
+            >
+              {t('platform.subscription.exempt.changeUntil')}
+            </button>
+          ) : (
+            <div className="mt-2 space-y-2 rounded-md border border-border p-3">
+              <label htmlFor={editUntilId} className="block text-sm font-medium">
+                {t('platform.subscription.exempt.until')}
+              </label>
+              <input
+                id={editUntilId}
+                type="date"
+                value={noEnd ? '' : newUntilDay}
+                min={todayIso()}
+                disabled={noEnd || busy}
+                onChange={(e) => setNewUntilDay(e.target.value)}
+                className="modern-input w-full"
+              />
+              <label htmlFor={noEndId} className="flex items-center gap-2 text-sm">
+                <input
+                  id={noEndId}
+                  type="checkbox"
+                  checked={noEnd}
+                  disabled={busy}
+                  onChange={(e) => setNoEnd(e.target.checked)}
+                />
+                {t('platform.subscription.exempt.noEnd')}
+              </label>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="modern-button-secondary"
+                  onClick={() => setEditingUntil(false)}
+                  disabled={busy}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="modern-button" onClick={() => void salvarData()} disabled={busy}>
+                  {busy ? t('common.saving') : t('common.save')}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

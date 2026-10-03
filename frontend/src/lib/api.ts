@@ -1339,7 +1339,7 @@ export interface AsaasIntegrationUpdate {
 }
 
 /** O estado da NFS-e de uma cobrança. */
-export type InvoiceStatus = 'pending' | 'scheduled' | 'authorized' | 'error' | 'canceled'
+export type InvoiceStatus = 'pending' | 'scheduled' | 'authorized' | 'error' | 'canceling' | 'canceled'
 
 /** A NFS-e como o provedor a vê: número e links só quando emitida. */
 export interface TenantInvoiceView {
@@ -2282,6 +2282,7 @@ export const platformAPI = {
    * Aplica (`code`, substituindo o que houver) ou tira (`null`) o cupom de um
    * provedor. 409 `coupon_invalid`, `coupon_expired`, `coupon_exhausted`,
    * `coupon_plan_mismatch`, `coupon_already_applied`; 502 `gateway_failed`
+   * (o console reaplica mesmo a quem já resgatou o cupom — sem contar outro resgate)
    * quando a fatura em aberto não pôde ser cancelada (nada muda).
    */
   setSubscriptionCoupon: (tenantId: number, code: string | null) =>
@@ -2338,7 +2339,10 @@ export const subscriptionAPI = {
 
   /**
    * "Tenho um cupom": aplica o código à assinatura e devolve a mesma tela de
-   * `current()`, com `subscription.coupon`. 409 com `coupon_*` na recusa.
+   * `current()`, com `subscription.coupon`. 409 na recusa: `coupon_invalid`
+   * (inexistente, inativo, vencido, esgotado ou de outro plano — a rota do
+   * provedor não diz qual), `coupon_already_applied` e `coupon_already_used`
+   * (este provedor já resgatou o cupom).
    */
   applyCoupon: (code: string) =>
     apiClient.post<SubscriptionUsage>('/tenant/subscription/coupon', { code })
@@ -5133,6 +5137,8 @@ export interface RevenueReport {
   monthly: RevenueMonth[]
   byPlan: RevenuePlanRow[]
   discountCents: number
+  /** O desconto é estimado contra o preço de hoje dos planos (o da época não é gravado). */
+  discountApproximate?: boolean
 }
 
 /** Os relatórios do console: a receita, e a planilha das cobranças do período. */

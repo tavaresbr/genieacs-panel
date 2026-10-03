@@ -850,6 +850,7 @@ export default {
   'coupon.exhausted': 'Ce code promo a atteint sa limite d\'utilisations',
   'coupon.planMismatch': 'Ce code promo ne s\'applique pas à votre offre',
   'coupon.alreadyApplied': 'Un code promo est déjà appliqué à cet abonnement',
+  'coupon.alreadyUsed': 'Vous avez déjà utilisé ce code promo',
   'coupon.applied': 'Code promo {code} appliqué',
   'coupon.applyFailed': 'Échec de l\'application du code promo',
 

@@ -1,5 +1,6 @@
 import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
+import Coupon from '../models/Coupon.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import SubscriptionService from './subscriptionService.js';
@@ -138,7 +139,10 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   if (subscription?.billing_exempt_at) return nada;
   // O preço com o cupom de `subscription` (0093) — que, na aplicação de um
   // cupom, é o estado DEPOIS dela, ainda não gravado.
-  const preco = await SubscriptionService.effectivePriceCents(subscription, plano);
+  const cupom = subscription?.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+  const preco = SubscriptionService.priceFor(subscription, plano, cupom);
+  // Com que plano e cupom o preço novo sai — gravados na linha (0093).
+  const precificacao = SubscriptionService.chargePricing(subscription, plano, cupom);
   const moeda = String(plano?.currency || 'BRL').toUpperCase();
   // Um plano sem preço não tem cobrança a reemitir: a do prazo fica como está,
   // e a faxina da emissão cuida dela. Não acontece pela tela (plano de graça
@@ -150,8 +154,15 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   // tira um cupom não desfaz o desconto que alguém deu a dedo àquela fatura.
   // (A troca de plano não passa isto: um plano novo é outra fatura.)
   if (keepOverride && aberta?.amount_overridden_at) return nada;
-  if (!aberta || (Number(aberta.amount_cents) === preco
-    && String(aberta.currency || '').toUpperCase() === moeda)) {
+  if (!aberta) return nada;
+  if (Number(aberta.amount_cents) === preco && String(aberta.currency || '').toUpperCase() === moeda) {
+    // Mesmo valor, nada a reemitir — mas a linha passa a dizer o plano e o
+    // cupom de agora (dois planos no mesmo preço, o cupom no piso), que é o
+    // que o pagamento dela vai ler. A de valor mudado à mão fica como está.
+    if (!aberta.amount_overridden_at && (Number(aberta.plan_id ?? 0) !== Number(precificacao.planId ?? 0)
+      || Number(aberta.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0))) {
+      await BillingCharge.update(aberta.id, { plan_id: precificacao.planId, coupon_id: precificacao.couponId });
+    }
     return nada;
   }
 
@@ -209,7 +220,9 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   // entre as duas escritas seria emitida pelo agendador ou por um "pagar
   // agora" com o preço que o estado velho ainda diz. Quem chama a solta em
   // `reemitir` — ou em `soltar`, se a gravação falhar.
-  if (!(await BillingCharge.resetForReissue(linha.id, { amountCents: preco, currency: moeda, holdUntil: garraAte }))) {
+  if (!(await BillingCharge.resetForReissue(linha.id, {
+    amountCents: preco, currency: moeda, holdUntil: garraAte, ...precificacao
+  }))) {
     await BillingCharge.release(linha.id);
     throw ocupado();
   }
@@ -231,10 +244,23 @@ async function descidaTravada(subscription, atual) {
   const quando = subscription.pending_plan_at ? new Date(subscription.pending_plan_at) : null;
   if (!quando || Number.isNaN(quando.getTime())) return false;
   const linha = await BillingCharge.forPeriod(ChargeIssuingService.periodKey(quando));
-  // Contra o preço do atual COM o cupom: a fatura do atual teria saído com o
-  // desconto, e só menos que ela é "pagou o barato".
-  const pagaBarato = linha?.status === 'paid'
-    && Number(linha.amount_cents) < await SubscriptionService.effectivePriceCents(subscription, atual);
+  // Pelo plano gravado na cobrança (0093), ou, sem ele, pelo valor — ver
+  // `SubscriptionService.paidScheduledPlan`: com o cupom, "menos que o preço
+  // do atual" pode nunca acontecer (os dois no piso) ou acontecer pagando o
+  // atual (cupom só nele). A de valor mudado à mão só responde pelo plano.
+  let pagaBarato = false;
+  if (linha?.status === 'paid') {
+    const agendado = await Plan.findById(subscription.pending_plan_id);
+    const cupom = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+    pagaBarato = SubscriptionService.paidScheduledPlan({
+      planId: linha.plan_id ?? null,
+      cents: linha.amount_overridden_at ? null : Number(linha.amount_cents),
+      subscription,
+      current: atual,
+      scheduled: agendado,
+      coupon: cupom
+    }) === true;
+  }
   if (pagaBarato) {
     await Subscription.upsertForTenant(subscription.tenant_id, { pending_plan_locked_at: new Date() });
     SubscriptionService.invalidate(subscription.tenant_id);
@@ -646,6 +672,15 @@ class SelfBillingService {
    * `ChargeIssuingService.repriceBlockedDowngrade`). Lança `SelfBillingError`
    * como a troca: quem chama decide o que fazer com a recusa.
    */
+  /**
+   * O plano que a fatura do prazo vivo cobra — o atual, ou o da descida
+   * agendada para este prazo (ver `planoDaFatura`). Para quem fala do valor
+   * da fatura antes de ela existir, como o lembrete de cobrança.
+   */
+  static async invoicePlanFor(subscription, { countDevices = null } = {}) {
+    return (await planoDaFatura(subscription, { countDevices })).plano;
+  }
+
   static async repriceOpenCharge({ subscription, plan, tenant, blockedBy = undefined }) {
     const cobranca = await reprecificarCobranca(subscription, plan);
     const reissue = await reemitir(cobranca, tenant, { pendingBlockedBy: blockedBy });

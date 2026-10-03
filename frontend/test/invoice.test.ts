@@ -3,7 +3,8 @@ import {
   canIssueInvoice,
   canIssueInvoiceForEvent,
   invoiceBadgeClass,
-  invoiceStatusKey
+  invoiceStatusKey,
+  safeInvoiceUrl
 } from '@/lib/invoice'
 
 describe('canIssueInvoice', () => {
@@ -34,11 +35,25 @@ describe('canIssueInvoiceForEvent', () => {
 })
 
 describe('rótulos', () => {
-  it('conhece os cinco estados e devolve nulo para um desconhecido', () => {
+  it('conhece os seis estados e devolve nulo para um desconhecido', () => {
     expect(invoiceStatusKey('authorized')).toBe('nfse.status.authorized')
+    expect(invoiceStatusKey('canceling')).toBe('nfse.status.canceling')
+    expect(invoiceBadgeClass('canceling')).toBe('modern-badge-warning')
     expect(invoiceStatusKey('novo')).toBeNull()
     expect(invoiceBadgeClass('authorized')).toBe('modern-badge-success')
     expect(invoiceBadgeClass('error')).toBe('modern-badge-error')
     expect(invoiceBadgeClass('scheduled')).toBe('modern-badge-warning')
+  })
+})
+
+describe('safeInvoiceUrl', () => {
+  it('só deixa passar https', () => {
+    expect(safeInvoiceUrl('https://asaas.test/nota.pdf')).toBe('https://asaas.test/nota.pdf')
+    expect(safeInvoiceUrl('http://asaas.test/nota.pdf')).toBeNull()
+    expect(safeInvoiceUrl('javascript:alert(1)')).toBeNull()
+    expect(safeInvoiceUrl('data:text/html,oi')).toBeNull()
+    expect(safeInvoiceUrl('/relativo.pdf')).toBeNull()
+    expect(safeInvoiceUrl(null)).toBeNull()
+    expect(safeInvoiceUrl(undefined)).toBeNull()
   })
 })

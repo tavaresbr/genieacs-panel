@@ -27,6 +27,7 @@ const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: Tenant } = await import('../src/models/Tenant.js');
 const { default: Plan } = await import('../src/models/Plan.js');
 const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
+const { default: Coupon } = await import('../src/models/Coupon.js');
 const { default: ChargeIssuingService } = await import('../src/services/chargeIssuingService.js');
 const { subscriptionView } = await import('../src/controllers/platformBillingController.js');
 const { resetMailTransport } = await import('../src/services/mail/index.js');
@@ -38,6 +39,7 @@ let recebidas;
 let alfa;
 let pago;
 let gratis;
+let basico;
 
 before(async () => {
   ({ server: smtp, recebidas } = smtpDeMentira());
@@ -60,6 +62,9 @@ before(async () => {
   gratis = await Plan.create({
     code: 'lembrete-free', name: 'Free', price_cents: 0, currency: 'BRL', period_days: 30, trial_days: 0, active: true
   });
+  basico = await Plan.create({
+    code: 'lembrete-basico', name: 'Básico', price_cents: 9990, currency: 'BRL', period_days: 30, trial_days: 0, active: true
+  });
 });
 
 after(async () => {
@@ -74,7 +79,8 @@ after(async () => {
 async function comAssinatura(patch) {
   await Subscription.upsertForTenant(alfa, {
     plan_id: pago.id, status: 'active', trial_ends_at: null, renews_at: null, canceled_at: null,
-    expiry_warned_for: null, billing_exempt_at: null, ...patch
+    expiry_warned_for: null, billing_exempt_at: null, coupon_id: null, coupon_cycles_left: null,
+    coupon_applied_at: null, pending_plan_id: null, pending_plan_at: null, pending_plan_locked_at: null, ...patch
   });
   await SubscriptionService.invalidate(alfa);
 }
@@ -246,6 +252,32 @@ describe('o que a mensagem leva', () => {
     assert.equal(texto.includes('gateway.exemplo.test'), false);
     assert.match(texto, /199,90/);
     assert.match(texto, /painel\.test/);
+  });
+
+  it('sem cobrança, o preço que a emissão pediria: com o cupom, e o da descida agendada para o prazo', async () => {
+    const cupom = await Coupon.create({
+      code: 'LEMBRETE10', kind: 'percent', value: 10, duration: 'forever', redemptions: 1, active: true
+    });
+    const prazo = new Date(Date.now() + 3 * DIA);
+    await comAssinatura({ renews_at: prazo, coupon_id: cupom.id, coupon_applied_at: new Date() });
+    assert.equal((await avisar(new Date())).sent, true);
+    assert.match(ultima(), /179,91/, 'o preço do plano com o cupom, não o de tabela');
+
+    // A descida agendada para este prazo: a fatura dele é do plano novo.
+    await getDb()('subscription_reminder_sends').del();
+    await comAssinatura({
+      renews_at: prazo, coupon_id: cupom.id, coupon_applied_at: new Date(), pending_plan_id: basico.id, pending_plan_at: prazo
+    });
+    assert.equal((await avisar(new Date())).sent, true);
+    assert.match(ultima(), /89,91/, 'o básico com o cupom: 9990 − 999');
+
+    // Agendada para outro prazo, não é desta fatura.
+    await getDb()('subscription_reminder_sends').del();
+    await comAssinatura({
+      renews_at: prazo, pending_plan_id: basico.id, pending_plan_at: new Date(prazo.getTime() + 30 * DIA)
+    });
+    assert.equal((await avisar(new Date())).sent, true);
+    assert.match(ultima(), /199,90/);
   });
 
   it('o provedor e a data, em ISO', async () => {

@@ -112,13 +112,32 @@ function cenario() {
     // De um provedor que não está na lista (a plataforma, ou um apagado).
     { ...base, id: 109, tenant_id: 99, subscription_id: null, amount_cents: 77700, status: 'paid', gateway_charge_id: 'pay_g', due_date: '2026-06-01', updated_at: '2026-06-01 00:00:00' }
   ];
+  const pago = (tenantId, externalId, amount, createdAt, detail = null) => ({
+    tenant_id: tenantId, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED, external_id: externalId, amount_cents: amount,
+    created_at: createdAt, detail: detail === null ? null : JSON.stringify(detail)
+  });
   const events = [
-    { tenant_id: 1, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED, external_id: 'pay_a', created_at: '2026-03-04 15:00:00' },
-    { tenant_id: 1, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED, external_id: 'pay_b', created_at: '2026-01-04 09:00:00' },
-    { tenant_id: 1, type: BILLING_EVENT_TYPES.PAYMENT_REFUNDED, external_id: 'pay_b:refund', created_at: '2026-02-10 09:00:00' },
+    pago(1, 'pay_a', 10000, '2026-03-04 15:00:00', { planId: 1, expectedCents: 10000 }),
+    pago(1, 'pay_b', 10000, '2026-01-04 09:00:00', { planId: 1, expectedCents: 10000 }),
+    {
+      tenant_id: 1, type: BILLING_EVENT_TYPES.PAYMENT_REFUNDED, external_id: 'pay_b:refund', amount_cents: 10000,
+      created_at: '2026-02-10 09:00:00', detail: JSON.stringify({ reference: 'pay_b' })
+    },
+    // A baixa sem gateway da cobrança 103, com desconto de cupom.
+    pago(7, 'charge:103', 8000, '2026-04-06 10:00:00', { planId: 1, expectedCents: 8000 }),
+    // A marca manual do console, sem cobrança nenhuma e sem referência — e de
+    // um plano (Anual) que não é o de hoje da assinatura.
+    pago(7, null, 100000, '2026-05-10 12:00:00', { planId: 2, expectedCents: 100000 }),
+    // Paga no gateway por uma cobrança que nunca teve linha aqui.
+    pago(2, 'pay_sem_linha', 120000, '2026-06-15 08:00:00', { planId: 2, expectedCents: 120000 }),
+    // Paga a menos e depois aceita: o aceite é um evento de zero, não outro pagamento.
+    pago(6, 'pay_curto', 6000, '2026-08-01 08:00:00', { expectedCents: 10000, underpaid: true, shortfallCents: 4000 }),
+    pago(6, 'pay_curto:accepted', 0, '2026-08-02 08:00:00', { planId: 1, periodDays: 30, expectedCents: 10000 }),
     // Um evento de outro provedor com a mesma referência não data a cobrança deste.
-    { tenant_id: 2, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED, external_id: 'pay_a', created_at: '2025-01-01 00:00:00' },
-    { tenant_id: 2, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED, external_id: 'pay_velho', created_at: '2024-05-02 00:00:00' }
+    pago(2, 'pay_a', 99999, '2025-01-01 00:00:00'),
+    pago(2, 'pay_velho', 120000, '2024-05-02 00:00:00'),
+    // De um provedor que não está na lista.
+    pago(99, 'pay_g', 77700, '2026-06-01 00:00:00')
   ];
   return { tenants, subscriptions, plans, prices, charges, events };
 }
@@ -133,14 +152,19 @@ describe('revenue report: aggregation', () => {
     assert.equal(relatorio.activeCount, 3);
   });
 
-  it('separates received from refunded, each by its own date', () => {
-    assert.equal(relatorio.receivedCents, 10000 + 10000 + 8000);
+  it('sums received and refunded from the billing events, each by its own date', () => {
+    // pay_b + pay_a + charge:103 + a marca manual + o pagamento sem linha + o curto.
+    assert.equal(relatorio.receivedCents, 10000 + 10000 + 8000 + 100000 + 120000 + 6000);
     assert.equal(relatorio.refundedCents, 10000);
     const mes = (m) => relatorio.monthly.find((linha) => linha.month === m);
     assert.deepEqual(mes('2026-01'), { month: '2026-01', receivedCents: 10000, refundedCents: 0, count: 1 });
     assert.deepEqual(mes('2026-02'), { month: '2026-02', receivedCents: 0, refundedCents: 10000, count: 0 });
     assert.deepEqual(mes('2026-03'), { month: '2026-03', receivedCents: 10000, refundedCents: 0, count: 1 });
     assert.deepEqual(mes('2026-04'), { month: '2026-04', receivedCents: 8000, refundedCents: 0, count: 1 });
+    assert.deepEqual(mes('2026-05'), { month: '2026-05', receivedCents: 100000, refundedCents: 0, count: 1 });
+    assert.deepEqual(mes('2026-06'), { month: '2026-06', receivedCents: 120000, refundedCents: 0, count: 1 });
+    // O curto entra pelo que veio, uma vez; o aceite não é outro pagamento.
+    assert.deepEqual(mes('2026-08'), { month: '2026-08', receivedCents: 6000, refundedCents: 0, count: 1 });
     // O `updated_at` de julho da cobrança 101 não conta: quem data é o extrato.
     assert.equal(mes('2026-07').receivedCents, 0);
     assert.equal(relatorio.monthly.length, 12);
@@ -152,15 +176,20 @@ describe('revenue report: aggregation', () => {
     assert.equal(relatorio.overdueTenants, 1);
   });
 
-  it('reports the discount on paid charges below the plan price', () => {
-    assert.equal(relatorio.discountCents, 2000);
+  it('estimates the discount from what each payment was asked against today\'s plan price', () => {
+    // 103: Pro 10000 pedindo 8000. A marca manual: Anual 120000 pedindo 100000.
+    // pay_b foi estornado: não conta. O curto pediu o preço cheio.
+    assert.equal(relatorio.discountCents, 2000 + 20000);
+    assert.equal(relatorio.discountApproximate, true);
   });
 
   it('breaks MRR and received down by plan, without the free and exempt ones', () => {
     const pro = relatorio.byPlan.find((linha) => linha.planId === 1);
     const anual = relatorio.byPlan.find((linha) => linha.planId === 2);
-    assert.deepEqual(pro, { planId: 1, name: 'Pro', activeCount: 2, mrrCents: 18000, receivedCents: 28000 });
-    assert.deepEqual(anual, { planId: 2, name: 'Anual', activeCount: 1, mrrCents: 9863, receivedCents: 0 });
+    // Pro: pay_a, pay_b, 103 e o curto (pelo plano de hoje, sem `planId` no evento).
+    assert.deepEqual(pro, { planId: 1, name: 'Pro', activeCount: 2, mrrCents: 18000, receivedCents: 34000 });
+    // Anual: o plano que o evento diz, não o de hoje da assinatura 17.
+    assert.deepEqual(anual, { planId: 2, name: 'Anual', activeCount: 1, mrrCents: 9863, receivedCents: 220000 });
     assert.equal(relatorio.byPlan.some((linha) => linha.planId === 3), false);
     assert.equal(relatorio.byPlan[0].planId, 1);
   });
@@ -286,9 +315,16 @@ describe('revenue report: routes', () => {
         subscriptionId: sub.id, type: BILLING_EVENT_TYPES.PAYMENT_REFUNDED, amountCents: 20000, currency: 'BRL',
         provider: 'asaas', externalId: 'pay_rel_2:refund'
       });
+      // A marca manual do console, sem cobrança e sem referência.
+      await BillingEvent.record({
+        subscriptionId: sub.id, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED, amountCents: 5000, currency: 'BRL',
+        provider: 'manual'
+      });
       return ids;
     });
     assert.ok(paga && estornada);
+    await db('billing_events').where({ tenant_id: delta, amount_cents: 5000 }).whereNull('external_id')
+      .update({ created_at: new Date(Date.UTC(2021, 5, 10, 10)) });
     // Os instantes do extrato, postos no período — ao segundo, pelo MySQL.
     await db('billing_events').where({ tenant_id: delta, external_id: 'pay_rel_1' })
       .update({ created_at: new Date(Date.UTC(2021, 2, 2, 10)) });
@@ -308,14 +344,16 @@ describe('revenue report: routes', () => {
     assert.equal(resposta.status, 200, JSON.stringify(resposta.body));
     const dados = resposta.body.data;
     assert.equal(dados.from, '2021-01-01');
-    assert.equal(dados.receivedCents, 40000);
+    // As duas cobranças e a marca manual, que não tem cobrança.
+    assert.equal(dados.receivedCents, 45000);
     assert.equal(dados.refundedCents, 20000);
     assert.equal(dados.monthly.length, 12);
     assert.equal(dados.monthly.find((m) => m.month === '2021-03').receivedCents, 20000);
+    assert.equal(dados.monthly.find((m) => m.month === '2021-06').receivedCents, 5000);
     assert.equal(dados.monthly.find((m) => m.month === '2021-05').refundedCents, 20000);
     const linha = dados.byPlan.find((l) => l.planId === plano.id);
     // 20000 a cada 60 dias = 10000 por mês.
-    assert.deepEqual(linha, { planId: plano.id, name: 'Receita Pro', activeCount: 1, mrrCents: 10000, receivedCents: 40000 });
+    assert.deepEqual(linha, { planId: plano.id, name: 'Receita Pro', activeCount: 1, mrrCents: 10000, receivedCents: 45000 });
     assert.ok(dados.mrrCents >= 10000);
   });
 

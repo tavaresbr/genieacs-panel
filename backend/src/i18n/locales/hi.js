@@ -861,6 +861,7 @@ export default {
   'coupon.exhausted': 'यह कूपन अपनी उपयोग सीमा तक पहुँच गया है',
   'coupon.planMismatch': 'यह कूपन आपके प्लान पर लागू नहीं होता',
   'coupon.alreadyApplied': 'इस सदस्यता पर पहले से एक कूपन लागू है',
+  'coupon.alreadyUsed': 'आप इस कूपन का पहले ही उपयोग कर चुके हैं',
   'coupon.applied': 'कूपन {code} लागू किया गया',
   'coupon.applyFailed': 'कूपन लागू नहीं किया जा सका',
   'subscription.missing': 'इस ISP की कोई सदस्यता नहीं है। प्लेटफ़ॉर्म से संपर्क करें।',

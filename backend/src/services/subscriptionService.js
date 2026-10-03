@@ -135,8 +135,18 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
       if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
       // `overridden`: o valor foi mudado à mão pelo console (0078) e não é o
       // preço de plano nenhum — ver o destino da descida em `recordPayment`.
+      // `planId`/`couponId`: com que plano e cupom ela foi emitida (0093),
+      // quando a linha o diz — nulo `planId` é cobrança feita à mão ou de
+      // antes das colunas, e aí só o valor responde.
+      const temPreco = cobranca.plan_id !== null && cobranca.plan_id !== undefined;
       return {
-        cents: Math.floor(valor), motivo: null, fonte: 'charge', overridden: Boolean(cobranca.amount_overridden_at)
+        cents: Math.floor(valor),
+        motivo: null,
+        fonte: 'charge',
+        overridden: Boolean(cobranca.amount_overridden_at),
+        planId: temPreco ? Number(cobranca.plan_id) : null,
+        couponId: temPreco && cobranca.coupon_id !== null && cobranca.coupon_id !== undefined
+          ? Number(cobranca.coupon_id) : null
       };
     }
   }
@@ -573,6 +583,45 @@ class SubscriptionService {
     if (!subscription?.coupon_id) return this.priceFor(subscription, plan, null);
     const cupom = coupon !== undefined ? coupon : await Coupon.findById(subscription.coupon_id);
     return this.priceFor(subscription, plan, cupom);
+  }
+
+  /**
+   * O que a cobrança de `plan` grava sobre o próprio preço (0093): o plano e
+   * o cupom com que ele foi calculado — `couponId` nulo quando o cupom não
+   * vale ali. É o que o pagamento lê depois (`recordPayment`) para saber se a
+   * fatura paga carregava o desconto e qual plano ela pagou.
+   */
+  static chargePricing(subscription, plan, coupon) {
+    return {
+      planId: plan?.id ? Number(plan.id) : null,
+      couponId: this.couponApplies(subscription, plan, coupon) ? Number(coupon.id) : null
+    };
+  }
+
+  /**
+   * Se a cobrança paga do período da descida agendada pagou o plano AGENDADO
+   * — `true`, `false`, ou nulo quando não dá para dizer.
+   *
+   * O plano gravado na cobrança (`planId`, 0093) é a resposta. Sem ele (a
+   * cobrança feita à mão, ou de antes da coluna), pelo valor: o que casa com
+   * o preço de um plano e não com o do outro decide; os dois iguais (o cupom
+   * levou os dois ao piso) é nulo. Nenhum casando, contra o preço de TABELA
+   * do atual quando o cupom não vale nos dois — com ele valendo só num, o
+   * preço com desconto do atual pode ficar abaixo do agendado, e "menos que o
+   * atual" deixaria de querer dizer "pagou o barato".
+   */
+  static paidScheduledPlan({ planId = null, cents = null, subscription, current, scheduled, coupon = null }) {
+    if (!scheduled) return null;
+    if (planId !== null && planId !== undefined) return Number(planId) === Number(scheduled.id);
+    if (cents === null || cents === undefined || !current) return null;
+    const precoAtual = this.priceFor(subscription, current, coupon);
+    const precoAgendado = this.priceFor(subscription, scheduled, coupon);
+    if (precoAtual === precoAgendado) return null;
+    if (cents === precoAgendado) return true;
+    if (cents === precoAtual) return false;
+    const nosDois = this.couponApplies(subscription, current, coupon) === this.couponApplies(subscription, scheduled, coupon);
+    const referencia = nosDois ? precoAtual : Math.max(0, Math.floor(Number(current.price_cents ?? 0)) || 0);
+    return cents < referencia;
   }
 
   /**
@@ -1611,18 +1660,29 @@ class SubscriptionService {
     //     vai para a renovação SEGUINTE — tenta de novo lá, pela mesma regra.
     let destinoDaDescida = null;
     if (reactivates && planoAgendado) {
-      // Com o cupom, quando ele vale no plano atual: a fatura do atual teria
-      // saído com o desconto, e é com ela que a do agendado se compara.
-      const precoAtual = this.priceFor(before, planoAtual, cupom);
+      // Qual plano a cobrança paga cobrou: o gravado nela (0093), ou, sem
+      // ele, pelo valor (`paidScheduledPlan`) — com o cupom, que pode ter
+      // levado os dois planos ao mesmo preço, a comparação de valores sozinha
+      // adiaria a descida para sempre.
+      //
       // A cobrança com valor mudado à mão pelo console (o desconto) não diz
-      // nada sobre QUAL plano foi pago: menos que o preço do atual ali é
-      // abatimento, não o preço do barato. Aí vale o plano que a cobrança
-      // teria pedido sem o desconto — o agendado, se a descida cabe no uso;
-      // o atual, se não cabe —, que é a mesma resposta de quando não há
-      // cobrança nenhuma.
-      const pagoBarato = pedido.cents !== null && !pedido.overridden
-        ? pedido.cents < precoAtual
-        : plano === planoAgendado;
+      // nada sobre QUAL plano foi pago pelo VALOR: menos que o preço do atual
+      // ali é abatimento, não o preço do barato. Aí vale o plano gravado nela,
+      // ou o que a cobrança teria pedido sem o desconto — o agendado, se a
+      // descida cabe no uso; o atual, se não cabe —, que é a mesma resposta de
+      // quando não há cobrança nenhuma (o valor esperado ali É o do `plano`).
+      const pelaCobranca = pedido.fonte === 'charge' || pedido.fonte === 'superseded_charge';
+      const veredito = pelaCobranca
+        ? this.paidScheduledPlan({
+          planId: pedido.planId ?? null,
+          cents: pedido.overridden ? null : pedido.cents,
+          subscription: before,
+          current: planoAtual,
+          scheduled: planoAgendado,
+          coupon: cupom
+        })
+        : null;
+      const pagoBarato = veredito ?? (plano === planoAgendado);
       destinoDaDescida = pagoBarato ? 'lock' : 'postpone';
     }
     const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();
@@ -1652,8 +1712,22 @@ class SubscriptionService {
     // período (é a fatura com desconto sendo paga), só nos cupons que contam
     // ciclo, e só se o cupom vale no plano do período pago — a fatura de um
     // plano fora da lista saiu sem desconto, e não gastou nada.
-    const gastaCupom = reactivates && cupom && cupom.duration !== 'forever'
-      && this.couponApplies(before, plano, cupom);
+    //
+    // E só se a fatura paga CARREGAVA o desconto: a cobrança com valor mudado
+    // à mão pelo console não é a do cupom; a emitida com o cupom gravado nela
+    // (0093) diz por si; sem essa marca, o valor pedido tem de ser o preço
+    // com o cupom — a fatura velha de preço cheio, paga depois de o console
+    // aplicar o cupom a um suspenso, não gasta o ciclo que não descontou.
+    let faturaComCupom = false;
+    if (cupom && !pedido.overridden) {
+      if (pedido.fonte === 'charge' && pedido.planId !== null && pedido.planId !== undefined) {
+        faturaComCupom = Number(pedido.couponId) === Number(cupom.id);
+      } else {
+        faturaComCupom = this.couponApplies(before, plano, cupom)
+          && (pedido.cents === null || pedido.cents === this.priceFor(before, plano, cupom));
+      }
+    }
+    const gastaCupom = reactivates && cupom && cupom.duration !== 'forever' && faturaComCupom;
 
     try {
       const subscription = await getDb().transaction(async (trx) => {

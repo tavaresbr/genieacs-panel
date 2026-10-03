@@ -853,6 +853,7 @@ export default {
   'coupon.exhausted': 'بلغت هذه القسيمة الحد الأقصى للاستخدام',
   'coupon.planMismatch': 'هذه القسيمة لا تنطبق على خطتك',
   'coupon.alreadyApplied': 'توجد قسيمة مطبقة بالفعل على هذا الاشتراك',
+  'coupon.alreadyUsed': 'لقد استخدمت هذه القسيمة بالفعل',
   'coupon.applied': 'تم تطبيق القسيمة {code}',
   'coupon.applyFailed': 'تعذر تطبيق القسيمة',
   'subscription.missing': 'ليس لهذا المزوّد اشتراك. تواصل مع المنصة.',

@@ -65,7 +65,9 @@ export const COUPON_REFUSAL_CODES = [
   'coupon_expired',
   'coupon_exhausted',
   'coupon_plan_mismatch',
-  'coupon_already_applied'
+  'coupon_already_applied',
+  // O provedor já resgatou este cupom um dia (e o gastou): não vale de novo.
+  'coupon_already_used'
 ] as const
 
 export function isCouponRefusal(code: string | undefined) {

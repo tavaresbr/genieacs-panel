@@ -5,7 +5,7 @@ import { platformAPI, type InvoiceConsoleView, type TenantInvoiceView } from '@/
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
-import { invoiceBadgeClass, invoiceStatusKey } from '@/lib/invoice'
+import { invoiceBadgeClass, invoiceStatusKey, safeInvoiceUrl } from '@/lib/invoice'
 
 /**
  * A NFS-e de uma cobrança, como uma célula "Nota": o estado, o número e o
@@ -17,6 +17,7 @@ export function InvoiceSummary({ invoice }: { invoice: TenantInvoiceView | Invoi
   if (!invoice) return <span className="text-xs text-muted-foreground">{t('nfse.none')}</span>
   const chave = invoiceStatusKey(invoice.status)
   const erro = 'error' in invoice ? invoice.error : null
+  const pdf = safeInvoiceUrl(invoice.pdfUrl)
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
       <span className={invoiceBadgeClass(invoice.status)} title={erro ?? undefined}>
@@ -25,10 +26,10 @@ export function InvoiceSummary({ invoice }: { invoice: TenantInvoiceView | Invoi
       {invoice.number && (
         <span className="font-mono text-xs text-muted-foreground">{t('nfse.number', { number: invoice.number })}</span>
       )}
-      {invoice.pdfUrl && (
+      {pdf && (
         /* Endereço de terceiro: `noopener`, pelo motivo de sempre. */
         <a
-          href={invoice.pdfUrl}
+          href={pdf}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"

@@ -111,7 +111,8 @@ class BillingCharge {
    * o bilhete que a ganha.
    */
   static async open({
-    subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null
+    subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null,
+    planId = null, couponId = null
   }) {
     return tinsertReturningId('billing_charges', {
       // A linha nasce JÁ garrada por quem a inseriu — ver `claim`. Sem isto,
@@ -125,7 +126,11 @@ class BillingCharge {
       currency: String(currency || 'BRL').toUpperCase().slice(0, 3),
       provider: String(provider).slice(0, 32),
       status: 'pending',
-      due_date: dueDate
+      due_date: dueDate,
+      // Com que plano e cupom este valor foi calculado (0093) — ver
+      // `BILLING_CHARGE_PRICING_COLUMNS`.
+      plan_id: planId ?? null,
+      coupon_id: couponId ?? null
     });
   }
 
@@ -255,7 +260,9 @@ class BillingCharge {
    *
    * @returns {Promise<boolean>}
    */
-  static async resetForReissue(id, { amountCents, currency, holdUntil = null }) {
+  static async resetForReissue(id, {
+    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined
+  }) {
     const linha = await BillingCharge.findById(id);
     if (!linha) return false;
     const anteriores = BillingCharge.supersededOf(linha);
@@ -290,6 +297,10 @@ class BillingCharge {
       // O valor novo é o preço de um plano: o desconto dado à cobrança velha
       // pelo console não passa para a reemitida.
       amount_overridden_at: null,
+      // O plano e o cupom do preço novo (0093), quando quem reprecifica os
+      // diz; sem eles (a reabertura da isenção, que mantém o valor), ficam.
+      ...(planId !== undefined ? { plan_id: planId } : {}),
+      ...(couponId !== undefined ? { coupon_id: couponId } : {}),
       updated_at: new Date()
     });
     return changed > 0;

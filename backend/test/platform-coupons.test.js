@@ -679,3 +679,170 @@ describe('o consumo dos ciclos', () => {
     assert.equal(Number((await assinaturaDe(beta)).coupon_cycles_left), 2, 'com o cupom no lugar, um ciclo a mais');
   });
 });
+
+describe('um resgate por provedor', () => {
+  const resgatesDe = (couponId, tenantId) => getDb()('coupon_redemptions').where({ coupon_id: couponId, tenant_id: tenantId });
+
+  it('o provedor não reaplica o cupom que já gastou; o console pode, sem contar outro resgate', async () => {
+    const c = await cupom({ duration: 'once' });
+    assert.equal((await aplicarProvedor(c.code)).status, 200);
+    assert.equal((await resgatesDe(c.id, alfa)).length, 1);
+    await pagar(alfa, { amountCents: 17991, externalId: 'pay_gastou_once' });
+    assert.equal((await assinaturaDe(alfa)).coupon_id, null, 'o ciclo único foi gasto');
+
+    const deNovo = await aplicarProvedor(c.code);
+    assert.equal(deNovo.status, 409, JSON.stringify(deNovo.body));
+    assert.equal(deNovo.body.code, 'coupon_already_used');
+    assert.equal(Number((await Coupon.findById(c.id)).redemptions), 1);
+
+    // O console passa por cima — e o provedor já ocupa a vaga dele.
+    const peloConsole = await aplicarConsole(alfa, c.code);
+    assert.equal(peloConsole.status, 200, JSON.stringify(peloConsole.body));
+    assert.equal(Number((await assinaturaDe(alfa)).coupon_id), c.id);
+    assert.equal(Number((await Coupon.findById(c.id)).redemptions), 1, 'reaplicar não conta outro resgate');
+    assert.equal((await resgatesDe(c.id, alfa)).length, 1);
+
+    // Outro provedor resgata normalmente.
+    assert.equal((await aplicarConsole(beta, c.code)).status, 200);
+    assert.equal(Number((await Coupon.findById(c.id)).redemptions), 2);
+    assert.equal((await resgatesDe(c.id, beta)).length, 1);
+  });
+
+  it('o console reaplica a quem já resgatou mesmo com o teto cheio', async () => {
+    const c = await cupom({ max_redemptions: 1 });
+    assert.equal((await aplicarConsole(beta, c.code)).status, 200);
+    assert.equal((await aplicarConsole(beta, null)).status, 200);
+    const outro = await aplicarConsole(gama, c.code);
+    assert.equal(outro.body.code, 'coupon_exhausted');
+    assert.equal((await aplicarConsole(beta, c.code)).status, 200, 'a vaga já é dele');
+    assert.equal(Number((await Coupon.findById(c.id)).redemptions), 1);
+  });
+
+  it('a aplicação que falha devolve a vaga e a linha do resgate juntas', async () => {
+    const c = await cupom();
+    await abrirCobranca(alfa, { gatewayChargeId: 'pay_nao_cancela' });
+    const res = await aplicarProvedor(c.code);
+    assert.equal(res.status, 502, JSON.stringify(res.body));
+    assert.equal(Number((await Coupon.findById(c.id)).redemptions), 0);
+    assert.equal((await resgatesDe(c.id, alfa)).length, 0);
+    // E, sem a fatura presa, o provedor consegue aplicar depois.
+    await getDb()('billing_charges').where({ tenant_id: alfa }).del();
+    assert.equal((await aplicarProvedor(c.code)).status, 200);
+  });
+
+  it('a rota do provedor não diz por que o cupom não vale; o console diz', async () => {
+    const casos = [
+      [await cupom({ valid_until: new Date(Date.now() - DAY) }), 'coupon_expired'],
+      [await cupom({ max_redemptions: 1, redemptions: 1 }), 'coupon_exhausted'],
+      [await cupom({ plan_ids: JSON.stringify([planos.basico.id]) }), 'coupon_plan_mismatch'],
+      [await cupom({ active: false }), 'coupon_invalid']
+    ];
+    for (const [c, doConsole] of casos) {
+      const prov = await aplicarProvedor(c.code);
+      assert.equal(prov.status, 409);
+      assert.equal(prov.body.code, 'coupon_invalid', `${c.code}: ${JSON.stringify(prov.body)}`);
+      assert.equal((await aplicarConsole(beta, c.code)).body.code, doConsole);
+    }
+  });
+});
+
+describe('o ciclo só é gasto pela fatura que levou o desconto', () => {
+  it('a emissão grava o plano e o cupom na cobrança, e pagá-la gasta o ciclo', async () => {
+    const c = await cupom({ duration: 'once' });
+    await assinar(beta, { coupon: c, cyclesLeft: 1 });
+    const emitida = await emitir(beta);
+    assert.equal(emitida.issued, true, JSON.stringify(emitida));
+    const [linha] = await cobrancasDe(beta);
+    assert.equal(Number(linha.plan_id), planos.pro.id);
+    assert.equal(Number(linha.coupon_id), c.id);
+    await pagar(beta, { amountCents: 17991, externalId: linha.gateway_charge_id });
+    assert.equal((await assinaturaDe(beta)).coupon_id, null);
+  });
+
+  it('a cobrança com valor mudado à mão não gasta o "só a primeira fatura"', async () => {
+    const c = await cupom({ duration: 'once' });
+    await assinar(beta, { coupon: c, cyclesLeft: 1 });
+    await abrirCobranca(beta, { amountCents: 12345, gatewayChargeId: 'pay_mao', overridden: true });
+    const pago = await pagar(beta, { amountCents: 12345, externalId: 'pay_mao' });
+    assert.equal(pago.underpaid, false);
+    const depois = await assinaturaDe(beta);
+    assert.equal(Number(depois.coupon_id), c.id);
+    assert.equal(Number(depois.coupon_cycles_left), 1);
+  });
+
+  it('suspenso, cupom pelo console, e a fatura velha de preço cheio paga: o ciclo fica', async () => {
+    const c = await cupom({ duration: 'once' });
+    await assinar(gama, { status: 'suspended' });
+    await abrirCobranca(gama, { amountCents: 19990, gatewayChargeId: 'pay_velha_cheia' });
+    const aplicado = await aplicarConsole(gama, c.code);
+    assert.equal(aplicado.status, 200, JSON.stringify(aplicado.body));
+    assert.equal(aplicado.body.data.charge, 'none', 'o suspenso não tem a fatura reprecificada');
+    await Subscription.upsertForTenant(gama, { status: 'active' });
+    await SubscriptionService.invalidate(gama);
+    await pagar(gama, { amountCents: 19990, externalId: 'pay_velha_cheia' });
+    const depois = await assinaturaDe(gama);
+    assert.equal(Number(depois.coupon_id), c.id, 'a fatura paga não tinha o desconto');
+    assert.equal(Number(depois.coupon_cycles_left), 1);
+  });
+
+  it('a cobrança emitida sem o cupom (plano fora da lista) não gasta, mesmo com o valor igual', async () => {
+    const c = await cupom({ duration: 'once', plan_ids: JSON.stringify([planos.basico.id]) });
+    await assinar(beta, { coupon: c, cyclesLeft: 1 });
+    assert.equal((await emitir(beta)).issued, true);
+    const [linha] = await cobrancasDe(beta);
+    assert.equal(linha.coupon_id, null);
+    await pagar(beta, { amountCents: 19990, externalId: linha.gateway_charge_id });
+    assert.equal(Number((await assinaturaDe(beta)).coupon_cycles_left), 1);
+  });
+});
+
+describe('a descida agendada paga, com o cupom no meio', () => {
+  async function pagarDescida(tenantId, c) {
+    const renovacao = daquiA(2);
+    await assinar(tenantId, { coupon: c, renewsAt: renovacao, pendingPlan: planos.basico, pendingAt: renovacao });
+    const emitida = await emitir(tenantId);
+    assert.equal(emitida.issued, true, JSON.stringify(emitida));
+    const [linha] = await cobrancasDe(tenantId);
+    assert.equal(Number(linha.plan_id), planos.basico.id, 'a cobrança diz que é do plano agendado');
+    await pagar(tenantId, { amountCents: Number(linha.amount_cents), externalId: linha.gateway_charge_id });
+    return { renovacao, linha, depois: await assinaturaDe(tenantId) };
+  }
+
+  it('A: cupom só no Pro, que fica mais barato que o Básico — pagar o Básico trava a descida', async () => {
+    const c = await cupom({ kind: 'fixed', value: 15000, plan_ids: JSON.stringify([planos.pro.id]) });
+    const { renovacao, linha, depois } = await pagarDescida(beta, c);
+    assert.equal(Number(linha.amount_cents), 9990);
+    assert.ok(depois.pending_plan_locked_at, 'travada, e não adiada');
+    assert.equal(seg(depois.pending_plan_at), seg(renovacao), 'a data da descida não andou');
+    assert.equal(Number(depois.pending_plan_id), planos.basico.id);
+  });
+
+  it('B: os dois planos no piso — pagar a descida trava, em vez de adiar para sempre', async () => {
+    const c = await cupom({ kind: 'fixed', value: 50000 });
+    const { renovacao, linha, depois } = await pagarDescida(gama, c);
+    assert.equal(Number(linha.amount_cents), 500);
+    assert.ok(depois.pending_plan_locked_at);
+    assert.equal(seg(depois.pending_plan_at), seg(renovacao));
+  });
+
+  it('e a tela do provedor lê a mesma trava pela cobrança paga do período', async () => {
+    const c = await cupom({ kind: 'fixed', value: 50000 });
+    const renovacao = daquiA(2);
+    await assinar(alfa, { coupon: c, renewsAt: renovacao, pendingPlan: planos.basico, pendingAt: renovacao });
+    await runInTenant(alfa, async () => {
+      const id = await BillingCharge.open({
+        periodEnd: ChargeIssuingService.periodKey(renovacao),
+        amountCents: 500,
+        currency: 'BRL',
+        provider: 'asaas',
+        planId: planos.basico.id,
+        couponId: c.id
+      });
+      await BillingCharge.update(id, { status: 'paid', gateway_charge_id: 'pay_descida_paga', issuing_until: null });
+    });
+    const res = await provedor('/subscription/plan', { method: 'PUT', body: { planId: planos.barato.id } });
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'pending_locked');
+    assert.ok((await assinaturaDe(alfa)).pending_plan_locked_at);
+  });
+});

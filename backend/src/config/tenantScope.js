@@ -146,7 +146,11 @@ export const SCOPED_TABLES = new Set([
   'billing_invoices',
   // Os lembretes de cobrança mandados ao provedor (0092). Do provedor, como a
   // cobrança de que falam.
-  'subscription_reminder_sends'
+  'subscription_reminder_sends',
+  // Os cupons que ESTE provedor já resgatou (0093) — a memória que impede o
+  // mesmo cupom de valer duas vezes para ele. O cupom é do catálogo (`coupons`,
+  // compartilhada); o resgate é do provedor, e some junto com ele.
+  'coupon_redemptions'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

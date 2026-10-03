@@ -10,13 +10,16 @@ import {
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: Plan } = await import('../src/models/Plan.js');
 const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
-const { default: BillingInvoice } = await import('../src/models/BillingInvoice.js');
+const { default: BillingInvoice, safeInvoiceUrl } = await import('../src/models/BillingInvoice.js');
 const { default: ChargeIssuingService } = await import('../src/services/chargeIssuingService.js');
 const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
-const { default: BillingInvoiceService, backoffMs } = await import('../src/services/billing/billingInvoiceService.js');
+const {
+  default: BillingInvoiceService, backoffMs, effectiveDateOf, invoicePayload, MAX_CANCEL_ATTEMPTS
+} = await import('../src/services/billing/billingInvoiceService.js');
 const { default: BillingWebhookController } = await import('../src/controllers/billingWebhookController.js');
 const { save, invalidateAsaasSettings } = await import('../src/services/billing/asaasSettingsService.js');
 const { resetDeploymentSharing } = await import('../src/services/genieacsEgress.js');
+const { billingWebhookLimiter, ipKey } = await import('../src/middleware/rateLimit.js');
 const { attachLocale } = await import('../src/middleware/locale.js');
 const { resolveTenant } = await import('../src/middleware/tenantResolver.js');
 const { default: platformBillingRoutes } = await import('../src/routes/platformBilling.js');
@@ -49,6 +52,9 @@ let modoCriacao = 'ok';
 const notas = new Map();
 let seq = 0;
 let recusarCancelamento = false;
+/** Chamados (e esperados) antes de o gateway responder a criação / a autorização — a corrida com o estorno. */
+let aoCriar = null;
+let aoAutorizar = null;
 
 let panelUrl;
 let consoleServer;
@@ -62,7 +68,7 @@ function subirGateway() {
   gateway = http.createServer((req, res) => {
     let bruto = '';
     req.on('data', (c) => { bruto += c; });
-    req.on('end', () => {
+    req.on('end', async () => {
       let payload = null;
       try { payload = bruto ? JSON.parse(bruto) : null; } catch { payload = null; }
       const [caminho, query = ''] = req.url.split('?');
@@ -78,6 +84,7 @@ function subirGateway() {
         seq += 1;
         const id = `inv_${seq}`;
         notas.set(id, { id, status: 'SCHEDULED', payment: payload.payment });
+        if (aoCriar) await aoCriar(id);
         if (modoCriacao === 'perde') return responder(500, { errors: [{ description: 'tempo esgotado' }] });
         return responder(200, notas.get(id));
       }
@@ -89,7 +96,10 @@ function subirGateway() {
       if (gesto) {
         const nota = notas.get(decodeURIComponent(gesto[1]));
         if (!nota) return responder(404, {});
-        if (gesto[2] === 'authorize') return responder(200, nota);
+        if (gesto[2] === 'authorize') {
+          if (aoAutorizar) await aoAutorizar(nota.id);
+          return responder(200, nota);
+        }
         if (gesto[2] === 'cancel') {
           if (recusarCancelamento) return responder(400, { errors: [{ description: 'prazo de cancelamento expirado' }] });
           nota.status = 'CANCELED';
@@ -226,7 +236,12 @@ beforeEach(async () => {
   recebidas = [];
   modoCriacao = 'ok';
   recusarCancelamento = false;
+  aoCriar = null;
+  aoAutorizar = null;
   notas.clear();
+  // O balde do webhook (30 por minuto) é do endereço, e esta suíte entrega
+  // mais que isso em um minuto: cada teste começa com ele vazio.
+  await billingWebhookLimiter.resetKey(ipKey({ ip: '127.0.0.1' }));
   seq = 0;
   const db = getDb();
   await db('billing_invoices').whereIn('tenant_id', [alfa, beta]).del();
@@ -304,10 +319,12 @@ describe('a passada do agendador', () => {
     const { id } = await pagaPeloGateway(beta, 'pay_emite');
     const resumo = await processar(beta);
     assert.equal(resumo.issued, 1);
+    // Pergunta SEMPRE antes de criar, mesmo na primeira tentativa.
     assert.deepEqual(chamadasDeNota().map((r) => `${r.method} ${r.path}`), [
-      'POST /invoices', 'POST /invoices/inv_1/authorize'
+      'GET /invoices', 'POST /invoices', 'POST /invoices/inv_1/authorize'
     ]);
-    const corpo = recebidas[0].payload;
+    const corpo = chamadasDeNota().find((r) => r.method === 'POST' && r.path === '/invoices').payload;
+    assert.equal(corpo.effectiveDate, effectiveDateOf(new Date()));
     assert.equal(corpo.payment, 'pay_emite');
     assert.equal(corpo.value, 100, 'em reais');
     assert.equal(corpo.serviceDescription, 'Licença de uso do painel');
@@ -435,9 +452,25 @@ describe('o estorno', () => {
     const res = await platform(`/tenants/${beta}/charges/${id}/refund`, { method: 'POST', body: {} });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal((await runInTenant(beta, () => BillingCharge.findById(id))).status, 'refunded');
-    const nota = await notaDe(beta, id);
-    assert.equal(nota.status, 'scheduled');
+    let nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'canceling', 'fica pedindo o cancelamento');
     assert.match(nota.error, /Cancellation failed/);
+    assert.equal(nota.external_id, 'inv_1');
+    const espera = new Date(nota.next_attempt_at).getTime();
+    assert.ok(espera > Date.now(), 'com espera');
+
+    // O agendador insiste — antes da espera, nada; depois dela, cancela.
+    recebidas = [];
+    await processar(beta);
+    assert.equal(chamadasDeNota().filter((r) => r.path.endsWith('/cancel')).length, 0);
+    recusarCancelamento = false;
+    const resumo = await processar(beta, new Date(espera + 1000));
+    assert.equal(resumo.canceled, 1);
+    assert.ok(chamadasDeNota().some((r) => r.method === 'POST' && r.path === '/invoices/inv_1/cancel'));
+    nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'canceled');
+    assert.equal(nota.next_attempt_at, null);
+    assert.equal(notas.get('inv_1').status, 'CANCELED');
   });
 
   it('pelo gateway (PAYMENT_REFUNDED) também cancela, fora da entrega', async () => {
@@ -458,6 +491,7 @@ describe('o console', () => {
   it('reemite a nota com erro, recusa a viva e não alcança a cobrança do vizinho', async () => {
     const { id } = await pagaPeloGateway(beta, 'pay_reemite');
     await processar(beta);
+    notas.get('inv_1').status = 'ERROR';
     await entregar({ event: 'INVOICE_ERROR', invoice: { id: 'inv_1', status: 'ERROR', payment: 'pay_reemite' } });
 
     const res = await platform(`/tenants/${beta}/charges/${id}/invoice`, { method: 'POST' });
@@ -566,5 +600,238 @@ describe('o provedor', () => {
     });
     assert.ok(minha.invoice.issuedAt);
     assert.equal('error' in minha.invoice, false);
+  });
+});
+
+describe('nota duplicada, corrida com o estorno, valor e endereços', () => {
+  it('pergunta à Asaas antes de criar mesmo na primeira tentativa, e adota a viva', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_ja_tem');
+    notas.set('inv_98', { id: 'inv_98', status: 'CANCELED', payment: 'pay_ja_tem' });
+    notas.set('inv_99', {
+      id: 'inv_99', status: 'AUTHORIZED', payment: 'pay_ja_tem', number: '5', pdfUrl: 'https://asaas.test/5.pdf'
+    });
+    const resumo = await processar(beta);
+    assert.equal(resumo.issued, 1);
+    // A cancelada não serve; a autorizada é adotada — sem criar, sem autorizar de novo.
+    assert.deepEqual(chamadasDeNota().map((r) => `${r.method} ${r.path}`), ['GET /invoices']);
+    const nota = await notaDe(beta, id);
+    assert.equal(nota.external_id, 'inv_99');
+    assert.equal(nota.status, 'authorized');
+    assert.equal(nota.number, '5');
+    assert.equal(notas.size, 2);
+  });
+
+  it('a reemissão adota a nota que a Asaas ainda tem viva, em vez de pedir outra', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_viva');
+    await processar(beta);
+    // O painel viu erro; a Asaas, depois de corrigida lá, autorizou.
+    await entregar({ event: 'INVOICE_ERROR', invoice: { id: 'inv_1', status: 'ERROR', payment: 'pay_viva' } });
+    Object.assign(notas.get('inv_1'), { status: 'AUTHORIZED', number: '31', pdfUrl: 'https://asaas.test/31.pdf' });
+    recebidas = [];
+    const res = await platform(`/tenants/${beta}/charges/${id}/invoice`, { method: 'POST' });
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'invoice_exists');
+    assert.equal(res.body.adopted, true);
+    assert.equal(res.body.invoiceStatus, 'authorized');
+    assert.deepEqual(chamadasDeNota().map((r) => `${r.method} ${r.path}`), ['GET /invoices/inv_1']);
+    const nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'authorized');
+    assert.equal(nota.external_id, 'inv_1');
+    assert.equal(nota.number, '31');
+    assert.equal(nota.error, null);
+    assert.ok(nota.issued_at);
+
+    // E a passada seguinte não cria nada.
+    recebidas = [];
+    await processar(beta, new Date(Date.now() + 60 * 60 * 1000));
+    assert.equal(chamadasDeNota().filter((r) => r.method === 'POST').length, 0);
+    assert.equal(notas.size, 1);
+  });
+
+  it('o estorno no meio da criação: a passada não grava por cima e cancela a nota que criou', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_corrida');
+    aoCriar = async () => {
+      aoCriar = null;
+      await runInTenant(beta, async () => {
+        await BillingCharge.update(id, { status: 'refunded' });
+        assert.deepEqual(await BillingInvoiceService.cancelForCharge(id), { canceled: true, reason: 'not_issued' });
+      });
+    };
+    const resumo = await processar(beta);
+    assert.equal(resumo.issued, 0);
+    assert.deepEqual(chamadasDeNota().map((r) => `${r.method} ${r.path}`), [
+      'GET /invoices', 'POST /invoices', 'POST /invoices/inv_1/cancel'
+    ]);
+    const nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'canceled');
+    assert.equal(nota.external_id, 'inv_1');
+    assert.equal(notas.get('inv_1').status, 'CANCELED');
+  });
+
+  it('o estorno no meio da autorização: cancela na Asaas e a passada respeita', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_corrida_2');
+    aoAutorizar = async () => {
+      aoAutorizar = null;
+      await runInTenant(beta, async () => {
+        await BillingCharge.update(id, { status: 'refunded' });
+        assert.deepEqual(await BillingInvoiceService.cancelForCharge(id), { canceled: true });
+      });
+    };
+    await processar(beta);
+    const nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'canceled', 'a passada não devolveu a linha a agendada');
+    assert.equal(nota.external_id, 'inv_1');
+    assert.equal(notas.get('inv_1').status, 'CANCELED');
+  });
+
+  it('a nota com erro e id na Asaas é cancelada lá no estorno', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_erro_estorno');
+    await processar(beta);
+    await entregar({ event: 'INVOICE_ERROR', invoice: { id: 'inv_1', status: 'ERROR', payment: 'pay_erro_estorno' } });
+    recebidas = [];
+    const res = await platform(`/tenants/${beta}/charges/${id}/refund`, { method: 'POST', body: {} });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.ok(chamadasDeNota().some((r) => r.method === 'POST' && r.path === '/invoices/inv_1/cancel'));
+    assert.equal((await notaDe(beta, id)).status, 'canceled');
+  });
+
+  it('a passada que acha a cobrança estornada com nota na Asaas a cancela lá — e insiste se falhar', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_pend_com_id');
+    await processar(beta);
+    // A autorização falhou: pendente, com o id gravado. E o dinheiro voltou por fora.
+    await runInTenant(beta, async () => {
+      const linha = await BillingInvoice.forCharge(id);
+      await BillingInvoice.update(linha.id, { status: 'pending', next_attempt_at: null });
+      await BillingCharge.update(id, { status: 'refunded' });
+    });
+    recusarCancelamento = true;
+    recebidas = [];
+    await processar(beta);
+    assert.deepEqual(chamadasDeNota().map((r) => `${r.method} ${r.path}`), [
+      'POST /invoices/inv_1/cancel', 'GET /invoices/inv_1'
+    ]);
+    let nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'canceling');
+    assert.equal(Number(nota.attempts), 1);
+
+    recusarCancelamento = false;
+    await processar(beta, new Date(new Date(nota.next_attempt_at).getTime() + 1000));
+    nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'canceled');
+    assert.equal(notas.get('inv_1').status, 'CANCELED');
+  });
+
+  it('o cancelamento que falha mas a Asaas já tem a nota morta fica cancelado', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_ja_morta');
+    await processar(beta);
+    notas.get('inv_1').status = 'CANCELED';
+    recusarCancelamento = true;
+    const resultado = await runInTenant(beta, () => BillingInvoiceService.cancelForCharge(id));
+    assert.deepEqual(resultado, { canceled: true, reason: 'already_dead_at_gateway' });
+    assert.equal((await notaDe(beta, id)).status, 'canceled');
+  });
+
+  it('a baixa que aceita um pagamento a menos enfileira a nota, do valor que entrou', async () => {
+    const periodo = await periodoAtual(beta);
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_curto' });
+    const aviso = await entregar({
+      event: 'PAYMENT_RECEIVED',
+      payment: { id: 'pay_curto', value: 60, externalReference: `tenant:${beta}:${periodo}` }
+    });
+    assert.equal(aviso.body.code, 'underpaid', JSON.stringify(aviso.body));
+    assert.equal(await notaDe(beta, id), null, 'a cobrança não está paga: sem nota');
+
+    const res = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: ChargeIssuingService.isoDate(new Date()), amountCents: 6000, allowUnderpayment: true }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.acceptedUnderpayment, true);
+    assert.equal((await notaDe(beta, id)).status, 'pending');
+
+    await processar(beta);
+    const corpo = chamadasDeNota().find((r) => r.method === 'POST' && r.path === '/invoices').payload;
+    assert.equal(corpo.value, 60, 'o que entrou, não os 100 da cobrança');
+  });
+
+  it('o corpo da nota: valor recebido e a data de competência em São Paulo', () => {
+    const config = { serviceDescription: 'x', issPercent: 2 };
+    const charge = { id: 7, gateway_charge_id: 'pay_x', amount_cents: 10000, period_end: '2026-10-10' };
+    // 01:30 UTC do dia 4 ainda é dia 3 em São Paulo.
+    const tarde = new Date('2026-10-04T01:30:00Z');
+    assert.equal(effectiveDateOf(tarde), '2026-10-03');
+    assert.equal(effectiveDateOf(new Date('2026-10-04T03:30:00Z')), '2026-10-04');
+    assert.equal(invoicePayload(config, charge, tarde).effectiveDate, '2026-10-03');
+    assert.equal(invoicePayload(config, charge, tarde).valueCents, 10000);
+    assert.equal(invoicePayload(config, charge, tarde, 6000).valueCents, 6000);
+  });
+
+  it('só guarda e só mostra endereço https da nota', async () => {
+    assert.equal(safeInvoiceUrl('https://asaas.test/a.pdf'), 'https://asaas.test/a.pdf');
+    assert.equal(safeInvoiceUrl('http://asaas.test/a.pdf'), null);
+    assert.equal(safeInvoiceUrl('javascript:alert(1)'), null);
+    assert.equal(safeInvoiceUrl('  '), null);
+    assert.equal(safeInvoiceUrl('não é url'), null);
+
+    const { id } = await pagaPeloGateway(beta, 'pay_url');
+    await processar(beta);
+    await entregar({
+      event: 'INVOICE_AUTHORIZED',
+      invoice: {
+        id: 'inv_1', status: 'AUTHORIZED', payment: 'pay_url', number: '8',
+        pdfUrl: 'javascript:alert(document.cookie)', xmlUrl: 'http://asaas.test/8.xml'
+      }
+    });
+    const nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'authorized');
+    assert.equal(nota.pdf_url, null);
+    assert.equal(nota.xml_url, null);
+
+    // Uma linha gravada antes da regra também não sai com o link.
+    await runInTenant(beta, () => BillingInvoice.update(nota.id, { pdf_url: 'javascript:alert(1)' }));
+    const lida = await notaDe(beta, id);
+    assert.equal(BillingInvoice.present(lida).pdfUrl, null);
+    assert.equal(BillingInvoice.presentForConsole(lida).pdfUrl, null);
+  });
+
+  it('desiste do cancelamento depois do teto: erro com o recado, e a reemissão não cria outra nota', async () => {
+    const { id } = await pagaPeloGateway(beta, 'pay_teimosa');
+    await processar(beta);
+    recusarCancelamento = true;
+    const res = await platform(`/tenants/${beta}/charges/${id}/refund`, { method: 'POST', body: {} });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    let nota = await notaDe(beta, id);
+    assert.equal(nota.status, 'canceling');
+    assert.equal(Number(nota.attempts), 1);
+
+    // O agendador insiste até o teto, cada vez depois da espera.
+    for (let i = 2; i <= MAX_CANCEL_ATTEMPTS; i += 1) {
+      await processar(beta, new Date(new Date(nota.next_attempt_at).getTime() + 1000));
+      nota = await notaDe(beta, id);
+      assert.equal(Number(nota.attempts), i);
+    }
+    assert.equal(nota.status, 'error');
+    assert.equal(nota.next_attempt_at, null);
+    assert.match(nota.error, /cancele manualmente no painel do Asaas/);
+    assert.match(nota.error, /prazo de cancelamento expirado/);
+    assert.equal(notas.get('inv_1').status, 'SCHEDULED', 'continua viva lá: é o que o recado pede');
+
+    // Parou: a passada seguinte não pede mais nada.
+    recebidas = [];
+    await processar(beta, new Date(Date.now() + 2 * DAY));
+    assert.equal(chamadasDeNota().length, 0);
+
+    // O console vê o recado na nota da cobrança.
+    const lista = await platform(`/tenants/${beta}/charges`);
+    const linha = lista.body.data.charges.find((c) => c.id === id);
+    assert.equal(linha.invoice.status, 'error');
+    assert.match(linha.invoice.error, /cancele manualmente/);
+
+    // A reemissão recusa: a cobrança estornada não está paga.
+    recebidas = [];
+    const reemite = await platform(`/tenants/${beta}/charges/${id}/invoice`, { method: 'POST' });
+    assert.equal(reemite.status, 409);
+    assert.equal(reemite.body.code, 'not_paid');
+    assert.equal(chamadasDeNota().length, 0);
+    assert.equal(notas.size, 1);
   });
 });
