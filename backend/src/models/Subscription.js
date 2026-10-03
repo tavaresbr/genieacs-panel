@@ -107,6 +107,125 @@ class Subscription {
     return changed > 0;
   }
 
+  /**
+   * Grava uma mudança do "isento de cobrança" — só se a isenção ainda está
+   * como se leu (`wasExempt`) e, no fim automático (`expiredBy`), só se o
+   * `billing_exempt_until` gravado já passou daquele instante.
+   *
+   * Condicional pelo mesmo motivo de `applyPendingPlan`: duas voltas do
+   * agendador (ou o agendador e o console) podem desligar a mesma isenção no
+   * mesmo minuto, e sem a condição as duas gravariam a sua linha no extrato e
+   * reabririam a cobrança. Quem muda a linha é quem desligou; o outro recebe
+   * `false` e não grava nada.
+   */
+  static async changeBillingExemptIf(tenantId, { wasExempt, expiredBy = null }, patch, db = getDb()) {
+    if (!tenantId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const query = db('subscriptions').where({ tenant_id: tenantId });
+    if (wasExempt) query.whereNotNull('billing_exempt_at');
+    else query.whereNull('billing_exempt_at');
+    if (expiredBy) query.whereNotNull('billing_exempt_until').where('billing_exempt_until', '<=', expiredBy);
+    const changed = await query.update({ ...patch, updated_at: new Date() });
+    return changed > 0;
+  }
+
+  /**
+   * Põe (ou tira) o cupom da assinatura — só se o cupom de agora ainda é o que
+   * se leu (`expectCouponId`, nulo para "sem cupom").
+   *
+   * Condicional pelo mesmo motivo de `applyPendingPlan`: duas aplicações ao
+   * mesmo tempo (o provedor e o console, dois cliques) leriam as duas "sem
+   * cupom" e gravariam cada uma o seu — e cada uma teria consumido um resgate.
+   * A segunda recebe `false` e devolve o resgate dela.
+   */
+  static async setCoupon(tenantId, { expectCouponId = null, couponId, cyclesLeft, appliedAt }, db = getDb()) {
+    if (!tenantId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    let query = db('subscriptions').where({ tenant_id: tenantId });
+    query = expectCouponId === null || expectCouponId === undefined
+      ? query.whereNull('coupon_id')
+      : query.where({ coupon_id: expectCouponId });
+    const changed = await query.update({
+      coupon_id: couponId ?? null,
+      coupon_cycles_left: couponId ? (cyclesLeft ?? null) : null,
+      coupon_applied_at: couponId ? (appliedAt ?? new Date()) : null,
+      updated_at: new Date()
+    });
+    return changed > 0;
+  }
+
+  /**
+   * Gasta um ciclo do cupom `couponId` — o pagamento que estendeu o período
+   * consumiu uma fatura com desconto. No zero, o cupom sai da assinatura.
+   *
+   * Comparar-e-trocar pelo valor lido (`coupon_cycles_left = antes`): dois
+   * pagamentos diferentes ao mesmo tempo não descontam o mesmo ciclo duas
+   * vezes nem o perdem. Devolve o que gastou, ou nulo quando não havia o que
+   * gastar (sem cupom, outro cupom, `forever`, zerado, ou perdeu a corrida).
+   */
+  static async consumeCouponCycle(tenantId, couponId, db = getDb()) {
+    const linha = await Subscription.forTenant(tenantId, db);
+    if (!linha || !couponId || Number(linha.coupon_id) !== Number(couponId)) return null;
+    if (linha.coupon_cycles_left === null || linha.coupon_cycles_left === undefined) return null;
+    const antes = Number(linha.coupon_cycles_left);
+    if (!(antes > 0)) return null;
+    const depois = antes - 1;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const changed = await db('subscriptions')
+      .where({ tenant_id: tenantId, coupon_id: couponId, coupon_cycles_left: antes })
+      .update(depois > 0
+        ? { coupon_cycles_left: depois, updated_at: new Date() }
+        : { coupon_id: null, coupon_cycles_left: null, coupon_applied_at: null, updated_at: new Date() });
+    if (!changed) return null;
+    const aplicado = linha.coupon_applied_at ? new Date(linha.coupon_applied_at) : null;
+    return {
+      cyclesBefore: antes,
+      cyclesAfter: depois,
+      cleared: depois === 0,
+      appliedAt: aplicado && !Number.isNaN(aplicado.getTime()) ? aplicado.toISOString() : null
+    };
+  }
+
+  /**
+   * Devolve o ciclo que um pagamento estornado gastou (ver
+   * `consumeCouponCycle`). Três casos:
+   *
+   *   - o mesmo cupom continua na assinatura: um ciclo a mais;
+   *   - nenhum cupom, e foi ESTE pagamento que o tirou (`cleared`): ele volta,
+   *     com um ciclo e o `coupon_applied_at` de antes;
+   *   - outro cupom no lugar: nada — o provedor já trocou de desconto, e
+   *     devolver o velho passaria por cima do novo.
+   *
+   * Devolve o que fez: `{ restored, reattached?, cyclesAfter?, reason? }`.
+   */
+  static async restoreCouponCycle(tenantId, consumo, db = getDb()) {
+    const couponId = Number(consumo?.id);
+    if (!couponId) return { restored: false, reason: 'nothing_consumed' };
+    const linha = await Subscription.forTenant(tenantId, db);
+    if (!linha) return { restored: false, reason: 'no_subscription' };
+    if (Number(linha.coupon_id) === couponId) {
+      const antes = linha.coupon_cycles_left === null || linha.coupon_cycles_left === undefined
+        ? null : Number(linha.coupon_cycles_left);
+      if (antes === null) return { restored: false, reason: 'forever' };
+      // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+      const changed = await db('subscriptions')
+        .where({ tenant_id: tenantId, coupon_id: couponId, coupon_cycles_left: antes })
+        .update({ coupon_cycles_left: antes + 1, updated_at: new Date() });
+      return changed ? { restored: true, cyclesAfter: antes + 1 } : { restored: false, reason: 'raced' };
+    }
+    if (!linha.coupon_id && consumo.cleared) {
+      const aplicado = consumo.appliedAt ? new Date(consumo.appliedAt) : new Date();
+      const reaplicou = await Subscription.setCoupon(tenantId, {
+        expectCouponId: null,
+        couponId,
+        cyclesLeft: 1,
+        appliedAt: Number.isNaN(aplicado.getTime()) ? new Date() : aplicado
+      }, db);
+      return reaplicou ? { restored: true, reattached: true, cyclesAfter: 1 } : { restored: false, reason: 'raced' };
+    }
+    return { restored: false, reason: linha.coupon_id ? 'other_coupon' : 'not_cleared' };
+  }
+
   /** A do provedor em escopo — o caminho que um controlador do próprio provedor usaria. */
   static async createCurrent(row) {
     await tinsert('subscriptions', row);

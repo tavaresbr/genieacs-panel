@@ -1,6 +1,7 @@
 import Plan, { PLAN_LIMIT_COLUMNS, parsePlanFeatures } from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import BillingEvent from '../models/BillingEvent.js';
+import SubscriptionReminderSend from '../models/SubscriptionReminderSend.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import AuditLog from '../models/AuditLog.js';
@@ -9,7 +10,12 @@ import { manualBilling } from '../services/billing/manualBillingProvider.js';
 import { ChargeFollowError } from '../services/chargeIssuingService.js';
 import DeviceService from '../services/deviceService.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { tdb } from '../config/database.js';
+import BillingInvoice from '../models/BillingInvoice.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import CouponService, { couponTrail } from '../services/couponService.js';
+import { SelfBillingError } from '../services/selfBillingService.js';
+import { translateError } from '../i18n/index.js';
 
 /**
  * A metade comercial do plano de controle: planos, a assinatura de cada
@@ -192,7 +198,13 @@ async function recordBoth(req, tenant, { platformAction, detail, tenantDetail = 
  */
 async function subscriptionView(tenant) {
   const state = await runInTenant(tenant.id, () => SubscriptionService.current());
-  const events = await runInTenant(tenant.id, () => BillingEvent.listRecent({ limit: 50 }));
+  const { events, notaDoEvento } = await runInTenant(tenant.id, async () => {
+    const lidos = await BillingEvent.listRecent({ limit: 50 });
+    return { events: lidos, notaDoEvento: await notasDoExtrato(lidos) };
+  });
+  // Os lembretes de cobrança que já saíram (0092), só para ler: o console
+  // responde "ele foi avisado?" sem abrir o log do SMTP.
+  const reminders = await runInTenant(tenant.id, () => SubscriptionReminderSend.listSent({ limit: 30 }));
   return {
     tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
     subscription: SubscriptionService.present(state, { withExemptReason: true }),
@@ -205,9 +217,48 @@ async function subscriptionView(tenant) {
       provider: event.provider,
       externalId: event.external_id,
       detail: event.detail ? JSON.parse(event.detail) : null,
-      at: event.created_at
-    }))
+      at: event.created_at,
+      // A cobrança que este pagamento quitou e a NFS-e dela — nulos fora do
+      // pagamento, ou quando ele não tem cobrança do painel por trás.
+      chargeId: notaDoEvento.get(event.id)?.chargeId ?? null,
+      invoice: BillingInvoice.presentForConsole(notaDoEvento.get(event.id)?.invoice ?? null)
+    })),
+    reminders
   };
+}
+
+/**
+ * Para cada pagamento do extrato, a cobrança que ele quitou e a nota dela.
+ *
+ * O pagamento guarda a referência com que entrou (`external_id`): o id da
+ * cobrança no gateway, ou `charge:<id>` na baixa sem gateway. É por ela que
+ * se acha a cobrança — no escopo do provedor, que quem chama já abriu.
+ */
+async function notasDoExtrato(events) {
+  const pagamentos = events.filter((event) => event.type === 'payment.recorded' && event.external_id);
+  if (!pagamentos.length) return new Map();
+  const doGateway = [];
+  const locais = [];
+  for (const event of pagamentos) {
+    const local = /^charge:(\d+)$/.exec(event.external_id);
+    if (local) locais.push(Number(local[1]));
+    else doGateway.push(event.external_id);
+  }
+  const cobrancas = await tdb('billing_charges').where((q) => {
+    q.whereIn('id', locais.length ? locais : [0]);
+    if (doGateway.length) q.orWhereIn('gateway_charge_id', doGateway);
+  }).select('id', 'gateway_charge_id');
+  const porGateway = new Map(cobrancas.filter((c) => c.gateway_charge_id).map((c) => [c.gateway_charge_id, c.id]));
+  const ids = new Set(cobrancas.map((c) => Number(c.id)));
+  const notas = await BillingInvoice.forCharges([...ids]);
+  const mapa = new Map();
+  for (const event of pagamentos) {
+    const local = /^charge:(\d+)$/.exec(event.external_id);
+    const chargeId = local ? Number(local[1]) : porGateway.get(event.external_id);
+    if (!chargeId || !ids.has(Number(chargeId))) continue;
+    mapa.set(event.id, { chargeId: Number(chargeId), invoice: notas.get(Number(chargeId)) || null });
+  }
+  return mapa;
 }
 
 class PlatformBillingController {
@@ -453,11 +504,14 @@ class PlatformBillingController {
   }
 
   /**
-   * `PUT /tenants/:id/subscription/billing-exempt` — `{ exempt, reason? }`:
+   * `PUT /tenants/:id/subscription/billing-exempt` — `{ exempt, reason?, until? }`:
    * liga ou desliga o "isento de cobrança" (ver
-   * `SubscriptionService.setBillingExempt`).
+   * `SubscriptionService.setBillingExempt`). `until` é a data de fim (ISO,
+   * no futuro, senão 400 `invalid_until`), ou nulo/ausente para "até alguém
+   * desligar"; só com `exempt: true` (400 `until_requires_exempt`). Já
+   * isento, um `until` diferente muda só a data (`untilChanged: true`).
    *
-   * Responde `{ subscription, canceledCharges, failedCharges, alreadyInState }`
+   * Responde `{ subscription, canceledCharges, failedCharges, alreadyInState, untilChanged }`
    * (`failedCharges` é quantas ficaram em aberto), com
    * `subscription` no MESMO formato de `GET /tenants/:id/subscription`
    * (`subscriptionView`), para a tela trocar o que mostra sem perguntar de
@@ -480,6 +534,10 @@ class PlatformBillingController {
       if (reason.length > 255) {
         return res.status(400).json(createErrorResponse('reason must be at most 255 characters'));
       }
+      if (body.until !== undefined && body.until !== null
+        && (typeof body.until !== 'string' || !body.until.trim() || Number.isNaN(Date.parse(body.until)))) {
+        return res.status(400).json(createErrorResponse('until must be an ISO date-time', null, 'invalid_until'));
+      }
 
       const tenant = await tenantOr404(req, res);
       if (!tenant) return undefined;
@@ -491,6 +549,7 @@ class PlatformBillingController {
           tenantId: tenant.id,
           exempt: body.exempt,
           reason: reason || null,
+          until: body.until,
           actorUserId: req.user?.userId ?? null
         });
       } catch (error) {
@@ -504,6 +563,9 @@ class PlatformBillingController {
         const detail = {
           exempt: body.exempt,
           reason: reason || null,
+          until: resultado.subscription?.billing_exempt_until
+            ? new Date(resultado.subscription.billing_exempt_until).toISOString() : null,
+          ...(resultado.untilChanged ? { untilChanged: true, untilBefore: resultado.untilBefore ?? null } : {}),
           statusBefore: resultado.statusBefore,
           statusAfter: resultado.statusAfter,
           canceledCharges: resultado.canceledCharges,
@@ -524,19 +586,88 @@ class PlatformBillingController {
       }
 
       return res.json(createResponse(
-        body.exempt ? 'Billing exemption enabled' : 'Billing exemption disabled',
+        resultado.untilChanged ? 'Billing exemption end date updated'
+          : (body.exempt ? 'Billing exemption enabled' : 'Billing exemption disabled'),
         {
           subscription: await subscriptionView(tenant),
           canceledCharges: resultado.canceledCharges,
           // As que ficaram em aberto (o gateway recusou, ou estavam ocupadas):
           // a tela avisa, e a varredura do agendador tenta de novo.
           failedCharges: resultado.failedCharges.length,
-          alreadyInState: resultado.alreadyInState
+          alreadyInState: resultado.alreadyInState,
+          untilChanged: Boolean(resultado.untilChanged)
         }
       ));
     } catch (error) {
       console.error('Set billing exemption error:', error);
       return res.status(500).json(createErrorResponse('Failed to change the billing exemption', error.message));
+    }
+  }
+
+  /**
+   * `PUT /tenants/:id/subscription/coupon` — `{ code }` aplica (substituindo
+   * o que houver), `{ code: null }` tira. As recusas do cupom são 409 com o
+   * código que a tela lê (`coupon_invalid`, `coupon_expired`,
+   * `coupon_exhausted`, `coupon_plan_mismatch`, `coupon_already_applied`); o
+   * gateway que recusa cancelar a fatura em aberto é 502 e nada muda.
+   */
+  static async setCoupon(req, res) {
+    try {
+      const body = req.body ?? {};
+      if (!('code' in body) || (body.code !== null && typeof body.code !== 'string')) {
+        return res.status(400).json(createErrorResponse('code must be a string or null'));
+      }
+      const tenant = await tenantOr404(req, res);
+      if (!tenant) return undefined;
+      if (tenant.kind === 'platform') return res.status(404).json(createErrorResponse('Provider not found'));
+
+      const tirar = body.code === null || body.code.trim() === '';
+      let resultado;
+      try {
+        resultado = tirar
+          ? await CouponService.remove({
+            tenantId: tenant.id,
+            actorUserId: req.user?.userId ?? null,
+            countDevices: () => runInTenant(tenant.id, () => DeviceService.countDevicesFromGenieAcs())
+          })
+          : await CouponService.apply({
+            tenantId: tenant.id,
+            code: body.code,
+            actorUserId: req.user?.userId ?? null,
+            source: 'console',
+            countDevices: () => runInTenant(tenant.id, () => DeviceService.countDevicesFromGenieAcs())
+          });
+      } catch (error) {
+        if (error instanceof SelfBillingError) {
+          return res.status(error.status || 409).json({
+            ...createErrorResponse(translateError(req.t ?? ((k) => k), error), error.detail ?? null, error.code),
+            ...(error.extra ?? {})
+          });
+        }
+        throw error;
+      }
+
+      if (tirar ? resultado.changed : true) {
+        await recordBoth(req, tenant, {
+          platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_COUPON_CHANGED,
+          detail: {
+            coupon: tirar ? null : couponTrail(resultado.coupon),
+            ...(tirar ? { removedCoupon: couponTrail(resultado.coupon) } : {}),
+            ...(resultado.replacedCouponId ? { replacedCouponId: resultado.replacedCouponId } : {}),
+            ...(resultado.priceCents !== undefined ? { priceCents: resultado.priceCents } : {}),
+            ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
+          }
+        });
+      }
+
+      return res.json(createResponse(tirar ? 'Coupon removed' : 'Coupon applied', {
+        subscription: await subscriptionView(tenant),
+        charge: resultado.charge,
+        changed: tirar ? resultado.changed : true
+      }));
+    } catch (error) {
+      console.error('Set subscription coupon error:', error);
+      return res.status(500).json(createErrorResponse('Failed to change the coupon', error.message));
     }
   }
 

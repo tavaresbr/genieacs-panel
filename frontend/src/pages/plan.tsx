@@ -27,9 +27,12 @@ import {
   pendingBlockedDetail,
   periodLabel,
   planChangeKind,
-  resourceLabelKey
+  resourceLabelKey,
+  subscriptionAllowsChanges
 } from '@/lib/plan-options'
-import { displayDate } from '@/lib/date-format'
+import { displayDate, displayDayMonth } from '@/lib/date-format'
+import { couponAppliesToPlan, couponDurationLabel, couponPriceCents } from '@/lib/coupon'
+import { CouponBadge } from '@/components/platform/coupon-control'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -89,6 +92,11 @@ export default function PlanPage() {
   // Muda a cada troca de plano ou cobrança gerada: é o que faz a lista de
   // cobranças, que carrega sozinha, buscar de novo.
   const [chargesKey, setChargesKey] = useState(0)
+  // "Tenho um cupom": o campo fica fechado até a pessoa pedir.
+  const [cupomAberto, setCupomAberto] = useState(false)
+  const [cupom, setCupom] = useState('')
+  const [aplicandoCupom, setAplicandoCupom] = useState(false)
+  const [cupomErro, setCupomErro] = useState<string | null>(null)
   const cadastroRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -208,6 +216,33 @@ export default function PlanPage() {
     })
   }
 
+  /**
+   * Aplica o cupom e redesenha com o que volta (a mesma tela de `current`, com
+   * `subscription.coupon`). A fatura em aberto pode ter sido reemitida com o
+   * desconto, então as cobranças recarregam. A recusa (inválido, vencido,
+   * esgotado, de outro plano) fica no campo, na frase do servidor.
+   */
+  const aplicarCupom = async () => {
+    const codigo = cupom.trim()
+    if (!codigo) return
+    setAplicandoCupom(true)
+    setCupomErro(null)
+    try {
+      const res = await subscriptionAPI.applyCoupon(codigo)
+      if (res.success && res.data) {
+        setData(res.data)
+        setCupom('')
+        setCupomAberto(false)
+        toast.success(res.message || t('coupons.applied'))
+        setChargesKey((k) => k + 1)
+      } else {
+        setCupomErro(res.message || t('coupons.applyFailed'))
+      }
+    } finally {
+      setAplicandoCupom(false)
+    }
+  }
+
   useEffect(() => {
     void load()
   }, [load])
@@ -216,10 +251,17 @@ export default function PlanPage() {
   // Isento: não vence nem recebe fatura. Some o prazo, o aviso de vencido e o
   // "pagar agora"; fica a nota.
   const isento = isBillingExempt(subscription)
+  // Até quando (dd/mm), quando a isenção tem data de fim.
+  const isentoAte = isento ? displayDayMonth(subscription?.billingExemptUntil) : null
   const venceu = !isento && expirou(subscription?.renewsAt)
   const pendente = subscription?.pendingPlan ?? null
   const pendenteBloqueio = pendingBlockedDetail(pendente)
   const planoAtualId = plans?.find((p) => p.current)?.id ?? null
+  const cupomAtual = subscription?.coupon ?? null
+  const moedaAtual = plans?.find((p) => p.current)?.currency ?? 'BRL'
+  // O campo do cupom: quem escreve, com a assinatura viva, sem isenção e sem
+  // cupom (trocar de cupom é com a plataforma).
+  const podeCupom = podeEscrever && !isento && !cupomAtual && subscriptionAllowsChanges(subscription)
 
   const meter = (used: number | null, limit: number | null) => {
     if (used === null) return { text: t('platform.subscription.uncounted'), pct: 0 }
@@ -266,7 +308,7 @@ export default function PlanPage() {
               {isento && (
                 <p role="status" className="mt-3 flex items-start gap-2 text-sm text-foreground">
                   <Icon name="info" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
-                  {t('plan.billingExemptNote')}
+                  {isentoAte ? t('plan.billingExemptUntilNote', { date: isentoAte }) : t('plan.billingExemptNote')}
                 </p>
               )}
               <dl className="mt-4 space-y-2 text-sm">
@@ -289,6 +331,53 @@ export default function PlanPage() {
                   </div>
                 )}
               </dl>
+              {cupomAtual && (
+                <div className="mt-4 space-y-1 text-sm">
+                  <CouponBadge coupon={cupomAtual} currency={moedaAtual} />
+                  <p className="text-muted-foreground">
+                    {t(couponDurationLabel(cupomAtual).key, couponDurationLabel(cupomAtual).vars)}
+                    {cupomAtual.cyclesLeft !== null && ` · ${t('coupons.cyclesLeft', { count: cupomAtual.cyclesLeft })}`}
+                  </p>
+                  <p className="font-medium text-foreground">
+                    {cupomAtual.appliesToPlan
+                      ? t('plan.coupon.nextInvoice', { price: formatMoney(cupomAtual.priceCents, moedaAtual) })
+                      : t('coupons.notApplicable')}
+                  </p>
+                </div>
+              )}
+              {podeCupom && !cupomAberto && (
+                <button type="button" className="mt-4 text-sm font-medium text-primary underline-offset-2 hover:underline" onClick={() => setCupomAberto(true)}>
+                  {t('plan.coupon.have')}
+                </button>
+              )}
+              {podeCupom && cupomAberto && (
+                <form
+                  className="mt-4"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void aplicarCupom()
+                  }}
+                >
+                  <label htmlFor="plan-coupon" className="mb-1 block text-sm font-medium">{t('plan.coupon.have')}</label>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      id="plan-coupon"
+                      value={cupom}
+                      onChange={(e) => setCupom(e.target.value.toUpperCase())}
+                      className="modern-input min-w-0 flex-1"
+                      placeholder={t('coupons.codePlaceholder')}
+                      maxLength={32}
+                      autoComplete="off"
+                      disabled={aplicandoCupom}
+                    />
+                    <button type="submit" className="modern-button-secondary" disabled={aplicandoCupom || !cupom.trim()}>
+                      {aplicandoCupom ? t('coupons.applying') : t('coupons.apply')}
+                    </button>
+                  </div>
+                  <p className="field-hint">{t('plan.coupon.hint')}</p>
+                  {cupomErro && <p role="alert" className="mt-1 text-sm text-destructive">{cupomErro}</p>}
+                </form>
+              )}
               <p className="field-hint mt-4">{t('plan.changeHint')}</p>
               {canPayNow(plans, podeEscrever, subscription) && (
                 <button type="button" className="modern-button mt-4" disabled={pagando} onClick={pagarAgora}>
@@ -417,6 +506,16 @@ export default function PlanPage() {
                         )}
                       </div>
                       <p className="mt-1 text-lg font-semibold text-foreground">{t(periodo.key, periodo.vars)}</p>
+                      {/* O preço com o cupom do provedor, quando ele vale neste
+                          plano — a vitrine; o valor que vale é o da fatura. */}
+                      {cupomAtual && couponAppliesToPlan(cupomAtual, plan.id)
+                        && couponPriceCents(plan.priceCents, cupomAtual) !== plan.priceCents && (
+                        <p className="text-sm font-medium text-[hsl(var(--status-success))]">
+                          {t('coupons.priceWithCoupon', {
+                            price: formatMoney(couponPriceCents(plan.priceCents, cupomAtual), plan.currency)
+                          })}
+                        </p>
+                      )}
                       <dl className="mt-3 flex-1 space-y-1 text-sm">
                         {PLAN_RESOURCES.map((recurso) => (
                           <div key={recurso} className="flex justify-between gap-3">

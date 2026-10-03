@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { displayDate } from '@/lib/date-format'
+import { safeInvoiceUrl } from '@/lib/invoice'
 
 /**
  * O que foi cobrado deste provedor, e onde ele paga.
@@ -115,6 +116,23 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
                   {t('charges.period')}: {formatDate(charge.periodEnd) ?? charge.periodEnd}
                   {formatDate(charge.dueDate) && ` · ${t('charges.dueDate')}: ${formatDate(charge.dueDate)}`}
                 </p>
+                {/* A nota fiscal emitida: o número e o PDF, para o financeiro do
+                    provedor. Só endereço `https:` vira link. */}
+                {safeInvoiceUrl(charge.invoice?.pdfUrl) && (
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    {charge.invoice?.number && (
+                      <span className="text-muted-foreground">{t('nfse.number', { number: charge.invoice.number })}</span>
+                    )}
+                    <a
+                      href={safeInvoiceUrl(charge.invoice?.pdfUrl) ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {t('nfse.pdf')}
+                    </a>
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {/* Um status que este frontend ainda não conhece (backend mais novo)

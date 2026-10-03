@@ -19,6 +19,7 @@ import SubscriptionNoticeService from './subscriptionNoticeService.js';
 import MaintenanceService from './maintenanceService.js';
 import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
+import BillingInvoiceService from './billing/billingInvoiceService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -256,43 +257,12 @@ class SchedulerService {
       if (summary.autoTag) await this.writeState({ lastAutoTagAt: new Date().toISOString() });
     }
 
-    // O aviso de vencimento roda DENTRO do laço por provedor, e não numa
-    // passada global sobre `subscriptions`, porque ele precisa do provedor em
-    // escopo de qualquer jeito: a assinatura, o nome, o endereço de cobrança e
-    // a equipe saem todos de leituras escopadas. Uma passada global leria a
-    // tabela inteira e depois reabriria o escopo uma vez por linha, que é o
-    // mesmo trabalho com um passo a mais.
-    //
-    // Não tem cadência própria: `pendingExpiryNotice` já responde "nada a
-    // fazer" a partir da marca no banco, e um relógio em `app_state` seria uma
-    // segunda memória dizendo a mesma coisa — com a chance de discordar.
-    // O provedor vem do laço e não de uma releitura: `forEachTenant` já entrega
-    // a linha inteira de `tenants` — com nome, slug e `billing_email` —, e
-    // buscá-la de novo aqui seria uma consulta por provedor por minuto para
-    // reler o que já estava na mão.
-    summary.subscriptionNotice = await SubscriptionNoticeService.notifyCurrent({ tenant })
-      .catch((error) => {
-        console.warn(`Could not send the subscription notice: ${error.message}`);
-        return { sent: false, reason: 'error' };
-      });
-
-    // A emissão, logo depois do aviso e pelas mesmas razões — provedor em
-    // escopo, sem cadência própria, com o `tenant` vindo do laço.
-    //
-    // Depois e não antes, e a ordem importa: o aviso conta os dias até o prazo,
-    // e a emissão, quando acontece, é o que dá ao provedor o link para pagar.
-    // Emitir primeiro faria o aviso da MESMA passada já sair com a cobrança
-    // recém-criada em mãos — o que é melhor, e é exatamente por isso que não se
-    // faz aqui: a emissão fala com um sistema de fora e pode demorar ou falhar,
-    // e um aviso que depende dela vira um aviso que não sai quando o gateway
-    // está fora do ar.
-    //
-    // O custo dessa escolha é real e vale dizer: o PRIMEIRO aviso de um ciclo
-    // sai com o endereço do painel, e não com o link de pagamento, porque a
-    // cobrança dele nasce depois. Os seguintes levam o link — e a marca
-    // `expiry_warned_for` faz o primeiro ser também o único, então na prática
-    // o link chega no aviso de um prazo que mudou. É o preço de o aviso não
-    // depender do gateway, e é mais barato que o contrário.
+    // Os lembretes de cobrança e a emissão rodam DENTRO do laço por provedor,
+    // e não numa passada global sobre `subscriptions`, porque precisam do
+    // provedor em escopo de qualquer jeito: a assinatura, o nome, o endereço
+    // de cobrança e a equipe saem todos de leituras escopadas. Sem cadência
+    // própria — a memória de cada um está no banco — e com o `tenant` vindo
+    // do laço, que já entrega a linha inteira de `tenants`.
     //
     // Antes da emissão, a descida de plano agendada para a renovação que já
     // chegou (ver `SubscriptionService.applyPendingPlan`). Antes porque a
@@ -306,6 +276,15 @@ class SchedulerService {
       return { applied: false, reason: 'error' };
     });
 
+    // O fim da isenção com data de fim, também antes da emissão: desligada
+    // aqui, a mesma volta já emite a fatura que ela segurava (ver
+    // `SubscriptionService.endExpiredBillingExempt`).
+    summary.billingExemptEnded = await SubscriptionService.endExpiredBillingExempt({ tenant })
+      .catch((error) => {
+        console.warn(`Could not end the expired billing exemption: ${error.message}`);
+        return { ended: false, reason: 'error' };
+      });
+
     // A mesma contagem de ONTs vai à emissão: é ela que decide se a cobrança
     // da renovação já sai pelo preço da descida agendada (ver `issueCurrent`).
     summary.chargeIssued = await ChargeIssuingService.issueCurrent({
@@ -314,6 +293,24 @@ class SchedulerService {
       .catch((error) => {
         console.warn(`Could not issue the subscription charge: ${error.message}`);
         return { issued: false, reason: 'error' };
+      });
+
+    // A NFS-e das cobranças pagas que a fila guardou (ver
+    // `billingInvoiceService`): pedir as pendentes e consultar as agendadas.
+    // Sem cadência própria — a espera de cada nota mora na linha dela.
+    summary.invoices = await BillingInvoiceService.processDue().catch((error) => {
+      console.warn(`Invoice pass failed: ${error.message}`);
+      return { error: error.message };
+    });
+    // Os lembretes de cobrança, DEPOIS da emissão (0092). A ordem importa: o
+    // primeiro lembrete (`before`, cinco dias antes) cai no mesmo dia em que a
+    // fatura é emitida (`LEAD_DAYS`), e só depois dela ele tem o link de pagar
+    // na mão. A emissão nunca lança (falha vira `reason`), então um gateway
+    // fora do ar não impede o lembrete — ele só sai com o endereço do painel.
+    summary.subscriptionNotice = await SubscriptionNoticeService.notifyCurrent({ tenant })
+      .catch((error) => {
+        console.warn(`Could not send the subscription reminder: ${error.message}`);
+        return { sent: false, reason: 'error' };
       });
 
     const provisioningConfig = await ProvisioningService.getConfig();

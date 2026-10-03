@@ -9,14 +9,18 @@ import {
   type SubscriptionConsoleRow,
   type SubscriptionConsoleStatus,
   type SubscriptionConsoleSummary,
+  type SubscriptionReminderView,
   type SubscriptionStatus
 } from '@/lib/api'
-import { BillingExemptControl, STATUS_LABEL_KEYS, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { BillingExemptControl, STATUS_LABEL_KEYS, exemptUntilLabel, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
+import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
 import { copyToClipboard, parseAmountToCents } from '@/lib/utils'
+import { canIssueInvoice } from '@/lib/invoice'
 import {
   CHARGE_STATUS_LABEL_KEYS,
   CONSOLE_STATUS_LABEL_KEYS,
@@ -356,7 +360,7 @@ function StatusBadge({ row }: { row: SubscriptionRow }) {
       </span>
       {isBillingExempt(row.subscription) && (
         <span className="modern-badge-info" title={row.subscription.billingExemptReason ?? undefined}>
-          {t('platform.subs.exempt')}
+          {exemptUntilLabel(row.subscription, t) ?? t('platform.subs.exempt')}
         </span>
       )}
     </span>
@@ -372,6 +376,17 @@ function PlanCell({ row }: { row: SubscriptionRow }) {
       <span>{sub.planName ?? sub.planCode ?? '—'}</span>
       {sub.priceCents !== null && (
         <span className="block text-xs text-muted-foreground">{formatMoney(sub.priceCents, sub.currency)}</span>
+      )}
+      {/* O cupom: o selo e o que a próxima fatura de fato pede. */}
+      {sub.coupon && (
+        <span className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+          <CouponBadge coupon={sub.coupon} currency={sub.currency} />
+          {sub.coupon.appliesToPlan && sub.coupon.priceCents !== sub.priceCents && (
+            <span className="text-muted-foreground">
+              {t('coupons.priceWithCoupon', { price: formatMoney(sub.coupon.priceCents, sub.currency) })}
+            </span>
+          )}
+        </span>
       )}
       {/* A descida agendada: até a data, o plano de cima continua valendo — e
           quem olha a carteira precisa saber que a receita vai cair. */}
@@ -531,6 +546,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
 
   const [charges, setCharges] = useState<ChargeConsoleView[]>([])
   const [events, setEvents] = useState<BillingEventView[]>([])
+  const [reminders, setReminders] = useState<SubscriptionReminderView[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -550,6 +566,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
       setError(cobrancas.message || '')
     }
     setEvents(assinatura.success && assinatura.data ? assinatura.data.events : [])
+    setReminders(assinatura.success && assinatura.data ? assinatura.data.reminders ?? [] : [])
     setLoading(false)
   }, [tenantId])
 
@@ -630,6 +647,15 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
           >
             {savingPlan ? t('common.saving') : t('platform.subscription.changePlan')}
           </button>
+          {sub && (
+            <CouponControl
+              tenantId={tenantId}
+              coupon={sub.coupon}
+              currency={sub.currency}
+              storedStatus={sub.storedStatus}
+              onChanged={recarregar}
+            />
+          )}
         </div>
 
         <div className="rounded-md border border-border bg-card p-3">
@@ -694,6 +720,8 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
                 context={{ gateway: row.gateway, subscription: row.subscription }}
                 onAction={(kind) => setDialog({ kind, charge })}
                 onCopy={(url) => void copiar(url)}
+                tenantId={tenantId}
+                onInvoiceQueued={recarregar}
               />
             ))}
           </ul>
@@ -718,6 +746,9 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
           </ul>
         </div>
       )}
+
+      {/* Lembretes de cobrança mandados (somente leitura) */}
+      {reminders.length > 0 && <ReminderList reminders={reminders} />}
 
       {dialog?.kind === 'status' && (
         <StatusDialog tenantId={tenantId} status={dialog.status} onClose={fechar} onDone={recarregar} />
@@ -754,19 +785,67 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
   )
 }
 
+const REMINDER_STEP_KEYS = {
+  before: 'platform.subs.reminders.step.before',
+  due: 'platform.subs.reminders.step.due',
+  after: 'platform.subs.reminders.step.after'
+} as const
+
+const REMINDER_CHANNEL_KEYS: Record<string, 'platform.subs.reminders.channel.email' | 'platform.subs.reminders.channel.whatsapp'> = {
+  email: 'platform.subs.reminders.channel.email',
+  whatsapp: 'platform.subs.reminders.channel.whatsapp'
+}
+
+/**
+ * Os lembretes de cobrança que a régua já mandou a este provedor: responde
+ * "ele foi avisado?" sem abrir o log do SMTP. Só leitura — a régua é do
+ * agendador.
+ */
+function ReminderList({ reminders }: { reminders: SubscriptionReminderView[] }) {
+  const { t, formatDateTime } = useTranslation()
+  return (
+    <div className="rounded-md border border-border bg-card">
+      <h4 className="px-3 pt-3 text-sm font-semibold text-foreground">{t('platform.subs.reminders.title')}</h4>
+      <ul className="divide-y divide-border">
+        {reminders.map((reminder) => (
+          <li
+            key={`${reminder.dueAt}:${reminder.step}`}
+            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="modern-badge">{t(REMINDER_STEP_KEYS[reminder.step])}</span>
+              <span className="text-muted-foreground">{t('platform.subs.reminders.dueAt', { date: formatDay(reminder.dueAt) })}</span>
+              <span className="text-muted-foreground">
+                {reminder.channels
+                  .map((canal) => (REMINDER_CHANNEL_KEYS[canal] ? t(REMINDER_CHANNEL_KEYS[canal]) : canal))
+                  .join(' · ')}
+              </span>
+            </span>
+            <span className="text-muted-foreground">{formatDateTime(reminder.sentAt)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 type ChargeDialogKind = 'settle' | 'dueDate' | 'amount' | 'cancelCharge' | 'reissue' | 'refund'
 
 function ChargeItem({
   charge,
   context,
   onAction,
-  onCopy
+  onCopy,
+  tenantId,
+  onInvoiceQueued
 }: {
   charge: ChargeConsoleView
   /** A linha decide parte das ações: gateway, prazo e estado da assinatura. */
   context: ChargeContext
   onAction: (kind: ChargeDialogKind) => void
   onCopy: (url: string) => void
+  tenantId: number
+  onInvoiceQueued: () => void | Promise<void>
 }) {
   const { t } = useTranslation()
   const acoes = chargeActions(charge, context)
@@ -802,6 +881,13 @@ function ChargeItem({
       {charge.lastError && (
         <p className="text-xs text-destructive [overflow-wrap:anywhere]">
           {t('platform.subs.lastError', { error: charge.lastError })}
+        </p>
+      )}
+      {/* A nota fiscal: só da cobrança paga, ou de qualquer uma que já tenha nota. */}
+      {(charge.status === 'paid' || charge.invoice) && (
+        <p className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">{t('nfse.column')}:</span>
+          <InvoiceSummary invoice={charge.invoice} />
         </p>
       )}
       {charge.superseded.length > 0 && (
@@ -852,6 +938,14 @@ function ChargeItem({
             <Icon name="x" size={16} />
             {t('platform.subs.cancelCharge')}
           </button>
+        )}
+        {canIssueInvoice(charge) && (
+          <IssueInvoiceButton
+            tenantId={tenantId}
+            chargeId={charge.id}
+            reissue={Boolean(charge.invoice)}
+            onDone={onInvoiceQueued}
+          />
         )}
         {acoes.refund && (
           <button type="button" className="modern-button-secondary text-destructive" onClick={() => onAction('refund')}>

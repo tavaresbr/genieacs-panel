@@ -48,6 +48,10 @@ router.get('/plans', authenticateToken, requirePermission('settings.read'), Tena
 // código que a tela lê. Nenhum dos dois lê gateway ou cliente do corpo.
 router.put('/subscription/plan', authenticateToken, requirePermission('settings.write'), TenantController.changePlan);
 router.post('/charges/pay', authenticateToken, requirePermission('settings.write'), TenantController.payNow);
+// O cupom de desconto (0093) que o provedor digita na tela de Plano. Mesma
+// capacidade e mesmo lado da porta da assinatura que a troca de plano: um
+// desconto é uma das saídas de quem está atrasado.
+router.post('/subscription/coupon', authenticateToken, requirePermission('settings.write'), TenantController.applyCoupon);
 
 // O nome do provedor, escrito por quem administra. É o antigo `appName` das
 // configurações, agora na linha do provedor — ver o controlador.

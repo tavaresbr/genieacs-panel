@@ -4,6 +4,7 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
 import Subscription from '../models/Subscription.js';
 import Plan from '../models/Plan.js';
+import Coupon from '../models/Coupon.js';
 import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import SubscriptionService from './subscriptionService.js';
@@ -21,8 +22,8 @@ import SubscriptionService from './subscriptionService.js';
  * não paga no mesmo dia em que recebe. Emitir no vencimento é emitir atrasado:
  * o provedor é bloqueado enquanto o dinheiro está a caminho. `LEAD_DAYS` é essa
  * folga, e é um parâmetro comercial próprio — deliberadamente NÃO é
- * `warnWindowDays`, que responde outra pergunta (quanto antes uma PESSOA
- * precisa ser avisada) e muda por outros motivos.
+ * `SubscriptionService.REMINDER_BEFORE_DAYS`, que responde outra pergunta
+ * (quanto antes uma PESSOA precisa ser lembrada) e muda por outros motivos.
  *
  * ## A memória, e por que ela é uma linha e não uma marca
  *
@@ -518,9 +519,14 @@ class ChargeIssuingService {
       return { issued: false, reason: 'not_billable' };
     }
 
-    let preco = Number(plan?.price_cents ?? 0);
+    // O preço com o cupom da assinatura, quando há um que vale neste plano
+    // (0093, `effectivePriceCents`) — lido uma vez e reaproveitado para o
+    // plano da descida agendada logo abaixo.
+    const cupom = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+    let preco = await SubscriptionService.effectivePriceCents(subscription, plan, { coupon: cupom });
     // Plano de graça não gera cobrança de R$ 0,00 — o gateway a recusaria, e
-    // com razão. É o caso do `unlimited`, que todo provedor herdado tem.
+    // com razão. É o caso do `unlimited`, que todo provedor herdado tem. O
+    // cupom nunca leva um plano pago a zero (o piso de `COUPON_FLOOR_CENTS`).
     if (!(preco > 0)) return { issued: false, reason: 'free_plan' };
 
     // O prazo vivo: o do período pago, ou o do teste para quem ainda não pagou
@@ -608,13 +614,18 @@ class ChargeIssuingService {
           }
           if (!descidaBloqueada) {
             planoDoPeriodo = agendado;
-            preco = Number(agendado.price_cents);
+            // O cupom vale no plano novo só se ele está na lista do cupom: o
+            // período que esta cobrança paga já é do plano agendado.
+            preco = await SubscriptionService.effectivePriceCents(subscription, agendado, { coupon: cupom });
           }
         }
       }
     }
 
     const moeda = planoDoPeriodo.currency || 'BRL';
+    // Com que plano e cupom este preço saiu (0093), gravados na linha — ver
+    // `SubscriptionService.chargePricing`.
+    const precificacao = SubscriptionService.chargePricing(subscription, planoDoPeriodo, cupom);
     const garraAte = new Date(now.getTime() + this.CLAIM_MS);
     let existente = await BillingCharge.forPeriod(periodo);
     if (existente) {
@@ -625,7 +636,9 @@ class ChargeIssuingService {
       if (manual && existente.status === 'canceled') {
         const minha = await BillingCharge.claim(existente.id, { until: garraAte, now, unissued: false });
         if (!minha) return { issued: false, reason: 'raced', charge: existente };
-        const reaberta = await BillingCharge.resetForReissue(existente.id, { amountCents: preco, currency: moeda });
+        const reaberta = await BillingCharge.resetForReissue(existente.id, {
+          amountCents: preco, currency: moeda, ...precificacao
+        });
         if (!reaberta) await BillingCharge.release(existente.id);
         existente = await BillingCharge.findById(existente.id);
       }
@@ -698,6 +711,13 @@ class ChargeIssuingService {
         patch.amount_cents = preco;
         patch.currency = String(moeda).toUpperCase().slice(0, 3);
       }
+      // O plano e o cupom do preço que vai ao gateway — também quando o valor
+      // não mudou (dois planos no mesmo preço, o cupom no piso). Na de valor
+      // mudado à mão fica o que a linha diz: o valor não é o de plano nenhum.
+      if (!existente.amount_overridden_at) {
+        if (Number(existente.plan_id ?? 0) !== Number(precificacao.planId ?? 0)) patch.plan_id = precificacao.planId;
+        if (Number(existente.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0)) patch.coupon_id = precificacao.couponId;
+      }
       if (Object.keys(patch).length) await BillingCharge.update(existente.id, patch);
     }
 
@@ -713,7 +733,8 @@ class ChargeIssuingService {
           currency: moeda,
           provider: provider.name,
           dueDate: vencimentoDoGateway,
-          claimUntil: garraAte
+          claimUntil: garraAte,
+          ...precificacao
         });
       } catch (error) {
         // Duas passadas se cruzaram e a outra ganhou. O índice único é quem
