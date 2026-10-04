@@ -57,7 +57,28 @@ function padroes() {
     satisfaction: { enabled: false },
     // A distribuição automática para quem está disponível. Desligada: atribuir
     // à mão (assumir, transferir) funciona sempre.
-    distribution: { enabled: false }
+    distribution: { enabled: false },
+    // Etiqueta automática: o que o cliente pediu ao bot vira etiqueta na
+    // conversa. Os ids são preenchidos quando as etiquetas padrão nascem.
+    autoTags: { enabled: true, invoice: null, signal: null }
+  };
+}
+
+const idOuNulo = (valor, atual) => {
+  if (valor === undefined) return atual;
+  if (valor === null || valor === '') return null;
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n <= 0) throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_auto_tags');
+  return n;
+};
+
+function lerAutoTags(raw, atual) {
+  if (raw === undefined) return atual;
+  if (!raw || typeof raw !== 'object') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_auto_tags');
+  return {
+    enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true,
+    invoice: idOuNulo(raw.invoice, atual.invoice),
+    signal: idOuNulo(raw.signal, atual.signal)
   };
 }
 
@@ -152,7 +173,8 @@ class WaBotConfigService {
         week: Array.isArray(salvo.hours?.week) && salvo.hours.week.length === 7 ? salvo.hours.week : base.hours.week
       },
       satisfaction: { ...base.satisfaction, ...(salvo.satisfaction || {}) },
-      distribution: { ...base.distribution, ...(salvo.distribution || {}) }
+      distribution: { ...base.distribution, ...(salvo.distribution || {}) },
+      autoTags: { ...base.autoTags, ...(salvo.autoTags || {}) }
     };
     this.cache.set(config);
     return config;
@@ -187,7 +209,8 @@ class WaBotConfigService {
       messages: lerMensagens(patch.messages, atual.messages),
       hours: lerHorario(patch.hours, atual.hours),
       satisfaction: lerPesquisa(patch.satisfaction, atual.satisfaction),
-      distribution: lerDistribuicao(patch.distribution, atual.distribution)
+      distribution: lerDistribuicao(patch.distribution, atual.distribution),
+      autoTags: lerAutoTags(patch.autoTags, atual.autoTags)
     };
     const interruptores = {};
     if (patch.enabled !== undefined) interruptores.botEnabled = patch.enabled !== false;
