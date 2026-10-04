@@ -5,6 +5,8 @@ import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers }
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
+const { default: WaBotService } = await import('../src/services/waBotService.js');
+const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
 
 const SENHA = 'senha-etiquetas-1';
 let panelUrl;
@@ -115,5 +117,36 @@ describe('as etiquetas das conversas', () => {
     await req('DELETE', `/api/whatsapp/tags/${suporte.id}`);
     const vinculos = await getDb()('wa_conversation_tags').where({ tag_id: suporte.id });
     assert.equal(vinculos.length, 0);
+  });
+
+  it('o bot etiqueta pelo assunto: segunda via em Financeiro, sinal em Suporte técnico', async () => {
+    // As padrão (e a regra) nasceram no primeiro GET; Suporte técnico foi
+    // excluída no teste anterior, e a regra dela voltou a "nenhuma".
+    const config = await asTenant(() => WaBotConfigService.getConfig());
+    const tags = (await req('GET', '/api/whatsapp/tags')).body.data;
+    const financeiro = tags.find((t) => t.name === 'Financeiro');
+    assert.equal(config.autoTags.invoice, financeiro.id);
+    assert.equal(config.autoTags.signal, null, 'a etiqueta excluída sai da regra');
+
+    const id = await conversa('5593981150010');
+    await asTenant(() => WaBotService.registrar({ id }, 'fatura'));
+    await asTenant(() => WaBotService.registrar({ id }, 'fatura'));
+    await asTenant(() => WaBotService.registrar({ id }, 'sinal'));
+    let vinculos = await getDb()('wa_conversation_tags').where({ conversation_id: id });
+    assert.deepEqual(vinculos.map((v) => v.tag_id), [financeiro.id], 'uma vez só, e nada para o sinal sem regra');
+
+    // Apontar a regra do sinal para uma etiqueta e ver o bot usá-la; a da
+    // equipe continua.
+    const instalacao = tags.find((t) => t.name === 'Instalação');
+    await asTenant(() => WaBotConfigService.saveConfig({ autoTags: { signal: instalacao.id } }));
+    await asTenant(() => WaBotService.registrar({ id }, 'outage'));
+    vinculos = await getDb()('wa_conversation_tags').where({ conversation_id: id }).orderBy('id');
+    assert.deepEqual(vinculos.map((v) => v.tag_id), [financeiro.id, instalacao.id]);
+
+    // Desligada, não etiqueta.
+    const outra = await conversa('5593981150011');
+    await asTenant(() => WaBotConfigService.saveConfig({ autoTags: { enabled: false } }));
+    await asTenant(() => WaBotService.registrar({ id: outra }, 'fatura'));
+    assert.equal((await getDb()('wa_conversation_tags').where({ conversation_id: outra })).length, 0);
   });
 });

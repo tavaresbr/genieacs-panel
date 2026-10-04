@@ -81,7 +81,8 @@ class WhatsAppController {
         messages: body.messages,
         hours: body.hours,
         satisfaction: body.satisfaction,
-        distribution: body.distribution
+        distribution: body.distribution,
+        autoTags: body.autoTags
       }, req.locale);
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {

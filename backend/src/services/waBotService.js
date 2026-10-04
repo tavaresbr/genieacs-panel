@@ -6,6 +6,7 @@ import WhatsAppConfigService from './whatsappConfigService.js';
 import WaBotConfigService from './waBotConfigService.js';
 import OutageIncidentService from './outageIncidentService.js';
 import MaintenanceService from './maintenanceService.js';
+import WaTagService from './waTagService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -853,6 +854,9 @@ class WaBotService {
     } catch (error) {
       console.warn('waBot evento:', error?.message || error);
     }
+    // O assunto do pedido vira etiqueta na conversa (ver `INTENT_GROUP`).
+    // `autoTagFor` não lança: é acessório à resposta, que já saiu.
+    await WaTagService.autoTagFor(conversation?.id, intent);
   }
 
   /** Grava (ou tira, com `null`) a pausa do bot nesta conversa. */

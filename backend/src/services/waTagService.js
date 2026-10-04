@@ -3,6 +3,7 @@ import { WaError } from './whatsappConfigService.js';
 import { isAccountColor } from '../config/waAccountColors.js';
 import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
 import { tdb, tinsert, tinsertReturningId } from '../config/database.js';
+import WaBotConfigService from './waBotConfigService.js';
 
 /** A marca de que as etiquetas padrão já foram criadas — apagar uma não a traz de volta. */
 const SEEDED_KEY = 'wa_tags_seeded';
@@ -19,6 +20,20 @@ const PADRAO = Object.freeze([
 ]);
 
 const PERIODOS = Object.freeze([7, 30, 90]);
+
+/**
+ * O que o cliente pediu ao bot, por grupo de etiqueta automática: segunda via,
+ * "sem fatura em aberto" e liberação em confiança são assunto financeiro;
+ * sinal, queda e manutenção são suporte técnico.
+ */
+export const INTENT_GROUP = Object.freeze({
+  fatura: 'invoice',
+  noOpenInvoice: 'invoice',
+  liberar: 'invoice',
+  sinal: 'signal',
+  outage: 'signal',
+  maintenance: 'signal'
+});
 
 const invalida = (key, code, status = 400, vars = {}) => new WaError(key, { code, status, vars });
 
@@ -39,9 +54,46 @@ class WaTagService {
     const existentes = await tdb('wa_tags').count({ n: '*' }).first();
     if (Number(existentes?.n || 0) > 0) return;
     const t = translatorFor(DEFAULT_LOCALE);
+    const ids = {};
     for (const [chave, color] of PADRAO) {
       // eslint-disable-next-line no-await-in-loop
-      await tinsert('wa_tags', { name: t(chave), color, created_at: new Date() });
+      ids[chave] = await tinsertReturningId('wa_tags', { name: t(chave), color, created_at: new Date() });
+    }
+    // A etiqueta automática já nasce apontando para as padrão — sem passar
+    // por cima de uma escolha que o provedor tenha feito antes.
+    try {
+      const { autoTags } = await WaBotConfigService.getConfig();
+      await WaBotConfigService.saveConfig({
+        autoTags: {
+          invoice: autoTags.invoice ?? ids['whatsapp.tags.defaultFinance'],
+          signal: autoTags.signal ?? ids['whatsapp.tags.defaultSupport']
+        }
+      });
+    } catch (error) {
+      console.warn(`WhatsApp auto tags not configured: ${error.message}`);
+    }
+  }
+
+  /**
+   * A etiqueta automática de uma resposta do bot. Só acrescenta: nunca tira o
+   * que a equipe pôs. Nunca lança — a resposta ao cliente já saiu.
+   */
+  static async autoTagFor(conversationId, intent) {
+    try {
+      const grupo = INTENT_GROUP[intent];
+      if (!grupo || !conversationId) return null;
+      await this.seedOnce();
+      const { autoTags } = await WaBotConfigService.getConfig();
+      const tagId = autoTags?.enabled ? autoTags[grupo] : null;
+      if (!tagId) return null;
+      const existe = await tdb('wa_tags').where({ id: tagId }).first('id');
+      if (!existe) return null;
+      const ja = await tdb('wa_conversation_tags').where({ conversation_id: conversationId, tag_id: tagId }).first('id');
+      if (!ja) await tinsert('wa_conversation_tags', { conversation_id: conversationId, tag_id: tagId, created_at: new Date() });
+      return Number(tagId);
+    } catch (error) {
+      console.warn(`WhatsApp auto tag failed: ${error.message}`);
+      return null;
     }
   }
 
@@ -104,6 +156,13 @@ class WaTagService {
     const atual = await this.get(id);
     await tdb('wa_conversation_tags').where({ tag_id: atual.id }).del();
     await tdb('wa_tags').where({ id: atual.id }).del();
+    // Uma regra automática que apontava para ela volta a "nenhuma".
+    const { autoTags } = await WaBotConfigService.getConfig();
+    const limpar = {};
+    for (const grupo of ['invoice', 'signal']) {
+      if (Number(autoTags?.[grupo]) === Number(atual.id)) limpar[grupo] = null;
+    }
+    if (Object.keys(limpar).length) await WaBotConfigService.saveConfig({ autoTags: limpar });
   }
 
   /** Troca o conjunto inteiro de uma conversa. Só aceita etiquetas deste provedor. */

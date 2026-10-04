@@ -4606,6 +4606,8 @@ export interface BotConfig {
   satisfaction: { enabled: boolean }
   /** A distribuição automática das conversas entre quem está disponível. */
   distribution: { enabled: boolean }
+  /** Etiqueta automática pelo assunto do pedido ao bot; ids de `WhatsAppTag`, ou null. */
+  autoTags: { enabled: boolean; invoice: number | null; signal: number | null }
 }
 
 /** Quanto o cliente espera por gente: `GET /whatsapp/response-time-report`. Tempos em segundos. */

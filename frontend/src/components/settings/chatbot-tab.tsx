@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { whatsappAPI, type BotConfig, type BotHoursDay, type BotMessageKey } from '@/lib/api'
+import { whatsappAPI, type BotConfig, type BotHoursDay, type BotMessageKey, type WhatsAppTag } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -61,6 +61,16 @@ export function ChatbotTab() {
   const toast = useToast()
   const [config, setConfig] = useState<BotConfig | null>(null)
   const [saving, setSaving] = useState(false)
+  const [tagOptions, setTagOptions] = useState<WhatsAppTag[]>([])
+
+  // As etiquetas para os seletores da etiqueta automática.
+  useEffect(() => {
+    let vivo = true
+    void whatsappAPI.listTags().then((res) => {
+      if (vivo && res.success && res.data) setTagOptions(res.data)
+    })
+    return () => { vivo = false }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -138,7 +148,8 @@ export function ChatbotTab() {
         messages: config.messages,
         hours: config.hours,
         satisfaction: config.satisfaction,
-        distribution: config.distribution
+        distribution: config.distribution,
+        autoTags: config.autoTags
       })
       if (res.success && res.data) {
         setConfig(res.data)
@@ -214,6 +225,33 @@ export function ChatbotTab() {
         <h2 className="section-heading">{t('whatsapp.tags.manageTitle')}</h2>
         <p className="field-hint mt-1">{t('whatsapp.tags.manageHint')}</p>
         <div className="mt-4"><TagsManager /></div>
+        <div className="mt-6 grid gap-4 border-t border-border pt-5">
+          <Caixa
+            checked={config.autoTags.enabled}
+            onChange={(value) => patch({ autoTags: { ...config.autoTags, enabled: value } })}
+            title={t('settings.chatbot.autoTagsEnabled')}
+            hint={t('settings.chatbot.autoTagsHint')}
+          />
+          {([
+            ['invoice', 'settings.chatbot.autoTagsInvoice'],
+            ['signal', 'settings.chatbot.autoTagsSignal']
+          ] as const).map(([grupo, rotulo]) => (
+            <label key={grupo} className="grid max-w-md gap-1 text-sm">
+              <span className="font-medium">{t(rotulo)}</span>
+              <select
+                className="modern-input"
+                disabled={!config.autoTags.enabled}
+                value={config.autoTags[grupo] ?? ''}
+                onChange={(event) => patch({
+                  autoTags: { ...config.autoTags, [grupo]: event.target.value ? Number(event.target.value) : null }
+                })}
+              >
+                <option value="">{t('settings.chatbot.autoTagsNone')}</option>
+                {tagOptions.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
       </section>
 
       <section className="modern-card p-5 sm:p-6">
