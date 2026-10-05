@@ -4090,7 +4090,7 @@ export interface WhatsAppDunningStep {
   templateId: number
 }
 
-export type WhatsAppDunningSkipReason = 'noPhone' | 'optOut' | 'templateIncomplete' | 'maxReached' | 'interval' | 'sgpRefused'
+export type WhatsAppDunningSkipReason = 'noPhone' | 'optOut' | 'templateIncomplete' | 'maxReached' | 'interval' | 'paused' | 'sgpRefused'
 
 export interface WhatsAppDunningRunSummary {
   at: string
@@ -4110,6 +4110,8 @@ export interface WhatsAppDunningRule {
   maxPerInvoice: number
   minIntervalHours: number
   maxPerRun: number
+  /** Dias de pausa quando o cliente manda comprovante; 0 desliga. */
+  receiptPauseDays: number
   thanksTemplateId: number | null
   window: { timezone: string; week: WhatsAppDunningWindowDay[] }
   enabledAt: string | null
@@ -4514,8 +4516,16 @@ export type WaSubscriberPanel =
         highlight: string | null
         error: WaSubscriberPartError | null
       }
+      /** A régua parada para este contrato (comprovante recebido); null sem pausa. */
+      dunningPause: WaDunningPause | null
       ticketEnabled: boolean
     }
+
+export interface WaDunningPause {
+  contract: string
+  until: string
+  reason: 'receipt' | 'manual'
+}
 
 export interface WaSubscriberAttendance {
   conversationId: number
@@ -4907,7 +4917,7 @@ export const whatsappAPI = {
     apiClient.get<WhatsAppDunningRule>('/whatsapp/dunning/rule'),
 
   saveDunningRule: (payload: Partial<Pick<WhatsAppDunningRule,
-    'steps' | 'window' | 'maxPerInvoice' | 'minIntervalHours' | 'maxPerRun' | 'thanksTemplateId'>>) =>
+    'steps' | 'window' | 'maxPerInvoice' | 'minIntervalHours' | 'maxPerRun' | 'receiptPauseDays' | 'thanksTemplateId'>>) =>
     apiClient.put<WhatsAppDunningRule>('/whatsapp/dunning/rule', payload),
 
   setDunningEnabled: (enabled: boolean) =>
@@ -5160,6 +5170,13 @@ export const whatsappAPI = {
 
   bindSubscriber: (conversationId: number, payload: { contract: string; document?: string }) =>
     apiClient.post<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber/bind`, payload),
+
+  /** "Retomar régua": tira a pausa por comprovante do contrato desta conversa. */
+  subscriberResumeDunning: (conversationId: number, contract: string) =>
+    apiClient.post<{ contract: string; dunningPause: null }>(
+      `/whatsapp/conversations/${conversationId}/subscriber/dunning-resume`,
+      { contract }
+    ),
 
   subscriberUnlock: (conversationId: number, contract: string) =>
     apiClient.post<{ contract: string }>(`/whatsapp/conversations/${conversationId}/subscriber/unlock`, { contract }),

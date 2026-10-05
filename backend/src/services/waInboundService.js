@@ -13,6 +13,7 @@ import WaBotService from './waBotService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
 import WaAssignmentService from './waAssignmentService.js';
 import WaConversationService from './waConversationService.js';
+import WaDunningService, { pareceComprovante } from './waDunningService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DATA_DIR } from '../config/paths.js';
@@ -408,6 +409,14 @@ async function gravarMensagem(account, item) {
     } catch (error) {
       console.error('waInbound bindSubscriber:', error?.message || error);
     }
+  }
+
+  // 8c. Imagem ou PDF do cliente numa conversa com contrato: pode ser o
+  // comprovante. A régua para esse contrato por uns dias, e a conversa ganha
+  // nota e etiqueta para alguém conferir no SGP. Nunca lança.
+  if (!fromMe && pareceComprovante(anexo?.attachment_type)) {
+    const atual = conversation.contract ? conversation : await WaConversation.getById(conversation.id);
+    await WaDunningService.pauseForReceipt({ conversation: atual, messageId, mime: anexo.attachment_type });
   }
 
   // 9. O bot de autoatendimento.

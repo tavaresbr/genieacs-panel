@@ -450,6 +450,11 @@ class CustomerDataExportService {
       }).orderBy('id')
       : []);
 
+    // A régua parada para o contrato (comprovante recebido, ou à mão).
+    guardar('wa_dunning_pauses', contratos.length
+      ? await tdb('wa_dunning_pauses').whereIn('contract', contratos).orderBy('id')
+      : []);
+
     guardar('mapping_nodes', nos);
     guardar('mapping_edges', noIds.length
       ? await tdb('mapping_edges').where((q) => {

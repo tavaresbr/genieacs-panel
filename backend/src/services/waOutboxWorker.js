@@ -1,6 +1,7 @@
 import AppState from '../models/AppState.js';
 import WaMessage from '../models/WaMessage.js';
 import WaSendService from './waSendService.js';
+import WaDunningService from './waDunningService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import { isPermanentFailure } from './waSendFailure.js';
 import { forEachTenant } from '../config/tenantJobs.js';
@@ -283,6 +284,11 @@ class WaOutboxWorker {
 
     const [id] = await WaMessage.listSendable(1, { bulk: true });
     if (!id) return;
+
+    // A régua decidiu horas antes: o cliente pode ter mandado o comprovante,
+    // ou o SGP dado a baixa. Retirada, a vez não se gasta — a próxima
+    // passada pega a seguinte.
+    if (!await WaDunningService.stillDue(id)) return;
 
     const atual = this.paces.get(tenantId) || { proximaEm: 0, sequencia: 0 };
     const agora = Date.now();

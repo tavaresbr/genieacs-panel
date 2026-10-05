@@ -91,7 +91,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const [contract, setContract] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [searchedDocument, setSearchedDocument] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'unlock' | 'ticket' | 'bind' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
+  const [busy, setBusy] = useState<'unlock' | 'resume' | 'ticket' | 'bind' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
   const [templates, setTemplates] = useState<WhatsAppTemplate[] | null>(null)
   const [templateId, setTemplateId] = useState('')
   const [ticketOpen, setTicketOpen] = useState(false)
@@ -208,6 +208,25 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
       }
       toast.success(res.message || t('detail.sgp.unlockSent'))
       void load({ contract, document: searchedDocument })
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // O comprovante pausou a régua; quem confere no SGP devolve o contrato a ela.
+  const resumeDunning = async () => {
+    if (!contract) return
+    setBusy('resume')
+    try {
+      const res = await whatsappAPI.subscriberResumeDunning(conversationId, contract)
+      if (!res.success) {
+        toast.error(res.message || t('api.requestFailed'))
+        return
+      }
+      toast.success(res.message || t('whatsapp.sgp.dunningResumed'))
+      setPanel((atual) => (atual && atual.ready ? { ...atual, dunningPause: null } : atual))
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -652,6 +671,29 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
 
             {panel.contract && (
               <Card icon="invoice" title={t('detail.sgp.openInvoices')}>
+                {panel.dunningPause && (
+                  <div
+                    role="status"
+                    className="mb-3 rounded-md border border-[hsl(var(--status-warning)/0.4)] bg-[hsl(var(--status-warning)/0.1)] p-2 text-xs"
+                  >
+                    <p className="font-semibold text-foreground">
+                      {t('whatsapp.sgp.dunningPaused', { until: formatDateTime(panel.dunningPause.until) })}
+                    </p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      {t(panel.dunningPause.reason === 'receipt' ? 'whatsapp.sgp.dunningPausedReceipt' : 'whatsapp.sgp.dunningPausedManual')}
+                    </p>
+                    {canSendInvoice && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary mt-2 min-h-8 px-2 py-1 text-xs"
+                        disabled={busy !== null}
+                        onClick={() => void resumeDunning()}
+                      >
+                        {t('whatsapp.sgp.dunningResume')}
+                      </button>
+                    )}
+                  </div>
+                )}
                 {canSecondCopy && !panel.invoices.error && panel.invoices.items.length > 0 && (
                   <div className="mb-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-2">
                     {templates && templates.length === 0 ? (
