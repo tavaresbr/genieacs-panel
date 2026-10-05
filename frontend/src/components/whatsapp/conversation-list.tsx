@@ -62,6 +62,8 @@ interface ConversationListProps {
   onSelect: (conversation: WhatsAppConversation) => void
   /** A search term or a non-default pile is narrowing what is drawn here. */
   filtered: boolean
+  /** Conversa → minutos esperando gente além do limite (o selo vermelho). */
+  waiting?: ReadonlyMap<number, number>
 }
 
 /**
@@ -70,7 +72,7 @@ interface ConversationListProps {
  * clears when a thread is opened have to be settled in one place, and that
  * place is the page.
  */
-export function ConversationList({ conversations, accounts, selectedId, onSelect, filtered }: ConversationListProps) {
+export function ConversationList({ conversations, accounts, selectedId, onSelect, filtered, waiting }: ConversationListProps) {
   const { t, intlLocale } = useTranslation()
 
   if (conversations.length === 0) {
@@ -151,6 +153,12 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                   <span className="modern-badge-warning" title={t('whatsapp.inbox.optedOutHint')}>
                     <Icon name="bell" size={12} />
                     {t('whatsapp.inbox.optedOut')}
+                  </span>
+                )}
+                {waiting?.has(conversation.id) && (
+                  <span className="modern-badge-error" title={t('whatsapp.waiting.badgeHint')}>
+                    <Icon name="warning" size={12} />
+                    {t('whatsapp.waiting.badge', { minutes: waiting.get(conversation.id) ?? 0 })}
                   </span>
                 )}
                 {(conversation.tags ?? []).map((tag) => <TagChip key={tag.id} tag={tag} />)}

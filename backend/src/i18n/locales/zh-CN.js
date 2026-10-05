@@ -770,6 +770,8 @@ export default {
   'whatsapp.alerts.massOutageCleared': '{node} 已恢复：ONT 重新开始应答',
   'whatsapp.alerts.waDisconnected': 'WhatsApp 已断开：号码 {account} 已中断 {minutes} 分钟，发给客户的消息无法发送。请在 设置 › WhatsApp 中扫描二维码重新连接{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新连接：号码 {account} 恢复正常',
+  'whatsapp.alerts.waWaiting': '客户 {contact} 已等待回复 {minutes} 分钟 — 客服：{agent}',
+  'whatsapp.alerts.noAgent': '无客服',
   // WhatsApp — 机器人回复的正文
   'whatsapp.bot.invoiceDigitableLine': '条形码号：{value}',
   'whatsapp.bot.invoicePix': 'PIX 复制粘贴码：{value}',

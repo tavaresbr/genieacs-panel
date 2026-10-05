@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   whatsappAPI,
   type MetaTemplatePayload,
@@ -34,11 +34,14 @@ import { OutagePanel } from '@/components/outages/outage-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthBell } from '@/components/whatsapp/health-strip'
 import { AvailabilityToggle } from '@/components/whatsapp/assignment'
+import { NotifyToggle } from '@/components/whatsapp/message-notifier'
+import { focusedConversation } from '@/lib/wa-notify'
+import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { firstName, type QuickReply } from '@/lib/quick-replies'
 import { metaWindowFor } from '@/lib/wa-meta-window'
 
@@ -213,6 +216,12 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const [assignee, setAssignee] = useState<AssigneeFilter>('all')
   const [tagFilter, setTagFilter] = useState<number | null>(null)
   const [tagOptions, setTagOptions] = useState<WhatsAppTag[]>([])
+  // Quem espera gente além do limite: o selo das linhas e a faixa da lista.
+  const waitingReport = useWaiting()
+  const waitingMap = useMemo(
+    () => new Map((waitingReport?.items ?? []).map((item) => [item.conversationId, item.minutes])),
+    [waitingReport]
+  )
 
   const [loadingList, setLoadingList] = useState(true)
   const [loadingThread, setLoadingThread] = useState(false)
@@ -245,6 +254,12 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const filterRef = useRef<{ search: string; status: ConversationStatus; assignee: AssigneeFilter; tag: number | null }>({ search: '', status: 'open', assignee: 'all', tag: null })
 
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
+
+  // O sino não avisa da conversa que está aberta à vista.
+  useEffect(() => {
+    focusedConversation.id = selectedId
+    return () => { focusedConversation.id = null }
+  }, [selectedId])
 
   // One request per pause, not one per keystroke.
   useEffect(() => {
@@ -810,6 +825,13 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   )}
                 </div>
               </div>
+              <WaitingBanner
+                report={waitingReport}
+                onShow={(filtro) => {
+                  setStatus('open')
+                  setAssignee(filtro)
+                }}
+              />
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {loadingList
                   ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -823,6 +845,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       // from an empty inbox, and only one of the two is worth
                       // clearing the box for.
                       filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null}
+                      waiting={waitingMap}
                     />
                   )}
               </div>
@@ -1143,6 +1166,29 @@ export default function WhatsAppPage() {
   const [handOver, setHandOver] = useState<{ conversation: WhatsAppConversation; seq: number } | null>(
     routed ? { conversation: routed, seq: 1 } : null
   )
+  // `?conversation=<id>`: o clique numa notificação do navegador. Abre a
+  // conversa na caixa de entrada e limpa a URL, para recarregar não reabrir.
+  const navigate = useNavigate()
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const deepLink = new URLSearchParams(location.search).get('conversation')
+  useEffect(() => {
+    if (!deepLink) return
+    const id = Number.parseInt(deepLink, 10)
+    // Limpar a URL muda `deepLink` e reexecuta o efeito: a busca não pode
+    // ser cancelada por isso, só pela saída da página.
+    navigate(location.pathname, { replace: true })
+    if (!Number.isInteger(id) || id <= 0) return
+    void whatsappAPI.getConversation(id).then((res) => {
+      if (!mounted.current || !res.success || !res.data) return
+      const conversation = res.data
+      setTab('inbox')
+      setHandOver((current) => ({ conversation, seq: (current?.seq ?? 0) + 1 }))
+    })
+  }, [deepLink, location.pathname, navigate])
   const visibleTabs = TABS.filter(([, , permission]) => can(permission))
 
   return (
@@ -1181,6 +1227,7 @@ export default function WhatsAppPage() {
               </button>
             ))}
           </div>
+          {tab === 'inbox' && <NotifyToggle />}
           {tab === 'inbox' && <AvailabilityToggle />}
           <HealthBell
             actions={(disponivel) => (

@@ -8,6 +8,8 @@ import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import OutageIncidentService from './outageIncidentService.js';
 import MaintenanceService from './maintenanceService.js';
+import WaBotConfigService from './waBotConfigService.js';
+import WaResponseTimeService from './waResponseTimeService.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import DeviceService from './deviceService.js';
 import WaSendService from './waSendService.js';
@@ -49,7 +51,8 @@ export const ALERT_RULES = Object.freeze([
   'rx_power_low',
   'temperature_high',
   'mass_outage',
-  'wa_disconnected'
+  'wa_disconnected',
+  'wa_waiting'
 ]);
 
 /**
@@ -74,7 +77,9 @@ const RULE_KEYS = Object.freeze({
   rx_power_low: { firing: 'whatsapp.alerts.rxPowerLow', cleared: 'whatsapp.alerts.rxPowerLowCleared' },
   temperature_high: { firing: 'whatsapp.alerts.temperatureHigh', cleared: 'whatsapp.alerts.temperatureHighCleared' },
   mass_outage: { firing: 'whatsapp.alerts.massOutage', cleared: 'whatsapp.alerts.massOutageCleared' },
-  wa_disconnected: { firing: 'whatsapp.alerts.waDisconnected', cleared: 'whatsapp.alerts.waDisconnectedCleared' }
+  wa_disconnected: { firing: 'whatsapp.alerts.waDisconnected', cleared: 'whatsapp.alerts.waDisconnectedCleared' },
+  // Respondida não vira mensagem: seria um aviso para cada conversa atendida.
+  wa_waiting: { firing: 'whatsapp.alerts.waWaiting', cleared: null }
 });
 
 /**
@@ -112,7 +117,10 @@ const DEFAULT_RULES = Object.freeze({
   // resolve sozinho em segundos não pode acordar ninguém. A repetição é de
   // hora em hora porque, enquanto o número está caído, nenhum cliente recebe
   // resposta — é mais urgente que uma ONT quente.
-  wa_disconnected: { enabled: true, threshold: 5, cooldownMinutes: 60 }
+  wa_disconnected: { enabled: true, threshold: 5, cooldownMinutes: 60 },
+  // O limite são os minutos de espera por gente; o aviso se repete a cada hora
+  // enquanto o cliente continua sem resposta.
+  wa_waiting: { enabled: true, threshold: 15, cooldownMinutes: 60 }
 });
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -599,6 +607,9 @@ class WaAlertService {
       // parou — são problemas diferentes, e o segundo nem passa pela frota.
       const contas = await this.evaluateAccounts(settings, now);
       await this.reconcile({ ...contas, settings, channels, now, summary, scope: (rule) => rule === 'wa_disconnected' });
+      // Cliente esperando gente: também independe da frota.
+      const esperas = await this.evaluateWaiting(settings, now);
+      await this.reconcile({ ...esperas, settings, channels, now, summary, scope: (rule) => rule === 'wa_waiting' });
 
       const devices = await DeviceService.getDashboardDevices();
       if (!Array.isArray(devices) || devices.length === 0) {
@@ -610,7 +621,7 @@ class WaAlertService {
       }
 
       const { firing, unknown } = await this.evaluate(devices, settings, now);
-      await this.reconcile({ firing, unknown, settings, channels, now, summary, scope: (rule) => rule !== 'wa_disconnected' });
+      await this.reconcile({ firing, unknown, settings, channels, now, summary, scope: (rule) => rule !== 'wa_disconnected' && rule !== 'wa_waiting' });
       // O incidente de queda — o que o operador usa para avisar os CLIENTES.
       // À parte e calado: um incidente que não abre não derruba o alerta da
       // equipe, que já saiu.
@@ -843,6 +854,44 @@ class WaAlertService {
           ...this.accountVars(account),
           minutes: Number.isFinite(firedAt) ? Math.max(0, Math.round((now - firedAt) / 60_000)) : 0,
           link
+        }
+      });
+    }
+    return { firing, unknown };
+  }
+
+  /**
+   * Clientes esperando resposta de gente há mais que o limite da regra.
+   *
+   * Fora do horário de atendimento nada dispara e nada é dado como
+   * resolvido: as linhas abertas vão para `unknown`. Uma mensagem das 23h
+   * não é atraso de ninguém, e "respondida" às 23h01 seria mentira.
+   */
+  static async evaluateWaiting(settings, now) {
+    const firing = new Map();
+    const unknown = new Set();
+    const rule = settings.rules.wa_waiting;
+    if (!rule?.enabled) return { firing, unknown };
+    if (!(await WaBotConfigService.withinHours(new Date(now)))) {
+      for (const row of await WaAlertState.listOpen()) {
+        if (row.rule === 'wa_waiting') unknown.add(conditionKey('wa_waiting', row.subject));
+      }
+      return { firing, unknown };
+    }
+    const t = translatorFor(DEFAULT_LOCALE);
+    const esperando = await WaResponseTimeService.waitingNow({
+      now: new Date(now),
+      minMinutes: Math.max(1, Number(rule.threshold) || 15)
+    });
+    for (const item of esperando) {
+      const subject = String(item.conversationId);
+      firing.set(conditionKey('wa_waiting', subject), {
+        rule: 'wa_waiting',
+        subject,
+        vars: {
+          contact: item.contact || subject,
+          minutes: item.minutes,
+          agent: item.assignedTo || t('whatsapp.alerts.noAgent')
         }
       });
     }
@@ -1161,9 +1210,10 @@ class WaAlertService {
    */
   static compose(condition, cleared) {
     const keys = RULE_KEYS[condition.rule];
-    if (!keys) return null;
+    const key = keys ? (cleared ? keys.cleared : keys.firing) : null;
+    if (!key) return null;
     const t = translatorFor(DEFAULT_LOCALE);
-    return t(cleared ? keys.cleared : keys.firing, condition.vars || {});
+    return t(key, condition.vars || {});
   }
 }
 

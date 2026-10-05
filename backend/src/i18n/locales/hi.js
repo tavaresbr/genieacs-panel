@@ -771,6 +771,8 @@ export default {
   'whatsapp.alerts.massOutageCleared': '{node} वापस आ गया: ONT फिर से उत्तर दे रहे हैं',
   'whatsapp.alerts.waDisconnected': 'WhatsApp डिस्कनेक्ट: नंबर {account} {minutes} मिनट से बंद है और ग्राहकों को संदेश नहीं जा रहे। सेटिंग्स › WhatsApp में QR से फिर से जोड़ें{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp फिर से जुड़ा: नंबर {account} फिर से काम कर रहा है',
+  'whatsapp.alerts.waWaiting': 'ग्राहक {contact} {minutes} मिनट से जवाब का इंतज़ार कर रहा है — एजेंट: {agent}',
+  'whatsapp.alerts.noAgent': 'कोई एजेंट नहीं',
   // WhatsApp — बॉट उत्तरों का मुख्य पाठ
   'whatsapp.bot.invoiceDigitableLine': 'टाइप करने योग्य पंक्ति: {value}',
   'whatsapp.bot.invoicePix': 'PIX कॉपी और पेस्ट: {value}',

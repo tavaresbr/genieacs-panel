@@ -88,6 +88,16 @@ const RULES: ReadonlyArray<{
     min: 0,
     max: 120,
     step: 1
+  },
+  {
+    // Minutos de espera por gente, no horário de atendimento.
+    rule: 'wa_waiting',
+    icon: 'contacts',
+    label: 'whatsapp.alerts.waWaitingRule',
+    hint: 'whatsapp.alerts.waWaitingHint',
+    min: 1,
+    max: 240,
+    step: 1
   }
 ]
 

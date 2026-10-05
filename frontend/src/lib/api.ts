@@ -1,3 +1,4 @@
+import type { NotificationItem } from '@/lib/wa-notify'
 import { getActiveLocale, translate } from '@/lib/i18n'
 import type { LoginResponse, OperatorRole, User } from '@/types'
 import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollment'
@@ -4357,7 +4358,21 @@ export interface WhatsAppHealth {
   }
 }
 
-export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage' | 'wa_disconnected'
+export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage' | 'wa_disconnected' | 'wa_waiting'
+
+/** `GET /whatsapp/waiting`: quem espera gente há mais que o limite da regra. */
+export interface WaitingReport {
+  thresholdMinutes: number
+  withinHours: boolean
+  items: Array<{
+    conversationId: number
+    since: string
+    minutes: number
+    assignedUserId: number | null
+    assignedTo: string | null
+    contact: string | null
+  }>
+}
 
 export interface WhatsAppAlertSettings {
   enabled: boolean
@@ -5042,6 +5057,18 @@ export const whatsappAPI = {
   /** Troca o conjunto inteiro de etiquetas da conversa. */
   setConversationTags: (conversationId: number, tagIds: number[]) =>
     apiClient.put<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/tags`, { tagIds }),
+
+  getWaiting: () =>
+    apiClient.get<WaitingReport>('/whatsapp/waiting'),
+
+  /** As mensagens novas de clientes que pedem aviso, depois do cursor do servidor. */
+  getNotifications: (after?: string | null) =>
+    apiClient.get<{ cursor: string; items: NotificationItem[] }>(
+      `/whatsapp/notifications${after ? `?after=${encodeURIComponent(after)}` : ''}`
+    ),
+
+  getConversation: (id: number) =>
+    apiClient.get<WhatsAppConversation>(`/whatsapp/conversations/${id}`),
 
   listAgents: () =>
     apiClient.get<WhatsAppAgent[]>('/whatsapp/agents'),

@@ -45,6 +45,63 @@ function horaNoFuso(instante, timezone) {
 }
 
 /**
+ * A linha do tempo de cada conversa de um lote, desde `desde`: mensagens do
+ * cliente, do bot e de gente, e os pedidos de atendente — em ordem. E quais
+ * dessas conversas estão abertas.
+ */
+async function linhasDoTempo(lote, desde) {
+  const [mensagens, pedidos, conversas] = await Promise.all([
+    tdb('wa_messages')
+      .whereIn('conversation_id', lote)
+      .where('created_at', '>=', desde)
+      .where('is_note', false)
+      .where((q) => q.where({ direction: 'in' }).orWhereIn('source', ['operator', 'bot']))
+      .orderBy([{ column: 'conversation_id' }, { column: 'created_at' }, { column: 'id' }])
+      .select('conversation_id', 'direction', 'source', 'sent_by', 'external_id', 'created_at'),
+    tdb('wa_bot_events')
+      .whereIn('conversation_id', lote)
+      .where('created_at', '>=', desde)
+      .whereIn('intent', [...PEDIDOS_DE_ATENDENTE])
+      .select('conversation_id', 'created_at'),
+    tdb('wa_conversations').whereIn('id', lote).whereNull('closed_at').select('id')
+  ]);
+  const linhas = new Map();
+  const empurrar = (id, evento) => {
+    const lista = linhas.get(id) || [];
+    lista.push(evento);
+    linhas.set(id, lista);
+  };
+  for (const m of mensagens) {
+    let tipo;
+    if (m.direction === 'in') tipo = 'cliente';
+    else if (m.source === 'bot') tipo = 'bot';
+    else if (m.sent_by || m.external_id) tipo = 'gente';
+    else continue; // a resposta do operador ainda na fila, sem envio: não respondeu ninguém
+    empurrar(Number(m.conversation_id), { t: ms(m.created_at), tipo, agente: m.sent_by ? Number(m.sent_by) : null });
+  }
+  // O pedido é gravado logo depois da resposta do bot; empatado com ela,
+  // vem depois, para reabrir a espera que a resposta fechou.
+  for (const p of pedidos) empurrar(Number(p.conversation_id), { t: ms(p.created_at), tipo: 'pedido', ordem: 1 });
+  for (const eventos of linhas.values()) eventos.sort((a, b) => a.t - b.t || (a.ordem ?? 0) - (b.ordem ?? 0));
+  return { linhas, abertas: new Set(conversas.map((c) => Number(c.id))) };
+}
+
+/** O começo da espera ainda sem resposta de gente ao fim da linha do tempo, ou null. */
+export function esperaAberta(eventos) {
+  let inicio = null;
+  for (const e of eventos) {
+    if (e.tipo === 'cliente') {
+      if (inicio === null) inicio = e.t;
+    } else if (e.tipo === 'bot' || e.tipo === 'gente') {
+      inicio = null;
+    } else if (e.tipo === 'pedido') {
+      inicio = e.t;
+    }
+  }
+  return inicio;
+}
+
+/**
  * Quanto o cliente espera por uma pessoa no WhatsApp.
  *
  * A unidade é a ESPERA: começa na primeira mensagem do cliente que ninguém
@@ -80,46 +137,11 @@ class WaResponseTimeService {
     const abertas = new Set();
     for (let i = 0; i < conversaIds.length; i += LOTE) {
       const lote = conversaIds.slice(i, i + LOTE);
-      /* eslint-disable no-await-in-loop -- lotes para não estourar o IN */
-      const [mensagens, pedidos, conversas] = await Promise.all([
-        tdb('wa_messages')
-          .whereIn('conversation_id', lote)
-          .where('created_at', '>=', desde)
-          .where('is_note', false)
-          .where((q) => q.where({ direction: 'in' }).orWhereIn('source', ['operator', 'bot']))
-          .orderBy([{ column: 'conversation_id' }, { column: 'created_at' }, { column: 'id' }])
-          .select('conversation_id', 'direction', 'source', 'sent_by', 'external_id', 'created_at'),
-        tdb('wa_bot_events')
-          .whereIn('conversation_id', lote)
-          .where('created_at', '>=', desde)
-          .whereIn('intent', [...PEDIDOS_DE_ATENDENTE])
-          .select('conversation_id', 'created_at'),
-        tdb('wa_conversations').whereIn('id', lote).whereNull('closed_at').select('id')
-      ]);
-      /* eslint-enable no-await-in-loop */
-      for (const c of conversas) abertas.add(Number(c.id));
-
-      // Uma linha do tempo por conversa: mensagens e pedidos de atendente.
-      const linhas = new Map();
-      const empurrar = (id, evento) => {
-        const lista = linhas.get(id) || [];
-        lista.push(evento);
-        linhas.set(id, lista);
-      };
-      for (const m of mensagens) {
-        let tipo;
-        if (m.direction === 'in') tipo = 'cliente';
-        else if (m.source === 'bot') tipo = 'bot';
-        else if (m.sent_by || m.external_id) tipo = 'gente';
-        else continue; // a resposta do operador ainda na fila, sem envio: não respondeu ninguém
-        empurrar(Number(m.conversation_id), { t: ms(m.created_at), tipo, agente: m.sent_by ? Number(m.sent_by) : null });
-      }
-      // O pedido é gravado logo depois da resposta do bot; empatado com ela,
-      // vem depois, para reabrir a espera que a resposta fechou.
-      for (const p of pedidos) empurrar(Number(p.conversation_id), { t: ms(p.created_at), tipo: 'pedido', ordem: 1 });
+      // eslint-disable-next-line no-await-in-loop -- lotes para não estourar o IN
+      const { linhas, abertas: abertasDoLote } = await linhasDoTempo(lote, desde);
+      for (const id of abertasDoLote) abertas.add(id);
 
       for (const [conversa, eventos] of linhas) {
-        eventos.sort((a, b) => a.t - b.t || (a.ordem ?? 0) - (b.ordem ?? 0));
         let inicio = null;
         for (const e of eventos) {
           if (e.tipo === 'cliente') {
@@ -178,6 +200,44 @@ class WaResponseTimeService {
         oldestSince: esperandoAgora.length ? new Date(Math.min(...esperandoAgora)).toISOString() : null
       }
     };
+  }
+
+  /**
+   * Quem está esperando gente agora, há pelo menos `minMinutes`: conversas
+   * abertas com mensagem do cliente nos últimos 7 dias, a espera mais antiga
+   * primeiro.
+   */
+  static async waitingNow({ now = new Date(), minMinutes = 0 } = {}) {
+    const desde = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const candidatas = await tdb('wa_conversations')
+      .whereNull('closed_at')
+      .where('last_inbound_at', '>=', desde)
+      .select('id', 'push_name', 'wa_phone_e164', 'contract', 'assigned_user_id');
+    const porId = new Map(candidatas.map((c) => [Number(c.id), c]));
+    const itens = [];
+    const ids = [...porId.keys()];
+    for (let i = 0; i < ids.length; i += LOTE) {
+      // eslint-disable-next-line no-await-in-loop -- lotes para não estourar o IN
+      const { linhas } = await linhasDoTempo(ids.slice(i, i + LOTE), desde);
+      for (const [id, eventos] of linhas) {
+        const inicio = esperaAberta(eventos);
+        if (inicio === null) continue;
+        const minutos = Math.floor((now.getTime() - inicio) / 60_000);
+        if (minutos < minMinutes) continue;
+        const c = porId.get(id);
+        itens.push({
+          conversationId: id,
+          since: new Date(inicio).toISOString(),
+          minutes: minutos,
+          assignedUserId: c?.assigned_user_id ? Number(c.assigned_user_id) : null,
+          contact: c?.push_name || (c?.wa_phone_e164 ? `+${c.wa_phone_e164}` : null) || c?.contract || null
+        });
+      }
+    }
+    const nomes = await WaAssignmentService.names(itens.map((x) => x.assignedUserId));
+    return itens
+      .map((x) => ({ ...x, assignedTo: x.assignedUserId ? nomes.get(x.assignedUserId) ?? null : null }))
+      .sort((a, b) => b.minutes - a.minutes);
   }
 }
 
