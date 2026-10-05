@@ -1036,6 +1036,8 @@ export default {
   'contacts.import.badHeader': '1 行目にエクスポートの列 (Chave、Contrato、CPF/CNPJ、Nome) が必要です',
   'contacts.import.rowNotFound': 'キーまたは契約が見つかりません',
   'contacts.import.rowNoName': '名前のない新規顧客',
+  'contacts.import.whatsappPreviewed': 'WhatsApp連絡先のプレビューの準備ができました',
+  'contacts.import.whatsappApplied': 'WhatsApp連絡先をインポートしました：{created}件作成',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid の設定を読み込みました',

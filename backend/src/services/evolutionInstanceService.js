@@ -9,6 +9,8 @@ import { WA_WEBHOOK_PATH } from '../config/waWebhookPath.js';
 import { isAccountColor, nextAccountColor } from '../config/waAccountColors.js';
 import {
   checkNumbersRequest,
+  findContactsRequest,
+  readContacts,
   connectRequest,
   createInstanceRequest,
   createBusinessInstanceRequest,
@@ -1227,6 +1229,26 @@ class EvolutionInstanceService {
     // the others is part of setting it.
     if (isDefault === true) updated = await WhatsAppAccount.setDefault(account.id);
     return updated;
+  }
+
+  /**
+   * A agenda do número conectado: `[{ number, name }]`, só pessoas.
+   *
+   * Pelo mesmo número pareado por QR que `checkNumbers` usa; a Cloud API da
+   * Meta não tem agenda para devolver.
+   */
+  static async listContacts() {
+    const config = await this.requireConfig();
+    const account = await WhatsAppAccount.getForPurpose('general', { integration: 'baileys' });
+    if (!account) {
+      if (await WhatsAppAccount.getForPurpose('general')) {
+        throw new WaError('whatsapp.error.notSupportedCloud', { code: 'not_supported_cloud', status: 409 });
+      }
+      throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 400 });
+    }
+    const client = this.clientFor(account, config);
+    const result = await client.sendOrThrow(findContactsRequest(account.flavor, account.name));
+    return readContacts(account.flavor, result.data);
   }
 
   /**

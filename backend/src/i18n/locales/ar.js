@@ -1028,6 +1028,8 @@ export default {
   'contacts.import.badHeader': 'يجب أن يحتوي السطر الأول على أعمدة التصدير (Chave أو Contrato أو CPF/CNPJ أو Nome)',
   'contacts.import.rowNotFound': 'المفتاح أو العقد غير موجود',
   'contacts.import.rowNoName': 'عميل جديد بلا اسم',
+  'contacts.import.whatsappPreviewed': 'معاينة جهات اتصال واتساب جاهزة',
+  'contacts.import.whatsappApplied': 'تم استيراد جهات اتصال واتساب: أُنشئ {created}',
 
   // TeiaH Valid
   'teiah.configLoaded': 'تم تحميل إعدادات TeiaH Valid',

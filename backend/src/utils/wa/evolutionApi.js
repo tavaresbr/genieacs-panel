@@ -895,6 +895,50 @@ export function readNumberChecks(flavor, data) {
     .filter((r) => r.number);
 }
 
+/**
+ * A agenda do número conectado.
+ *
+ * A lista de contatos de um celular passa fácil de um megabyte, o teto padrão
+ * do cliente; `maxBytes` pede um teto maior só para esta leitura.
+ *
+ * @returns {EvoRequest & { maxBytes: number }}
+ */
+export function findContactsRequest(flavor, name) {
+  const maxBytes = 16 * 1024 * 1024;
+  return flavor === 'go'
+    ? { path: '/user/contacts', method: 'GET', key: 'instance', maxBytes }
+    : { path: `/chat/findContacts/${enc(name)}`, method: 'POST', key: 'instance', body: { where: {} }, maxBytes };
+}
+
+/**
+ * Os contatos de pessoa que a agenda devolveu: `{ number, name }`.
+ *
+ * Grupos, listas de transmissão, status e identificadores `@lid` (sem número)
+ * ficam de fora; o resto vira só dígitos. O nome é o que o dono salvou no
+ * celular, na falta dele o que a própria pessoa usa no WhatsApp.
+ */
+export function readContacts(flavor, data) {
+  let list = [];
+  if (Array.isArray(data)) list = data;
+  else if (data && typeof data === 'object') {
+    const inner = unwrap(data);
+    if (Array.isArray(inner)) list = inner;
+    else if (Array.isArray(inner.data)) list = inner.data;
+    else if (Array.isArray(inner.contacts)) list = inner.contacts;
+  }
+  const out = [];
+  for (const item of list) {
+    const it = item ?? {};
+    const jid = String(it.remoteJid ?? it.id ?? it.Jid ?? it.JID ?? it.jid ?? '');
+    if (!jid.endsWith('@s.whatsapp.net') && !/^\d+$/.test(jid)) continue;
+    const number = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (!number) continue;
+    const name = String(it.FullName ?? it.fullName ?? it.name ?? it.pushName ?? it.PushName ?? it.BusinessName ?? '').trim();
+    out.push({ number, name: name.slice(0, 120) });
+  }
+  return out;
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Webhook
 // ────────────────────────────────────────────────────────────────────

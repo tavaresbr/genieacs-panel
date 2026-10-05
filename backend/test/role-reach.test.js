@@ -418,6 +418,16 @@ const CASOS = [
     codigoAceito: 'empty'
   },
   {
+    // Sem o WhatsApp ligado, quem passa pela guarda ouve 400 `not_configured`.
+    cap: 'contacts.import',
+    label: 'POST /api/contacts/import/whatsapp',
+    method: 'POST',
+    path: () => '/api/contacts/import/whatsapp?mode=preview',
+    body: {},
+    aceito: [400],
+    codigoAceito: 'not_configured'
+  },
+  {
     cap: 'catalogue.write',
     label: 'PUT /api/vendor-management/:id',
     method: 'PUT',
@@ -836,12 +846,12 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 60 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 61 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
     // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas,
-    // e depois as três da TeiaH Valid.
-    assert.equal(CASOS.length, 60);
+    // e depois as três da TeiaH Valid, e a importação da agenda do WhatsApp.
+    assert.equal(CASOS.length, 61);
   });
 });
 

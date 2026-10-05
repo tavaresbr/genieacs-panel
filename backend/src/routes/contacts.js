@@ -2,7 +2,7 @@ import express from 'express';
 import ContactController from '../controllers/contactController.js';
 import { IMPORT_MAX_BYTES } from '../services/contactSheetService.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { sgpAdminLimiter, whatsappSendLimiter } from '../middleware/rateLimit.js';
+import { sgpAdminLimiter, whatsappSendLimiter, whatsappTestLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -43,6 +43,15 @@ router.post(
   // The sheet arrives as text; one byte over the limit is a 413 before any row is read.
   express.text({ type: () => true, limit: IMPORT_MAX_BYTES }),
   ContactController.importSheet
+);
+// The phone book of the connected WhatsApp number. It asks the Evolution server
+// by hand, so it takes the same budget as the other manual WhatsApp reads.
+router.post(
+  '/import/whatsapp',
+  authenticateToken,
+  requirePermission('contacts.import'),
+  whatsappTestLimiter,
+  ContactController.importWhatsapp
 );
 router.get('/:key', authenticateToken, requirePermission('contacts.read'), ContactController.get);
 // Asks the SGP, once per contract: the same limiter as every other SGP read an

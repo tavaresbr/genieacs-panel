@@ -143,7 +143,7 @@ export class EvolutionClient {
    * diante; e o teto de corpo agora é aplicado pelo transporte, antes de o
    * corpo inteiro estar na memória.
    */
-  async open(path, { method, headers, body }) {
+  async open(path, { method, headers, body, maxBytes }) {
     const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const url = new URL(`${this.baseUrl}${path}`);
     const hostname = bareHostname(url.hostname);
@@ -167,7 +167,7 @@ export class EvolutionClient {
       headers,
       body,
       signal,
-      maxBytes: MAX_RESPONSE_BYTES
+      maxBytes: maxBytes ?? MAX_RESPONSE_BYTES
     });
   }
 
@@ -214,7 +214,8 @@ export class EvolutionClient {
       response = await this.open(request.path, {
         method: request.method,
         headers: { 'Content-Type': 'application/json', apikey },
-        body: request.body === undefined ? undefined : JSON.stringify(request.body)
+        body: request.body === undefined ? undefined : JSON.stringify(request.body),
+        maxBytes: request.maxBytes
       });
     } catch (error) {
       if (error instanceof WaError) throw error;
@@ -235,7 +236,7 @@ export class EvolutionClient {
       throw new WaError('whatsapp.error.redirect', { code: 'redirect', status: 502 });
     }
 
-    const data = await readBody(response);
+    const data = await readBody(response, request.maxBytes ?? MAX_RESPONSE_BYTES);
 
     // A licensed distribution refuses EVERY route with the same 503, health
     // included. Without naming it, the operator reads a raw JSON dump inside
@@ -330,8 +331,8 @@ function blockedHost(reason) {
  * A server behind a misconfigured proxy answers HTML, and a JSON parse failure
  * there would hide the status code that actually explains the problem.
  */
-async function readBody(response) {
-  const text = await readCapped(response);
+async function readBody(response, limit = MAX_RESPONSE_BYTES) {
+  const text = await readCapped(response, limit);
   if (!text) return null;
   try {
     return JSON.parse(text);
@@ -349,9 +350,9 @@ async function readBody(response) {
  * truncated string: half a JSON document parses as nothing useful, and handing
  * back a fragment would invite a caller to act on it.
  */
-async function readCapped(response) {
+async function readCapped(response, limit = MAX_RESPONSE_BYTES) {
   const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+  if (Number.isFinite(declared) && declared > limit) {
     await response.body?.cancel().catch(() => {});
     return '';
   }
@@ -361,7 +362,7 @@ async function readCapped(response) {
   try {
     for await (const chunk of response.body) {
       total += chunk.length;
-      if (total > MAX_RESPONSE_BYTES) {
+      if (total > limit) {
         await response.body.cancel().catch(() => {});
         return '';
       }
