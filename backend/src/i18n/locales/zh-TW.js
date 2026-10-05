@@ -769,6 +769,8 @@ export default {
   'whatsapp.alerts.massOutageCleared': '{node} 已恢復：ONT 重新開始回應',
   'whatsapp.alerts.waDisconnected': 'WhatsApp 已中斷：號碼 {account} 已中斷 {minutes} 分鐘，傳給客戶的訊息無法送出。請在 設定 › WhatsApp 掃描 QR 碼重新連線{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新連線：號碼 {account} 恢復正常',
+  'whatsapp.alerts.waWaiting': '客戶 {contact} 已等待回覆 {minutes} 分鐘 — 客服：{agent}',
+  'whatsapp.alerts.noAgent': '無客服',
   // WhatsApp — 機器人回覆的內文
   'whatsapp.bot.invoiceDigitableLine': '條碼號：{value}',
   'whatsapp.bot.invoicePix': 'PIX 複製貼上碼：{value}',

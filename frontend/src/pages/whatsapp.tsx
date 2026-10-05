@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   whatsappAPI,
   type MetaTemplatePayload,
@@ -34,6 +34,7 @@ import { OutagePanel } from '@/components/outages/outage-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthBell } from '@/components/whatsapp/health-strip'
 import { AvailabilityToggle } from '@/components/whatsapp/assignment'
+import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
@@ -213,6 +214,12 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const [assignee, setAssignee] = useState<AssigneeFilter>('all')
   const [tagFilter, setTagFilter] = useState<number | null>(null)
   const [tagOptions, setTagOptions] = useState<WhatsAppTag[]>([])
+  // Quem espera gente além do limite: o selo das linhas e a faixa da lista.
+  const waitingReport = useWaiting()
+  const waitingMap = useMemo(
+    () => new Map((waitingReport?.items ?? []).map((item) => [item.conversationId, item.minutes])),
+    [waitingReport]
+  )
 
   const [loadingList, setLoadingList] = useState(true)
   const [loadingThread, setLoadingThread] = useState(false)
@@ -810,6 +817,13 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   )}
                 </div>
               </div>
+              <WaitingBanner
+                report={waitingReport}
+                onShow={(filtro) => {
+                  setStatus('open')
+                  setAssignee(filtro)
+                }}
+              />
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {loadingList
                   ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -823,6 +837,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       // from an empty inbox, and only one of the two is worth
                       // clearing the box for.
                       filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null}
+                      waiting={waitingMap}
                     />
                   )}
               </div>

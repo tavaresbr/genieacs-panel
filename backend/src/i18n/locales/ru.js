@@ -771,6 +771,8 @@ export default {
   'whatsapp.alerts.massOutageCleared': 'Узел {node} восстановлен: устройства ONT снова отвечают',
   'whatsapp.alerts.waDisconnected': 'WhatsApp отключён: номер {account} не работает уже {minutes} мин, сообщения клиентам не отправляются. Переподключите его по QR-коду в Настройки › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp снова подключён: номер {account} снова работает',
+  'whatsapp.alerts.waWaiting': 'Клиент {contact} ждёт ответа {minutes} мин. — оператор: {agent}',
+  'whatsapp.alerts.noAgent': 'без оператора',
   // WhatsApp — тексты ответов бота
   'whatsapp.bot.invoiceDigitableLine': 'Банковский код: {value}',
   'whatsapp.bot.invoicePix': 'Код PIX для копирования: {value}',

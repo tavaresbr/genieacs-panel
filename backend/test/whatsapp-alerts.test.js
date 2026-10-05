@@ -82,6 +82,7 @@ const onlyRule = (rule, patch = {}) => ({
   temperature_high: { enabled: false },
   mass_outage: { enabled: false },
   wa_disconnected: { enabled: false },
+  wa_waiting: { enabled: false },
   [rule]: { enabled: true, ...patch }
 });
 
@@ -134,7 +135,7 @@ describe('the settings routes', () => {
     assert.equal(status, 200);
     assert.deepEqual(
       Object.keys(body.data.rules).sort(),
-      ['mass_outage', 'ont_offline', 'rx_power_low', 'temperature_high', 'wa_disconnected']
+      ['mass_outage', 'ont_offline', 'rx_power_low', 'temperature_high', 'wa_disconnected', 'wa_waiting']
     );
     for (const rule of Object.values(body.data.rules)) {
       assert.equal(typeof rule.enabled, 'boolean');
@@ -674,5 +675,84 @@ describe('a WhatsApp number that drops tells the team', () => {
     await setRules(onlyRule('wa_disconnected', { threshold: 0 }));
     await scan({ now: now() });
     assert.equal((await alertRows()).filter((row) => row.rule === 'ont_offline').length, before);
+  });
+});
+
+const { tinsert } = await import('../src/config/database.js');
+const { default: WaConversation } = await import('../src/models/WaConversation.js');
+const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
+
+describe('a customer waiting for a person tells the team', () => {
+  let conversaId;
+
+  const msg = (direction, minutosAtras, extra = {}) => asTenant(() => tinsert('wa_messages', {
+    conversation_id: conversaId,
+    direction,
+    body: direction === 'in' ? 'alguém?' : 'oi, já vejo',
+    source: 'operator',
+    delivery_status: direction === 'in' ? null : 'sent',
+    created_at: new Date(Date.now() - minutosAtras * MINUTE),
+    updated_at: new Date(Date.now() - minutosAtras * MINUTE),
+    ...extra
+  }));
+
+  before(async () => {
+    const c = await asTenant(() => WaConversation.ensure({
+      accountId: alertsAccountId,
+      externalThreadId: '5593981169999@s.whatsapp.net',
+      waPhone: '5593981169999',
+      waLid: null,
+      pushName: 'Dona Maria'
+    }));
+    conversaId = c.id;
+    await getDb()('wa_conversations').where({ id: conversaId }).update({ last_inbound_at: new Date(Date.now() - 20 * MINUTE) });
+  });
+
+  it('avisa uma vez quando passa do limite, e respondida sai calada', async () => {
+    await msg('in', 20, { external_id: 'ESPERA-IN-1' });
+    await setRules(onlyRule('wa_waiting', { threshold: 15 }));
+
+    const primeira = await scan({ now: now() });
+    assert.equal(primeira.notified, 1);
+    const enviados = (await outbox()).filter((m) => /esperando resposta/.test(m.body));
+    assert.equal(enviados.length, 1);
+    assert.match(enviados[0].body, /Dona Maria/);
+    assert.match(enviados[0].body, /sem atendente/);
+
+    await scan({ now: now() + 5 * MINUTE });
+    assert.equal((await outbox()).filter((m) => /esperando resposta/.test(m.body)).length, 1, 'não repete antes do intervalo');
+
+    // A equipe respondeu pelo celular (eco com id do servidor).
+    await msg('out', 1, { external_id: 'ESPERA-OUT-1' });
+    const depois = await scan({ now: now() + 10 * MINUTE });
+    assert.equal(depois.cleared, 1);
+    assert.equal((await outbox()).filter((m) => /esperando resposta/.test(m.body)).length, 1, 'respondida não vira mensagem');
+  });
+
+  it('fora do horário de atendimento, nada dispara', async () => {
+    await msg('in', 30, { external_id: 'ESPERA-IN-2' });
+    await asTenant(() => WaBotConfigService.saveConfig({
+      hours: { enabled: true, week: [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, closed: true })) }
+    }));
+    try {
+      await setRules(onlyRule('wa_waiting', { threshold: 15 }));
+      const r = await scan({ now: now() });
+      assert.equal(r.fired, 0);
+      assert.equal((await alertRows()).filter((row) => row.rule === 'wa_waiting').length, 0);
+    } finally {
+      await asTenant(() => WaBotConfigService.saveConfig({ hours: { enabled: false } }));
+    }
+  });
+
+  it('a rota da caixa de entrada lista quem espera', async () => {
+    await msg('in', 25, { external_id: 'ESPERA-IN-3' });
+    await setRules(onlyRule('wa_waiting', { threshold: 15 }));
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/waiting`, { headers: authHeaders(token) });
+    assert.equal(status, 200);
+    assert.equal(body.data.thresholdMinutes, 15);
+    assert.equal(body.data.withinHours, true);
+    const item = body.data.items.find((i) => i.conversationId === conversaId);
+    assert.ok(item && item.minutes >= 25, JSON.stringify(body.data));
+    assert.equal(item.contact, 'Dona Maria');
   });
 });

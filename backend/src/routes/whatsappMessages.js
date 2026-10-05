@@ -45,6 +45,9 @@ router.post('/tags', authenticateToken, requirePermission('whatsapp.config'), Wh
 router.patch('/tags/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.updateTag);
 router.delete('/tags/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.deleteTag);
 
+// Quem está esperando gente há mais que o limite: o aviso da caixa de entrada.
+router.get('/waiting', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listWaiting);
+
 // A equipe e a disponibilidade de cada um: quem lê a caixa vê quem atende.
 router.get('/agents', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listAgents);
 // O próprio interruptor, e só o próprio: ninguém fica "disponível" por outro.

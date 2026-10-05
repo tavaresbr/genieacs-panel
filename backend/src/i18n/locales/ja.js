@@ -762,6 +762,8 @@ export default {
   'whatsapp.alerts.massOutageCleared': '{node} が復旧しました: ONT が再び応答しています',
   'whatsapp.alerts.waDisconnected': 'WhatsApp切断: 番号 {account} が {minutes} 分前から停止しており、顧客へのメッセージが送信されていません。設定 › WhatsApp でQRコードから再接続してください{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp再接続: 番号 {account} が復旧しました',
+  'whatsapp.alerts.waWaiting': 'お客様 {contact} が {minutes} 分間返信を待っています — 担当者: {agent}',
+  'whatsapp.alerts.noAgent': '担当者なし',
   // WhatsApp — ボットの応答本文
   'whatsapp.bot.invoiceDigitableLine': 'バーコード番号: {value}',
   'whatsapp.bot.invoicePix': 'PIX コピー&ペースト: {value}',

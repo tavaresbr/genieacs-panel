@@ -771,6 +771,8 @@ export default {
   'whatsapp.alerts.massOutageCleared': '{node} wiederhergestellt: die ONTs antworten wieder',
   'whatsapp.alerts.waDisconnected': 'WhatsApp getrennt: Die Nummer {account} ist seit {minutes} Min. ausgefallen, Nachrichten an Kunden werden nicht gesendet. Per QR-Code unter Einstellungen › WhatsApp neu verbinden{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp wieder verbunden: Die Nummer {account} funktioniert wieder',
+  'whatsapp.alerts.waWaiting': 'Kunde {contact} wartet seit {minutes} Min. auf Antwort — Mitarbeiter: {agent}',
+  'whatsapp.alerts.noAgent': 'kein Mitarbeiter',
   // WhatsApp — corpo das respostas do bot
   'whatsapp.bot.invoiceDigitableLine': 'Zahlcode: {value}',
   'whatsapp.bot.invoicePix': 'PIX zum Kopieren: {value}',

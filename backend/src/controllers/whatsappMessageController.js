@@ -3,6 +3,9 @@ import WaConversationService from '../services/waConversationService.js';
 import WaContactService from '../services/waContactService.js';
 import WaAssignmentService from '../services/waAssignmentService.js';
 import WaTagService from '../services/waTagService.js';
+import WaResponseTimeService from '../services/waResponseTimeService.js';
+import WaAlertService from '../services/waAlertService.js';
+import WaBotConfigService from '../services/waBotConfigService.js';
 import { SgpError } from '../services/sgpService.js';
 import { roleHas } from '../config/permissions.js';
 import WaMessage from '../models/WaMessage.js';
@@ -160,6 +163,23 @@ class WhatsAppMessageController {
       return res.json(createResponse(req.t('whatsapp.tags.deleted'), null));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configSaveFailed');
+    }
+  }
+
+  /**
+   * `GET /waiting` — quem espera gente há mais que o limite da regra
+   * "Cliente esperando". O painel avisa mesmo com os alertas da equipe
+   * desligados; fora do horário de atendimento a lista vem vazia.
+   */
+  static async listWaiting(req, res) {
+    try {
+      const settings = await WaAlertService.getSettings();
+      const threshold = Math.max(1, Number(settings.rules?.wa_waiting?.threshold) || 15);
+      const withinHours = await WaBotConfigService.withinHours(new Date());
+      const items = withinHours ? await WaResponseTimeService.waitingNow({ minMinutes: threshold }) : [];
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), { thresholdMinutes: threshold, withinHours, items }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
     }
   }
 

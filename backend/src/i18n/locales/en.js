@@ -770,6 +770,8 @@ export default {
   'whatsapp.alerts.massOutageCleared': '{node} is back: the ONTs are answering again',
   'whatsapp.alerts.waDisconnected': 'WhatsApp disconnected: number {account} went down {minutes} min ago and messages to customers are not going out. Reconnect with the QR code in Settings › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp reconnected: number {account} is working again',
+  'whatsapp.alerts.waWaiting': 'Customer {contact} waiting for a reply for {minutes} min — agent: {agent}',
+  'whatsapp.alerts.noAgent': 'no agent',
   // WhatsApp — corpo das respostas do bot
   'whatsapp.bot.invoiceDigitableLine': 'Digitable line: {value}',
   'whatsapp.bot.invoicePix': 'PIX copy and paste: {value}',
