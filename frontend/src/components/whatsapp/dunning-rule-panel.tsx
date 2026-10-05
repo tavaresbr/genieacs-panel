@@ -53,6 +53,7 @@ export const SKIP_LABELS: Record<WhatsAppDunningSkipReason, TranslationKey> = {
   templateIncomplete: 'whatsapp.dunning.skip.templateIncomplete',
   maxReached: 'whatsapp.dunning.skip.maxReached',
   interval: 'whatsapp.dunning.skip.interval',
+  paused: 'whatsapp.dunning.skip.paused',
   sgpRefused: 'whatsapp.dunning.skip.sgpRefused'
 }
 
@@ -89,6 +90,7 @@ interface Draft {
   maxPerInvoice: string
   minIntervalHours: string
   maxPerRun: string
+  receiptPauseDays: string
   thanksTemplateId: number | null
   window: { timezone: string; week: WhatsAppDunningWindowDay[] }
 }
@@ -101,6 +103,7 @@ function toDraft(rule: WhatsAppDunningRule): Draft {
     maxPerInvoice: String(rule.maxPerInvoice),
     minIntervalHours: String(rule.minIntervalHours),
     maxPerRun: String(rule.maxPerRun),
+    receiptPauseDays: String(rule.receiptPauseDays ?? 3),
     thanksTemplateId: rule.thanksTemplateId,
     window: rule.window
   }
@@ -217,6 +220,7 @@ export function DunningRulePanel() {
         maxPerInvoice: Number(draft.maxPerInvoice),
         minIntervalHours: Number(draft.minIntervalHours),
         maxPerRun: Number(draft.maxPerRun),
+        receiptPauseDays: Number(draft.receiptPauseDays),
         thanksTemplateId: draft.thanksTemplateId
       })
       if (!alive.current) return
@@ -600,7 +604,7 @@ export function DunningRulePanel() {
       {/* ── Limits ─────────────────────────────────────────────────────── */}
       <div className="modern-card p-4 sm:p-5">
         <h3 className="field-label mb-3">{t('whatsapp.dunning.limitsTitle')}</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <label htmlFor="dunning-max-invoice" className="field-label">{t('whatsapp.dunning.maxPerInvoice')}</label>
             <input
@@ -642,6 +646,20 @@ export function DunningRulePanel() {
               onChange={(event) => patch({ maxPerRun: event.target.value })}
             />
             <p className="field-hint">{t('whatsapp.dunning.maxPerRunHint')}</p>
+          </div>
+          <div>
+            <label htmlFor="dunning-receipt-pause" className="field-label">{t('whatsapp.dunning.receiptPause')}</label>
+            <input
+              id="dunning-receipt-pause"
+              type="number"
+              min={0}
+              max={15}
+              className="modern-input"
+              value={draft.receiptPauseDays}
+              disabled={!canManage}
+              onChange={(event) => patch({ receiptPauseDays: event.target.value })}
+            />
+            <p className="field-hint">{t('whatsapp.dunning.receiptPauseHint')}</p>
           </div>
         </div>
       </div>

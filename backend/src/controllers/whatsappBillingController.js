@@ -54,6 +54,7 @@ function auditDetail(rule) {
     steps: (rule.steps || []).map((step) => ({ offsetDays: step.offsetDays, templateId: step.templateId })),
     maxPerInvoice: rule.maxPerInvoice,
     minIntervalHours: rule.minIntervalHours,
+    receiptPauseDays: rule.receiptPauseDays,
     thanksTemplateId: rule.thanksTemplateId ?? null
   };
 }
@@ -348,6 +349,7 @@ class WhatsAppBillingController {
         maxPerInvoice: body.maxPerInvoice,
         minIntervalHours: body.minIntervalHours,
         maxPerRun: body.maxPerRun,
+        receiptPauseDays: body.receiptPauseDays,
         thanksTemplateId: body.thanksTemplateId
       });
       await AuditLog.fromRequest(req, {

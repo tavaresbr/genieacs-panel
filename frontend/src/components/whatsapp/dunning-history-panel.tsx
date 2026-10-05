@@ -27,7 +27,8 @@ const REASON_LABELS: Record<string, TranslationKey> = {
   opt_out: 'whatsapp.dunning.skip.optOut',
   template_incomplete: 'whatsapp.dunning.skip.templateIncomplete',
   max_reached: 'whatsapp.dunning.skip.maxReached',
-  paid: 'whatsapp.dunning.skip.paid'
+  paid: 'whatsapp.dunning.skip.paid',
+  paused: 'whatsapp.dunning.skip.paused'
 }
 
 const DELIVERY_LABELS: Record<string, TranslationKey> = {

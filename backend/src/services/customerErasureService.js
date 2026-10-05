@@ -154,6 +154,9 @@ class CustomerErasureService {
           if (contratos.length) w.orWhereIn('contract', contratos);
         }))
         : 0,
+      wa_dunning_pauses: contratos.length
+        ? await contar('wa_dunning_pauses', (q) => q.whereIn('contract', contratos))
+        : 0,
       mapping_nodes: nos.length
     };
 
@@ -295,6 +298,10 @@ class CustomerErasureService {
           if (telefones.length) q.whereIn('phone_e164', telefones);
           if (contratos.length) q.orWhereIn('contract', contratos);
         }).del();
+      }
+
+      if (contratos.length) {
+        await tdb('wa_dunning_pauses', trx).whereIn('contract', contratos).del();
       }
 
       if (noIds.length) {
