@@ -60,13 +60,19 @@ describe('o sino do navegador', () => {
     const { status, body } = await notificacoes();
     assert.equal(status, 200);
     assert.deepEqual(body.data.items, []);
-    assert.ok(body.data.cursor);
+    assert.match(body.data.cursor, /^\d+$/);
+  });
+
+  it('um cursor que não é id vale como primeira leitura', async () => {
+    const { status, body } = await notificacoes('2026-10-05T00:00:00.000Z');
+    assert.equal(status, 200);
+    assert.deepEqual(body.data.items, []);
+    assert.match(body.data.cursor, /^\d+$/);
   });
 
   it('toca para a conversa do atendente e para quem espera gente; não para o bot nem para o colega', async () => {
     const { body: primeira } = await notificacoes();
     const cursor = primeira.data.cursor;
-    await new Promise((r) => setTimeout(r, 5));
 
     const minha = await conversa('5593981170001', { assigned_user_id: userId });
     const doColega = await conversa('5593981170002', { assigned_user_id: userId + 999 });
@@ -93,5 +99,20 @@ describe('o sino do navegador', () => {
     // O cursor avança: lido de novo, não repete.
     const { body: depois } = await notificacoes(body.data.cursor);
     assert.deepEqual(depois.data.items, []);
+  });
+
+  it('mais de 50 de uma vez: o resto vem na leitura seguinte, sem repetir', async () => {
+    const { body: primeira } = await notificacoes();
+    const minha = await conversa('5593981170009', { assigned_user_id: userId });
+    for (let i = 0; i < 60; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await recebe(minha, `mensagem ${i}`);
+    }
+    const { body: a } = await notificacoes(primeira.data.cursor);
+    const { body: b } = await notificacoes(a.data.cursor);
+    assert.equal(a.data.items.length, 50);
+    assert.equal(b.data.items.length, 10);
+    const ids = [...a.data.items, ...b.data.items].map((i) => i.messageId);
+    assert.equal(new Set(ids).size, 60);
   });
 });

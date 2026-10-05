@@ -15,18 +15,29 @@ const ms = (valor) => (valor instanceof Date ? valor.getTime() : new Date(valor)
  * "2" que o cliente digita no menu.
  */
 class WaNotificationService {
+  /**
+   * O cursor é o id da última mensagem lida, não uma hora: no MySQL o
+   * `created_at` guarda segundos inteiros (arredondados), e um cursor com
+   * milissegundos repetiria ou perderia mensagens perto da virada do segundo.
+   */
   static async since({ userId, after, now = new Date() } = {}) {
-    const cursor = now.toISOString();
-    const desde = after ? new Date(after) : null;
-    if (!desde || Number.isNaN(desde.getTime())) return { cursor, items: [] };
-    const limite = new Date(Math.max(desde.getTime(), now.getTime() - JANELA_MAX_MS));
+    const texto = String(after ?? '').trim();
+    const desde = /^\d+$/.test(texto) ? Number(texto) : null;
+    if (desde === null || !Number.isSafeInteger(desde)) {
+      // Primeira leitura (ou um cursor de outra versão): só o ponto de partida.
+      const maior = await tdb('wa_messages').max({ id: 'id' }).first();
+      return { cursor: String(Number(maior?.id ?? 0)), items: [] };
+    }
 
     const mensagens = await tdb('wa_messages')
       .where({ direction: 'in' })
-      .where('created_at', '>', limite)
+      .where('id', '>', desde)
+      .where('created_at', '>', new Date(now.getTime() - JANELA_MAX_MS))
       .orderBy('id', 'asc')
       .limit(LIMITE)
       .select('id', 'conversation_id', 'body', 'attachment_type', 'created_at');
+    // O lote inteiro avança o cursor, inclusive o que não vira aviso.
+    const cursor = String(mensagens.length ? Number(mensagens[mensagens.length - 1].id) : desde);
     if (!mensagens.length) return { cursor, items: [] };
 
     const ids = [...new Set(mensagens.map((m) => Number(m.conversation_id)))];

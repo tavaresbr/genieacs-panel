@@ -194,7 +194,7 @@ class WhatsAppMessageController {
     }
   }
 
-  /** `GET /notifications?after=` — mensagens novas para o sino do navegador. */
+  /** `GET /notifications?after=<id>` — mensagens novas para o sino do navegador. */
   static async listNotifications(req, res) {
     try {
       return res.json(createResponse(
