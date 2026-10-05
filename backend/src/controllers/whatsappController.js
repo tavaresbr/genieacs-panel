@@ -2,6 +2,7 @@ import WaMetaTemplateService from '../services/waMetaTemplateService.js';
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
+import WaAiService from '../services/waAiService.js';
 import WaBotReportService from '../services/waBotReportService.js';
 import WaSatisfactionService from '../services/waSatisfactionService.js';
 import WaResponseTimeService from '../services/waResponseTimeService.js';
@@ -31,6 +32,17 @@ class WhatsAppController {
       return res.json(createResponse(req.t('whatsapp.configLoaded'), await WaBotConfigService.getPublic(req.locale)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `POST /api/whatsapp/bot-config/ai-test` — uma pergunta curta à IA, com a chave da tela ou a salva. */
+  static async testBotAi(req, res) {
+    try {
+      const body = req.body ?? {};
+      const result = await WaAiService.test({ baseUrl: body.baseUrl, apiKey: body.apiKey, model: body.model });
+      return res.json(createResponse(req.t('whatsapp.ai.testOk'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.ai.error.failed');
     }
   }
 
@@ -82,7 +94,8 @@ class WhatsAppController {
         hours: body.hours,
         satisfaction: body.satisfaction,
         distribution: body.distribution,
-        autoTags: body.autoTags
+        autoTags: body.autoTags,
+        ai: body.ai
       }, req.locale);
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {

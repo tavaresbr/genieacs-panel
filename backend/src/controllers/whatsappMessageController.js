@@ -7,6 +7,7 @@ import WaResponseTimeService from '../services/waResponseTimeService.js';
 import WaNotificationService from '../services/waNotificationService.js';
 import WaAlertService from '../services/waAlertService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
+import WaAiService from '../services/waAiService.js';
 import { SgpError } from '../services/sgpService.js';
 import { roleHas } from '../config/permissions.js';
 import WaMessage from '../models/WaMessage.js';
@@ -191,6 +192,26 @@ class WhatsAppMessageController {
       return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: 1 }), await WaConversationService.decorate(conversation)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.conversationsLoadFailed');
+    }
+  }
+
+  /** `GET /ai/status` — se o botão "Sugerir (IA)" aparece para quem atende. */
+  static async aiStatus(req, res) {
+    try {
+      const ai = await WaBotConfigService.aiSettings();
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), { suggest: Boolean(ai.suggest && ai.apiKey) }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `POST /conversations/:id/suggest-reply` — um rascunho da IA; nada é enviado. */
+  static async suggestReply(req, res) {
+    try {
+      const result = await WaAiService.suggest(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.ai.suggested'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.ai.error.failed');
     }
   }
 

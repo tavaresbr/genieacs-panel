@@ -64,6 +64,11 @@ interface ThreadComposerProps {
   metaTemplates?: WhatsAppMetaTemplate[]
   /** Envia um modelo aprovado — o único envio aceito fora da janela. */
   onSendTemplate?: (payload: MetaTemplatePayload) => Promise<boolean>
+  /**
+   * "Sugerir (IA)": pede um rascunho e o põe na caixa. Nada é enviado — o
+   * atendente lê, corrige e aperta Enviar. Ausente, o botão não aparece.
+   */
+  onSuggest?: () => Promise<string | null>
 }
 
 /**
@@ -115,7 +120,7 @@ const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).
  * modo nota continua ligado, porque o resto do lote ainda é nota e virar
  * resposta no meio do caminho é justamente a direção perigosa.
  */
-export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate, onSuggest }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
@@ -124,6 +129,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
   const [working, setWorking] = useState(false)
   const [progress, setProgress] = useState<{ n: number; total: number } | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
   // Lido uma vez: o navegador não ganha nem perde microfone com a aba aberta.
   const [canRecord] = useState(canRecordAudio)
   const boxRef = useRef<HTMLTextAreaElement>(null)
@@ -570,6 +576,28 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
             >
               <Icon name="chat" size={16} />
               <span className="hidden sm:inline">{t('whatsapp.quickReplies.button')}</span>
+            </button>
+          )}
+          {onSuggest && !isNote && (
+            <button
+              type="button"
+              className="modern-button-secondary shrink-0 px-3 sm:px-4"
+              aria-label={t('whatsapp.ai.suggest')}
+              title={t('whatsapp.ai.suggest')}
+              disabled={busy || suggesting}
+              onClick={() => {
+                setSuggesting(true)
+                void onSuggest()
+                  .then((texto) => {
+                    if (!texto) return
+                    setBody(texto)
+                    boxRef.current?.focus()
+                  })
+                  .finally(() => setSuggesting(false))
+              }}
+            >
+              <Icon name="sparkles" size={16} />
+              <span className="hidden sm:inline">{suggesting ? t('whatsapp.ai.suggesting') : t('whatsapp.ai.suggest')}</span>
             </button>
           )}
           {canRecord && !isNote && (

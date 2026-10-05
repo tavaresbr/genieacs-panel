@@ -2,6 +2,14 @@ import AppState from '../models/AppState.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
+import { createSecretBox } from '../utils/secretBox.js';
+import { AI_DEFAULT_BASE_URL, AI_DEFAULT_MODEL, normalizeAiBaseUrl } from './waAiClient.js';
+
+/** A chave da IA, cifrada num contexto só dela. */
+const aiKeyBox = createSecretBox('skygenpanel-wa-ai-key-v1');
+const AI_ERROR_KEY = 'wa_ai_last_error';
+export const AI_INSTRUCTIONS_MAX = 4000;
+const AI_MODEL_MAX = 64;
 
 /**
  * O que o provedor ajusta no atendimento automático — a aba "Chatbot".
@@ -60,8 +68,45 @@ function padroes() {
     distribution: { enabled: false },
     // Etiqueta automática: o que o cliente pediu ao bot vira etiqueta na
     // conversa. Os ids são preenchidos quando as etiquetas padrão nascem.
-    autoTags: { enabled: true, invoice: null, signal: null }
+    autoTags: { enabled: true, invoice: null, signal: null },
+    // Atendimento por IA (API compatível com OpenAI, como a z.ai). Desligado:
+    // só liga com chave. `apiKey` é o texto cifrado, nunca a chave.
+    ai: {
+      enabled: false,
+      suggest: false,
+      baseUrl: AI_DEFAULT_BASE_URL,
+      model: AI_DEFAULT_MODEL,
+      apiKey: null,
+      instructions: ''
+    }
   };
+}
+
+function lerIa(raw, atual) {
+  if (raw === undefined) return atual;
+  if (!raw || typeof raw !== 'object') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai');
+  let apiKey = atual.apiKey;
+  if (raw.apiKey !== undefined) {
+    const texto = String(raw.apiKey ?? '').trim();
+    apiKey = texto ? { v: 1, ...aiKeyBox.encrypt(texto) } : null;
+  }
+  const model = raw.model === undefined ? atual.model : String(raw.model ?? '').trim() || AI_DEFAULT_MODEL;
+  if (model.length > AI_MODEL_MAX) throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai');
+  const instructions = raw.instructions === undefined ? atual.instructions : String(raw.instructions ?? '').trim();
+  if (instructions.length > AI_INSTRUCTIONS_MAX) throw invalido('whatsapp.error.invalidBotConfig', 'bot_message_too_long');
+  const proximo = {
+    enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true,
+    suggest: raw.suggest === undefined ? atual.suggest : raw.suggest === true,
+    baseUrl: raw.baseUrl === undefined ? atual.baseUrl : normalizeAiBaseUrl(raw.baseUrl),
+    model,
+    apiKey,
+    instructions
+  };
+  // Ligar sem chave seria uma IA que falha a cada mensagem.
+  if ((proximo.enabled || proximo.suggest) && !proximo.apiKey) {
+    throw invalido('whatsapp.ai.error.keyRequired', 'ai_key_required');
+  }
+  return proximo;
 }
 
 const idOuNulo = (valor, atual) => {
@@ -174,7 +219,8 @@ class WaBotConfigService {
       },
       satisfaction: { ...base.satisfaction, ...(salvo.satisfaction || {}) },
       distribution: { ...base.distribution, ...(salvo.distribution || {}) },
-      autoTags: { ...base.autoTags, ...(salvo.autoTags || {}) }
+      autoTags: { ...base.autoTags, ...(salvo.autoTags || {}) },
+      ai: { ...base.ai, ...(salvo.ai || {}) }
     };
     this.cache.set(config);
     return config;
@@ -193,13 +239,42 @@ class WaBotConfigService {
 
   /** O que a tela lê: esta configuração mais os dois interruptores do WhatsApp. */
   static async getPublic(locale) {
-    const [config, wa] = await Promise.all([this.getConfig(), WhatsAppConfigService.getConfig()]);
+    const [config, wa, ultimoErro] = await Promise.all([
+      this.getConfig(), WhatsAppConfigService.getConfig(), this.aiLastError()
+    ]);
+    // A chave nunca sai: a tela só sabe se há uma.
+    const { apiKey, ...ai } = config.ai;
     return {
       enabled: wa.botEnabled !== false,
       unlockEnabled: wa.botUnlockEnabled === true,
       ...config,
+      ai: { ...ai, hasApiKey: Boolean(apiKey), lastError: ultimoErro },
       defaults: this.defaults(locale)
     };
+  }
+
+  /** A configuração da IA com a chave em claro, para quem chama a API. */
+  static async aiSettings() {
+    const { ai } = await this.getConfig();
+    const apiKey = ai.apiKey ? (aiKeyBox.decrypt(ai.apiKey) ?? '') : '';
+    return { ...ai, apiKey };
+  }
+
+  /** A última falha da IA (`{at, code}`), para a tela dizer por que caiu no menu. */
+  static async aiLastError() {
+    try {
+      return JSON.parse((await AppState.get(AI_ERROR_KEY)) || 'null');
+    } catch {
+      return null;
+    }
+  }
+
+  static async recordAiError(code) {
+    try {
+      await AppState.upsert(AI_ERROR_KEY, code ? JSON.stringify({ at: new Date().toISOString(), code }) : 'null');
+    } catch {
+      // A tela perder o último erro é melhor que o bot perder a resposta.
+    }
   }
 
   static async saveConfig(patch = {}, locale) {
@@ -210,7 +285,8 @@ class WaBotConfigService {
       hours: lerHorario(patch.hours, atual.hours),
       satisfaction: lerPesquisa(patch.satisfaction, atual.satisfaction),
       distribution: lerDistribuicao(patch.distribution, atual.distribution),
-      autoTags: lerAutoTags(patch.autoTags, atual.autoTags)
+      autoTags: lerAutoTags(patch.autoTags, atual.autoTags),
+      ai: lerIa(patch.ai, atual.ai)
     };
     const interruptores = {};
     if (patch.enabled !== undefined) interruptores.botEnabled = patch.enabled !== false;

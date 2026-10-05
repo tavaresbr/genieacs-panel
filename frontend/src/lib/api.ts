@@ -4684,6 +4684,29 @@ export interface BotConfig {
   distribution: { enabled: boolean }
   /** Etiqueta automática pelo assunto do pedido ao bot; ids de `WhatsAppTag`, ou null. */
   autoTags: { enabled: boolean; invoice: number | null; signal: number | null }
+  /** Atendimento por IA. A chave nunca volta do servidor: só `hasApiKey`. */
+  ai: BotAiConfig
+}
+
+export interface BotAiConfig {
+  enabled: boolean
+  suggest: boolean
+  baseUrl: string
+  model: string
+  instructions: string
+  hasApiKey: boolean
+  /** A última falha da IA, para dizer por que o cliente recebeu o menu. */
+  lastError: { at: string; code: string } | null
+}
+
+/** O que a tela manda: `apiKey` nova troca a chave, `''` apaga, ausente mantém. */
+export interface BotAiInput {
+  enabled?: boolean
+  suggest?: boolean
+  baseUrl?: string
+  model?: string
+  instructions?: string
+  apiKey?: string
 }
 
 /** Quanto o cliente espera por gente: `GET /whatsapp/response-time-report`. Tempos em segundos. */
@@ -4761,8 +4784,20 @@ export const whatsappAPI = {
     apiClient.get<BotConfig>('/whatsapp/bot-config'),
 
   /** Campo ausente mantém o gravado. */
-  updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults'>>) =>
+  updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults' | 'ai'>> & { ai?: BotAiInput }) =>
     apiClient.put<BotConfig>('/whatsapp/bot-config', config),
+
+  /** Uma pergunta curta à IA, com a chave digitada ou a salva. */
+  testBotAi: (payload: { baseUrl?: string; model?: string; apiKey?: string }) =>
+    apiClient.post<{ reply: string }>('/whatsapp/bot-config/ai-test', payload),
+
+  /** Se o botão "Sugerir (IA)" aparece para quem atende. */
+  getAiStatus: () =>
+    apiClient.get<{ suggest: boolean }>('/whatsapp/ai/status'),
+
+  /** Um rascunho da IA para a caixa de resposta; nada é enviado. */
+  suggestReply: (conversationId: number) =>
+    apiClient.post<{ text: string }>(`/whatsapp/conversations/${conversationId}/suggest-reply`, {}),
 
   getBotReport: (days: 7 | 30 | 90) =>
     apiClient.get<BotReport>(`/whatsapp/bot-report?days=${days}`),
