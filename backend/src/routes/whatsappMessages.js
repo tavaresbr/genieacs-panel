@@ -45,6 +45,12 @@ router.post('/tags', authenticateToken, requirePermission('whatsapp.config'), Wh
 router.patch('/tags/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.updateTag);
 router.delete('/tags/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.deleteTag);
 
+// Uma conversa só: é o que o clique na notificação abre.
+router.get('/conversations/:id', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.getConversation);
+
+// Mensagens novas para a notificação do navegador, desde o último cursor.
+router.get('/notifications', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listNotifications);
+
 // Quem está esperando gente há mais que o limite: o aviso da caixa de entrada.
 router.get('/waiting', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listWaiting);
 

@@ -4,6 +4,7 @@ import WaContactService from '../services/waContactService.js';
 import WaAssignmentService from '../services/waAssignmentService.js';
 import WaTagService from '../services/waTagService.js';
 import WaResponseTimeService from '../services/waResponseTimeService.js';
+import WaNotificationService from '../services/waNotificationService.js';
 import WaAlertService from '../services/waAlertService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
 import { SgpError } from '../services/sgpService.js';
@@ -178,6 +179,28 @@ class WhatsAppMessageController {
       const withinHours = await WaBotConfigService.withinHours(new Date());
       const items = withinHours ? await WaResponseTimeService.waitingNow({ minMinutes: threshold }) : [];
       return res.json(createResponse(req.t('whatsapp.configLoaded'), { thresholdMinutes: threshold, withinHours, items }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `GET /conversations/:id` — uma conversa, como a lista a desenha (o link da notificação). */
+  static async getConversation(req, res) {
+    try {
+      const conversation = await WaConversationService.get(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: 1 }), await WaConversationService.decorate(conversation)));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationsLoadFailed');
+    }
+  }
+
+  /** `GET /notifications?after=` — mensagens novas para o sino do navegador. */
+  static async listNotifications(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('whatsapp.configLoaded'),
+        await WaNotificationService.since({ userId: req.user?.userId ?? null, after: req.query?.after })
+      ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');
     }

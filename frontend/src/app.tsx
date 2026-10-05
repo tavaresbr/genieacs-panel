@@ -10,6 +10,7 @@ import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 import { SubscriptionNotice } from '@/components/subscription-notice'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { WhatsAppDisconnectedBanner } from '@/components/whatsapp/disconnected-banner'
+import { WhatsAppMessageNotifier } from '@/components/whatsapp/message-notifier'
 import { ConsoleHeader } from '@/components/console-header'
 import { MfaEnrollmentScreen } from '@/components/mfa-enrollment-screen'
 import { mustEnroll } from '@/lib/mfa-enrollment'
@@ -168,6 +169,9 @@ function ProtectedShell() {
           {/* Número de WhatsApp caído: em toda tela, porque o atendente só
               descobriria quando tentasse responder. */}
           <WhatsAppDisconnectedBanner />
+          {/* Mensagem nova de cliente: som e notificação do sistema, mesmo
+              com o painel em outra aba. Não desenha nada. */}
+          <WhatsAppMessageNotifier />
         </div>
         <Suspense fallback={<PageFallback />}>
           <OnboardingGate>

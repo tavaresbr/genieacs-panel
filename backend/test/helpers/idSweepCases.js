@@ -89,6 +89,15 @@ export const casos = [
   },
   {
     chave: 'conversation',
+    label: 'GET /api/whatsapp/conversations/:id',
+    method: 'GET',
+    path: (id) => `/api/whatsapp/conversations/${id}`,
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
     label: 'PUT /api/whatsapp/conversations/:id/tags',
     method: 'PUT',
     path: (id) => `/api/whatsapp/conversations/${id}/tags`,
