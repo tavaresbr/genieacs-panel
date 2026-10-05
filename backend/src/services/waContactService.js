@@ -1,4 +1,5 @@
 import WaConversation from '../models/WaConversation.js';
+import { optOutOf } from '../utils/wa/waOptOutTipos.js';
 import WaOptOut from '../models/WaOptOut.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
@@ -323,7 +324,7 @@ class WaContactService {
       })
       .orderBy('last_message_at', 'desc')
       .select('id', 'contract', 'sgp_contact_id', 'wa_phone_e164', 'last_message_at', 'closed_at');
-    const blocked = await WaOptOut.activePhones(phones);
+    const blocked = await WaOptOut.activeBlocks(phones);
 
     return subscribers.map((subscriber) => {
       const spellings = variantesTelefoneBr(subscriber.phone);
@@ -348,11 +349,43 @@ class WaContactService {
         hasDevice: Boolean(subscriber.deviceId),
         phone: subscriber.phone,
         phoneSource: subscriber.phoneSource,
-        optedOut: spellings.some((phone) => blocked.has(phone)),
+        ...optOutOf(spellings.map((phone) => blocked.get(phone)).filter((tipos) => tipos !== undefined)),
         conversationId: thread?.id ?? null,
         lastMessageAt: thread?.last_message_at ?? null
       };
     });
+  }
+
+  /**
+   * O nome do cliente de cada número, para a lista do "não perturbe". Procura
+   * o número (nas duas grafias do nono dígito) nos dois cadastros; o do ONT
+   * vence o do SGP, como na lista de contatos.
+   */
+  static async namesByPhone(phones) {
+    const wanted = [...new Set((phones || []).filter(Boolean))];
+    const names = new Map();
+    if (wanted.length === 0) return names;
+    const spellings = new Map();
+    for (const phone of wanted) for (const variant of variantesTelefoneBr(phone)) spellings.set(variant, phone);
+    const list = [...spellings.keys()];
+    const take = (rows, column) => {
+      for (const row of rows) {
+        const phone = spellings.get(row[column]);
+        if (phone && row.client_name) names.set(phone, row.client_name);
+      }
+    };
+    for (let at = 0; at < list.length; at += 500) {
+      const part = list.slice(at, at + 500);
+      // eslint-disable-next-line no-await-in-loop -- poucos blocos, uma leitura cada
+      take(await tdb('sgp_contacts').whereIn('phone_e164', part).select('phone_e164', 'client_name'), 'phone_e164');
+      // eslint-disable-next-line no-await-in-loop
+      take(await tdb('sgp_contacts').whereIn('phone_manual', part).select('phone_manual', 'client_name'), 'phone_manual');
+      // eslint-disable-next-line no-await-in-loop
+      take(await tdb('sgp_links').whereIn('phone_e164', part).select('phone_e164', 'client_name'), 'phone_e164');
+      // eslint-disable-next-line no-await-in-loop
+      take(await tdb('sgp_links').whereIn('phone_manual', part).select('phone_manual', 'client_name'), 'phone_manual');
+    }
+    return names;
   }
 
   /**

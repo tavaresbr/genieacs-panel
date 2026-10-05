@@ -122,6 +122,16 @@ export const casos = [
     tabela: 'wa_templates'
   },
   {
+    // Antes do DELETE: o controle revoga a linha semeada, e uma linha
+    // revogada responde 404 também ao dono.
+    chave: 'optOut',
+    label: 'PATCH /api/whatsapp/opt-outs/:id',
+    method: 'PATCH',
+    path: (id) => `/api/whatsapp/opt-outs/${id}`,
+    body: { categories: ['marketing'] },
+    tabela: 'wa_opt_outs'
+  },
+  {
     chave: 'optOut',
     label: 'DELETE /api/whatsapp/opt-outs/:id',
     method: 'DELETE',

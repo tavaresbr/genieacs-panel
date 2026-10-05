@@ -276,7 +276,7 @@ class MaintenanceService {
     const account = await contaDeEnvio();
     if (!account) return { enviados: [], pulados: 0, semConta: true };
     const telefones = [...new Set(linhas.map((row) => row.phone_e164).filter(Boolean))];
-    const optOut = await WaOptOut.activePhones(telefones);
+    const optOut = await WaOptOut.activePhones(telefones, 'service');
     const enviados = [];
     let pulados = 0;
     for (const phone of telefones) {

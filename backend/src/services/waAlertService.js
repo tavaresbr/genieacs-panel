@@ -1088,7 +1088,7 @@ class WaAlertService {
    * company and kept the phone.
    */
   static async dialableRecipients(recipients) {
-    const optedOut = await WaOptOut.activePhones(recipients);
+    const optedOut = await WaOptOut.activePhones(recipients, 'service');
     return recipients.filter((number) => !optedOut.has(number));
   }
 

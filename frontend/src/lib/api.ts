@@ -4093,6 +4093,10 @@ export interface WhatsAppOptOut {
   waLid: string | null
   origin: 'customer' | 'operator'
   reasonText: string | null
+  /** The kinds of message it blocks; `null` is everything. */
+  categories: string[] | null
+  /** The client this number belongs to, when the SGP records know it. */
+  clientName: string | null
   createdAt: string | null
 }
 
@@ -4599,7 +4603,10 @@ export interface WhatsAppContact {
   hasDevice: boolean
   phone: string | null
   phoneSource: 'manual' | 'sgp' | null
+  /** Blocked for everything. */
   optedOut: boolean
+  /** Blocked only for these kinds; `null` when not blocked or blocked for everything. */
+  optOutCategories?: string[] | null
   /** The thread already open with this subscriber, if any. */
   conversationId: number | null
   lastMessageAt: string | null
@@ -4930,8 +4937,12 @@ export const whatsappAPI = {
   listOptOuts: () =>
     apiClient.get<WhatsAppOptOut[]>('/whatsapp/opt-outs'),
 
-  createOptOut: (payload: { phone: string; reasonText?: string }) =>
+  createOptOut: (payload: { phone: string; reasonText?: string; categories?: string[] | null }) =>
     apiClient.post<WhatsAppOptOut>('/whatsapp/opt-outs', payload),
+
+  /** Changes which kinds of message an entry blocks; `null` is everything. */
+  updateOptOut: (id: number, categories: string[] | null) =>
+    apiClient.requestWithBody<WhatsAppOptOut>('PATCH', `/whatsapp/opt-outs/${id}`, { categories }),
 
   revokeOptOut: (id: number) =>
     apiClient.delete(`/whatsapp/opt-outs/${id}`),

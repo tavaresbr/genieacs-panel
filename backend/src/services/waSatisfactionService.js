@@ -76,7 +76,7 @@ class WaSatisfactionService {
       if (!humano) return { asked: false, reason: 'no_agent' };
 
       if (conversation.wa_phone_e164) {
-        const fora = await WaOptOut.activePhones([conversation.wa_phone_e164]);
+        const fora = await WaOptOut.activePhones([conversation.wa_phone_e164], 'survey');
         if (fora.size) return { asked: false, reason: 'opted_out' };
       }
 

@@ -130,7 +130,7 @@ class OutageIncidentService {
     if (avisados.length > 0) {
       const account = await contaDeEnvio();
       const telefones = [...new Set(avisados.map((row) => row.phone_e164))];
-      const optOut = await WaOptOut.activePhones(telefones);
+      const optOut = await WaOptOut.activePhones(telefones, 'service');
       if (account) {
         for (const phone of telefones) {
           if (optOut.has(phone)) continue;
@@ -176,7 +176,7 @@ class OutageIncidentService {
       .whereNull('notified_at')
       .whereNotNull('phone_e164');
     const telefones = [...new Set(pendentes.map((row) => row.phone_e164))];
-    const optOut = await WaOptOut.activePhones(telefones);
+    const optOut = await WaOptOut.activePhones(telefones, 'service');
     const agora = new Date();
     let enviados = 0;
     let pulados = 0;
