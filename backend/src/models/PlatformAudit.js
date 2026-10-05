@@ -45,6 +45,11 @@ class PlatformAudit {
     // credencial. Na SaaS só o console grava isso, e a linha é o que responde
     // "desde quando este cliente aponta para aquele ACS, e quem mudou".
     TENANT_GENIEACS_CHANGED: 'tenant.genieacs_changed',
+    // Os firmwares SEM dono de um GenieACS compartilhado (enviados antes de o
+    // dono ir no nome do arquivo): o console reenviou um como de um provedor
+    // (`<tag>--<nome>`), ou apagou o antigo. O detalhe diz o nome e a tag.
+    TENANT_FIRMWARE_REASSIGNED: 'tenant.firmware_reassigned',
+    TENANT_FIRMWARE_DELETED: 'tenant.firmware_deleted',
     // O servidor Evolution que atende todos os provedores.
     PLATFORM_WHATSAPP_CHANGED: 'platform.whatsapp_changed',
     // Os dados da empresa que vende o SaaS (Configurações → Dados do SaaS).

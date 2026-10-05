@@ -65,6 +65,8 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'device.factory_reset': 'audit.action.deviceFactoryReset',
   'device.diagnostic_started': 'audit.action.deviceDiagnosticStarted',
   'device.firmware_upgrade': 'audit.action.deviceFirmwareUpgrade',
+  'device.firmware_upload': 'audit.action.deviceFirmwareUpload',
+  'device.firmware_delete': 'audit.action.deviceFirmwareDelete',
   'device.batch_action': 'audit.action.deviceBatchAction',
   'user.mfa_enabled': 'audit.action.userMfaEnabled',
   'user.mfa_disabled': 'audit.action.userMfaDisabled',

@@ -3,6 +3,7 @@ import DeviceService from './deviceService.js';
 import WaConversationService from './waConversationService.js';
 import WaTemplateService from './waTemplateService.js';
 import WaBillingService from './waBillingService.js';
+import WaDunningService from './waDunningService.js';
 import { WaError } from './whatsappConfigService.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
@@ -223,10 +224,11 @@ class WaSubscriberPanelService {
       ? SgpService.exactContract(contracts, wanted)
       : SgpService.pickContract(contracts, conversation.contract || found.link?.contract || null);
 
-    const [router, invoices, contact] = await Promise.all([
+    const [router, invoices, contact, dunningPause] = await Promise.all([
       this.router(selected?.contract ?? null, conversation),
       this.invoices(selected?.contract ?? null),
-      selected?.clientId || !selected ? null : SgpContact.getByContract(selected.contract)
+      selected?.clientId || !selected ? null : SgpContact.getByContract(selected.contract),
+      selected ? WaDunningService.pauseFor(selected.contract) : null
     ]);
     const sgpUrl = SgpService.clientPageUrl(config, selected?.clientId || contact?.sgp_client_id);
 
@@ -251,6 +253,9 @@ class WaSubscriberPanelService {
       sgpUrl,
       router,
       invoices,
+      // A régua parada para este contrato (comprovante recebido): a faixa
+      // com "Retomar" no topo das faturas.
+      dunningPause,
       ticketEnabled: config.ticketEnabled === true
     };
   }
@@ -300,6 +305,13 @@ class WaSubscriberPanelService {
     const { contract: clean } = await this.actionContract(conversationId, contract);
     const result = await SgpService.requestTrustUnlock({ contract: clean });
     return { contract: clean, message: result.message };
+  }
+
+  /** Tira a pausa da régua de um contrato desta conversa. */
+  static async resumeDunning(conversationId, { contract }) {
+    const { contract: clean } = await this.actionContract(conversationId, contract);
+    await WaDunningService.resume(clean);
+    return { contract: clean, dunningPause: null };
   }
 
   /**

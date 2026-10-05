@@ -1980,6 +1980,31 @@ const WA_TAG_TABLES = [
 ];
 
 /**
+ * A régua de cobrança parada para um contrato (0097): o cliente mandou um
+ * comprovante, ou alguém pausou à mão. Uma linha por contrato; `until` é até
+ * quando. A passada pula o contrato sem gravar nada, então a etapa continua
+ * devida e sai depois da pausa se a fatura ainda estiver aberta.
+ */
+const waDunningPausesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('contract', 64).notNullable();
+  t.timestamp('until').notNullable();
+  t.string('reason', 16).notNullable(); // receipt | manual
+  t.integer('conversation_id').unsigned();
+  t.integer('message_id').unsigned();
+  t.integer('created_by').unsigned();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'contract'], { indexName: 'wa_dunning_pauses_contract_uq' });
+};
+
+const DUNNING_PAUSE_TABLES = [
+  ['wa_dunning_pauses', waDunningPausesTable]
+];
+
+/**
  * Os cupons de desconto da assinatura (0093). Da PLATAFORMA, como `plans`: um
  * cupom é do catálogo comercial do deploy inteiro, e um provedor o resgata —
  * não tem o seu. Por isso sem `tenant_id`, e só o console escreve aqui.
@@ -2395,6 +2420,7 @@ export const SCHEMA_TABLES = [
   ...SATISFACTION_TABLES,
   ...WA_AGENT_TABLES,
   ...WA_TAG_TABLES,
+  ...DUNNING_PAUSE_TABLES,
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
   ...COUPON_TABLES,
@@ -5444,7 +5470,19 @@ export const migrations = [
     }
   },
   {
-    id: '0097_wa_opt_out_categories',
+    /** A régua parada por contrato — ver `waDunningPausesTable`. */
+    id: '0097_wa_dunning_pauses',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_dunning_pauses');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'wa_dunning_pauses', waDunningPausesTable(db));
+    }
+  },
+  {
+    id: '0098_wa_opt_out_categories',
     async isApplied(db) {
       if (!(await db.schema.hasTable('wa_opt_outs'))) return true;
       return (await missingColumns(db, 'wa_opt_outs', WA_OPT_OUT_CATEGORY_COLUMNS)).length === 0;

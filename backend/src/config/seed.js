@@ -2,6 +2,7 @@ import { getDb, insertReturningId } from './database.js';
 import { IS_SAAS } from './edition.js';
 import { WA_SERVER_FIELDS } from './platformManaged.js';
 import { LEGACY_PRODUCT_NAMES, PRODUCT_NAME } from './brand.js';
+import { log } from '../utils/logger.js';
 
 export const DEFAULT_SETTINGS = {
   appName: PRODUCT_NAME,
@@ -366,7 +367,10 @@ export async function catalogueSource(db, sizes = null) {
  * silent — detection matches no vendor, the WiFi write finds no parameter path
  * and falls back to guessing, and the panel merely looks wrong.
  *
- * DE ONDE ELE COPIA: `catalogueSource`, logo acima, e o porquê está lá.
+ * DE ONDE ELE COPIA: `catalogueSource`, logo acima, e o porquê está lá — com
+ * uma restrição: na edição hospedada só copia quando a fonte é a caixa da
+ * plataforma. Fonte `provider` ali é o catálogo customizado de outro cliente,
+ * e esse não se copia; o provedor novo nasce vazio e o log avisa.
  *
  * The copy runs only for a provider whose three tables are ALL empty. Deleting
  * a vendor is an edit like any other, so anything left standing means an
@@ -386,16 +390,35 @@ async function seedVendorCatalogue(db, tenants) {
   const sizes = await catalogueSizes(db);
   const has = (tenant) => (sizes.get(Number(tenant.id)) || 0) > 0;
 
-  const { id: sourceId } = await catalogueSource(db, sizes);
+  const { id: sourceId, kind } = await catalogueSource(db, sizes);
   if (sourceId === null) return;
+
+  // Na edição hospedada, só a caixa da plataforma é fonte. O recuo para "o
+  // provedor de menor id" é a regra do self-hosted, onde a instalação inteira é
+  // de um ISP só; num deploy que atende vários, ele entregaria a um cliente
+  // novo os fabricantes e o `wifi_security_config` que OUTRO cliente editou —
+  // dado de um provedor vazando para outro. Sem caixa com catálogo, o provedor
+  // novo nasce vazio, e o aviso abaixo é o que faz isso aparecer no log em vez
+  // de virar um "o WiFi não troca" três telas depois. `catalogueSource` segue
+  // devolvendo `kind: 'provider'` porque o console mostra essa situação.
+  if (IS_SAAS && kind !== 'platform') {
+    const vazios = tenants.filter((tenant) => !has(tenant)).map((tenant) => Number(tenant.id));
+    if (vazios.length > 0) {
+      log.warn('vendor catalogue not copied: hosted edition only copies from the platform tenant', {
+        sourceTenant: Number(sourceId),
+        sourceKind: kind,
+        tenants: vazios.join(',')
+      });
+    }
+    return;
+  }
 
   for (const tenant of tenants) {
     if (has(tenant)) continue;
-    // A CAIXA também recebe, enquanto estiver vazia, e é de propósito: é assim
-    // que ela nasce com o catálogo que o deploy já roda, sem ninguém redigitar
-    // nada. É o único momento em que o primeiro ISP ainda é a referência —
-    // uma vez, no dia em que a caixa é criada. Depois disso a fonte é ela, e
-    // este laço nunca mais a visita, porque ela deixou de estar vazia.
+    // Uma caixa vazia já não recebe cópia do primeiro ISP na edição hospedada
+    // (o retorno acima): o catálogo dela é montado por quem opera o deploy,
+    // pela aba Catálogo padrão. Quando a fonte é a própria caixa, ela não está
+    // vazia, e este laço nunca a visita.
     await copyCatalogue(db, sourceId, tenant.id);
   }
 }

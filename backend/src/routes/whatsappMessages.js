@@ -150,6 +150,17 @@ router.post(
   WhatsAppSubscriberController.unlock
 );
 
+// "Retomar régua": quem atende confere o comprovante no SGP e devolve o
+// contrato à régua. `whatsapp.send`, como mandar a 2ª via — é atendimento.
+router.post(
+  '/conversations/:id/subscriber/dunning-resume',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  requirePermission('sgp.read'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.resumeDunning
+);
+
 // The billing text is only ever handed back to the composer: `whatsapp.send`
 // because the only use of it is a message, `sgp.read` because it reads the ERP.
 router.post(

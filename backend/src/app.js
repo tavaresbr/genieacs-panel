@@ -15,10 +15,11 @@ import {
   apiLimiter,
   attachmentUploadLimiter,
   authLimiter,
+  firmwareUploadLimiter,
   portalIpLimiter,
   portalLoginLimiter
 } from './middleware/rateLimit.js';
-import { authenticateToken, requirePermission } from './middleware/auth.js';
+import { authenticateToken, requirePermission, requirePlatformAdmin } from './middleware/auth.js';
 import { log, requestLogger } from './utils/logger.js';
 import { httpMetrics } from './utils/metrics.js';
 import { acsAgentOfflineBody, isAgentOffline } from './services/genieacs/agent.js';
@@ -57,6 +58,7 @@ import { BILLING_WEBHOOK_PATH } from './config/billingWebhookPath.js';
 import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
+import { FIRMWARE_REASSIGN_PATH, FIRMWARE_UPLOAD_PATH, firmwareRawBody } from './services/firmwareStore.js';
 import provisioningRoutes from './routes/provisioning.js';
 import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
@@ -215,6 +217,30 @@ app.use(
   // sem que nada perto dela dissesse por quê.
   requirePermission('whatsapp.send'),
   attachmentRawBody
+);
+// O firmware enviado ao GenieACS: o corpo é o arquivo (até `FIRMWARE_MAX_MB`),
+// reservado aqui pelo mesmo motivo e na mesma ordem do anexo acima — limite,
+// sessão e capacidade ANTES de o parser guardar um byte. Só o `POST` e só o
+// caminho exato (`app.post`, e não `app.use`): a lista (`GET`) e o apagar
+// (`DELETE .../:name`) do mesmo prefixo não têm corpo, e não devem gastar o
+// balde do envio. As rotas em si vivem com as vizinhas (`routes/devices.js`,
+// `routes/platform.js`), que repetem as guardas.
+app.post(
+  FIRMWARE_UPLOAD_PATH,
+  firmwareUploadLimiter,
+  authenticateToken,
+  // A MESMA capacidade da rota em `routes/devices.js`.
+  requirePermission('devices.maintain'),
+  firmwareRawBody
+);
+// O reenvio da plataforma de um firmware sem dono (console → GenieACS do
+// provedor). Guarda do console em vez da capacidade de provedor.
+app.post(
+  FIRMWARE_REASSIGN_PATH,
+  firmwareUploadLimiter,
+  authenticateToken,
+  requirePlatformAdmin,
+  firmwareRawBody
 );
 app.use(express.json({ limit: '1mb' }));
 

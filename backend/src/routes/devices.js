@@ -25,6 +25,14 @@ router.post('/swaps/:id/acknowledge', authenticateToken, requirePermission('devi
 // Todos os firmwares que dizem o modelo: a lista do lote, onde as ONTs
 // marcadas podem ser de modelos diferentes.
 router.get('/firmware/files', authenticateToken, requirePermission('devices.maintain'), DeviceController.listFirmwareCatalog);
+// Enviar e apagar um firmware no GenieACS. O corpo do envio é o arquivo cru,
+// lido pelo parser reservado em `app.js` (limite e guardas lá, repetidas aqui).
+// O nome no `DELETE` é o `id` da lista — com o prefixo do dono num ACS
+// compartilhado — e vai na query (`?name=`), como o id do aparelho nas
+// vizinhas: é arquivo do GenieACS, não linha deste painel, e
+// route-coverage.test.js não deixa crescer a lista de rotas por parâmetro.
+router.post('/firmware/files', authenticateToken, requirePermission('devices.maintain'), DeviceController.uploadFirmwareFile);
+router.delete('/firmware/files', authenticateToken, requirePermission('devices.maintain'), DeviceController.deleteFirmwareFile);
 router.get('/firmware', authenticateToken, requirePermission('devices.maintain'), DeviceController.listFirmware);
 router.post('/firmware/upgrade', authenticateToken, requirePermission('devices.maintain'), DeviceController.upgradeFirmware);
 router.get('/parameters', authenticateToken, requirePermission('devices.inspect'), DeviceController.getDeviceParameters);

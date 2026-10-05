@@ -7,6 +7,7 @@ import GenieAcsEgress from '../genieacsEgress.js';
 import GenieAcsAuthService from '../genieacsAuthService.js';
 import { withAcsSlot } from './concurrency.js';
 import { sameAcsAsAny } from './acsIdentity.js';
+import { firmwareOwner, validFirmwareName } from '../firmwareFiles.js';
 
 /**
  * O modo `direct`: o painel fala HTTP com a NBI do provedor.
@@ -24,6 +25,13 @@ import { sameAcsAsAny } from './acsIdentity.js';
  */
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+
+/**
+ * O prazo de quem manda um arquivo inteiro (firmware) à NBI. Os 15 s de sempre
+ * são para JSON; 64 MB subindo por um link de provedor levam mais. É o mesmo
+ * teto que o agente aceita (`MAX_TIMEOUT_MS` do programa dele).
+ */
+export const UPLOAD_TIMEOUT_MS = 120_000;
 
 /**
  * A tag de equipamentos do provedor, num GenieACS COMPARTILHADO.
@@ -78,6 +86,34 @@ export function forgetSharedAcs() {
 }
 
 const naoEncontrado = () => new TranslatableError('device.notFound', null, { status: 404, code: 'device_not_found' });
+const arquivoNaoEncontrado = () => new TranslatableError('device.firmwareNotFound', null, { status: 404, code: 'firmware_not_found' });
+
+/**
+ * O caminho de UM arquivo na coleção `files`, com o nome conferido e escapado.
+ * Nome torto é "não encontrado" — o mesmo que o escopo responde —, e nunca um
+ * caminho montado com ele.
+ */
+export function filePath(name) {
+  if (!validFirmwareName(name)) throw arquivoNaoEncontrado();
+  return `files/${encodeURIComponent(name)}`;
+}
+
+/**
+ * A busca da coleção `files` E o prefixo do dono (`<tag>--`). A tag só tem
+ * `[A-Za-z0-9_]` (`DEVICE_SCOPE_TAG_PATTERN`), então vai na expressão sem
+ * escape nenhum.
+ */
+export function mergeFilesOwnerQuery(rawQuery, tag) {
+  let base = null;
+  if (rawQuery !== undefined && rawQuery !== null && String(rawQuery).trim() !== '') {
+    base = typeof rawQuery === 'string' ? JSON.parse(rawQuery) : rawQuery;
+  }
+  // A tag "sem dono" não é dona de nada: a expressão que nunca casa.
+  const dono = tag !== UNASSIGNED_SCOPE_TAG && DEVICE_SCOPE_TAG_PATTERN.test(String(tag)) ? `^${tag}--` : '^$a';
+  const escopo = { _id: { $regex: dono } };
+  const temBase = base && typeof base === 'object' && Object.keys(base).length > 0;
+  return JSON.stringify(temBase ? { $and: [base, escopo] } : escopo);
+}
 
 class DirectConnector {
   static mode = 'direct';
@@ -158,7 +194,11 @@ class DirectConnector {
     body = null,
     headers = {},
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    unscoped = false
+    unscoped = false,
+    // Corpo binário (o arquivo de firmware): vai como está, sem
+    // `JSON.stringify`, com o `contentType` dado. Exclui `body`.
+    rawBody = null,
+    contentType = 'application/octet-stream'
   } = {}) {
     // O escopo do provedor vem ANTES de montar a URL: é aqui, e só aqui, que
     // toda conversa com o ACS passa — lista, detalhe, tarefa, tag, falha.
@@ -199,7 +239,11 @@ class DirectConnector {
       try {
         const extras = { ...headers };
         let payload = null;
-        if (body !== null && body !== undefined) {
+        if (rawBody !== null && rawBody !== undefined) {
+          if (!Buffer.isBuffer(rawBody)) throw new TypeError('rawBody must be a Buffer');
+          extras['Content-Type'] = contentType;
+          payload = rawBody;
+        } else if (body !== null && body !== undefined) {
           extras['Content-Type'] = 'application/json';
           payload = typeof body === 'string' ? body : JSON.stringify(body);
         }
@@ -326,6 +370,8 @@ class DirectConnector {
    * - Tag de provedor num equipamento: ninguém põe nem tira pela API do painel.
    * - Falha (`faults/<device>:<canal>`): o equipamento da falha tem que ser dele.
    * - Fila de tarefas de um equipamento: idem.
+   * - Arquivo (`files/<nome>`: gravar, apagar): só o que leva o prefixo da tag
+   *   no nome (`firmwareOwner`); a lista da coleção ganha o mesmo filtro.
    */
   static async applyScope(tag, endpoint, method, query = {}) {
     const caminho = String(endpoint ?? '').replace(/^\/+/, '');
@@ -351,6 +397,24 @@ class DirectConnector {
       const faultId = decodeURIComponent(partes[1]);
       const corte = faultId.lastIndexOf(':');
       await this.assertOwned(tag, corte > 0 ? faultId.slice(0, corte) : faultId);
+      return query;
+    }
+
+    if (partes[0] === 'files') {
+      if (partes.length === 1 || partes[1] === '') {
+        // A lista: só os do dono, já no GenieACS. O serviço filtra de novo
+        // (`filesOwnedBy`); isto é a guarda de quem esquecer de filtrar.
+        if (method !== 'GET') throw arquivoNaoEncontrado();
+        return { ...query, query: mergeFilesOwnerQuery(query?.query, tag) };
+      }
+      let nome = '';
+      try { nome = decodeURIComponent(partes[1]); } catch { nome = ''; }
+      // O arquivo de outro provedor, o sem dono e o nome torto respondem o
+      // mesmo "não encontrado": nunca confirmar que um nome existe.
+      if (partes.length > 2 || tag === UNASSIGNED_SCOPE_TAG || !validFirmwareName(nome)
+        || firmwareOwner({ _id: nome }) !== tag) {
+        throw arquivoNaoEncontrado();
+      }
       return query;
     }
 

@@ -70,6 +70,16 @@ class WhatsAppSubscriberController {
     }
   }
 
+  /** "Retomar régua": a próxima passada volta a cobrar o contrato. */
+  static async resumeDunning(req, res) {
+    try {
+      const result = await WaSubscriberPanelService.resumeDunning(req.params?.id, { contract: req.body?.contract });
+      return res.json(createResponse(req.t('whatsapp.dunning.resumed'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.resumeFailed');
+    }
+  }
+
   static async secondCopy(req, res) {
     try {
       const result = await WaSubscriberPanelService.secondCopy(req.params?.id, {

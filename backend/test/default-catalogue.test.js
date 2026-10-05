@@ -11,8 +11,10 @@ import assert from 'node:assert/strict';
  * decidido isso, e ele edita ou apaga o dele à vontade, porque é dele.
  *
  * O que o arquivo prova é a inversão e o que ela NÃO derruba: com uma caixa de
- * plataforma, ela manda; sem caixa, a regra antiga vale byte por byte, que é o
- * que mantém funcionando todo install self-hosted.
+ * plataforma, ela manda; sem caixa, a regra antiga vale byte por byte no
+ * self-hosted (`default-catalogue-selfhosted.test.js`). Na edição hospedada,
+ * que é a deste arquivo, o recuo para um provedor não copia nada: o catálogo de
+ * um cliente não vira o de outro.
  *
  * Por que isto não é cosmético: do catálogo saem os caminhos de parâmetro que o
  * painel ESCREVE no CPE. Sem ele a troca de senha de WiFi adivinha o caminho —
@@ -83,11 +85,24 @@ describe('a fonte do catálogo padrão', () => {
     assert.equal(Number(fonte.id), Number(instalacao));
   });
 
-  it('e um provedor novo herda dela', async () => {
+  /**
+   * Mas, na edição hospedada, um provedor novo NÃO herda dela. Fonte `provider`
+   * aqui é o catálogo que outro cliente customizou — os fabricantes e o
+   * `wifi_security_config` dele —, e copiá-lo é vazar dado de um provedor para
+   * outro. O recuo continua valendo no self-hosted, onde a instalação inteira é
+   * de um ISP só (`default-catalogue-selfhosted.test.js`).
+   */
+  it('e, na edição hospedada, o provedor novo NÃO herda dela', async () => {
     const novo = await criarProvedor('beta', 'Provedor Beta');
     await seedDefaults();
+    assert.deepEqual(await vendorsDe(novo), []);
+    assert.equal(
+      (await getDb()('wifi_security_config').where({ tenant_id: novo })).length,
+      0
+    );
+    // E a fonte de quem ninguém copiou segue intacta.
     assert.deepEqual(
-      (await vendorsDe(novo)).map((v) => v.name),
+      (await vendorsDe(instalacao)).map((v) => v.name),
       ['Fonte da instalação']
     );
   });
@@ -144,22 +159,34 @@ describe('e com a caixa da plataforma', () => {
 });
 
 /**
- * O bootstrap, que é surpreendente e é de propósito.
+ * A caixa vazia, na edição hospedada.
+ *
+ * Antes ela recebia cópia do primeiro ISP no boot, e era assim que nascia com
+ * o catálogo do deploy. Era também a mesma cópia entre clientes que a regra
+ * acima proíbe: o catálogo do primeiro ISP é dele, customizado por ele. Agora
+ * a caixa é montada por quem opera o deploy, e o console mostra a fonte como
+ * `provider` enquanto ela estiver vazia.
  */
 describe('e a caixa vazia', () => {
-  it('recebe cópia como qualquer um, e é assim que ela nasce com o catálogo do deploy', async () => {
+  it('não recebe cópia de provedor nenhum, e nem o provedor que nasce junto', async () => {
     const db = getDb();
     const caixa = await db('tenants').where({ kind: 'platform' }).first();
     await apagarCatalogo(caixa.id);
 
-    // Vazia, ela não pode ser a fonte de ninguém — inclusive de si mesma.
+    // Vazia, ela não pode ser a fonte de ninguém — inclusive de si mesma. E o
+    // `kind` continua dizendo 'provider', que é o que o console exibe.
     const fonte = await catalogueSource(db);
     assert.equal(fonte.kind, 'provider');
 
+    const novo = await criarProvedor('epsilon', 'Provedor Epsilon');
     await seedDefaults();
-    // E o próximo boot a encontra com catálogo, vinda do provedor. É o único
-    // momento em que o primeiro ISP ainda é a referência: uma vez.
-    assert.ok((await vendorsDe(caixa.id)).length > 0);
+    assert.deepEqual(await vendorsDe(caixa.id), []);
+    assert.deepEqual(await vendorsDe(novo), []);
+    assert.equal((await catalogueSource(db)).kind, 'provider');
+
+    // Recheada à mão — o caminho que sobra —, ela volta a ser a fonte. É também
+    // o estado de que a rota do console, logo abaixo, precisa.
+    await runInTenant(caixa.id, () => Vendor.create(vendorRow('Fabricante da plataforma')));
     assert.equal((await catalogueSource(db)).kind, 'platform');
   });
 });

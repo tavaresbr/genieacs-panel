@@ -10,6 +10,8 @@ import WaSendService from './waSendService.js';
 import WaMetaTemplateService from './waMetaTemplateService.js';
 import WaTemplateService from './waTemplateService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
+import WaTagService from './waTagService.js';
+import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
 import { isUniqueViolation, tdb, tinsertReturningId, withDeadlockRetry } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
@@ -85,9 +87,19 @@ export const PREVIEW_CONTRACTS = 1000;
 /** Por quanto tempo um pagamento ainda rende agradecimento. */
 const THANKS_WINDOW_MS = 3 * 24 * 3600_000;
 
+/** Quantos dias a régua para quando o cliente manda um comprovante. */
+export const RECEIPT_PAUSE_MAX_DAYS = 15;
+const DIA_MS = 24 * 3600_000;
+
+/** O que conta como comprovante: imagem ou PDF. Áudio e vídeo, não. */
+export function pareceComprovante(mime) {
+  const tipo = String(mime ?? '').toLowerCase();
+  return tipo.startsWith('image/') || tipo === 'application/pdf';
+}
+
 /** Os motivos de pulo, na ordem em que o operador pode agir sobre eles. */
 export const SKIP_REASONS = Object.freeze([
-  'noPhone', 'optOut', 'templateIncomplete', 'maxReached', 'interval', 'sgpRefused'
+  'noPhone', 'optOut', 'templateIncomplete', 'maxReached', 'interval', 'paused', 'sgpRefused'
 ]);
 
 /** O motivo gravado em `wa_dunning_sends.reason`. */
@@ -105,6 +117,9 @@ function padroes() {
     maxPerInvoice: 6,
     minIntervalHours: 24,
     maxPerRun: 500,
+    // Comprovante (imagem ou PDF) numa conversa com contrato: a régua para
+    // esse contrato por tantos dias. 0 desliga.
+    receiptPauseDays: 3,
     thanksTemplateId: null,
     window: { timezone: 'America/Sao_Paulo', week: semanaPadraoCobranca() },
     enabledAt: null,
@@ -275,6 +290,8 @@ class WaDunningService {
       : inteiro(input.minIntervalHours, { min: 0, max: MIN_INTERVAL_LIMIT_HOURS, code: 'invalid_min_interval' });
     const maxPerRun = input.maxPerRun === undefined ? atual.maxPerRun
       : inteiro(input.maxPerRun, { min: 1, max: MAX_PER_RUN_LIMIT, code: 'invalid_max_per_run' });
+    const receiptPauseDays = input.receiptPauseDays === undefined ? atual.receiptPauseDays
+      : inteiro(input.receiptPauseDays, { min: 0, max: RECEIPT_PAUSE_MAX_DAYS, code: 'invalid_receipt_pause' });
 
     let thanksTemplateId = input.thanksTemplateId === undefined ? atual.thanksTemplateId : input.thanksTemplateId;
     if (thanksTemplateId === '' || thanksTemplateId === null) thanksTemplateId = null;
@@ -287,6 +304,7 @@ class WaDunningService {
       maxPerInvoice,
       minIntervalHours,
       maxPerRun,
+      receiptPauseDays,
       thanksTemplateId,
       enabled: atual.enabled && steps.length > 0,
       updatedAt: new Date().toISOString()
@@ -427,6 +445,7 @@ class WaDunningService {
       maxPerInvoice: rule.maxPerInvoice,
       minIntervalHours: rule.minIntervalHours,
       maxPerRun: rule.maxPerRun,
+      receiptPauseDays: rule.receiptPauseDays,
       thanksTemplateId: rule.thanksTemplateId,
       window: rule.window,
       enabledAt: rule.enabledAt,
@@ -589,6 +608,7 @@ class WaDunningService {
     onProgress?.({ checked: 0, total: subscribers.length });
     const blocked = await WaOptOut.activePhones(subscribers.map((s) => s.phone).filter(Boolean), 'billing');
     const open = await this.openSendsByContract();
+    const pausados = await this.pausedContracts(now);
     let calls = 0;
 
     for (const subscriber of subscribers) {
@@ -619,6 +639,28 @@ class WaDunningService {
       const dias = diasEntre(fatura.dueDate, now);
       const step = etapaDevida(rule.steps, dias);
       if (!step) continue;
+
+      // O cliente mandou comprovante (ou alguém pausou): nada se grava, e a
+      // etapa continua devida para a primeira passada depois da pausa.
+      if (pausados.has(subscriber.contract)) {
+        summary.skipped.paused += 1;
+        if (dryRun) {
+          summary.items.push({
+            contract: subscriber.contract,
+            clientName: subscriber.clientName,
+            phone: subscriber.phone,
+            dueDate: fatura.dueDate ? String(fatura.dueDate).slice(0, 10) : null,
+            amount: fatura.amount ?? null,
+            daysOverdue: dias,
+            stepOffset: step.offsetDays,
+            templateName: templates.get(step.templateId)?.name ?? null,
+            status: 'deferred',
+            reason: 'paused',
+            missing: []
+          });
+        }
+        continue;
+      }
 
       // eslint-disable-next-line no-await-in-loop -- uma decisão por contrato
       const outcome = await this.decide({
@@ -830,16 +872,167 @@ class WaDunningService {
   }
 
   static async cancelQueued(row, now) {
-    let retirada = false;
-    if (row.message_id) {
-      retirada = (await tdb('wa_messages')
-        .where({ id: row.message_id, delivery_status: 'queued' })
-        .del()) > 0;
-    }
+    const retirada = await this.withdraw(row);
     await tdb('wa_dunning_sends').where({ id: row.id }).update({
       paid_at: now,
       ...(retirada ? { status: 'canceled', reason: 'paid', message_id: null } : {}),
       updated_at: now
+    });
+  }
+
+  /** Apaga a mensagem da fila, se ela ainda não saiu. */
+  static async withdraw(row) {
+    if (!row.message_id) return false;
+    return (await tdb('wa_messages')
+      .where({ id: row.message_id, delivery_status: 'queued' })
+      .del()) > 0;
+  }
+
+  /**
+   * Retira da fila, sem dar a fatura como paga: a etapa fica decidida, como
+   * já acontece com a que o pagamento cancelou — não volta a ser cobrada.
+   */
+  static async cancelWithReason(row, reason, now = new Date()) {
+    if (!await this.withdraw(row)) return false;
+    await tdb('wa_dunning_sends').where({ id: row.id })
+      .update({ status: 'canceled', reason, message_id: null, updated_at: now });
+    return true;
+  }
+
+  // ── Conferência na saída ───────────────────────────────────────────
+
+  /**
+   * A mensagem da régua ainda deve sair? Perguntado pelo outbox na hora do
+   * envio, porque entre a passada e a saída podem correr horas: o cliente
+   * mandou o comprovante, ou o SGP deu a baixa.
+   *
+   * `false` quer dizer que a mensagem foi retirada da fila. Uma mensagem que
+   * não é da régua, ou um SGP que não responde, deixa sair — a passada já viu
+   * a fatura em aberto, e uma queda do ERP não pode travar a régua.
+   */
+  static async stillDue(messageId, now = new Date()) {
+    try {
+      const row = await tdb('wa_dunning_sends')
+        .where({ message_id: messageId, kind: 'step', status: 'queued' })
+        .first('id', 'contract', 'invoice_key', 'message_id');
+      if (!row) return true;
+      if ((await this.pausedContracts(now, [row.contract])).has(row.contract)) {
+        return !await this.cancelWithReason(row, 'paused', now);
+      }
+      const invoices = await WaBillingService.pacedInvoices(row.contract, false);
+      if (invoices === null) return true;
+      if (invoices.some((f) => chaveDaFatura(f) === row.invoice_key)) return true;
+      // Saiu das em aberto: paga (marca e agradece pelo caminho de sempre)
+      // ou cancelada (só retira).
+      await this.detectPayments(row.contract, now);
+      const depois = await tdb('wa_dunning_sends').where({ id: row.id }).first('status');
+      if (depois?.status === 'queued') return !await this.cancelWithReason(row, 'paid', now);
+      return false;
+    } catch (error) {
+      console.warn(`[wa] régua: conferência na saída da mensagem ${messageId}: ${error.message}`);
+      return true;
+    }
+  }
+
+  // ── Pausa por comprovante ──────────────────────────────────────────
+
+  /** Os contratos com a régua parada agora (opcionalmente só entre `contracts`). */
+  static async pausedContracts(now = new Date(), contracts = null) {
+    const q = tdb('wa_dunning_pauses').where('until', '>', now);
+    if (contracts) q.whereIn('contract', contracts.map(String));
+    return new Set((await q.pluck('contract')).map(String));
+  }
+
+  /** A pausa ativa de um contrato, para a tela; `null` sem nenhuma. */
+  static async pauseFor(contract, now = new Date()) {
+    const key = String(contract ?? '').trim();
+    if (!key) return null;
+    const row = await tdb('wa_dunning_pauses').where({ contract: key }).where('until', '>', now).first();
+    if (!row) return null;
+    return { contract: key, until: new Date(row.until).toISOString(), reason: row.reason };
+  }
+
+  /** Para a régua de um contrato até `until`. Nunca encurta uma pausa maior. */
+  static async pause({ contract, until, reason, conversationId = null, messageId = null, userId = null, now = new Date() }) {
+    const key = String(contract ?? '').trim();
+    if (!key) return null;
+    const atual = await tdb('wa_dunning_pauses').where({ contract: key }).first();
+    if (atual) {
+      const fim = new Date(Math.max(new Date(atual.until).getTime(), until.getTime()));
+      await tdb('wa_dunning_pauses').where({ id: atual.id }).update({
+        until: fim, reason, conversation_id: conversationId, message_id: messageId, created_by: userId, updated_at: now
+      });
+    } else {
+      try {
+        await tinsertReturningId('wa_dunning_pauses', {
+          contract: key, until, reason, conversation_id: conversationId, message_id: messageId,
+          created_by: userId, created_at: now, updated_at: now
+        });
+      } catch (error) {
+        // Dois comprovantes juntos: o outro gravou primeiro, e vale o mesmo.
+        if (!isUniqueViolation(error)) throw error;
+      }
+    }
+    // O que já estava na fila para este contrato não sai.
+    const naFila = await tdb('wa_dunning_sends')
+      .where({ contract: key, kind: 'step', status: 'queued' })
+      .whereNotNull('message_id')
+      .select('id', 'message_id');
+    let retiradas = 0;
+    for (const row of naFila) {
+      // eslint-disable-next-line no-await-in-loop -- poucas linhas por contrato
+      if (await this.cancelWithReason(row, 'paused', now)) retiradas += 1;
+    }
+    return { contract: key, until: until.toISOString(), withdrawn: retiradas };
+  }
+
+  /** Retomar: a próxima passada volta a cobrar o contrato. */
+  static async resume(contract) {
+    const key = String(contract ?? '').trim();
+    if (!key) return false;
+    return (await tdb('wa_dunning_pauses').where({ contract: key }).del()) > 0;
+  }
+
+  /**
+   * O cliente mandou imagem ou PDF numa conversa com contrato: pode ser o
+   * comprovante. A régua para esse contrato por `receiptPauseDays` dias,
+   * e a conversa ganha a nota e a etiqueta para alguém conferir no SGP.
+   *
+   * Nunca lança: a mensagem do cliente já está gravada.
+   *
+   * @returns {Promise<{contract: string, until: string}|null>}
+   */
+  static async pauseForReceipt({ conversation, messageId = null, mime, now = new Date() }) {
+    try {
+      if (!pareceComprovante(mime) || !conversation?.contract) return null;
+      const rule = await this.getRule();
+      const dias = Number(rule.receiptPauseDays) || 0;
+      if (!rule.enabled || dias <= 0) return null;
+      const until = new Date(now.getTime() + dias * DIA_MS);
+      const feito = await this.pause({
+        contract: conversation.contract, until, reason: 'receipt', conversationId: conversation.id, messageId, now
+      });
+      if (!feito) return null;
+      const pausa = await this.pauseFor(conversation.contract, now);
+      await this.noteReceipt(conversation, pausa?.until ?? feito.until);
+      await WaTagService.tagReceipt(conversation.id);
+      return { contract: feito.contract, until: pausa?.until ?? feito.until };
+    } catch (error) {
+      console.warn(`[wa] régua: pausa por comprovante: ${error.message}`);
+      return null;
+    }
+  }
+
+  /** A nota interna na conversa: só o atendente vê. */
+  static async noteReceipt(conversation, until) {
+    const t = translatorFor(DEFAULT_LOCALE);
+    const quando = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit'
+    }).format(new Date(until));
+    await WaSendService.enqueue({
+      conversationId: conversation.id,
+      body: t('whatsapp.dunning.receiptNote', { contract: conversation.contract, until: quando }),
+      isNote: true
     });
   }
 

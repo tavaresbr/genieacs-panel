@@ -138,8 +138,9 @@ server {
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
 
-    # O painel não recebe upload: o maior corpo que ele aceita é 1 MB
-    # (`express.json`), e a mídia do WhatsApp ele busca, não recebe.
+    # O painel quase não recebe upload: o maior corpo JSON que ele aceita é 1 MB
+    # (`express.json`), e a mídia do WhatsApp ele busca, não recebe. A exceção
+    # é o envio de firmware, com `location` e teto próprios logo abaixo.
     client_max_body_size 2m;
 
     # --- O agente do GenieACS (WebSocket) ---------------------------------
@@ -171,6 +172,48 @@ server {
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
         proxy_buffering off;
+    }
+
+    # --- Envio de firmware ao GenieACS ---------------------------------------
+    #
+    # A única rota do painel que recebe arquivo grande: o firmware que o
+    # provedor envia (Configurações) e o que o console reenvia como de um
+    # provedor. O painel aceita até `FIRMWARE_MAX_MB` (64 por padrão); o teto
+    # aqui é o mesmo — subir um sem descer o outro faz o nginx recusar com uma
+    # página dele, que a tela não sabe ler. Os tempos são maiores porque o
+    # painel só responde depois de repassar o arquivo inteiro ao GenieACS (até
+    # 120 s); `proxy_request_buffering off` manda os bytes ao painel enquanto
+    # chegam, em vez de guardá-los em disco primeiro.
+    location = /api/devices/firmware/files {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        client_max_body_size 64m;
+        proxy_request_buffering off;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
+    }
+
+    location ~ ^/api/platform/tenants/[0-9]+/genieacs/firmware/reassign$ {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        client_max_body_size 64m;
+        proxy_request_buffering off;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
     }
 
     location / {
@@ -220,6 +263,48 @@ server {
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
         proxy_buffering off;
+    }
+
+    # --- Envio de firmware ao GenieACS ---------------------------------------
+    #
+    # A única rota do painel que recebe arquivo grande: o firmware que o
+    # provedor envia (Configurações) e o que o console reenvia como de um
+    # provedor. O painel aceita até `FIRMWARE_MAX_MB` (64 por padrão); o teto
+    # aqui é o mesmo — subir um sem descer o outro faz o nginx recusar com uma
+    # página dele, que a tela não sabe ler. Os tempos são maiores porque o
+    # painel só responde depois de repassar o arquivo inteiro ao GenieACS (até
+    # 120 s); `proxy_request_buffering off` manda os bytes ao painel enquanto
+    # chegam, em vez de guardá-los em disco primeiro.
+    location = /api/devices/firmware/files {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        client_max_body_size 64m;
+        proxy_request_buffering off;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
+    }
+
+    location ~ ^/api/platform/tenants/[0-9]+/genieacs/firmware/reassign$ {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        client_max_body_size 64m;
+        proxy_request_buffering off;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
     }
 
     location / {

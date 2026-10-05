@@ -349,6 +349,68 @@ describe('the slug cache', () => {
       db.off('query', count);
     }
   });
+
+  /**
+   * O slug renomeado DIRETO no banco — que é o que as outras instâncias de um
+   * deploy enxergam quando o console roda numa só: ninguém chamou
+   * `forgetResolvedTenant()` neste processo. Antes, o endereço antigo resolvia
+   * até o restart; agora, até `RESOLVED_TENANT_TTL_MS`.
+   */
+  it('lets a slug renamed behind its back stop resolving once the entry expires', async () => {
+    const { resolveTenantIdBySlug, forgetResolvedTenant, setResolverClockForTests, RESOLVED_TENANT_TTL_MS } =
+      await import('../src/middleware/tenantResolver.js');
+    const db = getDb();
+    let agora = 1_000_000;
+    setResolverClockForTests(() => agora);
+    forgetResolvedTenant();
+    await db('tenants').insert({ slug: 'renomeia', name: 'Renomeia ISP', status: 'active' });
+    const id = (await db('tenants').where({ slug: 'renomeia' }).first()).id;
+    try {
+      assert.equal(await resolveTenantIdBySlug('renomeia'), id);
+
+      await db('tenants').where({ id }).update({ slug: 'renomeado' });
+
+      // Dentro do prazo, o cache ainda responde — é o custo aceito.
+      agora += RESOLVED_TENANT_TTL_MS - 1;
+      assert.equal(await resolveTenantIdBySlug('renomeia'), id);
+
+      // Vencido, é falta: relê o banco, e o endereço antigo não é de ninguém.
+      agora += 2;
+      assert.equal(await resolveTenantIdBySlug('renomeia'), null,
+        'o endereço antigo segue resolvendo depois do prazo');
+      assert.equal(await resolveTenantIdBySlug('renomeado'), id);
+    } finally {
+      setResolverClockForTests();
+      forgetResolvedTenant();
+    }
+  });
+
+  it('expires the default provider too', async () => {
+    const { resolveDefaultTenantId, forgetResolvedTenant, setResolverClockForTests, RESOLVED_TENANT_TTL_MS } =
+      await import('../src/middleware/tenantResolver.js');
+    const db = getDb();
+    let agora = 5_000_000;
+    setResolverClockForTests(() => agora);
+    forgetResolvedTenant();
+    try {
+      await resolveDefaultTenantId();
+      let queries = 0;
+      const count = () => { queries += 1; };
+      db.on('query', count);
+      try {
+        await resolveDefaultTenantId();
+        assert.equal(queries, 0, 'dentro do prazo, o acerto vem do cache');
+        agora += RESOLVED_TENANT_TTL_MS;
+        await resolveDefaultTenantId();
+        assert.equal(queries, 1, 'vencida, a entrada tem que ser relida');
+      } finally {
+        db.off('query', count);
+      }
+    } finally {
+      setResolverClockForTests();
+      forgetResolvedTenant();
+    }
+  });
 });
 
 describe('the rate limit bucket', () => {

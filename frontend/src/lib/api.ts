@@ -4,6 +4,7 @@ import type { LoginResponse, OperatorRole, User } from '@/types'
 import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollment'
 import type { LiveStatus } from '@/lib/map-status'
 import { offlineMessageKey } from '@/lib/genieacs-agent'
+import { firmwareUploadHeaders, type FirmwareMeta } from '@/lib/firmware'
 import { formatRelativeTime } from '@/lib/utils'
 import { clearSessionScopedStorage } from '@/lib/session-owner'
 
@@ -51,6 +52,20 @@ export interface DeviceFirmwareFile {
   uploadedAt: string | null
   /** É a versão que a ONT já roda. */
   installed: boolean
+}
+
+/** Um arquivo de firmware do GenieACS como o servidor o mostra (`publicFile`). */
+export type FirmwareFileInfo = Omit<DeviceFirmwareFile, 'installed'>
+
+/**
+ * Os firmwares do ACS compartilhado que não carregam o prefixo de nenhum
+ * provedor — os que existiam antes do escopo. `tag` é a tag deste provedor, que
+ * vira o prefixo `<tag>--` no reenvio; `shared` diz se o ACS é dividido.
+ */
+export interface TenantUnownedFirmware {
+  tag: string | null
+  shared: boolean
+  files: FirmwareFileInfo[]
 }
 
 export interface DeviceFirmwareList {
@@ -2291,6 +2306,26 @@ export const platformAPI = {
   testTenantGenieAcs: (tenantId: number, url?: string) =>
     apiClient.post<{ deviceCount?: number }>(`/platform/tenants/${tenantId}/genieacs/test`, url ? { url } : {}),
 
+  /** Os firmwares do ACS compartilhado sem o prefixo de provedor nenhum. */
+  listUnownedFirmware: (tenantId: number) =>
+    apiClient.get<TenantUnownedFirmware>(`/platform/tenants/${tenantId}/genieacs/firmware/unowned`),
+
+  /**
+   * Regrava um firmware sem dono como deste provedor (`<tag>--<nome>`), com os
+   * metadados do antigo. O painel não baixa do GenieACS: quem manda os bytes é
+   * o administrador, com o arquivo original do computador dele. O antigo fica —
+   * apagá-lo é o outro botão.
+   */
+  reassignFirmware: (tenantId: number, originalName: string, file: File) =>
+    apiClient.sendBlob<FirmwareFileInfo>(
+      `/platform/tenants/${tenantId}/genieacs/firmware/reassign`,
+      file,
+      { 'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(originalName) }
+    ),
+
+  deleteUnownedFirmware: (tenantId: number, name: string) =>
+    apiClient.delete(`/platform/tenants/${tenantId}/genieacs/firmware/unowned/${encodeURIComponent(name)}`),
+
   /** O cadastro do próprio console: quem tem a chave do plano de controle. */
   listAdmins: () =>
     apiClient.get<{ admins: PlatformAdminView[] }>('/platform/admins'),
@@ -2595,6 +2630,15 @@ export const devicesAPI = {
     apiClient.post<DeviceBatchResponse>('/devices/batch', { action, deviceIds, filter, fileId }),
 
   listFirmwareCatalog: () => apiClient.get<DeviceFirmwareCatalog>('/devices/firmware/files'),
+
+  // O arquivo cru no corpo e os metadados em cabeçalho, como o anexo do
+  // WhatsApp (`uploadAttachment`). No ACS compartilhado o servidor põe o
+  // prefixo do provedor no nome — a resposta traz o nome final.
+  uploadFirmware: (file: File, meta: FirmwareMeta) =>
+    apiClient.sendBlob<FirmwareFileInfo>('/devices/firmware/files', file, firmwareUploadHeaders(file.name, meta)),
+
+  deleteFirmware: (name: string) =>
+    apiClient.delete(`/devices/firmware/files?name=${encodeURIComponent(name)}`),
 
   // Os firmwares do GenieACS que servem para o modelo desta ONT.
   listFirmware: (deviceId: string) =>
@@ -4094,7 +4138,7 @@ export interface WhatsAppDunningStep {
   templateId: number
 }
 
-export type WhatsAppDunningSkipReason = 'noPhone' | 'optOut' | 'templateIncomplete' | 'maxReached' | 'interval' | 'sgpRefused'
+export type WhatsAppDunningSkipReason = 'noPhone' | 'optOut' | 'templateIncomplete' | 'maxReached' | 'interval' | 'paused' | 'sgpRefused'
 
 export interface WhatsAppDunningRunSummary {
   at: string
@@ -4114,6 +4158,8 @@ export interface WhatsAppDunningRule {
   maxPerInvoice: number
   minIntervalHours: number
   maxPerRun: number
+  /** Dias de pausa quando o cliente manda comprovante; 0 desliga. */
+  receiptPauseDays: number
   thanksTemplateId: number | null
   window: { timezone: string; week: WhatsAppDunningWindowDay[] }
   enabledAt: string | null
@@ -4518,8 +4564,16 @@ export type WaSubscriberPanel =
         highlight: string | null
         error: WaSubscriberPartError | null
       }
+      /** A régua parada para este contrato (comprovante recebido); null sem pausa. */
+      dunningPause: WaDunningPause | null
       ticketEnabled: boolean
     }
+
+export interface WaDunningPause {
+  contract: string
+  until: string
+  reason: 'receipt' | 'manual'
+}
 
 export interface WaSubscriberAttendance {
   conversationId: number
@@ -4918,7 +4972,7 @@ export const whatsappAPI = {
     apiClient.get<WhatsAppDunningRule>('/whatsapp/dunning/rule'),
 
   saveDunningRule: (payload: Partial<Pick<WhatsAppDunningRule,
-    'steps' | 'window' | 'maxPerInvoice' | 'minIntervalHours' | 'maxPerRun' | 'thanksTemplateId'>>) =>
+    'steps' | 'window' | 'maxPerInvoice' | 'minIntervalHours' | 'maxPerRun' | 'receiptPauseDays' | 'thanksTemplateId'>>) =>
     apiClient.put<WhatsAppDunningRule>('/whatsapp/dunning/rule', payload),
 
   setDunningEnabled: (enabled: boolean) =>
@@ -5171,6 +5225,13 @@ export const whatsappAPI = {
 
   bindSubscriber: (conversationId: number, payload: { contract: string; document?: string }) =>
     apiClient.post<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber/bind`, payload),
+
+  /** "Retomar régua": tira a pausa por comprovante do contrato desta conversa. */
+  subscriberResumeDunning: (conversationId: number, contract: string) =>
+    apiClient.post<{ contract: string; dunningPause: null }>(
+      `/whatsapp/conversations/${conversationId}/subscriber/dunning-resume`,
+      { contract }
+    ),
 
   subscriberUnlock: (conversationId: number, contract: string) =>
     apiClient.post<{ contract: string }>(`/whatsapp/conversations/${conversationId}/subscriber/unlock`, { contract }),

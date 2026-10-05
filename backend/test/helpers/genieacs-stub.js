@@ -104,9 +104,13 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
   const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, taskStatusFor: null, respond, requests: [], onTask: null };
 
   const server = http.createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => { raw += chunk; });
+    // O corpo em bytes: um firmware enviado (`PUT /files/<nome>`) não é texto,
+    // e juntá-lo como string corromperia todo byte que não é UTF-8 válido.
+    const chunks = [];
+    req.on('data', (chunk) => { chunks.push(chunk); });
     req.on('end', () => {
+      const bytes = Buffer.concat(chunks);
+      const raw = bytes.toString('utf8');
       const url = new URL(req.url, 'http://stub');
       const send = (status, data) => {
         res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -120,7 +124,9 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         search: url.search,
         authorization: req.headers.authorization ?? null,
         contentType: req.headers['content-type'] ?? null,
-        body: raw
+        headers: { ...req.headers },
+        body: raw,
+        bytes
       });
 
       if (state.respond) return state.respond({ req, res, url, body: raw, send });
@@ -143,15 +149,53 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         return send(status, status >= 400 ? { message: 'refused' } : task);
       }
 
-      if (url.pathname === '/files' && req.method === 'GET') {
+      if ((url.pathname === '/files' || url.pathname === '/files/') && req.method === 'GET') {
         let filter = {};
         try {
           filter = JSON.parse(url.searchParams.get('query') || '{}');
         } catch {
           filter = {};
         }
-        const tipo = filter['metadata.fileType'];
-        return send(200, state.files.filter((file) => !tipo || file.metadata?.fileType === tipo));
+        // `metadata.fileType` como valor, `_id` como valor ou `{ $regex }` (o
+        // prefixo do dono num ACS compartilhado) e `$and` juntando — as formas
+        // que o painel usa. `skip`/`limit` como o NBI: a ordem é a da lista.
+        const casa = (file, f) => {
+          if (Array.isArray(f.$and)) return f.$and.every((parte) => casa(file, parte || {}));
+          if (f['metadata.fileType'] !== undefined && file.metadata?.fileType !== f['metadata.fileType']) return false;
+          if (f._id !== undefined) {
+            if (typeof f._id?.$regex === 'string') { if (!new RegExp(f._id.$regex).test(String(file._id))) return false; }
+            else if (file._id !== f._id) return false;
+          }
+          return true;
+        };
+        const skip = Number(url.searchParams.get('skip') || 0);
+        const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : Infinity;
+        const achados = state.files.filter((file) => casa(file, filter));
+        return send(200, achados.slice(skip, skip + limit));
+      }
+
+      // Um arquivo: o `PUT` grava (substituindo, como o GenieACS faz) com os
+      // metadados dos quatro cabeçalhos; o `DELETE` apaga, 404 se não existe.
+      const fileMatch = url.pathname.match(/^\/files\/([^/]+)$/);
+      if (fileMatch && req.method === 'PUT') {
+        const id = decodeURIComponent(fileMatch[1]);
+        const meta = {};
+        for (const [campo, cabecalho] of [['fileType', 'filetype'], ['oui', 'oui'], ['productClass', 'productclass'], ['version', 'version']]) {
+          if (req.headers[cabecalho] !== undefined) meta[campo] = req.headers[cabecalho];
+        }
+        state.files = state.files.filter((file) => file._id !== id);
+        state.files.push({ _id: id, length: bytes.length, uploadDate: new Date().toISOString(), metadata: meta });
+        state.uploads = [...(state.uploads || []), { id, bytes, headers: { ...req.headers } }];
+        res.writeHead(201);
+        return res.end();
+      }
+      if (fileMatch && req.method === 'DELETE') {
+        const id = decodeURIComponent(fileMatch[1]);
+        if (!state.files.some((file) => file._id === id)) return send(404, { message: 'not found' });
+        state.files = state.files.filter((file) => file._id !== id);
+        state.deletedFiles = [...(state.deletedFiles || []), id];
+        res.writeHead(200);
+        return res.end();
       }
 
       if (url.pathname === '/tasks' && req.method === 'GET') {
