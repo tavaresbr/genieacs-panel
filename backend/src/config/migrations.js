@@ -1622,6 +1622,14 @@ const WA_BROADCAST_INVOICE_COLUMNS = [
   ['due_date', (t) => t.string('due_date', 16)]
 ];
 
+/**
+ * Quais tipos de comunicação um "não perturbe" bloqueia. Nula = todos: o que já
+ * está na lista, e todo "SAIR" do cliente, continua bloqueando tudo.
+ */
+const WA_OPT_OUT_CATEGORY_COLUMNS = [
+  ['categories', (t) => t.string('categories', 100).nullable()]
+];
+
 const SKIP_DETAIL_TABLES = [
   ['wa_dunning_sends', WA_DUNNING_DETAIL_COLUMNS],
   ['wa_broadcast_recipients', WA_BROADCAST_INVOICE_COLUMNS]
@@ -5433,6 +5441,21 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop
         await createTableIfMissing(db, nome, construtor(db));
       }
+    }
+  },
+  {
+    id: '0097_wa_opt_out_categories',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_opt_outs'))) return true;
+      return (await missingColumns(db, 'wa_opt_outs', WA_OPT_OUT_CATEGORY_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_opt_outs'))) return;
+      const missing = await missingColumns(db, 'wa_opt_outs', WA_OPT_OUT_CATEGORY_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_opt_outs', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

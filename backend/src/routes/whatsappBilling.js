@@ -33,6 +33,7 @@ router.put('/meta-prices', ...gestao, WhatsAppBillingController.saveMetaPrices);
 // ── Do not disturb ─────────────────────────────────────────────────────
 router.get('/opt-outs', ...leitura, WhatsAppBillingController.listOptOuts);
 router.post('/opt-outs', ...gestao, WhatsAppBillingController.createOptOut);
+router.patch('/opt-outs/:id', ...gestao, WhatsAppBillingController.updateOptOut);
 router.delete('/opt-outs/:id', ...gestao, WhatsAppBillingController.revokeOptOut);
 
 // ── Billing cadence ────────────────────────────────────────────────────

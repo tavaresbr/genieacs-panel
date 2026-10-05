@@ -89,7 +89,8 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'whatsapp.dunning_enabled': 'audit.action.whatsappDunningEnabled',
   'whatsapp.dunning_disabled': 'audit.action.whatsappDunningDisabled',
   'whatsapp.dunning_saved': 'audit.action.whatsappDunningSaved',
-  'whatsapp.campaign_created': 'audit.action.whatsappCampaignCreated'
+  'whatsapp.campaign_created': 'audit.action.whatsappCampaignCreated',
+  'whatsapp.opt_out_changed': 'audit.action.whatsappOptOutChanged'
 }
 
 /** A chave da frase, ou `null` para a ação que este frontend não conhece. */

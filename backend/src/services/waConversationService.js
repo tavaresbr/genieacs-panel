@@ -1,4 +1,5 @@
 import WaConversation from '../models/WaConversation.js';
+import { optOutOf, tiposGravados } from '../utils/wa/waOptOutTipos.js';
 import WaMessage from '../models/WaMessage.js';
 import WaOptOut from '../models/WaOptOut.js';
 import SgpLink from '../models/SgpLink.js';
@@ -247,6 +248,8 @@ class WaConversationService {
       sgpContactId: row.sgp_contact_id ? Number(row.sgp_contact_id) : null,
       clientName: extra.clientName ?? null,
       optedOut: extra.optedOut ?? false,
+      // Só quando o bloqueio é parcial: os tipos que ele cobre.
+      optOutCategories: extra.optOutCategories ?? null,
       lastMessageAt: row.last_message_at || null,
       lastInboundAt: row.last_inbound_at || null,
       unreadCount: Number(row.unread_count || 0),
@@ -336,7 +339,7 @@ class WaConversationService {
       const links = await tdb('sgp_links').whereIn('contract', contracts).select('contract', 'client_name');
       for (const link of links) names.set(link.contract, link.client_name);
     }
-    const blocked = await WaOptOut.activePhones(rows.map((r) => r.wa_phone_e164));
+    const blocked = await WaOptOut.activeBlocks(rows.map((r) => r.wa_phone_e164));
     const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
     const etiquetas = await WaTagService.tagsFor(rows.map((r) => r.id));
 
@@ -346,7 +349,7 @@ class WaConversationService {
       clientName: row.contract
         ? names.get(row.contract) ?? null
         : (row.sgp_contact_id ? contactNames.get(Number(row.sgp_contact_id)) ?? null : null),
-      optedOut: blocked.has(row.wa_phone_e164)
+      ...optOutOf(blocked.has(row.wa_phone_e164) ? [blocked.get(row.wa_phone_e164)] : [])
     }));
   }
 
@@ -380,11 +383,15 @@ class WaConversationService {
       tags: etiquetas.get(Number(conversation.id)) ?? [],
       assignedTo: conversation.assigned_user_id ? atendentes.get(Number(conversation.assigned_user_id)) ?? null : null,
       clientName: link?.client_name ?? contact?.client_name ?? null,
-      optedOut: await WaOptOut.isActive({
-        waPhone: conversation.wa_phone_e164,
-        waLid: conversation.wa_lid
-      })
+      ...optOutOf(await this.optOutEntries(conversation))
     });
+  }
+
+  /** Os bloqueios do número ou do LID da conversa, um por linha ativa. */
+  static async optOutEntries(conversation) {
+    const row = await WaOptOut.findActive({ waPhone: conversation.wa_phone_e164, waLid: conversation.wa_lid });
+    if (!row) return [];
+    return [tiposGravados(row.categories)];
   }
 
   /**

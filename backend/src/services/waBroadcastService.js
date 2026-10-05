@@ -408,7 +408,9 @@ class WaBroadcastService {
 
     // 1. Opt-out. Campaigns are INITIATED contact, so unlike the reply box this
     // path does enforce the list.
-    if (await WaOptOut.isActive({ waPhone: recipient.phone_e164 })) {
+    // O tipo vem da campanha: cobrança é `billing`, aviso geral é `marketing`.
+    // Quem bloqueou só promoção ainda recebe a fatura.
+    if (await WaOptOut.isActive({ waPhone: recipient.phone_e164, category: broadcast?.kind === 'general' ? 'marketing' : 'billing' })) {
       await WaBroadcast.updateRecipient(recipient.id, {
         status: 'skipped',
         error_msg: 'opt_out'

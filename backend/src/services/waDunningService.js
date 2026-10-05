@@ -587,7 +587,7 @@ class WaDunningService {
     }
 
     onProgress?.({ checked: 0, total: subscribers.length });
-    const blocked = await WaOptOut.activePhones(subscribers.map((s) => s.phone).filter(Boolean));
+    const blocked = await WaOptOut.activePhones(subscribers.map((s) => s.phone).filter(Boolean), 'billing');
     const open = await this.openSendsByContract();
     let calls = 0;
 
@@ -907,7 +907,7 @@ class WaDunningService {
     });
     if (alvo.length === 0) return 0;
 
-    const blocked = await WaOptOut.activePhones(alvo.map((r) => r.phone_e164).filter(Boolean));
+    const blocked = await WaOptOut.activePhones(alvo.map((r) => r.phone_e164).filter(Boolean), 'billing');
     let sent = 0;
     for (const row of alvo) {
       const fatura = { amount: row.amount === null ? null : Number(row.amount), dueDate: row.due_date, id: row.invoice_key };

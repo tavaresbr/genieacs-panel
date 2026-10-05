@@ -194,7 +194,7 @@ class WaCampaignService {
       else semTelefone.push(linha);
     }
 
-    const bloqueados = await WaOptOut.activePhones(comTelefone.map((r) => r.phone));
+    const bloqueados = await WaOptOut.activePhones(comTelefone.map((r) => r.phone), 'marketing');
     const vistos = new Set();
     const recipients = [];
     let optOut = 0;

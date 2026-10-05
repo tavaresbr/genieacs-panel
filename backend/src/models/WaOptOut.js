@@ -1,4 +1,5 @@
 import { tdb, tinsertReturningId } from '../config/database.js';
+import { bloqueia, gravarTipos, tiposGravados } from '../utils/wa/waOptOutTipos.js';
 
 /**
  * "Não perturbe".
@@ -26,29 +27,52 @@ class WaOptOut {
    * Both identities are checked because a contact may be known by only one of
    * them, and the request to stop was made by the person, not by the column.
    */
-  static async isActive({ waPhone, waLid } = {}) {
+  static async isActive({ waPhone, waLid, category } = {}) {
     const phone = String(waPhone || '').trim();
     const lid = String(waLid || '').trim();
     if (!phone && !lid) return false;
-    const row = await tdb('wa_opt_outs')
+    const rows = await tdb('wa_opt_outs')
       .whereNull('revoked_at')
       .where((q) => {
         if (phone) q.orWhere({ wa_phone_e164: phone });
         if (lid) q.orWhere({ wa_lid: lid });
       })
-      .first();
-    return !!row;
+      .select('categories');
+    // Com `category`, só conta o bloqueio que cobre aquele tipo: quem pediu
+    // para não receber promoção ainda recebe a fatura.
+    return rows.some((row) => bloqueia(row.categories, category));
   }
 
   /** Active opt-outs among a batch of numbers — one query for a whole campaign. */
-  static async activePhones(phones) {
+  static async activePhones(phones, category) {
     const list = [...new Set((phones || []).map((p) => String(p || '').trim()).filter(Boolean))];
     if (list.length === 0) return new Set();
     const rows = await tdb('wa_opt_outs')
       .whereNull('revoked_at')
       .whereIn('wa_phone_e164', list)
-      .pluck('wa_phone_e164');
-    return new Set(rows);
+      .select('wa_phone_e164', 'categories');
+    return new Set(rows.filter((row) => bloqueia(row.categories, category)).map((row) => row.wa_phone_e164));
+  }
+
+  /**
+   * O que cada número bloqueia: o telefone → os tipos (`null` quando é tudo).
+   * Para a tela, que mostra "não perturbe" por inteiro ou só por tipo.
+   */
+  static async activeBlocks(phones) {
+    const list = [...new Set((phones || []).map((p) => String(p || '').trim()).filter(Boolean))];
+    const blocks = new Map();
+    if (list.length === 0) return blocks;
+    const rows = await tdb('wa_opt_outs')
+      .whereNull('revoked_at')
+      .whereIn('wa_phone_e164', list)
+      .select('wa_phone_e164', 'categories');
+    for (const row of rows) {
+      const tipos = tiposGravados(row.categories);
+      const antes = blocks.get(row.wa_phone_e164);
+      // Duas linhas para o mesmo número (raro): vale a união; `null` (tudo) vence.
+      blocks.set(row.wa_phone_e164, antes === null || tipos === null ? null : [...new Set([...(antes ?? []), ...tipos])]);
+    }
+    return blocks;
   }
 
   /**
@@ -59,8 +83,16 @@ class WaOptOut {
    * failure — the dangerous direction is a MISSING opt-out — but writing one
    * row per repeated "SAIR" would make the operator's list unreadable.
    */
-  static async record({ waPhone, waLid, conversationId, origin = 'customer', reasonText }) {
-    if (await this.isActive({ waPhone, waLid })) return null;
+  static async record({ waPhone, waLid, conversationId, origin = 'customer', reasonText, categories = null }) {
+    const existente = await this.findActive({ waPhone, waLid });
+    if (existente) {
+      // Quem já bloqueia só alguns tipos e agora pede TUDO (um "SAIR" do
+      // cliente, ou a equipe marcando "não receber nada") passa a bloquear
+      // tudo: o pedido mais forte vale. O contrário — afinar para menos —
+      // é decisão da equipe, e vai por `setCategories`.
+      if (!categories && existente.categories) await this.setCategories(existente.id, null);
+      return null;
+    }
     const now = new Date();
     const id = await tinsertReturningId('wa_opt_outs', {
       wa_phone_e164: waPhone || null,
@@ -68,8 +100,33 @@ class WaOptOut {
       conversation_id: conversationId || null,
       origin,
       reason_text: reasonText ? String(reasonText).slice(0, 500) : null,
+      categories: gravarTipos(categories),
       created_at: now
     });
+    return (await tdb('wa_opt_outs').where({ id }).first()) || null;
+  }
+
+  /** A linha ativa deste endereço, qualquer que seja o tipo que ela bloqueia. */
+  static async findActive({ waPhone, waLid } = {}) {
+    const phone = String(waPhone || '').trim();
+    const lid = String(waLid || '').trim();
+    if (!phone && !lid) return null;
+    return (await tdb('wa_opt_outs')
+      .whereNull('revoked_at')
+      .where((q) => {
+        if (phone) q.orWhere({ wa_phone_e164: phone });
+        if (lid) q.orWhere({ wa_lid: lid });
+      })
+      .orderBy('id')
+      .first()) || null;
+  }
+
+  /** Troca os tipos que uma linha ativa bloqueia; `null` é todos. */
+  static async setCategories(id, categories) {
+    await tdb('wa_opt_outs')
+      .where({ id })
+      .whereNull('revoked_at')
+      .update({ categories: gravarTipos(categories) });
     return (await tdb('wa_opt_outs').where({ id }).first()) || null;
   }
 

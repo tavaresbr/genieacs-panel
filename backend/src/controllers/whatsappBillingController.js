@@ -10,6 +10,8 @@ import WaOptOut from '../models/WaOptOut.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { SgpError } from '../services/sgpService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { lerTipos, tiposGravados } from '../utils/wa/waOptOutTipos.js';
+import WaContactService from '../services/waContactService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -35,7 +37,7 @@ function handleError(req, res, error, fallbackKey) {
 }
 
 /** The opt-out shape the browser may see, built field by field. */
-function publicOptOut(row) {
+function publicOptOut(row, clientName = null) {
   if (!row) return null;
   return {
     id: row.id,
@@ -43,8 +45,21 @@ function publicOptOut(row) {
     waLid: row.wa_lid || null,
     origin: row.origin,
     reasonText: row.reason_text || null,
+    // Os tipos que o bloqueio cobre; `null` é tudo.
+    categories: tiposGravados(row.categories),
+    clientName,
     createdAt: row.created_at || null
   };
+}
+
+/** `categories` do corpo da requisição, ou a recusa de um tipo que não existe. */
+function tiposDoCorpo(body) {
+  if (!body || !('categories' in body)) return { given: false, tipos: null };
+  const tipos = lerTipos(body.categories);
+  if (tipos === undefined) {
+    throw new WaError('whatsapp.error.invalidOptOutCategories', { code: 'invalid_categories', status: 400 });
+  }
+  return { given: true, tipos };
 }
 
 /** What the audit trail keeps of a cadence: its shape, never a phone. */
@@ -197,9 +212,10 @@ class WhatsAppBillingController {
   static async listOptOuts(req, res) {
     try {
       const rows = await WaOptOut.listActive();
+      const names = await WaContactService.namesByPhone(rows.map((row) => row.wa_phone_e164));
       return res.json(createResponse(
         req.t('whatsapp.optOut.loaded', { count: rows.length }),
-        rows.map(publicOptOut)
+        rows.map((row) => publicOptOut(row, names.get(row.wa_phone_e164) ?? null))
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.optOut.loadFailed');
@@ -216,21 +232,58 @@ class WhatsAppBillingController {
       if (!phone) {
         throw new WaError('whatsapp.error.invalidPhone', { code: 'invalid_phone', status: 400 });
       }
+      const { tipos } = tiposDoCorpo(body);
       const created = await WaOptOut.record({
         waPhone: phone,
         origin: 'operator',
-        reasonText: body.reasonText
+        reasonText: body.reasonText,
+        categories: tipos
       });
       // A null means an active opt-out already covers this number. Answering
       // with it rather than with an error keeps the button idempotent — the
-      // outcome the operator asked for is the outcome they have.
-      const row = created
-        || (await WaOptOut.listActive({ limit: 1000 })).find((entry) => entry.wa_phone_e164 === phone)
-        || null;
+      // outcome the operator asked for is the outcome they have. O que a
+      // equipe escolheu agora, porém, vale: os tipos da linha existente são
+      // trocados pelos do pedido (`record` só amplia, nunca restringe).
+      let row = created || await WaOptOut.findActive({ waPhone: phone });
+      if (!created && row && tiposGravados(row.categories)?.join() !== tipos?.join()) {
+        row = await WaOptOut.setCategories(row.id, tipos);
+      }
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_OPT_OUT_CHANGED,
+        subjectType: 'opt_out',
+        subjectId: row ? String(row.id) : null,
+        detail: { categories: tipos ?? 'all', added: Boolean(created) }
+      });
+      const names = await WaContactService.namesByPhone([phone]);
       return res.status(created ? 201 : 200).json(createResponse(
         req.t('whatsapp.optOut.created'),
-        publicOptOut(row)
+        publicOptOut(row, names.get(phone) ?? null)
       ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.optOut.failed');
+    }
+  }
+
+  /** A equipe afina quais tipos de comunicação o bloqueio cobre. */
+  static async updateOptOut(req, res) {
+    try {
+      const id = Number(req.params.id);
+      const { given, tipos } = tiposDoCorpo(req.body);
+      if (!given) {
+        throw new WaError('whatsapp.error.invalidOptOutCategories', { code: 'invalid_categories', status: 400 });
+      }
+      const row = Number.isInteger(id) ? await WaOptOut.setCategories(id, tipos) : null;
+      if (!row || row.revoked_at) {
+        return res.status(404).json(createErrorResponse(req.t('common.routeNotFound')));
+      }
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_OPT_OUT_CHANGED,
+        subjectType: 'opt_out',
+        subjectId: String(row.id),
+        detail: { categories: tipos ?? 'all', added: false }
+      });
+      const names = await WaContactService.namesByPhone([row.wa_phone_e164]);
+      return res.json(createResponse(req.t('whatsapp.optOut.updated'), publicOptOut(row, names.get(row.wa_phone_e164) ?? null)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.optOut.failed');
     }

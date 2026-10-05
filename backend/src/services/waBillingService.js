@@ -198,7 +198,7 @@ class WaBillingService {
 
     // ONE query for the whole campaign. Asking per recipient would be hundreds
     // of round trips to answer a question a single `IN` answers.
-    const blocked = await WaOptOut.activePhones(withPhone.map((row) => row.phone));
+    const blocked = await WaOptOut.activePhones(withPhone.map((row) => row.phone), 'billing');
     const reachable = withPhone.filter((row) => {
       if (!blocked.has(row.phone)) return true;
       skipped.optOut += 1;
