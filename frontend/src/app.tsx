@@ -1,9 +1,9 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
 import Sidebar from '@/components/sidebar'
 import { ThemeProvider } from '@/contexts/theme-context'
 import { AuthProvider, useAuth } from '@/contexts/auth-context'
-import { ToastProvider } from '@/components/ui/toast'
+import { ToastProvider, useToast } from '@/components/ui/toast'
 import { LoadingProvider, RouteChangeLoader } from '@/components/ui/loading'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageProvider, useTranslation } from '@/contexts/language-context'
@@ -19,6 +19,7 @@ import { settingsAPI } from '@/lib/api'
 import { onboardingDismissKey } from '@/lib/onboarding'
 import type { Permission } from '@/lib/permissions'
 import { needsGenieAcsOnboarding, sessionKind, shellFor } from '@/lib/shell'
+import { sessionOwner } from '@/lib/session-owner'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const DevicesPage = lazy(() => import('@/pages/devices'))
@@ -408,6 +409,38 @@ function ProviderRoutes() {
   )
 }
 
+/**
+ * Apaga os toasts quando a sessão muda de dono.
+ *
+ * O `ToastProvider` fica acima das rotas e sobrevive a sair, entrar em outro
+ * provedor e à personificação. Sem isto, um "Dispositivo X reiniciado" ou um
+ * erro com o nome de um cliente do provedor A continuava na tela de quem entrou
+ * em seguida — o provedor B lendo um aviso que não é dele.
+ *
+ * Compara com o dono ANTERIOR, guardado num ref, e não dispara na montagem: o
+ * primeiro valor é só o ponto de partida. E também no `auth:unauthorized`, que
+ * é a sessão caindo por 401 — ali o aviso de quem saiu já não tem a quem servir.
+ */
+function ToastSessionReset() {
+  const { user } = useAuth()
+  const { clearAll } = useToast()
+  const owner = sessionOwner(user)
+  const previous = useRef(owner)
+
+  useEffect(() => {
+    if (previous.current === owner) return
+    previous.current = owner
+    clearAll()
+  }, [owner, clearAll])
+
+  useEffect(() => {
+    window.addEventListener('auth:unauthorized', clearAll)
+    return () => window.removeEventListener('auth:unauthorized', clearAll)
+  }, [clearAll])
+
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -417,6 +450,7 @@ export default function App() {
           <LoadingProvider>
             <ToastProvider>
               <RouteChangeLoader />
+              <ToastSessionReset />
               <AppRoutes />
             </ToastProvider>
           </LoadingProvider>

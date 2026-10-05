@@ -81,6 +81,36 @@ describe('operator management', () => {
     assert.equal(status, 409);
   });
 
+  /**
+   * Quem existe SÓ em outro provedor não pode ser descoberto daqui. Com
+   * "e-mail já usado" diferente de "nome já usado", o administrador de um
+   * provedor enumeraria, tentativa a tentativa, quem tem conta em outro painel
+   * da instalação. As duas colisões têm que dar a mesma resposta, byte a byte.
+   */
+  it('answers an email collision and a username collision with the same body', async () => {
+    const db = getDb();
+    await db('tenants').insert({ slug: 'outro-provedor', name: 'Outro Provedor', status: 'active' });
+    const outro = (await db('tenants').where({ slug: 'outro-provedor' }).first()).id;
+    await db('users').insert({
+      username: 'so-do-outro', password: 'x', role: 'admin', email: 'so-do-outro@exemplo.test'
+    });
+    const alheio = (await db('users').where({ username: 'so-do-outro' }).first()).id;
+    await db('tenant_users').insert({ tenant_id: outro, user_id: alheio, role: 'admin' });
+
+    const criar = (body) => call(`${panelUrl}/api/users`, {
+      method: 'POST',
+      headers: authHeaders(adminToken),
+      body: { password: 'senha-nova-123', role: 'viewer', ...body }
+    });
+    const porEmail = await criar({ username: 'nome-livre', email: 'so-do-outro@exemplo.test' });
+    const porNome = await criar({ username: 'so-do-outro', email: 'livre@exemplo.test' });
+
+    assert.equal(porEmail.status, 409);
+    assert.equal(porNome.status, 409);
+    assert.deepEqual(porEmail.body, porNome.body);
+    assert.equal(porEmail.body.code, undefined);
+  });
+
   it('lists operators without exposing password hashes', async () => {
     const { status, body } = await call(`${panelUrl}/api/users`, {
       headers: authHeaders(adminToken)
