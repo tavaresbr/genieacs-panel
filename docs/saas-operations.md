@@ -62,7 +62,13 @@ blocos, o `default_server` que recusa host desconhecido, e as armadilhas anotada
 elas mordem (o curinga não cobre o apex; `http2 on;` não existe antes do nginx 1.25.1;
 as linhas `listen [::]` exigem IPv6). Cada bloco do painel tem também o `location =
 /api/genieacs-agent/connect` que deixa passar o WebSocket do agente do GenieACS — ver a
-seção 12 antes de reaproveitar um proxy antigo.
+seção 12 antes de reaproveitar um proxy antigo. E tem os dois `location` do envio de
+firmware (`/api/devices/firmware/files` e o reenvio do console,
+`/api/platform/tenants/<id>/genieacs/firmware/reassign`), com `client_max_body_size 64m`
+e `proxy_read_timeout 180s`: o resto do painel fica em 2 MB. Se mudar `FIRMWARE_MAX_MB`
+no painel, mude o teto desses dois blocos junto. Provedor em modo agente precisa do
+agente 1.1.0 ou mais novo para enviar firmware (o painel recusa com `acs_agent_outdated`),
+e por esse caminho o arquivo vai até 48 MB.
 
 #### O certificado: um curinga, ou um por provedor
 

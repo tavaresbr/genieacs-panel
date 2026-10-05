@@ -109,13 +109,21 @@ before(async () => {
   // install nobody has one: `vendors` is built by the operator through
   // `/api/vendor-management`, so with the table empty everywhere the copy would
   // have nothing to copy and would pass this suite by doing nothing at all.
-  await insertReturningId('vendors', { ...VENDOR, tenant_id: alfa });
-  await getDb()('wifi_security_config').insert({
-    tenant_id: alfa,
-    product_class: 'ONU-T1',
-    security_types: 'WPA2',
-    password_param_path: VENDOR.wifi_password_path
-  });
+  //
+  // Na edição hospedada, que é a deste arquivo, só a caixa da plataforma é
+  // fonte: o catálogo de um provedor (`alfa`) nunca é copiado para outro. Por
+  // isso a caixa nasce aqui com o mesmo catálogo, e o de `alfa` fica para
+  // provar que a cópia não é uma segunda leitura das linhas de ninguém.
+  const caixa = await Tenant.create({ slug: 'plataforma', name: 'Plataforma', kind: 'platform' });
+  for (const tenantId of [alfa, caixa]) {
+    await insertReturningId('vendors', { ...VENDOR, tenant_id: tenantId });
+    await getDb()('wifi_security_config').insert({
+      tenant_id: tenantId,
+      product_class: 'ONU-T1',
+      security_types: 'WPA2',
+      password_param_path: VENDOR.wifi_password_path
+    });
+  }
 });
 
 after(async () => {

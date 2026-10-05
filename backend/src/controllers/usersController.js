@@ -169,12 +169,17 @@ class UsersController {
       // Nome e e-mail conferidos juntos, contra o mesmo espaço de nomes: um
       // e-mail igual ao nome de outra pessoa (ou o contrário) tornaria o
       // identificador de login ambíguo, e `findByLogin` recusaria os dois.
+      //
+      // E UMA resposta só para os dois casos, byte por byte: com "e-mail já
+      // usado" distinto de "nome já usado", o administrador de um provedor
+      // descobriria, tentativa a tentativa, quais e-mails têm conta em OUTRO
+      // painel — o cadastro inteiro da instalação, enumerável daqui. A
+      // mensagem aponta o caminho certo (o convite), sem dizer qual dos dois
+      // colidiu nem onde. O console da plataforma (`platformMemberController`)
+      // segue distinguindo: quem está lá enxerga todos os cadastros mesmo.
       const conflito = await User.loginConflict({ username, email });
-      if (conflito === 'email_taken') {
-        return res.status(409).json(createErrorResponse(req.t('auth.emailTaken')));
-      }
       if (conflito) {
-        return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
+        return res.status(409).json(createErrorResponse(req.t('users.loginUnavailable')));
       }
 
       // O limite do plano, conferido ANTES de escrever qualquer coisa: uma

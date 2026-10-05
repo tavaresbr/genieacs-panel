@@ -13,6 +13,9 @@ import GenieAcsConnection, { CONNECTION_MODES, GENIEACS_OWNERSHIPS } from '../mo
 import { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN, forgetSharedAcs } from '../services/genieacs/direct.js';
 import { afterModeChange, agentStatus, issueAgentToken } from '../services/genieacs/agent.js';
 import { TAG_PREFIX } from '../services/deviceTagService.js';
+import FirmwareStore, { readOriginalName } from '../services/firmwareStore.js';
+import { isAgentOffline } from '../services/genieacs/agent.js';
+import { translateError } from '../i18n/index.js';
 import DeviceScopeTagger, {
   AUTO_PREFIXES_KEY, AUTO_PREFIXES_MAX, AUTO_PREFIX_MAX_LENGTH, parsePrefixes, prefixesOverlap
 } from '../services/deviceScopeTagger.js';
@@ -34,6 +37,22 @@ import DeviceScopeTagger, {
  *
  * Mensagens em inglês e sem tradução, como o resto do console.
  */
+
+/**
+ * A recusa de um gesto de firmware: as do serviço (nome, tamanho, existe, sem
+ * tag) com o código delas; o agente fora do ar como 503; o resto, 502 — é o
+ * GenieACS do provedor que falhou.
+ */
+function respostaDeFirmware(req, res, error, fallback) {
+  if (isAgentOffline(error)) {
+    return res.status(503).json(createErrorResponse('The GenieACS agent of this provider is offline', null, error.code));
+  }
+  if (error?.translationKey) {
+    return res.status(error.status || 400).json(createErrorResponse(translateError(req.t, error), null, error.code || null));
+  }
+  console.error('Platform GenieACS firmware error:', error);
+  return res.status(502).json(createErrorResponse(fallback, error.message));
+}
 
 async function loadTarget(req, res) {
   const id = Number(req.params?.id);
@@ -457,6 +476,73 @@ class PlatformGenieAcsController {
    * O mesmo teste da tela do provedor, rodando no escopo dele: a credencial
    * guardada só acompanha quando o endereço testado é a origem já salva.
    */
+  /**
+   * `GET /api/platform/tenants/:id/genieacs/firmware/unowned` —
+   * `{ tag, shared, files }`: os firmwares SEM prefixo de dono do GenieACS do
+   * provedor, quando esse ACS é compartilhado. ACS só dele: `shared: false` e
+   * lista vazia (lá o arquivo sem prefixo é dele). Consulta fora do escopo do
+   * provedor — o que se procura é justamente o que o escopo esconde.
+   */
+  static async listUnownedFirmware(req, res) {
+    try {
+      const tenant = await loadTarget(req, res);
+      if (!tenant) return undefined;
+      const data = await runInTenant(tenant.id, () => FirmwareStore.listUnowned());
+      return res.json(createResponse(null, data));
+    } catch (error) {
+      return respostaDeFirmware(req, res, error, 'Could not list the firmware files');
+    }
+  }
+
+  /**
+   * `POST /api/platform/tenants/:id/genieacs/firmware/reassign` — o arquivo
+   * cru no corpo, `X-File-Name` = o nome do arquivo SEM dono. Grava
+   * `<tag>--<nome>` com os metadados do antigo, se o tamanho bate; 201 com o
+   * arquivo novo. O antigo fica: apagá-lo é o gesto seguinte.
+   */
+  static async reassignFirmware(req, res) {
+    try {
+      const tenant = await loadTarget(req, res);
+      if (!tenant) return undefined;
+      const nome = readOriginalName(req);
+      const { tag, file } = await runInTenant(tenant.id, () => FirmwareStore.reassign(nome, req.body));
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_FIRMWARE_REASSIGNED,
+        tenant,
+        detail: { from: nome.slice(0, 200), to: file.id.slice(0, 200), tag }
+      });
+      // O provedor também vê, na trilha dele, quem pôs o arquivo lá.
+      await runInTenant(tenant.id, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.DEVICE_FIRMWARE_UPLOAD,
+        actorKind: 'platform',
+        subjectType: 'firmware',
+        subjectId: file.id.slice(0, 128),
+        detail: { size: file.size, productClass: file.productClass, version: file.version, reassignedFrom: nome.slice(0, 128) }
+      }));
+      return res.status(201).json(createResponse('Firmware reassigned', file));
+    } catch (error) {
+      return respostaDeFirmware(req, res, error, 'Could not reassign the firmware file');
+    }
+  }
+
+  /** `DELETE /api/platform/tenants/:id/genieacs/firmware/unowned/:name` — apaga um firmware sem dono. */
+  static async deleteUnownedFirmware(req, res) {
+    try {
+      const tenant = await loadTarget(req, res);
+      if (!tenant) return undefined;
+      const nome = String(req.params?.name ?? '');
+      const file = await runInTenant(tenant.id, () => FirmwareStore.removeUnowned(nome));
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_FIRMWARE_DELETED,
+        tenant,
+        detail: { file: file.id.slice(0, 200) }
+      });
+      return res.json(createResponse('Firmware deleted', { id: file.id }));
+    } catch (error) {
+      return respostaDeFirmware(req, res, error, 'Could not delete the firmware file');
+    }
+  }
+
   static async test(req, res) {
     try {
       const tenant = await loadTarget(req, res);

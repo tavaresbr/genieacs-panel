@@ -735,16 +735,16 @@ class PlatformController {
       }
 
       // Só quando o endereço mudou — e aí obrigatoriamente. O resolvedor guarda
-      // slug -> id pela vida do processo, então sem isto o endereço ANTIGO
-      // seguiria resolvendo para este provedor até o próximo restart, o que é
-      // pior que a suspensão sem invalidação: o endereço mudou de propósito, e
-      // o velho ficaria servindo o painel de quem já não mora lá enquanto está
-      // livre para ser dado a outro. Trocar o nome não mexe em nada guardado, e
-      // por isso não passa por aqui.
+      // slug -> id por `RESOLVED_TENANT_TTL_MS`, então sem isto o endereço
+      // ANTIGO seguiria resolvendo para este provedor até a entrada vencer, o
+      // que é pior que a suspensão sem invalidação: o endereço mudou de
+      // propósito, e o velho ficaria servindo o painel de quem já não mora lá
+      // enquanto está livre para ser dado a outro. Trocar o nome não mexe em
+      // nada guardado, e por isso não passa por aqui.
       //
-      // A limitação é a que `setStatus` já documenta: o cache é por processo,
-      // então num deploy com mais de uma instância as outras só acompanham no
-      // restart delas.
+      // O cache é por processo: num deploy com mais de uma instância, esta
+      // chamada só esvazia a desta, e as outras acompanham quando a entrada
+      // delas vence — no máximo `RESOLVED_TENANT_TTL_MS` depois.
       if (mudouSlug) forgetResolvedTenant();
 
       const detail = {};
@@ -831,11 +831,12 @@ class PlatformController {
       }
 
       await Tenant.setStatus(id, status);
-      // O resolvedor guarda slug -> id pela vida do processo e não relê o
-      // status, então sem isto uma suspensão só passa a valer no próximo
-      // restart: o painel e o portal do provedor suspenso seguem servindo e
-      // ainda autenticando gente nova, enquanto os jobs de fundo — que leem a
-      // coluna — param. Pior, a exclusão em duas etapas confia na suspensão
+      // O resolvedor guarda slug -> id por `RESOLVED_TENANT_TTL_MS` e não relê
+      // o status nesse meio-tempo, então sem isto uma suspensão só passa a
+      // valer quando a entrada vence (e, nas outras instâncias, é esse o prazo
+      // de qualquer jeito): o painel e o portal do provedor suspenso seguem
+      // servindo e ainda autenticando gente nova, enquanto os jobs de fundo —
+      // que leem a coluna — param. Pior, a exclusão em duas etapas confia na suspensão
       // para significar "ninguém está trabalhando lá dentro".
       forgetResolvedTenant();
       await PlatformAudit.fromRequest(req, {
@@ -1074,7 +1075,7 @@ class PlatformController {
 
       // O resolvedor guarda o id por slug e o primeiro provedor da tabela. Sem
       // isto, o processo continuaria resolvendo um provedor que não existe mais
-      // até reiniciar — e o host dele responderia com o escopo de um fantasma.
+      // até a entrada vencer — e o host dele responderia com o escopo de um fantasma.
       forgetResolvedTenant();
 
       return res.json(createResponse('Provider deleted successfully', {

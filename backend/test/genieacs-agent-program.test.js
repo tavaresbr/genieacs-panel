@@ -316,6 +316,42 @@ describe('agente do GenieACS: pedidos à NBI', () => {
     assert.deepEqual(stub.state.tags, [{ deviceId: 'ZTEG-1', tag: 'cliente vip', method: 'DELETE' }]);
   });
 
+  it('PUT de arquivo: bytes íntegros e os quatro metadados da NBI repassados (1.1.0)', async () => {
+    const panel = await startPanel();
+    const stub = await startStub();
+    launch(panel, stub.url);
+    const conn = await panel.connection(0);
+    // Bytes que não são UTF-8 válido: passar por string os corromperia.
+    const firmware = Buffer.from([0x00, 0xff, 0xfe, 0x80, 0x7f, 0xc3, 0x28, 0x0a]);
+    const reply = await conn.request({
+      id: 'f1',
+      method: 'PUT',
+      path: '/files/alfa--F670L_V2.bin',
+      headers: {
+        Authorization: 'Basic bmJpOnNlZ3JlZG8=',
+        'Content-Type': 'application/octet-stream',
+        fileType: '1 Firmware Upgrade Image',
+        oui: 'ZTEOUI',
+        productClass: 'F670L',
+        version: 'V2.0',
+        Cookie: 'painel=1'
+      },
+      body: firmware.toString('base64')
+    });
+    assert.equal(reply.status, 201);
+    const [upload] = stub.state.uploads;
+    assert.equal(upload.id, 'alfa--F670L_V2.bin');
+    assert.ok(upload.bytes.equals(firmware), 'os bytes chegaram diferentes');
+    assert.equal(upload.headers.filetype, '1 Firmware Upgrade Image');
+    assert.equal(upload.headers.oui, 'ZTEOUI');
+    assert.equal(upload.headers.productclass, 'F670L');
+    assert.equal(upload.headers.version, 'V2.0');
+    assert.equal(upload.headers.cookie, undefined);
+    assert.deepEqual(stub.state.files[0].metadata, {
+      fileType: '1 Firmware Upgrade Image', oui: 'ZTEOUI', productClass: 'F670L', version: 'V2.0'
+    });
+  });
+
   it('3xx do GenieACS volta como está: o agente não segue redirecionamento', async () => {
     const panel = await startPanel();
     const stub = await startStub();

@@ -175,6 +175,12 @@ class AuditLog {
     // Firmware trocado: a ONT grava e reinicia. O detalhe diz o arquivo e as
     // duas versões — a de antes é a que se procura quando algo parou depois.
     DEVICE_FIRMWARE_UPGRADE: 'device.firmware_upgrade',
+    // Firmware enviado ao GenieACS pelo painel, e apagado de lá. Não mexe em
+    // ONT nenhuma, e entra mesmo assim: o arquivo é o que um lote manda gravar
+    // em centenas delas, e "quem pôs este arquivo aqui" é a primeira pergunta
+    // quando um lote dá errado. O detalhe diz o modelo, a versão e o tamanho.
+    DEVICE_FIRMWARE_UPLOAD: 'device.firmware_upload',
+    DEVICE_FIRMWARE_DELETE: 'device.firmware_delete',
     // Uma ação em vários aparelhos: UMA linha por lote, com a ação, as
     // contagens e o recorte da lista. Uma linha por aparelho afogaria a trilha
     // e esconderia justamente que foi um lote.

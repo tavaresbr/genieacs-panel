@@ -81,6 +81,12 @@ router.get('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, Pla
 router.put('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.update);
 router.post('/tenants/:id/genieacs/test', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.test);
 router.post('/tenants/:id/genieacs/tag-devices', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.tagDevices);
+// Os firmwares SEM dono de um GenieACS compartilhado: listar, reenviar um como
+// do provedor (corpo cru, lido pelo parser reservado em `app.js`) e apagar o
+// antigo. Fora do escopo do provedor, que é o que os esconde.
+router.get('/tenants/:id/genieacs/firmware/unowned', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.listUnownedFirmware);
+router.post('/tenants/:id/genieacs/firmware/reassign', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.reassignFirmware);
+router.delete('/tenants/:id/genieacs/firmware/unowned/:name', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.deleteUnownedFirmware);
 // A chave do agente do GenieACS (modo `agent`). Mostrada uma vez, na resposta.
 router.post('/tenants/:id/genieacs/agent-token', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.agentToken);
 

@@ -67,14 +67,46 @@ export function tenantSlugFromHost(host, bases = [PANEL_BASE_DOMAIN, PORTAL_BASE
   return null;
 }
 
-// Both caches exist because a provider cannot change identity under a running
-// process: one arrives by migration or by the platform console, and both mean a
-// restart or an explicit invalidation.
-let cachedDefaultId = null;
+/**
+ * Quanto tempo uma resposta do resolvedor vale.
+ *
+ * Os dois caches existem porque resolver o host é o que TODA requisição faz, e
+ * o slug de um provedor muda raramente. Mas muda — o console renomeia,
+ * suspende, exclui —, e `forgetResolvedTenant()` só esvazia o cache do
+ * processo que atendeu aquela chamada. Num deploy com mais de uma instância,
+ * as outras seguiam resolvendo o endereço ANTIGO até reiniciar: um painel
+ * servindo num endereço já livre para ser dado a outro ISP, ou um provedor
+ * suspenso ainda atendendo.
+ *
+ * Com o prazo, a defasagem passa a ter teto: no pior caso, trinta segundos.
+ * O processo que fez a mudança continua esquecendo na hora, pela chamada
+ * explícita; os outros alcançam sozinhos quando a entrada vence.
+ */
+export const RESOLVED_TENANT_TTL_MS = 30_000;
+
+// O relógio é injetável só para os testes provarem o vencimento sem esperar
+// trinta segundos de verdade. Em produção é sempre `Date.now`.
+let clock = () => Date.now();
+
+/** Só para testes: troca o relógio do resolvedor; sem argumento, volta ao real. */
+export function setResolverClockForTests(fn) {
+  clock = typeof fn === 'function' ? fn : () => Date.now();
+}
+
+// Cada entrada é `{ id, expiresAt }`. Vencida é falta: apagada e relida.
+let cachedDefault = null;
 const cachedBySlug = new Map();
 
+function fresh(entry) {
+  return entry !== null && entry !== undefined && entry.expiresAt > clock();
+}
+
+function entryFor(id) {
+  return { id, expiresAt: clock() + RESOLVED_TENANT_TTL_MS };
+}
+
 export function forgetResolvedTenant() {
-  cachedDefaultId = null;
+  cachedDefault = null;
   cachedBySlug.clear();
 }
 
@@ -93,15 +125,16 @@ export function forgetResolvedTenant() {
  * prevent. That distinction is made by the caller, not here.
  */
 export async function resolveDefaultTenantId() {
-  if (cachedDefaultId !== null) return cachedDefaultId;
+  if (fresh(cachedDefault)) return cachedDefault.id;
+  cachedDefault = null;
   // `kind: 'provider'`, porque o que esta função responde é "de quem é o painel
   // deste endereço" — e a linha da plataforma não é o painel de ninguém. Sem o
   // filtro, um deploy que apagasse os provedores e ficasse só com ela passaria
   // a servir a caixa interna a toda requisição, em vez do 503 que diz a verdade.
   const row = await getDb()('tenants').where({ kind: 'provider' }).orderBy('id', 'asc').first();
   if (!row) return null;
-  cachedDefaultId = row.id;
-  return cachedDefaultId;
+  cachedDefault = entryFor(row.id);
+  return row.id;
 }
 
 /**
@@ -302,7 +335,9 @@ export function platformHostOnly(req, res, next) {
 /** The provider a slug names, or null. Inactive providers do not resolve. */
 export async function resolveTenantIdBySlug(slug) {
   if (!slug) return null;
-  if (cachedBySlug.has(slug)) return cachedBySlug.get(slug);
+  const cached = cachedBySlug.get(slug);
+  if (fresh(cached)) return cached.id;
+  if (cached) cachedBySlug.delete(slug);
   const row = await getDb()('tenants').where({ slug }).first();
   const id = row && row.status === 'active' ? row.id : null;
   // Only an answer worth keeping is kept. Caching the misses too would mean
@@ -310,7 +345,9 @@ export async function resolveTenantIdBySlug(slug) {
   // for `a.painel`, `b.painel`, `c.painel` — a slug nobody has costs one query
   // and is meant to cost nothing more. Providers are few and the hits are what
   // this cache exists for.
-  if (id !== null) cachedBySlug.set(slug, id);
+  // Uma entrada vencida também não fica: é apagada na leitura acima, então o
+  // Map nunca passa do número de slugs que de fato resolveram.
+  if (id !== null) cachedBySlug.set(slug, entryFor(id));
   return id;
 }
 

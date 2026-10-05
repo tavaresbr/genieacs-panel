@@ -73,7 +73,7 @@ const modo = (tenantId, valor) => runInTenant(tenantId, () => GenieAcsConnection
  * chamando o GenieACS falso, como o programa de verdade faz. `atender: false`
  * recebe e não responde; `aoPedir` troca o atendimento inteiro.
  */
-async function ligarAgente(token, { atender = true, aoPedir = null } = {}) {
+async function ligarAgente(token, { atender = true, aoPedir = null, versao = '0.1.0-teste' } = {}) {
   const ws = new WebSocket(wsUrl, { headers: { Authorization: `Bearer ${token}` } });
   const agente = { ws, pedidos: [], codigo: null };
   abertos.push(agente);
@@ -108,7 +108,7 @@ async function ligarAgente(token, { atender = true, aoPedir = null } = {}) {
     ws.addEventListener('open', resolve, { once: true });
     ws.addEventListener('error', () => reject(new Error('o agente não conectou')), { once: true });
   });
-  ws.send(JSON.stringify({ type: 'hello', version: '0.1.0-teste' }));
+  ws.send(JSON.stringify({ type: 'hello', version: versao }));
   return agente;
 }
 
@@ -463,6 +463,58 @@ describe('o pedido pelo agente é o pedido direto', () => {
     const alheio = await api('owner', '/devices/reboot', { method: 'POST', body: { deviceId: 'ont-beta' } });
     assert.equal(alheio.status, 404, JSON.stringify(alheio.body));
     assert.equal(genie.state.tasks.length, tarefas, 'a tarefa chegou ao equipamento de fora da etiqueta');
+  });
+
+  it('um firmware (PUT de arquivo) desce como bytes, com os metadados nos cabeçalhos', async () => {
+    await modo(alfa, 'agent');
+    const agente = await ligarAgente(await gerarChave(alfa), { versao: '1.1.0' });
+    await ate(async () => (await runInTenant(alfa, () => GenieAcsConnection.agentInfo())).version === '1.1.0', 'a versão chegar');
+    // Bytes que não são UTF-8 válido: passar por string os corromperia.
+    const firmware = Buffer.from([0x00, 0xff, 0xfe, 0x80, 0xc3, 0x28, 0x0a, 0x7f]);
+    const resposta = await fetch(`${panelUrl}/api/devices/firmware/files`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(tokens.owner),
+        'Content-Type': 'application/octet-stream',
+        'X-File-Name': 'F670L_V2.bin',
+        'X-Fw-Product-Class': 'F670L',
+        'X-Fw-Oui': 'ZTEOUI',
+        'X-Fw-Version': encodeURIComponent('V2.0 beta')
+      },
+      body: firmware
+    });
+    const corpo = await resposta.json();
+    assert.equal(resposta.status, 201, JSON.stringify(corpo));
+    assert.equal(corpo.data.id, 'F670L_V2.bin');
+    const put = agente.pedidos.find((p) => p.method === 'PUT');
+    assert.equal(put.path, '/files/F670L_V2.bin');
+    assert.ok(Buffer.from(put.body, 'base64').equals(firmware), 'o corpo desceu diferente');
+    assert.equal(put.headers.fileType, '1 Firmware Upgrade Image');
+    assert.equal(put.headers.productClass, 'F670L');
+    assert.equal(put.headers.version, 'V2.0 beta');
+    const gravado = genie.state.uploads.at(-1);
+    assert.ok(gravado.bytes.equals(firmware), 'o GenieACS recebeu bytes diferentes');
+    genie.state.files = [];
+  });
+
+  it('agente antigo (sem os cabeçalhos de arquivo): 409 acs_agent_outdated, e nada desce', async () => {
+    await modo(alfa, 'agent');
+    const agente = await ligarAgente(await gerarChave(alfa), { versao: '1.0.0' });
+    await ate(async () => (await runInTenant(alfa, () => GenieAcsConnection.agentInfo())).version === '1.0.0', 'a versão chegar');
+    const resposta = await fetch(`${panelUrl}/api/devices/firmware/files`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(tokens.owner),
+        'Content-Type': 'application/octet-stream',
+        'X-File-Name': 'velho.bin',
+        'X-Fw-Product-Class': 'F670L'
+      },
+      body: Buffer.from('firmware')
+    });
+    const corpo = await resposta.json();
+    assert.equal(resposta.status, 409, JSON.stringify(corpo));
+    assert.equal(corpo.code, 'acs_agent_outdated');
+    assert.ok(!agente.pedidos.some((p) => p.method === 'PUT'), 'o arquivo desceu ao agente antigo');
   });
 
   it('sem endereço configurado, a raiz lógica fixa monta o caminho', async () => {
