@@ -53,6 +53,7 @@ import { DATE_FORMATS, dateFormatExample, setActiveDateFormat, type DateFormat }
 import { InvitePanel } from '@/components/settings/invite-panel'
 import { ProviderAddressPanel } from '@/components/settings/provider-address-panel'
 import { GenieAcsConnectionCard } from '@/components/settings/genieacs-connection-card'
+import { FirmwareFilesCard } from '@/components/settings/firmware-files'
 import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/virtual-parameters'
 
 /** O que a SaaS grava pelo console e não por esta tela: o ACS e os parâmetros TR-069. */
@@ -2040,6 +2041,10 @@ export default function Settings() {
                 mesma pergunta: com o modo Agente, o painel não usa o endereço
                 acima — quem fala com o GenieACS é o agente, na rede dele. */}
             <GenieAcsConnectionCard canWrite={can('settings.write')} />
+
+            {/* Os firmwares do GenieACS: quem pode mandar firmware para a ONT
+                (`devices.maintain`) pode também subir e apagar o arquivo. */}
+            {can('devices.maintain') && <FirmwareFilesCard />}
           </div>
         )}
 

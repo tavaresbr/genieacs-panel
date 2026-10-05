@@ -595,3 +595,18 @@ export const attachmentUploadLimiter = limiter({
   keyGenerator: ipKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
+
+/**
+ * O envio de firmware ao GenieACS (do provedor e o reenvio da plataforma),
+ * limitado ANTES de o corpo ser lido, pelo mesmo motivo do anexo acima — só que
+ * aqui o parser aceita até 64 MB por pedido. Pelo endereço de origem, para
+ * contar também quem não tem sessão. Firmware se envia de vez em quando, um
+ * arquivo por vez: 30 por minuto é folga para quem trabalha e pouco para quem
+ * quer encher a memória do painel.
+ */
+export const firmwareUploadLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});

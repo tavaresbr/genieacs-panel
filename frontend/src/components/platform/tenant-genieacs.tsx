@@ -9,7 +9,8 @@ import {
   type GenieAcsOwnership,
   type Tenant,
   type TenantDeviceTagging,
-  type TenantGenieAcs as TenantGenieAcsData
+  type TenantGenieAcs as TenantGenieAcsData,
+  type TenantUnownedFirmware
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
@@ -18,6 +19,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/virtual-parameters'
 import { modeOptions } from '@/lib/genieacs-agent'
 import { GenieAcsAgentPanel } from '@/components/genieacs-agent-panel'
+import { firmwareErrorKind, formatFileSize, reassignSizeMatches, scopedFirmwareName } from '@/lib/firmware'
 
 interface Props {
   tenant: Tenant
@@ -61,6 +63,12 @@ const AUTH_LABELS: Record<GenieAcsAuthType, TranslationKey> = {
  * carregam. A marcação em lote existe para a frota que já estava no ACS antes
  * da tag — sempre com prévia antes de aplicar.
  *
+ * "Firmware sem dono" são os arquivos do ACS compartilhado que não carregam o
+ * prefixo `<tag>--` de provedor nenhum — subidos antes do escopo, pela
+ * interface do GenieACS. Nenhum provedor os enxerga. O console os lista e, por
+ * arquivo, deixa reenviar para este provedor (o administrador escolhe o
+ * original no computador: o painel não baixa do GenieACS) ou apagar o antigo.
+ *
  * O modo Agente é para o GenieACS numa rede sem IP público: um programa
  * instalado lá abre a conexão até o painel. O bloco dele (estado, chave,
  * instalação) é o mesmo das Configurações do provedor — `GenieAcsAgentPanel`.
@@ -89,6 +97,13 @@ export function TenantGenieAcs({ tenant }: Props) {
   const [serials, setSerials] = useState('')
   const [tagging, setTagging] = useState(false)
   const [preview, setPreview] = useState<TenantDeviceTagging | null>(null)
+  const [semDono, setSemDono] = useState<TenantUnownedFirmware | null>(null)
+  const [semDonoErro, setSemDonoErro] = useState<string | null>(null)
+  const [firmwareOcupado, setFirmwareOcupado] = useState<string | null>(null)
+  const [reenviando, setReenviando] = useState(false)
+  // Os antigos já reenviados nesta visita, com o nome novo: o antigo continua
+  // no ACS até alguém apagá-lo, e a tela lembra que já pode.
+  const [reenviados, setReenviados] = useState<Record<string, string>>({})
 
   const preencher = useCallback((next: TenantGenieAcsData) => {
     setData(next)
@@ -116,6 +131,19 @@ export function TenantGenieAcs({ tenant }: Props) {
     // apagaria o que a pessoa está digitando.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant.id, preencher])
+
+  const carregarSemDono = useCallback(async () => {
+    setSemDonoErro(null)
+    const res = await platformAPI.listUnownedFirmware(tenant.id)
+    if (res.success && res.data) setSemDono(res.data)
+    else setSemDonoErro(res.message || t('platform.genieacs.firmwareLoadFailed'))
+    // `t` muda de identidade a cada render; recarregar por isso seria um laço.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant.id])
+
+  useEffect(() => {
+    void carregarSemDono()
+  }, [carregarSemDono])
 
   // A leitura periódica do bloco do agente traz o snapshot inteiro, mas só o
   // `agent` é aproveitado: repreencher o formulário apagaria o que a pessoa
@@ -145,6 +173,8 @@ export function TenantGenieAcs({ tenant }: Props) {
       if (res.success && res.data) {
         preencher(res.data)
         toast.success(t('platform.genieacs.saved', { provider: tenant.name }))
+        // A tag pode ter mudado, e com ela o prefixo do reenvio.
+        void carregarSemDono()
       } else {
         toast.error(res.message || t('platform.saveFailed'))
       }
@@ -184,6 +214,60 @@ export function TenantGenieAcs({ tenant }: Props) {
       if (apply) toast.success(t('platform.genieacs.tagApplied', { count: res.data.tagged }))
     } finally {
       setTagging(false)
+    }
+  }
+
+  const erroDeFirmware = (res: { code?: string; message?: string }) => {
+    const tipo = firmwareErrorKind(res)
+    if (tipo === 'tooLarge') return t('platform.genieacs.firmwareTooLarge')
+    if (tipo === 'generic') return t('platform.saveFailed')
+    return res.message || t('platform.saveFailed')
+  }
+
+  const reenviar = async (original: { id: string; size: number | null }, arquivo: File) => {
+    // A conferência barata de que é o mesmo arquivo; o servidor confere de novo.
+    if (!reassignSizeMatches(original.size, arquivo.size)) {
+      toast.error(t('platform.genieacs.firmwareSizeMismatch', {
+        chosen: formatFileSize(arquivo.size) ?? String(arquivo.size),
+        original: formatFileSize(original.size) ?? String(original.size),
+        chosenBytes: String(arquivo.size),
+        originalBytes: String(original.size)
+      }))
+      return
+    }
+    setFirmwareOcupado(original.id)
+    setReenviando(true)
+    try {
+      const res = await platformAPI.reassignFirmware(tenant.id, original.id, arquivo)
+      if (res.success && res.data) {
+        const novo = res.data.id
+        setReenviados((atual) => ({ ...atual, [original.id]: novo }))
+        toast.success(t('platform.genieacs.firmwareReassigned', { name: novo }))
+      } else {
+        toast.error(erroDeFirmware(res))
+      }
+    } finally {
+      setFirmwareOcupado(null)
+      setReenviando(false)
+    }
+  }
+
+  const apagarAntigo = async (nome: string) => {
+    const pergunta = reenviados[nome]
+      ? 'platform.genieacs.firmwareDeleteConfirm'
+      : 'platform.genieacs.firmwareDeleteConfirmNotReassigned'
+    if (!window.confirm(t(pergunta, { name: nome }))) return
+    setFirmwareOcupado(nome)
+    try {
+      const res = await platformAPI.deleteUnownedFirmware(tenant.id, nome)
+      if (res.success) {
+        toast.success(t('platform.genieacs.firmwareDeleted', { name: nome }))
+        setSemDono((atual) => (atual ? { ...atual, files: atual.files.filter((f) => f.id !== nome) } : atual))
+      } else {
+        toast.error(erroDeFirmware(res))
+      }
+    } finally {
+      setFirmwareOcupado(null)
     }
   }
 
@@ -504,6 +588,122 @@ export function TenantGenieAcs({ tenant }: Props) {
             </div>
           </div>
         )}
+
+        {/* Firmware sem dono: depois da tag, porque o reenvio depende dela —
+            o nome novo é `<tag>--<nome>`. */}
+        <div className="mt-4 rounded-md border border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h5 className="font-medium text-foreground">{t('platform.genieacs.firmwareTitle')}</h5>
+              <p className="mt-1 text-sm text-muted-foreground">{t('platform.genieacs.firmwareDescription')}</p>
+            </div>
+            <button
+              type="button"
+              className="modern-button-secondary shrink-0"
+              disabled={firmwareOcupado !== null}
+              onClick={() => void carregarSemDono()}
+            >
+              <Icon name="refresh" size={16} />
+              {t('platform.genieacs.firmwareRefresh')}
+            </button>
+          </div>
+
+          {semDonoErro && <p className="mt-3 text-sm text-[hsl(var(--status-danger))]">{semDonoErro}</p>}
+          {!semDono && !semDonoErro && <p className="mt-3 text-sm text-muted-foreground">{t('common.loading')}</p>}
+
+          {semDono && !semDono.shared && (
+            <p className="mt-3 text-sm text-muted-foreground">{t('platform.genieacs.firmwareNotShared')}</p>
+          )}
+
+          {semDono && semDono.shared && (
+            <div className="mt-3 space-y-3 text-sm">
+              {semDono.tag ? (
+                <p className="field-hint">
+                  {t('platform.genieacs.firmwarePrefixHint', { prefix: `${semDono.tag}--` })}
+                </p>
+              ) : (
+                <p className="flex items-start gap-2 text-[hsl(var(--status-warning))]">
+                  <Icon name="warning" size={16} className="mt-0.5 shrink-0" />
+                  {t('platform.genieacs.firmwareNeedsTag')}
+                </p>
+              )}
+
+              {semDono.files.length === 0 ? (
+                <p className="text-muted-foreground">{t('platform.genieacs.firmwareNone')}</p>
+              ) : (
+                <ul className="space-y-2">
+                  {semDono.files.map((file) => {
+                    const ocupado = firmwareOcupado === file.id
+                    const novo = reenviados[file.id]
+                    const detalhes = [
+                      file.version,
+                      file.productClass,
+                      file.oui ? `OUI ${file.oui}` : null,
+                      formatFileSize(file.size),
+                      file.uploadedAt ? formatDateTime(file.uploadedAt) : null
+                    ].filter(Boolean)
+                    const inputId = `tenant-${tenant.id}-fw-${file.id}`
+                    return (
+                      <li key={file.id} className="rounded-lg border border-border p-3">
+                        <p className="break-all font-mono text-xs text-foreground">{file.id}</p>
+                        {detalhes.length > 0 && (
+                          <p className="text-xs text-muted-foreground">{detalhes.join(' · ')}</p>
+                        )}
+                        {novo && (
+                          <p className="mt-1 flex items-center gap-1 text-xs text-[hsl(var(--status-success))]">
+                            <Icon name="check" size={14} />
+                            {t('platform.genieacs.firmwareReassignedAs', { name: novo })}
+                          </p>
+                        )}
+                        {semDono.tag && !novo && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('platform.genieacs.firmwareWillBecome', { name: scopedFirmwareName(semDono.tag, file.id) })}
+                          </p>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {/* O arquivo é escolhido no computador: o painel não
+                              baixa o antigo do GenieACS para regravá-lo. */}
+                          <input
+                            id={inputId}
+                            type="file"
+                            className="sr-only"
+                            disabled={!semDono.tag || firmwareOcupado !== null}
+                            onChange={(e) => {
+                              const escolhido = e.target.files?.[0]
+                              e.target.value = ''
+                              if (escolhido) void reenviar(file, escolhido)
+                            }}
+                          />
+                          <label
+                            htmlFor={inputId}
+                            aria-disabled={!semDono.tag || firmwareOcupado !== null}
+                            className={`modern-button-secondary ${!semDono.tag || firmwareOcupado !== null ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
+                          >
+                            {ocupado && reenviando ? t('platform.genieacs.firmwareSending') : t('platform.genieacs.firmwareReassign')}
+                          </label>
+                          <button
+                            type="button"
+                            className="modern-button-secondary"
+                            disabled={firmwareOcupado !== null}
+                            onClick={() => void apagarAntigo(file.id)}
+                          >
+                            <Icon name="trash" size={16} />
+                            {t('platform.genieacs.firmwareDeleteOld')}
+                          </button>
+                        </div>
+                        {!novo && file.size !== null && (
+                          <p className="field-hint">
+                            {t('platform.genieacs.firmwareSameSize', { size: formatFileSize(file.size) ?? '', bytes: String(file.size) })}
+                          </p>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {testMessage && (

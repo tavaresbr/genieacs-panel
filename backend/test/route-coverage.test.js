@@ -185,6 +185,9 @@ const POR_ID = new Map([
   ['PUT /api/platform/tenants/:id/genieacs', 'plano de controle; prova em platform-managed-settings.test.js — inclusive a de que gravar no alfa não toca o beta'],
   ['POST /api/platform/tenants/:id/genieacs/test', 'plano de controle; prova em platform-managed-settings.test.js'],
   ['POST /api/platform/tenants/:id/genieacs/tag-devices', 'plano de controle; prova em shared-acs-scope.test.js — marca só o que não tem dono, nunca o de outro provedor'],
+  ['GET /api/platform/tenants/:id/genieacs/firmware/unowned', 'plano de controle; prova em firmware-upload.test.js — lista só o sem dono do ACS daquele provedor'],
+  ['POST /api/platform/tenants/:id/genieacs/firmware/reassign', 'plano de controle; prova em firmware-upload.test.js — grava com a tag do provedor da URL, e id que não existe é 404'],
+  ['DELETE /api/platform/tenants/:id/genieacs/firmware/unowned/:name', 'plano de controle; prova em firmware-upload.test.js — só apaga arquivo sem dono, nunca o de um provedor'],
   ['POST /api/platform/tenants/:id/genieacs/agent-token', 'plano de controle; prova em genieacs-agent-saas.test.js — a chave vai só para o provedor pedido, e id que não existe é 404'],
   ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro'],
   ['POST /api/platform/tenants/:id/gateway/asaas-customer', 'plano de controle; prova em platform-integrations.test.js — inclusive o 404 da caixa da plataforma e de quem não existe']
@@ -394,7 +397,14 @@ describe('toda rota endereçada por um parâmetro', () => {
   // `/coupons/:id` (tabela da plataforma, como `plans`) e o
   // `PUT .../subscription/coupon` (provedor visto de cima). Três linhas em
   // `DO_CONSOLE` e três aqui; prova em platform-coupons.test.js. Somados à NFS-e, são 66.
-  const TETO_DE_EXCECOES = 66;
+  //
+  // E as três dos firmwares SEM dono de um GenieACS compartilhado (listar,
+  // reenviar como do provedor, apagar o antigo). O id é de provedor visto de
+  // cima, e o `:name` é arquivo do GenieACS, não linha de tabela nenhuma. Mesmo
+  // pedágio: três linhas em `DO_CONSOLE` e três aqui; prova em
+  // firmware-upload.test.js. São 69. (O apagar do PROVEDOR leva o nome na
+  // query, e por isso não entra nesta conta.)
+  const TETO_DE_EXCECOES = 69;
 
 
   /**
@@ -444,6 +454,9 @@ describe('toda rota endereçada por um parâmetro', () => {
     'PUT /api/platform/tenants/:id/genieacs',
     'POST /api/platform/tenants/:id/genieacs/test',
     'POST /api/platform/tenants/:id/genieacs/tag-devices',
+    'GET /api/platform/tenants/:id/genieacs/firmware/unowned',
+    'POST /api/platform/tenants/:id/genieacs/firmware/reassign',
+    'DELETE /api/platform/tenants/:id/genieacs/firmware/unowned/:name',
     'POST /api/platform/tenants/:id/genieacs/agent-token',
     'POST /api/platform/tenants/:id/gateway/asaas-customer'
   ]);

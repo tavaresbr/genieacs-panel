@@ -15,6 +15,7 @@ import { translateError } from '../i18n/index.js';
 import { exportDevicesCsv } from '../services/deviceExport.js';
 import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBatchIds } from '../services/deviceBatch.js';
 import { acsAgentOfflineBody, isAgentOffline } from '../services/genieacs/agent.js';
+import FirmwareStore, { readUploadHeaders } from '../services/firmwareStore.js';
 
 /**
  * A recusa do escopo do provedor (ACS compartilhado) como resposta própria.
@@ -742,6 +743,59 @@ class DeviceController {
       }
       console.error('Firmware upgrade error:', error);
       return res.status(502).json(createErrorResponse(req.t('device.firmwareUpgradeFailed'), error.message));
+    }
+  }
+
+  /**
+   * `POST /api/devices/firmware/files` — o arquivo cru no corpo; nome e
+   * metadados em `X-File-Name`, `X-Fw-Oui`, `X-Fw-Product-Class`,
+   * `X-Fw-Version` (com `encodeURIComponent`). 201 com o arquivo como a lista
+   * o mostra (`id` já com o prefixo do dono, num ACS compartilhado).
+   */
+  static async uploadFirmwareFile(req, res) {
+    try {
+      const file = await FirmwareStore.upload(readUploadHeaders(req), req.body);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.DEVICE_FIRMWARE_UPLOAD,
+        subjectType: 'firmware',
+        subjectId: file.id.slice(0, 128),
+        detail: { size: file.size, productClass: file.productClass, version: file.version }
+      });
+      return res.status(201).json(createResponse(req.t('device.firmwareUploaded'), file));
+    } catch (error) {
+      const escopo = respostaDeEscopo(req, res, error);
+      if (escopo) return escopo;
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('Firmware upload error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.firmwareUploadFailed'), error.message));
+    }
+  }
+
+  /** `DELETE /api/devices/firmware/files?name=<id>` — só firmware do próprio provedor. */
+  static async deleteFirmwareFile(req, res) {
+    try {
+      const file = await FirmwareStore.remove(typeof req.query?.name === 'string' ? req.query.name : '');
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.DEVICE_FIRMWARE_DELETE,
+        subjectType: 'firmware',
+        subjectId: file.id.slice(0, 128),
+        detail: { productClass: file.productClass, version: file.version }
+      });
+      return res.json(createResponse(req.t('device.firmwareDeleted'), { id: file.id }));
+    } catch (error) {
+      const escopo = respostaDeEscopo(req, res, error);
+      if (escopo) return escopo;
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('Firmware delete error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.firmwareDeleteFailed'), error.message));
     }
   }
 

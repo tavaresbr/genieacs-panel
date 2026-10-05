@@ -47,6 +47,10 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { connectorFor } from './genieacs/connector.js';
 import { UNASSIGNED_SCOPE_TAG } from './genieacs/direct.js';
 
+/** A página da coleção `files`, e quantas no máximo (10 000 arquivos). */
+const FIRMWARE_PAGE_SIZE = 500;
+const FIRMWARE_MAX_PAGES = 20;
+
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
     'X_ZTE-COM_VLANID',
@@ -2421,11 +2425,54 @@ class DeviceService {
     const connector = await connectorFor();
     const tag = (await connector.scopeTag?.()) ?? null;
     if (tag === UNASSIGNED_SCOPE_TAG) return [];
-    const files = await this.fetchGenieAcsCollection('files', {
-      query: JSON.stringify({ 'metadata.fileType': FIRMWARE_FILE_TYPE }),
-      limit: 500
-    });
+    // Com tag, o GenieACS já devolve só os do dono (o prefixo `<tag>--`): a
+    // coleção é de todos, e paginar pela de todos para jogar fora a dos outros
+    // faria o corte de páginas cair sobre arquivos alheios. `filesOwnedBy`
+    // continua como defesa — a NBI é de terceiro.
+    const filtro = { 'metadata.fileType': FIRMWARE_FILE_TYPE };
+    if (tag) filtro._id = { $regex: `^${tag}--` };
+    const files = await this.fetchFirmwareFilePages(filtro);
     return filesOwnedBy(files, tag, { unassignedTag: UNASSIGNED_SCOPE_TAG });
+  }
+
+  /**
+   * Todos os arquivos que casam com `filter`, página por página.
+   *
+   * Antes era UMA página de 500, e o 501º firmware simplesmente não existia
+   * para o painel — nem na lista, nem na conferência antes do `download`.
+   * Agora vai até a página vir incompleta, com teto de `FIRMWARE_MAX_PAGES`
+   * páginas para que uma NBI que ignora `skip` (e devolve sempre a mesma
+   * página cheia) não prenda a requisição para sempre.
+   *
+   * `unscoped` é só da plataforma (os arquivos sem dono de um ACS
+   * compartilhado, que o escopo do provedor esconde por definição).
+   */
+  static async fetchFirmwareFilePages(filter, { unscoped = false } = {}) {
+    const connector = await connectorFor();
+    const todos = [];
+    for (let pagina = 0; pagina < FIRMWARE_MAX_PAGES; pagina += 1) {
+      // eslint-disable-next-line no-await-in-loop -- uma página depois da outra: o `skip` depende da anterior
+      const response = await connector.request(connector.collectionPath('files'), {
+        unscoped,
+        query: {
+          query: JSON.stringify(filter),
+          sort: JSON.stringify({ _id: 1 }),
+          skip: pagina * FIRMWARE_PAGE_SIZE,
+          limit: FIRMWARE_PAGE_SIZE
+        }
+      });
+      if (!response.ok) {
+        // eslint-disable-next-line no-await-in-loop -- sai do laço
+        throw await this.genieAcsError('GenieACS files API', response);
+      }
+      // eslint-disable-next-line no-await-in-loop -- idem
+      const text = await response.text();
+      const rows = text ? JSON.parse(text) : [];
+      if (!Array.isArray(rows)) throw new Error('Invalid API response');
+      todos.push(...rows);
+      if (rows.length < FIRMWARE_PAGE_SIZE) break;
+    }
+    return todos;
   }
 
   /** Todos os firmwares do GenieACS que dizem o modelo — a lista do lote. */

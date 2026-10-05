@@ -60,8 +60,31 @@ export function filesOwnedBy(files, tag, { unassignedTag = null } = {}) {
 const igual = (a, b) => String(a ?? '').trim().toUpperCase() === String(b ?? '').trim().toUpperCase();
 const vazio = (value) => String(value ?? '').trim() === '';
 
+/**
+ * O nome de um arquivo na coleção `files` — o que vira `files/<nome>` na NBI.
+ *
+ * Letras, dígitos, ponto, `_` e `-`, e nada mais: sem barra (seria outro
+ * caminho na NBI), sem espaço nem acento (o nome vai no caminho E no `download`
+ * que a ONT recebe, e firmware de ONT não lida bem com nenhum dos dois). Não
+ * começa com ponto, o que já tira `.` e `..` — que, no caminho, a URL
+ * resolveria para a raiz da NBI. O teto é folga para o prefixo do dono caber.
+ */
+export const FIRMWARE_NAME_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+export const FIRMWARE_NAME_MAX_LENGTH = 200;
+
+/** O nome serve para gravar ou apagar na NBI? */
+export function validFirmwareName(name) {
+  const nome = typeof name === 'string' ? name : '';
+  return nome.length > 0 && nome.length <= FIRMWARE_NAME_MAX_LENGTH && FIRMWARE_NAME_PATTERN.test(nome);
+}
+
+/** O arquivo é de firmware (o tipo que o painel usa)? */
+export function isFirmwareFile(file) {
+  return igual(file?.metadata?.fileType, FIRMWARE_FILE_TYPE);
+}
+
 /** O arquivo, no formato que a tela lê. */
-function publicFile(file) {
+export function publicFile(file) {
   const meta = file?.metadata ?? {};
   return {
     id: String(file._id),

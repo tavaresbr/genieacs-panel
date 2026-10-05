@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { currentTenantId } from '../../config/tenantContext.js';
 import GenieAcsConnection from '../../models/GenieAcsConnection.js';
 import GenieAcsAuthService from '../genieacsAuthService.js';
+import { TranslatableError } from '../../i18n/index.js';
 import DirectConnector from './direct.js';
 import agentHub, {
   AGENT_CLOSE, AGENT_OFFLINE_CODE, AgentOfflineError, hashAgentToken
@@ -27,6 +28,41 @@ import agentHub, {
 
 /** A raiz lógica quando o provedor em modo agente não configurou endereço nenhum. */
 export const AGENT_FALLBACK_ROOT = 'http://genieacs.agent';
+
+/**
+ * O maior corpo que desce ao agente. O frame tem 64 MiB (`AGENT_MAX_PAYLOAD`)
+ * e o corpo vai em base64, que cresce 4/3: 48 MiB é o que cabe. Acima disso o
+ * `send` recusa antes de montar o frame — um frame grande demais derrubaria a
+ * conexão inteira, com os outros pedidos em andamento junto.
+ */
+export const AGENT_MAX_REQUEST_BODY = 48 * 1024 * 1024;
+
+/**
+ * A primeira versão do agente que repassa os cabeçalhos do envio de arquivo
+ * (`fileType`, `oui`, `productClass`, `version`). Um agente mais velho
+ * descartaria os quatro em silêncio, e o firmware chegaria ao GenieACS sem
+ * tipo nem modelo — invisível para o painel. Quem envia confere antes
+ * (`agentSupportsFileUpload`).
+ */
+export const AGENT_FILE_UPLOAD_VERSION = '1.1.0';
+
+/** `a >= b` entre versões `x.y.z`; o que não for versão é tido como antiga. */
+function versaoAoMenos(a, b) {
+  const partes = (v) => (/^\d+\.\d+\.\d+/.test(String(v ?? '')) ? String(v).split(/[.-]/).slice(0, 3).map(Number) : null);
+  const x = partes(a);
+  const y = partes(b);
+  if (!x || !y) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (x[i] !== y[i]) return x[i] > y[i];
+  }
+  return true;
+}
+
+/** O agente do provedor em escopo anunciou uma versão que sabe enviar arquivo? */
+export async function agentSupportsFileUpload() {
+  const { version } = await GenieAcsConnection.agentInfo();
+  return versaoAoMenos(version, AGENT_FILE_UPLOAD_VERSION);
+}
 
 /** Status que uma `Response` não aceita com corpo. */
 const SEM_CORPO = new Set([101, 204, 205, 304]);
@@ -97,13 +133,25 @@ class AgentConnector extends DirectConnector {
       const { lastSeenAt } = await GenieAcsConnection.agentInfo();
       throw new AgentOfflineError(lastSeenAt);
     }
+    // O corpo em bytes, do jeito que veio: um `Buffer` (o arquivo de firmware)
+    // desce como está; texto (o JSON das tarefas) vira UTF-8. Passar o Buffer
+    // por uma string corromperia todo byte que não é UTF-8 válido.
+    let corpo = null;
+    if (body !== null && body !== undefined) {
+      corpo = Buffer.isBuffer(body) ? body : Buffer.from(String(body), 'utf8');
+      if (corpo.length > AGENT_MAX_REQUEST_BODY) {
+        throw new TranslatableError('device.firmwareTooLarge', { max: AGENT_MAX_REQUEST_BODY / (1024 * 1024) }, {
+          status: 413, code: 'firmware_too_large'
+        });
+      }
+    }
     const resposta = await agentHub.request(tenantId, {
       method,
       path: `${url.pathname}${url.search}`,
       // A credencial da NBI, montada pelo painel como em todo transporte: o
       // agente só repassa, não guarda nem registra.
       headers: await GenieAcsAuthService.nbiHeaders(headers),
-      body: body === null || body === undefined ? null : Buffer.from(body, 'utf8'),
+      body: corpo,
       timeoutMs,
       signal
     });

@@ -66,7 +66,7 @@ import { realpathSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { pathToFileURL } from 'node:url';
 
-export const AGENT_VERSION = '1.0.0';
+export const AGENT_VERSION = '1.1.0';
 
 /** Onde o painel espera o agente, relativo à `PANEL_URL`. */
 const CONNECT_PATH = '/api/genieacs-agent/connect';
@@ -116,8 +116,16 @@ const METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE']);
  * `transfer-encoding`, `x-forwarded-*` e o que mais vier ficam de fora — um
  * `host` escolhido pelo painel, por exemplo, alcançaria outro site virtual
  * atrás do mesmo proxy reverso do provedor.
+ *
+ * Desde a 1.1.0, também os quatro cabeçalhos com que a NBI do GenieACS recebe um
+ * arquivo (`PUT /files/<nome>`): `fileType`, `oui`, `productClass` e `version`.
+ * São os únicos metadados que a coleção `files` guarda, e sem eles o firmware
+ * enviado pelo painel chegaria ao ACS sem tipo nem modelo. O painel confere a
+ * versão anunciada no `hello` antes de mandar um arquivo por um agente.
  */
-const FORWARDED_REQUEST_HEADERS = new Set(['authorization', 'content-type', 'accept']);
+const FORWARDED_REQUEST_HEADERS = new Set([
+  'authorization', 'content-type', 'accept', 'filetype', 'oui', 'productclass', 'version'
+]);
 
 /**
  * Cabeçalhos da resposta que NÃO voltam ao painel.
