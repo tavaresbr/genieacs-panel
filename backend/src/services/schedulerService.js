@@ -312,6 +312,15 @@ class SchedulerService {
         console.warn(`Could not send the subscription reminder: ${error.message}`);
         return { sent: false, reason: 'error' };
       });
+    // A suspensão automática por inadimplência (0102), DEPOIS da régua: o
+    // aviso de suspensão e a suspensão são as últimas etapas dela, e no dia
+    // em que suspende a mensagem do prazo já saiu. Ver
+    // `SubscriptionNoticeService.autoSuspendCurrent`.
+    summary.autoSuspend = await SubscriptionNoticeService.autoSuspendCurrent({ tenant })
+      .catch((error) => {
+        console.warn(`Could not run the automatic suspension: ${error.message}`);
+        return { action: 'none', reason: 'error' };
+      });
 
     const provisioningConfig = await ProvisioningService.getConfig();
     if (

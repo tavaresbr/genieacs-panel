@@ -7,7 +7,7 @@ import BillingInvoice from '../models/BillingInvoice.js';
 import BillingInvoiceService, { InvoiceRequestError } from '../services/billing/billingInvoiceService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import BillingEvent from '../models/BillingEvent.js';
-import SubscriptionService from '../services/subscriptionService.js';
+import SubscriptionService, { isBillableStatus } from '../services/subscriptionService.js';
 import ChargeIssuingService, { ChargeFollowError } from '../services/chargeIssuingService.js';
 import { providerFor } from '../services/billing/registry.js';
 import { AsaasError } from '../services/billing/asaasClient.js';
@@ -362,6 +362,8 @@ class PlatformSubscriptionsController {
           subscription: sub ? {
             status,
             storedStatus: sub.status,
+            // A suspensão automática por inadimplência (0102) ganha selo próprio.
+            suspendedReason: sub.status === 'suspended' ? (sub.suspended_reason ?? null) : null,
             planId: sub.plan_id ?? null,
             planCode: sub.plan_code ?? null,
             planName: sub.plan_name ?? null,
@@ -529,7 +531,9 @@ class PlatformSubscriptionsController {
    *      pagamento seria registrado e o período NÃO andaria (é a regra de
    *      `recordPayment`: pagamento não reativa quem alguém desligou) — e uma
    *      baixa que fecha a cobrança sem mudar nada no acesso é a surpresa que
-   *      a pessoa precisa ver antes, e não depois.
+   *      a pessoa precisa ver antes, e não depois. A suspensão AUTOMÁTICA
+   *      por inadimplência (0102) não é "parada por gente": o pagamento a
+   *      reativa, e a baixa passa.
    *   1. **A garra**, antes de qualquer leitura que decida: ninguém reemite,
    *      cancela ou quita esta linha no meio.
    *   2. **O que já foi registrado por esta referência.** O webhook pode ter
@@ -587,7 +591,9 @@ class PlatformSubscriptionsController {
         resultado = await runInTenant(tenant.id, async () => {
           const cobranca = await cobrancaEmAberto(chargeId);
           const assinatura = await Subscription.forTenant(tenant.id);
-          if (!force && (assinatura?.status === 'suspended' || assinatura?.status === 'canceled')) {
+          // A suspensão AUTOMÁTICA (0102) passa: o pagamento a reativa.
+          if (!force && assinatura && !isBillableStatus(assinatura)
+            && (assinatura.status === 'suspended' || assinatura.status === 'canceled')) {
             throw new ConsoleChargeError(
               409,
               `The subscription is ${assinatura.status}: a payment would not extend it (send force to settle anyway)`,

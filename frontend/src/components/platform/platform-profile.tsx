@@ -6,6 +6,7 @@ import {
   publicAPI,
   PLATFORM_PROFILE_FIELDS,
   type CnpjData,
+  type PlatformBillingPolicy,
   type PlatformProfile,
   type PlatformProfileField
 } from '@/lib/api'
@@ -16,6 +17,14 @@ import type { TranslationKey } from '@/lib/i18n/dictionary'
 type Rascunho = Record<PlatformProfileField, string>
 
 const VAZIO = Object.fromEntries(PLATFORM_PROFILE_FIELDS.map((campo) => [campo, ''])) as Rascunho
+
+/** A suspensão automática (0102): números, digitados como texto. */
+type CampoPolitica = keyof PlatformBillingPolicy
+const CAMPOS_POLITICA: { campo: CampoPolitica; rotulo: TranslationKey; dica: TranslationKey; max: number }[] = [
+  { campo: 'autoSuspendDays', rotulo: 'platform.profile.autoSuspendDays', dica: 'platform.profile.autoSuspendDaysHint', max: 90 },
+  { campo: 'autoSuspendWarnDays', rotulo: 'platform.profile.autoSuspendWarnDays', dica: 'platform.profile.autoSuspendWarnDaysHint', max: 30 }
+]
+const PADRAO_POLITICA: PlatformBillingPolicy = { autoSuspendDays: 15, autoSuspendWarnDays: 3 }
 
 /** Os blocos do formulário, e os campos de cada um. */
 const BLOCOS: {
@@ -115,6 +124,7 @@ export function PlatformProfileForm() {
   const toast = useToast()
   const [perfil, setPerfil] = useState<PlatformProfile | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho>(VAZIO)
+  const [politica, setPolitica] = useState<Record<CampoPolitica, string>>({ autoSuspendDays: '', autoSuspendWarnDays: '' })
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   // A consulta do CNPJ na Receita: o estado da tela, e qual CNPJ já foi
@@ -128,6 +138,11 @@ export function PlatformProfileForm() {
     setRascunho(Object.fromEntries(
       PLATFORM_PROFILE_FIELDS.map((campo) => [campo, paraTela(campo, dados.values[campo])])
     ) as Rascunho)
+    const gravada = dados.billing ?? PADRAO_POLITICA
+    setPolitica({
+      autoSuspendDays: String(gravada.autoSuspendDays),
+      autoSuspendWarnDays: String(gravada.autoSuspendWarnDays)
+    })
   }, [])
 
   useEffect(() => {
@@ -185,9 +200,16 @@ export function PlatformProfileForm() {
     if (!perfil) return
     // Só o que mudou vai, para um campo que vem do `.env` não virar "gravado"
     // só porque o formulário o reenviou.
-    const patch: Partial<Record<PlatformProfileField, string>> = {}
+    const patch: Partial<Record<PlatformProfileField, string>> & Partial<Record<CampoPolitica, number | null>> = {}
     for (const campo of PLATFORM_PROFILE_FIELDS) {
       if (rascunho[campo].trim() !== paraTela(campo, perfil.values[campo])) patch[campo] = rascunho[campo].trim()
+    }
+    // Os números da política: vazio volta ao padrão; o servidor valida.
+    for (const { campo } of CAMPOS_POLITICA) {
+      const texto = politica[campo].trim()
+      const atual = perfil.billing?.[campo] ?? PADRAO_POLITICA[campo]
+      if (texto === String(atual)) continue
+      patch[campo] = texto === '' ? null : Number(texto)
     }
     if (!Object.keys(patch).length) {
       toast.success(t('platform.profile.nothingChanged'))
@@ -285,6 +307,34 @@ export function PlatformProfileForm() {
           </div>
         </section>
       ))}
+
+      <section className="rounded-md border border-border p-4 sm:p-5">
+        <h3 className="font-semibold text-foreground">{t('platform.profile.billing')}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{t('platform.profile.billingHint')}</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {CAMPOS_POLITICA.map(({ campo, rotulo, dica, max }) => (
+            <div key={campo}>
+              <label htmlFor={`profile-${campo}`} className="field-label">{t(rotulo)}</label>
+              <input
+                id={`profile-${campo}`}
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={max}
+                step={1}
+                className="modern-input w-full min-w-0"
+                value={politica[campo]}
+                disabled={!perfil.canSave}
+                aria-describedby={`profile-${campo}-hint`}
+                onChange={(e) => setPolitica((p) => ({ ...p, [campo]: e.target.value }))}
+              />
+              <p id={`profile-${campo}-hint`} className="field-hint">
+                {t(dica, { days: (perfil.billingDefaults ?? PADRAO_POLITICA)[campo] })}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="modern-button" disabled={salvando || !perfil.canSave}>

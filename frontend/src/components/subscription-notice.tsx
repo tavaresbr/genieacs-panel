@@ -90,9 +90,12 @@ export function SubscriptionNotice() {
   // Sem boleto em aberto, a saída do muro é gerar um — quando o bloqueio se
   // resolve pagando (atraso, teste vencido) e o plano é pago. As regras
   // moram em `canGenerateCharge`.
+  // A suspensão automática por inadimplência (0102) sai pagando: o muro dela
+  // diz isso, e oferece a cobrança como o do atraso.
+  const autoSuspended = blocked.code === 'subscription_suspended' && blocked.subscription?.reason === 'auto_nonpayment'
   const canGenerate = canGenerateCharge({
     code: blocked.code, paymentUrl, chargesLoaded, canWrite: can('settings.write'), plans,
-    billingExempt: blocked.subscription?.billingExempt === true
+    billingExempt: blocked.subscription?.billingExempt === true, autoSuspended
   })
 
   // Síncrono até o `payInNewTab`: a aba nova precisa nascer dentro do clique.
@@ -111,7 +114,7 @@ export function SubscriptionNotice() {
     })
   }
 
-  const message = t(MESSAGE_KEYS[blocked.code]) || blocked.message
+  const message = t(autoSuspended ? 'subscription.suspendedNonpayment' : MESSAGE_KEYS[blocked.code]) || blocked.message
   const wall = WALL_CODES.has(blocked.code)
 
   if (!wall) {

@@ -258,8 +258,14 @@ export function canGenerateCharge(opts: {
   plans: TenantPlanOption[] | null
   /** Isento de cobrança não tem fatura a gerar (o backend responde `billing_exempt`). */
   billingExempt?: boolean
+  /**
+   * A suspensão AUTOMÁTICA por inadimplência (0102): ao contrário da à mão,
+   * pagar a desfaz, então o muro dela oferece a cobrança como o atraso.
+   */
+  autoSuspended?: boolean
 }) {
-  if (!PAYABLE_GATE_CODES.has(opts.code)) return false
+  const pagavel = PAYABLE_GATE_CODES.has(opts.code) || (opts.code === 'subscription_suspended' && opts.autoSuspended === true)
+  if (!pagavel) return false
   if (opts.billingExempt) return false
   if (opts.paymentUrl || !opts.chargesLoaded) return false
   // O código já garante um estado que se paga (atraso ou teste vencido).

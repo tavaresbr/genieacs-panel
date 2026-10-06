@@ -36,6 +36,21 @@ const ENV_FALLBACK = Object.freeze({
 
 export const PROFILE_FIELDS = Object.freeze(Object.keys(ENV_FALLBACK));
 
+/**
+ * A política de cobrança da plataforma que mora aqui também (0102): números,
+ * e não texto, então fora de `PROFILE_FIELDS` — sem `.env`, com padrão
+ * próprio, e voltam ao padrão quando o console os apaga (`null`).
+ *
+ *   autoSuspendDays      dias depois do vencimento em que o provedor que não
+ *                        pagou é suspenso sozinho. Zero desliga.
+ *   autoSuspendWarnDays  quantos dias antes da suspensão sai o aviso. Zero
+ *                        desliga só o aviso; menor que `autoSuspendDays`.
+ */
+export const BILLING_POLICY_FIELDS = Object.freeze({
+  autoSuspendDays: { default: 15, min: 0, max: 90 },
+  autoSuspendWarnDays: { default: 3, min: 0, max: 30 }
+});
+
 const MAX = { legalName: 160, tradeName: 80, taxId: 20, address: 240, contactEmail: 160, notifyEmail: 160 };
 const URL_MAX = 300;
 const SOCIAL = { instagram: 'instagram.com', facebook: 'facebook.com', youtube: 'youtube.com', linkedin: 'linkedin.com' };
@@ -96,7 +111,47 @@ export async function readProfile() {
   for (const campo of ['contactWhatsapp', 'notifyWhatsapp']) {
     if (values[campo]) values[campo] = String(values[campo]).replace(/\D/g, '') || null;
   }
-  return { values, sources, canSave: Boolean(platformId), updatedAt: stored.updatedAt ?? null };
+  return {
+    values,
+    sources,
+    billing: politicaDe(stored),
+    billingDefaults: Object.fromEntries(Object.entries(BILLING_POLICY_FIELDS).map(([c, r]) => [c, r.default])),
+    canSave: Boolean(platformId),
+    updatedAt: stored.updatedAt ?? null
+  };
+}
+
+/** Os números da política como valem: o gravado, ou o padrão. */
+function politicaDe(stored) {
+  const politica = {};
+  for (const [campo, regra] of Object.entries(BILLING_POLICY_FIELDS)) {
+    const gravado = stored?.[campo];
+    politica[campo] = Number.isInteger(gravado) && gravado >= regra.min && gravado <= regra.max
+      ? gravado
+      : regra.default;
+  }
+  return politica;
+}
+
+/**
+ * A suspensão automática como o agendador a lê: `{ days, warnDays }`. Nunca
+ * lança — sem caixa da plataforma, ou com o banco fora, vale o padrão.
+ */
+export async function autoSuspendConfig() {
+  const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
+  const politica = politicaDe(stored);
+  return { days: politica.autoSuspendDays, warnDays: politica.autoSuspendWarnDays };
+}
+
+/** Um número da política recebido → inteiro a gravar, `null` para o padrão; lança se inválido. */
+function normalizarPolitica(campo, bruto) {
+  if (bruto === null || bruto === undefined || bruto === '') return null;
+  const regra = BILLING_POLICY_FIELDS[campo];
+  const numero = typeof bruto === 'number' ? bruto : Number(String(bruto).trim());
+  if (!Number.isInteger(numero) || numero < regra.min || numero > regra.max) {
+    throw new PlatformProfileError(`${campo} must be an integer from ${regra.min} to ${regra.max}`, { field: campo });
+  }
+  return numero;
 }
 
 /** Um link de rede social: URL https do site da rede, ou `@usuario`. */
@@ -174,6 +229,21 @@ export async function saveProfile(patch = {}) {
     else delete novo[campo];
     mudou.push(campo);
   }
+  for (const campo of Object.keys(BILLING_POLICY_FIELDS)) {
+    if (!(campo in patch)) continue;
+    const valor = normalizarPolitica(campo, patch[campo]);
+    const antes = Number.isInteger(stored[campo]) ? stored[campo] : null;
+    if (valor === antes) continue;
+    if (valor === null) delete novo[campo];
+    else novo[campo] = valor;
+    mudou.push(campo);
+  }
+  // O aviso tem de cair ANTES da suspensão: com ele igual ou maior, sairia no
+  // vencimento (ou antes dele) dizendo "vai ser suspenso" a quem nem atrasou.
+  const politica = politicaDe(novo);
+  if (politica.autoSuspendDays > 0 && politica.autoSuspendWarnDays >= politica.autoSuspendDays) {
+    throw new PlatformProfileError('autoSuspendWarnDays must be smaller than autoSuspendDays', { field: 'autoSuspendWarnDays' });
+  }
   if (mudou.length) {
     novo.updatedAt = new Date().toISOString();
     await runInTenant(platformId, () => AppState.upsert(CONFIG_KEY, JSON.stringify(novo)));
@@ -182,4 +252,6 @@ export async function saveProfile(patch = {}) {
   return mudou;
 }
 
-export default { readProfile, saveProfile, invalidatePlatformProfile, PROFILE_FIELDS };
+export default {
+  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS
+};

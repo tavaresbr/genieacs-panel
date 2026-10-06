@@ -1483,6 +1483,14 @@ const SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS = [
   ['billing_exempt_until', (t) => t.timestamp('billing_exempt_until').nullable()]
 ];
 
+/**
+ * A coluna da 0102 — ver a migração. Nula em todo `suspended` de antes dela,
+ * que é suspensão à mão: o pagamento não o reativa, como nunca reativou.
+ */
+const SUBSCRIPTION_SUSPENDED_REASON_COLUMNS = [
+  ['suspended_reason', (t) => t.string('suspended_reason', 32).nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -5517,6 +5525,27 @@ export const migrations = [
       const missing = await missingColumns(db, 'sgp_contacts', SGP_CONTACT_IMPORT_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('sgp_contacts', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * Por que a assinatura está `suspended` (`SubscriptionService`):
+     * `auto_nonpayment` é a suspensão automática por inadimplência, que o
+     * pagamento desfaz sozinho; `manual` é o console, que só o console desfaz.
+     * Nula nas linhas que já existem — toda suspensão de antes era à mão.
+     */
+    id: '0102_subscription_suspended_reason',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_SUSPENDED_REASON_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_SUSPENDED_REASON_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
       });
     }

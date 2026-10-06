@@ -1498,9 +1498,18 @@ export interface PlatformProfile {
   values: Record<PlatformProfileField, string | null>
   /** De onde vem cada valor: gravado no console, do `.env`, ou nenhum. */
   sources: Record<PlatformProfileField, 'db' | 'env' | null>
+  /** A política de suspensão automática (0102), já com o padrão aplicado. */
+  billing?: PlatformBillingPolicy
+  billingDefaults?: PlatformBillingPolicy
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
+}
+
+/** Dias de atraso até a suspensão automática (0 desliga) e de aviso antes dela. */
+export interface PlatformBillingPolicy {
+  autoSuspendDays: number
+  autoSuspendWarnDays: number
 }
 
 export interface PublicInfo {
@@ -1605,7 +1614,12 @@ export interface SubscriptionView {
    * Por que o estado que vale difere do gravado. São os dois prazos que vencem
    * sozinhos: o teste e o período pago. Nulo quando a coluna é a verdade.
    */
-  reason: 'trial_expired' | 'renewal_expired' | null
+  reason: 'trial_expired' | 'renewal_expired' | 'auto_nonpayment' | null
+  /**
+   * Por que está suspensa (0102): `auto_nonpayment` é a suspensão automática
+   * por inadimplência, que o pagamento desfaz; `manual` (ou nulo) é o console.
+   */
+  suspendedReason?: 'auto_nonpayment' | 'manual' | null
   plan: { code: string; name: string; limits: PlanLimits } | null
   trialEndsAt: string | null
   renewsAt: string | null
@@ -1730,6 +1744,8 @@ export interface ChargeConsoleView {
 export interface SubscriptionConsoleSubscription {
   status: SubscriptionStatus
   storedStatus: SubscriptionStatus
+  /** `auto_nonpayment` ganha o selo "Suspenso (inadimplência)". */
+  suspendedReason?: 'auto_nonpayment' | 'manual' | null
   planId: number | null
   planCode: string | null
   planName: string | null
@@ -1831,7 +1847,7 @@ export interface BillingEventView {
  * Um lembrete de cobrança que a plataforma mandou ao provedor (0092): a etapa
  * da régua, o prazo a que ela se refere (data ISO) e por onde saiu.
  */
-export type SubscriptionReminderStep = 'before' | 'due' | 'after'
+export type SubscriptionReminderStep = 'before' | 'due' | 'after' | 'suspension_warning' | 'suspended'
 
 export interface SubscriptionReminderView {
   dueAt: string
@@ -2009,8 +2025,11 @@ export const platformAPI = {
   getPlatformProfile: () => apiClient.get<PlatformProfile>('/platform/settings/profile'),
 
   /** Ausente mantém; vazio apaga o gravado (o `.env` volta a valer). */
-  updatePlatformProfile: (payload: Partial<Record<PlatformProfileField, string>>) =>
-    apiClient.put<PlatformProfile & { changed: PlatformProfileField[] }>('/platform/settings/profile', payload),
+  /** Os números da política: `null` volta ao padrão. */
+  updatePlatformProfile: (
+    payload: Partial<Record<PlatformProfileField, string>> & Partial<Record<keyof PlatformBillingPolicy, number | null>>
+  ) =>
+    apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
   testAsaasIntegration: () =>
     apiClient.post<AsaasConnectionTest>('/platform/integrations/asaas/test'),

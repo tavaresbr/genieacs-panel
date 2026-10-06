@@ -12,7 +12,7 @@ import {
   type SubscriptionReminderView,
   type SubscriptionStatus
 } from '@/lib/api'
-import { BillingExemptControl, STATUS_LABEL_KEYS, exemptUntilLabel, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { BillingExemptControl, exemptUntilLabel, statusBadgeClass, statusLabelKey } from '@/components/platform/tenant-plan'
 import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { Icon } from '@/components/ui/icon'
@@ -356,7 +356,7 @@ function StatusBadge({ row }: { row: SubscriptionRow }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <span className={statusBadgeClass(row.subscription.status)}>
-        {t(STATUS_LABEL_KEYS[row.subscription.status])}
+        {t(statusLabelKey(row.subscription))}
       </span>
       {isBillingExempt(row.subscription) && (
         <span className="modern-badge-info" title={row.subscription.billingExemptReason ?? undefined}>
@@ -788,7 +788,10 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
 const REMINDER_STEP_KEYS = {
   before: 'platform.subs.reminders.step.before',
   due: 'platform.subs.reminders.step.due',
-  after: 'platform.subs.reminders.step.after'
+  after: 'platform.subs.reminders.step.after',
+  // A suspensão automática (0102): o aviso antes, e o aviso dela.
+  suspension_warning: 'platform.subs.reminders.step.suspensionWarning',
+  suspended: 'platform.subs.reminders.step.suspended'
 } as const
 
 const REMINDER_CHANNEL_KEYS: Record<string, 'platform.subs.reminders.channel.email' | 'platform.subs.reminders.channel.whatsapp'> = {
