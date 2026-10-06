@@ -2155,6 +2155,8 @@ const de: Dictionary = {
   'whatsapp.inbox.deliveryFailed': 'Nicht zugestellt: {reason}',
   'whatsapp.inbox.loadMore': 'Ältere laden',
   'whatsapp.inbox.unread': '{count} ungelesen',
+  'whatsapp.inbox.awaiting': 'Wartet auf Antwort · {minutes} Min.',
+  'whatsapp.inbox.awaitingHint': 'Der Kunde hat zuletzt geschrieben, noch hat niemand geantwortet',
   'whatsapp.inbox.receivedBy': 'Empfangen über {number}',
   'whatsapp.accounts.color': 'Farbe',
   'whatsapp.color.blue': 'Blau',

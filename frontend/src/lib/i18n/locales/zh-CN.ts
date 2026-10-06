@@ -2272,6 +2272,8 @@ const zhCN: Dictionary = {
   'whatsapp.inbox.deliveryFailed': '未送达：{reason}',
   'whatsapp.inbox.loadMore': '加载更早的消息',
   'whatsapp.inbox.unread': '{count} 条未读',
+  'whatsapp.inbox.awaiting': '等待回复 · {minutes} 分钟',
+  'whatsapp.inbox.awaitingHint': '客户最后发言，尚无人回复',
   'whatsapp.inbox.receivedBy': '由 {number} 接收',
   'whatsapp.accounts.color': '颜色',
   'whatsapp.color.blue': '蓝色',

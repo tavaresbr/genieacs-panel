@@ -2279,6 +2279,8 @@ const ru: Dictionary = {
   'whatsapp.inbox.deliveryFailed': 'Не доставлено: {reason}',
   'whatsapp.inbox.loadMore': 'Загрузить более ранние',
   'whatsapp.inbox.unread': 'непрочитанных: {count}',
+  'whatsapp.inbox.awaiting': 'Ждёт ответа · {minutes} мин',
+  'whatsapp.inbox.awaitingHint': 'Клиент написал последним, ответа ещё нет',
   'whatsapp.inbox.receivedBy': 'Получено номером {number}',
   'whatsapp.accounts.color': 'Цвет',
   'whatsapp.color.blue': 'Синий',

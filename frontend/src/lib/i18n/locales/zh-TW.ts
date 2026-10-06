@@ -2272,6 +2272,8 @@ const zhTW: Dictionary = {
   'whatsapp.inbox.deliveryFailed': '未送達：{reason}',
   'whatsapp.inbox.loadMore': '載入較早的訊息',
   'whatsapp.inbox.unread': '{count} 則未讀',
+  'whatsapp.inbox.awaiting': '等待回覆 · {minutes} 分鐘',
+  'whatsapp.inbox.awaitingHint': '客戶最後發言，尚無人回覆',
   'whatsapp.inbox.receivedBy': '由 {number} 接收',
   'whatsapp.accounts.color': '顏色',
   'whatsapp.color.blue': '藍色',

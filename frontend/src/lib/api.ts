@@ -4647,6 +4647,8 @@ export interface WhatsAppConversation {
   assignedTo?: string | null
   /** Desde quando espera um atendente (a fila da distribuição); null fora dela. */
   waitingSince?: string | null
+  /** O cliente falou por último e ninguém respondeu: desde a primeira mensagem sem resposta. */
+  awaitingSince?: string | null
   /** As etiquetas da conversa, em ordem de nome. */
   tags?: WhatsAppTag[]
   createdAt: string | null

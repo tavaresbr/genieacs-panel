@@ -259,6 +259,10 @@ class WaConversationService {
       assignedUserId: row.assigned_user_id ? Number(row.assigned_user_id) : null,
       assignedTo: extra.assignedTo ?? null,
       tags: extra.tags ?? [],
+      // O cliente falou por último e ninguém (gente ou bot) respondeu ainda:
+      // desde a primeira mensagem dele sem resposta. Nota interna e envio
+      // automático (régua, campanha) não contam como resposta.
+      awaitingSince: extra.awaitingSince ?? null,
       waitingSince: row.waiting_since || null,
       botPausedUntil: row.bot_paused_until && new Date(row.bot_paused_until).getTime() > Date.now()
         ? new Date(row.bot_paused_until).toISOString()
@@ -342,9 +346,11 @@ class WaConversationService {
     const blocked = await WaOptOut.activeBlocks(rows.map((r) => r.wa_phone_e164));
     const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
     const etiquetas = await WaTagService.tagsFor(rows.map((r) => r.id));
+    const aguardando = await this.awaitingSince(rows.filter((r) => !r.closed_at).map((r) => r.id));
 
     return rows.map((row) => this.publicConversation(row, {
       tags: etiquetas.get(Number(row.id)) ?? [],
+      awaitingSince: aguardando.get(Number(row.id)) ?? null,
       assignedTo: row.assigned_user_id ? atendentes.get(Number(row.assigned_user_id)) ?? null : null,
       clientName: row.contract
         ? names.get(row.contract) ?? null
@@ -367,6 +373,44 @@ class WaConversationService {
     return row;
   }
 
+  /**
+   * Quais destas conversas têm o cliente esperando resposta, e desde quando:
+   * `Map<id, ISO>` com a primeira mensagem dele depois da última resposta.
+   *
+   * Resposta é saída de gente (painel ou celular) ou do bot. Três consultas
+   * agrupadas, não uma por conversa — a lista desenha cinquenta de uma vez.
+   */
+  static async awaitingSince(conversationIds) {
+    const ids = [...new Set(conversationIds.map(Number).filter(Boolean))];
+    const mapa = new Map();
+    if (!ids.length) return mapa;
+    const ultimaEntrada = await tdb('wa_messages')
+      .whereIn('conversation_id', ids).where({ direction: 'in', is_note: false })
+      .groupBy('conversation_id').select('conversation_id').max({ ultima: 'id' });
+    if (!ultimaEntrada.length) return mapa;
+    const ultimaResposta = new Map((await tdb('wa_messages')
+      .whereIn('conversation_id', ultimaEntrada.map((r) => r.conversation_id))
+      .where({ direction: 'out', is_note: false })
+      .whereIn('source', ['operator', 'bot'])
+      .groupBy('conversation_id').select('conversation_id').max({ ultima: 'id' }))
+      .map((r) => [Number(r.conversation_id), Number(r.ultima)]));
+    const esperando = ultimaEntrada
+      .map((r) => ({ id: Number(r.conversation_id), entrada: Number(r.ultima), resposta: ultimaResposta.get(Number(r.conversation_id)) ?? 0 }))
+      .filter((r) => r.entrada > r.resposta);
+    if (!esperando.length) return mapa;
+    const inicio = await tdb('wa_messages')
+      .where({ direction: 'in', is_note: false })
+      .where((q) => {
+        for (const c of esperando) q.orWhere((b) => b.where('conversation_id', c.id).where('id', '>', c.resposta));
+      })
+      .groupBy('conversation_id').select('conversation_id').min({ desde: 'created_at' });
+    for (const r of inicio) {
+      const quando = r.desde instanceof Date ? r.desde : new Date(r.desde);
+      if (!Number.isNaN(quando.getTime())) mapa.set(Number(r.conversation_id), quando.toISOString());
+    }
+    return mapa;
+  }
+
   /** The thread as the browser wants it, with the two facts the row cannot hold. */
   static async decorate(conversation) {
     const link = conversation.contract && conversation.device_id
@@ -379,8 +423,10 @@ class WaConversationService {
         : (conversation.sgp_contact_id ? await SgpContact.getById(conversation.sgp_contact_id) : null));
     const atendentes = await WaAssignmentService.names([conversation.assigned_user_id]);
     const etiquetas = await WaTagService.tagsFor([conversation.id]);
+    const aguardando = conversation.closed_at ? new Map() : await this.awaitingSince([conversation.id]);
     return this.publicConversation(conversation, {
       tags: etiquetas.get(Number(conversation.id)) ?? [],
+      awaitingSince: aguardando.get(Number(conversation.id)) ?? null,
       assignedTo: conversation.assigned_user_id ? atendentes.get(Number(conversation.assigned_user_id)) ?? null : null,
       clientName: link?.client_name ?? contact?.client_name ?? null,
       ...optOutOf(await this.optOutEntries(conversation))
