@@ -381,6 +381,8 @@ class PlatformSubscriptionsController {
             ),
             // O cartão recorrente (0100): bandeira e dígitos, nunca o token.
             card: SubscriptionService.presentCard(sub),
+            // A retenção (0106): os selos "Cancela em" e "Pausada até".
+            ...SubscriptionService.presentRetention(sub),
             ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra

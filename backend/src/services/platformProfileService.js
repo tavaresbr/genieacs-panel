@@ -48,7 +48,13 @@ export const PROFILE_FIELDS = Object.freeze(Object.keys(ENV_FALLBACK));
  */
 export const BILLING_POLICY_FIELDS = Object.freeze({
   autoSuspendDays: { default: 15, min: 0, max: 90 },
-  autoSuspendWarnDays: { default: 3, min: 0, max: 30 }
+  autoSuspendWarnDays: { default: 3, min: 0, max: 30 },
+  // A retenção no cancelamento (0106): o desconto oferecido a quem pede para
+  // cancelar (porcentagem e por quantas faturas) e o máximo de meses de
+  // pausa. Zero desliga a oferta correspondente.
+  retentionDiscountPercent: { default: 20, min: 0, max: 90 },
+  retentionDiscountMonths: { default: 3, min: 0, max: 24 },
+  retentionPauseMaxMonths: { default: 2, min: 0, max: 12 }
 });
 
 const MAX = { legalName: 160, tradeName: 80, taxId: 20, address: 240, contactEmail: 160, notifyEmail: 160 };
@@ -141,6 +147,21 @@ export async function autoSuspendConfig() {
   const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
   const politica = politicaDe(stored);
   return { days: politica.autoSuspendDays, warnDays: politica.autoSuspendWarnDays };
+}
+
+/**
+ * As ofertas de retenção como o fluxo de cancelamento as lê:
+ * `{ discountPercent, discountMonths, pauseMaxMonths }`. Nunca lança — sem
+ * caixa da plataforma, ou com o banco fora, vale o padrão.
+ */
+export async function retentionConfig() {
+  const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
+  const politica = politicaDe(stored);
+  return {
+    discountPercent: politica.retentionDiscountPercent,
+    discountMonths: politica.retentionDiscountMonths,
+    pauseMaxMonths: politica.retentionPauseMaxMonths
+  };
 }
 
 /** Um número da política recebido → inteiro a gravar, `null` para o padrão; lança se inválido. */
@@ -253,5 +274,5 @@ export async function saveProfile(patch = {}) {
 }
 
 export default {
-  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS
+  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, retentionConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS
 };

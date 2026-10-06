@@ -23,6 +23,14 @@ import BillingInvoice from './BillingInvoice.js';
  */
 export const EXEMPT_CANCEL_MARKER = 'billing_exempt: canceled by the billing exemption';
 
+/**
+ * O `last_error` da cobrança de renovação que o fluxo de cancelamento (0106)
+ * cancelou — a pausa aceita, o cancelamento agendado. Como a da isenção, não
+ * é erro: é a marca que o "desfazer o cancelamento" procura para devolver a
+ * cobrança do período à emissão (`ChargeIssuingService.reopenRetentionCanceled`).
+ */
+export const RETENTION_CANCEL_MARKER = 'retention: canceled by the cancellation flow';
+
 export const CHARGE_STATUSES = Object.freeze([
   /** Emitida, ninguém pagou ainda. É o estado em que ela nasce. */
   'pending',
@@ -720,7 +728,8 @@ class BillingCharge {
       // de um plano. A emissão não reprecifica uma cobrança marcada assim.
       amountOverriddenAt: row.amount_overridden_at ?? null,
       // A marca da isenção não é erro de ninguém (ver `EXEMPT_CANCEL_MARKER`).
-      lastError: row.last_error && row.last_error !== EXEMPT_CANCEL_MARKER ? row.last_error : null,
+      lastError: row.last_error && row.last_error !== EXEMPT_CANCEL_MARKER && row.last_error !== RETENTION_CANCEL_MARKER
+        ? row.last_error : null,
       createdAt: row.created_at ?? null,
       updatedAt: row.updated_at ?? null,
       superseded: BillingCharge.supersededOf(row).map((item) => ({

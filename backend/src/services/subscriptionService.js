@@ -50,7 +50,9 @@ export const GATE_CODES = Object.freeze({
   TRIAL_EXPIRED: 'subscription_trial_expired',
   SUSPENDED: 'subscription_suspended',
   CANCELED: 'subscription_canceled',
-  MISSING: 'subscription_missing'
+  MISSING: 'subscription_missing',
+  // A pausa aceita como retenção (0106): o painel só lê até `paused_until`.
+  PAUSED: 'subscription_paused'
 });
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -388,6 +390,31 @@ export function isBillableStatus(subscription) {
 }
 
 /**
+ * A pausa aceita como retenção (0106) — marcada ou correndo. `paused_until`
+ * gravado é a pausa inteira: de `renews_at` (o fim do período pago, que fica
+ * onde estava) até ela. Antes de `renews_at` o provedor usa o que pagou;
+ * depois, só lê (`effectiveStatus` → `past_due`/`paused`). Nos dois trechos
+ * nada se cobra: sem fatura, sem lembrete, sem suspensão automática.
+ */
+export function isPauseScheduled(subscription) {
+  return Boolean(subscription?.paused_until) && subscription?.status !== 'canceled';
+}
+
+/** A pausa CORRENDO agora: o período pago acabou e `paused_until` ainda não chegou. */
+export function isPaused(subscription, now = new Date()) {
+  if (!isPauseScheduled(subscription) || subscription.status !== 'active') return false;
+  const ate = asDate(subscription.paused_until);
+  const pago = asDate(subscription.renews_at);
+  if (!ate || ate.getTime() <= now.getTime()) return false;
+  return !pago || pago.getTime() <= now.getTime();
+}
+
+/** O cancelamento agendado pelo próprio provedor (0106), ainda por acontecer. */
+export function isCancelScheduled(subscription) {
+  return Boolean(subscription?.cancel_at) && subscription?.status !== 'canceled';
+}
+
+/**
  * Desde quando esta assinatura está devendo — o instante do prazo que venceu
  * sem pagamento —, ou nulo quando ela não está devendo (ou não dá para
  * dizer desde quando).
@@ -414,6 +441,9 @@ export function isBillableStatus(subscription) {
  */
 export function overdueSince(subscription, now = new Date(), { prorationDueAt = null } = {}) {
   if (!subscription || subscription.billing_exempt_at) return null;
+  // A retenção (0106): na pausa não se deve nada até `paused_until`, e o
+  // cancelamento agendado acaba na data — nenhum dos dois é inadimplência.
+  if (isPauseScheduled(subscription) || isCancelScheduled(subscription)) return null;
   if (!ESTADOS_QUE_ESTENDEM.has(subscription.status)) return null;
   const causas = [];
   const vencido = (data) => data && data.getTime() <= now.getTime();
@@ -517,6 +547,10 @@ class SubscriptionService {
         return { status: 'past_due', reason: 'trial_expired' };
       }
     }
+    // A pausa correndo (0106): o período pago acabou e a cobrança está
+    // suspensa até `paused_until`. Só ler, como o atraso — com o motivo
+    // próprio, para a tela dizer "pausada até" e não "em atraso".
+    if (isPaused(subscription, now)) return { status: 'past_due', reason: 'paused' };
     if (stored === 'active') {
       const ends = asDate(subscription.renews_at);
       if (ends && ends.getTime() <= now.getTime()) {
@@ -570,6 +604,9 @@ class SubscriptionService {
     // Isento de cobrança: não há prazo a lembrar nem fatura a pagar.
     if (subscription.billing_exempt_at) return null;
     if (!(Number(plano?.price_cents ?? 0) > 0)) return null;
+    // A retenção (0106): pausada não tem prazo a lembrar até `paused_until`,
+    // e quem agendou o cancelamento não renova.
+    if (isPauseScheduled(subscription) || isCancelScheduled(subscription)) return null;
     const stored = STATUSES.includes(subscription.status) ? subscription.status : 'suspended';
     if (stored !== 'trial' && stored !== 'active' && stored !== 'past_due') return null;
 
@@ -762,10 +799,10 @@ class SubscriptionService {
     if (status === 'past_due') {
       const reading = READ_METHODS.has(String(method).toUpperCase()) || webhook;
       if (reading) return { allowed: true, code: null };
-      return {
-        allowed: false,
-        code: reason === 'trial_expired' ? GATE_CODES.TRIAL_EXPIRED : GATE_CODES.PAST_DUE
-      };
+      let code = GATE_CODES.PAST_DUE;
+      if (reason === 'trial_expired') code = GATE_CODES.TRIAL_EXPIRED;
+      else if (reason === 'paused') code = GATE_CODES.PAUSED;
+      return { allowed: false, code };
     }
     if (status === 'suspended') return { allowed: false, code: GATE_CODES.SUSPENDED };
     return { allowed: false, code: GATE_CODES.CANCELED };
@@ -820,6 +857,7 @@ class SubscriptionService {
       trialEndsAt: subscription.trial_ends_at ?? null,
       renewsAt: subscription.renews_at ?? null,
       canceledAt: subscription.canceled_at ?? null,
+      ...this.presentRetention(subscription),
       // Por que está suspensa (0102): `auto_nonpayment` sai pagando; `manual`
       // (ou nulo, de antes da coluna) só pelo console. Nulo fora do suspenso.
       suspendedReason: subscription.status === 'suspended' ? (subscription.suspended_reason ?? null) : null,
@@ -827,6 +865,20 @@ class SubscriptionService {
       coupon: this.presentCoupon(subscription, plan, coupon),
       card: this.presentCard(subscription),
       ...this.presentBillingExempt(subscription, { withReason: withExemptReason })
+    };
+  }
+
+  /**
+   * A retenção no cancelamento (0106) como a tela e o console a leem: o
+   * cancelamento agendado (o fim do período pago) e a pausa — de `renewsAt`
+   * até `pausedUntil`. Nulos quando não há. Função própria porque a lista de
+   * Assinaturas monta a linha dela à mão.
+   */
+  static presentRetention(subscription) {
+    return {
+      cancelAt: isCancelScheduled(subscription) ? isoOf(subscription.cancel_at) : null,
+      pausedUntil: isPauseScheduled(subscription) ? isoOf(subscription.paused_until) : null,
+      pauseStartedAt: isPauseScheduled(subscription) ? isoOf(subscription.pause_started_at) : null
     };
   }
 
@@ -1461,6 +1513,14 @@ class SubscriptionService {
     if (trialEndsAt !== undefined) patch.trial_ends_at = asDate(trialEndsAt);
     if (renewsAt !== undefined) patch.renews_at = asDate(renewsAt);
     patch.canceled_at = status === 'canceled' ? new Date() : null;
+    // A retenção (0106): cancelar à mão encerra a pausa e o agendamento; e
+    // tirar do `canceled` não pode deixar para trás uma data de cancelamento
+    // vencida, que o agendador cumpriria de novo na passada seguinte.
+    if (status === 'canceled' || before.status === 'canceled') {
+      patch.cancel_at = null;
+      patch.paused_until = null;
+      patch.pause_started_at = null;
+    }
     // O prazo mudado junto com o status leva a cobrança em aberto com ele,
     // ANTES de ser gravado — ver `followOpenCharge`.
     if (trialEndsAt !== undefined || renewsAt !== undefined) await followOpenCharge(before, patch);
@@ -2161,6 +2221,19 @@ class SubscriptionService {
       // pagamento compra é cobrado pelo plano de agora.
       patch.upgraded_at = null;
       if (destinoDaDescida === 'lock' && !descida) patch.pending_plan_locked_at = now;
+      // A pausa de retenção (0106) acaba quando o provedor paga a renovação:
+      // é o "retomar antes" — o período conta a partir do pagamento (`base`
+      // é agora, já que a pausa só corre depois do fim do período pago) ou,
+      // pago antes de a pausa começar, a partir do fim do período, como se
+      // ela nunca tivesse existido.
+      if (before.paused_until) {
+        patch.paused_until = null;
+        patch.pause_started_at = null;
+      }
+      // E o cancelamento agendado não engole um período que foi pago (a
+      // fatura que já estava na mão dele, paga no meio do agendamento): a
+      // data anda junto com a renovação, e ele cancela no fim do que pagou.
+      if (before.cancel_at && before.status !== 'canceled') patch.cancel_at = patch.renews_at;
       if (destinoDaDescida === 'postpone') {
         console.warn(
           `Payment for provider ${tenantId} paid the renewal at the current plan's price because the `
@@ -2237,6 +2310,11 @@ class SubscriptionService {
             ...(autoSuspensa ? { suspendedReason: SUSPENDED_REASONS.AUTO_NONPAYMENT } : {}),
             ...((autoSuspensa && reactivates && !continuaSuspensa) || reativouPelaProrata ? { reactivated: true } : {}),
             ...(continuaSuspensa ? { stillSuspended: 'proration_overdue' } : {}),
+            // A retenção (0106): o pagamento que acabou a pausa, e o que
+            // empurrou o cancelamento agendado para o fim do período pago.
+            ...(patch.paused_until === null && before.paused_until
+              ? { pauseEnded: true, pausedUntil: isoOf(before.paused_until) } : {}),
+            ...(patch.cancel_at && before.cancel_at ? { cancelAtMoved: isoOf(patch.cancel_at) } : {}),
             renewsAt,
             // O prazo de ANTES, e quantos dias o plano deu, viajam junto para
             // o estorno (`reversePayment`): desfazer um pagamento é devolver o

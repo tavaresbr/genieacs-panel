@@ -1,5 +1,6 @@
 import express from 'express';
 import TenantController from '../controllers/tenantController.js';
+import CancellationController from '../controllers/cancellationController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -58,6 +59,16 @@ router.post('/subscription/coupon', authenticateToken, requirePermission('settin
 // o cartão recusado por Pix/boleto. O cartão em si nunca passa por aqui.
 router.put('/subscription/autopay', authenticateToken, requirePermission('settings.write'), TenantController.setCardAutopay);
 router.delete('/subscription/card', authenticateToken, requirePermission('settings.write'), TenantController.removeCard);
+// A retenção no cancelamento (0106): o motivo, as ofertas (desconto ou
+// pausa), o cancelamento no fim do período e o desfazer. `settings.write` na
+// rota e o papel de DONO no controlador — cancelar a empresa não é decisão de
+// um admin contratado. Fora da porta da assinatura: quem está atrasado
+// também pode querer sair.
+router.get('/subscription/cancellation', authenticateToken, requirePermission('settings.write'), CancellationController.status);
+router.post('/subscription/cancellation', authenticateToken, requirePermission('settings.write'), CancellationController.request);
+router.post('/subscription/cancellation/accept', authenticateToken, requirePermission('settings.write'), CancellationController.accept);
+router.post('/subscription/cancellation/confirm', authenticateToken, requirePermission('settings.write'), CancellationController.confirm);
+router.delete('/subscription/cancellation', authenticateToken, requirePermission('settings.write'), CancellationController.revert);
 
 // O nome do provedor, escrito por quem administra. É o antigo `appName` das
 // configurações, agora na linha do provedor — ver o controlador.

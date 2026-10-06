@@ -103,6 +103,10 @@ class PlatformAudit {
     COUPON_UPDATED: 'coupon.updated',
     COUPON_DELETED: 'coupon.deleted',
     SUBSCRIPTION_COUPON_CHANGED: 'subscription.coupon_changed',
+    // A retenção no cancelamento (0106): o provedor pediu para cancelar e
+    // aceitou o desconto ou a pausa, agendou o cancelamento, ou o desfez — ou
+    // o console o desfez. O detalhe diz qual (`action`).
+    SUBSCRIPTION_CANCELLATION_CHANGED: 'subscription.cancellation_changed',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem

@@ -20,11 +20,37 @@ const VAZIO = Object.fromEntries(PLATFORM_PROFILE_FIELDS.map((campo) => [campo, 
 
 /** A suspensão automática (0102): números, digitados como texto. */
 type CampoPolitica = keyof PlatformBillingPolicy
-const CAMPOS_POLITICA: { campo: CampoPolitica; rotulo: TranslationKey; dica: TranslationKey; max: number }[] = [
-  { campo: 'autoSuspendDays', rotulo: 'platform.profile.autoSuspendDays', dica: 'platform.profile.autoSuspendDaysHint', max: 90 },
-  { campo: 'autoSuspendWarnDays', rotulo: 'platform.profile.autoSuspendWarnDays', dica: 'platform.profile.autoSuspendWarnDaysHint', max: 30 }
+// `grupo`: a suspensão automática e, à parte, a retenção no cancelamento (0106).
+const CAMPOS_POLITICA: {
+  campo: CampoPolitica; rotulo: TranslationKey; dica: TranslationKey; max: number; grupo: 'billing' | 'retention'
+}[] = [
+  { campo: 'autoSuspendDays', rotulo: 'platform.profile.autoSuspendDays', dica: 'platform.profile.autoSuspendDaysHint', max: 90, grupo: 'billing' },
+  { campo: 'autoSuspendWarnDays', rotulo: 'platform.profile.autoSuspendWarnDays', dica: 'platform.profile.autoSuspendWarnDaysHint', max: 30, grupo: 'billing' },
+  {
+    campo: 'retentionDiscountPercent', rotulo: 'platform.profile.retentionDiscountPercent',
+    dica: 'platform.profile.retentionDiscountPercentHint', max: 90, grupo: 'retention'
+  },
+  {
+    campo: 'retentionDiscountMonths', rotulo: 'platform.profile.retentionDiscountMonths',
+    dica: 'platform.profile.retentionDiscountMonthsHint', max: 24, grupo: 'retention'
+  },
+  {
+    campo: 'retentionPauseMaxMonths', rotulo: 'platform.profile.retentionPauseMaxMonths',
+    dica: 'platform.profile.retentionPauseMaxMonthsHint', max: 12, grupo: 'retention'
+  }
 ]
-const PADRAO_POLITICA: PlatformBillingPolicy = { autoSuspendDays: 15, autoSuspendWarnDays: 3 }
+const PADRAO_POLITICA: PlatformBillingPolicy = {
+  autoSuspendDays: 15,
+  autoSuspendWarnDays: 3,
+  retentionDiscountPercent: 20,
+  retentionDiscountMonths: 3,
+  retentionPauseMaxMonths: 2
+}
+const POLITICA_VAZIA = Object.fromEntries(CAMPOS_POLITICA.map(({ campo }) => [campo, ''])) as Record<CampoPolitica, string>
+const GRUPOS_POLITICA: { grupo: 'billing' | 'retention'; titulo: TranslationKey; dica: TranslationKey }[] = [
+  { grupo: 'billing', titulo: 'platform.profile.billing', dica: 'platform.profile.billingHint' },
+  { grupo: 'retention', titulo: 'platform.profile.retention', dica: 'platform.profile.retentionHint' }
+]
 
 /** Os blocos do formulário, e os campos de cada um. */
 const BLOCOS: {
@@ -124,7 +150,7 @@ export function PlatformProfileForm() {
   const toast = useToast()
   const [perfil, setPerfil] = useState<PlatformProfile | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho>(VAZIO)
-  const [politica, setPolitica] = useState<Record<CampoPolitica, string>>({ autoSuspendDays: '', autoSuspendWarnDays: '' })
+  const [politica, setPolitica] = useState<Record<CampoPolitica, string>>(POLITICA_VAZIA)
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   // A consulta do CNPJ na Receita: o estado da tela, e qual CNPJ já foi
@@ -138,11 +164,10 @@ export function PlatformProfileForm() {
     setRascunho(Object.fromEntries(
       PLATFORM_PROFILE_FIELDS.map((campo) => [campo, paraTela(campo, dados.values[campo])])
     ) as Rascunho)
-    const gravada = dados.billing ?? PADRAO_POLITICA
-    setPolitica({
-      autoSuspendDays: String(gravada.autoSuspendDays),
-      autoSuspendWarnDays: String(gravada.autoSuspendWarnDays)
-    })
+    const gravada = { ...PADRAO_POLITICA, ...(dados.billing ?? {}) }
+    setPolitica(Object.fromEntries(
+      CAMPOS_POLITICA.map(({ campo }) => [campo, String(gravada[campo])])
+    ) as Record<CampoPolitica, string>)
   }, [])
 
   useEffect(() => {
@@ -308,33 +333,35 @@ export function PlatformProfileForm() {
         </section>
       ))}
 
-      <section className="rounded-md border border-border p-4 sm:p-5">
-        <h3 className="font-semibold text-foreground">{t('platform.profile.billing')}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{t('platform.profile.billingHint')}</p>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {CAMPOS_POLITICA.map(({ campo, rotulo, dica, max }) => (
-            <div key={campo}>
-              <label htmlFor={`profile-${campo}`} className="field-label">{t(rotulo)}</label>
-              <input
-                id={`profile-${campo}`}
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={max}
-                step={1}
-                className="modern-input w-full min-w-0"
-                value={politica[campo]}
-                disabled={!perfil.canSave}
-                aria-describedby={`profile-${campo}-hint`}
-                onChange={(e) => setPolitica((p) => ({ ...p, [campo]: e.target.value }))}
-              />
-              <p id={`profile-${campo}-hint`} className="field-hint">
-                {t(dica, { days: (perfil.billingDefaults ?? PADRAO_POLITICA)[campo] })}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {GRUPOS_POLITICA.map((bloco) => (
+        <section key={bloco.grupo} className="rounded-md border border-border p-4 sm:p-5">
+          <h3 className="font-semibold text-foreground">{t(bloco.titulo)}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{t(bloco.dica)}</p>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {CAMPOS_POLITICA.filter((c) => c.grupo === bloco.grupo).map(({ campo, rotulo, dica, max }) => (
+              <div key={campo}>
+                <label htmlFor={`profile-${campo}`} className="field-label">{t(rotulo)}</label>
+                <input
+                  id={`profile-${campo}`}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={max}
+                  step={1}
+                  className="modern-input w-full min-w-0"
+                  value={politica[campo]}
+                  disabled={!perfil.canSave}
+                  aria-describedby={`profile-${campo}-hint`}
+                  onChange={(e) => setPolitica((p) => ({ ...p, [campo]: e.target.value }))}
+                />
+                <p id={`profile-${campo}-hint`} className="field-hint">
+                  {t(dica, { days: (perfil.billingDefaults ?? PADRAO_POLITICA)[campo] ?? PADRAO_POLITICA[campo] })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="modern-button" disabled={salvando || !perfil.canSave}>

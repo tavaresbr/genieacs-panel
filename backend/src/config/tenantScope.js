@@ -154,7 +154,10 @@ export const SCOPED_TABLES = new Set([
   // Os cupons que ESTE provedor já resgatou (0093) — a memória que impede o
   // mesmo cupom de valer duas vezes para ele. O cupom é do catálogo (`coupons`,
   // compartilhada); o resgate é do provedor, e some junto com ele.
-  'coupon_redemptions'
+  'coupon_redemptions',
+  // Os pedidos de cancelamento do provedor (0106): o motivo que ele deu e o
+  // que aceitou. Do provedor, como a assinatura de que falam.
+  'cancellation_requests'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

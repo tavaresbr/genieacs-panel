@@ -34,6 +34,7 @@ import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { couponAppliesToPlan, couponDurationLabel, couponPriceCents } from '@/lib/coupon'
 import { CouponBadge } from '@/components/platform/coupon-control'
 import { CardAutopay } from '@/components/card-autopay'
+import { CancelSubscription } from '@/components/cancel-subscription'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -323,9 +324,12 @@ export default function PlanPage() {
               <h2 className="section-heading">{t('platform.subscription.plan')}</h2>
               <p className="mt-1 wrap-break-word text-2xl font-semibold text-foreground">{subscription.plan?.name ?? '—'}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                <span className={badgeClass(subscription.status)}>
-                  {t(STATUS_KEYS[subscription.status] ?? 'platform.subscription.suspended')}
-                </span>
+                {/* Pausada (0106) não é atraso: o selo dela, logo abaixo, diz até quando. */}
+                {subscription.reason !== 'paused' && (
+                  <span className={badgeClass(subscription.status)}>
+                    {t(STATUS_KEYS[subscription.status] ?? 'platform.subscription.suspended')}
+                  </span>
+                )}
                 {!isento && subscription.reason === 'trial_expired' && (
                   <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
                 )}
@@ -334,6 +338,17 @@ export default function PlanPage() {
                 )}
                 {!isento && subscription.reason === 'proration_overdue' && (
                   <span className="text-muted-foreground">{t('platform.subscription.prorationOverdueNote')}</span>
+                )}
+                {/* A retenção no cancelamento (0106). */}
+                {subscription.cancelAt && (
+                  <span className="modern-badge-warning">
+                    {t('platform.subs.cancelsOn', { date: displayDayMonth(subscription.cancelAt) ?? '—' })}
+                  </span>
+                )}
+                {subscription.pausedUntil && (
+                  <span className="modern-badge-info">
+                    {t('platform.subs.pausedUntil', { date: displayDayMonth(subscription.pausedUntil) ?? '—' })}
+                  </span>
                 )}
               </div>
               {isento && (
@@ -619,6 +634,20 @@ export default function PlanPage() {
               onSaved={(billing) => setData((atual) => (atual ? { ...atual, billing } : atual))}
             />
           </div>
+        )}
+
+        {/* O cancelamento, por último: o motivo, as ofertas de retenção e o
+            agendamento (0106). Só o dono o vê — o bloco se esconde sozinho. */}
+        {!loading && subscription && !isento && (
+          <CancelSubscription
+            subscription={subscription}
+            canWrite={podeEscrever}
+            currency={moedaAtual}
+            onChanged={() => {
+              void load()
+              setChargesKey((k) => k + 1)
+            }}
+          />
         )}
       </div>
     </div>
