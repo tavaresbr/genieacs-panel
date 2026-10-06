@@ -3709,6 +3709,8 @@ const en = {
   'integrations.saved': 'Integration saved',
   'integrations.updatedAt': 'Last changed {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'Connection',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': 'The gateway the platform bills providers through: it issues the subscription charges and calls the webhook when a payment comes in.',
   'integrations.asaas.apiKeyConfigured': 'API key configured',
   'integrations.asaas.apiKeyMissing': 'API key missing',

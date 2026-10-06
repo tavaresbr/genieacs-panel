@@ -3707,6 +3707,8 @@ const zhCN: Dictionary = {
   'integrations.saved': '集成已保存',
   'integrations.updatedAt': '最后修改 {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': '连接',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': '平台向服务商收费所用的支付网关：它开具订阅账单，并在收到付款时调用 Webhook。',
   'integrations.asaas.apiKeyConfigured': 'API 密钥已配置',
   'integrations.asaas.apiKeyMissing': '缺少 API 密钥',

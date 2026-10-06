@@ -3713,6 +3713,8 @@ const it: Dictionary = {
   'integrations.saved': 'Integrazione salvata',
   'integrations.updatedAt': 'Ultima modifica {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'Connessione',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': 'Il gateway con cui la piattaforma fattura i provider: emette gli addebiti degli abbonamenti e chiama il webhook quando arriva un pagamento.',
   'integrations.asaas.apiKeyConfigured': 'Chiave API configurata',
   'integrations.asaas.apiKeyMissing': 'Chiave API mancante',
