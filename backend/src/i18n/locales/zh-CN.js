@@ -611,6 +611,7 @@ export default {
   'whatsapp.ai.error.timeout': 'AI 响应超时',
   'whatsapp.ai.error.unauthorized': 'AI 服务商拒绝了该 API 密钥',
   'whatsapp.ai.error.rateLimited': '已达到 AI 使用上限，请稍后重试',
+  'whatsapp.ai.error.noBalance': 'AI 账户余额不足或没有有效资源包，请在服务商网站充值',
   'whatsapp.ai.error.badResponse': 'AI 返回了无效响应',
   'whatsapp.ai.error.unreachable': '无法连接到 AI',
   'whatsapp.ai.error.blockedHost': '不允许使用此 AI 地址',

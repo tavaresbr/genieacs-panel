@@ -269,9 +269,10 @@ class WaBotConfigService {
     }
   }
 
-  static async recordAiError(code) {
+  static async recordAiError(code, detail = null) {
     try {
-      await AppState.upsert(AI_ERROR_KEY, code ? JSON.stringify({ at: new Date().toISOString(), code }) : 'null');
+      const valor = code ? { at: new Date().toISOString(), code, detail: detail ? String(detail).slice(0, 240) : null } : null;
+      await AppState.upsert(AI_ERROR_KEY, JSON.stringify(valor));
     } catch {
       // A tela perder o último erro é melhor que o bot perder a resposta.
     }

@@ -4724,7 +4724,7 @@ export interface BotAiConfig {
   instructions: string
   hasApiKey: boolean
   /** A última falha da IA, para dizer por que o cliente recebeu o menu. */
-  lastError: { at: string; code: string } | null
+  lastError: { at: string; code: string; detail?: string | null } | null
 }
 
 /** O que a tela manda: `apiKey` nova troca a chave, `''` apaga, ausente mantém. */

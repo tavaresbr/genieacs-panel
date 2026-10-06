@@ -611,6 +611,7 @@ export default {
   'whatsapp.ai.error.timeout': 'The AI took too long to answer',
   'whatsapp.ai.error.unauthorized': 'The AI provider rejected the API key',
   'whatsapp.ai.error.rateLimited': 'AI usage limit reached; try again later',
+  'whatsapp.ai.error.noBalance': 'AI account has no balance or active package; top up on the provider’s site',
   'whatsapp.ai.error.badResponse': 'The AI returned an invalid response',
   'whatsapp.ai.error.unreachable': 'Could not connect to the AI',
   'whatsapp.ai.error.blockedHost': 'That AI address is not allowed',

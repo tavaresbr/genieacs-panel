@@ -25,6 +25,22 @@ export function handleError(req, res, error, fallbackKey) {
   return res.status(500).json(createErrorResponse(req.t(fallbackKey), error.message));
 }
 
+/**
+ * Erro da IA: a frase do painel e, ao lado, o que o provedor disse
+ * ("HTTP 401 · 1000: Authentication failed"). Sem isso o provedor de internet
+ * fica sem saber se a chave é de outra plataforma, se acabou o saldo…
+ */
+export function aiError(req, res, error) {
+  if (error instanceof WaError && String(error.code || '').startsWith('ai_')) {
+    const frase = translateError(req.t, error);
+    return res.status(error.status).json({
+      ...createErrorResponse(error.details ? `${frase} (${error.details})` : frase, null),
+      code: error.code
+    });
+  }
+  return handleError(req, res, error, 'whatsapp.ai.error.failed');
+}
+
 class WhatsAppController {
   /** `GET /api/whatsapp/bot-config` — a aba Chatbot: opções, textos, horário e os dois interruptores. */
   static async getBotConfig(req, res) {
@@ -42,7 +58,7 @@ class WhatsAppController {
       const result = await WaAiService.test({ baseUrl: body.baseUrl, apiKey: body.apiKey, model: body.model });
       return res.json(createResponse(req.t('whatsapp.ai.testOk'), result));
     } catch (error) {
-      return handleError(req, res, error, 'whatsapp.ai.error.failed');
+      return aiError(req, res, error);
     }
   }
 
