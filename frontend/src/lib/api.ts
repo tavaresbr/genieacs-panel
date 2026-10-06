@@ -3984,7 +3984,11 @@ export interface WhatsAppConfig {
   managedAdminKeyConfigured: boolean
   /** Para onde a Meta chama (API oficial) e o token que ela confere. */
   cloudCallbackUrl?: string
-  cloudWebhook?: { callbackUrl: string; verifyToken: string }
+  /**
+   * `auto`: a SaaS, onde o painel registra o webhook na conta WABA sozinho e o
+   * token de verificação do servidor NÃO vem. No self-host vêm a URL e o token.
+   */
+  cloudWebhook?: { auto?: boolean; callbackUrl?: string; verifyToken?: string }
   /**
    * Se o servidor (endereço, chave, hosts, webhook) é o da plataforma. Na SaaS
    * é, para todo provedor: a tela esconde esses campos e mostra só o uso.
@@ -4016,6 +4020,10 @@ export interface WhatsAppAccount {
   metaWabaId?: string | null
   metaTemplatesSyncedAt?: string | null
   metaTemplatesError?: string | null
+  /** O último registro do webhook na Meta pelo painel; nulo é "ainda não tentado". */
+  metaWebhookStatus?: 'ok' | 'error' | null
+  metaWebhookError?: string | null
+  metaWebhookAt?: string | null
   baseUrl: string
   status: WhatsAppStatus
   /**
@@ -5137,6 +5145,10 @@ export const whatsappAPI = {
       metaToken,
       ...(adminKey ? { adminKey } : {})
     }),
+
+  /** Registra de novo o webhook da conta WABA na Meta, pelo servidor do painel. */
+  registerMetaWebhook: (id: number) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-webhook`, {}),
 
   /** Sai PENDING: a Meta revisa, e só a sincronização depois da aprovação o libera. */
   createMetaTemplate: (accountId: number, payload: MetaTemplateCreatePayload) =>

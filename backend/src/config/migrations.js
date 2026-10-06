@@ -1670,6 +1670,19 @@ const WA_ACCOUNT_CLOUD_COLUMNS = [
 ];
 
 /**
+ * O webhook da conta WABA registrado pelo painel na Graph API
+ * (`POST /{waba}/subscribed_apps` com `override_callback_uri`). O provedor não
+ * cola mais URL nem token no app dele na Meta: o painel faz isso com o token
+ * do próprio número, e o resultado da última tentativa fica aqui para a tela
+ * mostrar e oferecer "registrar de novo". Nulo é "ainda não tentado".
+ */
+const WA_ACCOUNT_META_WEBHOOK_COLUMNS = [
+  ['meta_webhook_status', (t) => t.string('meta_webhook_status', 8).nullable()],
+  ['meta_webhook_error', (t) => t.string('meta_webhook_error', 255).nullable()],
+  ['meta_webhook_at', (t) => t.timestamp('meta_webhook_at').nullable()]
+];
+
+/**
  * Como a mensagem saiu: texto livre ou modelo aprovado da Meta. `meta_template`
  * é a foto do modelo no momento do enfileiramento ({name, language, params}) —
  * o envio fora da janela de 24 h só é aceito assim.
@@ -5669,6 +5682,22 @@ export const migrations = [
       const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_SUSPENDED_REASON_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** O webhook da Meta registrado pelo painel — ver `WA_ACCOUNT_META_WEBHOOK_COLUMNS`. */
+    id: '0103_wa_meta_webhook',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_WEBHOOK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const missing = await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_WEBHOOK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
         for (const add of missing) add(t);
       });
     }

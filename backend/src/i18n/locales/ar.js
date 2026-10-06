@@ -544,6 +544,8 @@ export default {
   'whatsapp.error.notCloud': "هذا الإجراء متاح فقط لرقم الواجهة الرسمية من Meta.",
   'whatsapp.error.cloudInstanceStillExists': "لا يزال خادم Evolution يحتفظ بمثيل هذا الرقم؛ لم يتم تغيير الرمز المميز. حاول مرة أخرى بعد بضع ثوانٍ.",
   'whatsapp.metaTokenUpdated': "تم تحديث رمز Meta المميز.",
+  'whatsapp.metaWebhook.registered': "تم تسجيل الـ webhook لدى Meta.",
+  'whatsapp.metaWebhook.failed': "رفضت Meta تسجيل الـ webhook: {reason}",
   'whatsapp.error.notSupportedCloud': "التحقق من الأرقام يتطلب رقمًا متصلًا عبر رمز QR؛ الواجهة الرسمية لا توفره.",
   'whatsapp.error.invalidCloudCallbackUrl': "عنوان رد الاتصال الخاص بـ Meta غير صالح",
   'whatsapp.error.noDestination': 'لا يملك جهة الاتصال هذه رقم هاتف ولا معرّف WhatsApp',

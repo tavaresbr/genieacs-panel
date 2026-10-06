@@ -260,18 +260,20 @@ class WhatsAppConfigService {
       ...rest,
       managed: Boolean(config.managedUrl),
       managedAdminKeyConfigured: Boolean(managedAdminKey),
-      // O token de verificação da Meta sai de propósito: o provedor precisa
-      // colá-lo no app dele na Meta. Ele só serve para confirmar a assinatura
-      // do webhook — não envia nem lê mensagem nenhuma.
+      // O webhook da API oficial. Na SaaS o servidor Evolution é da
+      // plataforma, e o token de verificação dele (WA_BUSINESS_TOKEN_WEBHOOK)
+      // é um só para todos os provedores: ele NÃO sai. O painel registra o
+      // webhook na conta WABA de cada número pela Graph API
+      // (`MetaWebhookService`), e a tela só mostra o resultado (`auto`).
       //
-      // Na SaaS ele é o da plataforma, o mesmo para todos os provedores, e
-      // ainda assim sai: cada provedor configura o webhook no app DELE na
-      // Meta, e o Evolution só aceita um token (WA_BUSINESS_TOKEN_WEBHOOK).
-      // Escondê-lo deixaria o número oficial sem como receber mensagens.
-      cloudWebhook: {
-        callbackUrl: this.cloudCallbackUrl(config),
-        verifyToken: cloudVerifyToken || ''
-      },
+      // No self-host o servidor é de quem opera o painel, e o token sai como
+      // sempre saiu: é dele, e ele pode querer colá-lo à mão no app da Meta.
+      cloudWebhook: config.platformManaged
+        ? { auto: true }
+        : {
+          callbackUrl: this.cloudCallbackUrl(config),
+          verifyToken: cloudVerifyToken || ''
+        },
       ready: this.isReady(config)
     };
   }
@@ -532,6 +534,13 @@ class WhatsAppConfigService {
       metaWabaId: row.meta_waba_id || null,
       metaTemplatesSyncedAt: row.meta_templates_synced_at || null,
       metaTemplatesError: row.meta_templates_error || null,
+      // O registro do webhook na Meta (`MetaWebhookService`): o resultado da
+      // última tentativa, nunca o token de verificação.
+      metaWebhookStatus: row.meta_webhook_status === 'ok' || row.meta_webhook_status === 'error'
+        ? row.meta_webhook_status
+        : null,
+      metaWebhookError: row.meta_webhook_error || null,
+      metaWebhookAt: row.meta_webhook_at || null,
       baseUrl: row.base_url,
       status: row.status,
       // O QR NÃO sai daqui.

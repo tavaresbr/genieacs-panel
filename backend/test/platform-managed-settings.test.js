@@ -184,8 +184,28 @@ describe('o servidor Evolution', () => {
     await runInTenant(caixa, () => WhatsAppConfigService.saveConfig({
       managedUrl: 'https://evo.plataforma.test',
       managedAdminKey: 'chave-da-plataforma',
-      webhookBaseUrl: 'https://painel.plataforma.test'
+      webhookBaseUrl: 'https://painel.plataforma.test',
+      cloudVerifyToken: 'verifica-da-plataforma'
     }));
+  });
+
+  it('o token de verificação da Meta não sai para o provedor: o painel registra o webhook', async () => {
+    const { status, body } = await api('/whatsapp/config');
+    assert.equal(status, 200);
+    assert.deepEqual(body.data.cloudWebhook, { auto: true });
+    assert.equal(JSON.stringify(body).includes('verifica-da-plataforma'), false);
+    // Mas o painel o tem, para mandá-lo à Meta.
+    const efetiva = await runInTenant(alfa, () => {
+      WhatsAppConfigService.invalidateConfigCache();
+      return WhatsAppConfigService.getConfig();
+    });
+    assert.equal(efetiva.cloudVerifyToken, 'verifica-da-plataforma');
+  });
+
+  it('e a caixa da plataforma, que é dona do servidor, continua vendo e editando o token', async () => {
+    const publico = await runInTenant(caixa, () => WhatsAppConfigService.getPublicConfig());
+    assert.equal(publico.platformManaged, false);
+    assert.equal(publico.cloudWebhook.verifyToken, 'verifica-da-plataforma');
   });
 
   it('o provedor enxerga o da plataforma, sem a chave', async () => {
