@@ -371,7 +371,11 @@ class PlatformSubscriptionsController {
             planId: sub.plan_id ?? null,
             planCode: sub.plan_code ?? null,
             planName: sub.plan_name ?? null,
-            priceCents: Number(sub.plan_price_cents ?? 0),
+            // O preço de UM ciclo (0103) — o do ano, no anual — e o ciclo.
+            priceCents: planos.get(Number(sub.plan_id))
+              ? SubscriptionService.cyclePriceCents(sub, planos.get(Number(sub.plan_id)))
+              : Number(sub.plan_price_cents ?? 0),
+            billingCycle: SubscriptionService.cycleOf(sub, planos.get(Number(sub.plan_id)) ?? null),
             currency: sub.plan_currency ?? null,
             trialEndsAt: sub.trial_ends_at ?? null,
             renewsAt: sub.renews_at ?? null,

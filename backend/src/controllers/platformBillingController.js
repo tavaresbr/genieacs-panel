@@ -390,6 +390,20 @@ class PlatformBillingController {
       if (Object.keys(patch).length === 0) {
         return res.status(400).json(createErrorResponse('Nothing to update'));
       }
+      // O preço anual é COBRADO (0103): tirá-lo de um plano com assinaturas
+      // no anual as faria voltar ao mensal em silêncio — preço e prazo de
+      // outro ciclo do que foi contratado. Mudar o valor pode; apagar, não.
+      if ('price_yearly_cents' in patch && !(Number(patch.price_yearly_cents) > 0)
+        && Number(plan.price_yearly_cents) > 0) {
+        const anuais = await Subscription.countAnnualOnPlan(id);
+        if (anuais > 0) {
+          return res.status(409).json(createErrorResponse(
+            `${anuais} subscription(s) use the annual cycle of this plan; the annual price cannot be removed`,
+            { count: anuais },
+            'plan_has_annual_subscriptions'
+          ));
+        }
+      }
 
       const updated = await Plan.update(id, patch);
       await PlatformAudit.fromRequest(req, {

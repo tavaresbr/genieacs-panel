@@ -410,7 +410,7 @@ class TenantController {
   }
 
   /**
-   * `PUT /api/tenant/subscription/plan` — `{ planId }`: o provedor troca de
+   * `PUT /api/tenant/subscription/plan` — `{ planId, cycle? }`: o provedor troca de
    * plano — na hora quando sobe, na renovação quando desce com um período
    * pago correndo (`subscription.pendingPlan` na resposta), e escolher o plano
    * atual com uma descida agendada desiste dela.
@@ -429,6 +429,8 @@ class TenantController {
     try {
       const resultado = await SelfBillingService.changePlan({
         planId: req.body?.planId,
+        // O ciclo (0103): `monthly` ou `annual`; sem ele, o de agora.
+        cycle: req.body?.cycle ?? null,
         actorUserId: req.user?.userId ?? null,
         countDevices: () => DeviceService.countDevicesFromGenieAcs()
       });
@@ -443,6 +445,8 @@ class TenantController {
           toCode: resultado.plan?.code ?? null,
           selfService: true,
           scheduled: Boolean(resultado.scheduled),
+          billingCycle: resultado.billingCycle ?? null,
+          ...(resultado.cycleFrom ? { cycleFrom: resultado.cycleFrom } : {}),
           ...(resultado.scheduled && resultado.effectiveAt
             ? { effectiveAt: new Date(resultado.effectiveAt).toISOString() } : {}),
           ...(resultado.pendingCanceled

@@ -889,6 +889,8 @@ export default {
   'subscription.planScheduled': 'Cambio a un plan menor programado para el {date}; tu plan actual sigue hasta entonces',
   'subscription.pendingCanceled': 'Cambio de plan programado cancelado; tu plan actual sigue',
   'subscription.pendingLocked': 'El cambio de plan programado ya se pagó al precio del nuevo plan y entra en vigor el {date}; ya no se puede modificar ni cancelar.',
+  'subscription.invalidCycle': 'El ciclo de facturación debe ser mensual o anual.',
+  'subscription.cycleUnavailable': 'Este plan no ofrece el ciclo anual.',
   'subscription.planChangeFailed': 'No se pudo cambiar el plan',
   'subscription.planNotFound': 'Este plan no existe o ya no se ofrece',
   'subscription.notChangeable': 'El plan de esta suscripción no se puede cambiar desde aquí',

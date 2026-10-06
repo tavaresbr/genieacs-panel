@@ -892,6 +892,8 @@ export default {
   'subscription.planScheduled': '{date} にプランのダウングレードを予約しました。それまでは現在のプランが有効です',
   'subscription.pendingCanceled': '予約していたプラン変更を取り消しました。現在のプランが継続します',
   'subscription.pendingLocked': '予約したプラン変更は新しいプランの料金で支払い済みのため {date} に適用されます。変更や取り消しはできません。',
+  'subscription.invalidCycle': '請求サイクルは月払いまたは年払いである必要があります。',
+  'subscription.cycleUnavailable': 'このプランは年払いに対応していません。',
   'subscription.planChangeFailed': 'プランを変更できませんでした',
   'subscription.planNotFound': 'このプランは存在しないか、提供が終了しています',
   'subscription.notChangeable': 'このサブスクリプションのプランはここでは変更できません',

@@ -892,6 +892,8 @@ export default {
   'subscription.planScheduled': '已安排在 {date} 降级套餐；在此之前当前套餐继续有效',
   'subscription.pendingCanceled': '已取消计划的套餐变更；当前套餐保持不变',
   'subscription.pendingLocked': '计划的套餐变更已按新套餐价格付款，将于 {date} 生效；无法再更改或取消。',
+  'subscription.invalidCycle': '计费周期必须为按月或按年。',
+  'subscription.cycleUnavailable': '此套餐不提供按年计费。',
   'subscription.planChangeFailed': '无法更改套餐',
   'subscription.planNotFound': '该套餐不存在或已不再提供',
   'subscription.notChangeable': '此订阅的套餐无法在此更改',

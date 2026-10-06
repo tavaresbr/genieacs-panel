@@ -891,6 +891,8 @@ export default {
   'subscription.planScheduled': 'تمت جدولة الانتقال إلى خطة أقل في {date}؛ تبقى خطتك الحالية حتى ذلك الحين',
   'subscription.pendingCanceled': 'تم إلغاء تغيير الخطة المجدول؛ تبقى خطتك الحالية',
   'subscription.pendingLocked': 'تم دفع تغيير الخطة المجدول بالفعل بسعر الخطة الجديدة ويسري اعتبارًا من {date}؛ لم يعد من الممكن تعديله أو إلغاؤه.',
+  'subscription.invalidCycle': 'يجب أن تكون دورة الفوترة شهرية أو سنوية.',
+  'subscription.cycleUnavailable': 'هذه الخطة لا تقدم الدورة السنوية.',
   'subscription.planChangeFailed': 'تعذّر تغيير الخطة',
   'subscription.planNotFound': 'هذه الخطة غير موجودة أو لم تعد متاحة',
   'subscription.notChangeable': 'لا يمكن تغيير خطة هذا الاشتراك من هنا',

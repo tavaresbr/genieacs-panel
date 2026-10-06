@@ -632,12 +632,17 @@ class ChargeIssuingService {
     // minuto, e contar uso (às vezes no ACS) semanas antes da janela de
     // emissão seria carga sem resposta a dar.
     let planoDoPeriodo = plan;
+    // A assinatura no ciclo do período que esta cobrança paga (0103).
+    let assinaturaDoPeriodo = subscription;
     let descidaBloqueada = null;
     if (subscription.pending_plan_id && subscription.pending_plan_at) {
       const agendada = new Date(subscription.pending_plan_at);
       if (!Number.isNaN(agendada.getTime()) && this.periodKey(agendada) === periodo) {
         const agendado = await Plan.findById(subscription.pending_plan_id);
-        if (agendado && Number(agendado.price_cents ?? 0) > 0) {
+        // No ciclo AGENDADO (0103): a troca do mensal para o anual faz a
+        // fatura desta renovação sair pelo preço do ano.
+        const agendadaView = SubscriptionService.scheduledView(subscription);
+        if (agendado && SubscriptionService.cyclePriceCents(agendadaView, agendado) > 0) {
           // Três fontes para o veredito, nesta ordem. A descida travada (paga
           // pelo preço dela, 0075) não tem veredito: vale o preço dela. Quem
           // reemite logo depois de decidir — a troca de plano, a reprecificação
@@ -650,13 +655,14 @@ class ChargeIssuingService {
           } else if (pendingBlockedBy !== undefined) {
             descidaBloqueada = pendingBlockedBy;
           } else {
-            descidaBloqueada = await SubscriptionService.overLimitOf(agendado, { countDevices });
+            descidaBloqueada = await SubscriptionService.scheduledOverLimit(subscription, agendado, { countDevices });
           }
           if (!descidaBloqueada) {
             planoDoPeriodo = agendado;
+            assinaturaDoPeriodo = agendadaView;
             // O cupom vale no plano novo só se ele está na lista do cupom: o
             // período que esta cobrança paga já é do plano agendado.
-            preco = await SubscriptionService.effectivePriceCents(subscription, agendado, { coupon: cupom });
+            preco = await SubscriptionService.effectivePriceCents(agendadaView, agendado, { coupon: cupom });
           }
         }
       }
@@ -665,7 +671,7 @@ class ChargeIssuingService {
     const moeda = planoDoPeriodo.currency || 'BRL';
     // Com que plano e cupom este preço saiu (0093), gravados na linha — ver
     // `SubscriptionService.chargePricing`.
-    const precificacao = SubscriptionService.chargePricing(subscription, planoDoPeriodo, cupom);
+    const precificacao = SubscriptionService.chargePricing(assinaturaDoPeriodo, planoDoPeriodo, cupom);
     const garraAte = new Date(now.getTime() + this.CLAIM_MS);
     // O cartão recorrente (0100): com o cartão salvo e utilizável, a cobrança
     // sai no cartão e o gateway a cobra sozinho; senão, a página de
@@ -799,6 +805,9 @@ class ChargeIssuingService {
       if (!existente.amount_overridden_at) {
         if (Number(existente.plan_id ?? 0) !== Number(precificacao.planId ?? 0)) patch.plan_id = precificacao.planId;
         if (Number(existente.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0)) patch.coupon_id = precificacao.couponId;
+        if ((existente.billing_cycle ?? null) !== (precificacao.billingCycle ?? null)) {
+          patch.billing_cycle = precificacao.billingCycle;
+        }
       }
       // O meio desta tentativa, gravado ANTES da chamada (0100): é ele que diz,
       // se a resposta se perder, que houve uma tentativa no cartão.
@@ -869,7 +878,9 @@ class ChargeIssuingService {
       amountCents: preco,
       currency: moeda,
       dueDate: vencimentoDoGateway,
-      description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`,
+      description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`
+        // O ciclo anual (0103) dito na fatura: é um valor maior, e é de um ano.
+        + (precificacao.billingCycle === 'annual' ? ' (anual)' : ''),
       // O formato que o webhook espera de volta, com o período junto: é por
       // ele que a entrega acha o provedor sem depender do cadastro do cliente
       // no gateway estar ligado a quem se pensa.
@@ -1021,6 +1032,7 @@ class ChargeIssuingService {
         claimUntil: new Date(now.getTime() + this.CLAIM_MS),
         planId: quote.toPlanId,
         couponId,
+        billingCycle: quote.billingCycle ?? null,
         detail: {
           fromPlanId: quote.fromPlanId,
           toPlanId: quote.toPlanId,

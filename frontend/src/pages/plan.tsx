@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { subscriptionAPI, type SubscriptionUsage, type TenantPlanOption } from '@/lib/api'
+import { subscriptionAPI, type BillingCycle, type SubscriptionUsage, type TenantPlanOption } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { BillingProfile } from '@/components/billing-profile'
@@ -16,6 +16,9 @@ import {
   canPayNow,
   canSwitchTo,
   confirmKey,
+  couponCountsYears,
+  currentCycle,
+  cyclePricing,
   isBillingExempt,
   isBillingExemptRefusal,
   isBusy,
@@ -100,6 +103,8 @@ export default function PlanPage() {
   const [cupom, setCupom] = useState('')
   const [aplicandoCupom, setAplicandoCupom] = useState(false)
   const [cupomErro, setCupomErro] = useState<string | null>(null)
+  // O seletor Mensal/Anual (0103): nulo é "o ciclo de agora da assinatura".
+  const [cicloEscolhido, setCicloEscolhido] = useState<BillingCycle | null>(null)
   const cadastroRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -130,9 +135,9 @@ export default function PlanPage() {
    * assinatura, catálogo e cobranças: o preço novo muda o que "pagar agora"
    * oferece, e a troca pode ter mexido na cobrança em aberto.
    */
-  const trocar = async (planId: number, fallback: string) => {
+  const trocar = async (planId: number, fallback: string, cycle?: BillingCycle) => {
     setAviso(null)
-    const res = await subscriptionAPI.changePlan(planId)
+    const res = await subscriptionAPI.changePlan(planId, cycle)
     if (res.success && res.data) {
       setData(res.data)
       setError(null)
@@ -184,11 +189,12 @@ export default function PlanPage() {
     })
   }
 
-  const mudarPara = async (plan: TenantPlanOption) => {
-    const periodo = periodLabel(plan.periodDays, formatMoney(plan.priceCents, plan.currency))
+  const mudarPara = async (plan: TenantPlanOption, ciclo: BillingCycle) => {
+    const doCiclo = cyclePricing(plan, ciclo)
+    const periodo = periodLabel(doCiclo.periodDays, formatMoney(doCiclo.priceCents, plan.currency))
     const preco = t(periodo.key, periodo.vars)
     const atual = plans?.find((p) => p.current) ?? null
-    const tipo = planChangeKind(atual, plan, data?.subscription)
+    const tipo = planChangeKind(atual, plan, data?.subscription, undefined, ciclo)
     if (tipo === 'same') return
     const vars = { name: plan.name, price: preco, date: formatDate(data?.subscription?.renewsAt) ?? '' }
     // A pró-rata, ANTES do clique que a cobra: "você vai pagar R$ X agora".
@@ -196,7 +202,7 @@ export default function PlanPage() {
     const pergunta = prorata ? `${t(confirmKey(tipo), vars)}\n\n${prorata}` : t(confirmKey(tipo), vars)
     if (!window.confirm(pergunta)) return
     setMudando(plan.id)
-    await trocar(plan.id, t('plan.options.changed', { name: plan.name }))
+    await trocar(plan.id, t('plan.options.changed', { name: plan.name }), ciclo)
     setMudando(null)
   }
 
@@ -276,6 +282,13 @@ export default function PlanPage() {
   }, [load])
 
   const subscription = data?.subscription ?? null
+  // O ciclo de agora e o que o seletor mostra (0103).
+  const cicloAtual = currentCycle(subscription)
+  const cicloVisto: BillingCycle = cicloEscolhido ?? cicloAtual
+  const rotuloCiclo = (ciclo: BillingCycle) => t(ciclo === 'annual' ? 'plan.cycle.annual' : 'plan.cycle.monthly')
+  // A maior economia do anual no catálogo, para o seletor.
+  const maiorEconomia = (plans ?? []).reduce((maior, p) => Math.max(maior, p.annualSavingsPercent ?? 0), 0)
+  const algumAnual = (plans ?? []).some((p) => p.annualAvailable)
   // Isento: não vence nem recebe fatura. Some o prazo, o aviso de vencido e o
   // "pagar agora"; fica a nota.
   const isento = isBillingExempt(subscription)
@@ -359,6 +372,12 @@ export default function PlanPage() {
                       {venceu ? t('plan.paidThroughExpired') : t('plan.paidThrough')}
                     </dt>
                     <dd className="font-medium">{formatDate(subscription.renewsAt)}</dd>
+                  </div>
+                )}
+                {subscription.billingCycle && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">{t('plan.cycle.label')}</dt>
+                    <dd className="font-medium">{rotuloCiclo(cicloAtual)}</dd>
                   </div>
                 )}
               </dl>
@@ -474,7 +493,12 @@ export default function PlanPage() {
               <Icon name="info" size={18} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
               <div className="min-w-0 text-sm">
                 <p className="wrap-break-word font-medium text-foreground">
-                  {t('plan.pending.title', { plan: pendente.name, date: formatDate(pendente.effectiveAt) ?? '—' })}
+                  {t('plan.pending.title', {
+                    plan: pendente.billingCycle && pendente.billingCycle !== cicloAtual
+                      ? `${pendente.name} (${rotuloCiclo(pendente.billingCycle)})`
+                      : pendente.name,
+                    date: formatDate(pendente.effectiveAt) ?? '—'
+                  })}
                 </p>
                 <p className="mt-1 text-muted-foreground">{t('plan.pending.hint')}</p>
                 {isPendingLocked(pendente) && (
@@ -526,8 +550,39 @@ export default function PlanPage() {
             assinatura, como as cobranças, porque tem a própria carga. */}
         {!loading && (
           <section className="modern-card mt-6 p-5 sm:p-6">
-            <h2 className="section-heading">{t('plan.options.title')}</h2>
-            <p className="section-description">{t('plan.options.description')}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="section-heading">{t('plan.options.title')}</h2>
+                <p className="section-description">{t('plan.options.description')}</p>
+              </div>
+              {/* Mensal ou Anual (0103): o preço que os cartões mostram e o
+                  ciclo que a troca pede. Só quando algum plano tem o anual. */}
+              {algumAnual && (
+                <div role="radiogroup" aria-label={t('plan.cycle.label')} className="flex shrink-0 flex-wrap items-center gap-2">
+                  {(['monthly', 'annual'] as const).map((ciclo) => (
+                    <button
+                      key={ciclo}
+                      type="button"
+                      role="radio"
+                      aria-checked={cicloVisto === ciclo}
+                      className={cicloVisto === ciclo ? 'modern-button' : 'modern-button-secondary'}
+                      onClick={() => setCicloEscolhido(ciclo)}
+                    >
+                      {rotuloCiclo(ciclo)}
+                      {ciclo === 'annual' && maiorEconomia > 0 && (
+                        <span className="text-xs font-normal">{t('plan.cycle.saveUpTo', { percent: maiorEconomia })}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {cicloVisto !== cicloAtual && (
+              <p className="field-hint mt-2">{t('plan.cycle.hint')}</p>
+            )}
+            {couponCountsYears(cupomAtual, cicloVisto) && (
+              <p role="note" className="mt-2 text-sm text-[hsl(var(--status-warning))]">{t('plan.cycle.couponYears')}</p>
+            )}
             {plansError !== null ? (
               <p className="mt-3 text-sm text-destructive">{plansError || t('plan.options.loadFailed')}</p>
             ) : !plans?.length ? (
@@ -535,34 +590,47 @@ export default function PlanPage() {
             ) : (
               <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {plans.map((plan) => {
-                  const periodo = periodLabel(plan.periodDays, formatMoney(plan.priceCents, plan.currency))
+                  // O preço do ciclo do seletor; sem anual, o mensal, com o aviso.
+                  const semAnual = cicloVisto === 'annual' && !plan.annualAvailable
+                  const doCiclo = cyclePricing(plan, cicloVisto)
+                  const periodo = periodLabel(doCiclo.periodDays, formatMoney(doCiclo.priceCents, plan.currency))
+                  const agendadoAqui = plan.id === pendente?.id && (pendente?.billingCycle ?? cicloAtual) === cicloVisto
+                  const atualAqui = plan.current && cicloVisto === cicloAtual
                   return (
                     <li
                       key={plan.id}
                       className={`flex min-w-0 flex-col rounded-lg border p-4 ${
-                        plan.current ? 'border-primary' : plan.id === pendente?.id ? 'border-dashed border-primary/60' : 'border-border'
+                        atualAqui ? 'border-primary' : agendadoAqui ? 'border-dashed border-primary/60' : 'border-border'
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <h3 className="min-w-0 wrap-break-word font-semibold text-foreground">{plan.name}</h3>
-                        {plan.current && <span className="modern-badge-success">{t('plan.options.current')}</span>}
-                        {!plan.current && plan.id === pendente?.id && (
+                        {atualAqui && <span className="modern-badge-success">{t('plan.options.current')}</span>}
+                        {!atualAqui && agendadoAqui && (
                           <span className="modern-badge-info">{t('plan.options.scheduled')}</span>
                         )}
                       </div>
-                      <p className="mt-1 text-lg font-semibold text-foreground">{t(periodo.key, periodo.vars)}</p>
+                      <p className={`mt-1 text-lg font-semibold ${semAnual ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {t(periodo.key, periodo.vars)}
+                      </p>
+                      {semAnual && <p className="text-sm text-muted-foreground">{t('plan.cycle.unavailable')}</p>}
+                      {cicloVisto === 'annual' && !semAnual && plan.annualSavingsPercent != null && plan.annualSavingsPercent > 0 && (
+                        <p className="text-sm font-medium text-[hsl(var(--status-success))]">
+                          {t('plan.cycle.save', { percent: plan.annualSavingsPercent })}
+                        </p>
+                      )}
                       {/* O preço com o cupom do provedor, quando ele vale neste
                           plano — a vitrine; o valor que vale é o da fatura. */}
                       {cupomAtual && couponAppliesToPlan(cupomAtual, plan.id)
-                        && couponPriceCents(plan.priceCents, cupomAtual) !== plan.priceCents && (
+                        && couponPriceCents(doCiclo.priceCents, cupomAtual) !== doCiclo.priceCents && (
                         <p className="text-sm font-medium text-[hsl(var(--status-success))]">
                           {t('coupons.priceWithCoupon', {
-                            price: formatMoney(couponPriceCents(plan.priceCents, cupomAtual), plan.currency)
+                            price: formatMoney(couponPriceCents(doCiclo.priceCents, cupomAtual), plan.currency)
                           })}
                         </p>
                       )}
                       {/* Quanto subir para este plano cobra agora (a pró-rata). */}
-                      {!plan.current && canSwitchTo(plan, podeEscrever, subscription) && plan.proration
+                      {!plan.current && cicloVisto === cicloAtual && canSwitchTo(plan, podeEscrever, subscription) && plan.proration
                         && !plan.proration.skipped && plan.proration.amountCents > 0 && (
                         <p className="text-sm text-muted-foreground">
                           {t('plan.proration.preview', {
@@ -579,12 +647,12 @@ export default function PlanPage() {
                           </div>
                         ))}
                       </dl>
-                      {canSwitchTo(plan, podeEscrever, subscription) && (
+                      {canSwitchTo(plan, podeEscrever, subscription, cicloVisto) && (
                         <button
                           type="button"
                           className="modern-button-secondary mt-4 w-full justify-center"
                           disabled={mudando !== null || cancelando}
-                          onClick={() => void mudarPara(plan)}
+                          onClick={() => void mudarPara(plan, cicloVisto)}
                         >
                           {mudando === plan.id ? t('plan.options.switching') : t('plan.options.switch')}
                         </button>

@@ -3,7 +3,7 @@ import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
-import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
+import SubscriptionService, { isBillableStatus, annualAvailable, parseBillingCycle } from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import { providerFor } from './billing/registry.js';
 import { asaasBilling } from './billing/asaasBillingProvider.js';
@@ -96,13 +96,21 @@ const GARRA_DA_TROCA_MS = 2 * 60 * 1000;
 const ocupado = () => new SelfBillingError('billing.busy', { code: 'busy', status: 409 });
 
 function presentPlan(plan, currentId, proration = null) {
+  const anual = annualAvailable(plan);
   return {
     id: plan.id,
     code: plan.code,
     name: plan.name,
-    priceCents: Number(plan.price_cents ?? 0),
+    // O preço e o prazo do ciclo MENSAL — os dois ciclos vão juntos (0103),
+    // e é a tela que escolhe qual mostrar pelo seletor Mensal/Anual.
+    priceCents: SubscriptionService.cyclePriceCents({ billing_cycle: 'monthly' }, plan),
     currency: plan.currency || 'BRL',
-    periodDays: Number(plan.period_days ?? 30),
+    periodDays: SubscriptionService.cyclePeriodDays({ billing_cycle: 'monthly' }, plan),
+    // O ciclo anual (0103): o preço cobrado por ano, ou nulo quando o plano
+    // não oferece o anual; e quanto ele economiza sobre doze meses.
+    priceYearlyCents: anual ? SubscriptionService.cyclePriceCents({ billing_cycle: 'annual' }, plan) : null,
+    annualAvailable: anual,
+    annualSavingsPercent: SubscriptionService.annualSavingsPercent(plan),
     limits: SubscriptionService.limitsOf(plan),
     current: currentId !== null && Number(plan.id) === Number(currentId),
     // O que subir para este plano cobraria AGORA (0101), pela mesma conta da
@@ -187,8 +195,11 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
     // cupom de agora (dois planos no mesmo preço, o cupom no piso), que é o
     // que o pagamento dela vai ler. A de valor mudado à mão fica como está.
     if (!aberta.amount_overridden_at && (Number(aberta.plan_id ?? 0) !== Number(precificacao.planId ?? 0)
-      || Number(aberta.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0))) {
-      await BillingCharge.update(aberta.id, { plan_id: precificacao.planId, coupon_id: precificacao.couponId });
+      || Number(aberta.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0)
+      || (aberta.billing_cycle ?? null) !== (precificacao.billingCycle ?? null))) {
+      await BillingCharge.update(aberta.id, {
+        plan_id: precificacao.planId, coupon_id: precificacao.couponId, billing_cycle: precificacao.billingCycle
+      });
     }
     return nada;
   }
@@ -281,6 +292,7 @@ async function descidaTravada(subscription, atual) {
     const cupom = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
     pagaBarato = SubscriptionService.paidScheduledPlan({
       planId: linha.plan_id ?? null,
+      billingCycle: linha.billing_cycle ?? null,
       cents: linha.amount_overridden_at ? null : Number(linha.amount_cents),
       subscription,
       current: atual,
@@ -303,22 +315,24 @@ async function descidaTravada(subscription, atual) {
  */
 async function planoDaFatura(subscription, { countDevices = null } = {}) {
   const atual = subscription?.plan_id ? await Plan.findById(subscription.plan_id) : null;
+  // `assinatura` é a do ciclo que a fatura cobra (0103): a de agora, ou a
+  // vista pelo ciclo agendado quando a fatura é a da troca agendada.
+  const doAtual = { plano: atual, assinatura: subscription, bloqueio: undefined };
   const prazo = subscription?.renews_at ?? subscription?.trial_ends_at;
-  if (!subscription?.pending_plan_id || !subscription?.pending_plan_at || !prazo) {
-    return { plano: atual, bloqueio: undefined };
-  }
+  if (!subscription?.pending_plan_id || !subscription?.pending_plan_at || !prazo) return doAtual;
   const agendada = new Date(subscription.pending_plan_at);
   const vivo = new Date(prazo);
   if (Number.isNaN(agendada.getTime()) || Number.isNaN(vivo.getTime())
     || ChargeIssuingService.periodKey(agendada) !== ChargeIssuingService.periodKey(vivo)) {
-    return { plano: atual, bloqueio: undefined };
+    return doAtual;
   }
   const agendado = await Plan.findById(subscription.pending_plan_id);
-  if (!agendado || !ehPago(agendado)) return { plano: atual, bloqueio: undefined };
-  const bloqueio = SubscriptionService.isPendingLocked(subscription)
-    ? null
-    : await SubscriptionService.overLimitOf(agendado, { countDevices });
-  return { plano: bloqueio ? atual : agendado, bloqueio };
+  const agendadaView = SubscriptionService.scheduledView(subscription);
+  if (!agendado || !(SubscriptionService.cyclePriceCents(agendadaView, agendado) > 0)) return doAtual;
+  const bloqueio = await SubscriptionService.scheduledOverLimit(subscription, agendado, { countDevices });
+  return bloqueio
+    ? { plano: atual, assinatura: subscription, bloqueio }
+    : { plano: agendado, assinatura: agendadaView, bloqueio };
 }
 
 /** Solta a garra que `reprecificarCobranca` deixou segura, se deixou. */
@@ -428,7 +442,11 @@ class SelfBillingService {
         planos.sort((a, b) => Number(a.id) - Number(b.id));
       }
     }
+    // A prévia da pró-rata é do MESMO ciclo (0103): no anual, o plano sem
+    // preço anual não é destino na hora — trocar para ele é trocar de ciclo.
+    const cicloAtual = SubscriptionService.cycleOf(subscription, planoAtual);
     return planos.map((plano) => presentPlan(plano, atual, Number(plano.id) === Number(atual)
+      || SubscriptionService.cycleOf(subscription, plano) !== cicloAtual
       ? null
       : previaDaProrata(SubscriptionService.prorationQuote(subscription, planoAtual, plano, cupom, now))));
   }
@@ -465,15 +483,29 @@ class SelfBillingService {
    * último: plano, estado, uso — tudo leitura —, e só então o gateway, porque
    * uma cobrança cancelada lá não volta.
    *
+   * ## O ciclo (0103)
+   *
+   * `cycle` é `monthly` ou `annual`; sem ele, o de agora. Trocar de CICLO
+   * com um período pago correndo é sempre agendado para a renovação — do
+   * mensal para o anual, o mês já pago vale até o fim (sem pró-rata, sem dia
+   * de graça) e a fatura daquele prazo sai pelo preço do ano; do anual para o
+   * mensal, como uma descida. Subida ou descida, no mesmo ciclo, é decidida
+   * pelo preço POR DIA (`dailyPriceOf`). Plano sem preço anual não é anual
+   * (409 `cycle_unavailable`).
+   *
    * @returns {Promise<{ changed: boolean, scheduled: boolean, pendingCanceled: boolean,
    *   effectiveAt: Date|null, from: number|null, to: number, plan: object,
-   *   charge: 'none'|'reissued', reissue?: object }>}
+   *   charge: 'none'|'reissued', reissue?: object, billingCycle: string }>}
    */
-  static async changePlan({ planId, actorUserId = null, countDevices = null, now = new Date() }) {
+  static async changePlan({ planId, cycle = null, actorUserId = null, countDevices = null, now = new Date() }) {
     const tenantId = currentTenantId();
     const id = Number(planId);
     if (!Number.isInteger(id) || id <= 0) {
       throw new SelfBillingError('subscription.planNotFound', { code: 'plan_not_found', status: 404 });
+    }
+    const cicloPedido = cycle === null || cycle === undefined || cycle === '' ? null : parseBillingCycle(cycle);
+    if (cycle !== null && cycle !== undefined && cycle !== '' && !cicloPedido) {
+      throw new SelfBillingError('subscription.invalidCycle', { code: 'invalid_cycle', status: 400 });
     }
 
     // A caixa da plataforma não tem plano que se troque: ela não é cliente.
@@ -495,7 +527,22 @@ class SelfBillingService {
     const de = subscription.plan_id ?? null;
     const atual = de ? await Plan.findById(de) : null;
     const agendadoId = subscription.pending_plan_id ? Number(subscription.pending_plan_id) : null;
-    const base = { from: de, to: id, scheduled: false, pendingCanceled: false, effectiveAt: null, charge: 'none' };
+    // Os ciclos (0103): o que vale agora, o pedido (ou o de agora) e o da
+    // troca agendada (nulo na coluna é "o mesmo de agora").
+    const cicloAtual = SubscriptionService.cycleOf(subscription, atual);
+    const ciclo = cicloPedido ?? cicloAtual;
+    const cicloAgendado = parseBillingCycle(subscription.pending_billing_cycle) ?? cicloAtual;
+    const mesmaAgendada = agendadoId === id && cicloAgendado === ciclo;
+    const base = {
+      from: de,
+      to: id,
+      scheduled: false,
+      pendingCanceled: false,
+      effectiveAt: null,
+      charge: 'none',
+      billingCycle: ciclo,
+      ...(ciclo !== cicloAtual ? { cycleFrom: cicloAtual } : {})
+    };
 
     // A descida já PAGA pelo preço dela não se desfaz (0075): nem desistir,
     // nem trocar por outra, nem subir antes da data. Pagar o barato adiantado
@@ -504,7 +551,7 @@ class SelfBillingService {
     // é o único clique que passa, porque não muda nada. Depois da data ela se
     // aplica, e a trava some com ela.
     if (agendadoId && await descidaTravada(subscription, atual)) {
-      if (agendadoId === id) {
+      if (mesmaAgendada) {
         const plan = await Plan.findById(id);
         const quando = subscription.pending_plan_at ? new Date(subscription.pending_plan_at) : null;
         return { ...base, changed: false, scheduled: true, effectiveAt: quando, plan };
@@ -527,7 +574,7 @@ class SelfBillingService {
     // Com uma descida agendada, "ficar onde está" é justamente desistir dela:
     // a cobrança da renovação, se já saiu com o preço menor, volta ao preço
     // do plano atual pela mesma porta da troca — cancelada lá e reemitida.
-    if (Number(de) === id) {
+    if (Number(de) === id && ciclo === cicloAtual) {
       if (!agendadoId) return { ...base, changed: false, plan: atual };
       const cobranca = await reprecificarCobranca(subscription, atual);
       await gravarSegurando(cobranca, () => SubscriptionService.cancelPendingPlan());
@@ -542,10 +589,22 @@ class SelfBillingService {
     // Inativo ou de graça, a mesma resposta: não está no catálogo que este
     // provedor pode escolher (`listPlans`), e para quem pede é como se não
     // existisse. Um 403 para o de graça diria "existe, mas não para você", e
-    // é uma frase que não precisa ser dita.
-    if (!plan || !plan.active || !ehPago(plan)) {
+    // é uma frase que não precisa ser dita. O plano ATUAL inativo passa: é só
+    // a troca de ciclo dele (0103), ficando onde está.
+    if (!plan || (!plan.active && Number(de) !== id) || !ehPago(plan)) {
       throw new SelfBillingError('subscription.planNotFound', { code: 'plan_not_found', status: 404 });
     }
+    // O anual só existe com o preço anual do plano (0103) — pedido, ou
+    // herdado de quem já é anual e escolhe um plano sem ele.
+    if (ciclo === 'annual' && !annualAvailable(plan)) {
+      throw new SelfBillingError('subscription.cycleUnavailable', {
+        code: 'cycle_unavailable', status: 409, extra: { planId: id, cycle: ciclo }
+      });
+    }
+    // A assinatura como vai ficar no ciclo pedido: é por ela que o preço do
+    // plano novo se calcula.
+    const noCiclo = { ...subscription, billing_cycle: ciclo };
+    const mudaCiclo = ciclo !== cicloAtual;
 
     // Subida, descida agendada ou descida na hora — ver o comentário do método.
     // `renews_at` no futuro é o período pago correndo; o estado gravado
@@ -554,14 +613,17 @@ class SelfBillingService {
     const renovacao = subscription.renews_at ? new Date(subscription.renews_at) : null;
     const periodoCorrendo = subscription.status === 'active'
       && renovacao && !Number.isNaN(renovacao.getTime()) && renovacao.getTime() > now.getTime();
-    const desce = Number(plan.price_cents ?? 0) < Number(atual?.price_cents ?? 0);
-    const agendar = Boolean(periodoCorrendo && desce);
+    // Pelo preço POR DIA (0103): o anual com desconto custa mais na fatura e
+    // menos por dia. E trocar de ciclo com o período correndo é sempre na
+    // renovação: o período pago é de um ciclo, e o seguinte é do outro.
+    const desce = SubscriptionService.dailyPriceOf(noCiclo, plan) < SubscriptionService.dailyPriceOf(subscription, atual);
+    const agendar = Boolean(periodoCorrendo && (desce || mudaCiclo));
 
     // Pedir de novo a descida que já está agendada não muda nada — nem a
     // cobrança, nem a trilha, nem a data. A data sobretudo: depois de um
     // pagamento adiantado `renews_at` já é o mês seguinte, e regravar a
     // agendada com ele adiaria a descida por um clique repetido.
-    if (agendar && agendadoId === id) {
+    if (agendar && mesmaAgendada) {
       const jaAgendada = subscription.pending_plan_at ? new Date(subscription.pending_plan_at) : null;
       return { ...base, changed: false, scheduled: true, effectiveAt: jaAgendada ?? renovacao, plan };
     }
@@ -599,9 +661,11 @@ class SelfBillingService {
     // Descer já na renovação seria usar o plano de cima o período inteiro sem
     // nunca pagá-lo — então a descida vai para a renovação SEGUINTE, e o
     // próximo período é cobrado pelo preço de cima.
+    // Só para a DESCIDA a outro plano: a troca só de ciclo no plano que subiu
+    // continua pagando o plano de cima na fatura seguinte (0103).
     let quando = renovacao;
-    if (agendar && subscription.upgraded_at) {
-      quando = new Date(renovacao.getTime() + SubscriptionService.periodDaysOf(atual) * 86_400_000);
+    if (agendar && subscription.upgraded_at && desce && Number(de) !== id) {
+      quando = new Date(renovacao.getTime() + SubscriptionService.cyclePeriodDays(subscription, atual) * 86_400_000);
     }
     const adiada = agendar && quando.getTime() !== renovacao.getTime();
 
@@ -619,10 +683,15 @@ class SelfBillingService {
     let bloqueio;
     let alvo = plan;
     if (agendar) {
-      bloqueio = adiada ? null : await SubscriptionService.overLimitOf(plan, { countDevices });
+      // A troca só de ciclo não confere uso: os tetos são os de agora.
+      bloqueio = adiada ? null : await SubscriptionService.scheduledOverLimit(
+        { ...subscription, pending_plan_locked_at: null }, plan, { countDevices }
+      );
       if (adiada || bloqueio) alvo = atual;
     }
-    const cobranca = await reprecificarCobranca(subscription, alvo);
+    // No ciclo do período que a cobrança paga: o pedido, quando ela é do
+    // plano novo; o de agora, quando continua sendo do atual.
+    const cobranca = await reprecificarCobranca(alvo === plan ? noCiclo : subscription, alvo);
 
     // A marca da subida no meio do período pago: só quando SOBE com o período
     // correndo, e a mais antiga fica (subir duas vezes no mesmo período não
@@ -635,7 +704,8 @@ class SelfBillingService {
     let prorata = null;
     let cupomDaProrata = null;
     if (!agendar && periodoCorrendo) {
-      const sobe = Number(plan.price_cents ?? 0) > Number(atual?.price_cents ?? 0);
+      // Aqui o ciclo é o mesmo (trocar de ciclo agenda): por dia, como a descida.
+      const sobe = SubscriptionService.dailyPriceOf(subscription, plan) > SubscriptionService.dailyPriceOf(subscription, atual);
       upgradedAt = subscription.upgraded_at ?? (sobe ? now : null);
       cupomDaProrata = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
       prorata = SubscriptionService.prorationQuote(subscription, atual, plan, cupomDaProrata, now);
@@ -653,9 +723,10 @@ class SelfBillingService {
     }
 
     await gravarSegurando(cobranca, () => (agendar
-      ? SubscriptionService.schedulePlanChange({ planId: plan.id, at: quando })
+      ? SubscriptionService.schedulePlanChange({ planId: plan.id, at: quando, billingCycle: mudaCiclo ? ciclo : null })
       : SubscriptionService.changePlan({
         planId: plan.id,
+        billingCycle: ciclo,
         actorUserId,
         upgradedAt,
         eventDetail: prorata ? {
@@ -803,6 +874,16 @@ class SelfBillingService {
     return (await planoDaFatura(subscription, { countDevices })).plano;
   }
 
+  /**
+   * O plano E a assinatura no ciclo com que a fatura do prazo vivo sai (0103)
+   * — para quem precisa do VALOR dela antes de ela existir (o lembrete):
+   * a troca para o anual agendada para este prazo cobra o preço do ano.
+   */
+  static async invoicePricingFor(subscription, { countDevices = null } = {}) {
+    const { plano, assinatura } = await planoDaFatura(subscription, { countDevices });
+    return { plan: plano, subscription: assinatura };
+  }
+
   static async repriceOpenCharge({ subscription, plan, tenant, blockedBy = undefined }) {
     const cobranca = await reprecificarCobranca(subscription, plan);
     const reissue = await reemitir(cobranca, tenant, { pendingBlockedBy: blockedBy });
@@ -830,9 +911,9 @@ class SelfBillingService {
     // fatura dela agora a deixaria sem link. Grava só; o preço novo vale na
     // próxima emissão, quando ela voltar.
     if (!ESTADOS_VIVOS.has(depois?.status)) return { result: await escrever(), charge: 'none' };
-    const { plano, bloqueio } = await planoDaFatura(depois, { countDevices });
+    const { plano, assinatura, bloqueio } = await planoDaFatura(depois, { countDevices });
     const cobranca = plano
-      ? await reprecificarCobranca(depois, plano, { keepOverride: true })
+      ? await reprecificarCobranca(assinatura, plano, { keepOverride: true })
       : { acao: 'none', linhaId: null };
     let result;
     try {

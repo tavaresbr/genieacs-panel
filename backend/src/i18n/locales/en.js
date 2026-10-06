@@ -892,6 +892,8 @@ export default {
   'subscription.planScheduled': 'Plan downgrade scheduled for {date}; your current plan stays until then',
   'subscription.pendingCanceled': 'Scheduled plan change canceled; your current plan stays',
   'subscription.pendingLocked': 'The scheduled plan change was already paid at the new plan\'s price and takes effect on {date}; it can no longer be changed or canceled.',
+  'subscription.invalidCycle': 'The billing cycle must be monthly or annual.',
+  'subscription.cycleUnavailable': 'This plan does not offer the annual cycle.',
   'subscription.planChangeFailed': 'Failed to change the plan',
   'subscription.planNotFound': 'This plan does not exist or is no longer offered',
   'subscription.notChangeable': 'The plan of this subscription cannot be changed here',

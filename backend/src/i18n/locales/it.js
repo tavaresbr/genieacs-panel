@@ -890,6 +890,8 @@ export default {
   'subscription.planScheduled': 'Passaggio a un piano inferiore programmato per il {date}; fino ad allora resta il piano attuale',
   'subscription.pendingCanceled': 'Cambio di piano programmato annullato; resta il piano attuale',
   'subscription.pendingLocked': 'Il cambio di piano programmato è già stato pagato al prezzo del nuovo piano e ha effetto dal {date}; non può più essere modificato né annullato.',
+  'subscription.invalidCycle': 'Il ciclo di fatturazione deve essere mensile o annuale.',
+  'subscription.cycleUnavailable': 'Questo piano non offre il ciclo annuale.',
   'subscription.planChangeFailed': 'Impossibile cambiare il piano',
   'subscription.planNotFound': 'Questo piano non esiste o non è più offerto',
   'subscription.notChangeable': 'Il piano di questo abbonamento non può essere cambiato da qui',
