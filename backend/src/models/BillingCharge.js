@@ -152,7 +152,7 @@ class BillingCharge {
    */
   static async open({
     subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null,
-    planId = null, couponId = null
+    planId = null, couponId = null, billingType = null
   }) {
     return tinsertReturningId('billing_charges', {
       // A linha nasce JÁ garrada por quem a inseriu — ver `claim`. Sem isto,
@@ -170,7 +170,9 @@ class BillingCharge {
       // Com que plano e cupom este valor foi calculado (0093) — ver
       // `BILLING_CHARGE_PRICING_COLUMNS`.
       plan_id: planId ?? null,
-      coupon_id: couponId ?? null
+      coupon_id: couponId ?? null,
+      // Com que meio ela vai ao gateway (0100) — `UNDEFINED` ou `CREDIT_CARD`.
+      billing_type: billingType ? String(billingType).slice(0, 16) : null
     });
   }
 
@@ -491,6 +493,9 @@ class BillingCharge {
       // O valor novo é o preço de um plano: o desconto dado à cobrança velha
       // pelo console não passa para a reemitida.
       amount_overridden_at: null,
+      // O meio é decidido de novo na reemissão (0100): o cartão, se ele ainda
+      // for utilizável; senão a página de Pix-ou-boleto.
+      billing_type: null,
       // O plano e o cupom do preço novo (0093), quando quem reprecifica os
       // diz; sem eles (a reabertura da isenção, que mantém o valor), ficam.
       ...(planId !== undefined ? { plan_id: planId } : {}),
@@ -629,6 +634,8 @@ class BillingCharge {
       dueDate: isoDateOf(row.due_date),
       invoiceUrl: row.invoice_url ?? null,
       provider: row.provider ?? null,
+      // `CREDIT_CARD` quando saiu no cartão salvo (0100); nulo/`UNDEFINED`, a página.
+      billingType: row.billing_type ?? null,
       gatewayChargeId: row.gateway_charge_id ?? null,
       attempts: Number(row.attempts ?? 0),
       // Quando o console mudou o valor à mão — nulo quando o valor é o preço
@@ -676,6 +683,8 @@ class BillingCharge {
       // botão que leva a uma página do gateway dizendo que não há o que pagar —
       // e, pior, convida a pagar de novo.
       invoiceUrl: OPEN_CHARGE_STATUSES.includes(row.status) ? (row.invoice_url ?? null) : null,
+      // Se ela é cobrada sozinha no cartão salvo (0100) — o meio, nunca o cartão.
+      billingType: row.billing_type ?? null,
       createdAt: row.created_at ?? null,
       // A nota fiscal (NFS-e) desta cobrança: estado, número e PDF — sem o erro.
       invoice: BillingInvoice.present(invoiceRow)

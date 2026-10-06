@@ -20,6 +20,7 @@ import MaintenanceService from './maintenanceService.js';
 import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import BillingInvoiceService from './billing/billingInvoiceService.js';
+import CardAutopayService from './billing/cardAutopayService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -284,6 +285,14 @@ class SchedulerService {
         console.warn(`Could not end the expired billing exemption: ${error.message}`);
         return { ended: false, reason: 'error' };
       });
+
+    // O cartão recorrente (0100), antes da emissão: o token que um webhook
+    // anotou, a cobrança de cartão que deixou de servir reemitida como
+    // Pix/boleto, e o aviso da recusa. Nunca lança (ver `processDue`).
+    summary.card = await CardAutopayService.processDue({ tenant }).catch((error) => {
+      console.warn(`Card autopay pass failed: ${error.message}`);
+      return { error: error.message };
+    });
 
     // A mesma contagem de ONTs vai à emissão: é ela que decide se a cobrança
     // da renovação já sai pelo preço da descida agendada (ver `issueCurrent`).

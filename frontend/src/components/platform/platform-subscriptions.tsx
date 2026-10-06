@@ -15,6 +15,7 @@ import {
 import { BillingExemptControl, exemptUntilLabel, statusBadgeClass, statusLabelKey } from '@/components/platform/tenant-plan'
 import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
+import { CardBadge } from '@/components/card-badge'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -363,6 +364,7 @@ function StatusBadge({ row }: { row: SubscriptionRow }) {
           {exemptUntilLabel(row.subscription, t) ?? t('platform.subs.exempt')}
         </span>
       )}
+      <CardBadge card={row.subscription.card} />
     </span>
   )
 }

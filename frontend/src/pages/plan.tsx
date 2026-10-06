@@ -33,6 +33,7 @@ import {
 import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { couponAppliesToPlan, couponDurationLabel, couponPriceCents } from '@/lib/coupon'
 import { CouponBadge } from '@/components/platform/coupon-control'
+import { CardAutopay } from '@/components/card-autopay'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -414,6 +415,20 @@ export default function PlanPage() {
                   <Icon name="invoice" size={17} />
                   {pagando ? t('plan.paying') : t('plan.payNow')}
                 </button>
+              )}
+              {/* O cartão recorrente: a quem paga (plano pago, sem isenção), e
+                  a quem já tem cartão ou cobrança automática para desligar. */}
+              {subscription.card && !isento
+                && (canPayNow(plans, true, subscription) || subscription.card.saved || subscription.card.autopayEnabled) && (
+                <CardAutopay
+                  card={subscription.card}
+                  canWrite={podeEscrever}
+                  canEnable={subscriptionAllowsChanges(subscription)}
+                  onChanged={(novo) => {
+                    setData(novo)
+                    setChargesKey((k) => k + 1)
+                  }}
+                />
               )}
             </section>
 
