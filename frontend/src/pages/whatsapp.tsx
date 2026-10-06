@@ -721,8 +721,8 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   }, [])
 
   return (
-    <section className="space-y-5">
-      <div>
+    <section className="space-y-5 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+      <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
         {/* Sem título próprio: a aba ativa já diz "Conversas", e um segundo
             título aqui era uma faixa inteira repetindo o nome dela. O contador
             e o atualizar moram agora no topo da lista, onde se usam. */}
@@ -736,18 +736,16 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
             </button>
           </section>
         ) : (
-          // A altura desconta o que fica acima e abaixo da caixa em tela
-          // larga: o respiro da página em cima e embaixo, a linha do título e
-          // as abas — medido num print, 10,5rem. Era 16rem para um topo de
-          // cinco camadas, e o topo novo deixava a caixa curta; um topo que
-          // voltar a crescer faz a página rolar, que é o que este número evita.
-          // No celular desconta também a barra fixa do painel (4rem), e usa
+          // Em tela larga a caixa ocupa o que sobra abaixo das abas (`flex-1`
+          // na cadeia de colunas da página), sem conta fixa: as abas quebram
+          // em duas linhas num notebook, e uma altura fixa fazia a página rolar.
+          // No celular a altura desconta a barra fixa do painel (4rem), e usa
           // `dvh`: o `vh` do navegador móvel conta a barra de endereço que
           // aparece e some, e a caixa de escrever ficava embaixo dela. A
           // página, nesta aba, troca o respiro de baixo pela área segura do
           // iPhone (ver `WhatsAppPage`), e a conta desconta o mesmo.
           <section
-            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-88 grid-cols-1 overflow-hidden lg:h-[calc(100vh-6.875rem)] lg:min-h-128 ${
+            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-88 grid-cols-1 overflow-hidden lg:h-auto lg:min-h-128 lg:flex-1 ${
               // Uma classe de colunas por vez: duas `lg:grid-cols-*` juntas
               // dependem da ordem do CSS gerado, e o painel caía numa segunda linha.
               // Com o Módulo SGP aberto, o painel é sempre uma coluna (nunca por
@@ -1221,8 +1219,11 @@ export default function WhatsAppPage() {
   return (
     // Na caixa de entrada o cartão já ocupa a altura da tela: o `pb-24` da
     // página só fazia a tela inteira rolar por baixo da conversa no celular.
-    <div className={`page-shell ${tab === 'inbox' ? 'pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:pb-8' : ''}`}>
-      <div className="page-frame">
+    // Em tela larga a altura vem da tela e não de uma conta: página, moldura,
+    // aba e cartão viram colunas flex, e o cartão fica com o que sobra abaixo
+    // das abas — que quebram em duas linhas num notebook.
+    <div className={`page-shell ${tab === 'inbox' ? 'pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:flex lg:h-screen lg:flex-col lg:pb-8' : ''}`}>
+      <div className={`page-frame ${tab === 'inbox' ? 'lg:flex lg:min-h-0 lg:flex-1 lg:flex-col' : ''}`}>
         {/*
           O título "WhatsApp" repetia o menu lateral e custava uma linha inteira
           acima da caixa de entrada: fica só para leitor de tela, e o sino de

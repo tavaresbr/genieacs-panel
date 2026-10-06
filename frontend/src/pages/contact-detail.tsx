@@ -312,7 +312,7 @@ export default function ContactDetailPage() {
                         <td>{day(contract.createdAt)}</td>
                         <td>
                           {contract.deviceId
-                            ? <Link className="text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
+                            ? <Link className="text-primary hover:underline wrap-anywhere" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
                             : <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>}
                         </td>
                       </tr>
