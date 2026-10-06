@@ -2761,6 +2761,7 @@ const ko: Dictionary = {
   'whatsapp.ai.err.blockedHost': '허용되지 않은 AI 주소입니다',
   'whatsapp.ai.err.invalidUrl': '잘못된 API 주소입니다',
   'whatsapp.ai.err.keyRequired': 'AI를 켜려면 API 키를 입력하세요',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'API 주소를 변경할 때는 API 키를 다시 입력하십시오',
   'whatsapp.ai.err.disabled': 'AI 제안이 꺼져 있습니다',
   'whatsapp.ai.err.failed': 'AI 오류가 발생했습니다',
   'whatsapp.tags.button': '태그',

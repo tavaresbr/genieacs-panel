@@ -2758,6 +2758,7 @@ const en = {
   'whatsapp.ai.err.blockedHost': 'AI address not allowed',
   'whatsapp.ai.err.invalidUrl': 'Invalid API address',
   'whatsapp.ai.err.keyRequired': 'Enter the API key to turn on the AI',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Enter the API key again when changing the API address',
   'whatsapp.ai.err.disabled': 'AI suggestions are turned off',
   'whatsapp.ai.err.failed': 'The AI failed',
   'whatsapp.tags.button': 'Tags',

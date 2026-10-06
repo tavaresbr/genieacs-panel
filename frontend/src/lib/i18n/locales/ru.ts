@@ -2764,6 +2764,7 @@ const ru: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Адрес ИИ не разрешён',
   'whatsapp.ai.err.invalidUrl': 'Недопустимый адрес API',
   'whatsapp.ai.err.keyRequired': 'Укажите ключ API, чтобы включить ИИ',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'При смене адреса API введите ключ заново',
   'whatsapp.ai.err.disabled': 'Подсказки ИИ отключены',
   'whatsapp.ai.err.failed': 'Сбой ИИ',
   'whatsapp.tags.button': 'Метки',

@@ -285,9 +285,51 @@ describe('configuração', () => {
 
   it('um endereço que não é a API (404) não passa no teste', async () => {
     const res = await call(`${panelUrl}/api/teiah/test`, {
-      method: 'POST', ...auth(), body: { baseUrl: `${teiahUrl}/outra-coisa` }
+      method: 'POST', ...auth(), body: { baseUrl: `${teiahUrl}/outra-coisa`, apiKey: API_KEY }
     });
     assert.equal(res.status, 502, JSON.stringify(res.body));
+  });
+
+  it('testar outro endereço sem chave: 400, e a chave salva não sai', async () => {
+    const antes = teiah.keys.length;
+    const res = await call(`${panelUrl}/api/teiah/test`, {
+      method: 'POST', ...auth(), body: { baseUrl: `${teiahUrl}/outra-coisa` }
+    });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'api_key_required_for_new_url');
+    assert.equal(teiah.keys.length, antes, 'nenhum pedido saiu');
+  });
+
+  it('o mesmo endereço, escrito de outro jeito, usa a chave salva', async () => {
+    const res = await call(`${panelUrl}/api/teiah/test`, {
+      method: 'POST', ...auth(), body: { baseUrl: `${teiahUrl.replace('http://', 'HTTP://')}/api/` }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(teiah.keys.at(-1), API_KEY);
+  });
+
+  it('salvar outro endereço sem chave é recusado; com chave, aceito', async () => {
+    const outro = `${teiahUrl}/outra-coisa`;
+    const semChave = await call(`${panelUrl}/api/teiah/config`, { method: 'PUT', ...auth(), body: { baseUrl: outro } });
+    assert.equal(semChave.status, 400, JSON.stringify(semChave.body));
+    assert.equal(semChave.body.code, 'api_key_required_for_new_url');
+    const lido = await call(`${panelUrl}/api/teiah/config`, auth());
+    assert.equal(lido.body.data.baseUrl, teiahUrl, 'o endereço não mudou');
+
+    const mesmo = await call(`${panelUrl}/api/teiah/config`, { method: 'PUT', ...auth(), body: { baseUrl: `${teiahUrl}/` } });
+    assert.equal(mesmo.status, 200, JSON.stringify(mesmo.body));
+
+    const comChave = await call(`${panelUrl}/api/teiah/config`, {
+      method: 'PUT', ...auth(), body: { baseUrl: outro, apiKey: API_KEY }
+    });
+    assert.equal(comChave.status, 200, JSON.stringify(comChave.body));
+    assert.equal(comChave.body.data.baseUrl, outro);
+
+    // De volta ao endereço de verdade para os testes seguintes.
+    const volta = await call(`${panelUrl}/api/teiah/config`, {
+      method: 'PUT', ...auth(), body: { baseUrl: teiahUrl, apiKey: API_KEY }
+    });
+    assert.equal(volta.status, 200, JSON.stringify(volta.body));
   });
 });
 

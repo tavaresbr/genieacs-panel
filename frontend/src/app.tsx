@@ -140,7 +140,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   // A decisão acima é tomada uma vez por sessão; concluir ou pular o assistente
   // grava a marca local e navega, sem refazê-la. Relida aqui, a marca deixa
   // quem acabou de pular chegar ao Dashboard em vez de voltar ao assistente.
-  if (needsOnboarding && location.pathname !== '/onboarding' && !onboardingDismissedLocally(tenant?.slug)) {
+  if (needsOnboarding && location.pathname !== '/onboarding' && !onboardingDismissedLocally(sessionSlug)) {
     return <Navigate to="/onboarding" replace />
   }
   return <>{children}</>

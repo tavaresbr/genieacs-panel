@@ -2737,6 +2737,7 @@ const ar: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'عنوان الذكاء الاصطناعي غير مسموح به',
   'whatsapp.ai.err.invalidUrl': 'عنوان API غير صالح',
   'whatsapp.ai.err.keyRequired': 'أدخل مفتاح API لتشغيل الذكاء الاصطناعي',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'عند تغيير عنوان API، أدخل مفتاح API مرة أخرى',
   'whatsapp.ai.err.disabled': 'اقتراحات الذكاء الاصطناعي متوقفة',
   'whatsapp.ai.err.failed': 'فشل الذكاء الاصطناعي',
   'whatsapp.tags.button': 'الوسوم',

@@ -2639,6 +2639,7 @@ const de: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'KI-Adresse nicht erlaubt',
   'whatsapp.ai.err.invalidUrl': 'Ungültige API-Adresse',
   'whatsapp.ai.err.keyRequired': 'Geben Sie den API-Schlüssel ein, um die KI zu aktivieren',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Geben Sie beim Ändern der API-Adresse den API-Schlüssel erneut ein',
   'whatsapp.ai.err.disabled': 'KI-Vorschläge sind deaktiviert',
   'whatsapp.ai.err.failed': 'Die KI ist fehlgeschlagen',
   'whatsapp.tags.button': 'Labels',

@@ -2576,6 +2576,7 @@ const ja: Dictionary = {
   'whatsapp.ai.err.blockedHost': '許可されていないAIアドレスです',
   'whatsapp.ai.err.invalidUrl': '無効なAPIアドレスです',
   'whatsapp.ai.err.keyRequired': 'AIをオンにするにはAPIキーを入力してください',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'API のアドレスを変更する場合は、API キーを再入力してください',
   'whatsapp.ai.err.disabled': 'AIの提案はオフになっています',
   'whatsapp.ai.err.failed': 'AIが失敗しました',
   'whatsapp.tags.button': 'タグ',
