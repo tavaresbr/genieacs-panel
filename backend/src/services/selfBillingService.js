@@ -3,7 +3,9 @@ import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
-import SubscriptionService, { isBillableStatus, annualAvailable, parseBillingCycle } from './subscriptionService.js';
+import SubscriptionService, {
+  isBillableStatus, annualAvailable, parseBillingCycle, isCancelScheduled, isPauseScheduled
+} from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import { providerFor } from './billing/registry.js';
 import { asaasBilling } from './billing/asaasBillingProvider.js';
@@ -533,6 +535,15 @@ class SelfBillingService {
     if (!subscription || !ESTADOS_VIVOS.has(subscription.status)) {
       throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
     }
+    // A retenção (0106): com o cancelamento agendado não há renovação a
+    // reprecificar nem subida a cobrar — quem quer outro plano desfaz o
+    // agendamento antes. Na pausa, a mesma coisa: a saída dela é pagar.
+    if (isCancelScheduled(subscription)) {
+      throw new SelfBillingError('cancellation.planChangeScheduled', { code: 'cancel_scheduled', status: 409 });
+    }
+    if (isPauseScheduled(subscription)) {
+      throw new SelfBillingError('cancellation.planChangePaused', { code: 'subscription_paused', status: 409 });
+    }
 
     const de = subscription.plan_id ?? null;
     const atual = de ? await Plan.findById(de) : null;
@@ -801,6 +812,10 @@ class SelfBillingService {
     // e não `not_billable`, para a tela dizer por quê.
     if (subscription.billing_exempt_at) {
       throw new SelfBillingError('charges.billingExempt', { code: 'billing_exempt', status: 409 });
+    }
+    // O cancelamento agendado (0106) não renova: não há fatura a pagar.
+    if (isCancelScheduled(subscription)) {
+      throw new SelfBillingError('cancellation.noChargeScheduled', { code: 'cancel_scheduled', status: 409 });
     }
     // Bloqueado pela pró-rata vencida (0101): o que se paga agora é ELA — a
     // renovação pode nem ter saído ainda, e emiti-la não desbloquearia nada.
@@ -1086,6 +1101,8 @@ class SelfBillingService {
         return new SelfBillingError('charges.freePlan', { code: 'free_plan', status: 409 });
       case 'billing_exempt':
         return new SelfBillingError('charges.billingExempt', { code: 'billing_exempt', status: 409 });
+      case 'cancel_scheduled':
+        return new SelfBillingError('cancellation.noChargeScheduled', { code: 'cancel_scheduled', status: 409 });
       case 'gateway_not_configured':
         return new SelfBillingError('charges.gatewayNotConfigured', { code: 'gateway_not_configured', status: 503 });
       case 'gateway_failed':

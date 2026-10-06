@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
+import { PlatformCancellations } from '@/components/platform/platform-cancellations'
 import {
   lastTwelveMonths,
   monthLabel,
@@ -214,6 +215,9 @@ export function PlatformRevenue() {
       {!report && loading && (
         <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
       )}
+
+      {/* Os pedidos de cancelamento (0106), desde o início do período da aba. */}
+      <PlatformCancellations from={range.from} />
     </div>
   )
 }

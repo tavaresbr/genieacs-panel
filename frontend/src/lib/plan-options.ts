@@ -146,10 +146,13 @@ export function isPendingLocked(pending: Pick<PendingPlan, 'locked'> | null | un
 export function canSwitchTo(
   plan: TenantPlanOption,
   canWrite: boolean,
-  subscription: (Pick<SubscriptionView, 'status' | 'pendingPlan'> & Partial<Pick<SubscriptionView, 'billingCycle'>>) | null | undefined,
+  subscription: (Pick<SubscriptionView, 'status' | 'pendingPlan'> & Partial<Pick<SubscriptionView, 'billingCycle' | 'cancelAt' | 'pausedUntil'>>) | null | undefined,
   cycle?: BillingCycle
 ) {
   if (!canWrite || !subscriptionAllowsChanges(subscription)) return false
+  // A retenção (0106): com o cancelamento agendado ou a pausa, a troca é
+  // recusada (`cancel_scheduled`, `subscription_paused`).
+  if (subscription?.cancelAt || subscription?.pausedUntil) return false
   // O ciclo (0103): o do seletor, ou o de agora. O plano atual entra quando o
   // ciclo é outro — é a troca de ciclo; o plano sem anual, não, no anual.
   const agora = currentCycle(subscription)
@@ -218,10 +221,11 @@ export function confirmKey(kind: Exclude<PlanChangeKind, 'same'>): TranslationKe
 export function canPayNow(
   plans: TenantPlanOption[] | null | undefined,
   canWrite: boolean,
-  subscription: Pick<SubscriptionView, 'status' | 'billingExempt'> | null | undefined
+  subscription: Pick<SubscriptionView, 'status' | 'billingExempt' | 'cancelAt'> | null | undefined
 ) {
+  // Com o cancelamento agendado (0106) não há renovação a pagar (`cancel_scheduled`).
   return canWrite && subscriptionAllowsChanges(subscription) && !isBillingExempt(subscription)
-    && currentPlanIsPaid(plans)
+    && !subscription?.cancelAt && currentPlanIsPaid(plans)
 }
 
 /**
@@ -309,7 +313,8 @@ export function isPendingLockedRefusal(code: string | undefined) {
  * `SubscriptionService.decide`). Suspenso e cancelado são decisão da
  * plataforma — pagar não os desfaz — e "sem assinatura" não tem o que cobrar.
  */
-const PAYABLE_GATE_CODES = new Set<string>(['subscription_past_due', 'subscription_trial_expired'])
+// A pausa de retenção (0106) também: pagar a renovação é o "retomar antes".
+const PAYABLE_GATE_CODES = new Set<string>(['subscription_past_due', 'subscription_trial_expired', 'subscription_paused'])
 
 /**
  * O muro do 402 oferece "gerar cobrança e pagar"? Só quando o bloqueio se

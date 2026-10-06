@@ -194,7 +194,8 @@ const POR_ID = new Map([
   // A indicação e os créditos (0105): provedor visto de cima; a prova de que o
   // crédito de um não aparece nem é abatido no outro está no mesmo arquivo.
   ['GET /api/platform/tenants/:id/referrals', 'plano de controle; prova em referrals.test.js — inclusive o 404 da caixa da plataforma'],
-  ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404']
+  ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
+  ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -413,7 +414,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // créditos de um provedor e o ajuste manual do saldo. Provedor visto de
   // cima; duas linhas em `DO_CONSOLE` e duas aqui; prova em
   // referrals.test.js. São 71.
-  const TETO_DE_EXCECOES = 71;
+  //
+  // E o desfazer do cancelamento agendado de um provedor pelo console
+  // (`DELETE .../subscription/cancellation`, 0106). Mesmo pedágio: uma linha
+  // em `DO_CONSOLE` e mais uma aqui; a prova de que só mexe no provedor da URL
+  // está em cancellation-retention.test.js. São 72.
+  const TETO_DE_EXCECOES = 72;
 
 
   /**
@@ -469,7 +475,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/genieacs/agent-token',
     'POST /api/platform/tenants/:id/gateway/asaas-customer',
     'GET /api/platform/tenants/:id/referrals',
-    'POST /api/platform/tenants/:id/credits'
+    'POST /api/platform/tenants/:id/credits',
+    'DELETE /api/platform/tenants/:id/subscription/cancellation'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

@@ -21,6 +21,7 @@ import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import BillingInvoiceService from './billing/billingInvoiceService.js';
 import CardAutopayService from './billing/cardAutopayService.js';
+import CancellationService from './cancellationService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -272,6 +273,14 @@ class SchedulerService {
     // emissão pergunta pelo plano, e a pergunta tem de ver o plano de agora.
     // As ONTs só são contadas se o plano novo as limita — e só quando há uma
     // descida vencida, que é quase nunca.
+    // A retenção no cancelamento (0106), antes de tudo que cobra: o
+    // cancelamento agendado cuja data chegou, e a pausa que acabou — esta
+    // devolve a cobrança, e a emissão logo abaixo abre a fatura na mesma volta.
+    summary.cancellation = await CancellationService.processDue({ tenant }).catch((error) => {
+      console.warn(`Could not process the scheduled cancellation or pause: ${error.message}`);
+      return { action: 'none', reason: 'error' };
+    });
+
     summary.pendingPlan = await SubscriptionService.applyPendingPlan({
       countDevices: () => DeviceService.countDevicesFromGenieAcs()
     }).catch((error) => {

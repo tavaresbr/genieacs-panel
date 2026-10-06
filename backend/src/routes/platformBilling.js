@@ -3,6 +3,7 @@ import PlatformBillingController from '../controllers/platformBillingController.
 import PlatformSubscriptionsController from '../controllers/platformSubscriptionsController.js';
 import PlatformCouponsController from '../controllers/platformCouponsController.js';
 import PlatformReferralsController from '../controllers/platformReferralsController.js';
+import CancellationController from '../controllers/cancellationController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -46,6 +47,8 @@ router.post('/coupons', ...guard, PlatformCouponsController.create);
 router.patch('/coupons/:id', ...guard, PlatformCouponsController.update);
 router.delete('/coupons/:id', ...guard, PlatformCouponsController.remove);
 router.put('/tenants/:id/subscription/coupon', ...guard, PlatformBillingController.setCoupon);
+// A retenção no cancelamento (0106): o console desfaz o cancelamento agendado.
+router.delete('/tenants/:id/subscription/cancellation', ...guard, CancellationController.consoleRevert);
 
 // A indicação e os créditos de um provedor (0105): a lista, e o ajuste manual
 // do saldo — auditado nas duas trilhas.

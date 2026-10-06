@@ -287,6 +287,24 @@ class Subscription {
     return { restored: false, reason: linha.coupon_id ? 'other_coupon' : 'not_cleared' };
   }
 
+  /**
+   * Uma mudança da retenção no cancelamento (0106) — a pausa, o cancelamento
+   * agendado, o desfazer, e o que o agendador cumpre na data — só se a linha
+   * ainda está como se leu: `condicao` recebe a consulta já filtrada pelo
+   * provedor e acrescenta o resto (o estado, a coluna ainda nula ou ainda
+   * vencida). Pelo mesmo motivo de `applyPendingPlan`: dois cliques, ou o
+   * agendador e um clique, não gravam a mesma decisão duas vezes. Devolve se
+   * mudou.
+   */
+  static async changeIf(tenantId, condicao, patch, db = getDb()) {
+    if (!tenantId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const query = db('subscriptions').where({ tenant_id: tenantId });
+    if (typeof condicao === 'function') condicao(query);
+    const changed = await query.update({ ...patch, updated_at: new Date() });
+    return changed > 0;
+  }
+
   /** A do provedor em escopo — o caminho que um controlador do próprio provedor usaria. */
   static async createCurrent(row) {
     await tinsert('subscriptions', row);

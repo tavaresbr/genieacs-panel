@@ -12,7 +12,9 @@ import {
   type SubscriptionReminderView,
   type SubscriptionStatus
 } from '@/lib/api'
-import { BillingExemptControl, exemptUntilLabel, statusBadgeClass, statusLabelKey } from '@/components/platform/tenant-plan'
+import {
+  BillingExemptControl, RetentionBadges, RevertCancellationButton, exemptUntilLabel, statusBadgeClass, statusLabelKey
+} from '@/components/platform/tenant-plan'
 import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { CardBadge } from '@/components/card-badge'
@@ -366,6 +368,7 @@ function StatusBadge({ row }: { row: SubscriptionRow }) {
         </span>
       )}
       <CardBadge card={row.subscription.card} />
+      <RetentionBadges subscription={row.subscription} />
     </span>
   )
 }
@@ -693,6 +696,12 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
             )}
           </div>
           <p className="field-hint">{t('platform.subscription.statusHint')}</p>
+          {/* O cancelamento agendado pelo próprio provedor (0106). */}
+          {sub?.cancelAt && (
+            <div className="mt-2">
+              <RevertCancellationButton tenantId={tenantId} cancelAt={sub.cancelAt} onChanged={recarregar} />
+            </div>
+          )}
           <BillingExemptControl tenantId={tenantId} subscription={sub} onChanged={recarregar} />
         </div>
 

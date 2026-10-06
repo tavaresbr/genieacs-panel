@@ -162,7 +162,10 @@ export const SCOPED_TABLES = new Set([
   // suas cobranças. Dinheiro de UM provedor: o crédito de um nunca abate a
   // fatura do outro.
   'tenant_credits',
-  'credit_allocations'
+  'credit_allocations',
+  // Os pedidos de cancelamento do provedor (0106): o motivo que ele deu e o
+  // que aceitou. Do provedor, como a assinatura de que falam.
+  'cancellation_requests'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

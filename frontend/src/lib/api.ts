@@ -1629,6 +1629,10 @@ export interface PlatformReferralPolicy {
 export interface PlatformBillingPolicy {
   autoSuspendDays: number
   autoSuspendWarnDays: number
+  /** A retenção no cancelamento (0106): o desconto (% e faturas) e o máximo de meses de pausa. 0 desliga. */
+  retentionDiscountPercent: number
+  retentionDiscountMonths: number
+  retentionPauseMaxMonths: number
 }
 
 export interface PublicInfo {
@@ -1734,7 +1738,7 @@ export interface SubscriptionView {
    * sozinhos: o teste e o período pago — e a fatura de pró-rata de uma subida
    * vencida sem pagamento (`proration_overdue`). Nulo quando a coluna é a verdade.
    */
-  reason: 'trial_expired' | 'renewal_expired' | 'proration_overdue' | 'auto_nonpayment' | null
+  reason: 'trial_expired' | 'renewal_expired' | 'proration_overdue' | 'auto_nonpayment' | 'paused' | null
   /**
    * Por que está suspensa (0102): `auto_nonpayment` é a suspensão automática
    * por inadimplência, que o pagamento desfaz; `manual` (ou nulo) é o console.
@@ -1766,6 +1770,14 @@ export interface SubscriptionView {
   coupon?: SubscriptionCoupon | null
   /** O cartão recorrente. Opcional: servidores antigos não mandam. */
   card?: SubscriptionCard | null
+  /**
+   * A retenção no cancelamento (0106): o cancelamento agendado pelo próprio
+   * provedor (o fim do período pago) e a pausa — de `renewsAt` até
+   * `pausedUntil`, sem cobrança. Opcionais: servidores antigos não mandam.
+   */
+  cancelAt?: string | null
+  pausedUntil?: string | null
+  pauseStartedAt?: string | null
 }
 
 /**
@@ -1988,6 +2000,9 @@ export interface SubscriptionConsoleSubscription {
   coupon?: SubscriptionCoupon | null
   /** O cartão recorrente. Opcional: servidores antigos não mandam. */
   card?: SubscriptionCard | null
+  /** Os selos "Cancela em" e "Pausada até" (0106). Opcionais: servidores antigos não mandam. */
+  cancelAt?: string | null
+  pausedUntil?: string | null
 }
 
 export type CouponKind = 'percent' | 'fixed'
@@ -2084,7 +2099,8 @@ export const SUBSCRIPTION_GATE_CODES = [
   'subscription_trial_expired',
   'subscription_suspended',
   'subscription_canceled',
-  'subscription_missing'
+  'subscription_missing',
+  'subscription_paused'
 ] as const
 export type SubscriptionGateCode = typeof SUBSCRIPTION_GATE_CODES[number]
 
@@ -2679,7 +2695,101 @@ export const subscriptionAPI = {
 
   /** Esquece o cartão salvo; a cobrança de cartão em aberto vira Pix/boleto. */
   removeCard: () =>
-    apiClient.delete<SubscriptionUsage>('/tenant/subscription/card')
+    apiClient.delete<SubscriptionUsage>('/tenant/subscription/card'),
+
+  /**
+   * A retenção no cancelamento (0106) — só o dono (403 `owner_only` para os
+   * outros). `cancellation()` lê os motivos e as ofertas;
+   * `requestCancellation` grava o motivo e devolve as ofertas;
+   * `acceptRetention` aceita o desconto ou a pausa; `confirmCancellation`
+   * recusa e cancela no fim do período pago (ou na hora, sem período pago);
+   * `revertCancellation` desfaz o agendado.
+   */
+  cancellation: () =>
+    apiClient.get<CancellationStatus>('/tenant/subscription/cancellation'),
+  requestCancellation: (reason: CancellationReason, comment?: string) =>
+    apiClient.post<{ request: CancellationRequestView; offers: CancellationOffers }>(
+      '/tenant/subscription/cancellation', { reason, ...(comment ? { comment } : {}) }
+    ),
+  acceptRetention: (offer: 'discount' | 'pause', months?: number) =>
+    apiClient.post<{ offer: 'discount' | 'pause'; subscription: SubscriptionView; pausedUntil?: string; priceCents?: number }>(
+      '/tenant/subscription/cancellation/accept', { offer, ...(months ? { months } : {}) }
+    ),
+  confirmCancellation: () =>
+    apiClient.post<{ immediate: boolean; cancelAt: string; subscription: SubscriptionView }>(
+      '/tenant/subscription/cancellation/confirm', {}
+    ),
+  revertCancellation: () =>
+    apiClient.delete<{ reverted: boolean; subscription: SubscriptionView }>('/tenant/subscription/cancellation')
+}
+
+/** Os motivos de cancelamento, na ordem da tela (0106). */
+export const CANCELLATION_REASONS = [
+  'too_expensive', 'not_using', 'missing_features', 'switching_provider',
+  'technical_issues', 'business_closed', 'temporary', 'other'
+] as const
+export type CancellationReason = typeof CANCELLATION_REASONS[number]
+
+/** As ofertas de retenção e, na que não vale, por quê. */
+export interface CancellationOffers {
+  discount: {
+    available: boolean
+    reason: 'disabled' | 'not_eligible' | 'used_recently' | 'better_coupon' | null
+    percent: number
+    /** Quantas faturas o desconto cobre: no ciclo anual (0103), uma — a anual seguinte. */
+    months: number
+    billingCycle?: BillingCycle
+    priceCents: number
+    availableAgainAt: string | null
+  }
+  pause: {
+    available: boolean
+    reason: 'disabled' | 'not_eligible' | 'already_paused' | null
+    maxMonths: number
+    /** Quando a pausa começaria: o fim do período pago. */
+    from: string | null
+  }
+}
+
+export interface CancellationRequestView {
+  id: number
+  reason: CancellationReason
+  comment: string | null
+  offersPresented: Array<'discount' | 'pause'>
+  offer: 'discount' | 'pause' | 'none' | null
+  outcome: 'retained_discount' | 'retained_pause' | 'canceled' | 'reverted' | null
+  months: number | null
+  discountPercent: number | null
+  cancelAt: string | null
+  createdAt: string | null
+  decidedAt: string | null
+  revertedAt: string | null
+  revertedBy: 'provider' | 'console' | null
+}
+
+export interface CancellationStatus {
+  reasons: CancellationReason[]
+  canCancel: boolean
+  offers: CancellationOffers
+  request: CancellationRequestView | null
+  scheduled: CancellationRequestView | null
+  cancelAt: string | null
+  pausedUntil: string | null
+  /** Quando o cancelamento valeria se confirmado agora; nulo é na hora. */
+  cancelWouldTakeEffectAt: string | null
+}
+
+/** O relatório de cancelamentos do console (`GET /platform/reports/cancellations`). */
+export interface CancellationReport {
+  total: number
+  byReason: Record<CancellationReason, number>
+  byOutcome: Record<'retained_discount' | 'retained_pause' | 'canceled' | 'reverted' | 'pending', number>
+  offers: Record<'discount' | 'pause', { presented: number; accepted: number }>
+  retained: number
+  decided: number
+  /** Retidos ÷ decididos, de 0 a 1; nulo sem nenhum decidido. */
+  retentionRate: number | null
+  requests: Array<CancellationRequestView & { tenant: { id: number; name: string | null; slug: string | null } }>
 }
 
 export const usersAPI = {
@@ -5820,6 +5930,14 @@ export const platformReportsAPI = {
     apiClient.getBlob(
       `/platform/reports/revenue.csv?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
     ),
+  /** Os pedidos de cancelamento (0106), desde `from` (YYYY-MM-DD) ou todos. */
+  cancellations: (from?: string) =>
+    apiClient.get<CancellationReport>(
+      `/platform/reports/cancellations${from ? `?from=${encodeURIComponent(from)}` : ''}`
+    ),
+  /** O console desfaz o cancelamento agendado de um provedor. 409 `not_scheduled` sem agendamento. */
+  revertCancellation: (tenantId: number) =>
+    apiClient.delete<{ reverted: boolean }>(`/platform/tenants/${tenantId}/subscription/cancellation`),
 }
 
 // ── A indicação de provedores (0105) ─────────────────────────────────────

@@ -2656,6 +2656,76 @@ const REFERRAL_TABLES = [
 ];
 
 /**
+ * A retenção no cancelamento (0106): cada vez que o dono de um provedor pede
+ * para cancelar, uma linha — o motivo, o comentário, o que lhe foi oferecido
+ * e o que ele decidiu. É a memória que segura o desconto de retenção a uma vez
+ * por doze meses, e é o relatório de cancelamentos do console.
+ *
+ *   reason            o motivo da lista (`CANCELLATION_REASONS`);
+ *   offers_presented  as ofertas que estavam disponíveis, separadas por
+ *                     vírgula (`discount,pause`), para a taxa de aceite;
+ *   offer             o que ele aceitou: `discount`, `pause`, ou `none`
+ *                     (recusou e cancelou); nulo enquanto não decidiu;
+ *   outcome           `retained_discount`, `retained_pause`, `canceled`
+ *                     (cancelamento agendado ou feito) ou `reverted` (o
+ *                     agendado foi desfeito); nulo enquanto não decidiu.
+ *
+ * Do provedor (escopada): diz o que ele nos contou, e some junto com ele.
+ */
+const cancellationRequestsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('reason', 32).notNullable();
+  t.text('comment');
+  t.string('offers_presented', 32);
+  t.string('offer', 16);
+  t.string('outcome', 24);
+  // Os meses da pausa ou do desconto aceito, e a porcentagem do desconto.
+  t.integer('months').unsigned();
+  t.integer('discount_percent').unsigned();
+  // A data do cancelamento agendado (o fim do período pago), quando foi o caso.
+  t.timestamp('cancel_at').nullable();
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('decided_at').nullable();
+  t.timestamp('reverted_at').nullable();
+  // Quem desfez: `provider` ou `console`.
+  t.string('reverted_by', 16);
+  t.index(['tenant_id', 'created_at'], 'cancellation_requests_tenant_idx');
+};
+
+const CANCELLATION_TABLES = [
+  ['cancellation_requests', cancellationRequestsTable]
+];
+
+/**
+ * As colunas da 0106 na assinatura:
+ *
+ *   cancel_at         o cancelamento agendado pelo próprio provedor — o fim do
+ *                     período pago. Até lá tudo funciona; nenhuma fatura nova
+ *                     sai; na data o agendador cancela.
+ *   paused_until      a pausa aceita como retenção: de `renews_at` até aqui,
+ *                     sem fatura, sem lembrete, sem suspensão automática, e o
+ *                     painel só lê. Na data a cobrança volta.
+ *   pause_started_at  quando a pausa foi aceita.
+ */
+const SUBSCRIPTION_RETENTION_COLUMNS = [
+  ['cancel_at', (t) => t.timestamp('cancel_at').nullable()],
+  ['paused_until', (t) => t.timestamp('paused_until').nullable()],
+  ['pause_started_at', (t) => t.timestamp('pause_started_at').nullable()]
+];
+
+/**
+ * O cupom do sistema (0106): `retention` é o desconto de retenção, criado
+ * pelo próprio painel. O provedor não o resgata digitando o código — só o
+ * fluxo de cancelamento o aplica.
+ */
+const COUPON_SYSTEM_COLUMNS = [
+  ['system_kind', (t) => t.string('system_kind', 16).nullable()]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -2693,7 +2763,8 @@ export const SCHEMA_TABLES = [
   ...COUPON_TABLES,
   ...SUBSCRIPTION_REMINDER_TABLES,
   ...USAGE_PEAK_TABLES,
-  ...REFERRAL_TABLES
+  ...REFERRAL_TABLES,
+  ...CANCELLATION_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5960,6 +6031,42 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop -- três tabelas só
         if (nome === 'credit_allocations' && !(await db.schema.hasTable('billing_charges'))) continue;
         // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * A retenção no cancelamento — ver `cancellationRequestsTable`,
+     * `SUBSCRIPTION_RETENTION_COLUMNS` e `COUPON_SYSTEM_COLUMNS`.
+     */
+    id: '0106_cancellation_retention',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasTable('cancellation_requests'))) return false;
+      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_RETENTION_COLUMNS], ['coupons', COUPON_SYSTEM_COLUMNS]]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_RETENTION_COLUMNS], ['coupons', COUPON_SYSTEM_COLUMNS]]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      for (const [nome, construtor] of CANCELLATION_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só
         await createTableIfMissing(db, nome, construtor(db));
       }
     }

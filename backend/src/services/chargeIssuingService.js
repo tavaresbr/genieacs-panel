@@ -1,5 +1,5 @@
 import BillingCharge, {
-  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, isProration, isoDateOf
+  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, RETENTION_CANCEL_MARKER, isProration, isoDateOf
 } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -10,7 +10,9 @@ import Coupon from '../models/Coupon.js';
 import UsagePeak from '../models/UsagePeak.js';
 import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
-import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
+import SubscriptionService, {
+  isBillableStatus, isCancelScheduled, isPauseScheduled
+} from './subscriptionService.js';
 import CardAutopayService from './billing/cardAutopayService.js';
 import TenantCredit from '../models/TenantCredit.js';
 
@@ -352,9 +354,9 @@ class ChargeIssuingService {
    *
    * @returns {Promise<boolean>} se reabriu.
    */
-  static async reopenExemptCanceled(periodEnd, { now = new Date() } = {}) {
+  static async reopenExemptCanceled(periodEnd, { now = new Date(), marker = EXEMPT_CANCEL_MARKER } = {}) {
     const linha = await BillingCharge.forPeriod(periodEnd);
-    if (!linha || linha.status !== 'canceled' || linha.last_error !== EXEMPT_CANCEL_MARKER) return false;
+    if (!linha || linha.status !== 'canceled' || linha.last_error !== marker) return false;
     const minha = await BillingCharge.claim(linha.id, {
       until: new Date(now.getTime() + this.CLAIM_MS), now, unissued: false, statuses: ['canceled']
     });
@@ -371,6 +373,86 @@ class ChargeIssuingService {
       await BillingCharge.update(linha.id, { amount_overridden_at: linha.amount_overridden_at });
     }
     return true;
+  }
+
+  /**
+   * A reserva de crédito (0105) de uma linha que esta passada reservou e
+   * depois decidiu NÃO emitir (o status, o cancelamento agendado ou a pausa
+   * que entraram no meio): volta ao saldo, e a linha volta a dizer o preço
+   * sem crédito — a próxima emissão reserva de novo, pelo saldo de então.
+   * Melhor esforço: falhar aqui só deixa a reserva para a próxima passada
+   * (`reserveForCharge` solta a anterior antes de reservar).
+   */
+  static async soltarCreditoNaoEmitido(chargeId, reservado, precoSemCredito) {
+    if (!(reservado > 0)) return;
+    try {
+      await TenantCredit.releaseForCharge(chargeId);
+      await BillingCharge.update(chargeId, { amount_cents: precoSemCredito });
+    } catch (error) {
+      console.error(`Charge ${chargeId} was not issued but its reserved credit could not be released: ${error.message}`);
+    }
+  }
+
+  /**
+   * O mesmo de `reopenExemptCanceled`, para a cobrança que o fluxo de
+   * cancelamento (0106) cancelou (`RETENTION_CANCEL_MARKER`): desfeito o
+   * cancelamento agendado, a fatura do período volta à emissão.
+   */
+  static async reopenRetentionCanceled(periodEnd, { now = new Date() } = {}) {
+    return this.reopenExemptCanceled(periodEnd, { now, marker: RETENTION_CANCEL_MARKER });
+  }
+
+  /**
+   * Cancela as cobranças de RENOVAÇÃO em aberto do provedor em escopo — as do
+   * período `periodEnd`, ou todas quando nulo — para a retenção no
+   * cancelamento (0106): a pausa aceita e o cancelamento agendado não deixam
+   * fatura viva na mão do provedor.
+   *
+   * Estrita, ao contrário da varredura da isenção: quem chama cancela ANTES
+   * de gravar a decisão, e qualquer recusa LANÇA (`ChargeFollowError`) — 409
+   * `busy` quando outra passada tem a linha, 502 `gateway_failed` quando o
+   * gateway recusa (o motivo mais provável é a fatura já ter sido paga lá).
+   * Aí nada é decidido: melhor "tente de novo" do que uma pausa com uma
+   * fatura viva no e-mail. A pró-rata não entra: é a diferença de um período
+   * que o provedor já usou.
+   *
+   * A cancelada leva `RETENTION_CANCEL_MARKER`, que é o que o desfazer procura
+   * (`reopenRetentionCanceled`) e o que o "pagar agora" da pausa reabre (a
+   * cancelada do período volta pelo clique, como qualquer cancelada).
+   *
+   * @returns {Promise<{ canceled: number[] }>} os ids das linhas canceladas.
+   */
+  static async cancelRenewalCharges({ periodEnd = null, now = new Date() } = {}) {
+    const chave = periodEnd ? String(periodEnd).slice(0, 10) : null;
+    const abertas = (await BillingCharge.openAll())
+      .filter((linha) => !isProration(linha) && (!chave || String(linha.period_end).slice(0, 10) === chave));
+    const canceladas = [];
+    for (const cobranca of abertas) {
+      // eslint-disable-next-line no-await-in-loop -- uma por provedor, quase sempre
+      const minha = await BillingCharge.claim(cobranca.id, {
+        until: new Date(now.getTime() + this.CLAIM_MS), now, unissued: false, openOnly: true
+      });
+      if (!minha) {
+        throw new ChargeFollowError(409, 'busy', 'The open charge is being changed by another process; try again shortly');
+      }
+      const provider = cobranca.gateway_charge_id ? providerFor(cobranca.provider) : null;
+      if (typeof provider?.cancelCharge === 'function') {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await provider.cancelCharge(cobranca.gateway_charge_id);
+        } catch (error) {
+          // eslint-disable-next-line no-await-in-loop
+          await BillingCharge.release(cobranca.id);
+          throw new ChargeFollowError(502, 'gateway_failed', `The payment gateway refused: ${error.message}`, error.message);
+        }
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await BillingCharge.update(cobranca.id, {
+        status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: RETENTION_CANCEL_MARKER
+      });
+      canceladas.push(Number(cobranca.id));
+    }
+    return { canceled: canceladas };
   }
 
   /**
@@ -609,6 +691,14 @@ class ChargeIssuingService {
     if (!isBillableStatus(subscription)) {
       return { issued: false, reason: 'not_billable' };
     }
+    // A retenção no cancelamento (0106). O cancelamento agendado não renova:
+    // nenhuma fatura nova, nem pelo clique — quem quer continuar desfaz o
+    // agendamento. A pausa também não gera fatura; o clique é a exceção, e é
+    // o "retomar antes": a fatura do período que a pausa segurava (a que ela
+    // cancelou volta, como toda cancelada pelo clique) e, paga, a pausa acaba
+    // (`SubscriptionService.recordPayment`).
+    if (isCancelScheduled(subscription)) return { issued: false, reason: 'cancel_scheduled' };
+    if (!manual && isPauseScheduled(subscription)) return { issued: false, reason: 'paused' };
 
     // O preço com o cupom da assinatura, quando há um que vale neste plano
     // (0093, `effectivePriceCents`) — lido uma vez e reaproveitado para o
@@ -929,6 +1019,7 @@ class ChargeIssuingService {
     // fica para a próxima fatura: cobrar o preço cheio é corrigível, perder
     // a emissão não.
     let creditoReservado = 0;
+    const precoAntesDoCredito = preco;
     if (!existente?.amount_overridden_at) {
       try {
         const credito = await TenantCredit.reserveForCharge(chargeId, preco);
@@ -956,8 +1047,18 @@ class ChargeIssuingService {
     // Cancelada ou suspensa à mão no meio: nada sai, e a linha fica sem id
     // (a faxina e a próxima emissão decidem por ela).
     if (releitura && !isBillableStatus(releitura)) {
+      await this.soltarCreditoNaoEmitido(chargeId, creditoReservado, precoAntesDoCredito);
       await BillingCharge.release(chargeId);
       return { issued: false, reason: 'not_billable' };
+    }
+    // O cancelamento agendado (ou a pausa, para o agendador) que entrou no
+    // meio desta passada (0106): nada sai, pela mesma razão — e o crédito
+    // (0105) que esta passada acabou de reservar volta ao saldo: uma linha
+    // que não vai ao gateway não segura o crédito de ninguém.
+    if (releitura && (isCancelScheduled(releitura) || (!manual && isPauseScheduled(releitura)))) {
+      await this.soltarCreditoNaoEmitido(chargeId, creditoReservado, precoAntesDoCredito);
+      await BillingCharge.release(chargeId);
+      return { issued: false, reason: isCancelScheduled(releitura) ? 'cancel_scheduled' : 'paused' };
     }
     // O cartão relido logo antes da chamada (0100): desligar a cobrança
     // automática ou remover o cartão enquanto esta passada estava no meio
@@ -1200,6 +1301,13 @@ class ChargeIssuingService {
       await this.cancelUnbillableProration(linha.id);
       return { issued: false, reason: 'not_billable', charge: await BillingCharge.findById(linha.id) };
     }
+    // A retenção (0106): pausada ou com o cancelamento agendado, a pró-rata
+    // que não chegou ao gateway ESPERA — sem ser cancelada: desfeito o
+    // agendamento (ou acabada a pausa), ela sai pela passada seguinte.
+    if (assinatura && (isPauseScheduled(assinatura) || isCancelScheduled(assinatura))) {
+      await BillingCharge.release(linha.id);
+      return { issued: false, reason: 'retention_hold', charge: linha };
+    }
 
     const hoje = this.isoDate(now);
     const daLinha = isoDateOf(linha.due_date);
@@ -1255,6 +1363,10 @@ class ChargeIssuingService {
     if (!releitura || !isBillableStatus(releitura)) {
       await this.cancelUnbillableProration(linha.id);
       return { issued: false, reason: 'not_billable', charge: await BillingCharge.findById(linha.id) };
+    }
+    if (isPauseScheduled(releitura) || isCancelScheduled(releitura)) {
+      await BillingCharge.release(linha.id);
+      return { issued: false, reason: 'retention_hold', charge: await BillingCharge.findById(linha.id) };
     }
     if (cartao) {
       cartao = provider.canChargeSavedCard ? CardAutopayService.chargeOptions(releitura) : null;
@@ -1384,6 +1496,8 @@ class ChargeIssuingService {
       }
       return { ...resumo, reason: 'not_billable', ...(canceladas ? { canceled: canceladas } : {}) };
     }
+    // A retenção (0106): a pró-rata espera, sem cancelar (ver `emitProration`).
+    if (isPauseScheduled(subscription) || isCancelScheduled(subscription)) return { ...resumo, reason: 'retention_hold' };
 
     const provider = providerFor(tenant.billing_gateway);
     if (!provider || !tenant.billing_customer_ref) return { ...resumo, reason: 'not_linked' };

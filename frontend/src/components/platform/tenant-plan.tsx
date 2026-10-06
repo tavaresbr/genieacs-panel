@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import {
   platformAPI,
+  platformReportsAPI,
   type BillingEventView,
   type Plan,
   type SubscriptionStatus,
@@ -86,6 +87,60 @@ export function exemptUntilLabel(
   if (subscription?.billingExempt !== true || !subscription.billingExemptUntil) return null
   const date = displayDayMonth(subscription.billingExemptUntil)
   return date ? t('platform.subscription.exempt.untilBadge', { date }) : null
+}
+
+/**
+ * Os selos da retenção no cancelamento (0106): "Cancela em dd/mm" (o
+ * cancelamento agendado pelo próprio provedor) e "Pausada até dd/mm". Nada
+ * quando não há nenhum dos dois.
+ */
+export function RetentionBadges({ subscription }: {
+  subscription: { cancelAt?: string | null; pausedUntil?: string | null } | null | undefined
+}) {
+  const { t } = useTranslation()
+  const cancela = displayDayMonth(subscription?.cancelAt)
+  const pausada = displayDayMonth(subscription?.pausedUntil)
+  return (
+    <>
+      {cancela && <span className="modern-badge-warning">{t('platform.subs.cancelsOn', { date: cancela })}</span>}
+      {pausada && <span className="modern-badge-info">{t('platform.subs.pausedUntil', { date: pausada })}</span>}
+    </>
+  )
+}
+
+/**
+ * O console desfaz o cancelamento agendado de um provedor (0106): a cobrança
+ * volta normalmente, e a fatura que o agendamento cancelou é reaberta.
+ */
+export function RevertCancellationButton({ tenantId, cancelAt, onChanged }: {
+  tenantId: number
+  cancelAt: string | null | undefined
+  onChanged: () => void | Promise<void>
+}) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  if (!cancelAt) return null
+  const desfazer = async () => {
+    if (!window.confirm(t('platform.subscription.revertCancelConfirm', { date: formatDate(cancelAt) }))) return
+    setBusy(true)
+    try {
+      const res = await platformReportsAPI.revertCancellation(tenantId)
+      if (res.success) {
+        toast.success(t('platform.subscription.cancelReverted'))
+        await onChanged()
+      } else {
+        toast.error(res.message || t('platform.subscription.revertCancelFailed'))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void desfazer()}>
+      {busy ? t('common.saving') : t('platform.subscription.revertCancel')}
+    </button>
+  )
 }
 
 /**
@@ -537,6 +592,15 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           )}
           {subscription.coupon && <CouponBadge coupon={subscription.coupon} currency={moedaDoPlano} />}
           <CardBadge card={subscription.card} />
+          <RetentionBadges subscription={subscription} />
+          <RevertCancellationButton
+            tenantId={tenantId}
+            cancelAt={subscription.cancelAt}
+            onChanged={async () => {
+              await load()
+              onSubscriptionChange()
+            }}
+          />
           {subscription.reason === 'trial_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
           )}
