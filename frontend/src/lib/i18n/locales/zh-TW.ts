@@ -994,6 +994,7 @@ const zhTW: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai 上：glm-4.5-flash（免費）、glm-4.5-air、glm-4.6。',
   'settings.chatbot.aiKey': 'API 金鑰',
   'settings.chatbot.aiKeySaved': '金鑰已設定',
+  'settings.chatbot.aiKeyEnds': '結尾為 …{hint}',
   'settings.chatbot.aiKeyRemove': '移除金鑰',
   'settings.chatbot.aiKeyWillRemove': '儲存後將移除金鑰。',
   'settings.chatbot.aiKeyReplace': '貼上新金鑰以替換',

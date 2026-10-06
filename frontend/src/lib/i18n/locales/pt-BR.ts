@@ -994,6 +994,7 @@ const ptBR: Dictionary = {
   'settings.chatbot.aiModelHint': 'Na z.ai: glm-4.5-flash (gratuito), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Chave da API',
   'settings.chatbot.aiKeySaved': 'Chave configurada',
+  'settings.chatbot.aiKeyEnds': 'termina em …{hint}',
   'settings.chatbot.aiKeyRemove': 'Remover chave',
   'settings.chatbot.aiKeyWillRemove': 'A chave será removida ao salvar.',
   'settings.chatbot.aiKeyReplace': 'Cole uma nova chave para trocar',

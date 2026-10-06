@@ -994,6 +994,7 @@ const fr: Dictionary = {
   'settings.chatbot.aiModelHint': 'Sur z.ai : glm-4.5-flash (gratuit), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Clé API',
   'settings.chatbot.aiKeySaved': 'Clé configurée',
+  'settings.chatbot.aiKeyEnds': 'se termine par …{hint}',
   'settings.chatbot.aiKeyRemove': 'Supprimer la clé',
   'settings.chatbot.aiKeyWillRemove': 'La clé sera supprimée à l’enregistrement.',
   'settings.chatbot.aiKeyReplace': 'Collez une nouvelle clé pour la remplacer',
