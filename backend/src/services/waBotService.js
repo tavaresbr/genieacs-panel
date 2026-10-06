@@ -478,6 +478,20 @@ function passoAtivo(conversation) {
 
 class WaBotService {
   static JANELA_HUMANO_MS = JANELA_HUMANO_MS;
+  static PAUSA_ATENDENTE_MS = PAUSA_ATENDENTE_MS;
+  static TENTATIVAS_DOCUMENTO = TENTATIVAS_DOCUMENTO;
+  static JANELA_TENTATIVAS_MS = JANELA_TENTATIVAS_MS;
+  static MAX_CONTRATOS_NA_LISTA = MAX_CONTRATOS_NA_LISTA;
+
+  // Os construtores de resposta, para o atendente IA (`waAiService.js`) usar
+  // como ferramentas: o mesmo texto, as mesmas travas e a mesma auditoria.
+  static textoFatura = responderFatura;
+  static textoSinal = responderSinal;
+  static textoQueda = responderQueda;
+  static textoManutencao = responderManutencao;
+  static textoLiberacao = responderLiberacao;
+  static textoPassagem = textoDePassagem;
+  static contratoBloqueado = contratoBloqueado;
 
   static TETO_POR_HORA = TETO_POR_HORA;
 
@@ -610,6 +624,15 @@ class WaBotService {
     if (pausadoAte > Date.now()) {
       if (!pedeMenu(texto)) return { replied: false, reason: 'paused' };
       await this.pausar(conversation, null);
+    }
+
+    // Atendimento por IA: depois de todas as travas acima, no lugar do menu.
+    // Pedido de senha/portal fica de fora: a resposta fixa, sempre. A IA que
+    // falha devolve `null`, e a mensagem segue pelo menu como antes.
+    if (intencao !== 'portal') {
+      const { default: WaAiService } = await import('./waAiService.js');
+      const daIa = await WaAiService.atender({ conversation, texto });
+      if (daIa) return daIa;
     }
 
     // Identity last, because it is the only check that leaves the panel's own

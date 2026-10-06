@@ -48,6 +48,17 @@ router.delete('/tags/:id', authenticateToken, requirePermission('whatsapp.config
 // Uma conversa só: é o que o clique na notificação abre.
 router.get('/conversations/:id', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.getConversation);
 
+// O botão "Sugerir (IA)" do composer: se aparece, e o rascunho em si. A IA
+// lê a conversa e devolve texto para a caixa; nada sai daqui para o cliente.
+router.get('/ai/status', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.aiStatus);
+router.post(
+  '/conversations/:id/suggest-reply',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  whatsappSendLimiter,
+  WhatsAppMessageController.suggestReply
+);
+
 // Mensagens novas para a notificação do navegador, desde o último cursor.
 router.get('/notifications', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listNotifications);
 

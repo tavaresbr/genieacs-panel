@@ -6,6 +6,9 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { TagsManager } from '@/components/whatsapp/tags'
+import { whatsappErrorMessage } from '@/components/whatsapp-connection'
+
+const AI_INSTRUCTIONS_MAX = 4000
 
 /** A ordem em que os textos aparecem na tela: do primeiro contato à despedida. */
 const MESSAGE_KEYS: BotMessageKey[] = [
@@ -57,11 +60,15 @@ function Caixa({ checked, onChange, title, hint, disabled = false }: {
  * WhatsApp; continuam guardados lá no servidor, e é daqui que se mexe neles.
  */
 export function ChatbotTab() {
-  const { t, locale } = useTranslation()
+  const { t, locale, formatDateTime } = useTranslation()
   const toast = useToast()
   const [config, setConfig] = useState<BotConfig | null>(null)
   const [saving, setSaving] = useState(false)
   const [tagOptions, setTagOptions] = useState<WhatsAppTag[]>([])
+  // A chave digitada (vazia = manter a salva) e o pedido de apagar a salva.
+  const [aiKey, setAiKey] = useState('')
+  const [aiKeyRemove, setAiKeyRemove] = useState(false)
+  const [aiTesting, setAiTesting] = useState(false)
 
   // As etiquetas para os seletores da etiqueta automática.
   useEffect(() => {
@@ -94,6 +101,7 @@ export function ChatbotTab() {
   if (!config) return <p className="py-3 text-sm text-muted-foreground">{t('common.loading')}</p>
 
   const patch = (next: Partial<BotConfig>) => setConfig((current) => (current ? { ...current, ...next } : current))
+  const patchAi = (next: Partial<BotConfig['ai']>) => patch({ ai: { ...config.ai, ...next } })
   const setOption = (key: keyof BotConfig['options'], value: boolean) =>
     patch({ options: { ...config.options, [key]: value } })
   const setMessage = (key: BotMessageKey, value: string) =>
@@ -149,16 +157,41 @@ export function ChatbotTab() {
         hours: config.hours,
         satisfaction: config.satisfaction,
         distribution: config.distribution,
-        autoTags: config.autoTags
+        autoTags: config.autoTags,
+        ai: {
+          enabled: config.ai.enabled,
+          suggest: config.ai.suggest,
+          baseUrl: config.ai.baseUrl,
+          model: config.ai.model,
+          instructions: config.ai.instructions,
+          ...(aiKey.trim() ? { apiKey: aiKey.trim() } : aiKeyRemove ? { apiKey: '' } : {})
+        }
       })
       if (res.success && res.data) {
         setConfig(res.data)
+        setAiKey('')
+        setAiKeyRemove(false)
         toast.success(t('settings.chatbot.saved'))
       } else {
         toast.error(res.message || t('settings.chatbot.saveFailed'))
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  const testarIa = async () => {
+    setAiTesting(true)
+    try {
+      const res = await whatsappAPI.testBotAi({
+        baseUrl: config.ai.baseUrl,
+        model: config.ai.model,
+        ...(aiKey.trim() ? { apiKey: aiKey.trim() } : {})
+      })
+      if (res.success && res.data) toast.success(t('settings.chatbot.aiTestOk', { reply: res.data.reply || '—' }))
+      else toast.error(res.message || whatsappErrorMessage(t, res.code))
+    } finally {
+      setAiTesting(false)
     }
   }
 
@@ -181,6 +214,108 @@ export function ChatbotTab() {
             title={t('settings.whatsapp.botUnlockEnabled')}
             hint={t('settings.whatsapp.botUnlockEnabledHint')}
           />
+        </div>
+      </section>
+
+      <section className="modern-card p-5 sm:p-6">
+        <h2 className="section-heading">{t('settings.chatbot.aiTitle')}</h2>
+        <p className="field-hint mt-1">{t('settings.chatbot.aiIntro')}</p>
+        <div className="mt-4 grid gap-4">
+          <Caixa
+            checked={config.ai.enabled}
+            disabled={!config.enabled}
+            onChange={(value) => patchAi({ enabled: value })}
+            title={t('settings.chatbot.aiEnabled')}
+            hint={t('settings.chatbot.aiEnabledHint')}
+          />
+          <Caixa
+            checked={config.ai.suggest}
+            onChange={(value) => patchAi({ suggest: value })}
+            title={t('settings.chatbot.aiSuggest')}
+            hint={t('settings.chatbot.aiSuggestHint')}
+          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="bot-ai-url" className="field-label">{t('settings.chatbot.aiBaseUrl')}</label>
+              <input
+                id="bot-ai-url"
+                className="modern-input w-full"
+                value={config.ai.baseUrl}
+                onChange={(event) => patchAi({ baseUrl: event.target.value })}
+              />
+            </div>
+            <div>
+              <label htmlFor="bot-ai-model" className="field-label">{t('settings.chatbot.aiModel')}</label>
+              <input
+                id="bot-ai-model"
+                className="modern-input w-full"
+                maxLength={64}
+                value={config.ai.model}
+                onChange={(event) => patchAi({ model: event.target.value })}
+              />
+              <p className="field-hint">{t('settings.chatbot.aiModelHint')}</p>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="bot-ai-key" className="field-label">{t('settings.chatbot.aiKey')}</label>
+            {config.ai.hasApiKey && !aiKeyRemove && (
+              <p className="mb-1 flex flex-wrap items-center gap-2 text-sm">
+                <span className="modern-badge-success">{t('settings.chatbot.aiKeySaved')}</span>
+                <button type="button" className="text-sm underline" onClick={() => setAiKeyRemove(true)}>
+                  {t('settings.chatbot.aiKeyRemove')}
+                </button>
+              </p>
+            )}
+            {aiKeyRemove && (
+              <p className="mb-1 text-sm text-[hsl(var(--status-warning))]">{t('settings.chatbot.aiKeyWillRemove')}</p>
+            )}
+            <input
+              id="bot-ai-key"
+              type="password"
+              autoComplete="off"
+              className="modern-input w-full"
+              value={aiKey}
+              placeholder={config.ai.hasApiKey ? t('settings.chatbot.aiKeyReplace') : t('settings.chatbot.aiKeyPlaceholder')}
+              onChange={(event) => { setAiKey(event.target.value); if (event.target.value) setAiKeyRemove(false) }}
+            />
+          </div>
+          <div>
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="bot-ai-instructions" className="field-label mb-0">{t('settings.chatbot.aiInstructions')}</label>
+              <span className="text-xs tabular-nums text-muted-foreground">{config.ai.instructions.length}/{AI_INSTRUCTIONS_MAX}</span>
+            </div>
+            <textarea
+              id="bot-ai-instructions"
+              className="modern-input w-full text-sm"
+              rows={6}
+              maxLength={AI_INSTRUCTIONS_MAX}
+              value={config.ai.instructions}
+              placeholder={t('settings.chatbot.aiInstructionsPlaceholder')}
+              onChange={(event) => patchAi({ instructions: event.target.value })}
+            />
+            <p className="field-hint">{t('settings.chatbot.aiInstructionsHint')}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="modern-button-secondary"
+              disabled={aiTesting || (!config.ai.hasApiKey && !aiKey.trim())}
+              onClick={() => void testarIa()}
+            >
+              {aiTesting ? t('common.loading') : t('settings.chatbot.aiTest')}
+            </button>
+            {config.ai.lastError && (
+              <span className="text-sm text-[hsl(var(--status-danger))]">
+                {t('settings.chatbot.aiLastError', {
+                  when: formatDateTime(config.ai.lastError.at),
+                  reason: whatsappErrorMessage(t, config.ai.lastError.code)
+                })}
+              </span>
+            )}
+          </div>
+          <p className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm text-muted-foreground">
+            {t('settings.chatbot.aiPrivacy')}
+          </p>
         </div>
       </section>
 

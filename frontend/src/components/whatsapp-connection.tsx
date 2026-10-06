@@ -36,6 +36,16 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   // como "a requisição falhou" — a única frase que não diz à pessoa que o
   // problema é o papel dela e que tentar de novo não resolve.
   missing_permission: 'api.missingPermission',
+  ai_timeout: 'whatsapp.ai.err.timeout',
+  ai_unauthorized: 'whatsapp.ai.err.unauthorized',
+  ai_rate_limited: 'whatsapp.ai.err.rateLimited',
+  ai_bad_response: 'whatsapp.ai.err.badResponse',
+  ai_unreachable: 'whatsapp.ai.err.unreachable',
+  ai_blocked_host: 'whatsapp.ai.err.blockedHost',
+  ai_invalid_url: 'whatsapp.ai.err.invalidUrl',
+  ai_key_required: 'whatsapp.ai.err.keyRequired',
+  ai_disabled: 'whatsapp.ai.err.disabled',
+  ai_failed: 'whatsapp.ai.err.failed',
   not_configured: 'whatsapp.error.notConfigured',
   incomplete_config: 'whatsapp.error.incompleteConfig',
   invalid_webhook_url: 'whatsapp.error.invalidWebhookUrl',

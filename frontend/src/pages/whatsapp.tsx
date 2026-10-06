@@ -181,6 +181,19 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
       vivo = false
     }
   }, [canQuickReply])
+  // "Sugerir (IA)": só para quem responde, e só com a sugestão ligada na aba Chatbot.
+  const canSuggest = can('whatsapp.send')
+  const [aiSuggest, setAiSuggest] = useState(false)
+  useEffect(() => {
+    if (!canSuggest) return
+    let vivo = true
+    void whatsappAPI.getAiStatus().then((res) => {
+      if (vivo) setAiSuggest(Boolean(res.success && res.data?.suggest))
+    })
+    return () => {
+      vivo = false
+    }
+  }, [canSuggest])
   // The module reads the ERP, so it is there only for whoever may read it;
   // an inbox-only operator keeps the two-column screen they had.
   const canSeeSgp = can('sgp.read')
@@ -879,6 +892,12 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     metaWindow={metaWindowFor(accounts.get(conversation.accountId), conversation)}
                     metaTemplates={metaTemplates.filter((m) => m.accountId === conversation.accountId)}
                     onSendTemplate={sendTemplate}
+                    onSuggest={canSuggest && aiSuggest ? async () => {
+                      const res = await whatsappAPI.suggestReply(conversation.id)
+                      if (res.success && res.data) return res.data.text
+                      toast.error(res.message || whatsappErrorMessage(t, res.code))
+                      return null
+                    } : undefined}
                     quickReplyVars={{
                       nome: conversation.clientName ?? conversation.pushName,
                       primeiro_nome: firstName(conversation.clientName ?? conversation.pushName),
