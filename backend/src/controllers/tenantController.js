@@ -449,7 +449,17 @@ class TenantController {
             ? { pendingCanceled: true, canceledPlanId: resultado.canceledPlanId ?? null } : {}),
           ...(resultado.replacedPlanId ? { replacedPlanId: resultado.replacedPlanId } : {}),
           ...(resultado.deferredByUpgrade ? { deferredByUpgrade: true } : {}),
-          ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
+          ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {}),
+          // A pró-rata da subida (0101): quanto, e se saiu.
+          ...(resultado.proration ? {
+            proration: {
+              amountCents: resultado.proration.amountCents,
+              issued: resultado.proration.issued,
+              ...(resultado.proration.skipped ? { skipped: resultado.proration.skipped } : {}),
+              ...(resultado.proration.reason ? { reason: resultado.proration.reason } : {}),
+              ...(resultado.proration.charge?.id ? { chargeId: resultado.proration.charge.id } : {})
+            }
+          } : {})
         };
         await AuditLog.fromRequest(req, {
           action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
@@ -466,7 +476,12 @@ class TenantController {
         if (!registrada) console.warn(`Provider ${req.tenantId} changed its plan without a platform trail line`);
       }
 
-      return res.json(createResponse(planChangeMessage(req, resultado), await subscriptionPayload(req)));
+      // `proration` (0101): a fatura de pró-rata que a subida abriu — com o
+      // link de pagamento, para a tela levar o provedor direto a ela.
+      return res.json(createResponse(planChangeMessage(req, resultado), {
+        ...await subscriptionPayload(req),
+        ...(resultado.proration ? { proration: resultado.proration } : {})
+      }));
     } catch (error) {
       if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
       console.error('Self-service plan change error:', error);

@@ -4292,6 +4292,15 @@ const zhCN: Dictionary = {
   'plan.coupon.have': "我有优惠券",
   'plan.coupon.hint': "折扣适用于你接下来的账单，包括已开出的未付账单。",
   'plan.coupon.nextInvoice': "下一张账单：{price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "按比例",
+  'plan.proration.preview': "现在升级：按比例收取 {amount}（剩余 {days} 天）",
+  'plan.proration.confirm': "您现在将支付 {amount}（剩余 {days} 天）。",
+  'plan.proration.belowMinimum': "本期差额低于最低金额，现在不收取。",
+  'plan.proration.issued': "已开具 {amount} 的按比例账单：请通过“账单”中的按钮付款。",
+  'plan.proration.pending': "{amount} 的按比例账单尚未开具；开具后将显示在“账单”中。",
+  'platform.subscription.prorationOverdueNote': "套餐变更的按比例账单已逾期；面板为只读。",
+  'subscription.prorationOverdue': "您套餐变更的按比例账单已逾期。付款前面板保持只读。",
 }
 
 export default zhCN

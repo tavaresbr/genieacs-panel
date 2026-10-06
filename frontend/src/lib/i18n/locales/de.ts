@@ -4296,6 +4296,15 @@ const de: Dictionary = {
   'plan.coupon.have': "Ich habe einen Gutschein",
   'plan.coupon.hint': "Der Rabatt gilt für Ihre nächsten Rechnungen, auch für eine bereits offene.",
   'plan.coupon.nextInvoice': "Nächste Rechnung: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "Anteilig",
+  'plan.proration.preview': "Wechsel jetzt: {amount} anteilig ({days} Tage verbleibend)",
+  'plan.proration.confirm': "Sie zahlen jetzt {amount} ({days} Tage verbleibend).",
+  'plan.proration.belowMinimum': "Die Differenz für diesen Zeitraum liegt unter dem Mindestbetrag und wird jetzt nicht berechnet.",
+  'plan.proration.issued': "Anteilige Rechnung über {amount} ausgestellt: Bezahlen Sie sie über die Schaltfläche unter Rechnungen.",
+  'plan.proration.pending': "Die anteilige Rechnung über {amount} wurde noch nicht ausgestellt; sie erscheint unter Rechnungen, sobald sie ausgestellt ist.",
+  'platform.subscription.prorationOverdueNote': "Die anteilige Rechnung für den Tarifwechsel ist überfällig; das Panel ist schreibgeschützt.",
+  'subscription.prorationOverdue': "Die anteilige Rechnung für Ihren Tarifwechsel ist überfällig. Das Panel bleibt bis zur Zahlung schreibgeschützt.",
 }
 
 export default de

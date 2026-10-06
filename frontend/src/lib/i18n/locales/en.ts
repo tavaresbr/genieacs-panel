@@ -4294,6 +4294,15 @@ const en = {
   'plan.coupon.have': "I have a coupon",
   'plan.coupon.hint': "The discount applies to your next invoices, including one that is already open.",
   'plan.coupon.nextInvoice': "Next invoice: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "Prorated",
+  'plan.proration.preview': "Upgrading now: {amount} prorated ({days} days left)",
+  'plan.proration.confirm': "You will pay {amount} now ({days} days left).",
+  'plan.proration.belowMinimum': "The difference for this period is below the minimum and is not charged now.",
+  'plan.proration.issued': "Prorated invoice of {amount} issued: pay it with the button under Charges.",
+  'plan.proration.pending': "The prorated invoice of {amount} has not been issued yet; it shows up under Charges as soon as it is.",
+  'platform.subscription.prorationOverdueNote': "The prorated invoice for the plan change is overdue; the panel is read-only.",
+  'subscription.prorationOverdue': "The prorated invoice for your plan change is overdue. The panel stays read-only until it is paid.",
 }
 
 export default en

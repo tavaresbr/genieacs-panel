@@ -24,11 +24,22 @@ import { currentTenantId } from '../config/tenantContext.js';
  * ## As decisões comerciais, e onde cada uma mora
  *
  *   - SUBIR vale NA HORA; DESCER, com um período pago correndo, vale na
- *     RENOVAÇÃO (ver `changePlan`). Não há proporcional: a próxima cobrança
- *     sai pelo preço do plano que o período seguinte vai ter, e o período já
- *     pago continua valendo até o fim como está. Proporcional é uma conta que
- *     o provedor não consegue conferir de cabeça, e o que não se confere de
- *     cabeça vira chamado.
+ *     RENOVAÇÃO (ver `changePlan`). A próxima cobrança sai pelo preço do
+ *     plano que o período seguinte vai ter.
+ *   - A SUBIDA com um período pago correndo (`active`, `renews_at` no futuro)
+ *     cobra na hora a diferença do que falta dele (0101): uma fatura avulsa
+ *     (`kind = 'proration'`) de
+ *     ⌈(preço efetivo novo − antigo) × segundos restantes ÷ segundos do período⌉
+ *     centavos, com o cupom nos dois preços, vencendo em três dias
+ *     (`SubscriptionService.prorationQuote`, `ChargeIssuingService.createProration`).
+ *     A conta não precisa ser feita de cabeça: a tela a mostra antes do
+ *     clique ("você vai pagar R$ X agora"), pela mesma função. Abaixo de
+ *     R$ 5,00 não sai fatura — o extrato registra o porquê. A fatura sai
+ *     DEPOIS de a troca estar gravada, e a falha do gateway não desfaz a
+ *     troca: a linha fica para o agendador retomar. Paga, ela não move o
+ *     prazo nem gasta ciclo de cupom; vencida, deixa o provedor `past_due`
+ *     (`proration_overdue`). Descer, ou desistir de uma descida agendada,
+ *     não cobra nada.
  *   - A cobrança do período que ainda está em aberto é do preço velho. Ela é
  *     CANCELADA no gateway e reemitida com o preço novo — duas faturas do
  *     mesmo mês na mão de quem paga é o erro que este serviço mais precisa não
@@ -83,7 +94,7 @@ const GARRA_DA_TROCA_MS = 2 * 60 * 1000;
 
 const ocupado = () => new SelfBillingError('billing.busy', { code: 'busy', status: 409 });
 
-function presentPlan(plan, currentId) {
+function presentPlan(plan, currentId, proration = null) {
   return {
     id: plan.id,
     code: plan.code,
@@ -92,7 +103,22 @@ function presentPlan(plan, currentId) {
     currency: plan.currency || 'BRL',
     periodDays: Number(plan.period_days ?? 30),
     limits: SubscriptionService.limitsOf(plan),
-    current: currentId !== null && Number(plan.id) === Number(currentId)
+    current: currentId !== null && Number(plan.id) === Number(currentId),
+    // O que subir para este plano cobraria AGORA (0101), pela mesma conta da
+    // troca — ou nulo, quando a troca não cobraria nada (não é subida, não há
+    // período pago correndo, ou fica abaixo do mínimo: `skipped`).
+    proration: proration
+  };
+}
+
+/** A prévia da pró-rata que a lista de planos mostra — ver `presentPlan`. */
+function previaDaProrata(quote) {
+  if (!quote?.eligible) return null;
+  return {
+    amountCents: quote.skipped ? 0 : quote.amountCents,
+    remainingDays: quote.remainingDays,
+    currency: quote.currency,
+    ...(quote.skipped ? { skipped: quote.skipped } : {})
   };
 }
 
@@ -339,6 +365,37 @@ async function reemitir(cobranca, tenant, { countDevices = null, pendingBlockedB
   }
 }
 
+/**
+ * A fatura de pró-rata de uma subida já gravada — melhor esforço, como a
+ * reemissão: o que der errado aqui fica na linha (`failed`, para o agendador)
+ * ou no log, e a troca continua feita.
+ *
+ * @returns {Promise<{ amountCents: number, remainingDays: number, issued: boolean,
+ *   reason?: string, skipped?: string, charge?: object|null }>}
+ */
+async function cobrarProrata(tenant, subscription, plan, quote, cupom, now) {
+  const resumo = { amountCents: quote.amountCents, remainingDays: quote.remainingDays, currency: quote.currency };
+  if (quote.skipped) return { ...resumo, issued: false, skipped: quote.skipped };
+  try {
+    const resultado = await ChargeIssuingService.createProration({
+      tenant,
+      subscription,
+      quote,
+      couponId: SubscriptionService.chargePricing(subscription, plan, cupom).couponId,
+      now
+    });
+    return {
+      ...resumo,
+      issued: Boolean(resultado.issued),
+      ...(resultado.issued ? {} : { reason: resultado.reason }),
+      charge: resultado.charge ? BillingCharge.present(resultado.charge) : null
+    };
+  } catch (error) {
+    console.error(`Proration charge after the upgrade of provider ${tenant.id} failed:`, error.message);
+    return { ...resumo, issued: false, reason: 'error' };
+  }
+}
+
 class SelfBillingService {
   /**
    * Os planos que o provedor pode escolher, com o preço — e o dele, sempre.
@@ -355,9 +412,12 @@ class SelfBillingService {
    * oferecê-lo aqui seria um botão "pare de pagar" ao lado do preço. Quem já
    * está num deles o vê marcado como o seu, e só.
    */
-  static async listPlans() {
+  static async listPlans({ now = new Date() } = {}) {
     const subscription = await Subscription.forTenant(currentTenantId());
     const atual = subscription?.plan_id ?? null;
+    // A prévia da pró-rata (0101): o plano e o cupom de agora, lidos uma vez.
+    const planoAtual = atual ? await Plan.findById(atual) : null;
+    const cupom = subscription?.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
     const planos = (await Plan.list({ activeOnly: true }))
       .filter((plano) => ehPago(plano) || Number(plano.id) === Number(atual));
     if (atual && !planos.some((plano) => Number(plano.id) === Number(atual))) {
@@ -367,7 +427,9 @@ class SelfBillingService {
         planos.sort((a, b) => Number(a.id) - Number(b.id));
       }
     }
-    return planos.map((plano) => presentPlan(plano, atual));
+    return planos.map((plano) => presentPlan(plano, atual, Number(plano.id) === Number(atual)
+      ? null
+      : previaDaProrata(SubscriptionService.prorationQuote(subscription, planoAtual, plano, cupom, now))));
   }
 
   /**
@@ -529,8 +591,10 @@ class SelfBillingService {
 
     // QUANDO a descida vale. Na renovação — a não ser que o plano de agora
     // tenha sido alcançado por uma SUBIDA neste mesmo período pago
-    // (`upgraded_at`, 0075). A subida não é cobrada no período em que
-    // acontece (não há proporcional); quem a paga é a cobrança seguinte.
+    // (`upgraded_at`, 0075). A pró-rata (0101) cobra a diferença do resto do
+    // período, mas pode não ter saído (abaixo do mínimo) ou não ter sido
+    // paga; a regra continua a mesma: quem paga a subida por inteiro é a
+    // cobrança seguinte.
     // Descer já na renovação seria usar o plano de cima o período inteiro sem
     // nunca pagá-lo — então a descida vai para a renovação SEGUINTE, e o
     // próximo período é cobrado pelo preço de cima.
@@ -564,16 +628,38 @@ class SelfBillingService {
     // apaga a primeira). Preço igual a mantém. Descer na hora a apaga — não há
     // período pago correndo a proteger.
     let upgradedAt = null;
+    // A pró-rata da subida (0101), calculada com o estado de ANTES — o plano
+    // e o prazo que o provedor pagou — e cobrada só depois de a troca estar
+    // gravada. Na descida (agendada ou na hora) não há o que cobrar.
+    let prorata = null;
+    let cupomDaProrata = null;
     if (!agendar && periodoCorrendo) {
       const sobe = Number(plan.price_cents ?? 0) > Number(atual?.price_cents ?? 0);
       upgradedAt = subscription.upgraded_at ?? (sobe ? now : null);
+      cupomDaProrata = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+      prorata = SubscriptionService.prorationQuote(subscription, atual, plan, cupomDaProrata, now);
+      if (!prorata.eligible) prorata = null;
     }
 
     await gravarSegurando(cobranca, () => (agendar
       ? SubscriptionService.schedulePlanChange({ planId: plan.id, at: quando })
-      : SubscriptionService.changePlan({ planId: plan.id, actorUserId, upgradedAt })));
+      : SubscriptionService.changePlan({
+        planId: plan.id,
+        actorUserId,
+        upgradedAt,
+        eventDetail: prorata ? {
+          proration: {
+            amountCents: prorata.amountCents,
+            remainingDays: prorata.remainingDays,
+            fromPriceCents: prorata.fromPriceCents,
+            toPriceCents: prorata.toPriceCents,
+            ...(prorata.skipped ? { skipped: prorata.skipped } : {})
+          }
+        } : null
+      })));
 
     const reissue = await reemitir(cobranca, tenant, { countDevices, pendingBlockedBy: bloqueio });
+    const proration = prorata ? await cobrarProrata(tenant, subscription, plan, prorata, cupomDaProrata, now) : null;
     return {
       ...base,
       changed: true,
@@ -583,7 +669,8 @@ class SelfBillingService {
       ...(agendadoId && agendadoId !== id ? { replacedPlanId: agendadoId } : {}),
       plan,
       charge: cobranca.acao,
-      ...(reissue ? { reissue } : {})
+      ...(reissue ? { reissue } : {}),
+      ...(proration ? { proration } : {})
     };
   }
 
@@ -617,6 +704,12 @@ class SelfBillingService {
     // e não `not_billable`, para a tela dizer por quê.
     if (subscription.billing_exempt_at) {
       throw new SelfBillingError('charges.billingExempt', { code: 'billing_exempt', status: 409 });
+    }
+    // Bloqueado pela pró-rata vencida (0101): o que se paga agora é ELA — a
+    // renovação pode nem ter saído ainda, e emiti-la não desbloquearia nada.
+    if (SubscriptionService.effectiveStatus(subscription).reason === 'proration_overdue') {
+      const prorata = (await BillingCharge.openProrations()).find((linha) => linha.gateway_charge_id && linha.invoice_url);
+      if (prorata) return { charge: prorata, issued: false, customerCreated: false };
     }
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
     // O preço que a fatura vai pedir, com o cupom (0093). O cupom nunca leva

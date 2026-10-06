@@ -540,6 +540,9 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           {subscription.reason === 'renewal_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.renewalExpiredNote')}</span>
           )}
+          {subscription.reason === 'proration_overdue' && (
+            <span className="text-muted-foreground">{t('platform.subscription.prorationOverdueNote')}</span>
+          )}
           {subscription.trialEndsAt && subscription.storedStatus === 'trial' && (
             <span className="text-muted-foreground">
               {t('platform.subscription.trialEnds', { date: formatDate(subscription.trialEndsAt) })}
@@ -723,6 +726,8 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
               <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span>
                   <span className="modern-badge mr-2">{event.type}</span>
+                  {/* O pagamento (ou a troca) da pró-rata de uma subida. */}
+                  {event.detail?.proration ? <span className="modern-badge-info mr-2">{t('charges.proration')}</span> : null}
                   {event.amountCents !== null && <span>{formatMoney(event.amountCents, event.currency)}</span>}
                   {event.externalId && <span className="ml-2 font-mono text-xs text-muted-foreground">{event.externalId}</span>}
                 </span>

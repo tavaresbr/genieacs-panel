@@ -2,7 +2,7 @@ import Tenant from '../models/Tenant.js';
 import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
-import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf, isProration } from '../models/BillingCharge.js';
 import BillingInvoice from '../models/BillingInvoice.js';
 import BillingInvoiceService, { InvoiceRequestError } from '../services/billing/billingInvoiceService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
@@ -246,7 +246,11 @@ async function fecharPeloRegistro(evento, { cobranca, externalId, allowUnderpaym
         externalId: referenciaDoAceite,
         actorUserId,
         allowUnderpayment: true,
-        now
+        now,
+        // A referência do aceite não acha cobrança nenhuma; a de pró-rata
+        // (0101) é nomeada, para o aceite não estender o período como se
+        // fosse a renovação.
+        ...(isProration(cobranca) ? { chargeId: cobranca.id } : {})
       });
       aceitou = !aceite.duplicate;
     }
@@ -692,7 +696,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_SETTLED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: amount,
           expectedCents: Number(resultado.cobranca.amount_cents),
           currency: resultado.cobranca.currency,
@@ -764,7 +768,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_CANCELED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: Number(resultado.cobranca.amount_cents),
           statusBefore: resultado.cobranca.status,
           atGateway: resultado.gateway,
@@ -888,7 +892,7 @@ class PlatformSubscriptionsController {
           platformAction: PlatformAudit.ACTIONS.CHARGE_UPDATED,
           detail: {
             chargeId: resultado.cobranca.id,
-            periodEnd: resultado.cobranca.period_end,
+            periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
             before: resultado.antes,
             after: resultado.depois,
             atGateway: resultado.gateway
@@ -1067,7 +1071,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_REFUNDED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: Number(resultado.cobranca.amount_cents),
           currency: resultado.cobranca.currency,
           renewsAtBefore: estorno.renewsAtBefore,
@@ -1128,6 +1132,36 @@ class PlatformSubscriptionsController {
               status: cobranca.status
             });
           }
+          // A fatura de pró-rata (0101) não é do período: a reemissão dela é a
+          // retentativa da que FALHOU no gateway, pela porta do agendador
+          // (`retryProrations`), com a mesma referência. A cancelada fica
+          // cancelada — cobrar de novo a diferença é uma decisão nova.
+          if (isProration(cobranca)) {
+            if (cobranca.status !== 'failed' || cobranca.gateway_charge_id) {
+              throw new ConsoleChargeError(409, `A ${cobranca.status} proration charge cannot be reissued`, 'not_reissuable', {
+                status: cobranca.status
+              });
+            }
+            const retentativa = await ChargeIssuingService.retryProrations({ tenant, manual: true, chargeId: cobranca.id });
+            const emissao = retentativa.result;
+            if (!emissao) {
+              const motivo = retentativa.reason ?? 'busy';
+              throw new ConsoleChargeError(409, `The charge was not reissued: ${motivo}`, motivo);
+            }
+            if (emissao.reason === 'gateway_failed') {
+              throw new ConsoleChargeError(502, `The payment gateway refused: ${emissao.error}`, 'gateway_failed', {
+                detail: emissao.error
+              });
+            }
+            if (!emissao.issued && emissao.reason !== 'already_issued') {
+              throw new ConsoleChargeError(409, `The charge was not reissued: ${emissao.reason}`, emissao.reason);
+            }
+            return {
+              cobranca,
+              issued: emissao.issued,
+              charge: emissao.charge ?? await BillingCharge.findById(cobranca.id)
+            };
+          }
           const assinatura = await Subscription.forTenant(tenant.id);
           // O mesmo prazo que `issueCurrent` lê, na mesma ordem.
           const prazo = assinatura?.renews_at ?? assinatura?.trial_ends_at ?? null;
@@ -1168,7 +1202,7 @@ class PlatformSubscriptionsController {
           platformAction: PlatformAudit.ACTIONS.CHARGE_REISSUED,
           detail: {
             chargeId: resultado.cobranca.id,
-            periodEnd: resultado.cobranca.period_end,
+            periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
             statusBefore: resultado.cobranca.status,
             amountCents: Number(resultado.charge?.amount_cents ?? 0)
           }
@@ -1219,7 +1253,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_INVOICE_REQUESTED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: Number(resultado.cobranca.amount_cents),
           invoiceStatusBefore: resultado.statusBefore
         }

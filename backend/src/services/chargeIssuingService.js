@@ -1,4 +1,6 @@
-import BillingCharge, { OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER } from '../models/BillingCharge.js';
+import BillingCharge, {
+  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, isProration, isoDateOf
+} from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
@@ -817,6 +819,217 @@ class ChargeIssuingService {
       chargeId: criada.chargeId,
       charge: await BillingCharge.findById(chargeId)
     };
+  }
+
+  // ── A fatura de pró-rata da subida (0101) ────────────────────────────
+
+  /**
+   * Quantos dias a fatura de pró-rata dá para ser paga. Curto de propósito:
+   * o plano novo já vale, e a diferença é do período que está correndo.
+   */
+  static PRORATION_DUE_DAYS = 3;
+
+  /**
+   * Abre e emite a fatura de pró-rata de uma subida que JÁ foi gravada.
+   *
+   * Depois da troca, e não antes: a subida vale na hora, e a fatura é a
+   * consequência dela — se a troca falhasse depois de a fatura sair, seria
+   * cobrar por um plano que o provedor não ganhou. E a falha daqui não desfaz
+   * a troca: a linha fica `failed` (ou `pending`, sem gateway configurado) e
+   * o agendador a retoma (`retryProrations`), com a mesma referência.
+   *
+   * `quote` é a conta de `SubscriptionService.prorationQuote`, feita com o
+   * estado de ANTES da troca. Nunca lança por causa do gateway.
+   *
+   * @returns {Promise<{ issued: boolean, reason?: string, charge?: object, error?: string }>}
+   */
+  static async createProration({
+    tenant, subscription, quote, couponId = null, now = new Date()
+  }) {
+    if (!quote?.eligible) return { issued: false, reason: 'not_eligible' };
+    if (quote.skipped) return { issued: false, reason: quote.skipped };
+    if (!tenant || tenant.kind === 'platform') return { issued: false, reason: 'platform_tenant' };
+    // Sem gateway que emita, como a renovação: quem é cobrado por fora (o
+    // `manual`) ou nunca foi ligado não ganha fatura daqui — e nem linha, que
+    // ficaria em aberto para sempre sem ninguém para emiti-la.
+    const provider = providerFor(tenant.billing_gateway);
+    if (!provider || !tenant.billing_customer_ref) return { issued: false, reason: 'not_linked' };
+    if (!provider.canIssue) return { issued: false, reason: 'provider_cannot_issue' };
+
+    const renovacao = new Date(quote.renewsAt);
+    const periodEnd = this.periodKey(renovacao);
+    const key = BillingCharge.prorationKey({ fromPlanId: quote.fromPlanId, toPlanId: quote.toPlanId, periodEnd });
+    let chargeId;
+    try {
+      chargeId = await BillingCharge.openProration({
+        key,
+        subscriptionId: subscription?.id ?? null,
+        amountCents: quote.amountCents,
+        currency: quote.currency || 'BRL',
+        provider: provider.name,
+        dueDate: this.isoDate(now.getTime() + this.PRORATION_DUE_DAYS * 86_400_000),
+        claimUntil: new Date(now.getTime() + this.CLAIM_MS),
+        planId: quote.toPlanId,
+        couponId,
+        detail: {
+          fromPlanId: quote.fromPlanId,
+          toPlanId: quote.toPlanId,
+          fromPriceCents: quote.fromPriceCents,
+          toPriceCents: quote.toPriceCents,
+          remainingSeconds: quote.remainingSeconds,
+          periodSeconds: quote.periodSeconds,
+          remainingDays: quote.remainingDays,
+          // O fim do período cuja diferença esta fatura cobra, na chave de
+          // sempre — é o que a tela e a NFS-e mostram como "período".
+          periodEnd,
+          renewsAt: quote.renewsAt,
+          at: now.toISOString()
+        }
+      });
+    } catch (error) {
+      // A mesma subida, no mesmo período, já tem a sua fatura — o outro
+      // clique que leu o mesmo plano de antes. Não se abre a segunda.
+      if (isUniqueViolation(error)) {
+        console.warn(`Proration ${key} of provider ${tenant.id} already exists; not charging the same upgrade twice`);
+        return { issued: false, reason: 'duplicate', charge: await BillingCharge.prorationByKey(key) };
+      }
+      throw error;
+    }
+    return this.emitProration({ tenant, provider, chargeId, now });
+  }
+
+  /**
+   * Leva ao gateway uma fatura de pró-rata que esta passada JÁ garrou.
+   *
+   * A mesma dança da renovação (`issueCurrent`): a isenção relida logo antes
+   * de falar com o gateway, a falha que vira `failed` com espera, e a gravação
+   * condicional do id (`markIssued`) que, perdida, cancela a duplicata lá. A
+   * referência é `tenant:<id>:proration:<id da linha>` — a mesma em toda
+   * retentativa, para o gateway e o webhook acharem a mesma fatura.
+   *
+   * O vencimento é o da linha, ou — se ela ficou parada até ele passar — três
+   * dias a partir de hoje: o gateway recusa cobrança que nasce vencida.
+   */
+  static async emitProration({ tenant, provider, chargeId, now = new Date() }) {
+    const linha = await BillingCharge.findById(chargeId);
+    if (!linha || !isProration(linha)) return { issued: false, reason: 'not_found' };
+    if (linha.gateway_charge_id) {
+      await BillingCharge.release(linha.id);
+      return { issued: false, reason: 'already_issued', charge: linha };
+    }
+    if (typeof provider.isConfigured === 'function' && !(await provider.isConfigured())) {
+      // Sem a chave, a linha espera — sem queimar tentativa, como a renovação.
+      await BillingCharge.release(linha.id);
+      return { issued: false, reason: 'gateway_not_configured', charge: linha };
+    }
+    const assinatura = await Subscription.forTenant(currentTenantId());
+    if (assinatura?.billing_exempt_at) {
+      await BillingCharge.update(linha.id, {
+        status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: EXEMPT_CANCEL_MARKER
+      });
+      return { issued: false, reason: 'billing_exempt' };
+    }
+
+    const hoje = this.isoDate(now);
+    const daLinha = isoDateOf(linha.due_date);
+    const vencimento = daLinha && daLinha >= hoje
+      ? daLinha
+      : this.isoDate(now.getTime() + this.PRORATION_DUE_DAYS * 86_400_000);
+    if (vencimento !== daLinha) await BillingCharge.update(linha.id, { due_date: vencimento });
+
+    const detalhe = BillingCharge.prorationDetailOf(linha);
+    const plano = detalhe?.toPlanId ? await Plan.findById(detalhe.toPlanId) : null;
+    const nomeDoPlano = plano?.name || plano?.code || '';
+    let criada;
+    try {
+      criada = await provider.createCharge({
+        customerRef: tenant.billing_customer_ref,
+        amountCents: Number(linha.amount_cents),
+        currency: linha.currency || 'BRL',
+        dueDate: vencimento,
+        description: `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(pró-rata)`,
+        reference: `tenant:${tenant.id}:proration:${linha.id}`
+      });
+    } catch (error) {
+      await BillingCharge.markFailed(linha.id, error.message, { retryAfterMs: this.RETRY_AFTER_MS });
+      console.warn(`Proration charge ${linha.id} of provider ${tenant.id} was not issued: ${error.message}`);
+      return { issued: false, reason: 'gateway_failed', error: error.message, charge: await BillingCharge.findById(linha.id) };
+    }
+
+    const gravada = await BillingCharge.markIssued(linha.id, {
+      gatewayChargeId: criada.chargeId,
+      invoiceUrl: criada.invoiceUrl,
+      dueDate: criada.dueDate
+    });
+    if (!gravada) {
+      try {
+        if (typeof provider.cancelCharge === 'function') await provider.cancelCharge(criada.chargeId);
+        console.warn(`Proration row ${linha.id} was issued by another pass; duplicate gateway charge ${criada.chargeId} was canceled`);
+      } catch (error) {
+        console.error(
+          `Proration row ${linha.id} was issued by another pass and duplicate gateway charge ${criada.chargeId} `
+          + `could NOT be canceled — cancel it by hand: ${error.message}`
+        );
+      }
+      return { issued: false, reason: 'raced', charge: await BillingCharge.findById(linha.id) };
+    }
+    return { issued: true, charge: await BillingCharge.findById(linha.id) };
+  }
+
+  /**
+   * A passada do agendador pelas faturas de pró-rata que não chegaram ao
+   * gateway: a criação falhou, ou a chave da API não estava configurada.
+   *
+   * As mesmas guardas da renovação — o teto de tentativas (`MAX_ATTEMPTS`), a
+   * espera entre elas (`next_attempt_at`) e a garra (`claim`), que só toma
+   * linha sem id no gateway — e a mesma referência em toda tentativa. O
+   * clique do console (`manual`) zera a paciência do agendador, como na
+   * renovação.
+   *
+   * De quebra, regrava `proration_due_at` quando há o que regravar: é o que
+   * conserta a cópia se algum caminho a deixou para trás.
+   *
+   * @returns {Promise<{ retried: number, issued: number }>}
+   */
+  static async retryProrations({ tenant: doLaco = null, now = new Date(), manual = false, chargeId = null } = {}) {
+    const tenant = doLaco ?? await Tenant.findById(currentTenantId());
+    const resumo = { retried: 0, issued: 0 };
+    if (!tenant || tenant.kind === 'platform') return { ...resumo, reason: 'platform_tenant' };
+    const subscription = await Subscription.forTenant(currentTenantId());
+    if (!subscription) return { ...resumo, reason: 'no_subscription' };
+    const abertas = await BillingCharge.openProrations();
+    if (abertas.length || subscription.proration_due_at) await BillingCharge.syncProrationDue();
+    if (!abertas.length) return resumo;
+    if (subscription.billing_exempt_at) return { ...resumo, reason: 'billing_exempt' };
+
+    const provider = providerFor(tenant.billing_gateway);
+    if (!provider || !tenant.billing_customer_ref) return { ...resumo, reason: 'not_linked' };
+    if (!provider.canIssue) return { ...resumo, reason: 'provider_cannot_issue' };
+    if (typeof provider.isConfigured === 'function' && !(await provider.isConfigured())) {
+      return { ...resumo, reason: 'gateway_not_configured' };
+    }
+
+    for (const linha of await BillingCharge.unissuedProrations()) {
+      if (chargeId && Number(linha.id) !== Number(chargeId)) continue;
+      if (!manual) {
+        if (Number(linha.attempts ?? 0) >= this.MAX_ATTEMPTS) continue;
+        const espera = linha.next_attempt_at ? new Date(linha.next_attempt_at) : null;
+        if (espera && !Number.isNaN(espera.getTime()) && espera.getTime() > now.getTime()) continue;
+      }
+      // eslint-disable-next-line no-await-in-loop -- uma ou duas por provedor, e cada uma fala com o gateway
+      const minha = await BillingCharge.claim(linha.id, { until: new Date(now.getTime() + this.CLAIM_MS), now });
+      if (!minha) continue;
+      if (manual) {
+        // eslint-disable-next-line no-await-in-loop
+        await BillingCharge.update(linha.id, { attempts: 0, next_attempt_at: null });
+      }
+      resumo.retried += 1;
+      // eslint-disable-next-line no-await-in-loop
+      const resultado = await this.emitProration({ tenant, provider, chargeId: linha.id, now });
+      if (resultado.issued) resumo.issued += 1;
+      if (chargeId) return { ...resumo, result: resultado };
+    }
+    return resumo;
   }
 
   /**

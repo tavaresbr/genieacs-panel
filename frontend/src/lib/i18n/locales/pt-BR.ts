@@ -4292,6 +4292,15 @@ const ptBR: Dictionary = {
   'plan.coupon.have': "Tenho um cupom",
   'plan.coupon.hint': "O desconto vale para as próximas faturas, inclusive a que já está em aberto.",
   'plan.coupon.nextInvoice': "Próxima fatura: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "Pró-rata",
+  'plan.proration.preview': "Subindo agora: {amount} de pró-rata ({days} dias restantes)",
+  'plan.proration.confirm': "Você vai pagar {amount} agora ({days} dias restantes).",
+  'plan.proration.belowMinimum': "A diferença deste período fica abaixo do mínimo e não é cobrada agora.",
+  'plan.proration.issued': "Fatura de pró-rata de {amount} emitida: pague pelo botão em Cobranças.",
+  'plan.proration.pending': "A fatura de pró-rata de {amount} ainda não saiu; ela aparece em Cobranças assim que for emitida.",
+  'platform.subscription.prorationOverdueNote': "A fatura de pró-rata da troca de plano venceu; o painel está só para leitura.",
+  'subscription.prorationOverdue': "A fatura de pró-rata da sua troca de plano venceu. O painel fica só para leitura até o pagamento.",
 }
 
 export default ptBR

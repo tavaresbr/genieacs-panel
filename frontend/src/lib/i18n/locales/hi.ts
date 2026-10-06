@@ -4300,6 +4300,15 @@ const hi: Dictionary = {
   'plan.coupon.have': "मेरे पास कूपन है",
   'plan.coupon.hint': "छूट आपके अगले इनवॉइस पर लागू होती है, पहले से खुले इनवॉइस सहित।",
   'plan.coupon.nextInvoice': "अगला इनवॉइस: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "आनुपातिक",
+  'plan.proration.preview': "अभी बदलने पर: {amount} आनुपातिक ({days} दिन शेष)",
+  'plan.proration.confirm': "आप अभी {amount} का भुगतान करेंगे ({days} दिन शेष)।",
+  'plan.proration.belowMinimum': "इस अवधि का अंतर न्यूनतम राशि से कम है और अभी नहीं लिया जाएगा।",
+  'plan.proration.issued': "{amount} का आनुपातिक इनवॉइस जारी हुआ: शुल्क अनुभाग के बटन से भुगतान करें।",
+  'plan.proration.pending': "{amount} का आनुपातिक इनवॉइस अभी जारी नहीं हुआ है; जारी होते ही यह शुल्क अनुभाग में दिखेगा।",
+  'platform.subscription.prorationOverdueNote': "प्लान बदलाव का आनुपातिक इनवॉइस बकाया है; पैनल केवल पढ़ने के लिए है।",
+  'subscription.prorationOverdue': "आपके प्लान बदलाव का आनुपातिक इनवॉइस बकाया है। भुगतान होने तक पैनल केवल पढ़ने के लिए रहेगा।",
 }
 
 export default hi

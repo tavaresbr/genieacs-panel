@@ -4300,6 +4300,15 @@ const ru: Dictionary = {
   'plan.coupon.have': "У меня есть купон",
   'plan.coupon.hint': "Скидка действует на ваши следующие счета, включая уже открытый.",
   'plan.coupon.nextInvoice': "Следующий счёт: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "Пропорционально",
+  'plan.proration.preview': "При переходе сейчас: {amount} пропорционально (осталось дней: {days})",
+  'plan.proration.confirm': "Вы заплатите {amount} сейчас (осталось дней: {days}).",
+  'plan.proration.belowMinimum': "Разница за этот период меньше минимальной суммы и сейчас не взимается.",
+  'plan.proration.issued': "Пропорциональный счёт на {amount} выставлен: оплатите его кнопкой в разделе «Счета».",
+  'plan.proration.pending': "Пропорциональный счёт на {amount} ещё не выставлен; он появится в разделе «Счета», как только будет выставлен.",
+  'platform.subscription.prorationOverdueNote': "Пропорциональный счёт за смену тарифа просрочен; панель доступна только для чтения.",
+  'subscription.prorationOverdue': "Пропорциональный счёт за смену вашего тарифа просрочен. Панель доступна только для чтения до оплаты.",
 }
 
 export default ru

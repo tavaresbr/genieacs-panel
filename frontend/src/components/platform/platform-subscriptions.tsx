@@ -425,6 +425,7 @@ function OpenChargeCell({ row }: { row: SubscriptionRow }) {
   return (
     <span className="flex flex-wrap items-center gap-2">
       <span className="font-mono tabular-nums">{formatMoney(charge.amountCents, charge.currency)}</span>
+      {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
       <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
         {t('platform.subs.dueOn', { date: formatDay(charge.dueDate) })}
       </span>
@@ -865,6 +866,8 @@ function ChargeItem({
           {late && charge.status === 'pending' ? t('charges.status.overdue') : t(CHARGE_STATUS_LABEL_KEYS[charge.status])}
         </span>
         <span className="font-mono font-semibold tabular-nums">{formatMoney(charge.amountCents, charge.currency)}</span>
+        {/* A avulsa da subida no meio do período (a diferença proporcional). */}
+        {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
         <span className="text-muted-foreground">{t('charges.period')}: {formatDay(charge.periodEnd)}</span>
         <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
           {t('charges.dueDate')}: {formatDay(charge.dueDate)}

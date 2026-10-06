@@ -1,6 +1,6 @@
 import { isUniqueViolation } from '../../config/database.js';
 import { runInTenant } from '../../config/tenantContext.js';
-import BillingCharge from '../../models/BillingCharge.js';
+import BillingCharge, { isProration } from '../../models/BillingCharge.js';
 import BillingEvent from '../../models/BillingEvent.js';
 import BillingInvoice, { REISSUABLE_INVOICE_STATUSES, safeInvoiceUrl } from '../../models/BillingInvoice.js';
 import {
@@ -159,6 +159,18 @@ function patchDaNota(nota, statusAtual, now = new Date()) {
 }
 
 /**
+ * A observação padrão da nota: o período da cobrança — e, na de pró-rata
+ * (0101), que é a diferença da troca de plano daquele período (a chave dela
+ * não é data; o fim do período está em `proration_detail`).
+ */
+function observacaoDaCobranca(charge) {
+  const fim = BillingCharge.periodEndOf(charge);
+  const ate = fim ? String(fim).slice(0, 10) : '';
+  if (isProration(charge)) return ate ? `Pró-rata da troca de plano, período até ${ate}` : 'Pró-rata da troca de plano';
+  return `Período até ${ate}`;
+}
+
+/**
  * O corpo do `POST /invoices`, da configuração e da cobrança.
  *
  * `valueCents` é o que de fato ENTROU por esta cobrança (ver
@@ -171,7 +183,7 @@ export function invoicePayload(config, charge, now = new Date(), valueCents = ch
     serviceDescription: config.serviceDescription,
     // A Asaas pede o campo; sem observação configurada, o período da cobrança
     // é o que melhor explica a nota a quem a lê.
-    observations: config.observations || `Período até ${String(charge.period_end).slice(0, 10)}`,
+    observations: config.observations || observacaoDaCobranca(charge),
     valueCents: Number(valueCents),
     deductions: 0,
     effectiveDate: effectiveDateOf(now),

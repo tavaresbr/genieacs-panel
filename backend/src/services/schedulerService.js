@@ -294,6 +294,12 @@ class SchedulerService {
         console.warn(`Could not issue the subscription charge: ${error.message}`);
         return { issued: false, reason: 'error' };
       });
+    // As faturas de pró-rata (0101) que não chegaram ao gateway na subida.
+    summary.prorations = await ChargeIssuingService.retryProrations({ tenant })
+      .catch((error) => {
+        console.warn(`Could not retry the proration charges: ${error.message}`);
+        return { retried: 0, issued: 0, error: error.message };
+      });
 
     // A NFS-e das cobranças pagas que a fila guardou (ver
     // `billingInvoiceService`): pedir as pendentes e consultar as agendadas.

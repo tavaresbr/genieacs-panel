@@ -162,6 +162,18 @@ describe('chargeActions', () => {
     expect(chargeActions(c({ status: 'canceled' }), { gateway: asaas, subscription: null }).reissue).toBe(false)
   })
 
+  it('a pró-rata só se reemite quando a criação falhou no gateway', () => {
+    const pr = (over: Partial<ChargeConsoleView>) => c({ kind: 'proration', ...over })
+    expect(chargeActions(pr({ status: 'failed', gatewayChargeId: null }), ctx).reissue).toBe(true)
+    // De qualquer período: a dela é o do momento da subida, não a chave da renovação.
+    expect(chargeActions(pr({ status: 'failed', gatewayChargeId: null, periodEnd: '2026-09-09' }), ctx).reissue).toBe(true)
+    expect(chargeActions(pr({ status: 'canceled' }), ctx).reissue).toBe(false)
+    expect(chargeActions(pr({ status: 'failed', gatewayChargeId: null }), { gateway: manual, subscription: sub() }).reissue)
+      .toBe(false)
+    expect(chargeActions(pr({ status: 'failed', gatewayChargeId: null }), { gateway: asaas, subscription: sub({ billingExempt: true }) })
+      .reissue).toBe(false)
+  })
+
   it('isento de cobrança não reemite', () => {
     expect(chargeActions(c({ status: 'canceled' }), ctx).reissue).toBe(true)
     expect(chargeActions(c({ status: 'canceled' }), { gateway: asaas, subscription: sub({ billingExempt: true }) }).reissue)

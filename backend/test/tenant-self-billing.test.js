@@ -213,7 +213,13 @@ describe('a lista de planos', () => {
 
     const antigo = lista.find((p) => p.code === 'auto-antigo');
     assert.equal(antigo.current, true);
-    const basico = lista.find((p) => p.code === 'auto-basico');
+    const { proration: previa, ...basico } = lista.find((p) => p.code === 'auto-basico');
+    // Do Antigo (R$ 50,00) ao Básico com dois dias por correr: a diferença
+    // proporcional não chega ao mínimo, e a prévia diz isso (0101).
+    assert.equal(previa.skipped, 'below_minimum');
+    assert.equal(previa.amountCents, 0);
+    assert.equal(previa.remainingDays, 2);
+    assert.equal(lista.find((p) => p.code === 'auto-antigo').proration, null, 'o atual não tem prévia');
     assert.deepEqual(basico, {
       id: planos.basico.id,
       code: 'auto-basico',
@@ -339,11 +345,13 @@ describe('a cobrança em aberto na troca de plano', () => {
 
     assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), [
       `DELETE /payments/${idVelho}`,
+      'POST /payments',
       'POST /payments'
-    ], 'a velha sai antes de a nova entrar');
+    ], 'a velha sai antes de a nova entrar — e depois, a pró-rata da subida (0101)');
     assert.equal(recebidas[1].payload.value, 199.9);
+    assert.match(recebidas[2].payload.externalReference, new RegExp(`^tenant:${alfa}:proration:\\d+$`));
 
-    const linhas = await cobrancas();
+    const linhas = (await cobrancas()).filter((l) => l.kind === 'renewal');
     assert.equal(linhas.length, 1, 'a mesma linha do período, e não uma segunda');
     assert.equal(linhas[0].amount_cents, 19990);
     assert.equal(linhas[0].status, 'pending');
@@ -428,7 +436,10 @@ describe('a cobrança em aberto na troca de plano', () => {
     assert.ok(status[0] === 200, JSON.stringify([a.body, b.body]));
     assert.ok([200, 409].includes(status[1]));
     assert.equal(recebidas.filter((r) => r.method === 'DELETE').length, 1);
-    assert.equal(recebidas.filter((r) => r.method === 'POST').length, 1);
+    const posts = recebidas.filter((r) => r.method === 'POST');
+    const prorata = posts.filter((r) => /:proration:/.test(r.payload?.externalReference ?? ''));
+    assert.equal(posts.length - prorata.length, 1, 'uma reemissão da renovação');
+    assert.equal(prorata.length, 1, 'e uma pró-rata só: a segunda troca já não é subida');
   });
 
   it('o pagamento atrasado da cobrança trocada é conferido pelo valor DELA', async () => {
@@ -1192,7 +1203,7 @@ describe('as travas da descida agendada', () => {
     // A cobrança desta renovação sai pelo plano de cima — é ela que paga a subida.
     const emitida = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
     assert.equal(emitida.amountCents, 19990);
-    const [cobranca] = await cobrancas();
+    const [cobranca] = (await cobrancas()).filter((l) => l.kind === 'renewal');
     const pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
       amountCents: 19990, provider: 'asaas', externalId: cobranca.gateway_charge_id
     }));

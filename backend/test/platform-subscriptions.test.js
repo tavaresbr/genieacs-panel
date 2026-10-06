@@ -292,8 +292,8 @@ describe('a lista de todos', () => {
     assert.equal(linhaBeta.openCharge.id, daBeta, 'a mais recente em aberto, e não a velha');
     assert.equal(linhaBeta.openCharge.gatewayChargeId, 'pay_beta_atual');
     assert.deepEqual(Object.keys(linhaBeta.openCharge).sort(), [
-      'amountCents', 'amountOverriddenAt', 'attempts', 'createdAt', 'currency', 'dueDate', 'gatewayChargeId', 'id', 'invoice', 'invoiceUrl',
-      'lastError', 'periodEnd', 'provider', 'status', 'superseded', 'updatedAt'
+      'amountCents', 'amountOverriddenAt', 'attempts', 'createdAt', 'currency', 'dueDate', 'gatewayChargeId', 'id', 'invoice', 'invoiceUrl', 'kind',
+      'lastError', 'periodEnd', 'proration', 'provider', 'status', 'superseded', 'updatedAt'
     ]);
 
     // Sem vazamento cruzado: a cobrança de cada linha é a do dono dela.

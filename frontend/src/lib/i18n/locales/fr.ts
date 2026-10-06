@@ -4292,6 +4292,15 @@ const fr: Dictionary = {
   'plan.coupon.have': "J'ai un code promo",
   'plan.coupon.hint': "La réduction s'applique à vos prochaines factures, y compris celle déjà ouverte.",
   'plan.coupon.nextInvoice': "Prochaine facture : {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "Prorata",
+  'plan.proration.preview': "En changeant maintenant : {amount} au prorata ({days} jours restants)",
+  'plan.proration.confirm': "Vous allez payer {amount} maintenant ({days} jours restants).",
+  'plan.proration.belowMinimum': "La différence pour cette période est inférieure au minimum et n’est pas facturée maintenant.",
+  'plan.proration.issued': "Facture au prorata de {amount} émise : réglez-la avec le bouton dans Factures.",
+  'plan.proration.pending': "La facture au prorata de {amount} n’a pas encore été émise ; elle apparaîtra dans Factures dès son émission.",
+  'platform.subscription.prorationOverdueNote': "La facture au prorata du changement de forfait est en retard ; le panneau est en lecture seule.",
+  'subscription.prorationOverdue': "La facture au prorata de votre changement de forfait est en retard. Le panneau reste en lecture seule jusqu’au paiement.",
 }
 
 export default fr
