@@ -887,6 +887,8 @@ export default {
   'subscription.retrieveFailed': 'サブスクリプションを読み取れませんでした',
   'plans.retrieved': 'プランを取得しました',
   'plans.retrieveFailed': 'プランを読み込めませんでした',
+  'referrals.retrieved': '紹介情報を取得しました',
+  'referrals.retrieveFailed': '紹介情報を読み込めませんでした',
   'subscription.planChanged': 'プランを変更しました',
   'subscription.planUnchanged': 'すでにこのプランです',
   'subscription.planScheduled': '{date} にプランのダウングレードを予約しました。それまでは現在のプランが有効です',

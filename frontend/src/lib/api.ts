@@ -807,6 +807,8 @@ export const authAPI = {
   signup: (payload: {
     providerName: string; slug: string; username: string; email: string; password: string
     planCode?: string; taxId?: string; phone?: string; legalName?: string; city?: string; state?: string
+    /** O código do link de indicação (`?ref=`); inválido é ignorado pelo servidor. */
+    referralCode?: string
   }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
 
@@ -1611,11 +1613,16 @@ export interface PlatformProfile {
   /** De onde vem cada valor: gravado no console, do `.env`, ou nenhum. */
   sources: Record<PlatformProfileField, 'db' | 'env' | null>
   /** A política de suspensão automática (0102), já com o padrão aplicado. */
-  billing?: PlatformBillingPolicy
-  billingDefaults?: PlatformBillingPolicy
+  billing?: PlatformBillingPolicy & PlatformReferralPolicy
+  billingDefaults?: PlatformBillingPolicy & PlatformReferralPolicy
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
+}
+
+/** O crédito da indicação de provedores, em centavos (0105); 0 desliga o programa. */
+export interface PlatformReferralPolicy {
+  referralRewardCents?: number
 }
 
 /** Dias de atraso até a suspensão automática (0 desliga) e de aviso antes dela. */
@@ -1911,6 +1918,8 @@ export interface TenantChargeView {
   proration?: ChargeProrationDetail | null
   /** A conta do valor: plano e excedente (0104). Opcional: servidores antigos não mandam. */
   pricing?: ChargePricing | null
+  /** O crédito (indicação, ajuste) abatido nela, em centavos. Opcional: servidores antigos não mandam. */
+  creditCents?: number
 }
 
 /**
@@ -1922,6 +1931,8 @@ export interface ChargeConsoleView {
   id: number
   periodEnd: string
   amountCents: number
+  /** O crédito abatido nela (0105). Opcional: servidores antigos não mandam. */
+  creditCents?: number
   currency: string
   status: TenantChargeView['status']
   dueDate: string | null
@@ -2238,7 +2249,8 @@ export const platformAPI = {
   /** Ausente mantém; vazio apaga o gravado (o `.env` volta a valer). */
   /** Os números da política: `null` volta ao padrão. */
   updatePlatformProfile: (
-    payload: Partial<Record<PlatformProfileField, string>> & Partial<Record<keyof PlatformBillingPolicy, number | null>>
+    payload: Partial<Record<PlatformProfileField, string>>
+      & Partial<Record<keyof PlatformBillingPolicy | keyof PlatformReferralPolicy, number | null>>
   ) =>
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
@@ -5808,4 +5820,101 @@ export const platformReportsAPI = {
     apiClient.getBlob(
       `/platform/reports/revenue.csv?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
     ),
+}
+
+// ── A indicação de provedores (0105) ─────────────────────────────────────
+
+export type ReferralStatus = 'pending' | 'credited' | 'canceled'
+
+/** Um crédito do saldo do provedor: a recompensa de uma indicação, ou o ajuste do console. */
+export interface TenantCreditView {
+  id: number
+  amountCents: number
+  remainingCents: number
+  source: 'referral' | 'manual'
+  reference: string | null
+  canceled: boolean
+  canceledAt: string | null
+  createdAt: string | null
+}
+
+/** A tela de Plano do provedor: o link, o saldo e os indicados (nome mascarado). */
+export interface TenantReferrals {
+  enabled: boolean
+  rewardCents: number
+  code: string | null
+  /** Nulo quando o deploy não sabe o próprio endereço; a tela monta pela origem. */
+  signupUrl: string | null
+  balanceCents: number
+  reservedCents: number
+  referrals: {
+    id: number
+    name: string
+    status: ReferralStatus
+    amountCents: number
+    createdAt: string | null
+    creditedAt: string | null
+  }[]
+  credits: TenantCreditView[]
+}
+
+/** Uma indicação vista do console: o nome inteiro e o pagamento que a pagou. */
+export interface ConsoleReferral {
+  id: number
+  tenantId: number
+  name: string | null
+  slug: string | null
+  status: ReferralStatus
+  amountCents: number
+  paymentExternalId: string | null
+  createdAt: string | null
+  creditedAt: string | null
+  canceledAt: string | null
+}
+
+export interface CreditAllocationView {
+  id: number
+  creditId: number
+  chargeId: number
+  amountCents: number
+  status: 'reserved' | 'consumed' | 'released'
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface ConsoleReferrals {
+  code: string | null
+  rewardCents: number
+  balanceCents: number
+  reservedCents: number
+  referredBy: ConsoleReferral | null
+  referrals: ConsoleReferral[]
+  credits: TenantCreditView[]
+  allocations: CreditAllocationView[]
+}
+
+export interface CreditAdjustResult {
+  creditId: number
+  amountCents: number
+  balanceBefore: number
+  balanceAfter: number
+  referrals: ConsoleReferrals
+}
+
+export const referralsAPI = {
+  /** O link de indicação (o código nasce na primeira leitura), o saldo e os indicados. */
+  mine: () =>
+    apiClient.get<TenantReferrals>('/tenant/referrals'),
+
+  /** O console: indicações e créditos de um provedor. */
+  ofTenant: (tenantId: number) =>
+    apiClient.get<ConsoleReferrals>(`/platform/tenants/${tenantId}/referrals`),
+
+  /**
+   * O ajuste manual do saldo, com motivo (auditado). Negativo tira do saldo;
+   * 409 `insufficient_credit` (com `balanceCents`) quando passa dele, 400
+   * `invalid_amount` e `reason_required`.
+   */
+  adjust: (tenantId: number, payload: { amountCents: number; reason: string }) =>
+    apiClient.post<CreditAdjustResult>(`/platform/tenants/${tenantId}/credits`, payload),
 }

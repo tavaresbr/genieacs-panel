@@ -8,6 +8,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
+import { referralCodeFromQuery } from '@/lib/referrals'
 
 /** O nome do provedor como subdomínio: minúsculas, sem acento, hífens. */
 function slugFromName(value: string) {
@@ -31,6 +32,9 @@ export default function Signup() {
   const { tenant, name: hostName, isPlatformHost } = useTenant()
   const base = tenant?.panelBaseDomain ?? null
   const [params] = useSearchParams()
+  // O código do link de indicação (0105). O servidor ignora o inválido e a
+  // indicação de si mesmo; aqui só se lê e se mostra.
+  const referralCode = referralCodeFromQuery(params.get('ref'))
   const [form, setForm] = useState({
     providerName: '', slug: '', username: '', email: '', password: '', confirm: '',
     planCode: params.get('plano') ?? params.get('plan') ?? '', taxId: '', phone: ''
@@ -116,6 +120,7 @@ export default function Signup() {
       const res = await authAPI.signup({
         providerName: form.providerName.trim(), slug: form.slug, username: form.username.trim(), email: form.email.trim(), password: form.password,
         planCode: form.planCode || undefined,
+        referralCode: referralCode || undefined,
         taxId: taxId || undefined,
         phone: telefone || undefined,
         legalName: cnpj.state === 'found' ? cnpj.legalName : undefined,
@@ -173,6 +178,9 @@ export default function Signup() {
                 <p className="page-kicker">{t('signup.kicker')}</p>
                 <h1 className="text-2xl font-bold text-foreground">{t('signup.title')}</h1>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{t('signup.subtitle')}</p>
+                {referralCode && (
+                  <p className="alert-info mt-3 text-sm leading-6">{t('signup.referred', { code: referralCode })}</p>
+                )}
               </div>
               <form className="space-y-5" onSubmit={submit} noValidate>
                 {error && (

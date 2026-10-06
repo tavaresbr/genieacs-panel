@@ -12,6 +12,7 @@ import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
 import CardAutopayService from './billing/cardAutopayService.js';
+import TenantCredit from '../models/TenantCredit.js';
 
 /**
  * A régua de emissão: quem cobra o provedor, e quando.
@@ -787,8 +788,10 @@ class ChargeIssuingService {
       // teto viraria uma fatura nova por oscilação na caixa de quem paga.
       // Nunca a de valor mudado à mão pelo console (0078): o desconto dado a
       // ela é decisão de gente, e reprecificá-la pelo plano o desfaria.
+      // Pelo preço ANTES do crédito reservado (0105): o valor que foi ao
+      // gateway é menor que o do plano de propósito, e não é reprecificação.
       if (existente.gateway_charge_id && descidaBloqueada && !existente.amount_overridden_at
-        && Number(existente.amount_cents) !== preco) {
+        && BillingCharge.baseAmountOf(existente) !== preco) {
         return this.repriceBlockedDowngrade({
           subscription, plan, tenant, charge: existente, blockedBy: descidaBloqueada, now
         });
@@ -863,7 +866,7 @@ class ChargeIssuingService {
       // gateway logo abaixo, e não o preço do plano.
       if (existente.amount_overridden_at) {
         preco = Number(existente.amount_cents);
-      } else if (Number(existente.amount_cents) !== preco || String(existente.currency || '').toUpperCase() !== moeda.toUpperCase()) {
+      } else if (BillingCharge.baseAmountOf(existente) !== preco || String(existente.currency || '').toUpperCase() !== moeda.toUpperCase()) {
         patch.amount_cents = preco;
         patch.currency = String(moeda).toUpperCase().slice(0, 3);
       }
@@ -912,6 +915,27 @@ class ChargeIssuingService {
           return { issued: false, reason: 'raced', charge: await BillingCharge.forPeriod(periodo) };
         }
         throw error;
+      }
+    }
+
+    // O crédito do provedor (0105) — a recompensa de indicação, o ajuste do
+    // console — abate o preço desta renovação, nunca abaixo do piso de
+    // R$ 5,00. Reservado na linha AGORA, com a garra dela: o que vai ao
+    // gateway logo abaixo é o preço menos o reservado, e a reserva só vira
+    // gasto quando ela for paga (ou volta ao saldo se ela for cancelada ou
+    // reemitida). Recalculado a cada tentativa: a reserva anterior desta
+    // linha volta antes. Não na de valor mudado à mão pelo console — o valor
+    // dela é decisão de gente. Uma falha aqui emite sem crédito, e o crédito
+    // fica para a próxima fatura: cobrar o preço cheio é corrigível, perder
+    // a emissão não.
+    let creditoReservado = 0;
+    if (!existente?.amount_overridden_at) {
+      try {
+        const credito = await TenantCredit.reserveForCharge(chargeId, preco);
+        preco = credito.amountCents;
+        creditoReservado = credito.reservedCents;
+      } catch (error) {
+        console.error(`Could not reserve credit on charge ${chargeId} of provider ${tenant.id}: ${error.message}`);
       }
     }
 
@@ -1036,6 +1060,7 @@ class ChargeIssuingService {
       issued: true,
       periodEnd: periodo,
       amountCents: preco,
+      ...(creditoReservado ? { creditCents: creditoReservado } : {}),
       chargeId: criada.chargeId,
       billingType: meio,
       ...(cartaoRecusado ? { cardRefused: true } : {}),

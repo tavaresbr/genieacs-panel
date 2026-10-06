@@ -887,6 +887,8 @@ export default {
   'subscription.retrieveFailed': '无法读取订阅',
   'plans.retrieved': '已获取套餐',
   'plans.retrieveFailed': '无法读取套餐',
+  'referrals.retrieved': '已获取推荐信息',
+  'referrals.retrieveFailed': '无法读取推荐信息',
   'subscription.planChanged': '套餐已更改',
   'subscription.planUnchanged': '这已经是您的套餐',
   'subscription.planScheduled': '已安排在 {date} 降级套餐；在此之前当前套餐继续有效',

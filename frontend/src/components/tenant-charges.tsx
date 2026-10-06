@@ -119,6 +119,12 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
                   {formatMoney(charge.amountCents, charge.currency)}
                   {/* A avulsa da subida no meio do período: não é a do mês. */}
                   {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
+                  {/* O crédito de indicação (ou do console) abatido nela (0105). */}
+                  {(charge.creditCents ?? 0) > 0 && (
+                    <span className="modern-badge-success">
+                      {t('referrals.creditApplied', { amount: formatMoney(charge.creditCents ?? 0, charge.currency) })}
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {t('charges.period')}: {formatDate(charge.periodEnd) ?? charge.periodEnd}

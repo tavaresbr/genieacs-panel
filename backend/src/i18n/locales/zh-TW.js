@@ -887,6 +887,8 @@ export default {
   'subscription.retrieveFailed': '無法讀取訂閱',
   'plans.retrieved': '已取得方案',
   'plans.retrieveFailed': '無法讀取方案',
+  'referrals.retrieved': '已取得推薦資訊',
+  'referrals.retrieveFailed': '無法讀取推薦資訊',
   'subscription.planChanged': '方案已變更',
   'subscription.planUnchanged': '這已經是您的方案',
   'subscription.planScheduled': '已排定於 {date} 降級方案；在此之前目前方案繼續有效',

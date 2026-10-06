@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
 import BillingInvoice from './BillingInvoice.js';
+import TenantCredit from './TenantCredit.js';
 
 /**
  * A cobrança que o painel emitiu a um provedor.
@@ -183,6 +184,11 @@ class BillingCharge {
   static async update(id, patch) {
     const changed = await tdb('billing_charges').where({ id })
       .update({ ...patch, updated_at: new Date() });
+    // O crédito reservado na cobrança (0105) segue o estado dela, aqui e não
+    // em cada um dos que chamam, pelo mesmo motivo da pró-rata logo abaixo:
+    // paga, a reserva vira gasto; cancelada, volta ao saldo; estornada, o que
+    // ela gastou volta também. Cada passo é idempotente (`TenantCredit`).
+    if (changed > 0 && 'status' in patch) await BillingCharge.followCredit(id, patch.status);
     // Quem muda o estado (ou o vencimento) de uma cobrança de pró-rata muda o
     // que a assinatura diz sobre ela (`proration_due_at`). Aqui, e não em
     // cada um dos que chamam — o webhook, os gestos do console, a faxina da
@@ -193,6 +199,35 @@ class BillingCharge {
       if (isProration(linha)) await BillingCharge.syncProrationDue();
     }
     return changed > 0;
+  }
+
+  /**
+   * O crédito acompanha o estado novo da cobrança — ver `update`. Nunca
+   * lança: a etiqueta da cobrança já foi gravada, e uma falha aqui fica no
+   * log com o que alguém precisa para acertar à mão.
+   */
+  static async followCredit(id, status) {
+    try {
+      if (status === 'paid') await TenantCredit.consumeForCharge(id);
+      else if (status === 'canceled') await TenantCredit.releaseForCharge(id);
+      else if (status === 'refunded') await TenantCredit.restoreForCharge(id);
+    } catch (error) {
+      console.error(`Charge ${id} became ${status} but its reserved credit could not follow: ${error.message}`);
+    }
+  }
+
+  /**
+   * Quanto de crédito a linha tem reservado (0105) — o preço do plano é
+   * `amount_cents` mais isto. Zero na linha sem crédito.
+   */
+  static creditReservedOf(linha) {
+    const valor = Number(linha?.credit_reserved_cents ?? 0);
+    return Number.isFinite(valor) && valor > 0 ? Math.floor(valor) : 0;
+  }
+
+  /** O preço da linha antes do crédito (0105): `amount_cents` + o reservado. */
+  static baseAmountOf(linha) {
+    return Number(linha?.amount_cents ?? 0) + BillingCharge.creditReservedOf(linha);
   }
 
   /**
@@ -481,6 +516,9 @@ class BillingCharge {
       anteriores.push({
         id: String(linha.gateway_charge_id),
         amountCents: Number(linha.amount_cents),
+        // O crédito que ela levava (0105): o preço do plano que ela cobrava
+        // é o valor mais isto.
+        ...(BillingCharge.creditReservedOf(linha) ? { creditCents: BillingCharge.creditReservedOf(linha) } : {}),
         currency: String(linha.currency || 'BRL').toUpperCase(),
         at: new Date().toISOString()
       });
@@ -523,6 +561,15 @@ class BillingCharge {
       ...(billingCycle !== undefined ? { billing_cycle: billingCycle } : {}),
       updated_at: new Date()
     });
+    // A reserva de crédito da cobrança velha volta ao saldo (0105): a
+    // reemissão reserva de novo, pelo preço de então (`issueCurrent`).
+    if (changed > 0) {
+      try {
+        await TenantCredit.releaseForCharge(id);
+      } catch (error) {
+        console.error(`Charge ${id} was reset for reissue but its reserved credit could not be released: ${error.message}`);
+      }
+    }
     return changed > 0;
   }
 
@@ -818,6 +865,8 @@ class BillingCharge {
       // A conta do valor (0104): preço do plano e excedente.
       pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
+      // O crédito abatido nela (0105) — o preço do plano é a soma dos dois.
+      creditCents: BillingCharge.creditReservedOf(row),
       currency: row.currency,
       status: row.status,
       dueDate: isoDateOf(row.due_date),
@@ -867,6 +916,7 @@ class BillingCharge {
       // A conta do valor (0104): preço do plano e excedente.
       pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
+      creditCents: BillingCharge.creditReservedOf(row),
       currency: row.currency,
       status: row.status,
       dueDate: row.due_date ?? null,

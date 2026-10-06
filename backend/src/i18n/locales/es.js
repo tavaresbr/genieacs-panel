@@ -884,6 +884,8 @@ export default {
   'subscription.retrieveFailed': 'No se pudo leer la suscripción',
   'plans.retrieved': 'Planes obtenidos',
   'plans.retrieveFailed': 'No se pudieron leer los planes',
+  'referrals.retrieved': 'Referencias obtenidas',
+  'referrals.retrieveFailed': 'No se pudieron leer las referencias',
   'subscription.planChanged': 'Plan cambiado',
   'subscription.planUnchanged': 'Este ya es tu plan',
   'subscription.planScheduled': 'Cambio a un plan menor programado para el {date}; tu plan actual sigue hasta entonces',

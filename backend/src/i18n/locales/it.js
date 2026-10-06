@@ -885,6 +885,8 @@ export default {
   'subscription.retrieveFailed': 'Impossibile leggere l\'abbonamento',
   'plans.retrieved': 'Piani recuperati',
   'plans.retrieveFailed': 'Impossibile leggere i piani',
+  'referrals.retrieved': 'Segnalazioni recuperate',
+  'referrals.retrieveFailed': 'Impossibile leggere le segnalazioni',
   'subscription.planChanged': 'Piano cambiato',
   'subscription.planUnchanged': 'Questo è già il tuo piano',
   'subscription.planScheduled': 'Passaggio a un piano inferiore programmato per il {date}; fino ad allora resta il piano attuale',

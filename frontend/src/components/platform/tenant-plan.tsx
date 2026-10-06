@@ -20,6 +20,7 @@ import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { exemptUntilFromDateInput, todayIso, toIsoDay } from '@/lib/subscription-console'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { CardBadge } from '@/components/card-badge'
+import { TenantReferrals } from '@/components/platform/tenant-referrals'
 
 interface Props {
   tenant: Tenant
@@ -718,6 +719,9 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           </dl>
         </div>
       )}
+
+      {/* A indicação e os créditos do provedor (0105), com o ajuste manual. */}
+      <TenantReferrals tenantId={tenantId} />
 
       {/* Extrato */}
       {events.length > 0 && (

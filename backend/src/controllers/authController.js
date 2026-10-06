@@ -27,6 +27,7 @@ import { normalizeTaxId, isValidCnpj } from '../utils/taxId.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { translate } from '../i18n/index.js';
 import { DEFAULT_LOCALE } from '../i18n/config.js';
+import ReferralService from '../services/referralService.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -309,6 +310,7 @@ class AuthController {
 
       let tenantId;
       let userId;
+      let referredBy = null;
       try {
         await getDb().transaction(async (trx) => {
           tenantId = await Tenant.create({ slug, name }, trx);
@@ -319,6 +321,19 @@ class AuthController {
             await trx('tenants').where({ id: tenantId }).update(fiscal);
           }
           await seedDefaults(trx, { tenantIds: [tenantId], planId: chosenPlan?.id ?? null });
+          // A indicação (0105): `?ref=CÓDIGO` no link de quem indicou. Código
+          // inválido e a indicação de si mesmo são ignorados — e uma falha
+          // aqui também, num savepoint: a indicação nunca derruba o cadastro.
+          if (body.referralCode) {
+            try {
+              referredBy = await trx.transaction((sp) => ReferralService.attachAtSignup({
+                trx: sp, tenantId, code: body.referralCode, email, taxId
+              }));
+            } catch (error) {
+              console.warn(`Signup: the referral code was ignored: ${error.message}`);
+              referredBy = null;
+            }
+          }
           userId = await User.create({
             username,
             password: await bcrypt.hash(password, BCRYPT_ROUNDS),
@@ -346,7 +361,7 @@ class AuthController {
       await PlatformAudit.record({
         action: PlatformAudit.ACTIONS.TENANT_CREATED,
         tenant,
-        detail: { via: 'signup', ownerUserId: userId },
+        detail: { via: 'signup', ownerUserId: userId, ...(referredBy ? { referredBy } : {}) },
         ip: req.ip ?? null
       });
 

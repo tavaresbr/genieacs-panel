@@ -888,6 +888,8 @@ export default {
   'subscription.retrieveFailed': 'Abonnement konnte nicht gelesen werden',
   'plans.retrieved': 'Tarife abgerufen',
   'plans.retrieveFailed': 'Tarife konnten nicht gelesen werden',
+  'referrals.retrieved': 'Empfehlungen abgerufen',
+  'referrals.retrieveFailed': 'Empfehlungen konnten nicht gelesen werden',
   'subscription.planChanged': 'Tarif geändert',
   'subscription.planUnchanged': 'Das ist bereits Ihr Tarif',
   'subscription.planScheduled': 'Wechsel in einen kleineren Tarif für den {date} geplant; bis dahin gilt Ihr aktueller Tarif',

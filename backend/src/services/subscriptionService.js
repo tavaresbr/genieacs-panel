@@ -11,6 +11,8 @@ import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { IS_SAAS } from '../config/edition.js';
 import { effectiveChargesConfig, earlyDiscountFor } from './billing/asaasSettingsService.js';
+import TenantCredit from '../models/TenantCredit.js';
+import ReferralService from './referralService.js';
 
 /**
  * O ciclo de vida da assinatura, e o que cada estado deixa fazer.
@@ -183,6 +185,9 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null, c
       const temPreco = cobranca.plan_id !== null && cobranca.plan_id !== undefined;
       return {
         cents: Math.floor(valor),
+        // O preço sem o crédito reservado nela (0105): é ele que diz QUAL
+        // plano a cobrança cobrou — `cents` é o que se esperava receber.
+        baseCents: Math.floor(valor) + BillingCharge.creditReservedOf(cobranca),
         motivo: null,
         fonte: 'charge',
         // A fatura de pró-rata (0101) não compra período: ver `recordPayment`.
@@ -229,6 +234,7 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null, c
         if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
         return {
           cents: Math.floor(valor),
+          baseCents: Math.floor(valor) + Math.max(0, Math.floor(Number(trocada.superseded.creditCents ?? 0)) || 0),
           motivo: null,
           fonte: 'superseded_charge',
           // A linha que a cobrança velha era diz o que ela pagava: o id velho
@@ -2434,7 +2440,7 @@ class SubscriptionService {
         ? this.paidScheduledPlan({
           planId: pedido.planId ?? null,
           billingCycle: pedido.billingCycle,
-          cents: pedido.overridden ? null : pedido.cents,
+          cents: pedido.overridden ? null : (pedido.baseCents ?? pedido.cents),
           subscription: before,
           current: planoAtual,
           scheduled: planoAgendado,
@@ -2530,13 +2536,31 @@ class SubscriptionService {
         faturaComCupom = Number(pedido.couponId) === Number(cupom.id);
       } else {
         faturaComCupom = this.couponApplies(before, plano, cupom)
-          && (pedido.cents === null || pedido.cents === this.priceFor(doPeriodo, plano, cupom));
+          && (pedido.cents === null || (pedido.baseCents ?? pedido.cents) === this.priceFor(doPeriodo, plano, cupom));
       }
     }
     const gastaCupom = reactivates && cupom && cupom.duration !== 'forever' && faturaComCupom;
 
+    // A indicação (0105): o pagamento que ESTENDE o período do indicado — não
+    // a pró-rata, não o pago a menos (nem o aceito a menos), não o de valor
+    // zero — dá a quem o indicou o crédito configurado. Lido aqui, fora da
+    // transação (ver `ReferralService.prepareReward`); gravado lá dentro.
+    const indicacao = reactivates && !faltou && amount > 0
+      ? await ReferralService.prepareReward(tenantId)
+      : null;
+    // O crédito reservado na cobrança que este pagamento quita passa a gasto,
+    // na mesma transação do evento (0105). O pago a menos deixa a cobrança em
+    // aberto, e a reserva com ela.
+    const cobrancaComCredito = !underpaid && pedido.chargeId
+      && (pedido.fonte === 'charge' || pedido.fonte === 'superseded_charge')
+      ? Number(pedido.chargeId) : null;
+
     try {
       const subscription = await getDb().transaction(async (trx) => {
+        const recompensa = indicacao
+          ? await ReferralService.rewardOnPayment({ trx, tenantId, prepared: indicacao, externalId, now })
+          : null;
+        const creditoGasto = cobrancaComCredito ? await TenantCredit.consumeForCharge(cobrancaComCredito, trx) : 0;
         // Dentro da transação do evento: a reentrega do mesmo pagamento morre
         // no índice único do evento logo abaixo, e o ciclo gasto aqui volta
         // junto no rollback — o cupom é consumido uma vez por pagamento.
@@ -2592,7 +2616,11 @@ class SubscriptionService {
             // devolver (`reversePayment`) — e, se o zerou, o cupom inteiro.
             ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {}),
             // A pró-rata (0101): o estorno lê isto e não desfaz prazo nenhum.
-            ...(isProration ? { proration: true, chargeId: pedido.chargeId } : {})
+            ...(isProration ? { proration: true, chargeId: pedido.chargeId } : {}),
+            // A indicação recompensada por este pagamento, e o crédito que a
+            // cobrança paga gastou (0105) — o estorno lê os dois.
+            ...(recompensa ?? {}),
+            ...(creditoGasto ? { creditConsumed: { chargeId: cobrancaComCredito, cents: creditoGasto } } : {})
           }
         }, trx);
         // Na mesma transação do pagamento: um período novo que começasse no
@@ -2775,8 +2803,21 @@ class SubscriptionService {
       patch.pending_plan_locked_at = null;
     }
 
+    // A cobrança que este pagamento quitou, para o crédito que ela gastou
+    // voltar ao saldo (0105). Lida antes da transação, pelas mesmas portas da
+    // conferência do pagamento (`valorPedido`).
+    const daLinha = /^charge:(\d+)$/.exec(referencia);
+    const cobrancaPaga = daLinha
+      ? await BillingCharge.findById(Number(daLinha[1]))
+      : (await BillingCharge.byGatewayId(referencia)) ?? (await BillingCharge.bySupersededGatewayId(referencia))?.row ?? null;
+
     try {
       const subscription = await getDb().transaction(async (trx) => {
+        // A recompensa de indicação que este pagamento gerou é cancelada, e o
+        // crédito que a cobrança dele gastou volta (0105) — na transação da
+        // marca do estorno, uma vez só.
+        const indicacaoDesfeita = await ReferralService.cancelOnRefund({ trx, tenantId, reference: referencia });
+        const creditoDevolvido = cobrancaPaga ? await TenantCredit.restoreForCharge(cobrancaPaga.id, trx) : 0;
         // O ciclo do cupom que o pagamento gastou volta com o dinheiro — na
         // mesma transação da marca do estorno, então o segundo estorno do
         // mesmo pagamento (o webhook depois do console) não devolve outro.
@@ -2803,7 +2844,9 @@ class SubscriptionService {
               : 0,
             basis,
             ...(patch.pending_plan_locked_at === null ? { pendingUnlocked: true } : {}),
-            ...(devolucao ? { couponRestored: { id: Number(gastou.id), code: gastou.code ?? null, ...devolucao } } : {})
+            ...(devolucao ? { couponRestored: { id: Number(gastou.id), code: gastou.code ?? null, ...devolucao } } : {}),
+            ...(indicacaoDesfeita ?? {}),
+            ...(creditoDevolvido ? { creditRestored: { chargeId: Number(cobrancaPaga.id), cents: creditoDevolvido } } : {})
           }
         }, trx);
         return Object.keys(patch).length

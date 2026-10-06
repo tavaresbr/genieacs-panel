@@ -543,7 +543,7 @@ describe('a configuração', () => {
   it('o padrão é 15 e 3', async () => {
     assert.deepEqual(await autoSuspendConfig(), { days: 15, warnDays: 3 });
     const { billing } = await readProfile();
-    assert.deepEqual(billing, { autoSuspendDays: 15, autoSuspendWarnDays: 3 });
+    assert.deepEqual(billing, { autoSuspendDays: 15, autoSuspendWarnDays: 3, referralRewardCents: 0 });
   });
 
   it('grava, valida e volta ao padrão', async () => {

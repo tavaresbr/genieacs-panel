@@ -883,6 +883,8 @@ export default {
   'subscription.retrieveFailed': 'Impossible de lire l\'abonnement',
   'plans.retrieved': 'Offres récupérées',
   'plans.retrieveFailed': 'Impossible de lire les offres',
+  'referrals.retrieved': 'Parrainages récupérés',
+  'referrals.retrieveFailed': 'Impossible de lire les parrainages',
   'subscription.planChanged': 'Offre modifiée',
   'subscription.planUnchanged': 'C\'est déjà votre offre',
   'subscription.planScheduled': 'Passage à une offre inférieure programmé pour le {date} ; votre offre actuelle reste valable d\'ici là',

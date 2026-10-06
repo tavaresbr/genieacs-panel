@@ -157,7 +157,12 @@ export const SCOPED_TABLES = new Set([
   'coupon_redemptions',
   // O pico de uso de cada período (0104), que a cobrança por excedente lê:
   // contagens do provedor, sem assinante nenhum.
-  'usage_peaks'
+  'usage_peaks',
+  // O saldo de créditos do provedor (0105) e o que dele foi para cada uma das
+  // suas cobranças. Dinheiro de UM provedor: o crédito de um nunca abate a
+  // fatura do outro.
+  'tenant_credits',
+  'credit_allocations'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -217,7 +222,12 @@ export const SHARED_TABLES = new Set([
   'leads',
   // Os cupons de desconto. Do catálogo comercial, como `plans`: o provedor
   // resgata um cupom da plataforma, e só o console escreve nesta tabela.
-  'coupons'
+  'coupons',
+  // As indicações (0105): cada linha fala de DOIS provedores — quem indicou e
+  // quem foi indicado —, e cada lado a lê pelo próprio id, sempre nomeado
+  // (`ReferralReward`). O crédito que ela gera mora em `tenant_credits`, essa
+  // sim escopada.
+  'referral_rewards'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

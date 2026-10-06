@@ -190,7 +190,11 @@ const POR_ID = new Map([
   ['DELETE /api/platform/tenants/:id/genieacs/firmware/unowned/:name', 'plano de controle; prova em firmware-upload.test.js — só apaga arquivo sem dono, nunca o de um provedor'],
   ['POST /api/platform/tenants/:id/genieacs/agent-token', 'plano de controle; prova em genieacs-agent-saas.test.js — a chave vai só para o provedor pedido, e id que não existe é 404'],
   ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro'],
-  ['POST /api/platform/tenants/:id/gateway/asaas-customer', 'plano de controle; prova em platform-integrations.test.js — inclusive o 404 da caixa da plataforma e de quem não existe']
+  ['POST /api/platform/tenants/:id/gateway/asaas-customer', 'plano de controle; prova em platform-integrations.test.js — inclusive o 404 da caixa da plataforma e de quem não existe'],
+  // A indicação e os créditos (0105): provedor visto de cima; a prova de que o
+  // crédito de um não aparece nem é abatido no outro está no mesmo arquivo.
+  ['GET /api/platform/tenants/:id/referrals', 'plano de controle; prova em referrals.test.js — inclusive o 404 da caixa da plataforma'],
+  ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -404,7 +408,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // pedágio: três linhas em `DO_CONSOLE` e três aqui; prova em
   // firmware-upload.test.js. São 69. (O apagar do PROVEDOR leva o nome na
   // query, e por isso não entra nesta conta.)
-  const TETO_DE_EXCECOES = 69;
+  //
+  // E as duas da indicação de provedores (0105): a lista de indicações e
+  // créditos de um provedor e o ajuste manual do saldo. Provedor visto de
+  // cima; duas linhas em `DO_CONSOLE` e duas aqui; prova em
+  // referrals.test.js. São 71.
+  const TETO_DE_EXCECOES = 71;
 
 
   /**
@@ -458,7 +467,9 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/genieacs/firmware/reassign',
     'DELETE /api/platform/tenants/:id/genieacs/firmware/unowned/:name',
     'POST /api/platform/tenants/:id/genieacs/agent-token',
-    'POST /api/platform/tenants/:id/gateway/asaas-customer'
+    'POST /api/platform/tenants/:id/gateway/asaas-customer',
+    'GET /api/platform/tenants/:id/referrals',
+    'POST /api/platform/tenants/:id/credits'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

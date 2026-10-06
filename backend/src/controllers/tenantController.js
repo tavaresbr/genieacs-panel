@@ -19,6 +19,7 @@ import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResol
 import { normalizeTaxId, isValidTaxId, isValidCnpj } from '../utils/taxId.js';
 import { lookupCnpj } from '../services/cnpjLookupService.js';
 import { lookupCep, geocodeAddress } from '../services/addressLookupService.js';
+import ReferralService from '../services/referralService.js';
 
 /**
  * O cadastro fiscal vindo do corpo, normalizado — ou o motivo de recusa.
@@ -388,6 +389,21 @@ class TenantController {
       return res.status(500).json(
         createErrorResponse(req.t('subscription.retrieveFailed'), error.message)
       );
+    }
+  }
+
+  /**
+   * `GET /api/tenant/referrals` — a indicação de provedores, na tela de Plano
+   * (0105): o código e o link (gerados na primeira vez), o saldo de créditos
+   * e quem este provedor indicou, com o nome mascarado. `settings.read`, como
+   * `/subscription`: é a mesma tela.
+   */
+  static async getReferrals(req, res) {
+    try {
+      return res.json(createResponse(req.t('referrals.retrieved'), await ReferralService.presentForTenant(req.tenantId)));
+    } catch (error) {
+      console.error('Get referrals error:', error);
+      return res.status(500).json(createErrorResponse(req.t('referrals.retrieveFailed'), error.message));
     }
   }
 
