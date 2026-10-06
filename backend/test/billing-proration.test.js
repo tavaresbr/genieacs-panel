@@ -128,6 +128,7 @@ async function assinar({ plan = planos.basico, status = 'active', renewsAt = daq
     upgraded_at: null,
     billing_exempt_at: null,
     proration_due_at: null,
+    suspended_reason: null,
     coupon_id: coupon?.id ?? null,
     coupon_cycles_left: coupon ? 3 : null,
     coupon_applied_at: coupon ? new Date(Math.floor(Date.now() / 1000) * 1000) : null
@@ -413,6 +414,54 @@ describe('o pagamento da pró-rata', () => {
     assert.equal(detalhe.expectedCents, Number(pr.amount_cents));
     assert.equal(detalhe.periodDays, undefined);
     assert.equal(Number(evento.amount_cents), Number(pr.amount_cents), 'o dinheiro entra no extrato');
+  });
+
+  it('o suspenso pela inadimplência (0102) que paga a pró-rata volta a ativo, sem estender o prazo', async () => {
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    const [pr] = await prorratas();
+    await getDb()('subscriptions').where({ tenant_id: alfa })
+      .update({ status: 'suspended', suspended_reason: 'auto_nonpayment' });
+    await SubscriptionService.invalidate(alfa);
+    const antes = await linha();
+
+    const res = await entregar({
+      event: 'PAYMENT_RECEIVED',
+      payment: {
+        id: pr.gateway_charge_id,
+        value: Number(pr.amount_cents) / 100,
+        customer: 'cus_alfa',
+        externalReference: `tenant:${alfa}:proration:${pr.id}`
+      }
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.code, 'recorded');
+
+    const depois = await linha();
+    assert.equal(depois.status, 'active');
+    assert.equal(depois.suspended_reason, null);
+    assert.equal(new Date(depois.renews_at).getTime(), new Date(antes.renews_at).getTime(), 'a pró-rata não compra período');
+    assert.equal((await prorratas())[0].status, 'paid');
+    const evento = await getDb()('billing_events')
+      .where({ tenant_id: alfa, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED }).first();
+    const detalhe = JSON.parse(evento.detail);
+    assert.equal(detalhe.proration, true);
+    assert.equal(detalhe.reactivated, true);
+    assert.equal(detalhe.suspendedReason, 'auto_nonpayment');
+    assert.equal(detalhe.periodDays, undefined);
+  });
+
+  it('o suspenso a dedo que paga a pró-rata continua suspenso', async () => {
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    const [pr] = await prorratas();
+    await getDb()('subscriptions').where({ tenant_id: alfa })
+      .update({ status: 'suspended', suspended_reason: 'manual' });
+    await SubscriptionService.invalidate(alfa);
+    await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: Number(pr.amount_cents), provider: 'asaas', externalId: pr.gateway_charge_id
+    }));
+    const depois = await linha();
+    assert.equal(depois.status, 'suspended');
+    assert.equal(depois.suspended_reason, 'manual');
   });
 
   it('pago a menos fica em aberto, conferido pelo valor DELA', async () => {

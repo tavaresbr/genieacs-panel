@@ -2,8 +2,8 @@ import { tdb } from '../../config/database.js';
 import { currentTenantId } from '../../config/tenantContext.js';
 import { createSecretBox } from '../../utils/secretBox.js';
 import Subscription from '../../models/Subscription.js';
-import BillingCharge, { OPEN_CHARGE_STATUSES } from '../../models/BillingCharge.js';
-import SubscriptionService from '../subscriptionService.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES, isProration } from '../../models/BillingCharge.js';
+import SubscriptionService, { isBillableStatus } from '../subscriptionService.js';
 import { providerFor } from './registry.js';
 
 /**
@@ -45,10 +45,17 @@ import { providerFor } from './registry.js';
 /** O contexto da caixa — o mesmo que `secretRotationService` usa para re-cifrar. */
 export const CARD_TOKEN_CONTEXT = 'skygenpanel-subscription-card-token-v1';
 
-const box = createSecretBox(CARD_TOKEN_CONTEXT);
-
-/** Os estados em que se cobra — os mesmos da emissão. */
-const ESTADOS_COBRAVEIS = new Set(['trial', 'active', 'past_due']);
+/**
+ * Criada na primeira vez que é usada, não no carregamento do módulo: este
+ * arquivo entra na cadeia de import do middleware de sessão, e um processo de
+ * produção sem segredo tem de ouvir primeiro que falta o JWT_SECRET — não que
+ * falta a chave da caixa de segredos.
+ */
+let caixa = null;
+function box() {
+  if (!caixa) caixa = createSecretBox(CARD_TOKEN_CONTEXT);
+  return caixa;
+}
 
 /**
  * Os erros do gateway que dizem que a cobrança de cartão NÃO chegou a ser
@@ -117,7 +124,7 @@ class CardAutopayService {
    */
   static chargeOptions(subscription) {
     if (!this.usable(subscription)) return null;
-    const token = box.decrypt(envelopeDe(subscription));
+    const token = box().decrypt(envelopeDe(subscription));
     if (!token) {
       console.warn(`The saved card of provider ${subscription.tenant_id} could not be decrypted; charging without it`);
       return null;
@@ -198,7 +205,7 @@ class CardAutopayService {
       return { captured: false, reason: 'not_card' };
     }
 
-    const atual = this.hasToken(subscription) ? box.decrypt(envelopeDe(subscription)) : null;
+    const atual = this.hasToken(subscription) ? box().decrypt(envelopeDe(subscription)) : null;
     const mesmo = atual !== null && atual === cartao.token;
     const patch = {
       card_brand: cartao.brand ?? (mesmo ? subscription.card_brand : null),
@@ -210,7 +217,7 @@ class CardAutopayService {
       updated_at: new Date()
     };
     if (!mesmo) {
-      const cifrado = box.encrypt(cartao.token);
+      const cifrado = box().encrypt(cartao.token);
       patch.card_token_ciphertext = cifrado.password_ciphertext;
       patch.card_token_iv = cifrado.password_iv;
       patch.card_token_tag = cifrado.password_tag;
@@ -269,13 +276,18 @@ class CardAutopayService {
     const subscription = await Subscription.forTenant(currentTenantId());
     if (!subscription || this.usable(subscription)) return { reissued: 0 };
     // Parada por gente (o console suspendeu, cancelou) ou isenta: a emissão
-    // não reemitiria, e cancelar a fatura agora a deixaria sem link.
-    if (!ESTADOS_COBRAVEIS.has(subscription.status) || subscription.billing_exempt_at) return { reissued: 0 };
+    // não reemitiria, e cancelar a fatura agora a deixaria sem link. A
+    // suspensão AUTOMÁTICA (0102) continua cobrável — é pagando que se sai
+    // dela —, e o mesmo critério da emissão (`isBillableStatus`) vale aqui.
+    if (!isBillableStatus(subscription) || subscription.billing_exempt_at) return { reissued: 0 };
     const linhas = await this.openCardCharges();
     if (!linhas.length) return { reissued: 0 };
 
     const { default: ChargeIssuingService } = await import('../chargeIssuingService.js');
     let reemitidas = 0;
+    // As de pró-rata (0101) não são a renovação: `issueCurrent` não as emite,
+    // e cada uma volta ao gateway pela porta dela (`retryProrations`).
+    const prorratas = [];
     for (const linha of linhas) {
       if (linha.next_attempt_at) {
         const espera = new Date(linha.next_attempt_at);
@@ -319,17 +331,32 @@ class CardAutopayService {
         // eslint-disable-next-line no-await-in-loop
         await BillingCharge.update(linha.id, { amount_overridden_at: linha.amount_overridden_at });
       }
+      if (isProration(linha)) prorratas.push(linha.id);
       reemitidas += 1;
     }
     if (!reemitidas) return { reissued: 0 };
-    let reissue;
-    try {
-      reissue = await ChargeIssuingService.issueCurrent({ tenant, manual: true, now });
-    } catch (error) {
-      console.error(`Reissue without the card failed for provider ${subscription.tenant_id}: ${error.message}`);
-      reissue = { issued: false, reason: 'error', error: error.message };
+    const resultado = { reissued: reemitidas };
+    if (reemitidas > prorratas.length) {
+      try {
+        resultado.reissue = await ChargeIssuingService.issueCurrent({ tenant, manual: true, now });
+      } catch (error) {
+        console.error(`Reissue without the card failed for provider ${subscription.tenant_id}: ${error.message}`);
+        resultado.reissue = { issued: false, reason: 'error', error: error.message };
+      }
     }
-    return { reissued: reemitidas, reissue };
+    if (prorratas.length) {
+      resultado.prorations = [];
+      for (const chargeId of prorratas) {
+        try {
+          // eslint-disable-next-line no-await-in-loop -- uma ou duas por provedor
+          resultado.prorations.push(await ChargeIssuingService.retryProrations({ tenant, manual: true, now, chargeId }));
+        } catch (error) {
+          console.error(`Proration ${chargeId} reissue without the card failed for provider ${subscription.tenant_id}: ${error.message}`);
+          resultado.prorations.push({ retried: 0, issued: 0, error: error.message });
+        }
+      }
+    }
+    return resultado;
   }
 
   /**
@@ -339,7 +366,7 @@ class CardAutopayService {
    * falha, para a próxima passada tentar de novo. Sem destinatário nenhum,
    * fica marcada: não há a quem dizer, e insistir a cada minuto não muda isso.
    */
-  static async notifyRefusal({ tenant = null, now = new Date() } = {}) {
+  static async notifyRefusal({ tenant = null, now = new Date(), charge = null } = {}) {
     const tenantId = currentTenantId();
     const subscription = await Subscription.forTenant(tenantId);
     if (!subscription?.card_failed_at || subscription.card_failure_notified_at) {
@@ -352,7 +379,7 @@ class CardAutopayService {
     const { default: SubscriptionNoticeService } = await import('../subscriptionNoticeService.js');
     let resultado;
     try {
-      resultado = await SubscriptionNoticeService.notifyCardRefused({ tenant, subscription, now });
+      resultado = await SubscriptionNoticeService.notifyCardRefused({ tenant, subscription, now, charge });
     } catch (error) {
       console.warn(`Could not send the card refusal notice to provider ${tenantId}: ${error.message}`);
       resultado = { sent: false, reason: 'send_failed' };

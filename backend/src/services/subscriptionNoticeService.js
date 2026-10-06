@@ -133,6 +133,23 @@ class SubscriptionNoticeService {
     // A plataforma não é cliente dela mesma.
     if (tenant.kind === 'platform') return { sent: false, reason: 'platform_tenant' };
 
+    // O cartão salvo com a cobrança automática (0100): a fatura sai no dia do
+    // vencimento e o gateway a cobra no cartão sozinho. "Vence em cinco dias,
+    // pague aqui" convidaria a pagar duas vezes — então `before` não sai, e
+    // `due` não sai enquanto a cobrança em aberto é a do cartão (o gateway
+    // está cobrando). Recusado o cartão, ele deixa de ser utilizável, a fatura
+    // vira Pix/boleto e a régua volta a valer; `after` (três dias depois,
+    // ainda sem pagamento) sai sempre.
+    if (ChargeIssuingService.cardAutopayFor(tenant, subscription)) {
+      if (pendente.step === 'before') return { sent: false, reason: 'card_autopay', step: pendente.step };
+      if (pendente.step === 'due') {
+        const aberta = await BillingCharge.currentOpen().catch(() => null);
+        if (aberta?.gateway_charge_id && aberta.billing_type === 'CREDIT_CARD') {
+          return { sent: false, reason: 'card_autopay', step: pendente.step };
+        }
+      }
+    }
+
     // A data do prazo no fuso da cobrança — a mesma chave da fatura — é a
     // chave da etapa e também o que a mensagem diz. ISO e curta: o idioma do
     // destinatário é desconhecido, e `12/09` é ambíguo.
@@ -294,7 +311,7 @@ class SubscriptionNoticeService {
    * mensagem, pelos mesmos destinatários e canais dos lembretes. Devolve
    * `{ sent, reason }` como `notifyCurrent`.
    */
-  static async notifyCardRefused({ tenant: doLaco = null } = {}) {
+  static async notifyCardRefused({ tenant: doLaco = null, charge = null } = {}) {
     const tenant = doLaco ?? await Tenant.findById(currentTenantId());
     if (!tenant) return { sent: false, reason: 'tenant_gone' };
     if (tenant.kind === 'platform') return { sent: false, reason: 'platform_tenant' };
@@ -304,7 +321,14 @@ class SubscriptionNoticeService {
     const fone = String(tenant.billing_phone ?? '').trim();
     if (!para.length && !fone) return { sent: false, reason: temEmail ? 'no_recipient' : 'no_transport' };
 
-    const cobranca = await BillingCharge.currentOpen().catch(() => null);
+    // A fatura que o cartão recusado deixou para pagar: a que quem chama
+    // passa (a pró-rata reemitida como Pix/boleto), ou a renovação em aberto.
+    // Sem renovação em aberto com link, a pró-rata em aberto que tem um.
+    let cobranca = charge?.invoice_url ? charge : await BillingCharge.currentOpen().catch(() => null);
+    if (!cobranca?.invoice_url) {
+      const prorratas = await BillingCharge.openProrations().catch(() => []);
+      cobranca = prorratas.find((linha) => linha.invoice_url && linha.billing_type !== 'CREDIT_CARD') ?? cobranca;
+    }
     const vars = {
       provider: tenant.name || PRODUCT_NAME,
       link: cobranca?.invoice_url || panelUrlFor(tenant) || ''

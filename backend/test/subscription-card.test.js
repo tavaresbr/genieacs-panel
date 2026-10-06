@@ -16,6 +16,7 @@ const { default: ChargeIssuingService } = await import('../src/services/chargeIs
 const { default: CardAutopayService } = await import('../src/services/billing/cardAutopayService.js');
 const { default: BillingWebhookController } = await import('../src/controllers/billingWebhookController.js');
 const { default: SchedulerService } = await import('../src/services/schedulerService.js');
+const { default: SubscriptionNoticeService } = await import('../src/services/subscriptionNoticeService.js');
 const { subscriptionView } = await import('../src/controllers/platformBillingController.js');
 
 /**
@@ -58,6 +59,7 @@ let alfa;
 let donoToken;
 let viewerToken;
 let basico;
+let pro;
 let smtp;
 let emails;
 const respostas = [];
@@ -211,6 +213,9 @@ before(async () => {
   basico = await Plan.create({
     code: 'cartao-basico', name: 'Básico', price_cents: 9990, currency: 'BRL', period_days: 30, trial_days: 0, active: true
   });
+  pro = await Plan.create({
+    code: 'cartao-pro', name: 'Pro', price_cents: 39990, currency: 'BRL', period_days: 30, trial_days: 0, active: true
+  });
 });
 
 after(async () => {
@@ -247,6 +252,8 @@ beforeEach(async () => {
     pending_plan_locked_at: null,
     upgraded_at: null,
     billing_exempt_at: null,
+    suspended_reason: null,
+    proration_due_at: null,
     card_autopay_at: null,
     card_remote_ip: null,
     ...CardAutopayService.CLEARED_CARD
@@ -616,5 +623,267 @@ describe('o token nunca aparece', () => {
     // ...e o gateway o ecoou na recusa, que chegou ao log sem ele.
     assert.ok(linhasDeLog.some((linha) => linha.includes('was refused') && linha.includes('[redacted]')),
       'a recusa foi registrada, com o token tirado');
+  });
+});
+
+/** Os POSTs de criação de uma fatura de pró-rata (0101). */
+const postsDeProrata = () => posts().filter((r) => /:proration:/.test(r.payload?.externalReference ?? ''));
+const prorratas = async () => (await cobrancas()).filter((c) => c.kind === 'proration');
+const trocar = (planId) => pedir('/subscription/plan', { method: 'PUT', body: { planId } });
+
+describe('a pró-rata da subida (0101) no cartão salvo', () => {
+  beforeEach(async () => {
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ renews_at: daquiA(15) });
+    await SubscriptionService.invalidate(alfa);
+  });
+
+  it('com a cobrança automática utilizável, sai no cartão — sem multa, juros nem desconto', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const res = await trocar(pro.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.proration.issued, true, JSON.stringify(res.body.data.proration));
+    const [pedido] = postsDeProrata();
+    assert.equal(pedido.payload.billingType, 'CREDIT_CARD');
+    assert.equal(pedido.payload.creditCardToken, TOKEN);
+    assert.equal(pedido.payload.remoteIp, '127.0.0.1');
+    for (const campo of ['fine', 'interest', 'discount']) assert.equal(pedido.payload[campo], undefined, campo);
+    const [linha] = await prorratas();
+    assert.equal(linha.billing_type, 'CREDIT_CARD');
+    assert.ok(linha.gateway_charge_id);
+  });
+
+  it('sem cartão, pela página de sempre', async () => {
+    const res = await trocar(pro.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const [pedido] = postsDeProrata();
+    assert.equal(pedido.payload.billingType, 'UNDEFINED');
+    assert.equal('creditCardToken' in pedido.payload, false);
+    assert.equal((await prorratas())[0].billing_type, 'UNDEFINED');
+  });
+
+  it('o cartão recusado: marca a falha, reemite como Pix/boleto na hora e avisa com o link DELA', async () => {
+    await autopay(true);
+    await salvarCartao();
+    modoCartao = 'recusar';
+    const res = await trocar(pro.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.proration.issued, true);
+    const [primeiro, segundo] = postsDeProrata();
+    assert.equal(primeiro.payload.billingType, 'CREDIT_CARD');
+    assert.equal(segundo.payload.billingType, 'UNDEFINED');
+    assert.equal(primeiro.payload.externalReference, segundo.payload.externalReference, 'a mesma linha, a mesma referência');
+    assert.equal('creditCardToken' in segundo.payload, false);
+
+    const [linha] = await prorratas();
+    assert.equal(linha.billing_type, 'UNDEFINED');
+    assert.ok(linha.invoice_url);
+    const sub = await assinatura();
+    assert.ok(sub.card_failed_at);
+    assert.equal(sub.card_failure, 'charge_refused');
+    assert.ok(sub.card_failure_notified_at);
+    assert.equal(emails.length, 1);
+    assert.ok(decodificarQuotedPrintable(emails[0]).includes(linha.invoice_url), 'o aviso leva o link da pró-rata');
+  });
+
+  it('a resposta perdida: a retentativa pergunta ao gateway e adota a que existe', async () => {
+    await autopay(true);
+    await salvarCartao();
+    modoCartao = 'cair';
+    assert.equal((await trocar(pro.id)).status, 200);
+    let [linha] = await prorratas();
+    assert.equal(linha.billing_type, 'CREDIT_CARD');
+    assert.equal(linha.gateway_charge_id, null);
+
+    modoCartao = 'ok';
+    recebidas = [];
+    const passada = await runInTenant(alfa, async () => ChargeIssuingService.retryProrations({
+      tenant: await Tenant.findById(alfa), manual: true
+    }));
+    assert.equal(passada.retried, 1);
+    assert.equal(posts().length, 0, 'nenhuma segunda cobrança no cartão');
+    [linha] = await prorratas();
+    assert.equal(linha.gateway_charge_id, criadas[0].id);
+  });
+
+  it('a recusa na captura (webhook) reemite a pró-rata sem o cartão', async () => {
+    await autopay(true);
+    await salvarCartao();
+    assert.equal((await trocar(pro.id)).status, 200);
+    const [deCartao] = await prorratas();
+    assert.equal(deCartao.billing_type, 'CREDIT_CARD');
+    recebidas = [];
+
+    const entrega = await entregar({
+      event: 'PAYMENT_CREDIT_CARD_CAPTURE_REFUSED',
+      payment: {
+        id: deCartao.gateway_charge_id, value: Number(deCartao.amount_cents) / 100, customer: 'cus_alfa',
+        billingType: 'CREDIT_CARD', externalReference: `tenant:${alfa}:proration:${deCartao.id}`
+      }
+    });
+    assert.equal(entrega.body.code, 'card_refused');
+    await BillingWebhookController.pendingCardWork;
+
+    assert.ok(recebidas.some((r) => r.method === 'DELETE' && r.path === `/payments/${deCartao.gateway_charge_id}`));
+    const [nova] = postsDeProrata();
+    assert.equal(nova.payload.billingType, 'UNDEFINED');
+    const [linha] = await prorratas();
+    assert.equal(linha.id, deCartao.id);
+    assert.equal(linha.billing_type, 'UNDEFINED');
+    assert.ok(linha.gateway_charge_id && linha.gateway_charge_id !== deCartao.gateway_charge_id);
+  });
+});
+
+describe('a antecedência da renovação no cartão', () => {
+  /** Um prazo às 15h (São Paulo) daqui a alguns dias, e instantes relativos a ele. */
+  const prazo = () => new Date(`${ChargeIssuingService.isoDate(daquiA(4))}T15:00:00-03:00`);
+  const horasAntes = (h) => new Date(prazo().getTime() - h * 3_600_000);
+  const agendador = (now) => runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
+    tenant: await Tenant.findById(alfa), now
+  }));
+
+  beforeEach(async () => {
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ renews_at: prazo() });
+    await SubscriptionService.invalidate(alfa);
+  });
+
+  it('Pix/boleto sai LEAD_DAYS antes; o cartão, só no dia do vencimento', async () => {
+    // Sem cartão: três dias antes já está na janela.
+    const semCartao = await agendador(horasAntes(72));
+    assert.equal(semCartao.issued, true, JSON.stringify(semCartao));
+    assert.equal(semCartao.billingType, 'UNDEFINED');
+
+    await getDb()('billing_charges').where({ tenant_id: alfa }).del();
+    recebidas = [];
+    await autopay(true);
+    await salvarCartao();
+    for (const h of [72, 24]) {
+      // eslint-disable-next-line no-await-in-loop
+      const cedo = await agendador(horasAntes(h));
+      assert.equal(cedo.reason, 'not_due_yet', `${h}h antes não cobra o cartão`);
+    }
+    assert.equal(posts().length, 0);
+
+    // No dia, desde a manhã: sai no cartão, vencendo no dia.
+    const noDia = await agendador(horasAntes(6));
+    assert.equal(noDia.issued, true, JSON.stringify(noDia));
+    assert.equal(noDia.billingType, 'CREDIT_CARD');
+    assert.equal(posts()[0].payload.dueDate, ChargeIssuingService.isoDate(prazo()));
+  });
+
+  it('o clique (manual) emite no cartão antes do dia', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const clique = await runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
+      tenant: await Tenant.findById(alfa), now: horasAntes(72), manual: true
+    }));
+    assert.equal(clique.issued, true, JSON.stringify(clique));
+    assert.equal(clique.billingType, 'CREDIT_CARD');
+  });
+
+  it('o cartão recusado volta à antecedência de Pix/boleto', async () => {
+    await autopay(true);
+    await salvarCartao();
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ card_failed_at: new Date(), card_failure: 'charge_refused' });
+    const res = await agendador(horasAntes(72));
+    assert.equal(res.issued, true, JSON.stringify(res));
+    assert.equal(res.billingType, 'UNDEFINED');
+  });
+});
+
+describe('os lembretes com a cobrança automática no cartão', () => {
+  const lembrar = () => runInTenant(alfa, async () => SubscriptionNoticeService.notifyCurrent({
+    tenant: await Tenant.findById(alfa)
+  }));
+  const prazoEm = async (dias) => {
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ renews_at: daquiA(dias) });
+    await SubscriptionService.invalidate(alfa);
+  };
+
+  beforeEach(async () => {
+    await getDb()('subscription_reminder_sends').where({ tenant_id: alfa }).del();
+  });
+
+  it('`before` não sai para quem paga no cartão; sem o cartão, sai', async () => {
+    await autopay(true);
+    await salvarCartao();
+    await prazoEm(2);
+    const pulado = await lembrar();
+    assert.equal(pulado.sent, false);
+    assert.equal(pulado.reason, 'card_autopay');
+    assert.equal(emails.length, 0);
+
+    await autopay(false);
+    await SubscriptionService.invalidate(alfa);
+    const enviado = await lembrar();
+    assert.equal(enviado.sent, true, JSON.stringify(enviado));
+    assert.equal(enviado.step, 'before');
+    assert.equal(emails.length, 1);
+  });
+
+  it('`due` espera a cobrança do cartão; recusado o cartão, sai', async () => {
+    await autopay(true);
+    await salvarCartao();
+    await prazoEm(-1);
+    assert.equal((await emitir()).billingType, 'CREDIT_CARD');
+    const pulado = await lembrar();
+    assert.equal(pulado.reason, 'card_autopay');
+    assert.equal(pulado.step, 'due');
+    assert.equal(emails.length, 0);
+
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ card_failed_at: new Date(), card_failure: 'capture_refused' });
+    await SubscriptionService.invalidate(alfa);
+    const enviado = await lembrar();
+    assert.equal(enviado.sent, true, JSON.stringify(enviado));
+    assert.equal(enviado.step, 'due');
+  });
+
+  it('`after` — ainda sem pagamento dias depois — sai mesmo com o cartão', async () => {
+    await autopay(true);
+    await salvarCartao();
+    await prazoEm(-4);
+    await emitir();
+    const enviado = await lembrar();
+    assert.equal(enviado.sent, true, JSON.stringify(enviado));
+    assert.equal(enviado.step, 'after');
+  });
+});
+
+describe('o suspenso pela inadimplência (0102) com o cartão salvo', () => {
+  beforeEach(async () => {
+    await autopay(true);
+    await salvarCartao();
+    await getDb()('subscriptions').where({ tenant_id: alfa })
+      .update({ status: 'suspended', suspended_reason: 'auto_nonpayment', renews_at: daquiA(-20) });
+    await SubscriptionService.invalidate(alfa);
+  });
+
+  it('a emissão do agendador continua e sai no cartão', async () => {
+    const res = await runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({ tenant: await Tenant.findById(alfa) }));
+    assert.equal(res.issued, true, JSON.stringify(res));
+    assert.equal(res.billingType, 'CREDIT_CARD');
+    assert.equal(posts()[0].payload.creditCardToken, TOKEN);
+  });
+
+  it('o cartão que deixa de valer: a cobrança de cartão volta a Pix/boleto também para ele', async () => {
+    await emitir();
+    const [deCartao] = await cobrancas();
+    assert.equal(deCartao.billing_type, 'CREDIT_CARD');
+    recebidas = [];
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ card_failed_at: new Date(), card_failure: 'capture_refused' });
+    const res = await runInTenant(alfa, async () => CardAutopayService.reissueIneligible({ tenant: await Tenant.findById(alfa) }));
+    assert.equal(res.reissued, 1, JSON.stringify(res));
+    assert.equal(posts()[0].payload.billingType, 'UNDEFINED');
+    assert.equal((await cobrancas())[0].billing_type, 'UNDEFINED');
+  });
+
+  it('o suspenso a dedo continua sem reemissão', async () => {
+    await emitir();
+    await getDb()('subscriptions').where({ tenant_id: alfa })
+      .update({ suspended_reason: 'manual', card_failed_at: new Date(), card_failure: 'capture_refused' });
+    recebidas = [];
+    const res = await runInTenant(alfa, async () => CardAutopayService.reissueIneligible({ tenant: await Tenant.findById(alfa) }));
+    assert.equal(res.reissued, 0);
+    assert.equal(posts().length, 0);
   });
 });

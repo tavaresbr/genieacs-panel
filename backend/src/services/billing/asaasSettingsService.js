@@ -340,7 +340,17 @@ export function earlyDiscountFor(amountCents, config) {
  */
 const CACHE_TTL_MS = 15_000;
 
-const box = createSecretBox(SECRET_CONTEXT);
+/**
+ * Criada na primeira vez que é usada, não no carregamento do módulo: este
+ * arquivo entra na cadeia de import do middleware de sessão, e um processo de
+ * produção sem segredo tem de ouvir primeiro que falta o JWT_SECRET — não que
+ * falta a chave da caixa de segredos.
+ */
+let caixa = null;
+function box() {
+  if (!caixa) caixa = createSecretBox(SECRET_CONTEXT);
+  return caixa;
+}
 
 let cache = null;
 
@@ -364,13 +374,13 @@ function envValue(nome) {
 }
 
 function selar(valor) {
-  return { v: 1, ...box.encrypt(valor) };
+  return { v: 1, ...box().encrypt(valor) };
 }
 
 /** O segredo aberto, ou nulo — inclusive quando a chave da caixa não o abre. */
 function abrir(envelope) {
   if (!envelope || typeof envelope !== 'object') return null;
-  const valor = box.decrypt(envelope);
+  const valor = box().decrypt(envelope);
   return valor ? String(valor) : null;
 }
 

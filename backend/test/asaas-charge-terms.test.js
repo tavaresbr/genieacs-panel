@@ -8,6 +8,7 @@ const { default: ChargeIssuingService } = await import('../src/services/chargeIs
 const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: Plan } = await import('../src/models/Plan.js');
+const { default: Tenant } = await import('../src/models/Tenant.js');
 const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
 const { createCharge, updateCharge, chargeTermsFor } = await import('../src/services/billing/asaasClient.js');
 const { AsaasBillingProvider } = await import('../src/services/billing/asaasBillingProvider.js');
@@ -159,10 +160,11 @@ describe('o corpo que sai para o gateway', () => {
     assert.deepEqual(await chargeTermsFor(19990, { billingType: 'CREDIT_CARD' }), {});
     await createCharge({
       customerRef: 'cus_termos', amountCents: 19990, dueDate: '2027-01-10', description: 'x', reference: 'r',
-      billingType: 'CREDIT_CARD'
+      billingType: 'CREDIT_CARD', creditCardToken: 'tok_termos', remoteIp: '203.0.113.7'
     });
     const { payload } = recebidas[0];
     assert.equal(payload.billingType, 'CREDIT_CARD');
+    assert.equal(payload.creditCardToken, 'tok_termos');
     assert.equal(payload.fine, undefined);
     assert.equal(payload.interest, undefined);
     assert.equal(payload.discount, undefined);
@@ -184,6 +186,31 @@ describe('o corpo que sai para o gateway', () => {
     await updateCharge('pay_termos_1', { value: 10000, billingType: 'CREDIT_CARD' });
     assert.equal(recebidas[3].payload.fine, undefined);
     assert.equal(recebidas[3].payload.discount, undefined);
+  });
+});
+
+describe('a fatura de pró-rata (0101)', () => {
+  it('sai pela mesma porta, com multa, juros e desconto', async () => {
+    await termos({ finePercent: 2, interestMonthlyPercent: 1, discountKind: 'fixed', discountValue: 500, discountDaysBefore: 0 });
+    await assinar({ renewsAt: daquiA(15) });
+    const res = await runInTenant(alfa, async () => ChargeIssuingService.createProration({
+      tenant: await Tenant.findById(alfa),
+      subscription: await Subscription.forTenant(alfa),
+      quote: {
+        eligible: true, amountCents: 7500, currency: 'BRL', renewsAt: daquiA(15).toISOString(),
+        fromPlanId: planoPago.id, toPlanId: planoPago.id + 1000, fromPriceCents: 10000, toPriceCents: 25000,
+        remainingSeconds: 15 * 86_400, periodSeconds: 30 * 86_400, remainingDays: 15
+      }
+    }));
+    assert.equal(res.issued, true, JSON.stringify(res));
+    assert.equal(res.billingType, 'UNDEFINED');
+    assert.equal(res.charge.billing_type, 'UNDEFINED');
+    const { payload } = recebidas[0];
+    assert.match(payload.externalReference, /:proration:/);
+    assert.equal(payload.billingType, 'UNDEFINED');
+    assert.deepEqual(payload.fine, { value: 2, type: 'PERCENTAGE' });
+    assert.deepEqual(payload.interest, { value: 1 });
+    assert.deepEqual(payload.discount, { value: 5, dueDateLimitDays: 0, type: 'FIXED' });
   });
 });
 
