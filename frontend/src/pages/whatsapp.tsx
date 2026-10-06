@@ -751,17 +751,21 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               // Uma classe de colunas por vez: duas `lg:grid-cols-*` juntas
               // dependem da ordem do CSS gerado, e o painel caía numa segunda linha.
               // Com o Módulo SGP aberto, o painel é sempre uma coluna (nunca por
-              // cima da conversa). Abaixo de 1200 px não cabem três: a lista de
-              // conversas sai enquanto o módulo está aberto.
+              // cima da conversa). Com o menu lateral, três colunas só cabem a
+              // partir de 1536 px (2xl): num notebook a conversa ficava com
+              // 300 px. Abaixo disso a lista de conversas sai enquanto o módulo
+              // está aberto. Só breakpoints do tema: a v4 ordena as media
+              // queries por unidade, e um `min-[1200px]` saía antes do `lg`
+              // (em rem), que vencia e jogava o painel numa segunda linha.
               showSgpPanel && conversation
-                ? 'lg:grid-cols-[1fr_minmax(16rem,20rem)] min-[1200px]:grid-cols-[minmax(14rem,17rem)_1fr_minmax(16rem,19rem)] xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]'
+                ? 'lg:grid-cols-[1fr_minmax(16rem,20rem)] xl:grid-cols-[1fr_minmax(18rem,22rem)] 2xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]'
                 : 'lg:grid-cols-[minmax(17rem,22rem)_1fr]'
             }`}
             // Sem a área segura (o teclado cobre o indicador de home) e sem o
             // `min-h`, que impediria o cartão de encolher.
             style={keyboardHeight !== null ? { height: `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
           >
-            <div className={`${showSgpPanel && conversation ? 'hidden min-[1200px]:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
+            <div className={`${showSgpPanel && conversation ? 'hidden 2xl:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">
                 <div className="flex items-center gap-2">
                   <input
@@ -915,8 +919,8 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               )}
             </div>
 
-            {/* Beside the thread from xl up. Narrower, a third column would
-                squeeze the conversation, so it is a drawer over it instead —
+            {/* A column beside the thread from lg up (the conversation list
+                steps aside below 2xl). Narrower, it is a drawer over it —
                 above the mobile top bar (z 1200), whose height would otherwise
                 hide the drawer's own close button, and below the navigation
                 menu (z 2000). */}

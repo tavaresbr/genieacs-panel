@@ -496,8 +496,8 @@ export default function DevicesPage() {
           </section>
         ) : (
           <>
-            <section className={`mb-4 grid gap-3 rounded-(--radius) border border-border bg-card p-3 sm:grid-cols-2 lg:items-end ${sgpAvailable ? 'lg:grid-cols-[minmax(14rem,1fr)_11rem_12rem_13rem_auto]' : 'lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]'}`}>
-              <div className="sm:col-span-2 lg:col-span-1">
+            <section className={`mb-4 grid gap-3 rounded-(--radius) border border-border bg-card p-3 sm:grid-cols-2 lg:items-end ${sgpAvailable ? 'xl:grid-cols-[minmax(14rem,1fr)_11rem_12rem_13rem_auto]' : 'xl:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]'}`}>
+              <div className="sm:col-span-2 xl:col-span-1">
                 <label htmlFor="device-search" className="field-label">{t('devices.filter.searchLabel')}</label>
                 <div className="relative">
                   <Icon name="search" size={18} className="pointer-events-none absolute inset-s-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -571,7 +571,7 @@ export default function DevicesPage() {
                   </div>
                 </div>
               )}
-              <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground sm:col-span-2 lg:col-span-1 lg:justify-end">
+              <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground sm:col-span-2 xl:col-span-1 xl:justify-end">
                 <span>
                   {t('devices.pagination.range', { from: rangeFrom, to: rangeTo, total: paging.total })}
                   {contractFiltered && <> · <strong className="data-value">{visibleDevices.length}</strong> {t('devices.shownLabel')}</>}
@@ -628,12 +628,12 @@ export default function DevicesPage() {
                           )}
                           <th>{t('devices.table.status')}</th>
                           <th>{t('devices.table.serial')}</th>
-                          <th className="hidden lg:table-cell">{t('devices.table.vendorModel')}</th>
+                          <th className="hidden xl:table-cell">{t('devices.table.vendorModel')}</th>
                           <th>{t('devices.table.subscriber')}</th>
-                          <th className="hidden lg:table-cell">{t('devices.table.customerId')}</th>
-                          {sgpAvailable && <th className="hidden lg:table-cell">{t('devices.sgp.column')}</th>}
+                          <th className="hidden 3xl:table-cell">{t('devices.table.customerId')}</th>
+                          {sgpAvailable && <th className="hidden 3xl:table-cell">{t('devices.sgp.column')}</th>}
                           <th>{t('devices.table.opticalRx')}</th>
-                          <th className="hidden lg:table-cell">{t('devices.table.lastInform')}</th>
+                          <th className="hidden 3xl:table-cell">{t('devices.table.lastInform')}</th>
                           <th><span className="sr-only">{t('common.actions')}</span></th>
                         </tr>
                       </thead>
@@ -654,33 +654,37 @@ export default function DevicesPage() {
                               )}
                               <td>
                                 <DeviceStatus device={device} />
-                                {/* Entre 768 e 1023 px as colunas escondidas viram segunda linha. */}
-                                <span className="mt-1 block whitespace-nowrap text-[0.68rem] text-muted-foreground lg:hidden">{formatDate(device._lastInform)}</span>
+                                {/* Com o menu lateral, todas as colunas juntas só cabem a partir
+                                    de ≈1840 px (3xl). Abaixo disso as escondidas viram segunda
+                                    linha: fabricante e modelo até 1280 px (xl); último inform,
+                                    ID do cliente e SGP até 3xl. */}
+                                <span className="mt-1 block text-[0.68rem] text-muted-foreground 3xl:hidden">{formatDate(device._lastInform)}</span>
                               </td>
-                              <td className="max-w-48 lg:max-w-[18rem]">
+                              <td className="max-w-40 xl:max-w-[18rem]">
                                 <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="block break-all font-mono text-sm font-semibold text-primary hover:underline lg:truncate lg:break-normal">
                                   {device.SerialNumber || device._id}
                                 </Link>
                                 {device.SerialNumber && <span className="mt-1 block break-all font-mono text-[0.68rem] text-muted-foreground lg:truncate lg:break-normal">{device._id}</span>}
-                                <span className="mt-0.5 block truncate text-xs text-muted-foreground lg:hidden">{device.brand} · {device.productclass || t('devices.modelNotReported')}</span>
+                                <span className="mt-0.5 block truncate text-xs text-muted-foreground xl:hidden">{device.brand} · {device.productclass || t('devices.modelNotReported')}</span>
                               </td>
-                              <td className="hidden lg:table-cell">
+                              <td className="hidden xl:table-cell">
                                 <span className="block font-semibold">{device.brand}</span>
                                 <span className="mt-0.5 block text-xs text-muted-foreground">{device.productclass || t('devices.modelNotReported')}</span>
                               </td>
-                              <td className="max-w-48 break-all font-mono text-xs lg:max-w-none lg:break-normal">
+                              <td className="max-w-44 break-all font-mono text-xs 3xl:max-w-none 3xl:break-normal">
                                 {device.pppoe || t('devices.notReported')}
-                                <span className="mt-0.5 block font-semibold text-muted-foreground lg:hidden">{device.customerId || t('devices.notGenerated')}</span>
+                                <span className="mt-0.5 block font-semibold text-muted-foreground 3xl:hidden">{device.customerId || t('devices.notGenerated')}</span>
+                                {sgpAvailable && <span className="mt-1 block break-normal font-sans 3xl:hidden">{renderSgpCell(device)}</span>}
                               </td>
-                              <td className="hidden font-mono text-xs font-semibold lg:table-cell">{device.customerId || t('devices.notGenerated')}</td>
-                              {sgpAvailable && <td className="hidden max-w-56 lg:table-cell">{renderSgpCell(device)}</td>}
+                              <td className="hidden font-mono text-xs font-semibold 3xl:table-cell">{device.customerId || t('devices.notGenerated')}</td>
+                              {sgpAvailable && <td className="hidden max-w-56 3xl:table-cell">{renderSgpCell(device)}</td>}
                               <td>
                                 <span className={`font-mono text-sm font-semibold ${signalInfo.color}`}>
                                   {device.rxpower !== null && device.rxpower !== undefined ? `${device.rxpower} dBm` : t('common.na')}
                                 </span>
                                 <span className="mt-0.5 block text-[0.68rem] text-muted-foreground">{signalInfo.label}</span>
                               </td>
-                              <td className="hidden whitespace-nowrap text-xs text-muted-foreground lg:table-cell">{formatDate(device._lastInform)}</td>
+                              <td className="hidden whitespace-nowrap text-xs text-muted-foreground 3xl:table-cell">{formatDate(device._lastInform)}</td>
                               <td>
                                 <div className="flex justify-end gap-1">
                                   <button onClick={(event) => handleSummon(event, device._id)} className="icon-button" title={t('devices.summon.title')} aria-label={t('devices.summon.aria', { device: device.SerialNumber || device._id })}>
