@@ -757,9 +757,12 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               // está aberto. Só breakpoints do tema: a v4 ordena as media
               // queries por unidade, e um `min-[1200px]` saía antes do `lg`
               // (em rem), que vencia e jogava o painel numa segunda linha.
+              // A conversa é `minmax(0,1fr)`, não `1fr`: o mínimo de um `1fr` é o
+              // conteúdo, e uma palavra sem quebra (um código PIX) alargava a
+              // coluna para além do cartão, que cortava a direita.
               showSgpPanel && conversation
-                ? 'lg:grid-cols-[1fr_minmax(16rem,20rem)] xl:grid-cols-[1fr_minmax(18rem,22rem)] 2xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]'
-                : 'lg:grid-cols-[minmax(17rem,22rem)_1fr]'
+                ? 'lg:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] 2xl:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)_minmax(18rem,22rem)]'
+                : 'lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)]'
             }`}
             // Sem a área segura (o teclado cobre o indicador de home) e sem o
             // `min-h`, que impediria o cartão de encolher.
@@ -868,7 +871,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               </div>
             </div>
 
-            <div className={`${panes.thread} min-h-0 flex-col`}>
+            <div className={`${panes.thread} min-h-0 min-w-0 flex-col`}>
               {conversation ? (
                 <>
                   <ConversationThread
