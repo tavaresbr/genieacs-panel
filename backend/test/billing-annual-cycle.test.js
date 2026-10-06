@@ -482,7 +482,7 @@ describe('o prazo que o pagamento compra é o da cobrança paga', () => {
     created_at: new Date(),
     updated_at: new Date(),
     ...linha
-  });
+  }).returning('id');
 
   it('a renovação MENSAL do plano atual, paga com descida + anual agendada que já cabe, compra um mês — e não um ano', async () => {
     const renova = daquiA(3);
