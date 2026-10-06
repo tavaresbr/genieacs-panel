@@ -4343,6 +4343,23 @@ const zhCN: Dictionary = {
   'siteMap.inner.onboarding': "首次配置",
   'siteMap.inner.onboardingReached': "在未配置 ACS 的情况下首次登录时自动打开",
   'sidebar.siteMap': "面板地图",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "超额价格",
+  'platform.plans.overageOperators': "每多一名操作员",
+  'platform.plans.overageSubscribers': "每多一个用户",
+  'platform.plans.overageDevices': "每多一台 ONT",
+  'platform.plans.overageHint': "留空：与现在一样，达到上限即阻止。设置价格后，超出上限不会被阻止，超出的单位（按周期峰值）计入续费账单。",
+  'platform.plans.overagePlaceholder': "无价格 — 阻止",
+  'platform.plans.overageInvalid': "超额价格无效。",
+  'platform.plans.summaryOverage': "超额：{items}",
+  'platform.plans.overagePerOperator': "{price}/操作员",
+  'platform.plans.overagePerSubscriber': "{price}/用户",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "超出套餐的用量（{resource}）：{units} × {unit} = {total}，计入下一张账单",
+  'plan.overage.hint': "此套餐超出上限不会被阻止：超出的单位按周期峰值用量计入续费账单。",
+  'plan.overage.total': "下一张账单的超额：{total}",
+  'charges.pricing.base': "套餐：{amount}",
+  'charges.pricing.overage': "超额（{resource}）：{units} × {unit} = {total}",
 }
 
 export default zhCN

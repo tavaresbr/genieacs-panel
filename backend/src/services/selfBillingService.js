@@ -104,6 +104,8 @@ function presentPlan(plan, currentId, proration = null) {
     currency: plan.currency || 'BRL',
     periodDays: Number(plan.period_days ?? 30),
     limits: SubscriptionService.limitsOf(plan),
+    // O preço por unidade acima do teto (0104); nulo é "o teto barra".
+    overagePriceCents: SubscriptionService.overagePricesOf(plan),
     current: currentId !== null && Number(plan.id) === Number(currentId),
     // O que subir para este plano cobraria AGORA (0101), pela mesma conta da
     // troca — ou nulo, quando a troca não cobraria nada (não é subida, não há
@@ -167,7 +169,7 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   // O preço com o cupom de `subscription` (0093) — que, na aplicação de um
   // cupom, é o estado DEPOIS dela, ainda não gravado.
   const cupom = subscription?.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
-  const preco = SubscriptionService.priceFor(subscription, plano, cupom);
+  const precoDoPlano = SubscriptionService.priceFor(subscription, plano, cupom);
   // Com que plano e cupom o preço novo sai — gravados na linha (0093).
   const precificacao = SubscriptionService.chargePricing(subscription, plano, cupom);
   const moeda = String(plano?.currency || 'BRL').toUpperCase();
@@ -175,8 +177,15 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   // e a faxina da emissão cuida dela. Não acontece pela tela (plano de graça
   // não é destino de troca), mas o plano atual de quem desiste de uma descida
   // pode ser um que o console deixou sem preço.
-  if (!(preco > 0)) return nada;
+  if (!(precoDoPlano > 0)) return nada;
   const aberta = await cobrancaEmAberto(subscription);
+  // O excedente congelado na linha (0104) vai junto, e por cima do preço do
+  // plano: trocar de plano ou de cupom muda o preço, não o uso do período que
+  // fecha — e reemitir não pode recontá-lo (ver
+  // `ChargeIssuingService.overageForPeriod`). A conta guarda as outras chaves
+  // que tiver (o crédito).
+  const preco = precoDoPlano + BillingCharge.overageCentsOf(aberta);
+  const conta = aberta ? BillingCharge.mergePricingDetail(aberta, { base: precoDoPlano }) : null;
   // O valor mudado à mão pelo console (0078) vence o cupom: quem aplica ou
   // tira um cupom não desfaz o desconto que alguém deu a dedo àquela fatura.
   // (A troca de plano não passa isto: um plano novo é outra fatura.)
@@ -248,7 +257,7 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   // agora" com o preço que o estado velho ainda diz. Quem chama a solta em
   // `reemitir` — ou em `soltar`, se a gravação falhar.
   if (!(await BillingCharge.resetForReissue(linha.id, {
-    amountCents: preco, currency: moeda, holdUntil: garraAte, ...precificacao
+    amountCents: preco, currency: moeda, holdUntil: garraAte, ...precificacao, pricingDetail: conta
   }))) {
     await BillingCharge.release(linha.id);
     throw ocupado();
@@ -579,7 +588,11 @@ class SelfBillingService {
     // (`pendingPlan.blockedBy`) enquanto ele existir.
     if (!agendar) {
       const { usage } = await SubscriptionService.usage({ countDevices });
-      const excesso = SubscriptionService.overLimitFor(SubscriptionService.limitsOf(plan), usage);
+      // O recurso com preço de excedente no plano novo não barra (0104): o
+      // uso acima do teto é cobrado na fatura, e não recusado aqui.
+      const excesso = SubscriptionService.overLimitFor(
+        SubscriptionService.limitsOf(plan), usage, SubscriptionService.overagePricesOf(plan)
+      );
       if (excesso) {
         throw new SelfBillingError(MENSAGEM_DO_EXCESSO[excesso.resource], {
           code: 'over_limit',

@@ -4343,6 +4343,23 @@ const ja: Dictionary = {
   'siteMap.inner.onboarding': "初回設定",
   'siteMap.inner.onboardingReached': "ACS 未設定のまま初回ログインすると自動で開きます",
   'sidebar.siteMap': "パネルマップ",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "超過料金",
+  'platform.plans.overageOperators': "追加オペレーター1人あたり",
+  'platform.plans.overageSubscribers': "追加加入者1件あたり",
+  'platform.plans.overageDevices': "追加ONT1台あたり",
+  'platform.plans.overageHint': "空欄: 従来どおり上限でブロックします。料金を設定すると上限を超えてもブロックされず、超過分（期間中のピーク）が更新請求書で請求されます。",
+  'platform.plans.overagePlaceholder': "料金なし — ブロック",
+  'platform.plans.overageInvalid': "超過料金が無効です。",
+  'platform.plans.summaryOverage': "超過: {items}",
+  'platform.plans.overagePerOperator': "{price}/オペレーター",
+  'platform.plans.overagePerSubscriber': "{price}/加入者",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "プランを超えた利用（{resource}）: {units} × {unit} = {total}（次回の請求書）",
+  'plan.overage.hint': "このプランでは上限を超えてもブロックされません。超過分は期間中のピーク利用に基づき、更新請求書で請求されます。",
+  'plan.overage.total': "次回請求書の超過分: {total}",
+  'charges.pricing.base': "プラン: {amount}",
+  'charges.pricing.overage': "超過（{resource}）: {units} × {unit} = {total}",
 }
 
 export default ja

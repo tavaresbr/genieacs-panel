@@ -4343,6 +4343,23 @@ const es: Dictionary = {
   'siteMap.inner.onboarding': "Primera configuración",
   'siteMap.inner.onboardingReached': "Se abre sola en el primer acceso sin ACS configurado",
   'sidebar.siteMap': "Mapa del panel",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "Precio del excedente",
+  'platform.plans.overageOperators': "Por operador adicional",
+  'platform.plans.overageSubscribers': "Por suscriptor adicional",
+  'platform.plans.overageDevices': "Por ONT adicional",
+  'platform.plans.overageHint': "Vacío: el límite bloquea, como hoy. Con precio, quien supere el límite no se bloquea y paga las unidades extra (por el mayor uso del período) en la factura de renovación.",
+  'platform.plans.overagePlaceholder': "sin precio — bloquea",
+  'platform.plans.overageInvalid': "Precio de excedente no válido.",
+  'platform.plans.summaryOverage': "excedente: {items}",
+  'platform.plans.overagePerOperator': "{price}/operador",
+  'platform.plans.overagePerSubscriber': "{price}/suscriptor",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "Uso por encima del plan ({resource}): {units} × {unit} = {total} en la próxima factura",
+  'plan.overage.hint': "En este plan, superar el límite no bloquea: las unidades extra se cobran por el mayor uso del período, en la factura de renovación.",
+  'plan.overage.total': "Excedente en la próxima factura: {total}",
+  'charges.pricing.base': "Plan: {amount}",
+  'charges.pricing.overage': "Excedente ({resource}): {units} × {unit} = {total}",
 }
 
 export default es

@@ -4350,6 +4350,23 @@ const ko: Dictionary = {
   'siteMap.inner.onboarding': "초기 설정",
   'siteMap.inner.onboardingReached': "ACS가 설정되지 않은 상태에서 처움 로개인하면 자동으로 열립니다",
   'sidebar.siteMap': "패널 지도",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "초과 사용 요금",
+  'platform.plans.overageOperators': "추가 운영자당",
+  'platform.plans.overageSubscribers': "추가 가입자당",
+  'platform.plans.overageDevices': "추가 ONT당",
+  'platform.plans.overageHint': "비워 두면 지금처럼 한도에서 차단합니다. 요금을 설정하면 한도를 넘어도 차단되지 않고, 초과 단위(기간 중 최대 사용량 기준)가 갱신 청구서에 청구됩니다.",
+  'platform.plans.overagePlaceholder': "요금 없음 — 차단",
+  'platform.plans.overageInvalid': "초과 사용 요금이 올바르지 않습니다.",
+  'platform.plans.summaryOverage': "초과: {items}",
+  'platform.plans.overagePerOperator': "{price}/운영자",
+  'platform.plans.overagePerSubscriber': "{price}/가입자",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "플랜 초과 사용({resource}): {units} × {unit} = {total} 다음 청구서에 청구",
+  'plan.overage.hint': "이 플랜에서는 한도를 넘어도 차단되지 않습니다. 초과 단위는 기간 중 최대 사용량 기준으로 갱신 청구서에 청구됩니다.",
+  'plan.overage.total': "다음 청구서의 초과 사용: {total}",
+  'charges.pricing.base': "플랜: {amount}",
+  'charges.pricing.overage': "초과({resource}): {units} × {unit} = {total}",
 }
 
 export default ko

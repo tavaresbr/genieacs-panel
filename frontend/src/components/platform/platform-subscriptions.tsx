@@ -16,6 +16,7 @@ import { BillingExemptControl, exemptUntilLabel, statusBadgeClass, statusLabelKe
 import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { CardBadge } from '@/components/card-badge'
+import { ChargePricingBreakdown } from '@/components/charge-pricing'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -874,6 +875,8 @@ function ChargeItem({
         <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
           {t('charges.dueDate')}: {formatDay(charge.dueDate)}
         </span>
+        {/* O plano e o excedente do período (0104), quando há excedente. */}
+        <ChargePricingBreakdown pricing={charge.pricing} currency={charge.currency} className="w-full text-xs text-muted-foreground" />
         {tentativas && (
           <span
             className={charge.lastError ? 'cursor-help text-[hsl(var(--status-warning))]' : 'text-muted-foreground'}

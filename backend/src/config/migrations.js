@@ -2023,6 +2023,52 @@ const DUNNING_PAUSE_TABLES = [
 ];
 
 /**
+ * A cobrança por excedente (0104): o preço, em centavos, de cada unidade acima
+ * do teto do plano — por operador, por assinante, por ONT. Nulo é "sem preço",
+ * e aí o teto continua bloqueando como sempre (o 402 de operador, a
+ * sincronização que não cria assinante, a troca de plano recusada). Com preço,
+ * o teto deixa de ser parede: quem passa paga as unidades a mais na fatura da
+ * renovação (ver `UsageOverageService`).
+ */
+const PLAN_OVERAGE_COLUMNS = [
+  ['overage_price_cents_operators', (t) => t.integer('overage_price_cents_operators').unsigned().nullable()],
+  ['overage_price_cents_subscribers', (t) => t.integer('overage_price_cents_subscribers').unsigned().nullable()],
+  ['overage_price_cents_devices', (t) => t.integer('overage_price_cents_devices').unsigned().nullable()]
+];
+
+/**
+ * A conta do valor de uma cobrança (0104), em JSON: `{ base, overage: [...] }`
+ * — o preço do plano (já com o cupom) e o excedente do período que fecha —,
+ * e outras parcelas que vierem depois (o crédito de indicação). Nula nas
+ * linhas de antes: o valor delas é o preço do plano, e só.
+ */
+const BILLING_CHARGE_PRICING_DETAIL_COLUMNS = [
+  ['pricing_detail', (t) => t.text('pricing_detail').nullable()]
+];
+
+/**
+ * O maior uso de cada recurso em cada período (0104). `period_end` é a chave
+ * do período no fuso da cobrança (`ChargeIssuingService.periodKey`, o mesmo
+ * texto de `billing_charges.period_end`), e o pico só sobe — o agendador grava
+ * o maior entre o guardado e o de agora. Do provedor (escopada), e some com
+ * ele.
+ */
+const usagePeaksTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('period_end', 10).notNullable();
+  t.string('resource', 16).notNullable(); // operators | subscribers | devices
+  t.integer('peak').unsigned().notNullable().defaultTo(0);
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'period_end', 'resource'], { indexName: 'usage_peaks_period_resource_uq' });
+};
+
+const USAGE_PEAK_TABLES = [
+  ['usage_peaks', usagePeaksTable]
+];
+
+/**
  * Os cupons de desconto da assinatura (0093). Da PLATAFORMA, como `plans`: um
  * cupom é do catálogo comercial do deploy inteiro, e um provedor o resgata —
  * não tem o seu. Por isso sem `tenant_id`, e só o console escreve aqui.
@@ -2518,7 +2564,8 @@ export const SCHEMA_TABLES = [
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
   ...COUPON_TABLES,
-  ...SUBSCRIPTION_REMINDER_TABLES
+  ...SUBSCRIPTION_REMINDER_TABLES,
+  ...USAGE_PEAK_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5671,6 +5718,40 @@ export const migrations = [
       await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /**
+     * A cobrança por excedente: o preço por unidade acima do teto em cada
+     * plano, a conta do valor em cada cobrança e o pico de uso por período —
+     * ver `PLAN_OVERAGE_COLUMNS`, `BILLING_CHARGE_PRICING_DETAIL_COLUMNS` e
+     * `usagePeaksTable`.
+     */
+    id: '0104_usage_overage',
+    async isApplied(db) {
+      for (const [tabela, colunas] of [['plans', PLAN_OVERAGE_COLUMNS], ['billing_charges', BILLING_CHARGE_PRICING_DETAIL_COLUMNS]]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('usage_peaks');
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [['plans', PLAN_OVERAGE_COLUMNS], ['billing_charges', BILLING_CHARGE_PRICING_DETAIL_COLUMNS]]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'usage_peaks', usagePeaksTable(db));
     }
   }
 ];

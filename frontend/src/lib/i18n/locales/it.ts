@@ -4349,6 +4349,23 @@ const it: Dictionary = {
   'siteMap.inner.onboarding': "Prima configurazione",
   'siteMap.inner.onboardingReached': "Si apre da sola al primo accesso senza ACS configurato",
   'sidebar.siteMap': "Mappa del pannello",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "Prezzo dell’eccedenza",
+  'platform.plans.overageOperators': "Per operatore in più",
+  'platform.plans.overageSubscribers': "Per abbonato in più",
+  'platform.plans.overageDevices': "Per ONT in più",
+  'platform.plans.overageHint': "Vuoto: il limite blocca, come oggi. Con un prezzo, chi supera il limite non viene bloccato e paga le unità in più (al picco del periodo) nella fattura di rinnovo.",
+  'platform.plans.overagePlaceholder': "senza prezzo — blocca",
+  'platform.plans.overageInvalid': "Prezzo dell’eccedenza non valido.",
+  'platform.plans.summaryOverage': "eccedenza: {items}",
+  'platform.plans.overagePerOperator': "{price}/operatore",
+  'platform.plans.overagePerSubscriber': "{price}/abbonato",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "Uso oltre il piano ({resource}): {units} × {unit} = {total} nella prossima fattura",
+  'plan.overage.hint': "In questo piano superare il limite non blocca: le unità in più sono addebitate al picco del periodo, nella fattura di rinnovo.",
+  'plan.overage.total': "Eccedenza nella prossima fattura: {total}",
+  'charges.pricing.base': "Piano: {amount}",
+  'charges.pricing.overage': "Eccedenza ({resource}): {units} × {unit} = {total}",
 }
 
 export default it

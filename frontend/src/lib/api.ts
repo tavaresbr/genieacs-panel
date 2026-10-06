@@ -1504,11 +1504,57 @@ export interface PlanLimits {
   devices: number | null
 }
 
+/**
+ * O preço, em centavos, de cada unidade acima do teto (0104). Nulo é "sem
+ * preço": o teto barra, como sempre. Com preço, quem passa paga as unidades a
+ * mais na fatura da renovação.
+ */
+export interface PlanOveragePrices {
+  operators: number | null
+  subscribers: number | null
+  devices: number | null
+}
+
+/** O que o console manda para mudar os preços de excedente; ausente é "não mexer". */
+export interface PlanOveragePayload {
+  overagePriceCents?: Partial<PlanOveragePrices> | null
+}
+
+/** Uma parcela do excedente: `units` (pico − teto) × `unitCents` = `cents`. */
+export interface OverageItem {
+  resource: 'operators' | 'subscribers' | 'devices'
+  peak: number
+  limit: number
+  units: number
+  unitCents: number
+  cents: number
+}
+
+/** O excedente do período corrente, como a tela de Plano o mostra. */
+export interface SubscriptionOverage {
+  prices: PlanOveragePrices
+  /** A renovação que fecha o período (YYYY-MM-DD) — nulo sem período pago. */
+  periodEnd: string | null
+  items: OverageItem[]
+  totalCents: number
+  currency: string
+}
+
+/** A conta do valor de uma cobrança: o plano (com o cupom), o excedente e o crédito. */
+export interface ChargePricing {
+  baseCents: number | null
+  overage: OverageItem[]
+  overageCents: number
+  creditCents: number
+}
+
 export interface Plan {
   id: number
   code: string
   name: string
   limits: PlanLimits
+  /** Preço por unidade acima do teto (0104). Opcional: servidores antigos não mandam. */
+  overagePriceCents?: PlanOveragePrices
   priceCents: number
   currency: string
   trialDays: number
@@ -1763,6 +1809,8 @@ export interface SubscriptionUsage {
   /** Os tetos de retenção do plano. Todos nulos na self-hosted. */
   retention?: RetentionCaps
   over: { operators: boolean; subscribers: boolean; devices: boolean }
+  /** O excedente do período (0104) — nulo sem preço de excedente no plano. Opcional: servidores antigos não mandam. */
+  overage?: SubscriptionOverage | null
 }
 
 /**
@@ -1779,6 +1827,8 @@ export interface TenantPlanOption {
   currency: string
   periodDays: number
   limits: PlanLimits
+  /** Preço por unidade acima do teto (0104). Opcional: servidores antigos não mandam. */
+  overagePriceCents?: PlanOveragePrices
   current: boolean
   /**
    * Quanto subir para este plano cobraria AGORA, de pró-rata — nulo quando a
@@ -1843,6 +1893,8 @@ export interface TenantChargeView {
   /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
   kind?: ChargeKind
   proration?: ChargeProrationDetail | null
+  /** A conta do valor: plano e excedente (0104). Opcional: servidores antigos não mandam. */
+  pricing?: ChargePricing | null
 }
 
 /**
@@ -1872,6 +1924,8 @@ export interface ChargeConsoleView {
   /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
   kind?: ChargeKind
   proration?: ChargeProrationDetail | null
+  /** A conta do valor: plano e excedente (0104). Opcional: servidores antigos não mandam. */
+  pricing?: ChargePricing | null
 }
 
 /** A assinatura resumida de uma linha da aba Assinaturas do console. */
@@ -2224,14 +2278,14 @@ export const platformAPI = {
     maxDevices: number | null; priceCents: number; currency: string; trialDays: number
     periodDays?: number; active?: boolean
     maxAuditRetentionDays?: number | null; maxMessageRetentionDays?: number | null; maxMediaRetentionDays?: number | null
-  } & PlanMarketingPayload) =>
+  } & PlanMarketingPayload & PlanOveragePayload) =>
     apiClient.post<{ plan: Plan }>('/platform/plans', payload),
 
   updatePlan: (id: number, payload: Partial<{
     name: string; maxOperators: number | null; maxSubscribers: number | null; maxDevices: number | null
     priceCents: number; currency: string; trialDays: number; periodDays: number; active: boolean
     maxAuditRetentionDays: number | null; maxMessageRetentionDays: number | null; maxMediaRetentionDays: number | null
-  }> & PlanMarketingPayload) =>
+  }> & PlanMarketingPayload & PlanOveragePayload) =>
     apiClient.requestWithBody<{ plan: Plan }>('PATCH', `/platform/plans/${id}`, payload),
 
   // ── Os pedidos de demonstração da página pública ─────────────────────

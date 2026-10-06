@@ -4345,6 +4345,23 @@ const en = {
   'siteMap.inner.onboarding': "First-time setup",
   'siteMap.inner.onboardingReached': "Opens on its own on the first sign-in with no ACS configured",
   'sidebar.siteMap': "Panel map",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "Overage price",
+  'platform.plans.overageOperators': "Per extra operator",
+  'platform.plans.overageSubscribers': "Per extra subscriber",
+  'platform.plans.overageDevices': "Per extra ONT",
+  'platform.plans.overageHint': "Empty: the limit blocks, as today. With a price, going over the limit is not blocked and the extra units (at the period peak) are billed on the renewal invoice.",
+  'platform.plans.overagePlaceholder': "no price — blocks",
+  'platform.plans.overageInvalid': "Invalid overage price.",
+  'platform.plans.summaryOverage': "overage: {items}",
+  'platform.plans.overagePerOperator': "{price}/operator",
+  'platform.plans.overagePerSubscriber': "{price}/subscriber",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "Usage above the plan ({resource}): {units} × {unit} = {total} on the next invoice",
+  'plan.overage.hint': "On this plan, going over the limit does not block: the extra units are billed at the period peak, on the renewal invoice.",
+  'plan.overage.total': "Overage on the next invoice: {total}",
+  'charges.pricing.base': "Plan: {amount}",
+  'charges.pricing.overage': "Overage ({resource}): {units} × {unit} = {total}",
 }
 
 export default en

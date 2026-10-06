@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { subscriptionAPI, type TenantChargeView } from '@/lib/api'
 import { formatMoney } from '@/lib/money'
+import { ChargePricingBreakdown } from '@/components/charge-pricing'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -123,6 +124,8 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
                   {t('charges.period')}: {formatDate(charge.periodEnd) ?? charge.periodEnd}
                   {formatDate(charge.dueDate) && ` · ${t('charges.dueDate')}: ${formatDate(charge.dueDate)}`}
                 </p>
+                {/* O plano e o excedente do período (0104), quando há excedente. */}
+                <ChargePricingBreakdown pricing={charge.pricing} currency={charge.currency} />
                 {/* A nota fiscal emitida: o número e o PDF, para o financeiro do
                     provedor. Só endereço `https:` vira link. */}
                 {safeInvoiceUrl(charge.invoice?.pdfUrl) && (

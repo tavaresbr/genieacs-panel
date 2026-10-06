@@ -4347,6 +4347,23 @@ const de: Dictionary = {
   'siteMap.inner.onboarding': "Erste Einrichtung",
   'siteMap.inner.onboardingReached': "Öffnet sich beim ersten Anmelden ohne konfiguriertes ACS von selbst",
   'sidebar.siteMap': "Panel-Übersicht",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "Preis für Mehrverbrauch",
+  'platform.plans.overageOperators': "Pro zusätzlichem Operator",
+  'platform.plans.overageSubscribers': "Pro zusätzlichem Teilnehmer",
+  'platform.plans.overageDevices': "Pro zusätzlichem ONT",
+  'platform.plans.overageHint': "Leer: Das Limit sperrt wie bisher. Mit Preis wird das Überschreiten nicht gesperrt, und die zusätzlichen Einheiten (nach dem Höchststand des Zeitraums) werden mit der Verlängerungsrechnung abgerechnet.",
+  'platform.plans.overagePlaceholder': "kein Preis — sperrt",
+  'platform.plans.overageInvalid': "Ungültiger Preis für Mehrverbrauch.",
+  'platform.plans.summaryOverage': "Mehrverbrauch: {items}",
+  'platform.plans.overagePerOperator': "{price}/Operator",
+  'platform.plans.overagePerSubscriber': "{price}/Teilnehmer",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "Nutzung über dem Tarif ({resource}): {units} × {unit} = {total} auf der nächsten Rechnung",
+  'plan.overage.hint': "In diesem Tarif sperrt das Überschreiten des Limits nicht: Zusätzliche Einheiten werden nach dem Höchststand des Zeitraums mit der Verlängerungsrechnung abgerechnet.",
+  'plan.overage.total': "Mehrverbrauch auf der nächsten Rechnung: {total}",
+  'charges.pricing.base': "Tarif: {amount}",
+  'charges.pricing.overage': "Mehrverbrauch ({resource}): {units} × {unit} = {total}",
 }
 
 export default de

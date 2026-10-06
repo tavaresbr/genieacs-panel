@@ -4343,6 +4343,23 @@ const ptBR: Dictionary = {
   'siteMap.inner.onboarding': "Primeira configuração",
   'siteMap.inner.onboardingReached': "Abre sozinha no primeiro acesso sem ACS configurado",
   'sidebar.siteMap': "Mapa do painel",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "Preço do excedente",
+  'platform.plans.overageOperators': "Por operador a mais",
+  'platform.plans.overageSubscribers': "Por assinante a mais",
+  'platform.plans.overageDevices': "Por ONT a mais",
+  'platform.plans.overageHint': "Vazio: o teto bloqueia, como hoje. Com preço, quem passar do teto não é bloqueado e paga as unidades a mais (pelo maior uso do período) na fatura da renovação.",
+  'platform.plans.overagePlaceholder': "sem preço — bloqueia",
+  'platform.plans.overageInvalid': "Preço de excedente inválido.",
+  'platform.plans.summaryOverage': "excedente: {items}",
+  'platform.plans.overagePerOperator': "{price}/operador",
+  'platform.plans.overagePerSubscriber': "{price}/assinante",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "Uso acima do plano ({resource}): {units} × {unit} = {total} na próxima fatura",
+  'plan.overage.hint': "Neste plano, passar do teto não bloqueia: as unidades a mais são cobradas pelo maior uso do período, na fatura da renovação.",
+  'plan.overage.total': "Excedente na próxima fatura: {total}",
+  'charges.pricing.base': "Plano: {amount}",
+  'charges.pricing.overage': "Excedente ({resource}): {units} × {unit} = {total}",
 }
 
 export default ptBR

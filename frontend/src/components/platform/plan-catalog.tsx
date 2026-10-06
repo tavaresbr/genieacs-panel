@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { parseAmountToCents } from '@/lib/utils'
+import { overagePriceFromInput } from '@/lib/overage'
 
 interface Props {
   plans: Plan[]
@@ -20,6 +21,10 @@ interface Rascunho {
   maxOperators: string
   maxSubscribers: string
   maxDevices: string
+  /** O preço por unidade acima do teto (0104), em reais. Vazio é "sem preço": o teto bloqueia. */
+  overageOperators: string
+  overageSubscribers: string
+  overageDevices: string
   price: string
   currency: string
   trialDays: string
@@ -42,6 +47,7 @@ interface Rascunho {
 
 const VAZIO: Rascunho = {
   code: '', name: '', maxOperators: '', maxSubscribers: '', maxDevices: '',
+  overageOperators: '', overageSubscribers: '', overageDevices: '',
   price: '', currency: 'BRL', trialDays: '14', periodDays: '30',
   maxAuditRetentionDays: '', maxMessageRetentionDays: '', maxMediaRetentionDays: '', active: true,
   public: false, featured: false, sortOrder: '0', pitch: '', features: '', priceYearly: ''
@@ -73,6 +79,11 @@ function limite(texto: string): number | null {
   return Number.isFinite(numero) && numero >= 0 ? Math.floor(numero) : null
 }
 
+/** Centavos como o campo os mostra ("10.00"); nulo é o campo vazio. */
+function reaisOuVazio(cents: number | null | undefined): string {
+  return cents == null ? '' : (cents / 100).toFixed(2)
+}
+
 function paraRascunho(plan: Plan): Rascunho {
   return {
     code: plan.code,
@@ -80,6 +91,9 @@ function paraRascunho(plan: Plan): Rascunho {
     maxOperators: plan.limits.operators === null ? '' : String(plan.limits.operators),
     maxSubscribers: plan.limits.subscribers === null ? '' : String(plan.limits.subscribers),
     maxDevices: plan.limits.devices === null ? '' : String(plan.limits.devices),
+    overageOperators: reaisOuVazio(plan.overagePriceCents?.operators),
+    overageSubscribers: reaisOuVazio(plan.overagePriceCents?.subscribers),
+    overageDevices: reaisOuVazio(plan.overagePriceCents?.devices),
     price: (plan.priceCents / 100).toFixed(2),
     currency: plan.currency,
     trialDays: String(plan.trialDays),
@@ -179,8 +193,20 @@ export function PlanCatalog({ plans, onChange }: Props) {
       return
     }
 
+    // Os preços de excedente (0104): vazio é "sem preço", inválido para tudo.
+    const excedente = {
+      operators: overagePriceFromInput(rascunho.overageOperators),
+      subscribers: overagePriceFromInput(rascunho.overageSubscribers),
+      devices: overagePriceFromInput(rascunho.overageDevices)
+    }
+    if (Object.values(excedente).some((valor) => valor === undefined)) {
+      toast.error(t('platform.plans.overageInvalid'))
+      return
+    }
+
     const comum = {
       name: nome,
+      overagePriceCents: excedente as { operators: number | null; subscribers: number | null; devices: number | null },
       maxOperators: limite(rascunho.maxOperators),
       maxSubscribers: limite(rascunho.maxSubscribers),
       maxDevices: limite(rascunho.maxDevices),
@@ -239,6 +265,20 @@ export function PlanCatalog({ plans, onChange }: Props) {
 
   const editandoEste = (plan: Plan) => editandoId === plan.id
 
+  /** "excedente: R$ 10,00/operador, R$ 3,00/ONT" — vazio sem preço nenhum. */
+  const resumoDoExcedente = (plan: Plan) => {
+    const precos = plan.overagePriceCents
+    if (!precos) return ''
+    const itens = ([
+      ['operators', 'platform.plans.overagePerOperator'],
+      ['subscribers', 'platform.plans.overagePerSubscriber'],
+      ['devices', 'platform.plans.overagePerDevice']
+    ] as const)
+      .filter(([recurso]) => precos[recurso] != null)
+      .map(([recurso, chave]) => t(chave, { price: dinheiro(precos[recurso] as number, plan.currency) }))
+    return itens.length ? t('platform.plans.summaryOverage', { items: itens.join(', ') }) : ''
+  }
+
   const formulario = (
     <div className="mt-4 space-y-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -281,6 +321,28 @@ export function PlanCatalog({ plans, onChange }: Props) {
         ))}
       </div>
       <p className="field-hint">{t('platform.plans.limitHint')}</p>
+
+      <fieldset>
+        <legend className="field-label">{t('platform.plans.overageTitle')}</legend>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {([
+            ['overageOperators', 'platform.plans.overageOperators'],
+            ['overageSubscribers', 'platform.plans.overageSubscribers'],
+            ['overageDevices', 'platform.plans.overageDevices']
+          ] as const).map(([campo, chave]) => (
+            <div key={campo}>
+              <label className="field-label" htmlFor={`plan-${campo}`}>{t(chave)}</label>
+              <input
+                id={`plan-${campo}`} className="modern-input w-full" inputMode="decimal"
+                value={rascunho[campo]}
+                onChange={(e) => setRascunho((r) => ({ ...r, [campo]: e.target.value }))}
+                placeholder={t('platform.plans.overagePlaceholder')}
+              />
+            </div>
+          ))}
+        </div>
+        <p className="field-hint">{t('platform.plans.overageHint')}</p>
+      </fieldset>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -467,6 +529,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
                     subscribers: plan.limits.subscribers ?? '∞',
                     devices: plan.limits.devices ?? '∞'
                   })}
+                  {resumoDoExcedente(plan) && ` · ${resumoDoExcedente(plan)}`}
                   {' · '}
                   {t('platform.plans.summaryTrial', { days: plan.trialDays })}
                   {plan.subscribers !== undefined && ` · ${t('platform.plans.summarySubscribers', { count: plan.subscribers })}`}

@@ -152,9 +152,11 @@ class BillingCharge {
    */
   static async open({
     subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null,
-    planId = null, couponId = null, billingType = null
+    planId = null, couponId = null, billingType = null, pricingDetail = undefined
   }) {
     return tinsertReturningId('billing_charges', {
+      // A conta do valor (0104) — ver `pricingDetailOf`.
+      ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
       // A linha nasce JÁ garrada por quem a inseriu — ver `claim`. Sem isto,
       // entre a inserção e a chamada ao gateway, outra passada que lesse a
       // linha nova sem `gateway_charge_id` a tomaria por "falhou no meio" e
@@ -466,7 +468,7 @@ class BillingCharge {
    * @returns {Promise<boolean>}
    */
   static async resetForReissue(id, {
-    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined
+    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined, pricingDetail = undefined
   }) {
     const linha = await BillingCharge.findById(id);
     if (!linha) return false;
@@ -511,9 +513,111 @@ class BillingCharge {
       // diz; sem eles (a reabertura da isenção, que mantém o valor), ficam.
       ...(planId !== undefined ? { plan_id: planId } : {}),
       ...(couponId !== undefined ? { coupon_id: couponId } : {}),
+      // A conta do valor novo (0104), quando quem reprecifica a diz; sem ela
+      // fica a que a linha tinha — o excedente congelado vai junto.
+      ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
       updated_at: new Date()
     });
     return changed > 0;
+  }
+
+  // ── A conta do valor (0104) ──────────────────────────────────────────
+
+  /**
+   * A conta do valor de uma cobrança, lida de `pricing_detail` — um objeto
+   * `{ base, overage: [...], ... }`, ou nulo (linha de antes da coluna, valor
+   * mudado à mão sem conta, lixo). Nunca lança.
+   *
+   *   - `base`: o preço do plano do período, já com o cupom — o cupom vale
+   *     só sobre ele, nunca sobre o excedente;
+   *   - `overage`: as parcelas do excedente do período que a renovação fecha
+   *     (`[{ resource, peak, limit, unitCents, units, cents }]`), CONGELADAS
+   *     na primeira vez que a linha as calculou: a reemissão (troca de plano,
+   *     cupom, "Reemitir", a cancelada reaberta) reaproveita estas, e não
+   *     reconta — o mesmo período nunca vira duas contas;
+   *   - outras chaves (o crédito de indicação, `credit`) são de quem as grava,
+   *     e `mergePricingDetail` as preserva.
+   */
+  static pricingDetailOf(linha) {
+    const bruto = linha?.pricing_detail;
+    if (!bruto) return null;
+    try {
+      const lido = typeof bruto === 'string' ? JSON.parse(bruto) : bruto;
+      return lido && typeof lido === 'object' && !Array.isArray(lido) ? lido : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** O JSON de `pricing_detail`, ou nulo para objeto nenhum. */
+  static serializePricingDetail(detalhe) {
+    if (detalhe === null || detalhe === undefined) return null;
+    return JSON.stringify(detalhe);
+  }
+
+  /**
+   * A conta de `linha` (ou de um objeto já lido) com as chaves de `patch` por
+   * cima — as outras ficam. É a porta de quem acrescenta uma parcela sem
+   * conhecer as dos outros (o excedente, o crédito). Devolve o OBJETO; quem
+   * grava passa por `serializePricingDetail` (ou pelo `pricingDetail` de
+   * `open`/`resetForReissue`, que serializam).
+   */
+  static mergePricingDetail(linhaOuDetalhe, patch = {}) {
+    const atual = linhaOuDetalhe && typeof linhaOuDetalhe === 'object' && 'pricing_detail' in linhaOuDetalhe
+      ? BillingCharge.pricingDetailOf(linhaOuDetalhe)
+      : (linhaOuDetalhe && typeof linhaOuDetalhe === 'object' ? linhaOuDetalhe : null);
+    return { ...(atual ?? {}), ...(patch ?? {}) };
+  }
+
+  /**
+   * As parcelas de excedente congeladas na linha — ou nulo quando a linha
+   * nunca as calculou (aí quem emite calcula, e congela).
+   */
+  static frozenOverageOf(linha) {
+    const detalhe = BillingCharge.pricingDetailOf(linha);
+    if (!detalhe || !Array.isArray(detalhe.overage)) return null;
+    return detalhe.overage
+      .filter((item) => item && Number.isInteger(Number(item.cents)) && Number(item.cents) > 0)
+      .map((item) => ({
+        resource: String(item.resource),
+        peak: Number(item.peak),
+        limit: Number(item.limit),
+        unitCents: Number(item.unitCents),
+        units: Number(item.units ?? (Number(item.peak) - Number(item.limit))),
+        cents: Number(item.cents)
+      }));
+  }
+
+  /** O total do excedente congelado na linha, em centavos (zero sem nenhum). */
+  static overageCentsOf(linha) {
+    return (BillingCharge.frozenOverageOf(linha) ?? []).reduce((soma, item) => soma + item.cents, 0);
+  }
+
+  /**
+   * A conta como as telas a mostram — o provedor e o console: o preço do
+   * plano, as parcelas do excedente e o resto que a conta tiver (o crédito).
+   * Nulo quando a linha não tem conta.
+   */
+  static presentPricing(linha) {
+    const detalhe = BillingCharge.pricingDetailOf(linha);
+    if (!detalhe) return null;
+    const base = Number(detalhe.base);
+    const credit = detalhe.credit && typeof detalhe.credit === 'object'
+      ? Number(detalhe.credit.cents ?? detalhe.credit.amountCents ?? 0)
+      : Number(detalhe.credit ?? 0);
+    return {
+      baseCents: Number.isFinite(base) ? base : null,
+      overage: (BillingCharge.frozenOverageOf(linha) ?? []).map((item) => ({
+        resource: item.resource,
+        peak: item.peak,
+        limit: item.limit,
+        units: item.units,
+        unitCents: item.unitCents,
+        cents: item.cents
+      })),
+      overageCents: BillingCharge.overageCentsOf(linha),
+      creditCents: Number.isFinite(credit) && credit > 0 ? credit : 0
+    };
   }
 
   /**
@@ -706,6 +810,8 @@ class BillingCharge {
       // `renewal` ou `proration` (0101) — o selo "Pró-rata" da tela.
       kind: row.kind || 'renewal',
       proration: BillingCharge.presentProration(row),
+      // A conta do valor (0104): preço do plano e excedente.
+      pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
       currency: row.currency,
       status: row.status,
@@ -753,6 +859,8 @@ class BillingCharge {
       periodEnd: BillingCharge.periodEndOf(row),
       kind: row.kind || 'renewal',
       proration: BillingCharge.presentProration(row),
+      // A conta do valor (0104): preço do plano e excedente.
+      pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
       currency: row.currency,
       status: row.status,

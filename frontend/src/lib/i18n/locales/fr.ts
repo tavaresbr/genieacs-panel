@@ -4343,6 +4343,23 @@ const fr: Dictionary = {
   'siteMap.inner.onboarding': "Première configuration",
   'siteMap.inner.onboardingReached': "S'ouvre d'elle-même à la première connexion sans ACS configuré",
   'sidebar.siteMap': "Plan du panneau",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "Prix du dépassement",
+  'platform.plans.overageOperators': "Par opérateur supplémentaire",
+  'platform.plans.overageSubscribers': "Par abonné supplémentaire",
+  'platform.plans.overageDevices': "Par ONT supplémentaire",
+  'platform.plans.overageHint': "Vide : la limite bloque, comme aujourd'hui. Avec un prix, le dépassement n'est pas bloqué et les unités en plus (au pic de la période) sont facturées sur la facture de renouvellement.",
+  'platform.plans.overagePlaceholder': "sans prix — bloque",
+  'platform.plans.overageInvalid': "Prix de dépassement invalide.",
+  'platform.plans.summaryOverage': "dépassement : {items}",
+  'platform.plans.overagePerOperator': "{price}/opérateur",
+  'platform.plans.overagePerSubscriber': "{price}/abonné",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "Utilisation au-delà du plan ({resource}) : {units} × {unit} = {total} sur la prochaine facture",
+  'plan.overage.hint': "Sur ce plan, dépasser la limite ne bloque pas : les unités en plus sont facturées au pic de la période, sur la facture de renouvellement.",
+  'plan.overage.total': "Dépassement sur la prochaine facture : {total}",
+  'charges.pricing.base': "Plan : {amount}",
+  'charges.pricing.overage': "Dépassement ({resource}) : {units} × {unit} = {total}",
 }
 
 export default fr

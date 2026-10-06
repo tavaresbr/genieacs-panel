@@ -29,6 +29,8 @@ import {
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
 const PRUNE_INTERVAL_MS = 24 * 3600_000;
+/** De quanto em quanto tempo o pico de uso do período é medido (0104). */
+const USAGE_PEAK_INTERVAL_MS = 10 * 60_000;
 /**
  * O prazo da trilha, e por que ele deixou de ser uma constante.
  *
@@ -293,6 +295,22 @@ class SchedulerService {
       console.warn(`Card autopay pass failed: ${error.message}`);
       return { error: error.message };
     });
+
+    // O pico de uso do período corrente (0104), ANTES da emissão: é ele que a
+    // cobrança da renovação lê para somar o excedente. A cada
+    // `USAGE_PEAK_INTERVAL_MS`, e não a cada minuto — um pico que dure menos
+    // que isso não muda a conta de um mês, e a contagem de ONTs vai ao ACS.
+    // Só os recursos com preço de excedente no plano; a contagem que falha
+    // não mexe no pico (ver `SubscriptionService.recordUsagePeaks`).
+    if (this.due(state.lastUsagePeakAt, USAGE_PEAK_INTERVAL_MS)) {
+      summary.usagePeaks = await SubscriptionService.recordUsagePeaks({
+        countDevices: () => DeviceService.countDevicesFromGenieAcs()
+      }).catch((error) => {
+        console.warn(`Could not record the usage peaks: ${error.message}`);
+        return { recorded: false, reason: 'error' };
+      });
+      await this.writeState({ lastUsagePeakAt: new Date().toISOString() });
+    }
 
     // A mesma contagem de ONTs vai à emissão: é ela que decide se a cobrança
     // da renovação já sai pelo preço da descida agendada (ver `issueCurrent`).

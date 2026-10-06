@@ -4351,6 +4351,23 @@ const hi: Dictionary = {
   'siteMap.inner.onboarding': "पहली सेटअप",
   'siteMap.inner.onboardingReached': "ACS कॉन्फिगर न होने पर पहले लॉगइन पर खुद खुलती है",
   'sidebar.siteMap': "पैनल का नक्शा",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "अतिरिक्त उपयोग का मूल्य",
+  'platform.plans.overageOperators': "प्रति अतिरिक्त ऑपरेटर",
+  'platform.plans.overageSubscribers': "प्रति अतिरिक्त सब्सक्राइबर",
+  'platform.plans.overageDevices': "प्रति अतिरिक्त ONT",
+  'platform.plans.overageHint': "खाली: सीमा पहले की तरह रोकती है। मूल्य होने पर सीमा पार करना रोका नहीं जाता, और अतिरिक्त इकाइयाँ (अवधि के शिखर के अनुसार) नवीनीकरण चालान में ली जाती हैं।",
+  'platform.plans.overagePlaceholder': "कोई मूल्य नहीं — रोकता है",
+  'platform.plans.overageInvalid': "अतिरिक्त उपयोग का मूल्य अमान्य है।",
+  'platform.plans.summaryOverage': "अतिरिक्त: {items}",
+  'platform.plans.overagePerOperator': "{price}/ऑपरेटर",
+  'platform.plans.overagePerSubscriber': "{price}/सब्सक्राइबर",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "प्लान से अधिक उपयोग ({resource}): {units} × {unit} = {total} अगले चालान में",
+  'plan.overage.hint': "इस प्लान में सीमा पार करने पर रोक नहीं है: अतिरिक्त इकाइयाँ अवधि के शिखर उपयोग के अनुसार नवीनीकरण चालान में ली जाती हैं।",
+  'plan.overage.total': "अगले चालान में अतिरिक्त: {total}",
+  'charges.pricing.base': "प्लान: {amount}",
+  'charges.pricing.overage': "अतिरिक्त ({resource}): {units} × {unit} = {total}",
 }
 
 export default hi

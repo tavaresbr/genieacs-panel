@@ -5,6 +5,7 @@ import BillingCharge, { isoDateOf, prorationOverdueAt } from '../models/BillingC
 import AuditLog from '../models/AuditLog.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import Coupon, { parseCouponPlanIds } from '../models/Coupon.js';
+import UsagePeak, { USAGE_RESOURCES } from '../models/UsagePeak.js';
 import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
@@ -224,6 +225,19 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null, c
 
 /** O fuso das datas de cobrança — o mesmo de `ChargeIssuingService.BILLING_TIMEZONE`. */
 const FUSO_DA_COBRANCA = 'America/Sao_Paulo';
+
+/**
+ * A chave do período que termina em `instante` — a mesma de
+ * `ChargeIssuingService.periodKey` (a data no fuso da cobrança), copiada aqui
+ * porque aquele arquivo importa este. É a chave de `usage_peaks` (0104).
+ */
+function chaveDoPeriodo(instante) {
+  const data = asDate(instante);
+  if (!data) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSO_DA_COBRANCA, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(data);
+}
 
 /** `YYYY-MM-DD` menos `dias`, em datas de calendário (sem fuso no meio). */
 function diasAntes(dataIso, dias) {
@@ -1088,11 +1102,14 @@ class SubscriptionService {
    * de `usage`. A ordem é a da tela — operadores, assinantes, ONTs — para que
    * a mesma situação dê sempre a mesma resposta.
    */
-  static overLimitFor(limits, usage) {
+  static overLimitFor(limits, usage, overagePrices = null) {
     for (const resource of ['operators', 'subscribers', 'devices']) {
       const limit = limits?.[resource] ?? null;
       const used = usage?.[resource];
       if (limit === null || used === null || used === undefined) continue;
+      // Com preço de excedente (0104), o teto não barra: quem passa paga as
+      // unidades a mais na fatura. Só o recurso sem preço continua barrando.
+      if (overagePrices?.[resource]) continue;
       if (used > limit) return { resource, used, limit };
     }
     return null;
@@ -1108,17 +1125,21 @@ class SubscriptionService {
    */
   static async overLimitOf(plan, { countDevices = null } = {}) {
     const limits = this.limitsOf(plan);
+    // O recurso com preço de excedente não barra (`overLimitFor`), e nem é
+    // contado: contar ONTs no ACS para uma resposta que não muda nada seria
+    // carga à toa.
+    const precos = this.overagePricesOf(plan);
     const usage = {};
-    if (limits.operators !== null) usage.operators = await this.operatorCount();
-    if (limits.subscribers !== null) usage.subscribers = await this.subscriberCount();
-    if (limits.devices !== null && typeof countDevices === 'function') {
+    if (limits.operators !== null && !precos.operators) usage.operators = await this.operatorCount();
+    if (limits.subscribers !== null && !precos.subscribers) usage.subscribers = await this.subscriberCount();
+    if (limits.devices !== null && !precos.devices && typeof countDevices === 'function') {
       try {
         usage.devices = await countDevices();
       } catch {
         usage.devices = null;
       }
     }
-    return this.overLimitFor(limits, usage);
+    return this.overLimitFor(limits, usage, precos);
   }
 
   /** Os dias que um pagamento compra neste plano (ou a reserva de trinta). */
@@ -1133,6 +1154,105 @@ class SubscriptionService {
       subscribers: asLimit(plan?.max_subscribers),
       devices: asLimit(plan?.max_devices)
     };
+  }
+
+  // ── Excedente (0104) ─────────────────────────────────────────────────
+
+  /**
+   * O preço, em centavos, de cada unidade acima do teto do plano — nulo onde
+   * o plano não tem preço (e aí o teto barra, como sempre). Zero e lixo
+   * também são "sem preço": excedente de graça é teto nenhum, e isso o plano
+   * já diz com o limite nulo.
+   */
+  static overagePricesOf(plan) {
+    const asPrice = (value) => {
+      const n = Number(value);
+      return value === null || value === undefined || !Number.isInteger(n) || n <= 0 ? null : n;
+    };
+    return {
+      operators: asPrice(plan?.overage_price_cents_operators),
+      subscribers: asPrice(plan?.overage_price_cents_subscribers),
+      devices: asPrice(plan?.overage_price_cents_devices)
+    };
+  }
+
+  /**
+   * As parcelas do excedente de `plan` para os picos `peaks`
+   * (`{ operators, subscribers, devices }`, nulo onde não se mediu):
+   * `max(0, pico − teto) × preço` por recurso com teto E preço. Só as
+   * parcelas com unidade a cobrar; pura e síncrona — a emissão, a tela e o
+   * teste fazem a mesma conta.
+   *
+   * @returns {Array<{ resource: string, peak: number, limit: number,
+   *   unitCents: number, units: number, cents: number }>}
+   */
+  static overageFor(plan, peaks) {
+    const limites = this.limitsOf(plan);
+    const precos = this.overagePricesOf(plan);
+    const parcelas = [];
+    for (const resource of USAGE_RESOURCES) {
+      const limit = limites[resource];
+      const unitCents = precos[resource];
+      const pico = peaks?.[resource];
+      if (limit === null || !unitCents || pico === null || pico === undefined) continue;
+      const peak = Math.floor(Number(pico));
+      if (!Number.isFinite(peak)) continue;
+      const units = Math.max(0, peak - limit);
+      if (units <= 0) continue;
+      parcelas.push({ resource, peak, limit, unitCents, units, cents: units * unitCents });
+    }
+    return parcelas;
+  }
+
+  /** A chave do período que a renovação desta assinatura fecha, ou nulo (sem período pago). */
+  static overagePeriodKey(subscription) {
+    return subscription?.renews_at ? chaveDoPeriodo(subscription.renews_at) : null;
+  }
+
+  /**
+   * Grava o pico de uso do período corrente do provedor em escopo — o passo
+   * do agendador (0104). O período corrente é o que termina em `renews_at`,
+   * e é o excedente dele que a cobrança daquela renovação soma
+   * (`ChargeIssuingService.issueCurrent`).
+   *
+   * Só os recursos que o plano de agora limita E cobra por excedente: os
+   * outros não viram dinheiro, e contar ONTs no ACS por nada é carga. A
+   * contagem de ONTs que falha (ACS fora) não mexe no pico — dado que não se
+   * tem não vira número, a regra de `usage`.
+   *
+   * Sem período pago (teste, assinatura sem data) não há o que medir: o
+   * teste não gera fatura de excedente.
+   *
+   * @returns {Promise<{ recorded: boolean, reason?: string, periodEnd?: string,
+   *   peaks?: object }>}
+   */
+  static async recordUsagePeaks({ countDevices = null } = {}) {
+    const subscription = await Subscription.forTenant(currentTenantId());
+    if (!subscription) return { recorded: false, reason: 'no_subscription' };
+    const periodo = this.overagePeriodKey(subscription);
+    if (!periodo) return { recorded: false, reason: 'no_period' };
+    const plano = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
+    const limites = this.limitsOf(plano);
+    const precos = this.overagePricesOf(plano);
+    const medir = USAGE_RESOURCES.filter((recurso) => limites[recurso] !== null && precos[recurso]);
+    if (!medir.length) return { recorded: false, reason: 'no_overage_price' };
+    const agora = {};
+    if (medir.includes('operators')) agora.operators = await this.operatorCount();
+    if (medir.includes('subscribers')) agora.subscribers = await this.subscriberCount();
+    if (medir.includes('devices') && typeof countDevices === 'function') {
+      try {
+        const n = await countDevices();
+        if (Number.isInteger(n) && n >= 0) agora.devices = n;
+      } catch {
+        // ACS fora: o pico das ONTs fica como estava.
+      }
+    }
+    const peaks = {};
+    for (const [recurso, valor] of Object.entries(agora)) {
+      // eslint-disable-next-line no-await-in-loop -- três recursos no máximo
+      peaks[recurso] = await UsagePeak.record(periodo, recurso, valor);
+    }
+    return { recorded: true, periodEnd: periodo, peaks };
   }
 
   /**
@@ -1208,6 +1328,8 @@ class SubscriptionService {
     const { plan } = await this.current();
     const limit = this.limitsOf(plan).operators;
     if (limit === null) return;
+    // Com preço de excedente (0104), o operador a mais entra e é cobrado.
+    if (this.overagePricesOf(plan).operators) return;
     const current = await this.operatorCount();
     if (current >= limit) {
       throw new PlanLimitError('plan_limit_operators', { limit, current, resource: 'operators' });
@@ -1227,6 +1349,9 @@ class SubscriptionService {
     const { plan } = await this.current();
     const limit = this.limitsOf(plan).subscribers;
     if (limit === null) return null;
+    // Com preço de excedente (0104), não há teto brando: o assinante a mais
+    // é criado e cobrado na fatura.
+    if (this.overagePricesOf(plan).subscribers) return null;
     return Math.max(0, limit - await this.subscriberCount());
   }
 
@@ -1265,19 +1390,49 @@ class SubscriptionService {
       subscription.pendingPlan.blockedBy = null;
     } else if (subscription?.pendingPlan) {
       subscription.pendingPlan.blockedBy = this.overLimitFor(
-        this.limitsOf(state.pendingPlan), { operators, subscribers, devices }
+        this.limitsOf(state.pendingPlan), { operators, subscribers, devices }, this.overagePricesOf(state.pendingPlan)
       );
     }
     return {
       subscription,
       usage: { operators, subscribers, devices },
       limits,
+      overage: await this.presentOverage(state, { operators, subscribers, devices }),
       retention: IS_SAAS ? this.retentionCapsOf(state.plan) : this.retentionCapsOf(null),
       over: {
         operators: over(operators, limits.operators),
         subscribers: over(subscribers, limits.subscribers),
         devices: over(devices, limits.devices)
       }
+    };
+  }
+
+  /**
+   * O excedente do período corrente como a tela o mostra (0104): os preços
+   * do plano e, por recurso que passou do teto, "N × R$ X = R$ Y" — com o
+   * maior entre o pico guardado e o uso de agora, que é o que a fatura da
+   * renovação vai cobrar se nada mudar até a emissão. Nulo quando o plano não
+   * tem preço de excedente nenhum.
+   */
+  static async presentOverage(state, usoAgora) {
+    const precos = this.overagePricesOf(state?.plan);
+    if (!precos.operators && !precos.subscribers && !precos.devices) return null;
+    const periodo = this.overagePeriodKey(state?.subscription);
+    const guardados = periodo ? await UsagePeak.forPeriod(periodo) : {};
+    const picos = {};
+    for (const recurso of USAGE_RESOURCES) {
+      const valores = [guardados?.[recurso], usoAgora?.[recurso]]
+        .filter((valor) => valor !== null && valor !== undefined && Number.isFinite(Number(valor)))
+        .map(Number);
+      picos[recurso] = valores.length ? Math.max(...valores) : null;
+    }
+    const items = periodo ? this.overageFor(state.plan, picos) : [];
+    return {
+      prices: precos,
+      periodEnd: periodo,
+      items,
+      totalCents: items.reduce((soma, item) => soma + item.cents, 0),
+      currency: String(state?.plan?.currency || 'BRL').toUpperCase()
     };
   }
 

@@ -34,6 +34,7 @@ import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { couponAppliesToPlan, couponDurationLabel, couponPriceCents } from '@/lib/coupon'
 import { CouponBadge } from '@/components/platform/coupon-control'
 import { CardAutopay } from '@/components/card-autopay'
+import { blockingOver } from '@/lib/overage'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -458,8 +459,30 @@ export default function PlanPage() {
                   )
                 })}
               </ul>
-              {(data!.over.operators || data!.over.subscribers || data!.over.devices) && (
+              {/* O aviso de bloqueio só para o recurso SEM preço de excedente: o
+                  com preço não bloqueia (0104), e o que ele custa vem logo abaixo. */}
+              {blockingOver(data!.over, data!.overage?.prices).length > 0 && (
                 <p className="mt-4 text-sm text-destructive">{t('plan.overHint')}</p>
+              )}
+              {data!.overage && (
+                <div className="mt-4 space-y-1 text-sm">
+                  {data!.overage.items.map((item) => (
+                    <p key={item.resource} className="font-medium text-[hsl(var(--status-warning))]">
+                      {t('plan.overage.line', {
+                        resource: t(resourceLabelKey(item.resource)),
+                        units: item.units,
+                        unit: formatMoney(item.unitCents, data!.overage!.currency),
+                        total: formatMoney(item.cents, data!.overage!.currency)
+                      })}
+                    </p>
+                  ))}
+                  {data!.overage.items.length > 1 && (
+                    <p className="font-semibold text-foreground">
+                      {t('plan.overage.total', { total: formatMoney(data!.overage.totalCents, data!.overage.currency) })}
+                    </p>
+                  )}
+                  <p className="field-hint">{t('plan.overage.hint')}</p>
+                </div>
               )}
             </section>
           </div>

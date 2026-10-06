@@ -4351,6 +4351,23 @@ const ru: Dictionary = {
   'siteMap.inner.onboarding': "Первая настройка",
   'siteMap.inner.onboardingReached': "Открывается сама при первом входе без настроенного ACS",
   'sidebar.siteMap': "Карта панели",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "Цена превышения",
+  'platform.plans.overageOperators': "За каждого доп. оператора",
+  'platform.plans.overageSubscribers': "За каждого доп. абонента",
+  'platform.plans.overageDevices': "За каждый доп. ONT",
+  'platform.plans.overageHint': "Пусто: лимит блокирует, как сейчас. С ценой превышение не блокируется, а дополнительные единицы (по пику за период) выставляются в счёте за продление.",
+  'platform.plans.overagePlaceholder': "без цены — блокирует",
+  'platform.plans.overageInvalid': "Недопустимая цена превышения.",
+  'platform.plans.summaryOverage': "превышение: {items}",
+  'platform.plans.overagePerOperator': "{price}/оператор",
+  'platform.plans.overagePerSubscriber': "{price}/абонент",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "Использование сверх тарифа ({resource}): {units} × {unit} = {total} в следующем счёте",
+  'plan.overage.hint': "В этом тарифе превышение лимита не блокируется: дополнительные единицы оплачиваются по пику за период в счёте за продление.",
+  'plan.overage.total': "Превышение в следующем счёте: {total}",
+  'charges.pricing.base': "Тариф: {amount}",
+  'charges.pricing.overage': "Превышение ({resource}): {units} × {unit} = {total}",
 }
 
 export default ru

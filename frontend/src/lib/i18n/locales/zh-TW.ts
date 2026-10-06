@@ -4344,6 +4344,23 @@ const zhTW: Dictionary = {
   'siteMap.inner.onboarding': "首次設定",
   'siteMap.inner.onboardingReached': "在尚未設定 ACS 的情況下首次登入時自動開啟",
   'sidebar.siteMap': "面板地圖",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "超額價格",
+  'platform.plans.overageOperators': "每多一位操作員",
+  'platform.plans.overageSubscribers': "每多一位用戶",
+  'platform.plans.overageDevices': "每多一台 ONT",
+  'platform.plans.overageHint': "留空：與現在一樣，達到上限即阻擋。設定價格後，超出上限不會被阻擋，超出的單位（依週期峰值）計入續約帳單。",
+  'platform.plans.overagePlaceholder': "無價格 — 阻擋",
+  'platform.plans.overageInvalid': "超額價格無效。",
+  'platform.plans.summaryOverage': "超額：{items}",
+  'platform.plans.overagePerOperator': "{price}/操作員",
+  'platform.plans.overagePerSubscriber': "{price}/用戶",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "超出方案的用量（{resource}）：{units} × {unit} = {total}，計入下一張帳單",
+  'plan.overage.hint': "此方案超出上限不會被阻擋：超出的單位依週期峰值用量計入續約帳單。",
+  'plan.overage.total': "下一張帳單的超額：{total}",
+  'charges.pricing.base': "方案：{amount}",
+  'charges.pricing.overage': "超額（{resource}）：{units} × {unit} = {total}",
 }
 
 export default zhTW

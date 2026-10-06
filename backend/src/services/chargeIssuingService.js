@@ -7,6 +7,7 @@ import { isUniqueViolation } from '../config/database.js';
 import Subscription from '../models/Subscription.js';
 import Plan from '../models/Plan.js';
 import Coupon from '../models/Coupon.js';
+import UsagePeak from '../models/UsagePeak.js';
 import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
@@ -60,6 +61,28 @@ import CardAutopayService from './billing/cardAutopayService.js';
  * 409 `busy` (a linha é de outra passada agora) ou 502 `gateway_failed`.
  */
 export { EXEMPT_CANCEL_MARKER };
+
+/** Os nomes curtos dos recursos na descrição da fatura no gateway (português, como o resto dela). */
+const NOME_DO_RECURSO = Object.freeze({ operators: 'operadores', subscribers: 'assinantes', devices: 'ONTs' });
+
+/** Centavos como "R$ 1.234,56" — a descrição da fatura é texto, sem a formatação da tela. */
+function reais(centavos) {
+  const n = Math.round(Number(centavos) || 0);
+  const inteiro = Math.floor(Math.abs(n) / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${n < 0 ? '-' : ''}R$ ${inteiro},${String(Math.abs(n) % 100).padStart(2, '0')}`;
+}
+
+/**
+ * O resumo do excedente que vai na descrição da fatura (0104):
+ * " + excedente R$ 45,00 (3 operadores × R$ 10,00; 5 ONTs × R$ 3,00)".
+ * Vazio sem excedente.
+ */
+export function overageDescription(parcelas) {
+  if (!Array.isArray(parcelas) || !parcelas.length) return '';
+  const total = parcelas.reduce((soma, item) => soma + Number(item.cents || 0), 0);
+  const partes = parcelas.map((item) => `${item.units} ${NOME_DO_RECURSO[item.resource] ?? item.resource} × ${reais(item.unitCents)}`);
+  return ` + excedente ${reais(total)} (${partes.join('; ')})`;
+}
 
 export class ChargeFollowError extends Error {
   constructor(status, code, message, detail = null) {
@@ -440,6 +463,43 @@ class ChargeIssuingService {
   }
 
   /**
+   * O excedente que a cobrança da renovação `periodo` soma (0104).
+   *
+   * ## Que período, e em que fatura
+   *
+   * A cobrança com a chave `P` (o `renews_at` de agora) paga o período que
+   * COMEÇA em `P` — ela sai `LEAD_DAYS` antes, ainda dentro do período que
+   * termina em `P`. O excedente cobrado nela é o do período que ela FECHA:
+   * o uso de `[renovação anterior, P)`, cujos picos o agendador grava com a
+   * mesma chave `P` (`SubscriptionService.recordUsagePeaks`). Ou seja: o
+   * período pago de antemão, e o excedente dele cobrado depois, na renovação
+   * seguinte — como uma conta de consumo.
+   *
+   * ## Congelado na linha
+   *
+   * Calculado UMA vez, quando a linha do período nasce (ou na primeira emissão
+   * de uma linha que ainda não o tinha), e gravado em `pricing_detail`. Toda
+   * reemissão do mesmo período — a troca de plano, o cupom, o "Reemitir", a
+   * cancelada reaberta — reaproveita as parcelas gravadas: o mesmo período dá
+   * sempre o mesmo valor, e nada é cobrado duas vezes. O pico que ainda subir
+   * entre a emissão e `P` (os últimos dias do período) não entra: a fatura
+   * diz o que mediu até sair, e o provedor já a tem na mão.
+   *
+   * Sem período pago (o teste, que vira a primeira fatura) não há excedente:
+   * o teste é de graça, com ou sem uso acima do teto. O plano é o ATUAL, o
+   * que valeu no período que fecha — e não o da descida agendada, que só
+   * passa a valer no período que esta cobrança paga.
+   */
+  static async overageForPeriod({ subscription, plan, periodo, existente = null }) {
+    const congelado = BillingCharge.frozenOverageOf(existente);
+    if (congelado) return congelado;
+    if (!periodo || SubscriptionService.overagePeriodKey(subscription) !== periodo) return [];
+    const precos = SubscriptionService.overagePricesOf(plan);
+    if (!precos.operators && !precos.subscribers && !precos.devices) return [];
+    return SubscriptionService.overageFor(plan, await UsagePeak.forPeriod(periodo));
+  }
+
+  /**
    * Emite a cobrança do provedor em escopo, se houver uma a emitir.
    *
    * Devolve `{ issued, reason }` e nunca lança: como o aviso, é um job, e
@@ -681,6 +741,14 @@ class ChargeIssuingService {
     // Só o "pagar agora" (`cardNow`) é o provedor pedindo para pagar já.
     const adiarCartao = Boolean(manual && cartao && !cardNow && periodo > this.isoDate(now));
     let existente = await BillingCharge.forPeriod(periodo);
+    // O excedente do período que esta renovação fecha (0104), somado ao preço
+    // do plano DEPOIS do cupom — o cupom vale só sobre o plano. Congelado na
+    // linha: ver `overageForPeriod`. `conta` é o que vai a `pricing_detail`,
+    // com as outras chaves que a linha já tiver (o crédito) preservadas.
+    const excedente = await this.overageForPeriod({ subscription, plan, periodo, existente });
+    const precoDoPlano = preco;
+    preco += excedente.reduce((soma, item) => soma + item.cents, 0);
+    const conta = BillingCharge.mergePricingDetail(existente, { base: precoDoPlano, overage: excedente });
     if (!existente && adiarCartao) return { issued: false, reason: 'card_deferred', charge: null };
     if (existente) {
       // Reaberta pelo clique, com o preço de agora — ver o comentário do método.
@@ -691,7 +759,7 @@ class ChargeIssuingService {
         const minha = await BillingCharge.claim(existente.id, { until: garraAte, now, unissued: false });
         if (!minha) return { issued: false, reason: 'raced', charge: existente };
         const reaberta = await BillingCharge.resetForReissue(existente.id, {
-          amountCents: preco, currency: moeda, ...precificacao
+          amountCents: preco, currency: moeda, ...precificacao, pricingDetail: conta
         });
         if (!reaberta) await BillingCharge.release(existente.id);
         existente = await BillingCharge.findById(existente.id);
@@ -799,6 +867,10 @@ class ChargeIssuingService {
       if (!existente.amount_overridden_at) {
         if (Number(existente.plan_id ?? 0) !== Number(precificacao.planId ?? 0)) patch.plan_id = precificacao.planId;
         if (Number(existente.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0)) patch.coupon_id = precificacao.couponId;
+        // A conta do valor que vai ao gateway (0104) — o excedente congelado
+        // na primeira vez, o preço do plano de agora.
+        const contaGravada = BillingCharge.serializePricingDetail(conta);
+        if ((existente.pricing_detail ?? null) !== contaGravada) patch.pricing_detail = contaGravada;
       }
       // O meio desta tentativa, gravado ANTES da chamada (0100): é ele que diz,
       // se a resposta se perder, que houve uma tentativa no cartão.
@@ -820,7 +892,8 @@ class ChargeIssuingService {
           dueDate: vencimentoDoGateway,
           claimUntil: garraAte,
           billingType: meio,
-          ...precificacao
+          ...precificacao,
+          pricingDetail: conta
         });
       } catch (error) {
         // Duas passadas se cruzaram e a outra ganhou. O índice único é quem
@@ -869,7 +942,11 @@ class ChargeIssuingService {
       amountCents: preco,
       currency: moeda,
       dueDate: vencimentoDoGateway,
-      description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`,
+      // O excedente (0104) vai resumido na descrição: quem paga vê do que é o
+      // valor a mais. A de valor mudado à mão (0078) não leva — o valor dela
+      // não é a conta.
+      description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`
+        + (existente?.amount_overridden_at ? '' : overageDescription(excedente)),
       // O formato que o webhook espera de volta, com o período junto: é por
       // ele que a entrega acha o provedor sem depender do cadastro do cliente
       // no gateway estar ligado a quem se pensa.

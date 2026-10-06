@@ -4352,6 +4352,23 @@ const ar: Dictionary = {
   'siteMap.inner.onboarding': "الإعداد الأول",
   'siteMap.inner.onboardingReached': "تُفتح وحدها عند أول دخول دون إعداد ACS",
   'sidebar.siteMap': "خريطة اللوحة",
+  // Cobrança por excedente (0104)
+  'platform.plans.overageTitle': "سعر التجاوز",
+  'platform.plans.overageOperators': "لكل مشغّل إضافي",
+  'platform.plans.overageSubscribers': "لكل مشترك إضافي",
+  'platform.plans.overageDevices': "لكل ONT إضافي",
+  'platform.plans.overageHint': "فارغ: الحد يمنع كما هو الآن. مع تحديد سعر، لا يُمنع تجاوز الحد وتُحتسب الوحدات الإضافية (حسب ذروة الفترة) في فاتورة التجديد.",
+  'platform.plans.overagePlaceholder': "بلا سعر — يمنع",
+  'platform.plans.overageInvalid': "سعر التجاوز غير صالح.",
+  'platform.plans.summaryOverage': "التجاوز: {items}",
+  'platform.plans.overagePerOperator': "{price}/مشغّل",
+  'platform.plans.overagePerSubscriber': "{price}/مشترك",
+  'platform.plans.overagePerDevice': "{price}/ONT",
+  'plan.overage.line': "استخدام يتجاوز الخطة ({resource}): {units} × {unit} = {total} في الفاتورة القادمة",
+  'plan.overage.hint': "في هذه الخطة لا يمنع تجاوز الحد: تُحتسب الوحدات الإضافية حسب ذروة الفترة في فاتورة التجديد.",
+  'plan.overage.total': "التجاوز في الفاتورة القادمة: {total}",
+  'charges.pricing.base': "الخطة: {amount}",
+  'charges.pricing.overage': "التجاوز ({resource}): {units} × {unit} = {total}",
 }
 
 export default ar
