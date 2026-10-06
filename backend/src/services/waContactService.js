@@ -71,10 +71,12 @@ class WaContactService {
   static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
-    const subscribers = await this.collect({ search, state, noPhone, imported });
+    const everyone = await this.gather({ search });
+    const subscribers = this.narrow(everyone, { state, noPhone, imported });
     const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
     return {
       total: subscribers.length,
+      counts: this.counts(everyone, { state, noPhone, imported }),
       contacts: await this.decorate(page)
     };
   }
@@ -91,6 +93,15 @@ class WaContactService {
    * WhatsApp's phone book or a spreadsheet), which no SGP row backs.
    */
   static async collect({ search = '', state = '', noPhone = false, imported = false } = {}) {
+    return this.narrow(await this.gather({ search }), { state, noPhone, imported });
+  }
+
+  /**
+   * Everyone the search matches, sorted, before any state, phone or origin
+   * filter — the one expensive read, so the list can both filter it and count
+   * it for the filter buttons without asking the database twice.
+   */
+  static async gather({ search = '' } = {}) {
     const raw = String(search ?? '').trim();
 
     const linkRows = await this.searchTable('sgp_links', raw);
@@ -109,15 +120,42 @@ class WaContactService {
       .filter((row) => !row.contract || !known.has(String(row.contract)))
       .map((row) => this.subscriberFromContact(row));
 
-    const wanted = CONTACT_STATES.includes(state) ? state : null;
     return [...withDevice, ...withoutDevice]
-      .filter((subscriber) => !wanted || subscriber.state === wanted)
-      .filter((subscriber) => !noPhone || !subscriber.phone)
-      .filter((subscriber) => !imported || subscriber.importSource)
       .sort((a, b) => (
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
     ));
+  }
+
+  /** The state, phone and origin filters, applied to what `gather` returned. */
+  static narrow(everyone, { state = '', noPhone = false, imported = false } = {}) {
+    const wanted = CONTACT_STATES.includes(state) ? state : null;
+    return everyone
+      .filter((subscriber) => !wanted || subscriber.state === wanted)
+      .filter((subscriber) => !noPhone || !subscriber.phone)
+      .filter((subscriber) => !imported || subscriber.importSource);
+  }
+
+  /**
+   * What each filter button would show if it were clicked now, with the other
+   * filters left as they are: the tabs count under the phone and origin
+   * toggles, each toggle counts under the current tab — so the number on the
+   * active filter is always the list's own total.
+   */
+  static counts(everyone, { state = '', noPhone = false, imported = false } = {}) {
+    const size = (filters) => this.narrow(everyone, filters).length;
+    const tab = CONTACT_STATES.includes(state) ? state : '';
+    return {
+      states: {
+        all: size({ noPhone, imported }),
+        active: size({ state: 'active', noPhone, imported }),
+        blocked: size({ state: 'blocked', noPhone, imported }),
+        cancelled: size({ state: 'cancelled', noPhone, imported }),
+        none: size({ state: 'none', noPhone, imported })
+      },
+      noPhone: size({ state: tab, noPhone: true, imported }),
+      imported: size({ state: tab, noPhone, imported: true })
+    };
   }
 
   /**

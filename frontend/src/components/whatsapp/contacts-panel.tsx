@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { contactsAPI, type ContactImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
+import { contactsAPI, type ContactImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContactCounts, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -46,7 +46,7 @@ interface ContactsPanelProps {
  * Starting sends nothing; the operator lands in an empty thread and writes.
  */
 export function ContactsPanel({ onOpenConversation, defaultState = '' }: ContactsPanelProps) {
-  const { t, intlLocale, formatDateTime } = useTranslation()
+  const { t, intlLocale, formatDateTime, formatNumber } = useTranslation()
   const { can } = useAuth()
   const toast = useToast()
 
@@ -68,6 +68,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const [noPhone, setNoPhone] = useState(false)
   // Só os cadastros que vieram de uma importação (agenda do WhatsApp ou planilha).
   const [imported, setImported] = useState(false)
+  // Quantos contatos cada filtro mostraria; vazio até a primeira leitura.
+  const [counts, setCounts] = useState<WhatsAppContactCounts | null>(null)
 
   const alive = useRef(true)
   // The newest request wins: a slow answer for "ben" must not overwrite the
@@ -125,6 +127,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     if (res.success && res.data) {
       setContacts(res.data.contacts)
       setTotal(res.data.total)
+      setCounts(res.data.counts ?? null)
       setLoadError('')
     } else {
       setLoadError(whatsappErrorMessage(t, res.code))
@@ -215,6 +218,11 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const shown = sgpResult ? sgpResult.contacts : contacts
 
   // Pedaços de cada linha, os mesmos na tabela e nos cartões do celular.
+  // O número ao lado do rótulo do filtro; nada até a lista ter sido lida uma vez.
+  const countBadge = (value: number | undefined) => (value === undefined ? null : (
+    <span className="ml-1.5 text-xs font-normal opacity-70" data-testid="wa-contacts-count">{formatNumber(value)}</span>
+  ))
+
   const nameOf = (contact: WhatsAppContact) => (canOpenProfile ? (
     <Link
       to={`/contacts/${encodeURIComponent(contact.key)}`}
@@ -382,6 +390,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
                 onClick={() => setStateFilter(id)}
               >
                 {t(labelKey)}
+                {countBadge(counts?.states[id || 'all'])}
               </button>
             ))}
           </div>
@@ -394,6 +403,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           >
             <Icon name="phone" size={16} />
             {t('whatsapp.contacts.filterNoPhone')}
+            {countBadge(counts?.noPhone)}
             {noPhone && <Icon name="x" size={14} />}
           </button>
           <button
@@ -405,6 +415,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           >
             <Icon name="copy" size={16} />
             {t('whatsapp.contacts.filterImported')}
+            {countBadge(counts?.imported)}
             {imported && <Icon name="x" size={14} />}
           </button>
         </div>
