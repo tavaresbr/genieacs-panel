@@ -1048,6 +1048,8 @@ export default {
   'contacts.import.badHeader': '第一列需要匯出時的欄位（Chave、Contrato、CPF/CNPJ 或 Nome）',
   'contacts.import.rowNotFound': '找不到鍵或合約',
   'contacts.import.rowNoName': '新客戶沒有姓名',
+  'contacts.import.whatsappPreviewed': 'WhatsApp 聯絡人預覽已就緒',
+  'contacts.import.whatsappApplied': '已匯入 WhatsApp 聯絡人：建立 {created} 個',
 
   // TeiaH Valid
   'teiah.configLoaded': '已載入 TeiaH Valid 設定',

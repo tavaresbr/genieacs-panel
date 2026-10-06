@@ -1,6 +1,7 @@
 import AuditLog from '../models/AuditLog.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
 import ContactSheetService from '../services/contactSheetService.js';
+import ContactWhatsappImportService from '../services/contactWhatsappImportService.js';
 import ContactInvoiceService from '../services/contactInvoiceService.js';
 import ContactOnboardingService from '../services/contactOnboardingService.js';
 import { WaError } from '../services/whatsappConfigService.js';
@@ -216,6 +217,29 @@ ContactController.importSheet = async function importSheet(req, res) {
       req.t('contacts.import.applied', { updated: result.updated, created: result.created }),
       translate(result)
     ));
+  } catch (error) {
+    return handleError(req, res, error, 'contacts.importFailed');
+  }
+};
+
+/**
+ * The phone book of the connected WhatsApp number. `preview` lists who would
+ * become a client; `apply` creates them. Existing contacts are never touched.
+ */
+ContactController.importWhatsapp = async function importWhatsapp(req, res) {
+  try {
+    if (req.query.mode !== 'apply') {
+      const plan = await ContactWhatsappImportService.plan();
+      return res.json(createResponse(req.t('contacts.import.whatsappPreviewed'), ContactWhatsappImportService.summary(plan)));
+    }
+    const result = await ContactWhatsappImportService.apply(actorOf(req));
+    await AuditLog.fromRequest(req, {
+      action: AuditLog.ACTIONS.CONTACTS_IMPORTED,
+      subjectType: 'contacts',
+      subjectId: null,
+      detail: { source: 'whatsapp', total: result.total, created: result.created, existing: result.existing }
+    });
+    return res.json(createResponse(req.t('contacts.import.whatsappApplied', { created: result.created }), result));
   } catch (error) {
     return handleError(req, res, error, 'contacts.importFailed');
   }

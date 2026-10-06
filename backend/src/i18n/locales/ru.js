@@ -1049,6 +1049,8 @@ export default {
   'contacts.import.badHeader': 'В первой строке нужны столбцы экспорта (Chave, Contrato, CPF/CNPJ или Nome)',
   'contacts.import.rowNotFound': 'Ключ или договор не найден',
   'contacts.import.rowNoName': 'Новый клиент без имени',
+  'contacts.import.whatsappPreviewed': 'Предпросмотр контактов WhatsApp готов',
+  'contacts.import.whatsappApplied': 'Контакты WhatsApp импортированы: создано {created}',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Настройки TeiaH Valid загружены',

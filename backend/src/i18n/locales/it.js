@@ -1046,6 +1046,8 @@ export default {
   'contacts.import.badHeader': 'La prima riga deve avere le colonne dell’esportazione (Chave, Contrato, CPF/CNPJ o Nome)',
   'contacts.import.rowNotFound': 'Chiave o contratto non trovato',
   'contacts.import.rowNoName': 'Nuovo cliente senza nome',
+  'contacts.import.whatsappPreviewed': 'Anteprima dei contatti WhatsApp pronta',
+  'contacts.import.whatsappApplied': 'Contatti WhatsApp importati: {created} creati',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Configurazione di TeiaH Valid caricata',
