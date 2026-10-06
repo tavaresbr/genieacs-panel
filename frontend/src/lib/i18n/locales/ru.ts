@@ -4281,6 +4281,26 @@ const ru: Dictionary = {
   'plan.coupon.have': "У меня есть купон",
   'plan.coupon.hint': "Скидка действует на ваши следующие счета, включая уже открытый.",
   'plan.coupon.nextInvoice': "Следующий счёт: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Навигация",
+  'siteMap.title': "Карта панели",
+  'siteMap.description': "Все экраны этой панели по группам и назначение каждого — только те, которые открывает ваш доступ.",
+  'siteMap.group.operation': "Ежедневная работа",
+  'siteMap.group.administration': "Администрирование",
+  'siteMap.group.platform': "Платформа",
+  'siteMap.settings.title': "Разделы настроек",
+  'siteMap.settings.description': "Каждая ссылка открывает настройки сразу на нужной вкладке.",
+  'siteMap.inner.title': "Экраны, куда попадают из другого",
+  'siteMap.inner.description': "У них нет своей ссылки: каждому нужен элемент, с которого пришли.",
+  'siteMap.inner.device': "Карточка устройства",
+  'siteMap.inner.deviceReached': "Нажмите на устройство в инвентаре",
+  'siteMap.inner.contact': "Карточка контакта",
+  'siteMap.inner.contactReached': "Нажмите на контакт в разделе «Контакты»",
+  'siteMap.inner.onboarding': "Первая настройка",
+  'siteMap.inner.onboardingReached': "Открывается сама при первом входе без настроенного ACS",
+  'sidebar.siteMap': "Карта панели",
 }
 
 export default ru

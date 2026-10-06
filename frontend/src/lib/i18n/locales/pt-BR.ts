@@ -4273,6 +4273,26 @@ const ptBR: Dictionary = {
   'plan.coupon.have': "Tenho um cupom",
   'plan.coupon.hint': "O desconto vale para as próximas faturas, inclusive a que já está em aberto.",
   'plan.coupon.nextInvoice': "Próxima fatura: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navegação",
+  'siteMap.title': "Mapa do painel",
+  'siteMap.description': "Todas as telas deste painel, agrupadas, com o que cada uma faz — só as que o seu acesso abre.",
+  'siteMap.group.operation': "Operação do dia",
+  'siteMap.group.administration': "Administração",
+  'siteMap.group.platform': "Plataforma",
+  'siteMap.settings.title': "Seções da Configuração",
+  'siteMap.settings.description': "Cada uma abre a Configuração já naquela aba.",
+  'siteMap.inner.title': "Telas alcançadas de dentro de outra",
+  'siteMap.inner.description': "Não têm link próprio: cada uma depende do item de onde se vem.",
+  'siteMap.inner.device': "Tela do aparelho",
+  'siteMap.inner.deviceReached': "Clique num aparelho do inventário",
+  'siteMap.inner.contact': "Tela do contato",
+  'siteMap.inner.contactReached': "Clique num contato em Contatos",
+  'siteMap.inner.onboarding': "Primeira configuração",
+  'siteMap.inner.onboardingReached': "Abre sozinha no primeiro acesso sem ACS configurado",
+  'sidebar.siteMap': "Mapa do painel",
 }
 
 export default ptBR

@@ -4280,6 +4280,26 @@ const ko: Dictionary = {
   'plan.coupon.have': "쿠폰이 있어요",
   'plan.coupon.hint': "할인은 이미 발행된 미결 청구서를 포함해 다음 청구서부터 적용됩니다.",
   'plan.coupon.nextInvoice': "다음 청구서: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "네버게이션",
+  'siteMap.title': "패널 지도",
+  'siteMap.description': "이 패널의 모든 화면을 그룹별로, 각각의 역할과 함깘 봅니다. 권한으로 여릴 수 있는 화면만 나옵니다.",
+  'siteMap.group.operation': "일상 운용",
+  'siteMap.group.administration': "관리",
+  'siteMap.group.platform': "플랫폼",
+  'siteMap.settings.title': "설정의 섹션",
+  'siteMap.settings.description': "각각 해당 탭에서 설정을 바로 엽니다.",
+  'siteMap.inner.title': "다른 화면에서 연결되는 화면",
+  'siteMap.inner.description': "자신의 링크가 없습니다. 각각 거쳐 오는 항목이 필요합니다.",
+  'siteMap.inner.device': "장치 상세",
+  'siteMap.inner.deviceReached': "장치 목록에서 장치를 클릭",
+  'siteMap.inner.contact': "연락처 상세",
+  'siteMap.inner.contactReached': "‘연락처’에서 연락처를 클릭",
+  'siteMap.inner.onboarding': "초기 설정",
+  'siteMap.inner.onboardingReached': "ACS가 설정되지 않은 상태에서 처움 로개인하면 자동으로 열립니다",
+  'sidebar.siteMap': "패널 지도",
 }
 
 export default ko

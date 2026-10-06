@@ -4275,6 +4275,26 @@ const en = {
   'plan.coupon.have': "I have a coupon",
   'plan.coupon.hint': "The discount applies to your next invoices, including one that is already open.",
   'plan.coupon.nextInvoice': "Next invoice: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navigation",
+  'siteMap.title': "Panel map",
+  'siteMap.description': "Every screen in this panel, grouped, with what each one is for — only the ones your access opens.",
+  'siteMap.group.operation': "Day-to-day operation",
+  'siteMap.group.administration': "Administration",
+  'siteMap.group.platform': "Platform",
+  'siteMap.settings.title': "Configuration sections",
+  'siteMap.settings.description': "Each one opens Configuration already on that tab.",
+  'siteMap.inner.title': "Screens reached from another one",
+  'siteMap.inner.description': "They have no link of their own: each needs the item you arrive from.",
+  'siteMap.inner.device': "Device detail",
+  'siteMap.inner.deviceReached': "Click a device in the inventory",
+  'siteMap.inner.contact': "Contact detail",
+  'siteMap.inner.contactReached': "Click a contact in Contacts",
+  'siteMap.inner.onboarding': "First-time setup",
+  'siteMap.inner.onboardingReached': "Opens on its own on the first sign-in with no ACS configured",
+  'sidebar.siteMap': "Panel map",
 }
 
 export default en

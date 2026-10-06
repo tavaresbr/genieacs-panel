@@ -4273,6 +4273,26 @@ const es: Dictionary = {
   'plan.coupon.have': "Tengo un cupón",
   'plan.coupon.hint': "El descuento se aplica a tus próximas facturas, incluida la que ya está abierta.",
   'plan.coupon.nextInvoice': "Próxima factura: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navegación",
+  'siteMap.title': "Mapa del panel",
+  'siteMap.description': "Todas las pantallas de este panel, agrupadas, con lo que hace cada una: solo las que abre tu acceso.",
+  'siteMap.group.operation': "Operación diaria",
+  'siteMap.group.administration': "Administración",
+  'siteMap.group.platform': "Plataforma",
+  'siteMap.settings.title': "Secciones de Configuración",
+  'siteMap.settings.description': "Cada una abre Configuración directamente en esa pestaña.",
+  'siteMap.inner.title': "Pantallas a las que se llega desde otra",
+  'siteMap.inner.description': "No tienen enlace propio: cada una depende del elemento desde el que se entra.",
+  'siteMap.inner.device': "Detalle del equipo",
+  'siteMap.inner.deviceReached': "Haz clic en un equipo del inventario",
+  'siteMap.inner.contact': "Detalle del contacto",
+  'siteMap.inner.contactReached': "Haz clic en un contacto en Contactos",
+  'siteMap.inner.onboarding': "Primera configuración",
+  'siteMap.inner.onboardingReached': "Se abre sola en el primer acceso sin ACS configurado",
+  'sidebar.siteMap': "Mapa del panel",
 }
 
 export default es

@@ -4273,6 +4273,26 @@ const zhCN: Dictionary = {
   'plan.coupon.have': "我有优惠券",
   'plan.coupon.hint': "折扣适用于你接下来的账单，包括已开出的未付账单。",
   'plan.coupon.nextInvoice': "下一张账单：{price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "导航",
+  'siteMap.title': "面板地图",
+  'siteMap.description': "本面板的所有页面，按组列出并说明用途——仅显示你的权限能打开的页面。",
+  'siteMap.group.operation': "日常运维",
+  'siteMap.group.administration': "管理",
+  'siteMap.group.platform': "平台",
+  'siteMap.settings.title': "设置的各个部分",
+  'siteMap.settings.description': "每个链接都会直接打开设置的对应标签页。",
+  'siteMap.inner.title': "从其他页面进入的页面",
+  'siteMap.inner.description': "它们没有自己的链接：每个都需要从所属条目进入。",
+  'siteMap.inner.device': "设备详情",
+  'siteMap.inner.deviceReached': "在设备清单中点击一台设备",
+  'siteMap.inner.contact': "联系人详情",
+  'siteMap.inner.contactReached': "在“联系人”中点击一位联系人",
+  'siteMap.inner.onboarding': "首次配置",
+  'siteMap.inner.onboardingReached': "在未配置 ACS 的情况下首次登录时自动打开",
+  'sidebar.siteMap': "面板地图",
 }
 
 export default zhCN

@@ -4281,6 +4281,26 @@ const hi: Dictionary = {
   'plan.coupon.have': "मेरे पास कूपन है",
   'plan.coupon.hint': "छूट आपके अगले इनवॉइस पर लागू होती है, पहले से खुले इनवॉइस सहित।",
   'plan.coupon.nextInvoice': "अगला इनवॉइस: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "नेविगेशन",
+  'siteMap.title': "पैनल का नक्शा",
+  'siteMap.description': "इस पैनल की सबी स्क्रीनें, समूहों में, और हर किसी का काम — केवल वे जिन्हें आपकी पहुँच खोलती है।",
+  'siteMap.group.operation': "रोज़मर्रा का संचालन",
+  'siteMap.group.administration': "प्रशासन",
+  'siteMap.group.platform': "प्लेटफॉर्म",
+  'siteMap.settings.title': "कॉन्फिगरेशन के खंड",
+  'siteMap.settings.description': "हर लिंक कॉन्फिगरेशन को सीधे उसी टैब पर खोलता है।",
+  'siteMap.inner.title': "अन्य स्क्रीन से पहुँजने वाली स्क्रीनें",
+  'siteMap.inner.description': "इनका अपना लिंक नहीं है: हर किसी को वह वस्तु ज़रूरी है जहाँ से आया जाता है।",
+  'siteMap.inner.device': "डिवाइस का विवरण",
+  'siteMap.inner.deviceReached': "इन्वेंट्री में किसी डिवाइस पर क्लिक करें",
+  'siteMap.inner.contact': "संपर्क का विवरण",
+  'siteMap.inner.contactReached': "“संपर्क” में किसी संपर्क पर क्लिक करें",
+  'siteMap.inner.onboarding': "पहली सेटअप",
+  'siteMap.inner.onboardingReached': "ACS कॉन्फिगर न होने पर पहले लॉगइन पर खुद खुलती है",
+  'sidebar.siteMap': "पैनल का नक्शा",
 }
 
 export default hi
