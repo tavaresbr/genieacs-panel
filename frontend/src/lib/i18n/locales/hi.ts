@@ -2736,6 +2736,7 @@ const hi: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'AI पता अनुमत नहीं है',
   'whatsapp.ai.err.invalidUrl': 'अमान्य API पता',
   'whatsapp.ai.err.keyRequired': 'AI चालू करने के लिए API कुंजी दर्ज करें',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'API पता बदलते समय API कुंजी फिर से दर्ज करें',
   'whatsapp.ai.err.disabled': 'AI सुझाव बंद हैं',
   'whatsapp.ai.err.failed': 'AI विफल रहा',
   'whatsapp.tags.button': 'टैग',

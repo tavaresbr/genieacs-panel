@@ -2755,6 +2755,7 @@ const zhTW: Dictionary = {
   'whatsapp.ai.err.blockedHost': '不允許使用該 AI 位址',
   'whatsapp.ai.err.invalidUrl': 'API 位址無效',
   'whatsapp.ai.err.keyRequired': '請輸入 API 金鑰以開啟 AI',
+  'whatsapp.ai.err.keyRequiredForNewUrl': '變更 API 位址時，請重新輸入 API 金鑰',
   'whatsapp.ai.err.disabled': 'AI 建議已關閉',
   'whatsapp.ai.err.failed': 'AI 發生錯誤',
   'whatsapp.tags.button': '標籤',

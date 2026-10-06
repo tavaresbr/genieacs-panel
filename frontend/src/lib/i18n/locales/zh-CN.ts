@@ -2755,6 +2755,7 @@ const zhCN: Dictionary = {
   'whatsapp.ai.err.blockedHost': '不允许使用该 AI 地址',
   'whatsapp.ai.err.invalidUrl': 'API 地址无效',
   'whatsapp.ai.err.keyRequired': '请输入 API 密钥以开启 AI',
+  'whatsapp.ai.err.keyRequiredForNewUrl': '更改 API 地址时，请重新输入 API 密钥',
   'whatsapp.ai.err.disabled': 'AI 建议已关闭',
   'whatsapp.ai.err.failed': 'AI 出错',
   'whatsapp.tags.button': '标签',

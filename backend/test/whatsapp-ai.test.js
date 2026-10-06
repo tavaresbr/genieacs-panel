@@ -221,6 +221,51 @@ describe('a configuração da IA', () => {
     assert.equal(pedidosIa[0].auth, `Bearer ${AI_KEY}`);
     assert.equal(pedidosIa[0].url, '/api/paas/v4/chat/completions');
   });
+
+  it('testar outro endereço sem chave: 400, e nenhum pedido sai com a chave salva', async () => {
+    const outro = aiUrl.replace('/api/paas/v4', '/outro');
+    const res = await api('/bot-config/ai-test', { method: 'POST', body: { baseUrl: outro } });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'ai_key_required_for_new_url');
+    assert.equal(pedidosIa.length, 0, 'nenhum pedido saiu');
+  });
+
+  it('o mesmo endereço, escrito de outro jeito, usa a chave salva', async () => {
+    roteiro = [{ content: 'OK' }];
+    const res = await api('/bot-config/ai-test', {
+      method: 'POST', body: { baseUrl: `${aiUrl.replace('http://', 'HTTP://')}/` }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(pedidosIa[0].auth, `Bearer ${AI_KEY}`);
+  });
+
+  it('outro endereço com a chave da tela: vai só a chave da tela', async () => {
+    const outro = aiUrl.replace('/api/paas/v4', '/outro');
+    const res = await api('/bot-config/ai-test', { method: 'POST', body: { baseUrl: outro, apiKey: 'chave-da-tela' } });
+    assert.equal(res.body.code, 'ai_unauthorized', JSON.stringify(res.body));
+    assert.equal(pedidosIa.length, 1);
+    assert.equal(pedidosIa[0].url, '/outro/chat/completions');
+    assert.equal(pedidosIa[0].auth, 'Bearer chave-da-tela');
+  });
+
+  it('salvar outro endereço sem chave é recusado; com chave, aceito', async () => {
+    const outro = aiUrl.replace('/api/paas/v4', '/outro');
+    const semChave = await salvarIa({ baseUrl: outro });
+    assert.equal(semChave.status, 400, JSON.stringify(semChave.body));
+    assert.equal(semChave.body.code, 'ai_key_required_for_new_url');
+    assert.equal((await api('/bot-config')).body.data.ai.baseUrl, aiUrl, 'o endereço não mudou');
+
+    const mesmo = await salvarIa({ baseUrl: `${aiUrl}/` });
+    assert.equal(mesmo.status, 200, JSON.stringify(mesmo.body));
+
+    const comChave = await salvarIa({ baseUrl: outro, apiKey: AI_KEY });
+    assert.equal(comChave.status, 200, JSON.stringify(comChave.body));
+    assert.equal(comChave.body.data.ai.baseUrl, outro);
+
+    // De volta ao endereço de verdade para os testes seguintes.
+    const volta = await salvarIa({ baseUrl: aiUrl, apiKey: AI_KEY });
+    assert.equal(volta.status, 200, JSON.stringify(volta.body));
+  });
 });
 
 describe('o motivo da recusa', () => {

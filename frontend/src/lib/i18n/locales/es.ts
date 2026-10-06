@@ -2755,6 +2755,7 @@ const es: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Dirección de IA no permitida',
   'whatsapp.ai.err.invalidUrl': 'Dirección de API no válida',
   'whatsapp.ai.err.keyRequired': 'Introduce la clave de API para activar la IA',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Al cambiar la dirección de la API, ingrese la clave de nuevo',
   'whatsapp.ai.err.disabled': 'Las sugerencias de la IA están desactivadas',
   'whatsapp.ai.err.failed': 'La IA falló',
   'whatsapp.tags.button': 'Etiquetas',

@@ -2755,6 +2755,7 @@ const ptBR: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Endereço da IA não permitido',
   'whatsapp.ai.err.invalidUrl': 'Endereço da API inválido',
   'whatsapp.ai.err.keyRequired': 'Informe a chave da API para ligar a IA',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Ao trocar o endereço da API, informe a chave de novo',
   'whatsapp.ai.err.disabled': 'As sugestões da IA estão desligadas',
   'whatsapp.ai.err.failed': 'A IA falhou',
   'whatsapp.tags.button': 'Etiquetas',
