@@ -163,7 +163,7 @@ class WaAiService {
     } catch (error) {
       const code = error?.code && String(error.code).startsWith('ai_') ? error.code : 'ai_failed';
       console.warn(`[wa] IA: conversa ${conversation.id}: ${code}${code === 'ai_failed' ? ` (${error?.message})` : ''}`);
-      await WaBotConfigService.recordAiError(code);
+      await WaBotConfigService.recordAiError(code, error?.details);
       return null;
     }
   }
@@ -187,7 +187,7 @@ class WaAiService {
       if (!texto) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
       return { text: texto };
     } catch (error) {
-      if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code);
+      if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code, error.details);
       throw error;
     }
   }

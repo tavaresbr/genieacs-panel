@@ -8,6 +8,7 @@ import WaNotificationService from '../services/waNotificationService.js';
 import WaAlertService from '../services/waAlertService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
 import WaAiService from '../services/waAiService.js';
+import { aiError } from './whatsappController.js';
 import { SgpError } from '../services/sgpService.js';
 import { roleHas } from '../config/permissions.js';
 import WaMessage from '../models/WaMessage.js';
@@ -211,6 +212,7 @@ class WhatsAppMessageController {
       const result = await WaAiService.suggest(req.params?.id);
       return res.json(createResponse(req.t('whatsapp.ai.suggested'), result));
     } catch (error) {
+      if (String(error?.code || '').startsWith('ai_')) return aiError(req, res, error);
       return handleError(req, res, error, 'whatsapp.ai.error.failed');
     }
   }

@@ -612,6 +612,7 @@ export default {
   'whatsapp.ai.error.timeout': 'ИИ отвечал слишком долго',
   'whatsapp.ai.error.unauthorized': 'Провайдер ИИ отклонил ключ API',
   'whatsapp.ai.error.rateLimited': 'Достигнут лимит использования ИИ; попробуйте позже',
+  'whatsapp.ai.error.noBalance': 'На счёте ИИ нет баланса или активного пакета; пополните его на сайте провайдера',
   'whatsapp.ai.error.badResponse': 'ИИ вернул некорректный ответ',
   'whatsapp.ai.error.unreachable': 'Не удалось подключиться к ИИ',
   'whatsapp.ai.error.blockedHost': 'Этот адрес ИИ не разрешён',

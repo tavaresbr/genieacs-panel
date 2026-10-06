@@ -39,6 +39,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   ai_timeout: 'whatsapp.ai.err.timeout',
   ai_unauthorized: 'whatsapp.ai.err.unauthorized',
   ai_rate_limited: 'whatsapp.ai.err.rateLimited',
+  ai_no_balance: 'whatsapp.ai.err.noBalance',
   ai_bad_response: 'whatsapp.ai.err.badResponse',
   ai_unreachable: 'whatsapp.ai.err.unreachable',
   ai_blocked_host: 'whatsapp.ai.err.blockedHost',

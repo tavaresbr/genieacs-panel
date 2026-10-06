@@ -243,6 +243,7 @@ export function ChatbotTab() {
                 value={config.ai.baseUrl}
                 onChange={(event) => patchAi({ baseUrl: event.target.value })}
               />
+              <p className="field-hint">{t('settings.chatbot.aiBaseUrlHint')}</p>
             </div>
             <div>
               <label htmlFor="bot-ai-model" className="field-label">{t('settings.chatbot.aiModel')}</label>
@@ -308,7 +309,9 @@ export function ChatbotTab() {
               <span className="text-sm text-[hsl(var(--status-danger))]">
                 {t('settings.chatbot.aiLastError', {
                   when: formatDateTime(config.ai.lastError.at),
-                  reason: whatsappErrorMessage(t, config.ai.lastError.code)
+                  reason: config.ai.lastError.detail
+                    ? `${whatsappErrorMessage(t, config.ai.lastError.code)} (${config.ai.lastError.detail})`
+                    : whatsappErrorMessage(t, config.ai.lastError.code)
                 })}
               </span>
             )}

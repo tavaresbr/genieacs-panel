@@ -44,6 +44,8 @@ let aiUrl;
 let roteiro = [];
 let pedidosIa = [];
 let iaFora = false;
+/** Uma recusa programada: `{ status, body }` que a IA de mentira devolve. */
+let recusa = null;
 
 function ontDoTeste() {
   const device = buildDevice({ id: DEVICE_ID, ssid: 'CLIENTE-IA' });
@@ -92,6 +94,10 @@ function startAiStub() {
       let payload = {};
       try { payload = JSON.parse(raw || '{}'); } catch { payload = {}; }
       pedidosIa.push({ url: req.url, auth: req.headers.authorization, payload });
+      if (recusa) {
+        res.writeHead(recusa.status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(recusa.body));
+      }
       if (iaFora) {
         res.writeHead(500);
         return res.end('{}');
@@ -186,6 +192,7 @@ beforeEach(() => {
   roteiro = [];
   pedidosIa = [];
   iaFora = false;
+  recusa = null;
 });
 
 describe('a configuração da IA', () => {
@@ -213,6 +220,34 @@ describe('a configuração da IA', () => {
     assert.equal(res.body.data.reply, 'OK');
     assert.equal(pedidosIa[0].auth, `Bearer ${AI_KEY}`);
     assert.equal(pedidosIa[0].url, '/api/paas/v4/chat/completions');
+  });
+});
+
+describe('o motivo da recusa', () => {
+  it('chave recusada: a tela recebe o que o provedor disse, sem a chave', async () => {
+    recusa = { status: 401, body: { error: { code: '1000', message: `Authentication failed for ${AI_KEY}` } } };
+    const res = await api('/bot-config/ai-test', { method: 'POST', body: {} });
+    assert.equal(res.status, 502);
+    assert.equal(res.body.code, 'ai_unauthorized');
+    assert.match(res.body.message, /HTTP 401 · 1000: Authentication failed/);
+    assert.equal(JSON.stringify(res.body).includes(AI_KEY), false);
+  });
+
+  it('sem saldo é outra coisa que limite de uso', async () => {
+    recusa = { status: 429, body: { error: { code: '1113', message: 'Insufficient balance or no resource package. Please recharge.' } } };
+    const res = await api('/bot-config/ai-test', { method: 'POST', body: {} });
+    assert.equal(res.body.code, 'ai_no_balance');
+    recusa = { status: 429, body: { error: { code: '1302', message: 'High concurrency' } } };
+    assert.equal((await api('/bot-config/ai-test', { method: 'POST', body: {} })).body.code, 'ai_rate_limited');
+  });
+
+  it('a falha no atendimento fica com o motivo para a tela', async () => {
+    await limparFio(ASSINANTE);
+    recusa = { status: 401, body: { error: { code: '1000', message: 'Authentication failed' } } };
+    await receber(ASSINANTE, 'oi');
+    const lido = await api('/bot-config');
+    assert.equal(lido.body.data.ai.lastError.code, 'ai_unauthorized');
+    assert.match(lido.body.data.ai.lastError.detail, /HTTP 401/);
   });
 });
 

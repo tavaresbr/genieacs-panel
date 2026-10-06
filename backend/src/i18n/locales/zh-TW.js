@@ -610,6 +610,7 @@ export default {
   'whatsapp.ai.error.timeout': 'AI 回應逾時',
   'whatsapp.ai.error.unauthorized': 'AI 服務商拒絕了此 API 金鑰',
   'whatsapp.ai.error.rateLimited': '已達 AI 使用上限，請稍後再試',
+  'whatsapp.ai.error.noBalance': 'AI 帳戶餘額不足或沒有有效資源包，請至服務商網站儲值',
   'whatsapp.ai.error.badResponse': 'AI 傳回了無效回應',
   'whatsapp.ai.error.unreachable': '無法連線到 AI',
   'whatsapp.ai.error.blockedHost': '不允許使用此 AI 位址',
