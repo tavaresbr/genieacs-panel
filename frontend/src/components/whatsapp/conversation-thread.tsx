@@ -41,6 +41,8 @@ interface ConversationThreadProps {
    * a time; on a wide screen the list is right there.
    */
   onBack?: () => void
+  /** Teclado aberto no celular: o cabeçalho vira uma linha (voltar + nome). */
+  compact?: boolean
 }
 
 /**
@@ -66,7 +68,8 @@ export function ConversationThread({
   sgpPanelOpen,
   onToggleSgpPanel,
   onLinked,
-  onBack
+  onBack,
+  compact = false
 }: ConversationThreadProps) {
   const { t } = useTranslation()
   const { can } = useAuth()
@@ -125,7 +128,7 @@ export function ConversationThread({
     <>
       <header
         ref={headerRef}
-        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-card px-3 py-2.5 sm:px-4 lg:items-start lg:gap-3 lg:py-3"
+        className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-card px-3 sm:px-4 lg:items-start lg:gap-3 lg:py-3 ${compact ? 'flex-nowrap py-1.5' : 'py-2.5'}`}
       >
         {/* No celular o voltar e as ações dividem a primeira linha, e o nome
             desce para a de baixo (`order-last`): numa linha própria cada, as
@@ -141,117 +144,122 @@ export function ConversationThread({
             {t('whatsapp.inbox.title')}
           </button>
         )}
-        <div className="order-last w-full min-w-0 lg:order-none lg:w-auto">
+        <div className={compact ? 'min-w-0 flex-1' : 'order-last w-full min-w-0 lg:order-none lg:w-auto'}>
           <h2 className="truncate text-base font-semibold text-foreground">{conversationTitle(conversation)}</h2>
-          {address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
+          {!compact && address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
 
-          <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${numero?.className ?? ''}`}>
-            {numero?.showName && <AccountChip name={numero.name} />}
-            {conversation.contract ? (
-              <span className="modern-badge-info">
-                <Icon name="invoice" size={12} />
-                {t('whatsapp.inbox.contract')}: <span className="font-mono">{conversation.contract}</span>
-              </span>
-            ) : (
-              <span className="modern-badge">
-                <Icon name="info" size={12} />
-                {t('whatsapp.inbox.unknownContact')}
-              </span>
-            )}
-            {conversation.clientName && (
-              <span className="modern-badge max-w-full">
-                <span className="truncate">{t('whatsapp.inbox.subscriber')}: {conversation.clientName}</span>
-              </span>
-            )}
-            {conversation.botPausedUntil && (
-              <span className="modern-badge-warning" title={t('whatsapp.inbox.wantsHumanHint')}>
-                <Icon name="contacts" size={12} />
-                {t('whatsapp.inbox.wantsHuman')}
-              </span>
-            )}
-            {conversation.optedOut && (
-              <span className="modern-badge-warning" title={t('whatsapp.inbox.optedOutHint')}>
-                <Icon name="bell" size={12} />
-                {t('whatsapp.inbox.optedOut')}
-              </span>
-            )}
-            {conversation.waitingSince && !conversation.assignedUserId && (
-              <span className="modern-badge-warning" title={t('whatsapp.assign.waitingHint')}>
-                <Icon name="contacts" size={12} />
-                {t('whatsapp.assign.waiting')}
-              </span>
-            )}
-            <AssigneeControl conversation={conversation} onChange={onLinked} />
-            <TagPicker conversation={conversation} onChange={onLinked} />
-            {closed && (
-              <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
-                <Icon name="check" size={12} />
-                {t('whatsapp.inbox.closed')}
-              </span>
-            )}
-          </div>
+          {/* Com o teclado aberto os selos e as ações saem: a altura vai para as mensagens. */}
+          {!compact && (
+            <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${numero?.className ?? ''}`}>
+              {numero?.showName && <AccountChip name={numero.name} />}
+              {conversation.contract ? (
+                <span className="modern-badge-info">
+                  <Icon name="invoice" size={12} />
+                  {t('whatsapp.inbox.contract')}: <span className="font-mono">{conversation.contract}</span>
+                </span>
+              ) : (
+                <span className="modern-badge">
+                  <Icon name="info" size={12} />
+                  {t('whatsapp.inbox.unknownContact')}
+                </span>
+              )}
+              {conversation.clientName && (
+                <span className="modern-badge max-w-full">
+                  <span className="truncate">{t('whatsapp.inbox.subscriber')}: {conversation.clientName}</span>
+                </span>
+              )}
+              {conversation.botPausedUntil && (
+                <span className="modern-badge-warning" title={t('whatsapp.inbox.wantsHumanHint')}>
+                  <Icon name="contacts" size={12} />
+                  {t('whatsapp.inbox.wantsHuman')}
+                </span>
+              )}
+              {conversation.optedOut && (
+                <span className="modern-badge-warning" title={t('whatsapp.inbox.optedOutHint')}>
+                  <Icon name="bell" size={12} />
+                  {t('whatsapp.inbox.optedOut')}
+                </span>
+              )}
+              {conversation.waitingSince && !conversation.assignedUserId && (
+                <span className="modern-badge-warning" title={t('whatsapp.assign.waitingHint')}>
+                  <Icon name="contacts" size={12} />
+                  {t('whatsapp.assign.waiting')}
+                </span>
+              )}
+              <AssigneeControl conversation={conversation} onChange={onLinked} />
+              <TagPicker conversation={conversation} onChange={onLinked} />
+              {closed && (
+                <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
+                  <Icon name="check" size={12} />
+                  {t('whatsapp.inbox.closed')}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Com a coluna estreita (celular, notebook, módulo SGP aberto) os
             quatro viram só ícone, com o nome no `aria-label` e no `title`; e o
             grupo quebra linha em vez de sair da tela. */}
-        <div className="flex flex-wrap items-center gap-2">
-          {can('whatsapp.send') && (
+        {!compact && (
+          <div className="flex flex-wrap items-center gap-2">
+            {can('whatsapp.send') && (
+              <button
+                type="button"
+                className={actionClass}
+                aria-expanded={linkerOpen}
+                aria-label={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
+                title={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
+                onClick={() => setLinkerOpen((open) => !open)}
+              >
+                <Icon name="edit" size={16} />
+                <span className={labelClass}>
+                  {t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
+                </span>
+              </button>
+            )}
+
+            {/* Closing is not a destructive act and is not offered as one: the
+                hint says what it does, and the same button undoes it. */}
             <button
               type="button"
               className={actionClass}
-              aria-expanded={linkerOpen}
-              aria-label={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
-              title={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
-              onClick={() => setLinkerOpen((open) => !open)}
+              disabled={filing}
+              aria-label={t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}
+              title={t('whatsapp.inbox.closeHint')}
+              onClick={() => onFile(closed ? 'open' : 'closed')}
             >
-              <Icon name="edit" size={16} />
-              <span className={labelClass}>
-                {t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
-              </span>
+              <Icon name={closed ? 'refresh' : 'check'} size={16} className={filing ? 'animate-spin' : ''} />
+              <span className={labelClass}>{t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}</span>
             </button>
-          )}
 
-          {/* Closing is not a destructive act and is not offered as one: the
-              hint says what it does, and the same button undoes it. */}
-          <button
-            type="button"
-            className={actionClass}
-            disabled={filing}
-            aria-label={t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}
-            title={t('whatsapp.inbox.closeHint')}
-            onClick={() => onFile(closed ? 'open' : 'closed')}
-          >
-            <Icon name={closed ? 'refresh' : 'check'} size={16} className={filing ? 'animate-spin' : ''} />
-            <span className={labelClass}>{t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}</span>
-          </button>
+            {onToggleSgpPanel && (
+              <button
+                type="button"
+                className={actionClass}
+                aria-pressed={Boolean(sgpPanelOpen)}
+                aria-label={t('whatsapp.sgp.toggle')}
+                title={t('whatsapp.sgp.toggle')}
+                onClick={onToggleSgpPanel}
+              >
+                <Icon name="database" size={16} />
+                <span className={labelClass}>{t('whatsapp.sgp.toggle')}</span>
+              </button>
+            )}
 
-          {onToggleSgpPanel && (
-            <button
-              type="button"
-              className={actionClass}
-              aria-pressed={Boolean(sgpPanelOpen)}
-              aria-label={t('whatsapp.sgp.toggle')}
-              title={t('whatsapp.sgp.toggle')}
-              onClick={onToggleSgpPanel}
-            >
-              <Icon name="database" size={16} />
-              <span className={labelClass}>{t('whatsapp.sgp.toggle')}</span>
-            </button>
-          )}
-
-          {conversation.deviceId && (
-            <Link
-              to={`/devices/detail?id=${encodeURIComponent(conversation.deviceId)}`}
-              className={actionClass}
-              aria-label={t('whatsapp.inbox.openDevice')}
-              title={t('whatsapp.inbox.openDevice')}
-            >
-              <Icon name="server" size={16} />
-              <span className={labelClass}>{t('whatsapp.inbox.openDevice')}</span>
-            </Link>
-          )}
-        </div>
+            {conversation.deviceId && (
+              <Link
+                to={`/devices/detail?id=${encodeURIComponent(conversation.deviceId)}`}
+                className={actionClass}
+                aria-label={t('whatsapp.inbox.openDevice')}
+                title={t('whatsapp.inbox.openDevice')}
+              >
+                <Icon name="server" size={16} />
+                <span className={labelClass}>{t('whatsapp.inbox.openDevice')}</span>
+              </Link>
+            )}
+          </div>
+        )}
       </header>
 
       {linkerOpen && (
