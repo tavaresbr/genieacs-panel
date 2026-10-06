@@ -16,6 +16,11 @@
 }
 
 @theme {
+  /* Monitor largo (≈1840 px+). Com o menu lateral, a tabela completa do
+     inventário só cabe daqui para cima. Em rem como os outros: a v4 ordena
+     as media queries por unidade. */
+  --breakpoint-3xl: 115rem;
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
