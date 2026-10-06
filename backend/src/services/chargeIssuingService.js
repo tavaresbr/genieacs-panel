@@ -397,7 +397,11 @@ class ChargeIssuingService {
       }
       let respondido = null;
       if (typeof provider?.updateCharge === 'function') {
-        respondido = await noGateway(() => provider.updateCharge(cobranca.gateway_charge_id, { dueDate: vencimento }));
+        respondido = await noGateway(() => provider.updateCharge(cobranca.gateway_charge_id, {
+          dueDate: vencimento,
+          // O valor de agora, para o desconto por antecipação ir junto com o piso.
+          amountCents: Number(cobranca.amount_cents)
+        }));
       }
       await BillingCharge.update(cobranca.id, {
         period_end: chaveNova,

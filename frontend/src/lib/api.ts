@@ -1375,6 +1375,16 @@ export interface AsaasIntegration {
   issPercent?: number
   retainIss?: boolean
   observations?: string | null
+  /**
+   * Multa (%), juros (% ao mês) e desconto por antecipação das cobranças no
+   * Asaas. `discountValue` é % com `percent` e CENTAVOS com `fixed`. Zero é
+   * desligado; opcionais porque servidores antigos não mandam os campos.
+   */
+  finePercent?: number
+  interestMonthlyPercent?: number
+  discountKind?: 'percent' | 'fixed'
+  discountValue?: number
+  discountDaysBefore?: number
 }
 
 /**
@@ -1393,6 +1403,11 @@ export interface AsaasIntegrationUpdate {
   issPercent?: number
   retainIss?: boolean
   observations?: string
+  finePercent?: number
+  interestMonthlyPercent?: number
+  discountKind?: 'percent' | 'fixed'
+  discountValue?: number
+  discountDaysBefore?: number
 }
 
 /** O estado da NFS-e de uma cobrança. */

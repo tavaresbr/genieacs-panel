@@ -841,7 +841,9 @@ class PlatformSubscriptionsController {
             if (gateway) {
               respondido = await noGateway(() => gateway.updateCharge(cobranca.gateway_charge_id, {
                 ...(mudaData ? { dueDate } : {}),
-                ...(mudaValor ? { value: amount } : {})
+                ...(mudaValor ? { value: amount } : {}),
+                // O valor que ela fica tendo: é sobre ele que o desconto vai.
+                amountCents: mudaValor ? amount : antes.amountCents
               }));
             }
             const patch = { issuing_until: null };

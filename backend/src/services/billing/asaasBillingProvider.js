@@ -65,6 +65,22 @@ function paraCentavos(valor) {
   return Math.round(numero * 100);
 }
 
+/**
+ * O dia em que quem pagou pagou, `YYYY-MM-DD` — ou nulo.
+ *
+ * `clientPaymentDate` antes de `paymentDate`: o boleto pago no último dia do
+ * desconto compensa um ou dois dias úteis depois, e é o dia do CLIENTE que o
+ * gateway usou para decidir se o desconto valia. Sem nenhum dos dois, quem
+ * confere usa o dia da entrega.
+ */
+function diaDoPagamento(pagamento) {
+  for (const campo of ['clientPaymentDate', 'paymentDate']) {
+    const valor = String(pagamento?.[campo] ?? '').trim().slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return valor;
+  }
+  return null;
+}
+
 export class AsaasBillingProvider extends BillingProvider {
   get name() {
     return 'asaas';
@@ -190,7 +206,12 @@ export class AsaasBillingProvider extends BillingProvider {
       // A nossa própria referência, quando fomos nós que criamos a cobrança.
       // Preferida sobre a de cima: ela é escrita por este painel e não depende
       // de o cadastro do cliente no gateway estar ligado ao provedor certo.
-      reference: pagamento.externalReference ? String(pagamento.externalReference) : null
+      reference: pagamento.externalReference ? String(pagamento.externalReference) : null,
+      // O dia do pagamento, para a janela do desconto por antecipação
+      // (`recordPayment`). O valor do desconto em si NÃO se lê daqui: o
+      // `discount` do corpo é a configuração da cobrança, não o que foi
+      // abatido — o abatido é a diferença entre `value` e o que se pediu.
+      paidOn: diaDoPagamento(pagamento)
     };
   }
 
@@ -263,9 +284,12 @@ export class AsaasBillingProvider extends BillingProvider {
     };
   }
 
-  async recordPayment({ amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, now }) {
+  async recordPayment({
+    amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, paidOn = null, now
+  }) {
     return SubscriptionService.recordPayment({
       amountCents,
+      paidOn,
       currency,
       provider: this.name,
       externalId,

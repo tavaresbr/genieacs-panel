@@ -1,7 +1,7 @@
 import Plan from '../models/Plan.js';
 import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
-import BillingCharge from '../models/BillingCharge.js';
+import BillingCharge, { isoDateOf } from '../models/BillingCharge.js';
 import AuditLog from '../models/AuditLog.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import Coupon, { parseCouponPlanIds } from '../models/Coupon.js';
@@ -9,6 +9,7 @@ import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { IS_SAAS } from '../config/edition.js';
+import { effectiveChargesConfig, earlyDiscountFor } from './billing/asaasSettingsService.js';
 
 /**
  * O ciclo de vida da assinatura, e o que cada estado deixa fazer.
@@ -144,6 +145,10 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
         motivo: null,
         fonte: 'charge',
         overridden: Boolean(cobranca.amount_overridden_at),
+        // Quem emitiu e para quando: é o que diz se um desconto por
+        // antecipação podia ter valido (`descontoAntecipado`).
+        provider: cobranca.provider ? String(cobranca.provider) : null,
+        dueDate: isoDateOf(cobranca.due_date),
         planId: temPreco ? Number(cobranca.plan_id) : null,
         couponId: temPreco && cobranca.coupon_id !== null && cobranca.coupon_id !== undefined
           ? Number(cobranca.coupon_id) : null
@@ -186,6 +191,54 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
   const moedaPlano = String(plano?.currency || '').toUpperCase();
   if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
   return { cents: Math.floor(preco), motivo: null, fonte: 'plan' };
+}
+
+/** O fuso das datas de cobrança — o mesmo de `ChargeIssuingService.BILLING_TIMEZONE`. */
+const FUSO_DA_COBRANCA = 'America/Sao_Paulo';
+
+/** `YYYY-MM-DD` menos `dias`, em datas de calendário (sem fuso no meio). */
+function diasAntes(dataIso, dias) {
+  const instante = Date.parse(`${dataIso}T00:00:00Z`);
+  if (!Number.isFinite(instante)) return null;
+  return new Date(instante - dias * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * O desconto por antecipação que explica um pagamento a menos — ou nulo.
+ *
+ * A cobrança que a plataforma emite no Asaas pode levar um desconto para quem
+ * paga até `discountDaysBefore` dias antes do vencimento (bloco `charges` de
+ * Integrações). Quem aproveita paga MENOS do que a linha pede, e isso não é
+ * "pago a menos": é o combinado. Vale como inteiro quando as três coisas
+ * fecham:
+ *
+ *   1. a cobrança é uma que o painel emitiu NO ASAAS (é só lá que o desconto
+ *      vai), com vencimento conhecido;
+ *   2. o valor pago cobre o pedido menos o desconto que a configuração de hoje
+ *      dá para ele — a mesma conta da emissão (`earlyDiscountFor`), com o piso
+ *      de R$ 5,00. Um centavo de folga na porcentagem, porque o gateway
+ *      arredonda do lado dele;
+ *   3. o pagamento caiu até o limite (`dueDate − discountDaysBefore`), pelo dia
+ *      do pagamento que o gateway informa ou, sem ele, pelo dia de hoje no
+ *      fuso da cobrança.
+ *
+ * Qualquer uma falhando, o pagamento continua sendo o que era: a menos.
+ */
+async function descontoAntecipado({ pedido, amount, paidOn, now }) {
+  if (pedido.fonte !== 'charge' || pedido.provider !== 'asaas' || !pedido.dueDate) return null;
+  const desconto = earlyDiscountFor(pedido.cents, await effectiveChargesConfig());
+  if (!desconto) return null;
+  const folga = desconto.kind === 'percent' ? 1 : 0;
+  const comDesconto = pedido.cents - desconto.cents;
+  if (amount < comDesconto - folga) return null;
+  const limite = diasAntes(pedido.dueDate, desconto.daysBefore);
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(String(paidOn ?? ''))
+    ? String(paidOn)
+    : new Intl.DateTimeFormat('en-CA', {
+      timeZone: FUSO_DA_COBRANCA, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(now);
+  if (!limite || dia > limite) return null;
+  return { discountCents: desconto.cents, discountedCents: comDesconto, paidOn: dia, limitDate: limite };
 }
 
 /**
@@ -1542,7 +1595,7 @@ class SubscriptionService {
    */
   static async recordPayment({
     amountCents, currency = 'BRL', provider = 'manual', externalId = null,
-    actorUserId = null, periodDays = null, allowUnderpayment = false, now = new Date()
+    actorUserId = null, periodDays = null, allowUnderpayment = false, paidOn = null, now = new Date()
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -1629,7 +1682,13 @@ class SubscriptionService {
     const pedido = await valorPedido({
       externalId, plano, currency, precoDoPlano: this.priceFor(before, plano, cupom)
     });
-    const faltou = pedido.cents !== null && amount < pedido.cents;
+    // Pagar a menos POR CAUSA do desconto por antecipação é pagar o inteiro:
+    // ver `descontoAntecipado`. A multa e os juros, do outro lado, chegam como
+    // pagamento a mais — e a mais já credita, logo acima.
+    const antecipado = pedido.cents !== null && amount < pedido.cents
+      ? await descontoAntecipado({ pedido, amount, paidOn, now })
+      : null;
+    const faltou = pedido.cents !== null && amount < pedido.cents && !antecipado;
     const underpaid = faltou && !allowUnderpayment;
     if (pedido.motivo === 'currency_mismatch') {
       // Nem credita errado nem bloqueia por uma condição que quem recebeu o
@@ -1767,6 +1826,9 @@ class SubscriptionService {
             ...(pedido.motivo ? { amountCheck: pedido.motivo } : {}),
             ...(underpaid ? { underpaid: true, shortfallCents: pedido.cents - amount } : {}),
             ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {}),
+            // O desconto por antecipação que fez o valor menor valer como
+            // inteiro — quanto, até quando, e em que dia se pagou.
+            ...(antecipado ? { earlyPaymentDiscount: antecipado } : {}),
             // O ciclo do cupom que este pagamento gastou, para o estorno o
             // devolver (`reversePayment`) — e, se o zerou, o cupom inteiro.
             ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {})

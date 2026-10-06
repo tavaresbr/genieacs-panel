@@ -1,6 +1,8 @@
 import { PinnedTransport } from '../../utils/net/pinnedFetch.js';
 import { deploymentIsShared } from '../genieacsEgress.js';
-import { effectiveApiKey, effectiveBaseUrl } from './asaasSettingsService.js';
+import {
+  effectiveApiKey, effectiveBaseUrl, effectiveChargesConfig, earlyDiscountFor
+} from './asaasSettingsService.js';
 
 /**
  * O cliente HTTP do gateway de pagamento — a única coisa deste repositório que
@@ -172,6 +174,39 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
 }
 
 /**
+ * A multa, os juros e o desconto por antecipação de uma cobrança, nos nomes
+ * do gateway — ou um objeto vazio.
+ *
+ * Só o que está ligado vai (`asaasSettingsService`, bloco `charges`): um
+ * `fine: { value: 0 }` mandado à toa seria uma linha a mais para o gateway
+ * recusar no dia em que mudar a regra dele. E nada disso vai numa cobrança de
+ * cartão: ela é paga na hora, o gateway ignora os três campos, e mandá-los só
+ * faria a página mostrar um desconto que nunca se aplica.
+ *
+ * O desconto sai de `earlyDiscountFor`, a mesma conta que a conferência do
+ * pagamento faz — e com o piso: quando a porcentagem levaria a fatura abaixo
+ * de R$ 5,00, vai o fixo que para exatamente no piso. Sem `amountCents` (a
+ * atualização que só muda o vencimento) o desconto não vai, e o que o gateway
+ * já tem fica como está.
+ */
+export async function chargeTermsFor(amountCents, { billingType = 'UNDEFINED' } = {}) {
+  if (String(billingType).toUpperCase() === 'CREDIT_CARD') return {};
+  const termos = await effectiveChargesConfig();
+  const campos = {};
+  if (termos.finePercent > 0) campos.fine = { value: termos.finePercent, type: 'PERCENTAGE' };
+  if (termos.interestMonthlyPercent > 0) campos.interest = { value: termos.interestMonthlyPercent };
+  const desconto = amountCents === undefined || amountCents === null
+    ? null
+    : earlyDiscountFor(Number(amountCents), termos);
+  if (desconto) {
+    campos.discount = desconto.kind === 'percent'
+      ? { value: desconto.percent, dueDateLimitDays: desconto.daysBefore, type: 'PERCENTAGE' }
+      : { value: paraReais(desconto.cents), dueDateLimitDays: desconto.daysBefore, type: 'FIXED' };
+  }
+  return campos;
+}
+
+/**
  * Cria a cobrança e devolve o que o painel precisa guardar.
  *
  * `billingType: 'UNDEFINED'` de propósito: devolve uma página onde quem paga
@@ -179,7 +214,9 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
  * e um ISP que prefere um ou outro não precisa que a plataforma adivinhe. Pedir
  * `PIX` fecharia a porta do boleto, que é como metade deste mercado paga.
  */
-export async function createCharge({ customerRef, amountCents, currency = 'BRL', dueDate, description, reference }) {
+export async function createCharge({
+  customerRef, amountCents, currency = 'BRL', dueDate, description, reference, billingType = 'UNDEFINED'
+}) {
   // O gateway é brasileiro e cobra em reais; ele não tem campo de moeda. Um
   // plano em outra moeda gravaria essa moeda na tabela e cobraria reais no
   // gateway — a cobrança sairia com o número certo e a unidade errada. Recusar
@@ -194,13 +231,15 @@ export async function createCharge({ customerRef, amountCents, currency = 'BRL',
   const resposta = await chamar('/payments', {
     payload: {
       customer: customerRef,
-      billingType: 'UNDEFINED',
+      billingType,
       // O gateway fala em reais; o painel guarda centavos, como toda coluna de
       // dinheiro daqui. A conversão mora neste ponto e em nenhum outro.
       value: Number((amountCents / 100).toFixed(2)),
       dueDate,
       description,
-      externalReference: reference
+      externalReference: reference,
+      // Multa, juros e desconto, quando ligados — e nunca no cartão.
+      ...(await chargeTermsFor(amountCents, { billingType }))
     }
   });
 
@@ -367,10 +406,16 @@ export async function undoReceivedInCash(chargeId) {
  * guarda dela — o vencimento que o gateway de fato aceitou, que é o que vale
  * se ele arredondar para um dia útil.
  */
-export async function updateCharge(chargeId, { dueDate = undefined, value = undefined } = {}) {
+export async function updateCharge(chargeId, {
+  dueDate = undefined, value = undefined, amountCents = undefined, billingType = 'UNDEFINED'
+} = {}) {
   const payload = { billingType: 'UNDEFINED' };
   if (dueDate !== undefined) payload.dueDate = dueDate;
   if (value !== undefined) payload.value = paraReais(value);
+  // Os termos de hoje vão junto: o desconto é sobre o valor que a cobrança
+  // passa a ter (`value`), ou sobre o que ela já tem (`amountCents`, quando
+  // quem chama o sabe) — o piso de R$ 5,00 depende dele.
+  Object.assign(payload, await chargeTermsFor(value !== undefined ? value : amountCents, { billingType }));
   const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { payload });
   return {
     dueDate: resposta?.dueDate ? String(resposta.dueDate).slice(0, 10) : null,
@@ -493,7 +538,7 @@ export async function cancelInvoice(invoiceId) {
 }
 
 export default {
-  createCharge, cancelCharge, getCharge, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
+  createCharge, chargeTermsFor, cancelCharge, getCharge, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
   createCustomer, testConnection, apiKey, baseUrl, AsaasError,
   createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment
 };
