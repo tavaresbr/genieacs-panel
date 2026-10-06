@@ -74,7 +74,7 @@ export default class ContactWhatsappImportService {
     let created = 0;
     for (const step of plan.creates) {
       // eslint-disable-next-line no-await-in-loop -- each client is written with its own list row
-      await ContactProfileService.create({ name: step.name, whatsappPhone: step.phone }, actor);
+      await ContactProfileService.create({ name: step.name, whatsappPhone: step.phone }, actor, { importSource: 'whatsapp' });
       created += 1;
     }
     return { ...this.summary(plan), created };

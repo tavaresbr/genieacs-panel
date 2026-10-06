@@ -1592,6 +1592,15 @@ const SGP_CONTACT_TEIAH_COLUMNS = [
 ];
 
 /**
+ * De onde veio um cadastro que não é do SGP: `whatsapp` (a agenda do número
+ * conectado) ou `sheet` (a planilha). Nulo é o que o SGP trouxe ou a equipe
+ * digitou — é o que o filtro "Importados" da tela de Contatos separa.
+ */
+const SGP_CONTACT_IMPORT_COLUMNS = [
+  ['import_source', (t) => t.string('import_source', 16).nullable()]
+];
+
+/**
  * O que uma campanha de aviso (não de cobrança) guarda além do que
  * `wa_broadcasts` já tinha: de que tipo ela é, quando deve começar sozinha, o
  * anexo que vai junto com cada mensagem e os filtros que escolheram o público.
@@ -1689,6 +1698,7 @@ const sgpContactsTable = (db) => (t) => {
   for (const [, add] of SGP_CONTACT_SYNC_COLUMNS) add(t);
   for (const [, add] of SGP_CONTACT_PROFILE_COLUMNS) add(t);
   for (const [, add] of SGP_CONTACT_TEIAH_COLUMNS) add(t);
+  for (const [, add] of SGP_CONTACT_IMPORT_COLUMNS) add(t);
   t.timestamp('last_synced_at').defaultTo(db.fn.now());
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
@@ -5492,6 +5502,21 @@ export const migrations = [
       const missing = await missingColumns(db, 'wa_opt_outs', WA_OPT_OUT_CATEGORY_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('wa_opt_outs', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    id: '0099_sgp_contacts_import_source',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return true;
+      return (await missingColumns(db, 'sgp_contacts', SGP_CONTACT_IMPORT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return;
+      const missing = await missingColumns(db, 'sgp_contacts', SGP_CONTACT_IMPORT_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('sgp_contacts', (t) => {
         for (const add of missing) add(t);
       });
     }

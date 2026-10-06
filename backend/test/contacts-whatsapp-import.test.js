@@ -154,6 +154,42 @@ describe('POST /api/contacts/import/whatsapp', () => {
     assert.equal(joao.client_name, 'JOÃO', 'o que existia não muda');
   });
 
+  it('o filtro "Importados" separa quem veio da agenda e da planilha', async () => {
+    const importarCsv = (csv) => fetch(`${panelUrl}/api/contacts/import?mode=apply`, {
+      method: 'POST',
+      headers: { ...authHeaders(token), 'Content-Type': 'text/csv' },
+      body: csv
+    }).then(async (res) => ({ status: res.status, body: await res.json() }));
+    const planilha = await importarCsv('Nome;WhatsApp\nCarla da Planilha;93991110005\n');
+    assert.equal(planilha.status, 200, JSON.stringify(planilha.body));
+    assert.equal(planilha.body.data.created, 1);
+
+    const lista = (query) => call(`${panelUrl}/api/whatsapp/contacts${query}`, { headers: authHeaders(token) });
+    const todos = await lista('');
+    const nomes = (r) => r.body.data.contacts.map((c) => c.clientName).sort();
+    assert.ok(nomes(todos).includes('JOÃO'), 'sem o filtro, o cadastro do SGP aparece');
+
+    const importados = await lista('?imported=true');
+    assert.equal(importados.status, 200);
+    assert.deepEqual(nomes(importados), ['5593991110003', 'Carla da Planilha', 'Maria Nova']);
+    assert.equal(importados.body.data.total, 3);
+    const origem = new Map(importados.body.data.contacts.map((c) => [c.clientName, c.importSource]));
+    assert.equal(origem.get('Maria Nova'), 'whatsapp');
+    assert.equal(origem.get('Carla da Planilha'), 'sheet');
+    assert.equal(todos.body.data.contacts.find((c) => c.clientName === 'JOÃO').importSource, null);
+
+    // Combina com a situação: os importados não têm contrato, então "ativos" esvazia.
+    const ativos = await lista('?imported=true&state=active');
+    assert.equal(ativos.body.data.total, 0);
+  });
+
+  it('a exportação respeita o filtro "Importados"', async () => {
+    const res = await fetch(`${panelUrl}/api/contacts/export?imported=true`, { headers: authHeaders(token) });
+    const csv = await res.text();
+    assert.match(csv, /Maria Nova/);
+    assert.doesNotMatch(csv, /JOÃO/);
+  });
+
   it('a agenda de mais de 1 MB cabe: o teto é maior só para esta leitura', async () => {
     const grande = Array.from({ length: 12000 }, (_, i) => ({
       remoteJid: `5593988${String(100000 + i)}@s.whatsapp.net`,

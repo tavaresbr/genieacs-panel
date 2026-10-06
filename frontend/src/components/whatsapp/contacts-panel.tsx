@@ -66,6 +66,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   // Só quem está sem telefone — combina com a aba: "Ativos sem telefone" é a
   // lista para corrigir primeiro, porque quem está nela fica fora da cobrança.
   const [noPhone, setNoPhone] = useState(false)
+  // Só os cadastros que vieram de uma importação (agenda do WhatsApp ou planilha).
+  const [imported, setImported] = useState(false)
 
   const alive = useRef(true)
   // The newest request wins: a slow answer for "ben" must not overwrite the
@@ -109,14 +111,15 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     }
   }, [search, t, toast])
 
-  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean) => {
+  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean, onlyImported: boolean) => {
     const seq = ++requestSeq.current
     setLoading(true)
     const res = await whatsappAPI.listContacts({
       search: term || undefined,
       limit: PAGE,
       state: (state || undefined) as WhatsAppContactState | undefined,
-      noPhone: onlyNoPhone
+      noPhone: onlyNoPhone,
+      imported: onlyImported
     })
     if (!alive.current || seq !== requestSeq.current) return
     if (res.success && res.data) {
@@ -129,7 +132,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     setLoading(false)
   }, [t])
 
-  useEffect(() => { void load(debounced, stateFilter, noPhone) }, [debounced, stateFilter, noPhone, load])
+  useEffect(() => { void load(debounced, stateFilter, noPhone, imported) }, [debounced, stateFilter, noPhone, imported, load])
 
   const loadMore = useCallback(async () => {
     const seq = requestSeq.current
@@ -139,7 +142,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       limit: PAGE,
       offset: contacts.length,
       state: (stateFilter || undefined) as WhatsAppContactState | undefined,
-      noPhone
+      noPhone,
+      imported
     })
     if (!alive.current) return
     setLoadingMore(false)
@@ -154,7 +158,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       ...page.filter((row) => !current.some((held) => held.key === row.key))
     ])
     setTotal(res.data.total)
-  }, [contacts.length, debounced, stateFilter, noPhone, t, toast])
+  }, [contacts.length, debounced, stateFilter, noPhone, imported, t, toast])
 
   const open = useCallback(async (contact: WhatsAppContact) => {
     setOpeningContract(contact.key)
@@ -190,7 +194,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const exportSheet = async () => {
     setExporting(true)
     try {
-      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone })
+      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone, imported })
       if (!res.success || !res.blob) {
         toast.error(res.message || t('contacts.sheet.exportFailed'))
         return
@@ -226,6 +230,11 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     <span className="flex flex-wrap items-center gap-1.5">
       {contact.document && (
         <span className="text-xs text-muted-foreground">{contact.document}</span>
+      )}
+      {contact.importSource && (
+        <span className="modern-badge-info" title={t('whatsapp.contacts.importedHint')}>
+          {t('whatsapp.contacts.imported')}
+        </span>
       )}
       {!contact.hasDevice && (
         <span className="modern-badge" title={t('whatsapp.contacts.noDeviceHint')}>
@@ -309,7 +318,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           <button
             type="button"
             className="modern-button-secondary"
-            onClick={() => void load(debounced, stateFilter, noPhone)}
+            onClick={() => void load(debounced, stateFilter, noPhone, imported)}
             disabled={loading}
           >
             <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
@@ -323,7 +332,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           onClose={() => setImporting(false)}
           onApplied={() => {
             setImporting(false)
-            void load(debounced, stateFilter, noPhone)
+            void load(debounced, stateFilter, noPhone, imported)
           }}
         />
       )}
@@ -386,6 +395,17 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
             <Icon name="phone" size={16} />
             {t('whatsapp.contacts.filterNoPhone')}
             {noPhone && <Icon name="x" size={14} />}
+          </button>
+          <button
+            type="button"
+            className={imported ? 'modern-button' : 'modern-button-secondary'}
+            aria-pressed={imported}
+            data-testid="wa-contacts-imported"
+            onClick={() => setImported((current) => !current)}
+          >
+            <Icon name="copy" size={16} />
+            {t('whatsapp.contacts.filterImported')}
+            {imported && <Icon name="x" size={14} />}
           </button>
         </div>
       )}
