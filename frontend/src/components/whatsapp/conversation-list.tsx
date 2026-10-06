@@ -1,6 +1,7 @@
 'use client'
 
 import { TagChip } from '@/components/whatsapp/tags'
+import { BILLING_BADGE, BILLING_FRAME, billingLabel } from '@/lib/wa-billing-status'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation } from '@/lib/api'
@@ -106,6 +107,10 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
         // alguém (ou o bot) responder. `motion-safe`: quem pediu menos
         // movimento ao sistema vê a marca parada.
         const aguardando = conversation.awaitingSince ? minutesSince(conversation.awaitingSince) : null
+        // A moldura da situação financeira: verde em dia, amarela vence hoje,
+        // vermelha atrasado. Sem consulta ao SGP ainda, sem moldura.
+        const situacao = conversation.billing ?? null
+        const rotulo = situacao ? billingLabel(situacao.status, situacao.daysOverdue) : null
         const faixa = numero
           ? `${numero.className} shadow-[inset_4px_0_0_0_hsl(var(--wa-account))]`
           : active ? 'shadow-[inset_3px_0_0_0_hsl(var(--primary))]' : ''
@@ -115,7 +120,7 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
               type="button"
               onClick={() => onSelect(conversation)}
               aria-current={active ? 'true' : undefined}
-              className={`flex w-full flex-col gap-1.5 px-3 py-3 text-start transition-colors ${faixa} ${
+              className={`flex w-full flex-col gap-1.5 px-3 py-3 text-start transition-colors ${faixa} ${situacao ? BILLING_FRAME[situacao.status] : ''} ${
                 active
                   ? 'bg-[hsl(var(--surface-subtle))]'
                   : aguardando !== null
@@ -154,6 +159,11 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                   <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
                     <Icon name="check" size={12} />
                     {t('whatsapp.inbox.closed')}
+                  </span>
+                )}
+                {situacao && rotulo && situacao.status !== 'ok' && (
+                  <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold ${BILLING_BADGE[situacao.status]}`}>
+                    {t(rotulo.key, rotulo.vars)}
                   </span>
                 )}
                 {aguardando !== null && !waiting?.has(conversation.id) && (

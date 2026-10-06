@@ -1,3 +1,4 @@
+import type { ConversationBilling } from '@/lib/wa-billing-status'
 import type { NotificationItem } from '@/lib/wa-notify'
 import { getActiveLocale, translate } from '@/lib/i18n'
 import type { LoginResponse, OperatorRole, User } from '@/types'
@@ -4869,6 +4870,8 @@ export interface WhatsAppConversation {
   waitingSince?: string | null
   /** O cliente falou por último e ninguém respondeu: desde a primeira mensagem sem resposta. */
   awaitingSince?: string | null
+  /** Em dia, vence hoje ou atrasado, pela última consulta ao SGP; null sem foto. */
+  billing?: ConversationBilling | null
   /** As etiquetas da conversa, em ordem de nome. */
   tags?: WhatsAppTag[]
   createdAt: string | null
