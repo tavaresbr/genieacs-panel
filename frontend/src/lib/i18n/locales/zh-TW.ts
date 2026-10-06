@@ -3828,6 +3828,7 @@ const zhTW: Dictionary = {
   'plan.cycle.unavailable': '無按年選項',
   'plan.cycle.hint': '週期變更於續約時生效；在此之前，已付費的週期繼續有效。',
   'plan.cycle.couponYears': '您的優惠券依計費週期計算：按年方案中，每個週期是一張年度帳單，也就是一年。',
+  'plan.cycle.couponDropped': "優惠券 {code} 不適用於按年方案：年度帳單將不使用該優惠券開立，並在按年週期開始時移除。",
   'plan.options.confirmCycleScheduled': '切換到 {name}（{price}）？變更將於續約日 {date} 生效；在此之前已付費的週期繼續有效，續約帳單將以新金額開立。',
   'plan.options.scheduled': '已排定',
   'plan.pending.title': '已排定更換：自 {date} 起使用 {plan}',
@@ -4404,6 +4405,7 @@ const zhTW: Dictionary = {
   'plan.coupon.nextInvoice': "下一張帳單：{price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "按比例",
+  'charges.overage': "超額",
   'plan.proration.preview': "現在升級：按比例收取 {amount}（剩餘 {days} 天）",
   'plan.proration.confirm': "您現在將支付 {amount}（剩餘 {days} 天）。",
   'plan.proration.belowMinimum': "本期差額低於最低金額，現在不收取。",
@@ -4445,9 +4447,11 @@ const zhTW: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "超出方案的用量（{resource}）：{units} × {unit} = {total}，計入下一張帳單",
   'plan.overage.hint': "此方案超出上限不會被阻擋：超出的單位依週期峰值用量計入續約帳單。",
+  'plan.overage.hintAnnual': "按年方案中，超出上限不會被封鎖：超出的單位每月依當月峰值，以僅含超額費用的帳單計費。",
   'plan.overage.total': "下一張帳單的超額：{total}",
   'charges.pricing.base': "方案：{amount}",
   'charges.pricing.overage': "超額（{resource}）：{units} × {unit} = {total}",
+  'charges.pricing.trueUp': "超額補差（{resource}，截至 {date} 的週期）：{units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "推薦有禮",
   'referrals.subtitle': "透過您的連結推薦其他服務商。對方支付首月費用後,您的下一張帳單將獲得 {amount} 的折抵額度。",

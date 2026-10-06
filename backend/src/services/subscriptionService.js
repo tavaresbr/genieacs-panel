@@ -122,6 +122,16 @@ function precoAnualDe(plano) {
   return Number.isFinite(valor) && valor > 0 ? Math.floor(valor) : null;
 }
 
+/**
+ * O cupom de retenção do ciclo anual (0106 + 0103): o desconto de N meses da
+ * configuração levado a UMA fatura anual. É do sistema, como o de retenção.
+ */
+export const ANNUAL_RETENTION_KIND = 'retention_annual';
+
+export function isAnnualRetentionCoupon(coupon) {
+  return coupon?.system_kind === ANNUAL_RETENTION_KIND;
+}
+
 /** Se o plano pode ser cobrado no ciclo anual: só com `price_yearly_cents`. */
 export function annualAvailable(plan) {
   return precoAnualDe(plan) !== null;
@@ -190,6 +200,15 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null, c
         // O preço sem o crédito reservado nela (0105): é ele que diz QUAL
         // plano a cobrança cobrou — `cents` é o que se esperava receber.
         baseCents: Math.floor(valor) + BillingCharge.creditReservedOf(cobranca),
+        // O preço do PLANO (já com o cupom) que a conta dela diz (0104) — sem
+        // o excedente nem o crédito: é o que a receita compara com o preço
+        // cheio para estimar o desconto. Nulo sem conta, ou com o valor
+        // mudado à mão (aí o valor inteiro é a decisão de gente).
+        planBaseCents: (() => {
+          if (cobranca.amount_overridden_at) return null;
+          const base = Number(BillingCharge.pricingDetailOf(cobranca)?.base);
+          return Number.isFinite(base) && base >= 0 ? Math.floor(base) : null;
+        })(),
         motivo: null,
         fonte: 'charge',
         // A fatura de pró-rata (0101) não compra período: ver `recordPayment`.
@@ -243,7 +262,15 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null, c
           // de uma pró-rata reemitida continua sendo pró-rata, e não compra
           // período (ver `recordPayment`).
           kind: trocada.row.kind || 'renewal',
-          chargeId: Number(trocada.row.id)
+          chargeId: Number(trocada.row.id),
+          // O plano e o ciclo que a cobrança VELHA cobrava, quando a entrada
+          // os guardou: é o período deles que o pagamento compra.
+          ...(trocada.superseded.planId !== null && trocada.superseded.planId !== undefined ? {
+            planId: Number(trocada.superseded.planId),
+            couponId: trocada.superseded.couponId === null || trocada.superseded.couponId === undefined
+              ? null : Number(trocada.superseded.couponId),
+            billingCycle: trocada.superseded.billingCycle ?? null
+          } : {})
         };
       }
     }
@@ -256,7 +283,7 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null, c
   if (!Number.isFinite(preco) || preco <= 0) return { cents: null, motivo: 'nothing_asked', fonte: null };
   const moedaPlano = String(plano?.currency || '').toUpperCase();
   if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
-  return { cents: Math.floor(preco), motivo: null, fonte: 'plan' };
+  return { cents: Math.floor(preco), planBaseCents: Math.floor(preco), motivo: null, fonte: 'plan' };
 }
 
 /** O fuso das datas de cobrança — o mesmo de `ChargeIssuingService.BILLING_TIMEZONE`. */
@@ -985,7 +1012,17 @@ class SubscriptionService {
     if (coupon.duration !== 'forever') {
       const restantes = Number(subscription.coupon_cycles_left);
       if (!Number.isFinite(restantes) || restantes <= 0) return false;
+      // A troca para o ANUAL (0103): o cupom de N faturas resgatado no
+      // mensal não desconta a fatura do ano — "20% por 3 meses" viraria 20%
+      // de um ano inteiro. A fatura anual da troca sai sem ele, e ele sai da
+      // assinatura quando o anual passa a valer (`dropCouponForAnnual`). O
+      // desconto de retenção do anual é calculado PARA o anual, e vale.
+      if (subscription.cycle_switch_from && subscription.cycle_switch_from !== 'annual'
+        && this.cycleOf(subscription, plan) === 'annual' && !isAnnualRetentionCoupon(coupon)) return false;
     }
+    // O desconto de retenção do anual (equivalente aos meses da configuração
+    // numa fatura anual) só desconta a fatura anual.
+    if (isAnnualRetentionCoupon(coupon) && this.cycleOf(subscription, plan) !== 'annual') return false;
     const planos = parseCouponPlanIds(coupon.plan_ids);
     return planos === null || planos.includes(Number(plan.id));
   }
@@ -1042,7 +1079,54 @@ class SubscriptionService {
   static scheduledView(subscription) {
     if (!subscription) return subscription;
     const ciclo = parseBillingCycle(subscription.pending_billing_cycle);
-    return ciclo ? { ...subscription, billing_cycle: ciclo } : subscription;
+    return ciclo ? this.inCycle(subscription, ciclo) : subscription;
+  }
+
+  /**
+   * A assinatura vista num ciclo (0103) — com a marca de onde ela vem
+   * (`cycle_switch_from`) quando é uma TROCA de ciclo: é por ela que o cupom
+   * de N faturas do mensal não desconta a fatura anual (`couponApplies`).
+   */
+  static inCycle(subscription, ciclo) {
+    if (!subscription) return subscription;
+    const de = subscription.cycle_switch_from ?? (parseBillingCycle(subscription.billing_cycle) ?? 'monthly');
+    return { ...subscription, billing_cycle: ciclo, ...(de !== ciclo ? { cycle_switch_from: de } : {}) };
+  }
+
+  /**
+   * Tira o cupom que não é `forever` quando a assinatura PASSA ao anual
+   * (0103) — a troca agendada aplicada, ou a troca na hora. O cupom de N
+   * faturas foi dado no mensal, e no anual cada fatura é um ano: N anos de
+   * desconto. Fica o `forever` (desconto permanente é permanente) e o de
+   * retenção do anual (calculado para o anual). Condicional ao cupom lido; o
+   * extrato registra `coupon.removed` com `reason: 'cycle_change'`.
+   *
+   * @returns {Promise<object|null>} o que saiu, ou nulo
+   */
+  static async dropCouponForAnnual(before, { trx = null, actorUserId = null } = {}) {
+    if (!before?.coupon_id || !before.tenant_id) return null;
+    const db = trx ?? getDb();
+    const cupom = await Coupon.findById(before.coupon_id, db);
+    if (cupom && (cupom.duration === 'forever' || isAnnualRetentionCoupon(cupom))) return null;
+    const ok = await Subscription.setCoupon(before.tenant_id, { expectCouponId: before.coupon_id, couponId: null }, db);
+    if (!ok) return null;
+    const saiu = {
+      coupon: cupom ? {
+        id: Number(cupom.id), code: cupom.code, kind: cupom.kind, value: Number(cupom.value), duration: cupom.duration
+      } : { id: Number(before.coupon_id) },
+      cyclesLeft: before.coupon_cycles_left === null || before.coupon_cycles_left === undefined
+        ? null : Number(before.coupon_cycles_left),
+      source: 'system',
+      reason: 'cycle_change'
+    };
+    await BillingEvent.record({
+      subscriptionId: before.id,
+      type: BILLING_EVENT_TYPES.COUPON_REMOVED,
+      createdBy: actorUserId,
+      detail: saiu
+    }, trx);
+    cache.invalidate();
+    return saiu;
   }
 
   /**
@@ -1145,11 +1229,22 @@ class SubscriptionService {
     if (!renovacao || renovacao.getTime() <= now.getTime()) return nada;
     const antigo = this.priceFor(subscription, fromPlan, coupon);
     const novo = this.priceFor(subscription, toPlan, coupon);
-    if (!(novo > antigo)) return nada;
+    // Pelo preço POR DIA de cada plano (0103): com `period_days` diferentes
+    // (o de 60 dias contra o de 30), a fatura maior pode ser o dia mais
+    // barato, e a menor o mais caro — e é o dia que diz se é subida (a mesma
+    // régua de `SelfBillingService.changePlan`). A diferença por dia × o
+    // tempo que falta; no mesmo período, é a conta de sempre:
+    //   ⌈ (novo − antigo) × restante ÷ período ⌉.
+    const diasDe = this.cyclePeriodDays(subscription, fromPlan ?? toPlan);
+    const diasPara = this.cyclePeriodDays(subscription, toPlan);
+    if (!(novo * diasDe > antigo * diasPara)) return nada;
     // O período do CICLO de agora (0103): a pró-rata é dentro do mesmo ciclo.
-    const periodoS = this.cyclePeriodDays(subscription, fromPlan ?? toPlan) * 86_400;
+    const periodoS = diasDe * 86_400;
     const restantesS = Math.floor((renovacao.getTime() - now.getTime()) / 1000);
-    const valor = Math.ceil(((novo - antigo) * restantesS) / periodoS);
+    // Em inteiros grandes, exata: (novo/diasPara − antigo/diasDe) × restante/dia.
+    const numerador = BigInt(novo * diasDe - antigo * diasPara) * BigInt(restantesS);
+    const denominador = BigInt(diasDe * diasPara * 86_400);
+    const valor = Number((numerador + denominador - 1n) / denominador);
     const quote = {
       eligible: true,
       amountCents: valor,
@@ -1409,9 +1504,83 @@ class SubscriptionService {
     return parcelas;
   }
 
+  /**
+   * As parcelas de excedente de um período pelas linhas de `usage_peaks`
+   * (`UsagePeak.rowsForPeriod`): pela FOTOGRAFIA do plano que valia quando o
+   * excedente maior foi medido (o teto e o preço de então), e — na linha sem
+   * fotografia — pelo plano `plan` de agora, como antes. Cada parcela leva a
+   * chave do período (`periodKey`).
+   */
+  static overageFromRows(plan, rows, periodKey = null) {
+    const parcelas = [];
+    const semFoto = {};
+    for (const resource of USAGE_RESOURCES) {
+      const linha = rows?.[resource];
+      if (!linha) continue;
+      if (linha.unitCents === null || linha.unitCents === undefined || linha.limit === null || linha.limit === undefined) {
+        semFoto[resource] = linha.peak;
+        continue;
+      }
+      const uso = Math.floor(Number(linha.overagePeak ?? linha.peak));
+      const units = Math.max(0, uso - Math.floor(Number(linha.limit)));
+      if (!(units > 0)) continue;
+      const unitCents = Math.floor(Number(linha.unitCents));
+      parcelas.push({
+        resource, peak: uso, limit: Math.floor(Number(linha.limit)), unitCents, units, cents: units * unitCents
+      });
+    }
+    parcelas.push(...this.overageFor(plan, semFoto));
+    const ordem = (r) => USAGE_RESOURCES.indexOf(r);
+    parcelas.sort((a, b) => ordem(a.resource) - ordem(b.resource));
+    return periodKey ? parcelas.map((item) => ({ ...item, periodKey })) : parcelas;
+  }
+
   /** A chave do período que a renovação desta assinatura fecha, ou nulo (sem período pago). */
   static overagePeriodKey(subscription) {
     return subscription?.renews_at ? chaveDoPeriodo(subscription.renews_at) : null;
+  }
+
+  /**
+   * As fatias MENSAIS do período anual (0104 + 0103): o excedente de quem é
+   * anual não espera um ano — é medido e cobrado a cada `period_days` do
+   * plano (o mês), numa fatura de só excedente por fatia
+   * (`ChargeIssuingService.issueOverageSlices`).
+   *
+   * O ano `[renews_at − 365 dias, renews_at)` em `floor(365 ÷ period_days)`
+   * fatias de `period_days` dias; a última vai até `renews_at` (com o resto:
+   * 35 dias, no mês de 30) e tem a chave da própria renovação — é a fatura
+   * do ano seguinte que a fecha, como no mensal. Vazio fora do anual ou sem
+   * período pago.
+   *
+   * @returns {Array<{ start: Date, end: Date, key: string, last: boolean }>}
+   */
+  static overageSlices(subscription, plan) {
+    const fim = asDate(subscription?.renews_at);
+    if (!fim || this.cycleOf(subscription, plan) !== 'annual') return [];
+    const dias = periodoDoPlano(plan);
+    const inicio = new Date(fim.getTime() - ANNUAL_PERIOD_DAYS * DAY_MS);
+    const n = Math.max(1, Math.floor(ANNUAL_PERIOD_DAYS / dias));
+    const fatias = [];
+    for (let k = 1; k <= n; k += 1) {
+      const ultima = k === n;
+      const de = new Date(inicio.getTime() + (k - 1) * dias * DAY_MS);
+      const ate = ultima ? fim : new Date(inicio.getTime() + k * dias * DAY_MS);
+      fatias.push({ start: de, end: ate, key: chaveDoPeriodo(ate), last: ultima });
+    }
+    return fatias;
+  }
+
+  /**
+   * A chave em que o pico de AGORA se grava: a do período que a renovação
+   * fecha, no mensal; a da fatia mensal corrente, no anual.
+   */
+  static usagePeakKey(subscription, plan, now = new Date()) {
+    const fatias = this.overageSlices(subscription, plan);
+    if (fatias.length) {
+      const corrente = fatias.find((f) => now.getTime() >= f.start.getTime() && now.getTime() < f.end.getTime());
+      if (corrente) return corrente.key;
+    }
+    return this.overagePeriodKey(subscription);
   }
 
   /**
@@ -1434,7 +1603,9 @@ class SubscriptionService {
   static async recordUsagePeaks({ countDevices = null, now = new Date() } = {}) {
     const subscription = await Subscription.forTenant(currentTenantId());
     if (!subscription) return { recorded: false, reason: 'no_subscription' };
-    const periodo = this.overagePeriodKey(subscription);
+    const planoDaFatia = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
+    // No anual (0103), a fatia mensal corrente (`overageSlices`).
+    const periodo = this.usagePeakKey(subscription, planoDaFatia, now);
     if (!periodo) return { recorded: false, reason: 'no_period' };
     // A pausa de retenção CORRENDO (0106): o período pago acabou, o painel só
     // lê e nada se cobra — e o tempo pausado não vira excedente. Sem esta
@@ -1445,7 +1616,7 @@ class SubscriptionService {
     // período pago para a chave nova. O cancelamento agendado continua
     // medindo: desfeito, a renovação cobra o excedente do período que usou.
     if (isPaused(subscription, now)) return { recorded: false, reason: 'paused' };
-    const plano = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
+    const plano = planoDaFatia;
     const limites = this.limitsOf(plano);
     const precos = this.overagePricesOf(plano);
     const medir = USAGE_RESOURCES.filter((recurso) => limites[recurso] !== null && precos[recurso]);
@@ -1464,7 +1635,10 @@ class SubscriptionService {
     const peaks = {};
     for (const [recurso, valor] of Object.entries(agora)) {
       // eslint-disable-next-line no-await-in-loop -- três recursos no máximo
-      peaks[recurso] = await UsagePeak.record(periodo, recurso, valor);
+      // Com a fotografia do plano em vigor (0104): o teto e o preço de agora.
+      peaks[recurso] = await UsagePeak.record(periodo, recurso, valor, {
+        limit: limites[recurso], unitCents: precos[recurso]
+      });
     }
     return { recorded: true, periodEnd: periodo, peaks };
   }
@@ -1633,19 +1807,26 @@ class SubscriptionService {
   static async presentOverage(state, usoAgora) {
     const precos = this.overagePricesOf(state?.plan);
     if (!precos.operators && !precos.subscribers && !precos.devices) return null;
-    const periodo = this.overagePeriodKey(state?.subscription);
-    const guardados = periodo ? await UsagePeak.forPeriod(periodo) : {};
-    const picos = {};
+    // No anual (0103), a fatia mensal corrente: é ela que vira fatura.
+    const anual = this.overageSlices(state?.subscription, state?.plan).length > 0;
+    const periodo = this.usagePeakKey(state?.subscription, state?.plan);
+    const linhas = periodo ? await UsagePeak.rowsForPeriod(periodo) : {};
+    // O que se deve pelas fotografias gravadas, e o que o uso de AGORA deve
+    // pelo plano de agora — por recurso, o maior dos dois.
+    const gravadas = periodo ? this.overageFromRows(state.plan, linhas) : [];
+    const agora = periodo ? this.overageFor(state.plan, usoAgora ?? {}) : [];
+    const items = [];
     for (const recurso of USAGE_RESOURCES) {
-      const valores = [guardados?.[recurso], usoAgora?.[recurso]]
-        .filter((valor) => valor !== null && valor !== undefined && Number.isFinite(Number(valor)))
-        .map(Number);
-      picos[recurso] = valores.length ? Math.max(...valores) : null;
+      const candidatos = [...gravadas, ...agora].filter((item) => item.resource === recurso);
+      if (!candidatos.length) continue;
+      items.push(candidatos.reduce((maior, item) => (item.cents > maior.cents ? item : maior)));
     }
-    const items = periodo ? this.overageFor(state.plan, picos) : [];
     return {
       prices: precos,
       periodEnd: periodo,
+      // Como o excedente é cobrado: na fatura da renovação (`renewal`), ou
+      // numa fatura de só excedente a cada mês do anual (`monthly`).
+      billing: anual ? 'monthly' : 'renewal',
       items,
       totalCents: items.reduce((soma, item) => soma + item.cents, 0),
       currency: String(state?.plan?.currency || 'BRL').toUpperCase()
@@ -1710,6 +1891,12 @@ class SubscriptionService {
         ...(eventDetail ?? {})
       }
     });
+    // Passou ao anual agora: o cupom de N faturas do mensal sai (0103).
+    if (ciclo === 'annual' && cicloAntes !== 'annual' && before?.coupon_id) {
+      await this.dropCouponForAnnual(before, { actorUserId });
+      cache.invalidate();
+      return Subscription.forTenant(tenantId);
+    }
     cache.invalidate();
     return subscription;
   }
@@ -1832,6 +2019,7 @@ class SubscriptionService {
         ...(travada ? { locked: true } : {})
       }
     });
+    if (cycleChangeDetail(subscription).cycleTo === 'annual') await this.dropCouponForAnnual(subscription);
     cache.invalidate();
     return { applied: true, from: subscription.plan_id ?? null, to: plano.id, locked: travada };
   }
@@ -2424,7 +2612,6 @@ class SubscriptionService {
     // agendado, quando o período já é da troca agendada — a fatura anual da
     // renovação estende 365 dias, e a mensal depois do anual, um mês.
     const doPeriodo = plano === planoAgendado ? this.scheduledView(before) : before;
-    const dias = periodDays ?? this.cyclePeriodDays(doPeriodo, plano);
 
     // O cupom (0093): o preço que a fatura deste período pediu já tem o
     // desconto, e é contra ele que se confere quando não há cobrança.
@@ -2459,7 +2646,9 @@ class SubscriptionService {
     // ela completa já está pago; o que ela paga é a diferença de preço dele.
     // (A reativação de quem foi suspenso por inadimplência, quando paga a
     // pró-rata, volta a `active` SEM estender o prazo — é por esta marca.)
-    const isProration = pedido.kind === 'proration';
+    // A de só excedente (0104) é avulsa do mesmo jeito: paga o consumo, não
+    // compra período.
+    const isProration = pedido.kind === 'proration' || pedido.kind === 'overage';
     // Pagar a menos POR CAUSA do desconto por antecipação é pagar o inteiro:
     // ver `descontoAntecipado`. A multa e os juros, do outro lado, chegam como
     // pagamento a mais — e a mais já credita, logo acima.
@@ -2528,6 +2717,37 @@ class SubscriptionService {
       const pagoBarato = veredito ?? (plano === planoAgendado);
       destinoDaDescida = pagoBarato ? 'lock' : 'postpone';
     }
+    // O plano e o ciclo do período que ESTE pagamento compra — e os dias.
+    //
+    // Decididos DEPOIS do destino da descida, e pela cobrança paga quando ela
+    // os diz: o palpite de cima (`plano`/`doPeriodo`) é o que a emissão teria
+    // pedido hoje, e não o que a fatura paga pediu. Sem isto, a renovação
+    // MENSAL do plano atual (a descida + anual estava bloqueada pelo uso
+    // quando ela saiu) paga com a descida agendada já cabendo no uso comprava
+    // 365 dias pelo preço de um mês.
+    //
+    //   - a descida adiada (`postpone`): o plano atual, no ciclo de agora;
+    //   - a cobrança com plano gravado (0093) responde: o plano dela no ciclo
+    //     dela (nulo é linha de antes do 0103, mensal);
+    //   - a descida travada (`lock`): o agendado, no ciclo agendado.
+    let planoDoPeriodo = plano;
+    let vistaDoPeriodo = doPeriodo;
+    const pelaCobrancaComPlano = (pedido.fonte === 'charge' || pedido.fonte === 'superseded_charge')
+      && pedido.planId !== null && pedido.planId !== undefined;
+    if (destinoDaDescida === 'postpone') {
+      planoDoPeriodo = planoAtual;
+      vistaDoPeriodo = before;
+    } else if (pelaCobrancaComPlano) {
+      const idCobrado = Number(pedido.planId);
+      planoDoPeriodo = planoAtual && Number(planoAtual.id) === idCobrado ? planoAtual
+        : planoAgendado && Number(planoAgendado.id) === idCobrado ? planoAgendado
+          : ((await Plan.findById(idCobrado)) ?? plano);
+      vistaDoPeriodo = this.inCycle(before, parseBillingCycle(pedido.billingCycle) ?? 'monthly');
+    } else if (destinoDaDescida === 'lock') {
+      planoDoPeriodo = planoAgendado;
+      vistaDoPeriodo = this.scheduledView(before);
+    }
+    const dias = periodDays ?? this.cyclePeriodDays(vistaDoPeriodo, planoDoPeriodo);
     const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();
     const descida = destinoDaDescida === 'lock' && descidaVenceu ? planoAgendado : null;
 
@@ -2605,7 +2825,8 @@ class SubscriptionService {
     // entrou, e a marca da subida (`upgraded_at`, que adia a descida para a
     // renovação seguinte) não tem mais o que proteger — se não sobrou outra
     // pró-rata em aberto.
-    if (isProration && !underpaid && before.upgraded_at && !outrasProrratas.length) {
+    if (pedido.kind === 'proration' && !underpaid && before.upgraded_at
+      && !outrasProrratas.some((linha) => linha.kind === 'proration')) {
       patch.upgraded_at = null;
     }
     const statusAfter = patch.status ?? before.status;
@@ -2623,7 +2844,7 @@ class SubscriptionService {
     // aplicar o cupom a um suspenso, não gasta o ciclo que não descontou.
     let faturaComCupom = false;
     if (cupom && !pedido.overridden) {
-      if (pedido.fonte === 'charge' && pedido.planId !== null && pedido.planId !== undefined) {
+      if (pelaCobrancaComPlano) {
         faturaComCupom = Number(pedido.couponId) === Number(cupom.id);
       } else {
         faturaComCupom = this.couponApplies(before, plano, cupom)
@@ -2679,7 +2900,8 @@ class SubscriptionService {
             // empurrou o cancelamento agendado para o fim do período pago.
             ...(patch.paused_until === null && before.paused_until
               ? { pauseEnded: true, pausedUntil: isoOf(before.paused_until) } : {}),
-            ...(patch.cancel_at && before.cancel_at ? { cancelAtMoved: isoOf(patch.cancel_at) } : {}),
+            ...(patch.cancel_at && before.cancel_at
+              ? { cancelAtMoved: isoOf(patch.cancel_at), cancelAtBefore: isoOf(before.cancel_at) } : {}),
             renewsAt,
             // O prazo de ANTES, e quantos dias o plano deu, viajam junto para
             // o estorno (`reversePayment`): desfazer um pagamento é devolver o
@@ -2689,8 +2911,8 @@ class SubscriptionService {
             renewsBefore: isoOf(before.renews_at),
             ...(reactivates ? {
               periodDays: dias,
-              planId: plano?.id ?? null,
-              billingCycle: plano ? this.cycleOf(doPeriodo, plano) : null
+              planId: planoDoPeriodo?.id ?? null,
+              billingCycle: planoDoPeriodo ? this.cycleOf(vistaDoPeriodo, planoDoPeriodo) : null
             } : {}),
             // A trava da descida agendada foi posta POR este pagamento, e
             // QUANDO: o estorno dele a tira, porque o que a pagou voltou — mas
@@ -2702,6 +2924,11 @@ class SubscriptionService {
             // lugar onde alguém reconstrói, meses depois, por que aquele
             // pagamento não esticou o período.
             expectedCents: pedido.cents,
+            // O preço do plano com o cupom que esta fatura pediu, sem o
+            // excedente nem o crédito — o que a receita compara com o preço
+            // cheio para estimar o desconto (`revenueReportService`).
+            ...(pedido.planBaseCents !== null && pedido.planBaseCents !== undefined && !isProration
+              ? { baseCents: pedido.planBaseCents } : {}),
             ...(pedido.motivo ? { amountCheck: pedido.motivo } : {}),
             ...(underpaid ? { underpaid: true, shortfallCents: pedido.cents - amount } : {}),
             ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {}),
@@ -2739,6 +2966,9 @@ class SubscriptionService {
               locked: true
             }
           }, trx);
+          if (cycleChangeDetail(before).cycleTo === 'annual') {
+            await this.dropCouponForAnnual(before, { trx, actorUserId });
+          }
         }
         return Object.keys(patch).length
           ? Subscription.upsertForTenant(tenantId, patch, trx)
@@ -2890,6 +3120,17 @@ class SubscriptionService {
       // segue registrado.
       console.warn(`Refund of payment ${referencia} for provider ${tenantId}: the subscription has no renewal date to roll back`);
     }
+    // O cancelamento agendado que ESTE pagamento empurrou (0106) volta à data
+    // de antes — o período que o empurrou foi devolvido. Só se a data ainda é
+    // a que ele gravou (com a folga do segundo do MySQL): outra mudança
+    // depois (desfeito, reagendado) fica.
+    const cancelaAntes = asDate(quemEstendeu?.cancelAtBefore);
+    const cancelaMovido = asDate(quemEstendeu?.cancelAtMoved);
+    const cancelaAgora = asDate(before.cancel_at);
+    if (cancelaAntes && cancelaMovido && cancelaAgora && before.status !== 'canceled'
+      && Math.abs(cancelaAgora.getTime() - cancelaMovido.getTime()) < 1000) {
+      patch.cancel_at = cancelaAntes;
+    }
     // A trava só sai se é a que ESTE pagamento pôs — o mesmo instante, com a
     // folga do segundo que o MySQL arredonda. Evento antigo, sem o instante
     // gravado, não destrava nada: sem como provar de quem é a trava, ela fica.
@@ -2940,14 +3181,30 @@ class SubscriptionService {
               : 0,
             basis,
             ...(patch.pending_plan_locked_at === null ? { pendingUnlocked: true } : {}),
+            ...(patch.cancel_at ? { cancelAtRestored: patch.cancel_at.toISOString() } : {}),
             ...(devolucao ? { couponRestored: { id: Number(gastou.id), code: gastou.code ?? null, ...devolucao } } : {}),
             ...(indicacaoDesfeita ?? {}),
             ...(creditoDevolvido ? { creditRestored: { chargeId: Number(cobrancaPaga.id), cents: creditoDevolvido } } : {})
           }
         }, trx);
-        return Object.keys(patch).length
-          ? Subscription.upsertForTenant(tenantId, patch, trx)
-          : Subscription.forTenant(tenantId, trx);
+        return {
+          linha: Object.keys(patch).length
+            ? await Subscription.upsertForTenant(tenantId, patch, trx)
+            : await Subscription.forTenant(tenantId, trx),
+          indicacaoDesfeita
+        };
+      }).then(async ({ linha, indicacaoDesfeita }) => {
+        // O crédito de indicação cancelado ainda reservado em faturas abertas
+        // de quem indicou: elas voltam ao preço sem ele (0105).
+        const desfeita = indicacaoDesfeita?.referralRewardCanceled;
+        if (desfeita?.creditId) {
+          await ReferralService.releaseCanceledCreditReservations({
+            referrerTenantId: desfeita.referrerTenantId, creditId: desfeita.creditId
+          }).catch((error) => {
+            console.error(`Could not release the reservations of canceled referral credit ${desfeita.creditId}: ${error.message}`);
+          });
+        }
+        return linha;
       });
       return {
         subscription,

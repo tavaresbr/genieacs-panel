@@ -3829,6 +3829,7 @@ const en = {
   'plan.cycle.unavailable': 'No annual option',
   'plan.cycle.hint': 'A cycle change takes effect at renewal; until then the period you already paid for stays valid.',
   'plan.cycle.couponYears': 'Your coupon counts billing cycles: on the annual plan, each cycle is one annual invoice, that is, one year.',
+  'plan.cycle.couponDropped': "The coupon {code} does not apply to the annual plan: the annual invoice is issued without it, and it is removed when the annual cycle starts.",
   'plan.options.confirmCycleScheduled': 'Switch to {name} ({price})? The change takes effect at renewal, on {date}; until then the period you already paid for stays valid, and the renewal invoice already uses the new amount.',
   'plan.options.scheduled': 'Scheduled',
   'plan.pending.title': 'Scheduled change: {plan} starting {date}',
@@ -4405,6 +4406,7 @@ const en = {
   'plan.coupon.nextInvoice': "Next invoice: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "Prorated",
+  'charges.overage': "Overage",
   'plan.proration.preview': "Upgrading now: {amount} prorated ({days} days left)",
   'plan.proration.confirm': "You will pay {amount} now ({days} days left).",
   'plan.proration.belowMinimum': "The difference for this period is below the minimum and is not charged now.",
@@ -4446,9 +4448,11 @@ const en = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "Usage above the plan ({resource}): {units} × {unit} = {total} on the next invoice",
   'plan.overage.hint': "On this plan, going over the limit does not block: the extra units are billed at the period peak, on the renewal invoice.",
+  'plan.overage.hintAnnual': "On the annual plan, going over the limit does not block: the extra units are billed every month, on an overage-only invoice, at each month's peak.",
   'plan.overage.total': "Overage on the next invoice: {total}",
   'charges.pricing.base': "Plan: {amount}",
   'charges.pricing.overage': "Overage ({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "Overage adjustment ({resource}, period ending {date}): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "Refer and earn",
   'referrals.subtitle': "Refer another provider with your link. When they pay their first month, you get {amount} of credit on your next invoice.",

@@ -3833,6 +3833,7 @@ const it: Dictionary = {
   'plan.cycle.unavailable': 'Nessuna opzione annuale',
   'plan.cycle.hint': 'Il cambio di ciclo vale dal rinnovo; fino ad allora il periodo già pagato resta valido.',
   'plan.cycle.couponYears': 'Il tuo coupon conta i cicli di fatturazione: con il piano annuale, ogni ciclo è una fattura annuale, cioè un anno.',
+  'plan.cycle.couponDropped': "Il coupon {code} non vale per il piano annuale: la fattura annuale viene emessa senza, e viene rimosso all'inizio del ciclo annuale.",
   'plan.options.confirmCycleScheduled': 'Passare a {name} ({price})? Il cambio vale dal rinnovo, il {date}; fino ad allora il periodo già pagato resta valido, e la fattura del rinnovo usa già il nuovo importo.',
   'plan.options.scheduled': 'Programmato',
   'plan.pending.title': 'Cambio programmato: {plan} dal {date}',
@@ -4409,6 +4410,7 @@ const it: Dictionary = {
   'plan.coupon.nextInvoice': "Prossima fattura: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "Pro rata",
+  'charges.overage': "Eccedenza",
   'plan.proration.preview': "Passando ora: {amount} pro rata ({days} giorni rimanenti)",
   'plan.proration.confirm': "Pagherai {amount} ora ({days} giorni rimanenti).",
   'plan.proration.belowMinimum': "La differenza per questo periodo è sotto il minimo e non viene addebitata ora.",
@@ -4450,9 +4452,11 @@ const it: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "Uso oltre il piano ({resource}): {units} × {unit} = {total} nella prossima fattura",
   'plan.overage.hint': "In questo piano superare il limite non blocca: le unità in più sono addebitate al picco del periodo, nella fattura di rinnovo.",
+  'plan.overage.hintAnnual': "Con il piano annuale, superare il limite non blocca: le unità in più sono addebitate ogni mese, in una fattura di sola eccedenza, in base al picco di ogni mese.",
   'plan.overage.total': "Eccedenza nella prossima fattura: {total}",
   'charges.pricing.base': "Piano: {amount}",
   'charges.pricing.overage': "Eccedenza ({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "Conguaglio dell'eccedenza ({resource}, periodo fino al {date}): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "Segnala e guadagna",
   'referrals.subtitle': "Segnala un altro provider con il tuo link. Quando paga la prima mensilità, ricevi {amount} di credito sulla tua prossima fattura.",

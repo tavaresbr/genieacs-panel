@@ -3827,6 +3827,7 @@ const zhCN: Dictionary = {
   'plan.cycle.unavailable': '无按年选项',
   'plan.cycle.hint': '周期变更在续费时生效；在此之前，已付费的周期继续有效。',
   'plan.cycle.couponYears': '您的优惠券按计费周期计算：按年套餐中，每个周期是一张年度账单，即一年。',
+  'plan.cycle.couponDropped': "优惠券 {code} 不适用于按年套餐：年度账单将不使用该优惠券开具，并在按年周期开始时移除。",
   'plan.options.confirmCycleScheduled': '切换到 {name}（{price}）？变更将在续费日 {date} 生效；在此之前已付费的周期继续有效，续费账单将按新金额开具。',
   'plan.options.scheduled': '已安排',
   'plan.pending.title': '已安排更换：自 {date} 起使用 {plan}',
@@ -4403,6 +4404,7 @@ const zhCN: Dictionary = {
   'plan.coupon.nextInvoice': "下一张账单：{price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "按比例",
+  'charges.overage': "超额",
   'plan.proration.preview': "现在升级：按比例收取 {amount}（剩余 {days} 天）",
   'plan.proration.confirm': "您现在将支付 {amount}（剩余 {days} 天）。",
   'plan.proration.belowMinimum': "本期差额低于最低金额，现在不收取。",
@@ -4444,9 +4446,11 @@ const zhCN: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "超出套餐的用量（{resource}）：{units} × {unit} = {total}，计入下一张账单",
   'plan.overage.hint': "此套餐超出上限不会被阻止：超出的单位按周期峰值用量计入续费账单。",
+  'plan.overage.hintAnnual': "按年套餐中，超出上限不会被阻止：超出的单位每月按当月峰值，以仅含超额费用的账单计费。",
   'plan.overage.total': "下一张账单的超额：{total}",
   'charges.pricing.base': "套餐：{amount}",
   'charges.pricing.overage': "超额（{resource}）：{units} × {unit} = {total}",
+  'charges.pricing.trueUp': "超额补差（{resource}，截至 {date} 的周期）：{units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "推荐有礼",
   'referrals.subtitle': "通过您的链接推荐其他服务商。对方支付首月费用后,您的下一张账单将获得 {amount} 的抵扣额度。",

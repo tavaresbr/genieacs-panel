@@ -1530,13 +1530,19 @@ export interface OverageItem {
   units: number
   unitCents: number
   cents: number
+  /** De que período (YYYY-MM-DD) é a parcela — a fatia mensal, no anual. */
+  periodKey?: string
+  /** `true_up`: o acerto do pico que subiu depois de a fatura do período sair. */
+  kind?: 'true_up'
 }
 
 /** O excedente do período corrente, como a tela de Plano o mostra. */
 export interface SubscriptionOverage {
   prices: PlanOveragePrices
-  /** A renovação que fecha o período (YYYY-MM-DD) — nulo sem período pago. */
+  /** A renovação que fecha o período (YYYY-MM-DD) — nulo sem período pago. No anual, o fim da fatia mensal. */
   periodEnd: string | null
+  /** `monthly`: no anual, o excedente sai todo mês numa fatura só dele; `renewal`: na fatura da renovação. */
+  billing?: 'renewal' | 'monthly'
   items: OverageItem[]
   totalCents: number
   currency: string
@@ -1883,7 +1889,7 @@ export interface PlanProrationPreview {
 }
 
 /** O tipo de uma cobrança: a da renovação do período, ou a avulsa da subida. */
-export type ChargeKind = 'renewal' | 'proration'
+export type ChargeKind = 'renewal' | 'proration' | 'overage'
 
 /** A conta de uma fatura de pró-rata, para a tela explicar o valor. */
 export interface ChargeProrationDetail {
@@ -2741,10 +2747,15 @@ export interface CancellationOffers {
     billingCycle?: BillingCycle
     priceCents: number
     availableAgainAt: string | null
+    /** No anual: a configuração (% por meses) que `percent` traduz para uma fatura anual. */
+    configPercent?: number
+    configMonths?: number
   }
   pause: {
     available: boolean
-    reason: 'disabled' | 'not_eligible' | 'already_paused' | null
+    reason: 'disabled' | 'not_eligible' | 'already_paused' | 'pause_cooldown' | null
+    /** Na carência (uma pausa a cada doze meses), quando volta a valer. */
+    availableAgainAt?: string | null
     maxMonths: number
     /** Quando a pausa começaria: o fim do período pago. */
     from: string | null
@@ -2760,6 +2771,8 @@ export interface CancellationRequestView {
   outcome: 'retained_discount' | 'retained_pause' | 'canceled' | 'reverted' | null
   months: number | null
   discountPercent: number | null
+  /** O ciclo da fatura que o desconto aceito cobre (0103). */
+  billingCycle?: BillingCycle | null
   cancelAt: string | null
   createdAt: string | null
   decidedAt: string | null

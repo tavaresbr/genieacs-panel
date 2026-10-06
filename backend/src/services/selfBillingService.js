@@ -624,7 +624,7 @@ class SelfBillingService {
     }
     // A assinatura como vai ficar no ciclo pedido: é por ela que o preço do
     // plano novo se calcula.
-    const noCiclo = { ...subscription, billing_cycle: ciclo };
+    const noCiclo = SubscriptionService.inCycle(subscription, ciclo);
     const mudaCiclo = ciclo !== cicloAtual;
 
     // Subida, descida agendada ou descida na hora — ver o comentário do método.

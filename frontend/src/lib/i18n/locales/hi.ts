@@ -3835,6 +3835,7 @@ const hi: Dictionary = {
   'plan.cycle.unavailable': 'वार्षिक विकल्प नहीं',
   'plan.cycle.hint': 'चक्र बदलाव नवीनीकरण पर लागू होता है; तब तक पहले से भुगतान की गई अवधि मान्य रहती है।',
   'plan.cycle.couponYears': 'आपका कूपन बिलिंग चक्र गिनता है: वार्षिक प्लान में हर चक्र एक वार्षिक बिल है, यानी एक साल।',
+  'plan.cycle.couponDropped': "कूपन {code} वार्षिक प्लान पर लागू नहीं होता: वार्षिक बिल इसके बिना जारी होता है, और वार्षिक चक्र शुरू होने पर इसे हटा दिया जाता है।",
   'plan.options.confirmCycleScheduled': '{name} ({price}) पर बदलें? बदलाव नवीनीकरण पर, {date} को लागू होगा; तब तक भुगतान की गई अवधि मान्य रहेगी, और नवीनीकरण का बिल नई राशि से बनेगा।',
   'plan.options.scheduled': 'निर्धारित',
   'plan.pending.title': 'निर्धारित बदलाव: {date} से {plan}',
@@ -4411,6 +4412,7 @@ const hi: Dictionary = {
   'plan.coupon.nextInvoice': "अगला इनवॉइस: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "आनुपातिक",
+  'charges.overage': "अतिरिक्त उपयोग",
   'plan.proration.preview': "अभी बदलने पर: {amount} आनुपातिक ({days} दिन शेष)",
   'plan.proration.confirm': "आप अभी {amount} का भुगतान करेंगे ({days} दिन शेष)।",
   'plan.proration.belowMinimum': "इस अवधि का अंतर न्यूनतम राशि से कम है और अभी नहीं लिया जाएगा।",
@@ -4452,9 +4454,11 @@ const hi: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "प्लान से अधिक उपयोग ({resource}): {units} × {unit} = {total} अगले चालान में",
   'plan.overage.hint': "इस प्लान में सीमा पार करने पर रोक नहीं है: अतिरिक्त इकाइयाँ अवधि के शिखर उपयोग के अनुसार नवीनीकरण चालान में ली जाती हैं।",
+  'plan.overage.hintAnnual': "वार्षिक प्लान में सीमा से ऊपर जाने पर रोक नहीं लगती: अतिरिक्त इकाइयों का बिल हर महीने, केवल अतिरिक्त उपयोग वाले बिल में, उस महीने के अधिकतम उपयोग पर बनता है।",
   'plan.overage.total': "अगले चालान में अतिरिक्त: {total}",
   'charges.pricing.base': "प्लान: {amount}",
   'charges.pricing.overage': "अतिरिक्त ({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "अतिरिक्त उपयोग समायोजन ({resource}, {date} तक की अवधि): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "रेफ़र करें और कमाएँ",
   'referrals.subtitle': "अपने लिंक से किसी दूसरे प्रदाता को रेफ़र करें। जब वह पहले महीने का भुगतान करेगा, आपको अगले बिल में {amount} का क्रेडिट मिलेगा।",

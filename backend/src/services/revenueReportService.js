@@ -385,7 +385,11 @@ export function aggregateRevenue({
     if (!aceite && !detalhe?.proration && plano && !estornados.has(`${tenantId}|${evento.external_id}`)) {
       // O preço cheio do ciclo que o pagamento pagou (0103): o do ano, se anual.
       const cheio = SubscriptionService.cyclePriceCents({ billing_cycle: detalhe?.billingCycle ?? 'monthly' }, plano);
-      const esperado = detalhe?.expectedCents;
+      // O preço do plano (com o cupom) gravado no pagamento, quando há: o
+      // pedido inteiro traz o excedente (que não é preço) e já vem sem o
+      // crédito (que não é desconto). Sem ele (os eventos de antes), o pedido.
+      const base = detalhe?.baseCents;
+      const esperado = base !== null && base !== undefined && Number.isFinite(Number(base)) ? base : detalhe?.expectedCents;
       const pedido = esperado === null || esperado === undefined || !Number.isFinite(Number(esperado))
         ? valor : Number(esperado);
       if (pedido < cheio) discountCents += cheio - pedido;

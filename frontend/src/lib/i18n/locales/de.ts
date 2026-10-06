@@ -3831,6 +3831,7 @@ const de: Dictionary = {
   'plan.cycle.unavailable': 'Keine jährliche Option',
   'plan.cycle.hint': 'Ein Zykluswechsel gilt ab der Verlängerung; bis dahin bleibt der bereits bezahlte Zeitraum gültig.',
   'plan.cycle.couponYears': 'Dein Gutschein zählt Abrechnungszyklen: Beim Jahrestarif ist jeder Zyklus eine Jahresrechnung, also ein Jahr.',
+  'plan.cycle.couponDropped': "Der Gutschein {code} gilt nicht für den Jahrestarif: Die Jahresrechnung wird ohne ihn erstellt, und er wird entfernt, wenn der Jahreszyklus beginnt.",
   'plan.options.confirmCycleScheduled': 'Zu {name} ({price}) wechseln? Der Wechsel gilt ab der Verlängerung am {date}; bis dahin bleibt der bereits bezahlte Zeitraum gültig, und die Verlängerungsrechnung verwendet bereits den neuen Betrag.',
   'plan.options.scheduled': 'Geplant',
   'plan.pending.title': 'Geplanter Wechsel: {plan} ab {date}',
@@ -4407,6 +4408,7 @@ const de: Dictionary = {
   'plan.coupon.nextInvoice': "Nächste Rechnung: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "Anteilig",
+  'charges.overage': "Mehrverbrauch",
   'plan.proration.preview': "Wechsel jetzt: {amount} anteilig ({days} Tage verbleibend)",
   'plan.proration.confirm': "Sie zahlen jetzt {amount} ({days} Tage verbleibend).",
   'plan.proration.belowMinimum': "Die Differenz für diesen Zeitraum liegt unter dem Mindestbetrag und wird jetzt nicht berechnet.",
@@ -4448,9 +4450,11 @@ const de: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "Nutzung über dem Tarif ({resource}): {units} × {unit} = {total} auf der nächsten Rechnung",
   'plan.overage.hint': "In diesem Tarif sperrt das Überschreiten des Limits nicht: Zusätzliche Einheiten werden nach dem Höchststand des Zeitraums mit der Verlängerungsrechnung abgerechnet.",
+  'plan.overage.hintAnnual': "Im Jahrestarif blockiert das Überschreiten des Limits nicht: Die zusätzlichen Einheiten werden jeden Monat auf einer reinen Mehrverbrauchsrechnung nach der Spitzennutzung des Monats abgerechnet.",
   'plan.overage.total': "Mehrverbrauch auf der nächsten Rechnung: {total}",
   'charges.pricing.base': "Tarif: {amount}",
   'charges.pricing.overage': "Mehrverbrauch ({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "Nachberechnung Mehrverbrauch ({resource}, Zeitraum bis {date}): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "Empfehlen und profitieren",
   'referrals.subtitle': "Empfehlen Sie einen anderen Anbieter über Ihren Link. Sobald er seinen ersten Monat bezahlt, erhalten Sie {amount} Guthaben auf Ihre nächste Rechnung.",

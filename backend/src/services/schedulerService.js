@@ -330,6 +330,14 @@ class SchedulerService {
         console.warn(`Could not issue the subscription charge: ${error.message}`);
         return { issued: false, reason: 'error' };
       });
+    // O excedente mensal de quem é ANUAL (0104 + 0103): a fatura de só
+    // excedente das fatias mensais que já terminaram. Antes da retentativa
+    // das avulsas, que leva ao gateway a que falhar aqui.
+    summary.overageSlices = await ChargeIssuingService.issueOverageSlices({ tenant })
+      .catch((error) => {
+        console.warn(`Could not issue the monthly overage charge: ${error.message}`);
+        return { issued: false, reason: 'error' };
+      });
     // As faturas de pró-rata (0101) que não chegaram ao gateway na subida.
     summary.prorations = await ChargeIssuingService.retryProrations({ tenant })
       .catch((error) => {

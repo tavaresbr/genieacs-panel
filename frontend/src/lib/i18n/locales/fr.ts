@@ -3827,6 +3827,7 @@ const fr: Dictionary = {
   'plan.cycle.unavailable': 'Pas d\'option annuelle',
   'plan.cycle.hint': 'Le changement de cycle prend effet au renouvellement ; d\'ici là, la période déjà payée reste valable.',
   'plan.cycle.couponYears': 'Votre coupon compte des cycles de facturation : avec l\'offre annuelle, chaque cycle est une facture annuelle, soit un an.',
+  'plan.cycle.couponDropped': "Le coupon {code} ne s'applique pas à l'offre annuelle : la facture annuelle est émise sans lui, et il est retiré au début du cycle annuel.",
   'plan.options.confirmCycleScheduled': 'Passer à {name} ({price}) ? Le changement prend effet au renouvellement, le {date} ; d\'ici là, la période déjà payée reste valable, et la facture du renouvellement utilise déjà le nouveau montant.',
   'plan.options.scheduled': 'Programmé',
   'plan.pending.title': 'Changement programmé : {plan} à partir du {date}',
@@ -4403,6 +4404,7 @@ const fr: Dictionary = {
   'plan.coupon.nextInvoice': "Prochaine facture : {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "Prorata",
+  'charges.overage': "Dépassement",
   'plan.proration.preview': "En changeant maintenant : {amount} au prorata ({days} jours restants)",
   'plan.proration.confirm': "Vous allez payer {amount} maintenant ({days} jours restants).",
   'plan.proration.belowMinimum': "La différence pour cette période est inférieure au minimum et n’est pas facturée maintenant.",
@@ -4444,9 +4446,11 @@ const fr: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "Utilisation au-delà du plan ({resource}) : {units} × {unit} = {total} sur la prochaine facture",
   'plan.overage.hint': "Sur ce plan, dépasser la limite ne bloque pas : les unités en plus sont facturées au pic de la période, sur la facture de renouvellement.",
+  'plan.overage.hintAnnual': "Avec l'offre annuelle, dépasser la limite ne bloque pas : les unités en trop sont facturées chaque mois, sur une facture de dépassement seule, au pic de chaque mois.",
   'plan.overage.total': "Dépassement sur la prochaine facture : {total}",
   'charges.pricing.base': "Plan : {amount}",
   'charges.pricing.overage': "Dépassement ({resource}) : {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "Ajustement du dépassement ({resource}, période jusqu'au {date}) : {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "Parrainez et gagnez",
   'referrals.subtitle': "Parrainez un autre fournisseur avec votre lien. Quand il paie son premier mois, vous recevez {amount} de crédit sur votre prochaine facture.",

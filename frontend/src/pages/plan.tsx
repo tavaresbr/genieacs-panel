@@ -17,6 +17,7 @@ import {
   canSwitchTo,
   confirmKey,
   couponCountsYears,
+  couponDroppedOnAnnual,
   currentCycle,
   cyclePricing,
   isBillingExempt,
@@ -202,7 +203,11 @@ export default function PlanPage() {
     const vars = { name: plan.name, price: preco, date: formatDate(data?.subscription?.renewsAt) ?? '' }
     // A pró-rata, ANTES do clique que a cobra: "você vai pagar R$ X agora".
     const prorata = tipo === 'upgrade' ? prorationLine(plan) : null
-    const pergunta = prorata ? `${t(confirmKey(tipo), vars)}\n\n${prorata}` : t(confirmKey(tipo), vars)
+    // O cupom de N faturas que a troca para o anual tira (0103), dito ANTES do clique.
+    const cupomSai = couponDroppedOnAnnual(data?.subscription?.coupon, currentCycle(data?.subscription), ciclo)
+      ? t('plan.cycle.couponDropped', { code: data?.subscription?.coupon?.code ?? '' })
+      : null
+    const pergunta = [t(confirmKey(tipo), vars), prorata, cupomSai].filter(Boolean).join('\n\n')
     if (!window.confirm(pergunta)) return
     setMudando(plan.id)
     await trocar(plan.id, t('plan.options.changed', { name: plan.name }), ciclo)
@@ -516,7 +521,9 @@ export default function PlanPage() {
                       {t('plan.overage.total', { total: formatMoney(data!.overage.totalCents, data!.overage.currency) })}
                     </p>
                   )}
-                  <p className="field-hint">{t('plan.overage.hint')}</p>
+                  <p className="field-hint">
+                    {t(data!.overage.billing === 'monthly' ? 'plan.overage.hintAnnual' : 'plan.overage.hint')}
+                  </p>
                 </div>
               )}
             </section>
@@ -619,7 +626,11 @@ export default function PlanPage() {
             {cicloVisto !== cicloAtual && (
               <p className="field-hint mt-2">{t('plan.cycle.hint')}</p>
             )}
-            {couponCountsYears(cupomAtual, cicloVisto) && (
+            {couponDroppedOnAnnual(cupomAtual, cicloAtual, cicloVisto) ? (
+              <p role="note" className="mt-2 text-sm text-[hsl(var(--status-warning))]">
+                {t('plan.cycle.couponDropped', { code: cupomAtual?.code ?? '' })}
+              </p>
+            ) : couponCountsYears(cupomAtual, cicloVisto) && (
               <p role="note" className="mt-2 text-sm text-[hsl(var(--status-warning))]">{t('plan.cycle.couponYears')}</p>
             )}
             {plansError !== null ? (

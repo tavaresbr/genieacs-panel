@@ -14,6 +14,7 @@ const { default: UsagePeak } = await import('../src/models/UsagePeak.js');
 const { BILLING_EVENT_TYPES } = await import('../src/models/BillingEvent.js');
 const { default: SubscriptionService, PlanLimitError } = await import('../src/services/subscriptionService.js');
 const { default: ChargeIssuingService, overageDescription } = await import('../src/services/chargeIssuingService.js');
+const { default: CancellationService } = await import('../src/services/cancellationService.js');
 
 /**
  * A cobrança por excedente (0104).
@@ -99,6 +100,16 @@ before(async () => {
   planos.duro = await criar({
     code: 'ex-duro', name: 'Duro', price_cents: 8000, max_operators: 1, max_subscribers: 2, max_devices: 3
   });
+  // Teto folgado, o mesmo preço por operador a mais: subir para ele não
+  // apaga o excedente já medido no plano de teto 1.
+  planos.folgado = await criar({
+    code: 'ex-folgado', name: 'Folgado', price_cents: 30000, max_operators: 10, overage_price_cents_operators: 1000
+  });
+  // O anual (0103) com excedente: R$ 100/mês ou R$ 1.000/ano, R$ 10 por operador a mais.
+  planos.anual = await criar({
+    code: 'ex-anual', name: 'Anual', price_cents: 10000, price_yearly_cents: 100000,
+    max_operators: 1, overage_price_cents_operators: 1000
+  });
   planos.maior = await criar({
     code: 'ex-maior', name: 'Maior', price_cents: 20000,
     max_operators: 1, overage_price_cents_operators: 1000
@@ -115,9 +126,16 @@ after(async () => {
 /** Um instante relativo a agora, ao segundo (o MySQL guarda segundos). */
 const daquiA = (dias) => new Date(Math.floor((Date.now() + dias * DIA) / 1000) * 1000);
 
-async function assinar({ plan = planos.medido, status = 'active', renewsAt = daquiA(3), trialEndsAt = null, coupon = null } = {}) {
+async function assinar({
+  plan = planos.medido, status = 'active', renewsAt = daquiA(3), trialEndsAt = null, coupon = null, cycle = 'monthly'
+} = {}) {
   await Subscription.upsertForTenant(alfa, {
     plan_id: plan.id,
+    billing_cycle: cycle,
+    pending_billing_cycle: null,
+    cancel_at: null,
+    paused_until: null,
+    pause_started_at: null,
     status,
     renews_at: renewsAt,
     trial_ends_at: trialEndsAt,
@@ -222,8 +240,8 @@ describe('o excedente na renovação', () => {
     const conta = BillingCharge.pricingDetailOf(cobranca);
     assert.equal(conta.base, 10000);
     assert.deepEqual(conta.overage, [
-      { resource: 'operators', peak: 4, limit: 1, unitCents: 1000, units: 3, cents: 3000 },
-      { resource: 'devices', peak: 8, limit: 3, unitCents: 300, units: 5, cents: 1500 }
+      { resource: 'operators', peak: 4, limit: 1, unitCents: 1000, units: 3, cents: 3000, periodKey: periodo },
+      { resource: 'devices', peak: 8, limit: 3, unitCents: 300, units: 5, cents: 1500, periodKey: periodo }
     ]);
 
     const [post] = postsDeRenovacao();
@@ -352,6 +370,11 @@ describe('o excedente na renovação', () => {
       amountCents: 12000, provider: 'asaas', externalId: cobranca.gateway_charge_id
     }));
     assert.equal(pago.underpaid ?? false, false);
+    // O preço do plano (sem o excedente) vai no evento, para a receita.
+    const evento = await getDb()('billing_events')
+      .where({ tenant_id: alfa, external_id: cobranca.gateway_charge_id }).first();
+    assert.equal(JSON.parse(evento.detail).baseCents, 10000);
+    assert.equal(JSON.parse(evento.detail).expectedCents, 12000);
     const depois = await linha();
     assert.ok(new Date(depois.renews_at).getTime() > new Date(antes.renews_at).getTime(), 'o período andou');
 
@@ -463,5 +486,182 @@ describe('com preço não bloqueia; sem preço, bloqueia', () => {
       await getDb()('tenant_users').where({ tenant_id: alfa })
         .whereIn('user_id', getDb()('users').select('id').where({ username: 'ex-segundo' })).del();
     }
+  });
+});
+
+const fotografar = (periodo, recurso, valor, limit, unitCents) => runInTenant(alfa, () => UsagePeak.record(
+  periodo, recurso, valor, { limit, unitCents }
+));
+const avulsas = async () => (await getDb()('billing_charges').where({ tenant_id: alfa, kind: 'overage' }).orderBy('id'));
+
+describe('a fotografia do plano no pico (0104)', () => {
+  it('subir de plano antes da fatura não apaga o excedente já medido', async () => {
+    const periodo = chaveDe((await linha()).renews_at);
+    await fotografar(periodo, 'operators', 3, 1, 1000); // 2 a mais × R$ 10 no plano de teto 1
+    await assinar({ plan: planos.folgado });
+    // No plano novo (teto 10) a mesma medição não deve nada: não troca a fotografia.
+    await fotografar(periodo, 'operators', 4, 10, 1000);
+    const r = await emitir();
+    assert.equal(r.issued, true, JSON.stringify(r));
+    assert.equal(r.amountCents, 30000 + 2000, 'o excedente do plano em que foi medido');
+    const [c] = await renovacoes();
+    const [parcela] = BillingCharge.frozenOverageOf(c);
+    assert.equal(parcela.limit, 1);
+    assert.equal(parcela.peak, 3);
+    assert.equal(parcela.units, 2);
+  });
+
+  it('fica a fotografia que deve mais; a linha sem fotografia usa o plano de agora', async () => {
+    const periodo = chaveDe((await linha()).renews_at);
+    await fotografar(periodo, 'operators', 3, 1, 1000); // deve 2000
+    await fotografar(periodo, 'operators', 2, 1, 1000); // deve 1000: fica a de cima
+    let [linhaDoPico] = await getDb()('usage_peaks').where({ tenant_id: alfa, period_end: periodo });
+    assert.equal(Number(linhaDoPico.overage_peak), 3);
+    await fotografar(periodo, 'operators', 3, 0, 1000); // teto menor: deve 3000, troca
+    [linhaDoPico] = await getDb()('usage_peaks').where({ tenant_id: alfa, period_end: periodo });
+    assert.equal(Number(linhaDoPico.limit_value), 0);
+    assert.equal(Number(linhaDoPico.peak), 3);
+    // O passo do agendador grava a fotografia junto.
+    await getDb()('usage_peaks').where({ tenant_id: alfa }).del();
+    await runInTenant(alfa, () => SubscriptionService.recordUsagePeaks({ countDevices: async () => 9 }));
+    const gravadas = await getDb()('usage_peaks').where({ tenant_id: alfa, period_end: periodo, resource: 'devices' }).first();
+    assert.equal(Number(gravadas.limit_value), 3);
+    assert.equal(Number(gravadas.unit_cents), 300);
+  });
+});
+
+describe('o acerto do período congelado cedo (true-up)', () => {
+  it('o pico que subiu depois da fatura entra na seguinte, uma vez só', async () => {
+    const renova = (await linha()).renews_at;
+    const atual = chaveDe(renova);
+    const anterior = chaveDe(new Date(new Date(renova).getTime() - 30 * DIA));
+    // A fatura do período anterior congelou 2 operadores a mais (R$ 20)…
+    await runInTenant(alfa, async () => {
+      const id = await BillingCharge.open({
+        periodEnd: anterior, amountCents: 12000, currency: 'BRL', provider: 'asaas',
+        pricingDetail: { base: 10000, overage: [{ resource: 'operators', peak: 3, limit: 1, unitCents: 1000, units: 2, cents: 2000, periodKey: anterior }] }
+      });
+      await BillingCharge.update(id, { status: 'paid', issuing_until: null, gateway_charge_id: 'pay_anterior' });
+    });
+    // …e o pico do período anterior subiu para 5 depois de ela sair.
+    await fotografar(anterior, 'operators', 5, 1, 1000);
+    const r = await emitir();
+    assert.equal(r.issued, true, JSON.stringify(r));
+    assert.equal(r.amountCents, 10000 + 2000, 'R$ 20 de acerto: 4 a mais agora, 2 já cobrados');
+    const [, c] = await renovacoes();
+    assert.equal(c.period_end, atual);
+    const [acerto] = BillingCharge.frozenOverageOf(c);
+    assert.equal(acerto.kind, 'true_up');
+    assert.equal(acerto.periodKey, anterior);
+    assert.equal(acerto.units, 2);
+    // Reemitir não recalcula; e o período anterior não tem outro acerto.
+    assert.deepEqual(await runInTenant(alfa, () => ChargeIssuingService.trueUpFor({ plan: planos.medido, periodo: atual })), []);
+    await getDb()('billing_charges').where({ id: c.id }).update({ status: 'canceled' });
+    await fotografar(anterior, 'operators', 9, 1, 1000);
+    assert.equal((await emitir({ manual: true })).amountCents, 12000, 'a conta congelada vale');
+  });
+
+  it('a fatura de antes da conta (sem `pricing_detail`) não ganha acerto', async () => {
+    const renova = (await linha()).renews_at;
+    const anterior = chaveDe(new Date(new Date(renova).getTime() - 30 * DIA));
+    await runInTenant(alfa, async () => {
+      const id = await BillingCharge.open({ periodEnd: anterior, amountCents: 10000, currency: 'BRL', provider: 'asaas' });
+      await BillingCharge.update(id, { status: 'paid', issuing_until: null });
+    });
+    await fotografar(anterior, 'operators', 5, 1, 1000);
+    assert.equal((await emitir()).amountCents, 10000);
+  });
+});
+
+describe('o excedente do anual, em fatias mensais', () => {
+  it('as fatias que terminaram viram uma fatura de só excedente, que não compra período', async () => {
+    // O ano começou há 65 dias: duas fatias de 30 dias já terminaram.
+    const renova = daquiA(300);
+    await assinar({ plan: planos.anual, cycle: 'annual', renewsAt: renova });
+    const assinatura = await linha();
+    const fatias = SubscriptionService.overageSlices(assinatura, planos.anual);
+    assert.equal(fatias.length, 12);
+    assert.equal(fatias[11].key, chaveDe(renova), 'a última fatia é a do prazo');
+    assert.equal(SubscriptionService.usagePeakKey(assinatura, planos.anual), fatias[2].key, 'mede na fatia corrente');
+    await fotografar(fatias[0].key, 'operators', 4, 1, 1000); // R$ 30
+    await fotografar(fatias[1].key, 'operators', 2, 1, 1000); // R$ 10
+
+    const r = await runInTenant(alfa, () => ChargeIssuingService.issueOverageSlices());
+    assert.equal(r.issued, true, JSON.stringify(r));
+    const [avulsa] = await avulsas();
+    assert.equal(Number(avulsa.amount_cents), 4000);
+    assert.equal(avulsa.period_end, BillingCharge.overageKey(fatias[1].key));
+    const post = recebidas.find((x) => x.method === 'POST' && /:overage:/.test(x.payload?.externalReference ?? ''));
+    assert.ok(post, 'foi ao gateway');
+    assert.match(post.payload.description, /excedente/);
+    // A seguinte passada não cobra de novo.
+    assert.equal((await runInTenant(alfa, () => ChargeIssuingService.issueOverageSlices())).reason, 'covered');
+
+    // Paga: não move o prazo.
+    const pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 4000, provider: 'asaas', externalId: avulsa.gateway_charge_id
+    }));
+    assert.equal(pago.proration, true);
+    assert.equal(new Date((await linha()).renews_at).getTime(), renova.getTime());
+  });
+
+  it('abaixo do mínimo, as fatias esperam — e a renovação anual soma as que sobraram, sem cobrar duas vezes', async () => {
+    const renova = daquiA(3);
+    await assinar({ plan: planos.anual, cycle: 'annual', renewsAt: renova });
+    const fatias = SubscriptionService.overageSlices(await linha(), planos.anual);
+    await fotografar(fatias[3].key, 'operators', 2, 1, 300); // R$ 3: abaixo do mínimo
+    await fotografar(fatias[11].key, 'operators', 3, 1, 1000); // R$ 20 na última fatia
+    // Uma fatia já cobrada por uma avulsa não volta.
+    await fotografar(fatias[0].key, 'operators', 9, 1, 1000);
+    await runInTenant(alfa, () => BillingCharge.openProration({
+      key: BillingCharge.overageKey(fatias[0].key), kind: 'overage', amountCents: 8000, currency: 'BRL', provider: 'asaas',
+      detail: { slices: [fatias[0].key], periodEnd: fatias[0].key }
+    }));
+    const r = await runInTenant(alfa, () => ChargeIssuingService.issueOverageSlices());
+    assert.equal(r.reason, 'below_minimum');
+    const emitida = await emitir();
+    assert.equal(emitida.issued, true, JSON.stringify(emitida));
+    assert.equal(emitida.amountCents, 100000 + 300 + 2000);
+    const renovacao = (await getDb()('billing_charges').where({ tenant_id: alfa, kind: 'renewal' }))[0];
+    const chaves = BillingCharge.frozenOverageOf(renovacao).map((i) => i.periodKey);
+    assert.deepEqual(chaves, [fatias[3].key, fatias[11].key]);
+    // Depois da renovação congelar a fatia, a avulsa não a cobra.
+    const depois = await runInTenant(alfa, () => ChargeIssuingService.issueOverageSlices());
+    assert.equal(depois.issued, false);
+    assert.equal(depois.reason, 'no_overage', 'as fatias que sobram não devem nada');
+    assert.equal((await avulsas()).length, 1, 'só a que já existia');
+  });
+});
+
+describe('o excedente final de quem cancela', () => {
+  it('o cancelamento agendado que chega emite a fatura final de só excedente', async () => {
+    const prazo = new Date(Math.floor((Date.now() - 60_000) / 1000) * 1000);
+    await assinar({ renewsAt: prazo });
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ cancel_at: prazo });
+    await SubscriptionService.invalidate(alfa);
+    await fotografar(chaveDe(prazo), 'operators', 4, 1, 1000); // R$ 30
+    const r = await runInTenant(alfa, () => CancellationService.processDue({}));
+    assert.equal(r.action, 'canceled');
+    assert.equal((await linha()).status, 'canceled');
+    const [final] = await avulsas();
+    assert.ok(final, 'saiu a fatura final');
+    assert.equal(Number(final.amount_cents), 3000);
+    assert.equal(final.period_end, BillingCharge.overageKey(chaveDe(prazo), { final: true }));
+    assert.ok(final.gateway_charge_id, 'foi ao gateway mesmo cancelada');
+    // Paga: o cancelado continua cancelado, nada de prazo.
+    const pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 3000, provider: 'asaas', externalId: final.gateway_charge_id
+    }));
+    assert.equal(pago.underpaid, false);
+    assert.equal((await linha()).status, 'canceled');
+  });
+
+  it('sem excedente, nada sai', async () => {
+    const prazo = new Date(Math.floor((Date.now() - 60_000) / 1000) * 1000);
+    await assinar({ renewsAt: prazo });
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ cancel_at: prazo });
+    await SubscriptionService.invalidate(alfa);
+    await runInTenant(alfa, () => CancellationService.processDue({}));
+    assert.equal((await avulsas()).length, 0);
   });
 });

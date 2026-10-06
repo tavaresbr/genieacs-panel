@@ -2079,6 +2079,12 @@ const BILLING_CHARGE_PRICING_DETAIL_COLUMNS = [
  * o maior entre o guardado e o de agora. Do provedor (escopada), e some com
  * ele.
  */
+const USAGE_PEAK_SNAPSHOT_COLUMNS = [
+  ['limit_value', (t) => t.integer('limit_value').unsigned().nullable()],
+  ['unit_cents', (t) => t.integer('unit_cents').unsigned().nullable()],
+  ['overage_peak', (t) => t.integer('overage_peak').unsigned().nullable()]
+];
+
 const usagePeaksTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -2086,6 +2092,12 @@ const usagePeaksTable = (db) => (t) => {
   t.string('period_end', 10).notNullable();
   t.string('resource', 16).notNullable(); // operators | subscribers | devices
   t.integer('peak').unsigned().notNullable().defaultTo(0);
+  // A fotografia do plano que valia quando o excedente MAIOR do período foi
+  // medido: o teto e o preço por unidade dele, e o uso naquele instante. A
+  // cobrança lê daqui, e não do plano de quando sai — subir de plano antes
+  // da fatura não apaga o excedente que já se devia. Nulos nas linhas
+  // gravadas sem a fotografia (aí vale o plano de agora).
+  for (const [, add] of USAGE_PEAK_SNAPSHOT_COLUMNS) add(t);
   t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
   t.unique(['tenant_id', 'period_end', 'resource'], { indexName: 'usage_peaks_period_resource_uq' });
 };
@@ -2684,6 +2696,9 @@ const cancellationRequestsTable = (db) => (t) => {
   // Os meses da pausa ou do desconto aceito, e a porcentagem do desconto.
   t.integer('months').unsigned();
   t.integer('discount_percent').unsigned();
+  // O ciclo da fatura que o desconto aceito cobre (0103): no anual, o
+  // desconto vira UMA fatura anual, e a carência conta doze meses dela.
+  t.string('billing_cycle', 8);
   // A data do cancelamento agendado (o fim do período pago), quando foi o caso.
   t.timestamp('cancel_at').nullable();
   t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
@@ -2697,6 +2712,11 @@ const cancellationRequestsTable = (db) => (t) => {
 
 const CANCELLATION_TABLES = [
   ['cancellation_requests', cancellationRequestsTable]
+];
+
+/** As colunas que a tabela ganhou depois de nascer (a base de desenvolvimento que já a tinha). */
+const CANCELLATION_REQUEST_LATE_COLUMNS = [
+  ['billing_cycle', (t) => t.string('billing_cycle', 8)]
 ];
 
 /**
@@ -5967,7 +5987,8 @@ export const migrations = [
         if ((await missingColumns(db, tabela, colunas)).length) return false;
       }
       if (!(await db.schema.hasTable('tenants'))) return true;
-      return db.schema.hasTable('usage_peaks');
+      if (!(await db.schema.hasTable('usage_peaks'))) return false;
+      return !(await missingColumns(db, 'usage_peaks', USAGE_PEAK_SNAPSHOT_COLUMNS)).length;
     },
     async up(db) {
       for (const [tabela, colunas] of [['plans', PLAN_OVERAGE_COLUMNS], ['billing_charges', BILLING_CHARGE_PRICING_DETAIL_COLUMNS]]) {
@@ -5983,6 +6004,13 @@ export const migrations = [
       }
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'usage_peaks', usagePeaksTable(db));
+      // A base que já tinha a tabela antes da fotografia do plano.
+      const semFoto = await missingColumns(db, 'usage_peaks', USAGE_PEAK_SNAPSHOT_COLUMNS);
+      if (semFoto.length) {
+        await db.schema.alterTable('usage_peaks', (t) => {
+          for (const add of semFoto) add(t);
+        });
+      }
     }
   },
   {
@@ -6044,7 +6072,10 @@ export const migrations = [
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       if (!(await db.schema.hasTable('cancellation_requests'))) return false;
-      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_RETENTION_COLUMNS], ['coupons', COUPON_SYSTEM_COLUMNS]]) {
+      for (const [tabela, colunas] of [
+        ['subscriptions', SUBSCRIPTION_RETENTION_COLUMNS], ['coupons', COUPON_SYSTEM_COLUMNS],
+        ['cancellation_requests', CANCELLATION_REQUEST_LATE_COLUMNS]
+      ]) {
         // eslint-disable-next-line no-await-in-loop -- duas tabelas só
         if (!(await db.schema.hasTable(tabela))) continue;
         // eslint-disable-next-line no-await-in-loop
@@ -6068,6 +6099,12 @@ export const migrations = [
       for (const [nome, construtor] of CANCELLATION_TABLES) {
         // eslint-disable-next-line no-await-in-loop -- uma tabela só
         await createTableIfMissing(db, nome, construtor(db));
+      }
+      const tardias = await missingColumns(db, 'cancellation_requests', CANCELLATION_REQUEST_LATE_COLUMNS);
+      if (tardias.length) {
+        await db.schema.alterTable('cancellation_requests', (t) => {
+          for (const add of tardias) add(t);
+        });
       }
     }
   }

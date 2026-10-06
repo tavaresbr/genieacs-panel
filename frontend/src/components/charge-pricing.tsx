@@ -3,6 +3,7 @@
 import type { ChargePricing } from '@/lib/api'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
+import { formatDay } from '@/lib/subscription-console'
 import { resourceLabelKey } from '@/lib/plan-options'
 
 /**
@@ -20,19 +21,23 @@ export function ChargePricingBreakdown({
   if (!pricing || !pricing.overage?.length) return null
   return (
     <div className={className}>
-      {pricing.baseCents !== null && (
+      {pricing.baseCents !== null && pricing.baseCents > 0 && (
         <p>{t('charges.pricing.base', { amount: formatMoney(pricing.baseCents, currency) })}</p>
       )}
-      {pricing.overage.map((item) => (
-        <p key={item.resource}>
-          {t('charges.pricing.overage', {
-            resource: t(resourceLabelKey(item.resource)),
-            units: item.units,
-            unit: formatMoney(item.unitCents, currency),
-            total: formatMoney(item.cents, currency)
-          })}
-        </p>
-      ))}
+      {pricing.overage.map((item) => {
+        const vars = {
+          resource: t(resourceLabelKey(item.resource)),
+          units: item.units,
+          unit: formatMoney(item.unitCents, currency),
+          total: formatMoney(item.cents, currency),
+          date: item.periodKey ? formatDay(item.periodKey) : ''
+        }
+        return (
+          <p key={`${item.resource}-${item.periodKey ?? ''}-${item.kind ?? ''}`}>
+            {t(item.kind === 'true_up' ? 'charges.pricing.trueUp' : 'charges.pricing.overage', vars)}
+          </p>
+        )
+      })}
     </div>
   )
 }

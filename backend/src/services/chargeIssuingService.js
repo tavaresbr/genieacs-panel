@@ -1,5 +1,5 @@
 import BillingCharge, {
-  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, RETENTION_CANCEL_MARKER, isProration, isoDateOf
+  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, RETENTION_CANCEL_MARKER, isProration, isOverageCharge, isoDateOf
 } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -86,6 +86,9 @@ export function overageDescription(parcelas) {
   const partes = parcelas.map((item) => `${item.units} ${NOME_DO_RECURSO[item.resource] ?? item.resource} × ${reais(item.unitCents)}`);
   return ` + excedente ${reais(total)} (${partes.join('; ')})`;
 }
+
+/** Todas as cobranças do provedor em escopo (as do excedente se leem pela conta de cada uma). */
+const getDbCharges = () => BillingCharge.allForTenant();
 
 export class ChargeFollowError extends Error {
   constructor(status, code, message, detail = null) {
@@ -577,9 +580,212 @@ class ChargeIssuingService {
     const congelado = BillingCharge.frozenOverageOf(existente);
     if (congelado) return congelado;
     if (!periodo || SubscriptionService.overagePeriodKey(subscription) !== periodo) return [];
-    const precos = SubscriptionService.overagePricesOf(plan);
-    if (!precos.operators && !precos.subscribers && !precos.devices) return [];
-    return SubscriptionService.overageFor(plan, await UsagePeak.forPeriod(periodo));
+    return this.overageClosing({ subscription, plan, periodo });
+  }
+
+  /**
+   * O excedente que FECHA o período `periodo` (a chave de `renews_at`):
+   *
+   *   - no anual (0103), as fatias mensais anteriores que nenhuma fatura de
+   *     só excedente cobriu (as que ficaram abaixo do mínimo do gateway, ou
+   *     que o agendador não alcançou) — além da última, que é a deste prazo;
+   *   - o do próprio período, pelas fotografias do plano (`overageFromRows`);
+   *   - o ACERTO (`true_up`) do período anterior: a fatura dele congelou o
+   *     excedente alguns dias antes do fim, e o pico que subiu depois entra
+   *     aqui, uma vez só (`trueUpFor`).
+   */
+  static async overageClosing({ subscription, plan, periodo, exceptChargeId = null }) {
+    const itens = [];
+    const fatias = SubscriptionService.overageSlices(subscription, plan).filter((f) => !f.last);
+    if (fatias.length) {
+      const cobertas = await this.coveredOverageKeys({ exceptChargeId });
+      for (const fatia of fatias) {
+        if (cobertas.has(fatia.key)) continue;
+        // eslint-disable-next-line no-await-in-loop -- até onze fatias, uma leitura cada
+        itens.push(...SubscriptionService.overageFromRows(plan, await UsagePeak.rowsForPeriod(fatia.key), fatia.key));
+      }
+    }
+    itens.push(...SubscriptionService.overageFromRows(plan, await UsagePeak.rowsForPeriod(periodo), periodo));
+    itens.push(...await this.trueUpFor({ plan, periodo, exceptChargeId }));
+    return itens;
+  }
+
+  /**
+   * As chaves de período cujo excedente uma fatura JÁ cobrou — a de só
+   * excedente (as fatias que ela diz, `slices`) e a da renovação (as
+   * parcelas congeladas dela, menos os acertos). Toda fatura conta, inclusive
+   * a cancelada à mão: cobrar de novo um período é decisão de gente.
+   */
+  static async coveredOverageKeys({ exceptChargeId = null } = {}) {
+    const chaves = new Set();
+    const linhas = await getDbCharges();
+    for (const linha of linhas) {
+      if (exceptChargeId && Number(linha.id) === Number(exceptChargeId)) continue;
+      const detalhe = BillingCharge.prorationDetailOf(linha);
+      if (isOverageCharge(linha) && Array.isArray(detalhe?.slices)) {
+        for (const chave of detalhe.slices) chaves.add(String(chave).slice(0, 10));
+      }
+      for (const item of BillingCharge.frozenOverageOf(linha) ?? []) {
+        if (item.kind !== 'true_up' && item.periodKey) chaves.add(item.periodKey);
+      }
+    }
+    return chaves;
+  }
+
+  /**
+   * O acerto do período ANTERIOR a `periodo` (0104): a fatura da renovação
+   * dele congelou o excedente ao sair, `LEAD_DAYS` antes do fim — o pico que
+   * subiu nesses dias não entrou. Aqui, por recurso, `max(0, o que o período
+   * deve agora − o que a fatura dele congelou)`, numa parcela `true_up` com a
+   * chave dele. Uma vez só: a parcela fica congelada nesta fatura, e um
+   * período que já teve acerto em outra não tem outro.
+   *
+   * Só contra uma fatura que de fato CONGELOU a conta (`pricing_detail` com
+   * `overage`) e que não foi cancelada nem estornada — a linha de antes da
+   * coluna não diz o que cobrou, e cobrar de novo o período inteiro seria
+   * cobrá-lo duas vezes.
+   */
+  static async trueUpFor({ plan, periodo, exceptChargeId = null }) {
+    const anterior = await BillingCharge.previousRenewal(periodo);
+    if (!anterior || ['canceled', 'refunded'].includes(anterior.status)) return [];
+    const congelado = BillingCharge.frozenOverageOf(anterior);
+    if (!congelado) return [];
+    const chave = String(anterior.period_end).slice(0, 10);
+    // Já acertado em outra fatura?
+    for (const linha of await getDbCharges()) {
+      if (exceptChargeId && Number(linha.id) === Number(exceptChargeId)) continue;
+      if ((BillingCharge.frozenOverageOf(linha) ?? []).some((item) => item.kind === 'true_up' && item.periodKey === chave)) {
+        return [];
+      }
+    }
+    const devido = SubscriptionService.overageFromRows(plan, await UsagePeak.rowsForPeriod(chave), chave);
+    const acertos = [];
+    for (const item of devido) {
+      const doPeriodo = congelado.filter((c) => c.resource === item.resource && c.kind !== 'true_up'
+        && (c.periodKey ?? chave) === chave);
+      const cobrado = doPeriodo.reduce((soma, c) => soma + c.cents, 0);
+      const unidades = doPeriodo.reduce((soma, c) => soma + c.units, 0);
+      const falta = item.cents - cobrado;
+      if (!(falta > 0)) continue;
+      acertos.push({
+        ...item,
+        units: Math.max(0, item.units - unidades),
+        cents: falta,
+        periodKey: chave,
+        kind: 'true_up'
+      });
+    }
+    return acertos;
+  }
+
+  /**
+   * A fatura de só excedente das fatias mensais do ANUAL (0104 + 0103), a
+   * passada do agendador por provedor: as fatias que já terminaram (menos a
+   * última, que a renovação fecha) e que nenhuma fatura cobriu viram UMA
+   * fatura avulsa (`kind: 'overage'`), pelo preço por unidade da fotografia
+   * de cada fatia. Não compra período, não gasta cupom, não usa crédito: é a
+   * conta de consumo do mês, paga como a pró-rata.
+   *
+   * Abaixo do mínimo do gateway (`PRORATION_MIN_CENTS`) não sai: as fatias
+   * esperam a seguinte — ou a fatura da renovação, que soma as que sobraram.
+   *
+   * @returns {Promise<{ issued: boolean, reason?: string, charge?: object }>}
+   */
+  static async issueOverageSlices({ tenant: doLaco = null, now = new Date() } = {}) {
+    const tenant = doLaco ?? await Tenant.findById(currentTenantId());
+    if (!tenant || tenant.kind === 'platform') return { issued: false, reason: 'platform_tenant' };
+    const subscription = await Subscription.forTenant(currentTenantId());
+    if (!subscription) return { issued: false, reason: 'no_subscription' };
+    if (subscription.billing_exempt_at) return { issued: false, reason: 'billing_exempt' };
+    if (!isBillableStatus(subscription)) return { issued: false, reason: 'not_billable' };
+    if (isCancelScheduled(subscription) || isPauseScheduled(subscription)) return { issued: false, reason: 'retention_hold' };
+    const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
+    const fatias = SubscriptionService.overageSlices(subscription, plan)
+      .filter((f) => !f.last && f.end.getTime() <= now.getTime());
+    if (!fatias.length) return { issued: false, reason: 'no_slice' };
+    const cobertas = await this.coveredOverageKeys();
+    const pendentes = fatias.filter((f) => !cobertas.has(f.key));
+    if (!pendentes.length) return { issued: false, reason: 'covered' };
+    const itens = [];
+    for (const fatia of pendentes) {
+      // eslint-disable-next-line no-await-in-loop -- poucas fatias, uma leitura cada
+      itens.push(...SubscriptionService.overageFromRows(plan, await UsagePeak.rowsForPeriod(fatia.key), fatia.key));
+    }
+    const total = itens.reduce((soma, item) => soma + item.cents, 0);
+    if (!(total > 0)) return { issued: false, reason: 'no_overage' };
+    if (total < SubscriptionService.PRORATION_MIN_CENTS) return { issued: false, reason: 'below_minimum', amountCents: total };
+    return this.openOverageCharge({
+      tenant, subscription, plan, itens, slices: pendentes.map((f) => f.key), final: false, now
+    });
+  }
+
+  /**
+   * A fatura FINAL de só excedente de quem cancela (0104 + 0106): o
+   * cancelamento agendado que chegou, ou o feito na hora. A renovação não sai
+   * para quem cancela, então o excedente do período que fecha (e as fatias do
+   * anual que sobraram, e o acerto do anterior) iria embora sem ela.
+   * `subscription` é a linha de ANTES do cancelamento (o prazo, o plano).
+   * Melhor esforço: nunca lança.
+   */
+  static async issueFinalOverage({ subscription, now = new Date() }) {
+    try {
+      const tenant = await Tenant.findById(currentTenantId());
+      if (!tenant || tenant.kind === 'platform' || !subscription || subscription.billing_exempt_at) {
+        return { issued: false, reason: 'not_billable' };
+      }
+      const periodo = SubscriptionService.overagePeriodKey(subscription);
+      if (!periodo) return { issued: false, reason: 'no_period' };
+      const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
+      // O período que a fatura da renovação pagou e congelou não se cobra de
+      // novo: só quando ela não foi paga (o cancelamento a cancelou).
+      const daRenovacao = await BillingCharge.forPeriod(periodo);
+      if (daRenovacao && daRenovacao.status === 'paid') return { issued: false, reason: 'settled' };
+      const itens = await this.overageClosing({ subscription, plan, periodo, exceptChargeId: daRenovacao?.id ?? null });
+      const total = itens.reduce((soma, item) => soma + item.cents, 0);
+      if (!(total > 0)) return { issued: false, reason: 'no_overage' };
+      if (total < SubscriptionService.PRORATION_MIN_CENTS) {
+        console.warn(`Final overage of provider ${tenant.id} (${total} cents) is below the gateway minimum; not charged`);
+        return { issued: false, reason: 'below_minimum', amountCents: total };
+      }
+      const slices = [...new Set(itens.filter((i) => i.kind !== 'true_up').map((i) => i.periodKey).filter(Boolean))];
+      return await this.openOverageCharge({ tenant, subscription, plan, itens, slices, final: true, now, periodo });
+    } catch (error) {
+      console.warn(`Could not issue the final overage charge of provider ${currentTenantId()}: ${error.message}`);
+      return { issued: false, reason: 'error', error: error.message };
+    }
+  }
+
+  /** Abre e emite uma fatura de só excedente — ver `issueOverageSlices` e `issueFinalOverage`. */
+  static async openOverageCharge({
+    tenant, subscription, plan, itens, slices, final, now, periodo = null
+  }) {
+    const provider = providerFor(tenant.billing_gateway);
+    if (!provider || !tenant.billing_customer_ref) return { issued: false, reason: 'not_linked' };
+    if (!provider.canIssue) return { issued: false, reason: 'provider_cannot_issue' };
+    const ultima = periodo ?? slices[slices.length - 1];
+    const key = BillingCharge.overageKey(ultima, { final });
+    const total = itens.reduce((soma, item) => soma + item.cents, 0);
+    let chargeId;
+    try {
+      chargeId = await BillingCharge.openProration({
+        key,
+        kind: 'overage',
+        subscriptionId: subscription?.id ?? null,
+        amountCents: total,
+        currency: String(plan?.currency || 'BRL').toUpperCase(),
+        provider: provider.name,
+        dueDate: this.isoDate(now.getTime() + this.PRORATION_DUE_DAYS * 86_400_000),
+        claimUntil: new Date(now.getTime() + this.CLAIM_MS),
+        planId: plan?.id ?? null,
+        billingCycle: plan ? SubscriptionService.cycleOf(subscription, plan) : null,
+        pricingDetail: { base: 0, overage: itens },
+        detail: { slices, periodEnd: ultima, ...(final ? { final: true } : {}), at: now.toISOString() }
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) return { issued: false, reason: 'duplicate' };
+      throw error;
+    }
+    return this.emitProration({ tenant, provider, chargeId, now });
   }
 
   /**
@@ -1156,6 +1362,28 @@ class ChargeIssuingService {
       }
       return { issued: false, reason: 'raced', charge: await BillingCharge.findById(chargeId) };
     }
+    // A retenção (0106) que entrou DURANTE o `createCharge`: a pausa ou o
+    // cancelamento agendado gravados enquanto o gateway respondia não acharam
+    // a linha (ela estava com a garra desta passada). Relida agora: se a
+    // assinatura passou a não renovar, a cobrança recém-criada é cancelada lá
+    // e aqui, com a marca da retenção — como `cancelRenewalCharges` faria.
+    // Melhor esforço: a recusa do gateway fica no log, e a varredura do fluxo
+    // de cancelamento (que roda de novo depois de gravar) tenta outra vez.
+    const depois = await Subscription.forTenant(currentTenantId());
+    if (depois && (isCancelScheduled(depois) || (!manual && isPauseScheduled(depois)))) {
+      try {
+        if (typeof provider.cancelCharge === 'function') await provider.cancelCharge(criada.chargeId);
+        await BillingCharge.update(chargeId, {
+          status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: RETENTION_CANCEL_MARKER
+        });
+        return { issued: false, reason: isCancelScheduled(depois) ? 'cancel_scheduled' : 'paused', canceledAfterIssue: true };
+      } catch (error) {
+        console.warn(
+          `Charge ${chargeId} of provider ${tenant.id} was issued while the subscription stopped renewing, `
+          + `and could not be canceled at the gateway: ${error.message}`
+        );
+      }
+    }
     if (cartaoRecusado) await this.avisarRecusa(tenant, now);
     return {
       issued: true,
@@ -1294,17 +1522,20 @@ class ChargeIssuingService {
       });
       return { issued: false, reason: 'billing_exempt' };
     }
+    // A fatura FINAL de excedente (0104) é de quem cancelou: o cancelamento
+    // não a cancela — é justamente a conta do que foi usado até ele.
+    const finalDeExcedente = isOverageCharge(linha) && Boolean(BillingCharge.prorationDetailOf(linha)?.final);
     // Cancelada ou suspensa à mão depois da subida: a diferença não se cobra
     // mais — a linha sai cancelada, sem nunca ter ido ao gateway. A de cartão
     // pergunta antes ao gateway (abaixo): a cobrança pode já existir lá.
-    if ((!assinatura || !isBillableStatus(assinatura)) && linha.billing_type !== 'CREDIT_CARD') {
+    if (!finalDeExcedente && (!assinatura || !isBillableStatus(assinatura)) && linha.billing_type !== 'CREDIT_CARD') {
       await this.cancelUnbillableProration(linha.id);
       return { issued: false, reason: 'not_billable', charge: await BillingCharge.findById(linha.id) };
     }
     // A retenção (0106): pausada ou com o cancelamento agendado, a pró-rata
     // que não chegou ao gateway ESPERA — sem ser cancelada: desfeito o
     // agendamento (ou acabada a pausa), ela sai pela passada seguinte.
-    if (assinatura && (isPauseScheduled(assinatura) || isCancelScheduled(assinatura))) {
+    if (!finalDeExcedente && assinatura && (isPauseScheduled(assinatura) || isCancelScheduled(assinatura))) {
       await BillingCharge.release(linha.id);
       return { issued: false, reason: 'retention_hold', charge: linha };
     }
@@ -1317,9 +1548,11 @@ class ChargeIssuingService {
     if (vencimento !== daLinha) await BillingCharge.update(linha.id, { due_date: vencimento });
 
     const detalhe = BillingCharge.prorationDetailOf(linha);
-    const plano = detalhe?.toPlanId ? await Plan.findById(detalhe.toPlanId) : null;
+    const doExcedente = isOverageCharge(linha);
+    const planoId = doExcedente ? linha.plan_id : detalhe?.toPlanId;
+    const plano = planoId ? await Plan.findById(planoId) : null;
     const nomeDoPlano = plano?.name || plano?.code || '';
-    const referencia = `tenant:${tenant.id}:proration:${linha.id}`;
+    const referencia = `tenant:${tenant.id}:${doExcedente ? 'overage' : 'proration'}:${linha.id}`;
 
     // O cartão salvo (0100), pela mesma decisão da renovação: com a cobrança
     // automática utilizável, a pró-rata sai no cartão e o gateway a cobra na
@@ -1360,11 +1593,11 @@ class ChargeIssuingService {
       });
       return { issued: false, reason: 'billing_exempt' };
     }
-    if (!releitura || !isBillableStatus(releitura)) {
+    if (!finalDeExcedente && (!releitura || !isBillableStatus(releitura))) {
       await this.cancelUnbillableProration(linha.id);
       return { issued: false, reason: 'not_billable', charge: await BillingCharge.findById(linha.id) };
     }
-    if (isPauseScheduled(releitura) || isCancelScheduled(releitura)) {
+    if (!finalDeExcedente && (isPauseScheduled(releitura) || isCancelScheduled(releitura))) {
       await BillingCharge.release(linha.id);
       return { issued: false, reason: 'retention_hold', charge: await BillingCharge.findById(linha.id) };
     }
@@ -1382,7 +1615,11 @@ class ChargeIssuingService {
       amountCents: Number(linha.amount_cents),
       currency: linha.currency || 'BRL',
       dueDate: vencimento,
-      description: `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(pró-rata)`,
+      description: doExcedente
+        ? `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(excedente${detalhe?.periodEnd
+          ? ` até ${String(detalhe.periodEnd).slice(0, 10).split('-').reverse().join('/')}` : ''})`
+          + overageDescription(BillingCharge.frozenOverageOf(linha) ?? []).replace(/^ \+ excedente [^(]*/, ' ')
+        : `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(pró-rata)`,
       reference: referencia,
       ...(comCartao ?? {})
     });
@@ -1488,7 +1725,14 @@ class ChargeIssuingService {
     if (!isBillableStatus(subscription)) {
       const canceladas = await BillingCharge.cancelUnissuedProrations({ reason: 'not_billable', now });
       for (const linha of await BillingCharge.unissuedProrations()) {
-        if (linha.billing_type !== 'CREDIT_CARD') continue;
+        // A fatura final de excedente (0104) é de quem cancelou: segue.
+        const final = isOverageCharge(linha) && BillingCharge.prorationDetailOf(linha)?.final;
+        if (linha.billing_type !== 'CREDIT_CARD' && !final) continue;
+        if (final && !manual) {
+          if (Number(linha.attempts ?? 0) >= this.MAX_ATTEMPTS) continue;
+          const espera = linha.next_attempt_at ? new Date(linha.next_attempt_at) : null;
+          if (espera && espera.getTime() > now.getTime()) continue;
+        }
         // eslint-disable-next-line no-await-in-loop
         if (!(await BillingCharge.claim(linha.id, { until: new Date(now.getTime() + this.CLAIM_MS), now }))) continue;
         // eslint-disable-next-line no-await-in-loop

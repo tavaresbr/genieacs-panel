@@ -4,7 +4,7 @@ import Subscription from '../models/Subscription.js';
 import Tenant from '../models/Tenant.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
 import CouponRedemption from '../models/CouponRedemption.js';
-import SubscriptionService from './subscriptionService.js';
+import SubscriptionService, { ANNUAL_RETENTION_KIND } from './subscriptionService.js';
 import SelfBillingService, { SelfBillingError } from './selfBillingService.js';
 import { getDb, isUniqueViolation } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
@@ -143,7 +143,9 @@ class CouponService {
       // O cupom do sistema (0106) não se resgata digitando: para o provedor
       // ele não existe. E a retenção só aplica o dela.
       if (cupom.system_kind && !comoConsole) throw COUPON_ERRORS.invalid();
-      if (daRetencao && cupom.system_kind !== 'retention') throw COUPON_ERRORS.invalid();
+      if (daRetencao && cupom.system_kind !== 'retention' && cupom.system_kind !== ANNUAL_RETENTION_KIND) {
+        throw COUPON_ERRORS.invalid();
+      }
       // O mesmo cupom outra vez não é um segundo resgate. Outro por cima: só
       // o console troca; o provedor precisa pedir.
       if (antes.coupon_id && (Number(antes.coupon_id) === Number(cupom.id) || !comoConsole)) {

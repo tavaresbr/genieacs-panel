@@ -82,6 +82,22 @@ export function currentCycle(subscription: Pick<SubscriptionView, 'billingCycle'
  * O cupom `repeating` conta ciclos por FATURA: no anual, cada ciclo dele é um
  * ano. A tela avisa quando há um cupom assim e o anual está em vista.
  */
+/**
+ * Se o cupom SAI na troca para o anual (0103): o de N faturas (`once`,
+ * `repeating`) resgatado no mensal não desconta a fatura do ano, e o servidor
+ * o tira quando o anual passa a valer. Fica o `forever` — e o desconto de
+ * retenção do anual, que já é calculado para ele.
+ */
+export function couponDroppedOnAnnual(
+  coupon: { duration: string; code?: string } | null | undefined,
+  currentCycle: BillingCycle,
+  cycle: BillingCycle
+) {
+  if (!coupon || cycle !== 'annual' || currentCycle === 'annual') return false
+  if (coupon.duration === 'forever') return false
+  return !String(coupon.code ?? '').startsWith('RETENCAO-ANUAL-')
+}
+
 export function couponCountsYears(
   coupon: { duration: string } | null | undefined,
   cycle: BillingCycle

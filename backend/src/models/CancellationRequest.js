@@ -66,6 +66,16 @@ class CancellationRequest {
     return changed > 0;
   }
 
+  /** O último pedido com este desfecho (o desconto, a pausa), de qualquer data, ou nulo. */
+  static async lastWithOutcome(outcome, trx = null) {
+    return (await tdb('cancellation_requests', trx)
+      .where({ outcome })
+      .whereNotNull('decided_at')
+      .orderBy('decided_at', 'desc')
+      .orderBy('id', 'desc')
+      .first()) || null;
+  }
+
   /** O último desconto de retenção aceito desde `since`, ou nulo. */
   static async discountAcceptedSince(since, trx = null) {
     return (await tdb('cancellation_requests', trx)

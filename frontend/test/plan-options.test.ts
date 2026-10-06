@@ -20,6 +20,7 @@ import {
   planChangeKind,
   annualAvailable,
   couponCountsYears,
+  couponDroppedOnAnnual,
   cyclePricing,
   dailyPrice
 } from '@/lib/plan-options'
@@ -172,6 +173,16 @@ describe('plan-options', () => {
       expect(couponCountsYears({ duration: 'repeating' }, 'monthly')).toBe(false)
       expect(couponCountsYears({ duration: 'forever' }, 'annual')).toBe(false)
       expect(couponCountsYears(null, 'annual')).toBe(false)
+    })
+
+    it('avisa que o cupom de N faturas sai na troca do mensal para o anual', () => {
+      expect(couponDroppedOnAnnual({ duration: 'repeating', code: 'X' }, 'monthly', 'annual')).toBe(true)
+      expect(couponDroppedOnAnnual({ duration: 'once', code: 'X' }, 'monthly', 'annual')).toBe(true)
+      expect(couponDroppedOnAnnual({ duration: 'forever', code: 'X' }, 'monthly', 'annual')).toBe(false)
+      expect(couponDroppedOnAnnual({ duration: 'once', code: 'RETENCAO-ANUAL-5' }, 'monthly', 'annual')).toBe(false)
+      expect(couponDroppedOnAnnual({ duration: 'repeating', code: 'X' }, 'annual', 'annual')).toBe(false)
+      expect(couponDroppedOnAnnual({ duration: 'repeating', code: 'X' }, 'monthly', 'monthly')).toBe(false)
+      expect(couponDroppedOnAnnual(null, 'monthly', 'annual')).toBe(false)
     })
   })
 

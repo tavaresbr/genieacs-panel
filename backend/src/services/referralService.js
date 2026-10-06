@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { getDb, isUniqueViolation } from '../config/database.js';
+import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
 import TenantCredit from '../models/TenantCredit.js';
 import { referralRewardCents } from './platformProfileService.js';
@@ -245,9 +245,79 @@ class ReferralService {
         id: Number(recompensa.id),
         referrerTenantId: Number(recompensa.referrer_tenant_id),
         amountCents: Number(recompensa.amount_cents),
-        canceledCents: cancelado
+        canceledCents: cancelado,
+        ...(recompensa.credit_id ? { creditId: Number(recompensa.credit_id) } : {})
       }
     };
+  }
+
+  /**
+   * Depois do estorno que cancelou o crédito de uma indicação
+   * (`cancelOnRefund`): as cobranças EM ABERTO de quem indicou que ainda
+   * seguram uma reserva desse crédito voltam ao preço sem ele. A reserva de
+   * um crédito cancelado não pode virar desconto quando a fatura for paga.
+   *
+   *   - a linha que ainda não foi ao gateway: a reserva solta e o valor volta
+   *     ao preço sem crédito — a emissão reserva de novo, do saldo que houver;
+   *   - a já emitida: cancelada no gateway e reemitida pela porta de sempre
+   *     (`resetForReissue` solta as reservas, e a emissão reserva de novo).
+   *
+   * Fora da transação do estorno (fala com o gateway), e melhor esforço: a
+   * falha fica no log, com o que alguém precisa para acertar à mão.
+   *
+   * @returns {Promise<number[]>} os ids das cobranças reprecificadas.
+   */
+  static async releaseCanceledCreditReservations({ referrerTenantId, creditId, now = new Date() }) {
+    if (!referrerTenantId || !creditId) return [];
+    const { default: BillingCharge, OPEN_CHARGE_STATUSES } = await import('../models/BillingCharge.js');
+    const { default: ChargeIssuingService } = await import('./chargeIssuingService.js');
+    const { default: Tenant } = await import('../models/Tenant.js');
+    const { providerFor } = await import('./billing/registry.js');
+    return runInTenant(referrerTenantId, async () => {
+      const reservas = await tdb('credit_allocations').where({ credit_id: creditId, status: 'reserved' });
+      const feitas = [];
+      for (const chargeId of [...new Set(reservas.map((r) => Number(r.charge_id)))]) {
+        try {
+          // eslint-disable-next-line no-await-in-loop -- uma ou duas cobranças
+          const linha = await BillingCharge.findById(chargeId);
+          if (!linha || !OPEN_CHARGE_STATUSES.includes(linha.status)) continue;
+          const semCredito = BillingCharge.baseAmountOf(linha);
+          if (!linha.gateway_charge_id) {
+            // eslint-disable-next-line no-await-in-loop
+            await TenantCredit.releaseForCharge(chargeId);
+            // eslint-disable-next-line no-await-in-loop
+            await BillingCharge.update(chargeId, { amount_cents: semCredito });
+            feitas.push(chargeId);
+            continue;
+          }
+          // eslint-disable-next-line no-await-in-loop
+          const minha = await BillingCharge.claim(chargeId, {
+            until: new Date(now.getTime() + ChargeIssuingService.CLAIM_MS), now, unissued: false, openOnly: true
+          });
+          if (!minha) {
+            console.warn(`Charge ${chargeId} holds a canceled referral credit but is busy; it keeps the reservation for now`);
+            continue;
+          }
+          const provider = providerFor(linha.provider);
+          if (typeof provider?.cancelCharge === 'function') {
+            // eslint-disable-next-line no-await-in-loop
+            await provider.cancelCharge(linha.gateway_charge_id);
+          }
+          // eslint-disable-next-line no-await-in-loop
+          await BillingCharge.resetForReissue(chargeId, { amountCents: semCredito, currency: linha.currency });
+          // eslint-disable-next-line no-await-in-loop
+          const tenant = await Tenant.findById(referrerTenantId);
+          // eslint-disable-next-line no-await-in-loop
+          await ChargeIssuingService.issueCurrent({ tenant, manual: true, now });
+          feitas.push(chargeId);
+        } catch (error) {
+          console.error(
+            `Charge ${chargeId} of provider ${referrerTenantId} still reserves the canceled referral credit ${creditId}: ${error.message}`
+          );
+        }
+      }
+      return feitas;
+    });
   }
 
   /** As indicações de quem indicou, com o nome do provedor indicado. */

@@ -3835,6 +3835,7 @@ const ru: Dictionary = {
   'plan.cycle.unavailable': 'Нет годового варианта',
   'plan.cycle.hint': 'Смена цикла вступает в силу при продлении; до этого оплаченный период остаётся в силе.',
   'plan.cycle.couponYears': 'Ваш купон считает циклы оплаты: в годовом тарифе каждый цикл — это годовой счёт, то есть один год.',
+  'plan.cycle.couponDropped': "Купон {code} не действует на годовом тарифе: годовой счёт выставляется без него, и он снимается, когда начинается годовой цикл.",
   'plan.options.confirmCycleScheduled': 'Перейти на {name} ({price})? Изменение вступит в силу при продлении, {date}; до этого оплаченный период остаётся в силе, а счёт за продление уже выставляется по новой цене.',
   'plan.options.scheduled': 'Запланировано',
   'plan.pending.title': 'Запланированная смена: {plan} с {date}',
@@ -4411,6 +4412,7 @@ const ru: Dictionary = {
   'plan.coupon.nextInvoice': "Следующий счёт: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "Пропорционально",
+  'charges.overage': "Превышение",
   'plan.proration.preview': "При переходе сейчас: {amount} пропорционально (осталось дней: {days})",
   'plan.proration.confirm': "Вы заплатите {amount} сейчас (осталось дней: {days}).",
   'plan.proration.belowMinimum': "Разница за этот период меньше минимальной суммы и сейчас не взимается.",
@@ -4452,9 +4454,11 @@ const ru: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "Использование сверх тарифа ({resource}): {units} × {unit} = {total} в следующем счёте",
   'plan.overage.hint': "В этом тарифе превышение лимита не блокируется: дополнительные единицы оплачиваются по пику за период в счёте за продление.",
+  'plan.overage.hintAnnual': "На годовом тарифе превышение лимита не блокирует: лишние единицы оплачиваются каждый месяц отдельным счётом за превышение, по пиковому использованию месяца.",
   'plan.overage.total': "Превышение в следующем счёте: {total}",
   'charges.pricing.base': "Тариф: {amount}",
   'charges.pricing.overage': "Превышение ({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "Доплата за превышение ({resource}, период до {date}): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "Рекомендуйте и получайте",
   'referrals.subtitle': "Порекомендуйте другого провайдера по своей ссылке. Когда он оплатит первый месяц, вы получите {amount} кредита на следующий счёт.",

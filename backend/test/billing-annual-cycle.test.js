@@ -395,6 +395,20 @@ describe('subida ou descida, pelo preço por dia', () => {
     assert.equal(Number((await linha()).plan_id), Number(planos.pro.id));
   });
 
+  it('mesma fatura e dia mais caro (60 → 30 dias): a subida cobra a diferença POR DIA', async () => {
+    // Bimestral R$ 120/60 dias = R$ 2/dia → Só mensal R$ 120/30 dias = R$ 4/dia.
+    await assinar({ plan: planos.bimestral, renewsAt: daquiA(10) });
+    const res = await trocar(planos.mensal.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(Number((await linha()).plan_id), Number(planos.mensal.id), 'subida: vale na hora');
+    const [pr] = await prorratas();
+    assert.ok(pr, 'a subida não sai de graça');
+    const detalhe = JSON.parse(pr.proration_detail);
+    const esperado = Math.ceil(((12000 * 60 - 12000 * 30) * detalhe.remainingSeconds) / (60 * 30 * 86_400));
+    assert.equal(Number(pr.amount_cents), esperado);
+    assert.ok(Math.abs(Number(pr.amount_cents) - 2000) <= 1, 'R$ 2 por dia × 10 dias');
+  });
+
   it('descer no anual (Pro anual → Básico anual) fica para a renovação', async () => {
     await assinar({ plan: planos.pro, cycle: 'annual', renewsAt: daquiA(200) });
     const res = await trocar(planos.basico.id);
@@ -454,5 +468,160 @@ describe('a receita (MRR)', () => {
     // 100000 × 30 ÷ 365 = 8219,18 → 8219; mais o mensal, 10000.
     assert.equal(relatorio.mrrCents, 8219 + 10000);
     assert.equal(relatorio.activeCount, 2);
+  });
+});
+
+describe('o prazo que o pagamento compra é o da cobrança paga', () => {
+  const inserirCobranca = (linha) => getDb()('billing_charges').insert({
+    tenant_id: alfa,
+    period_end: '2099-01-01',
+    currency: 'BRL',
+    provider: 'asaas',
+    status: 'pending',
+    attempts: 1,
+    created_at: new Date(),
+    updated_at: new Date(),
+    ...linha
+  });
+
+  it('a renovação MENSAL do plano atual, paga com descida + anual agendada que já cabe, compra um mês — e não um ano', async () => {
+    const renova = daquiA(3);
+    await assinar({ plan: planos.pro, renewsAt: renova });
+    await Subscription.upsertForTenant(alfa, {
+      pending_plan_id: planos.basico.id, pending_plan_at: renova, pending_billing_cycle: 'annual', pending_plan_locked_at: null
+    });
+    await SubscriptionService.invalidate(alfa);
+    // A fatura saiu pelo Pro mensal (a descida estava bloqueada pelo uso quando ela foi emitida).
+    await inserirCobranca({
+      amount_cents: 25000, gateway_charge_id: 'pay_mensal_pro', plan_id: planos.pro.id, billing_cycle: 'monthly'
+    });
+    const r = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 25000, provider: 'asaas', externalId: 'pay_mensal_pro'
+    }));
+    assert.equal(r.underpaid, false);
+    const dias = (new Date(r.subscription.renews_at).getTime() - renova.getTime()) / DIA;
+    assert.equal(dias, 30, 'R$ 250 do mês compram 30 dias');
+    assert.equal(r.subscription.billing_cycle, 'monthly');
+    assert.equal(new Date(r.subscription.pending_plan_at).getTime(), renova.getTime() + 30 * DIA, 'a troca vai para a renovação seguinte');
+    const evento = await getDb()('billing_events').where({ tenant_id: alfa, external_id: 'pay_mensal_pro' }).first();
+    const detalhe = JSON.parse(evento.detail);
+    assert.equal(detalhe.periodDays, 30);
+    assert.equal(Number(detalhe.planId), Number(planos.pro.id));
+    assert.equal(detalhe.billingCycle, 'monthly');
+  });
+
+  it('a renovação ANUAL do plano atual, paga com descida + mensal agendada, compra um ano — e não um mês', async () => {
+    const renova = daquiA(3);
+    await assinar({ plan: planos.pro, cycle: 'annual', renewsAt: renova });
+    await Subscription.upsertForTenant(alfa, {
+      pending_plan_id: planos.basico.id, pending_plan_at: renova, pending_billing_cycle: 'monthly', pending_plan_locked_at: null
+    });
+    await SubscriptionService.invalidate(alfa);
+    await inserirCobranca({
+      amount_cents: 250000, gateway_charge_id: 'pay_anual_pro', plan_id: planos.pro.id, billing_cycle: 'annual'
+    });
+    const r = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 250000, provider: 'asaas', externalId: 'pay_anual_pro'
+    }));
+    assert.equal((new Date(r.subscription.renews_at).getTime() - renova.getTime()) / DIA, 365);
+    const estorno = await runInTenant(alfa, () => SubscriptionService.reversePayment({ externalId: 'pay_anual_pro' }));
+    assert.equal(new Date(estorno.subscription.renews_at).getTime(), renova.getTime(), 'o estorno devolve os mesmos 365');
+  });
+
+  it('o boleto VELHO (mensal) de uma cobrança reemitida no anual compra um mês', async () => {
+    const renova = daquiA(3);
+    await assinar({ plan: planos.basico, renewsAt: renova });
+    await Subscription.upsertForTenant(alfa, {
+      pending_plan_id: planos.basico.id, pending_plan_at: renova, pending_billing_cycle: 'annual', pending_plan_locked_at: null
+    });
+    await SubscriptionService.invalidate(alfa);
+    const [id] = await inserirCobranca({
+      amount_cents: 10000, gateway_charge_id: 'pay_velho_mensal', plan_id: planos.basico.id, billing_cycle: 'monthly'
+    });
+    const BillingCharge = (await import('../src/models/BillingCharge.js')).default;
+    const idDaLinha = typeof id === 'object' ? id.id : id;
+    await runInTenant(alfa, () => BillingCharge.resetForReissue(idDaLinha, {
+      amountCents: 100000, currency: 'BRL', planId: planos.basico.id, couponId: null, billingCycle: 'annual'
+    }));
+    const velha = BillingCharge.supersededOf(await getDb()('billing_charges').where({ id: idDaLinha }).first());
+    assert.equal(velha[0].billingCycle, 'monthly', 'a entrada guarda o ciclo da cobrança velha');
+    assert.equal(Number(velha[0].planId), Number(planos.basico.id));
+    const r = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 10000, provider: 'asaas', externalId: 'pay_velho_mensal'
+    }));
+    assert.equal(r.underpaid, false);
+    assert.equal((new Date(r.subscription.renews_at).getTime() - renova.getTime()) / DIA, 30);
+  });
+});
+
+describe('o cupom na troca para o anual', () => {
+  const cupomDe = async (duration) => {
+    sequencia += 1;
+    return Coupon.create({
+      code: `TROCA${sequencia}`, kind: 'percent', value: 20, duration,
+      ...(duration === 'repeating' ? { duration_cycles: 3 } : {}), redemptions: 0, active: true
+    });
+  };
+  const removidos = async () => (await getDb()('billing_events').where({ tenant_id: alfa, type: 'coupon.removed' }))
+    .map((e) => JSON.parse(e.detail));
+
+  it('o cupom de N faturas do mensal não desconta a fatura anual, e sai quando o anual vale', async () => {
+    const cupom = await cupomDe('repeating');
+    const renova = daquiA(3);
+    await assinar({ renewsAt: renova, coupon: cupom });
+    assert.equal((await trocar(planos.basico.id, 'annual')).status, 200);
+    await emitir();
+    const [c] = await renovacoes();
+    assert.equal(Number(c.amount_cents), 100000, 'a fatura anual sai sem o cupom do mensal');
+    assert.equal(c.coupon_id, null);
+    assert.equal(Number((await linha()).coupon_id), Number(cupom.id), 'antes de o anual valer, o cupom continua');
+    await runInTenant(alfa, () => SubscriptionService.applyPendingPlan({ now: new Date(renova.getTime() + 1000) }));
+    const depois = await linha();
+    assert.equal(depois.billing_cycle, 'annual');
+    assert.equal(depois.coupon_id, null, 'o cupom sai');
+    const [evento] = await removidos();
+    assert.equal(evento.reason, 'cycle_change');
+    assert.equal(Number(evento.coupon.id), Number(cupom.id));
+  });
+
+  it('pago atrasado, o anual aplicado pelo pagamento também tira o cupom', async () => {
+    const cupom = await cupomDe('once');
+    const renova = daquiA(3);
+    await assinar({ renewsAt: renova, coupon: cupom });
+    assert.equal((await trocar(planos.basico.id, 'annual')).status, 200);
+    await emitir();
+    const [c] = await renovacoes();
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ renews_at: daquiA(-1), pending_plan_at: daquiA(-1) });
+    await SubscriptionService.invalidate(alfa);
+    assert.equal((await pagarRenovacao(c)).body.code, 'recorded');
+    const depois = await linha();
+    assert.equal(depois.billing_cycle, 'annual');
+    assert.equal(depois.coupon_id, null);
+    assert.equal((await removidos())[0]?.reason, 'cycle_change');
+  });
+
+  it('o cupom `forever` fica e desconta a fatura anual', async () => {
+    const cupom = await cupomDe('forever');
+    const renova = daquiA(3);
+    await assinar({ renewsAt: renova, coupon: cupom });
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ coupon_cycles_left: null });
+    assert.equal((await trocar(planos.basico.id, 'annual')).status, 200);
+    await emitir();
+    assert.equal(Number((await renovacoes())[0].amount_cents), 80000);
+    await runInTenant(alfa, () => SubscriptionService.applyPendingPlan({ now: new Date(renova.getTime() + 1000) }));
+    assert.equal(Number((await linha()).coupon_id), Number(cupom.id));
+    assert.equal((await removidos()).length, 0);
+  });
+
+  it('a troca na hora para o anual (no teste) tira o cupom de N faturas', async () => {
+    const cupom = await cupomDe('repeating');
+    await assinar({ coupon: cupom });
+    await Subscription.upsertForTenant(alfa, { status: 'trial', renews_at: null, trial_ends_at: daquiA(3) });
+    await SubscriptionService.invalidate(alfa);
+    assert.equal((await trocar(planos.basico.id, 'annual')).status, 200);
+    const depois = await linha();
+    assert.equal(depois.billing_cycle, 'annual');
+    assert.equal(depois.coupon_id, null);
+    assert.equal((await removidos())[0]?.reason, 'cycle_change');
   });
 });

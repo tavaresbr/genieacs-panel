@@ -3836,6 +3836,7 @@ const ar: Dictionary = {
   'plan.cycle.unavailable': 'لا يوجد خيار سنوي',
   'plan.cycle.hint': 'يسري تغيير الدورة عند التجديد؛ وحتى ذلك الحين تظل الفترة المدفوعة سارية.',
   'plan.cycle.couponYears': 'قسيمتك تحتسب دورات الفوترة: في الخطة السنوية، كل دورة هي فاتورة سنوية، أي سنة واحدة.',
+  'plan.cycle.couponDropped': "القسيمة {code} لا تنطبق على الخطة السنوية: تصدر الفاتورة السنوية بدونها، وتُزال عند بدء الدورة السنوية.",
   'plan.options.confirmCycleScheduled': 'هل تريد التبديل إلى {name} ({price})؟ يسري التغيير عند التجديد في {date}؛ وحتى ذلك الحين تظل الفترة المدفوعة سارية، وتصدر فاتورة التجديد بالقيمة الجديدة.',
   'plan.options.scheduled': 'مجدول',
   'plan.pending.title': 'تغيير مجدول: {plan} اعتبارًا من {date}',
@@ -4412,6 +4413,7 @@ const ar: Dictionary = {
   'plan.coupon.nextInvoice': "الفاتورة القادمة: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "تناسبي",
+  'charges.overage': "التجاوز",
   'plan.proration.preview': "عند الترقية الآن: {amount} بشكل تناسبي (الأيام المتبقية: {days})",
   'plan.proration.confirm': "ستدفع {amount} الآن (الأيام المتبقية: {days}).",
   'plan.proration.belowMinimum': "الفرق لهذه الفترة أقل من الحد الأدنى ولن يُحصَّل الآن.",
@@ -4453,9 +4455,11 @@ const ar: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "استخدام يتجاوز الخطة ({resource}): {units} × {unit} = {total} في الفاتورة القادمة",
   'plan.overage.hint': "في هذه الخطة لا يمنع تجاوز الحد: تُحتسب الوحدات الإضافية حسب ذروة الفترة في فاتورة التجديد.",
+  'plan.overage.hintAnnual': "في الخطة السنوية، تجاوز الحد لا يحظر: تُحتسب الوحدات الإضافية كل شهر في فاتورة للتجاوز فقط، حسب ذروة استخدام كل شهر.",
   'plan.overage.total': "التجاوز في الفاتورة القادمة: {total}",
   'charges.pricing.base': "الخطة: {amount}",
   'charges.pricing.overage': "التجاوز ({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "تسوية التجاوز ({resource}، الفترة حتى {date}): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "أحِل واربح",
   'referrals.subtitle': "أحِل مزوّدًا آخر عبر رابطك. عندما يدفع شهره الأول تحصل على رصيد {amount} في فاتورتك التالية.",

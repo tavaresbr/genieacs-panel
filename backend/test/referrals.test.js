@@ -334,6 +334,27 @@ describe('a recompensa', () => {
   });
 });
 
+describe('o crédito cancelado pelo estorno', () => {
+  it('a fatura aberta de quem indicou que reservava esse crédito volta ao preço sem ele', async () => {
+    const id = await indicado();
+    await pagar(id, { amountCents: 19990, externalId: `pay_reserva_${id}` });
+    assert.equal(await saldo(casa), 5000);
+    const emissao = await emitir(casa);
+    assert.equal(emissao.amountCents, 14990, 'a fatura de quem indicou reservou o crédito');
+    const antiga = emissao.charge;
+    recebidas = [];
+    await estornar(id, `pay_reserva_${id}`);
+    const depois = await cobranca(casa, antiga.id);
+    assert.equal(Number(depois.amount_cents), 19990, 'reemitida pelo preço cheio');
+    assert.equal(depois.credit_reserved_cents, null);
+    assert.ok(depois.gateway_charge_id && depois.gateway_charge_id !== antiga.gateway_charge_id, 'reemitida no gateway');
+    assert.ok(recebidas.some((r) => r.method === 'DELETE'), 'a velha cancelada no gateway');
+    const [alocacao] = await alocacoesDe(casa);
+    assert.equal(alocacao.status, 'released');
+    assert.equal(await saldo(casa), 0, 'o crédito cancelado não volta ao saldo');
+  });
+});
+
 describe('o crédito na fatura de quem indicou', () => {
   it('abate o preço na emissão, reserva na cobrança e vai ao gateway com o desconto', async () => {
     await darCredito(casa, 5000);

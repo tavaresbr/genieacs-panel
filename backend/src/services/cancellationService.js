@@ -8,7 +8,9 @@ import UsagePeak from '../models/UsagePeak.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import AuditLog from '../models/AuditLog.js';
 import CancellationRequest, { CANCELLATION_OUTCOMES } from '../models/CancellationRequest.js';
-import SubscriptionService, { isCancelScheduled, isPauseScheduled } from './subscriptionService.js';
+import SubscriptionService, {
+  ANNUAL_RETENTION_KIND, isCancelScheduled, isPauseScheduled, parseBillingCycle
+} from './subscriptionService.js';
 import ChargeIssuingService, { ChargeFollowError } from './chargeIssuingService.js';
 import CouponService from './couponService.js';
 import { SelfBillingError } from './selfBillingService.js';
@@ -81,8 +83,15 @@ export const SELF_CANCEL_REASON = 'self_cancel';
 
 const COMMENT_MAX = 2000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** O desconto de retenção vale uma vez a cada doze meses. */
-const DISCOUNT_COOLDOWN_MS = 365 * DAY_MS;
+/**
+ * A carência do desconto de retenção: doze meses DEPOIS do fim do período
+ * descontado — `max(12, meses descontados + 12)` contados da decisão. No
+ * anual o período descontado é a fatura do ano (doze meses), e a carência é
+ * de 24: sem isto, o desconto voltaria a cada renovação anual.
+ */
+const DISCOUNT_COOLDOWN_MONTHS = 12;
+/** A pausa de retenção: uma a cada doze meses. */
+const PAUSE_COOLDOWN_MONTHS = 12;
 /** Os estados em que o provedor decide sobre a própria assinatura — os de `SelfBillingService`. */
 const ESTADOS_VIVOS = new Set(['trial', 'active', 'past_due']);
 
@@ -118,6 +127,40 @@ export function addMonths(data, meses) {
   return d;
 }
 
+/**
+ * O desconto de retenção do anual: `percent` % por `months` meses, levado a
+ * UMA fatura anual — `percent × months ÷ 12` (20% × 3 ÷ 12 = 5% da fatura do
+ * ano), até 99%.
+ */
+export function annualRetentionPercent(percent, months) {
+  const p = Math.max(0, Number(percent) || 0);
+  const m = Math.max(0, Math.floor(Number(months) || 0));
+  return Math.min(99, (p * m) / 12);
+}
+
+/**
+ * O abatimento em centavos do desconto de retenção numa fatura anual de
+ * `annualCents` — arredondado para baixo, como todo desconto.
+ */
+export function annualRetentionCents(annualCents, percent, months) {
+  const preco = Math.max(0, Math.floor(Number(annualCents) || 0));
+  return Math.floor((preco * annualRetentionPercent(percent, months)) / 100);
+}
+
+/** Os meses que o desconto aceito cobriu (o anual: a fatura do ano). */
+function mesesDescontados(linha) {
+  if (linha?.billing_cycle === 'annual') return 12;
+  const meses = Number(linha?.months);
+  return Number.isFinite(meses) && meses > 0 ? Math.floor(meses) : 0;
+}
+
+/** Quando o desconto de retenção volta a valer depois do pedido `linha`. */
+function descontoVoltaEm(linha) {
+  const quando = asDate(linha?.decided_at);
+  if (!quando) return null;
+  return addMonths(quando, Math.max(DISCOUNT_COOLDOWN_MONTHS, mesesDescontados(linha) + DISCOUNT_COOLDOWN_MONTHS));
+}
+
 /** O código do cupom de retenção de uma configuração: um por porcentagem e meses. */
 export function retentionCouponCode(percent, months) {
   return `RETENCAO-${percent}-${months}`;
@@ -135,6 +178,7 @@ function presentRequest(row) {
     outcome: row.outcome ?? null,
     months: row.months === null || row.months === undefined ? null : Number(row.months),
     discountPercent: row.discount_percent === null || row.discount_percent === undefined ? null : Number(row.discount_percent),
+    billingCycle: parseBillingCycle(row.billing_cycle),
     cancelAt: isoOf(row.cancel_at),
     createdAt: isoOf(row.created_at),
     decidedAt: isoOf(row.decided_at),
@@ -182,6 +226,51 @@ async function cupomDeRetencao(percent, months) {
 }
 
 /**
+ * O cupom de retenção do ANUAL: UMA fatura (`once`) com o desconto
+ * equivalente (`annualRetentionPercent`). Percentual quando a conta dá um
+ * inteiro; senão o valor em centavos sobre o preço anual do plano
+ * (`annualCents`) — o cupom percentual é inteiro.
+ */
+async function cupomDeRetencaoAnual(percent, months, annualCents) {
+  const equivalente = annualRetentionPercent(percent, months);
+  const inteiro = Number.isInteger(equivalente) && equivalente >= 1;
+  const valor = inteiro ? equivalente : annualRetentionCents(annualCents, percent, months);
+  if (!(valor > 0)) return null;
+  const code = inteiro ? `RETENCAO-ANUAL-${valor}` : `RETENCAO-ANUAL-F${valor}`;
+  let cupom = await Coupon.findByCode(code);
+  if (!cupom) {
+    try {
+      cupom = await Coupon.create({
+        code,
+        kind: inteiro ? 'percent' : 'fixed',
+        value: valor,
+        duration: 'once',
+        active: true,
+        system_kind: ANNUAL_RETENTION_KIND
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      cupom = await Coupon.findByCode(code);
+    }
+  }
+  if (!cupom || cupom.system_kind !== ANNUAL_RETENTION_KIND || !cupom.active) return null;
+  return cupom;
+}
+
+/**
+ * A fatura que o desconto de retenção vai descontar: a assinatura no ciclo
+ * da próxima renovação e o plano dela — a troca agendada (a descida, o ciclo
+ * anual), quando há uma; senão a de agora.
+ */
+async function proximaFatura(subscription, plan) {
+  if (subscription?.pending_plan_id) {
+    const agendado = await Plan.findById(subscription.pending_plan_id);
+    if (agendado) return { view: SubscriptionService.scheduledView(subscription), plan: agendado };
+  }
+  return { view: subscription, plan };
+}
+
+/**
  * Quantos ciclos o desconto de retenção cobre nesta assinatura: os
  * `discountMonths` da configuração no mensal; UM no anual (0103). O cupom
  * `repeating` conta ciclos pagos, e no anual cada ciclo é um ano — "20% por 3
@@ -226,33 +315,55 @@ class CancellationService {
     const vivo = Boolean(subscription && ESTADOS_VIVOS.has(subscription.status)
       && !subscription.billing_exempt_at && preco > 0 && !isCancelScheduled(subscription));
 
-    const percent = politica.discountPercent;
+    // A fatura que o desconto desconta: a da próxima renovação — no ciclo
+    // anual quando a assinatura é anual OU vai ser (a troca agendada).
+    const proxima = await proximaFatura(subscription, plan);
+    const billingCycle = SubscriptionService.cycleOf(proxima.view, proxima.plan);
+    const anual = billingCycle === 'annual';
+    const percentDaConfig = politica.discountPercent;
     // `months` é quantas FATURAS o desconto cobre (o cupom `repeating` conta
-    // ciclos pagos). No ciclo anual (0103) cada ciclo é um ano, e N meses
-    // virariam N anos de desconto: lá o desconto vale UMA fatura — a anual
-    // seguinte (`retentionCyclesFor`).
-    const billingCycle = SubscriptionService.cycleOf(subscription, plan);
-    const months = retentionCyclesFor(subscription, plan, politica.discountMonths);
-    const comDesconto = SubscriptionService.priceWithCoupon(preco, { kind: 'percent', value: percent });
+    // ciclos pagos). No ciclo anual (0103) cada ciclo é um ano: lá o desconto
+    // vira UMA fatura anual com o equivalente — `percent × meses ÷ 12`.
+    const months = retentionCyclesFor(proxima.view, proxima.plan, politica.discountMonths);
+    let percent = percentDaConfig;
+    let comDesconto;
+    if (anual) {
+      const precoAnual = SubscriptionService.cyclePriceCents(proxima.view, proxima.plan);
+      percent = Math.round(annualRetentionPercent(percentDaConfig, politica.discountMonths) * 100) / 100;
+      comDesconto = SubscriptionService.priceWithCoupon(precoAnual, {
+        kind: 'fixed', value: annualRetentionCents(precoAnual, percentDaConfig, politica.discountMonths)
+      });
+    } else {
+      comDesconto = SubscriptionService.priceWithCoupon(preco, { kind: 'percent', value: percentDaConfig });
+    }
     const discount = {
-      available: false, reason: null, percent, months, billingCycle, priceCents: comDesconto, availableAgainAt: null
+      available: false,
+      reason: null,
+      percent,
+      months,
+      billingCycle,
+      priceCents: comDesconto,
+      availableAgainAt: null,
+      ...(anual ? { configPercent: percentDaConfig, configMonths: politica.discountMonths } : {})
     };
-    if (!(percent > 0 && politica.discountMonths > 0)) discount.reason = 'disabled';
+    if (!(percentDaConfig > 0 && politica.discountMonths > 0) || !(percent > 0)) discount.reason = 'disabled';
     else if (!vivo || isPauseScheduled(subscription)) discount.reason = 'not_eligible';
     else {
-      const ultimo = await CancellationRequest.discountAcceptedSince(new Date(now.getTime() - DISCOUNT_COOLDOWN_MS));
-      if (ultimo) {
+      const ultimo = await CancellationRequest.lastWithOutcome(CANCELLATION_OUTCOMES.RETAINED_DISCOUNT);
+      const volta = ultimo ? descontoVoltaEm(ultimo) : null;
+      if (volta && volta.getTime() > now.getTime()) {
         discount.reason = 'used_recently';
-        const quando = asDate(ultimo.decided_at);
-        discount.availableAgainAt = quando ? new Date(quando.getTime() + DISCOUNT_COOLDOWN_MS).toISOString() : null;
-      } else if (SubscriptionService.couponApplies(subscription, plan, coupon)
-        && SubscriptionService.priceFor(subscription, plan, coupon) <= comDesconto) {
+        discount.availableAgainAt = volta.toISOString();
+      } else if (SubscriptionService.couponApplies(anual ? proxima.view : subscription, anual ? proxima.plan : plan, coupon)
+        && SubscriptionService.priceFor(anual ? proxima.view : subscription, anual ? proxima.plan : plan, coupon) <= comDesconto) {
         discount.reason = 'better_coupon';
       }
     }
     discount.available = discount.reason === null;
 
-    const pause = { available: false, reason: null, maxMonths: politica.pauseMaxMonths, from: null };
+    const pause = {
+      available: false, reason: null, maxMonths: politica.pauseMaxMonths, from: null, availableAgainAt: null
+    };
     const renovacao = asDate(subscription?.renews_at);
     if (!(politica.pauseMaxMonths > 0)) pause.reason = 'disabled';
     else if (isPauseScheduled(subscription)) pause.reason = 'already_paused';
@@ -261,7 +372,16 @@ class CancellationService {
       // devendo (ou no teste) não tem o que pausar — tem o que pagar.
       pause.reason = 'not_eligible';
     } else {
-      pause.from = renovacao.toISOString();
+      // Uma pausa a cada doze meses, contados da decisão da última.
+      const ultima = await CancellationRequest.lastWithOutcome(CANCELLATION_OUTCOMES.RETAINED_PAUSE);
+      const decidida = asDate(ultima?.decided_at);
+      const volta = decidida ? addMonths(decidida, PAUSE_COOLDOWN_MONTHS) : null;
+      if (volta && volta.getTime() > now.getTime()) {
+        pause.reason = 'pause_cooldown';
+        pause.availableAgainAt = volta.toISOString();
+      } else {
+        pause.from = renovacao.toISOString();
+      }
     }
     pause.available = pause.reason === null;
     return { discount, pause };
@@ -357,13 +477,26 @@ class CancellationService {
     }
     return offer === 'discount'
       ? this.aceitarDesconto({
-        tenantId, aberto, config: { ...config, discountMonths: offers.discount.months }, actorUserId, countDevices, now
+        tenantId, subscription, plan, aberto, config, oferta: offers.discount, actorUserId, countDevices, now
       })
       : this.aceitarPausa({ tenantId, subscription, aberto, config, months, actorUserId, now });
   }
 
-  static async aceitarDesconto({ tenantId, aberto, config, actorUserId, countDevices, now }) {
-    const cupom = await cupomDeRetencao(config.discountPercent, config.discountMonths);
+  static async aceitarDesconto({
+    tenantId, subscription, plan, aberto, config, oferta, actorUserId, countDevices, now
+  }) {
+    // No anual (a assinatura, ou a troca agendada para ele), UMA fatura anual
+    // com o equivalente; no mensal, N faturas com a porcentagem.
+    const anual = oferta?.billingCycle === 'annual';
+    let cupom;
+    if (anual) {
+      const proxima = await proximaFatura(subscription, plan);
+      cupom = await cupomDeRetencaoAnual(
+        config.discountPercent, config.discountMonths, SubscriptionService.cyclePriceCents(proxima.view, proxima.plan)
+      );
+    } else {
+      cupom = await cupomDeRetencao(config.discountPercent, config.discountMonths);
+    }
     if (!cupom) throw recusa('cancellation.offerUnavailable', 'offer_unavailable', 409, { reason: 'disabled' });
     // A porta de sempre do cupom: a fatura em aberto reprecificada (cancelada
     // no gateway ANTES de gravar; a recusa para tudo e nada muda).
@@ -375,12 +508,19 @@ class CancellationService {
       outcome: CANCELLATION_OUTCOMES.RETAINED_DISCOUNT,
       months: config.discountMonths,
       discount_percent: config.discountPercent,
+      billing_cycle: anual ? 'annual' : 'monthly',
       decided_at: aoSegundo(now)
     });
     return {
       offer: 'discount',
       request: presentRequest(await CancellationRequest.findById(aberto.id)),
-      coupon: { id: Number(cupom.id), code: cupom.code, percent: config.discountPercent, months: config.discountMonths },
+      coupon: {
+        id: Number(cupom.id),
+        code: cupom.code,
+        percent: anual ? oferta.percent : config.discountPercent,
+        months: anual ? 1 : config.discountMonths,
+        billingCycle: anual ? 'annual' : 'monthly'
+      },
       priceCents: aplicado.priceCents,
       replacedCouponId: aplicado.replacedCouponId ?? null,
       charge: aplicado.charge
@@ -435,6 +575,11 @@ class CancellationService {
     });
     SubscriptionService.cache.invalidate();
     if (!gravou) throw new SelfBillingError('billing.busy', { code: 'busy', status: 409 });
+    // A emissão que estava no meio quando a pausa foi gravada (a linha com a
+    // garra dela escapou da varredura de cima): varrida de novo, agora que a
+    // pausa já está gravada — melhor esforço; a emissão também relê a
+    // assinatura depois de criar a cobrança.
+    await this.varrerDeNovo(renovacao, now);
     return {
       offer: 'pause',
       request: presentRequest(await CancellationRequest.findById(aberto.id)),
@@ -472,6 +617,9 @@ class CancellationService {
       await CancellationRequest.decide(aberto.id, {
         offer: 'none', outcome: CANCELLATION_OUTCOMES.CANCELED, cancel_at: aoSegundo(now), decided_at: aoSegundo(now)
       });
+      // O excedente do período que fecha (0104), numa fatura final de só
+      // excedente — as de renovação acabaram de ser canceladas.
+      await ChargeIssuingService.issueFinalOverage({ subscription, now });
       return {
         immediate: true,
         cancelAt: aoSegundo(now).toISOString(),
@@ -505,12 +653,23 @@ class CancellationService {
     });
     SubscriptionService.cache.invalidate();
     if (!gravou) throw new SelfBillingError('billing.busy', { code: 'busy', status: 409 });
+    // Como na pausa: a emissão que escapou da varredura de antes.
+    await this.varrerDeNovo(fim, now);
     return {
       immediate: false,
       cancelAt: quando.toISOString(),
       canceledCharges: canceladas.canceled.length,
       request: presentRequest(await CancellationRequest.findById(aberto.id))
     };
+  }
+
+  /** A segunda varredura das faturas da renovação de `prazo`, depois de gravar — melhor esforço. */
+  static async varrerDeNovo(prazo, now) {
+    try {
+      await ChargeIssuingService.cancelRenewalCharges({ periodEnd: ChargeIssuingService.periodKey(prazo), now });
+    } catch (error) {
+      console.warn(`Could not re-sweep the renewal charges of provider ${currentTenantId()}: ${error.message}`);
+    }
   }
 
   /**
@@ -627,6 +786,10 @@ class CancellationService {
     } catch (error) {
       console.warn(`Could not cancel the open renewal charges of provider ${tenantId} after its cancellation: ${error.message}`);
     }
+    // O excedente do período que fecha com o cancelamento (0104): a
+    // renovação não sai para quem cancela, então ele vai numa fatura final
+    // de só excedente. Melhor esforço.
+    const excedenteFinal = await ChargeIssuingService.issueFinalOverage({ subscription, now });
 
     const linha = tenant?.slug ? tenant : ((await getDb()('tenants').where({ id: tenantId }).first()) ?? { id: tenantId });
     await PlatformAudit.record({
@@ -641,14 +804,22 @@ class CancellationService {
       subjectId: tenantId,
       detail: { ...detail, source: 'scheduler', platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_STATUS_CHANGED }
     });
-    return { action: 'canceled', cancelAt: cancelaEm.toISOString() };
+    return {
+      action: 'canceled',
+      cancelAt: cancelaEm.toISOString(),
+      ...(excedenteFinal?.issued || excedenteFinal?.charge ? { finalOverage: excedenteFinal.charge?.id ?? true } : {})
+    };
   }
 
   static async retomarDaPausa({ tenant, tenantId, subscription, pausaAte, now }) {
+    // O prazo depois da pausa: o fim dela — ou o prazo de agora, se ele já
+    // vai além (um período pago depois de a pausa ser marcada não é encurtado).
+    const prazoAntes = asDate(subscription.renews_at);
+    const novoPrazo = prazoAntes && prazoAntes.getTime() > pausaAte.getTime() ? prazoAntes : pausaAte;
     const detail = {
       pausedUntil: pausaAte.toISOString(),
       renewsBefore: isoOf(subscription.renews_at),
-      renewsAt: pausaAte.toISOString(),
+      renewsAt: novoPrazo.toISOString(),
       automatic: true
     };
     const gravou = await getDb().transaction(async (trx) => {
@@ -656,7 +827,7 @@ class CancellationService {
         .whereNotNull('paused_until')
         .where('paused_until', '<=', now)
         .whereNot({ status: 'canceled' }), {
-        renews_at: pausaAte,
+        renews_at: novoPrazo,
         paused_until: null,
         pause_started_at: null
       }, trx);
@@ -670,14 +841,14 @@ class CancellationService {
     });
     SubscriptionService.cache.invalidate();
     if (!gravou) return { action: 'none', reason: 'raced' };
-    await this.levarPicosDaPausa(subscription.renews_at, pausaAte);
+    if (novoPrazo.getTime() !== (prazoAntes?.getTime() ?? NaN)) await this.levarPicosDaPausa(subscription.renews_at, novoPrazo);
     const linha = tenant?.slug ? tenant : ((await getDb()('tenants').where({ id: tenantId }).first()) ?? { id: tenantId });
     await PlatformAudit.record({
       action: PlatformAudit.ACTIONS.SUBSCRIPTION_CANCELLATION_CHANGED,
       tenant: linha,
       detail: { action: 'pause_ended', ...detail, source: 'scheduler' }
     });
-    return { action: 'resumed', renewsAt: pausaAte.toISOString() };
+    return { action: 'resumed', renewsAt: novoPrazo.toISOString() };
   }
 
   /**
@@ -696,11 +867,17 @@ class CancellationService {
     const para = SubscriptionService.overagePeriodKey({ renews_at: pausaAte });
     if (!de || !para || de === para) return;
     try {
-      const picos = await UsagePeak.forPeriod(de);
-      for (const [recurso, valor] of Object.entries(picos)) {
-        if (valor === null || valor === undefined) continue;
+      const linhas = await UsagePeak.rowsForPeriod(de);
+      for (const [recurso, linha] of Object.entries(linhas)) {
+        if (!linha) continue;
+        // A fotografia do plano vai junto (0104): a cobrança da volta lê o
+        // teto e o preço de quando o excedente foi medido.
+        const foto = linha.unitCents !== null && linha.limit !== null
+          ? { limit: linha.limit, unitCents: linha.unitCents } : null;
         // eslint-disable-next-line no-await-in-loop -- três recursos no máximo
-        await UsagePeak.record(para, recurso, valor);
+        if (foto) await UsagePeak.recordSnapshot(para, recurso, linha.overagePeak ?? linha.peak, foto);
+        // eslint-disable-next-line no-await-in-loop
+        await UsagePeak.record(para, recurso, linha.peak);
       }
     } catch (error) {
       console.warn(`Could not carry the usage peaks over the pause of provider ${currentTenantId()}: ${error.message}`);

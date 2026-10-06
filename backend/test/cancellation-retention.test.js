@@ -349,9 +349,13 @@ describe('o desconto', () => {
     assert.equal(recusado.body.code, 'offer_unavailable');
     assert.equal(recusado.body.reason, 'used_recently');
 
-    // Treze meses depois, volta a valer.
+    // A carência é de doze meses DEPOIS do período descontado (3 meses):
+    // treze meses depois ainda não vale; dezesseis meses depois, volta.
     await getDb()('cancellation_requests').where({ tenant_id: alfa, outcome: 'retained_discount' })
       .update({ decided_at: aoSegundo(Date.now() - 395 * DIA) });
+    assert.equal((await pedirCancelamento()).body.data.offers.discount.reason, 'used_recently');
+    await getDb()('cancellation_requests').where({ tenant_id: alfa, outcome: 'retained_discount' })
+      .update({ decided_at: aoSegundo(Date.now() - 490 * DIA) });
     assert.equal((await pedirCancelamento()).body.data.offers.discount.available, true);
   });
 

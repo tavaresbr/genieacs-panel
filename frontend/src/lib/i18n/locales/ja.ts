@@ -3827,6 +3827,7 @@ const ja: Dictionary = {
   'plan.cycle.unavailable': '年払いなし',
   'plan.cycle.hint': 'サイクルの変更は更新時に適用されます。それまでは支払い済みの期間が有効です。',
   'plan.cycle.couponYears': 'クーポンは請求サイクルごとに数えられます。年払いでは1サイクルが年額請求1回、つまり1年です。',
+  'plan.cycle.couponDropped': "クーポン {code} は年払いには適用されません。年額請求はクーポンなしで発行され、年払いサイクルの開始時にクーポンは削除されます。",
   'plan.options.confirmCycleScheduled': '{name}（{price}）に変更しますか？変更は更新日の{date}に適用されます。それまでは支払い済みの期間が有効で、更新時の請求は新しい金額になります。',
   'plan.options.scheduled': '予定',
   'plan.pending.title': '予定された変更：{date} から {plan}',
@@ -4403,6 +4404,7 @@ const ja: Dictionary = {
   'plan.coupon.nextInvoice': "次回の請求額: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "日割り",
+  'charges.overage': "超過分",
   'plan.proration.preview': "今すぐ変更すると: 日割りで {amount}（残り {days} 日）",
   'plan.proration.confirm': "今 {amount} をお支払いいただきます（残り {days} 日）。",
   'plan.proration.belowMinimum': "この期間の差額は最低額を下回るため、今は請求されません。",
@@ -4444,9 +4446,11 @@ const ja: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "プランを超えた利用（{resource}）: {units} × {unit} = {total}（次回の請求書）",
   'plan.overage.hint': "このプランでは上限を超えてもブロックされません。超過分は期間中のピーク利用に基づき、更新請求書で請求されます。",
+  'plan.overage.hintAnnual': "年払いでは上限を超えてもブロックされません。超過分は毎月、超過分のみの請求書で、その月のピーク使用量に基づいて請求されます。",
   'plan.overage.total': "次回請求書の超過分: {total}",
   'charges.pricing.base': "プラン: {amount}",
   'charges.pricing.overage': "超過（{resource}）: {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "超過分の精算（{resource}、{date}までの期間）: {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "紹介して特典を獲得",
   'referrals.subtitle': "あなたのリンクで他のプロバイダーを紹介してください。相手が最初の月額を支払うと、次回の請求で {amount} のクレジットが付与されます。",

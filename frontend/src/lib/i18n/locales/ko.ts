@@ -3834,6 +3834,7 @@ const ko: Dictionary = {
   'plan.cycle.unavailable': '연간 옵션 없음',
   'plan.cycle.hint': '주기 변경은 갱신 시 적용됩니다. 그때까지는 이미 결제한 기간이 유효합니다.',
   'plan.cycle.couponYears': '쿠폰은 결제 주기 단위로 계산됩니다. 연간 요금제에서는 한 주기가 연간 청구서 1건, 즉 1년입니다.',
+  'plan.cycle.couponDropped': "쿠폰 {code}은(는) 연간 요금제에 적용되지 않습니다. 연간 청구서는 쿠폰 없이 발행되며, 연간 주기가 시작되면 쿠폰이 제거됩니다.",
   'plan.options.confirmCycleScheduled': '{name}({price})(으)로 변경할까요? 변경은 갱신일인 {date}에 적용됩니다. 그때까지는 이미 결제한 기간이 유효하며, 갱신 청구서는 새 금액으로 발행됩니다.',
   'plan.options.scheduled': '예약됨',
   'plan.pending.title': '예약된 변경: {date}부터 {plan}',
@@ -4410,6 +4411,7 @@ const ko: Dictionary = {
   'plan.coupon.nextInvoice': "다음 청구서: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "일할 계산",
+  'charges.overage': "초과 사용",
   'plan.proration.preview': "지금 변경 시: 일할 계산 {amount} (남은 기간 {days}일)",
   'plan.proration.confirm': "지금 {amount}을(를) 결제하게 됩니다 (남은 기간 {days}일).",
   'plan.proration.belowMinimum': "이번 기간의 차액이 최소 금액보다 적어 지금은 청구되지 않습니다.",
@@ -4451,9 +4453,11 @@ const ko: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "플랜 초과 사용({resource}): {units} × {unit} = {total} 다음 청구서에 청구",
   'plan.overage.hint': "이 플랜에서는 한도를 넘어도 차단되지 않습니다. 초과 단위는 기간 중 최대 사용량 기준으로 갱신 청구서에 청구됩니다.",
+  'plan.overage.hintAnnual': "연간 요금제에서는 한도를 넘어도 차단되지 않습니다. 초과 단위는 매월 초과분 전용 청구서로, 해당 월의 최대 사용량 기준으로 청구됩니다.",
   'plan.overage.total': "다음 청구서의 초과 사용: {total}",
   'charges.pricing.base': "플랜: {amount}",
   'charges.pricing.overage': "초과({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "초과 사용 정산 ({resource}, {date}까지의 기간): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "추천하고 혜택 받기",
   'referrals.subtitle': "내 링크로 다른 제공업체를 추천하세요. 상대가 첫 달 요금을 결제하면 다음 청구서에 {amount}의 크레딧을 받습니다.",

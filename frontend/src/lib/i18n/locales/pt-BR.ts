@@ -3827,6 +3827,7 @@ const ptBR: Dictionary = {
   'plan.cycle.unavailable': 'Sem opção anual',
   'plan.cycle.hint': 'A troca de ciclo vale na renovação; até lá o período já pago continua valendo.',
   'plan.cycle.couponYears': 'Seu cupom vale por ciclos de cobrança: no plano anual, cada ciclo é uma fatura anual, ou seja, um ano.',
+  'plan.cycle.couponDropped': "O cupom {code} não vale no plano anual: a fatura anual sai sem ele, e ele é removido quando o ciclo anual começar.",
   'plan.options.confirmCycleScheduled': 'Mudar para {name} ({price})? A troca vale na renovação, em {date}; até lá o período já pago continua valendo, e a fatura da renovação já sai com o novo valor.',
   'plan.options.scheduled': 'Agendado',
   'plan.pending.title': 'Mudança agendada: {plan} a partir de {date}',
@@ -4403,6 +4404,7 @@ const ptBR: Dictionary = {
   'plan.coupon.nextInvoice': "Próxima fatura: {price}",
   // Pró-rata da subida no meio do período (0101)
   'charges.proration': "Pró-rata",
+  'charges.overage': "Excedente",
   'plan.proration.preview': "Subindo agora: {amount} de pró-rata ({days} dias restantes)",
   'plan.proration.confirm': "Você vai pagar {amount} agora ({days} dias restantes).",
   'plan.proration.belowMinimum': "A diferença deste período fica abaixo do mínimo e não é cobrada agora.",
@@ -4444,9 +4446,11 @@ const ptBR: Dictionary = {
   'platform.plans.overagePerDevice': "{price}/ONT",
   'plan.overage.line': "Uso acima do plano ({resource}): {units} × {unit} = {total} na próxima fatura",
   'plan.overage.hint': "Neste plano, passar do teto não bloqueia: as unidades a mais são cobradas pelo maior uso do período, na fatura da renovação.",
+  'plan.overage.hintAnnual': "No plano anual, passar do teto não bloqueia: as unidades a mais são cobradas todo mês, numa fatura só do excedente, pelo maior uso de cada mês.",
   'plan.overage.total': "Excedente na próxima fatura: {total}",
   'charges.pricing.base': "Plano: {amount}",
   'charges.pricing.overage': "Excedente ({resource}): {units} × {unit} = {total}",
+  'charges.pricing.trueUp': "Acerto do excedente ({resource}, período até {date}): {units} × {unit} = {total}",
   // A indicação de provedores (0105)
   'referrals.title': "Indique e ganhe",
   'referrals.subtitle': "Indique outro provedor pelo seu link. Quando ele pagar a primeira mensalidade, você ganha {amount} de crédito na sua próxima fatura.",
