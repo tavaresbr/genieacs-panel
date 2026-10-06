@@ -60,6 +60,23 @@ class Subscription {
   }
 
   /**
+   * Quantas assinaturas estão (ou vão estar, pela troca agendada) no ciclo
+   * ANUAL deste plano (0104). É a pergunta do console antes de tirar o preço
+   * anual de um plano: sem ele, essas assinaturas voltariam ao mensal em
+   * silêncio.
+   */
+  static async countAnnualOnPlan(planId) {
+    // tenant-scope-exempt: pergunta do plano de controle, acima dos provedores.
+    const linha = await runUnscoped('the console checks every provider on an annual plan', () => getDb()('subscriptions')
+      .where({ plan_id: planId, billing_cycle: 'annual' })
+      .orWhere((q) => q.where({ pending_plan_id: planId })
+        .whereRaw("COALESCE(pending_billing_cycle, billing_cycle) = 'annual'"))
+      .count({ total: '*' })
+      .first());
+    return Number(linha?.total ?? 0);
+  }
+
+  /**
    * Cria ou altera a assinatura de um provedor nomeado.
    *
    * `patch` só leva colunas; quem decide o que a mudança significa (extrato,
@@ -97,9 +114,12 @@ class Subscription {
       .where({ tenant_id: tenantId, pending_plan_id: pendingPlanId })
       .update({
         plan_id: pendingPlanId,
+        // O ciclo agendado junto (0104), quando há um; nulo é "o mesmo".
+        billing_cycle: db.raw('COALESCE(pending_billing_cycle, billing_cycle)'),
         pending_plan_id: null,
         pending_plan_at: null,
         pending_plan_locked_at: null,
+        pending_billing_cycle: null,
         // O plano novo é o de baixo: não há subida no período a proteger.
         upgraded_at: null,
         updated_at: new Date()
@@ -265,6 +285,24 @@ class Subscription {
       return reaplicou ? { restored: true, reattached: true, cyclesAfter: 1 } : { restored: false, reason: 'raced' };
     }
     return { restored: false, reason: linha.coupon_id ? 'other_coupon' : 'not_cleared' };
+  }
+
+  /**
+   * Uma mudança da retenção no cancelamento (0107) — a pausa, o cancelamento
+   * agendado, o desfazer, e o que o agendador cumpre na data — só se a linha
+   * ainda está como se leu: `condicao` recebe a consulta já filtrada pelo
+   * provedor e acrescenta o resto (o estado, a coluna ainda nula ou ainda
+   * vencida). Pelo mesmo motivo de `applyPendingPlan`: dois cliques, ou o
+   * agendador e um clique, não gravam a mesma decisão duas vezes. Devolve se
+   * mudou.
+   */
+  static async changeIf(tenantId, condicao, patch, db = getDb()) {
+    if (!tenantId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const query = db('subscriptions').where({ tenant_id: tenantId });
+    if (typeof condicao === 'function') condicao(query);
+    const changed = await query.update({ ...patch, updated_at: new Date() });
+    return changed > 0;
   }
 
   /** A do provedor em escopo — o caminho que um controlador do próprio provedor usaria. */

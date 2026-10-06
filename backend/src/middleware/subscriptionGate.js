@@ -91,6 +91,15 @@ const EXEMPT_PATHS = new Set([
   // devolve a fatura de quem está atrasado para Pix/boleto.
   '/api/tenant/subscription/autopay',
   '/api/tenant/subscription/card',
+  // A indicação (0106): o saldo de crédito na mesma tela de Plano que quem
+  // está bloqueado usa para pagar — e o crédito é parte do que ele vai pagar.
+  '/api/tenant/referrals',
+  // A retenção no cancelamento (0107): pedir para cancelar, aceitar uma
+  // oferta, confirmar e desfazer — quem está atrasado (ou pausado) também
+  // pode querer sair, ou ficar.
+  '/api/tenant/subscription/cancellation',
+  '/api/tenant/subscription/cancellation/accept',
+  '/api/tenant/subscription/cancellation/confirm',
   '/api/auth'
 ]);
 // Os caminhos EXATOS das entregas de fora. `/api/sgp/events` sem o
@@ -114,7 +123,8 @@ const MESSAGE_KEYS = Object.freeze({
   [GATE_CODES.TRIAL_EXPIRED]: 'subscription.trialExpired',
   [GATE_CODES.SUSPENDED]: 'subscription.suspended',
   [GATE_CODES.CANCELED]: 'subscription.canceled',
-  [GATE_CODES.MISSING]: 'subscription.missing'
+  [GATE_CODES.MISSING]: 'subscription.missing',
+  [GATE_CODES.PAUSED]: 'subscription.paused'
 });
 
 /**

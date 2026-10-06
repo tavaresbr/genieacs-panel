@@ -127,12 +127,52 @@ function readMarketing(body, target) {
   return null;
 }
 
+/**
+ * Os preços de excedente (0105) do corpo em `target` — `overagePriceCents:
+ * { operators, subscribers, devices }`, cada um em centavos (inteiro ≥ 1) ou
+ * nulo/vazio para "sem preço" (o teto barra). Ausente é "não mexer"; devolve
+ * a mensagem de erro, ou `null`.
+ */
+const OVERAGE_FIELDS = [
+  ['operators', 'overage_price_cents_operators'],
+  ['subscribers', 'overage_price_cents_subscribers'],
+  ['devices', 'overage_price_cents_devices']
+];
+
+function readOverage(body, target) {
+  const precos = body.overagePriceCents;
+  if (precos === undefined) return null;
+  if (precos === null) {
+    for (const [, column] of OVERAGE_FIELDS) target[column] = null;
+    return null;
+  }
+  if (typeof precos !== 'object' || Array.isArray(precos)) {
+    return 'overagePriceCents must be an object with operators, subscribers and devices';
+  }
+  for (const [key, column] of OVERAGE_FIELDS) {
+    const valor = precos[key];
+    if (valor === undefined) continue;
+    if (valor === null || valor === '') {
+      target[column] = null;
+      continue;
+    }
+    const n = Number(valor);
+    if (!Number.isInteger(n) || n < 1 || n > 100_000_000) {
+      return `overagePriceCents.${key} must be a positive integer of cents, or null`;
+    }
+    target[column] = n;
+  }
+  return null;
+}
+
 function presentPlan(plan) {
   return {
     id: plan.id,
     code: plan.code,
     name: plan.name,
     limits: SubscriptionService.limitsOf(plan),
+    // O preço por unidade acima do teto (0105); nulo é "o teto barra".
+    overagePriceCents: SubscriptionService.overagePricesOf(plan),
     priceCents: Number(plan.price_cents ?? 0),
     currency: plan.currency,
     trialDays: Number(plan.trial_days ?? 0),
@@ -320,6 +360,8 @@ class PlatformBillingController {
       if (erroRetencao) return res.status(400).json(createErrorResponse(erroRetencao));
       const erroVitrine = readMarketing(body, row);
       if (erroVitrine) return res.status(400).json(createErrorResponse(erroVitrine));
+      const erroExcedente = readOverage(body, row);
+      if (erroExcedente) return res.status(400).json(createErrorResponse(erroExcedente));
       row.currency = String(body.currency ?? 'BRL').toUpperCase().slice(0, 3);
       row.active = body.active === undefined ? true : Boolean(body.active);
 
@@ -385,10 +427,26 @@ class PlatformBillingController {
       if (erroRetencao) return res.status(400).json(createErrorResponse(erroRetencao));
       const erroVitrine = readMarketing(body, patch);
       if (erroVitrine) return res.status(400).json(createErrorResponse(erroVitrine));
+      const erroExcedente = readOverage(body, patch);
+      if (erroExcedente) return res.status(400).json(createErrorResponse(erroExcedente));
       if (body.currency !== undefined) patch.currency = String(body.currency).toUpperCase().slice(0, 3);
       if (body.active !== undefined) patch.active = Boolean(body.active);
       if (Object.keys(patch).length === 0) {
         return res.status(400).json(createErrorResponse('Nothing to update'));
+      }
+      // O preço anual é COBRADO (0104): tirá-lo de um plano com assinaturas
+      // no anual as faria voltar ao mensal em silêncio — preço e prazo de
+      // outro ciclo do que foi contratado. Mudar o valor pode; apagar, não.
+      if ('price_yearly_cents' in patch && !(Number(patch.price_yearly_cents) > 0)
+        && Number(plan.price_yearly_cents) > 0) {
+        const anuais = await Subscription.countAnnualOnPlan(id);
+        if (anuais > 0) {
+          return res.status(409).json(createErrorResponse(
+            `${anuais} subscription(s) use the annual cycle of this plan; the annual price cannot be removed`,
+            { count: anuais },
+            'plan_has_annual_subscriptions'
+          ));
+        }
       }
 
       const updated = await Plan.update(id, patch);

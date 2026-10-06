@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
 import BillingInvoice from './BillingInvoice.js';
+import TenantCredit from './TenantCredit.js';
 
 /**
  * A cobrança que o painel emitiu a um provedor.
@@ -22,6 +23,14 @@ import BillingInvoice from './BillingInvoice.js';
  * mostra como "último erro". Cabe folgada nos 500 caracteres da coluna.
  */
 export const EXEMPT_CANCEL_MARKER = 'billing_exempt: canceled by the billing exemption';
+
+/**
+ * O `last_error` da cobrança de renovação que o fluxo de cancelamento (0107)
+ * cancelou — a pausa aceita, o cancelamento agendado. Como a da isenção, não
+ * é erro: é a marca que o "desfazer o cancelamento" procura para devolver a
+ * cobrança do período à emissão (`ChargeIssuingService.reopenRetentionCanceled`).
+ */
+export const RETENTION_CANCEL_MARKER = 'retention: canceled by the cancellation flow';
 
 export const CHARGE_STATUSES = Object.freeze([
   /** Emitida, ninguém pagou ainda. É o estado em que ela nasce. */
@@ -70,10 +79,27 @@ export const OPEN_CHARGE_STATUSES = Object.freeze(['pending', 'failed', 'overdue
  *              Não compra período nenhum: paga, não move `renews_at`; vencida,
  *              deixa o provedor `past_due` (`subscriptions.proration_due_at`).
  */
-export const CHARGE_KINDS = Object.freeze(['renewal', 'proration']);
+export const CHARGE_KINDS = Object.freeze(['renewal', 'proration', 'overage']);
 
-/** Se a linha é a fatura de pró-rata de uma subida. */
-export const isProration = (row) => row?.kind === 'proration';
+/**
+ * As faturas AVULSAS — as que não compram período: a pró-rata da subida
+ * (0101) e a de só excedente (0105: a fatia mensal do excedente de quem é
+ * anual, e a final de quem cancela). Todas seguem o mesmo caminho: chave que
+ * não é data, emissão e retentativa pela porta da pró-rata
+ * (`ChargeIssuingService.emitProration`/`retryProrations`), pagamento que não
+ * move `renews_at`, vencida deixa `past_due` (`proration_due_at`).
+ */
+export const SIDE_CHARGE_KINDS = Object.freeze(['proration', 'overage']);
+
+/**
+ * Se a linha é uma fatura AVULSA (`SIDE_CHARGE_KINDS`) — a pró-rata ou a de
+ * só excedente. O nome ficou o da primeira delas: todo lugar que pergunta
+ * "isto compra período?" pergunta por aqui.
+ */
+export const isProration = (row) => SIDE_CHARGE_KINDS.includes(row?.kind);
+
+/** Se a linha é a fatura de só excedente (0105). */
+export const isOverageCharge = (row) => row?.kind === 'overage';
 
 /**
  * As leituras que querem "a cobrança da renovação" — a do período, a mais
@@ -81,7 +107,7 @@ export const isProration = (row) => row?.kind === 'proration';
  * fora. A chave dela (`p…`) já não é data e não casa com período nenhum, mas
  * a condição fica escrita: é ela que diz a intenção, e não a coincidência.
  */
-const soRenovacao = (query) => query.whereNot('kind', 'proration');
+const soRenovacao = (query) => query.whereNotIn('kind', SIDE_CHARGE_KINDS);
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -152,9 +178,11 @@ class BillingCharge {
    */
   static async open({
     subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null,
-    planId = null, couponId = null, billingType = null
+    planId = null, couponId = null, billingType = null, pricingDetail = undefined, billingCycle = null
   }) {
     return tinsertReturningId('billing_charges', {
+      // A conta do valor (0105) — ver `pricingDetailOf`.
+      ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
       // A linha nasce JÁ garrada por quem a inseriu — ver `claim`. Sem isto,
       // entre a inserção e a chamada ao gateway, outra passada que lesse a
       // linha nova sem `gateway_charge_id` a tomaria por "falhou no meio" e
@@ -171,6 +199,8 @@ class BillingCharge {
       // `BILLING_CHARGE_PRICING_COLUMNS`.
       plan_id: planId ?? null,
       coupon_id: couponId ?? null,
+      // E em que ciclo (0104): `monthly` ou `annual`.
+      billing_cycle: billingCycle ? String(billingCycle).slice(0, 16) : null,
       // Com que meio ela vai ao gateway (0100) — `UNDEFINED` ou `CREDIT_CARD`.
       billing_type: billingType ? String(billingType).slice(0, 16) : null
     });
@@ -179,6 +209,11 @@ class BillingCharge {
   static async update(id, patch) {
     const changed = await tdb('billing_charges').where({ id })
       .update({ ...patch, updated_at: new Date() });
+    // O crédito reservado na cobrança (0106) segue o estado dela, aqui e não
+    // em cada um dos que chamam, pelo mesmo motivo da pró-rata logo abaixo:
+    // paga, a reserva vira gasto; cancelada, volta ao saldo; estornada, o que
+    // ela gastou volta também. Cada passo é idempotente (`TenantCredit`).
+    if (changed > 0 && 'status' in patch) await BillingCharge.followCredit(id, patch.status);
     // Quem muda o estado (ou o vencimento) de uma cobrança de pró-rata muda o
     // que a assinatura diz sobre ela (`proration_due_at`). Aqui, e não em
     // cada um dos que chamam — o webhook, os gestos do console, a faxina da
@@ -189,6 +224,35 @@ class BillingCharge {
       if (isProration(linha)) await BillingCharge.syncProrationDue();
     }
     return changed > 0;
+  }
+
+  /**
+   * O crédito acompanha o estado novo da cobrança — ver `update`. Nunca
+   * lança: a etiqueta da cobrança já foi gravada, e uma falha aqui fica no
+   * log com o que alguém precisa para acertar à mão.
+   */
+  static async followCredit(id, status) {
+    try {
+      if (status === 'paid') await TenantCredit.consumeForCharge(id);
+      else if (status === 'canceled') await TenantCredit.releaseForCharge(id);
+      else if (status === 'refunded') await TenantCredit.restoreForCharge(id);
+    } catch (error) {
+      console.error(`Charge ${id} became ${status} but its reserved credit could not follow: ${error.message}`);
+    }
+  }
+
+  /**
+   * Quanto de crédito a linha tem reservado (0106) — o preço do plano é
+   * `amount_cents` mais isto. Zero na linha sem crédito.
+   */
+  static creditReservedOf(linha) {
+    const valor = Number(linha?.credit_reserved_cents ?? 0);
+    return Number.isFinite(valor) && valor > 0 ? Math.floor(valor) : 0;
+  }
+
+  /** O preço da linha antes do crédito (0106): `amount_cents` + o reservado. */
+  static baseAmountOf(linha) {
+    return Number(linha?.amount_cents ?? 0) + BillingCharge.creditReservedOf(linha);
   }
 
   /**
@@ -225,13 +289,14 @@ class BillingCharge {
    */
   static async openProration({
     key, subscriptionId = null, amountCents, currency, provider, dueDate, claimUntil = null,
-    planId = null, couponId = null, detail = null
+    planId = null, couponId = null, detail = null, billingCycle = null, kind = 'proration', pricingDetail = undefined
   }) {
     return tinsertReturningId('billing_charges', {
       issuing_until: claimUntil,
       subscription_id: subscriptionId,
       period_end: String(key).slice(0, 10),
-      kind: 'proration',
+      kind: SIDE_CHARGE_KINDS.includes(kind) ? kind : 'proration',
+      ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
       proration_detail: detail ? JSON.stringify(detail) : null,
       amount_cents: amountCents,
       currency: String(currency || 'BRL').toUpperCase().slice(0, 3),
@@ -239,7 +304,8 @@ class BillingCharge {
       status: 'pending',
       due_date: dueDate,
       plan_id: planId ?? null,
-      coupon_id: couponId ?? null
+      coupon_id: couponId ?? null,
+      billing_cycle: billingCycle ? String(billingCycle).slice(0, 16) : null
     });
   }
 
@@ -250,13 +316,44 @@ class BillingCharge {
   }
 
   /**
+   * A chave (`period_end`) da fatura de só excedente (0105): `o` e a data do
+   * fim do período que ela fecha, sem os traços (`o20261106`) — não é data,
+   * como a da pró-rata, e o `o` fica depois de todo dígito na ordem do texto
+   * (`openBefore` nunca a alcança). Uma por fim de período: o índice único é
+   * a trava da corrida de duas passadas.
+   */
+  static overageKey(periodKey, { final = false } = {}) {
+    const dia = String(periodKey ?? '').slice(0, 10).replace(/-/g, '');
+    return `${final ? 'f' : 'o'}${dia}`.slice(0, 10);
+  }
+
+  /** Todas as cobranças deste provedor (poucas por provedor: uma por período, e as avulsas). */
+  static async allForTenant() {
+    return tdb('billing_charges').orderBy('id');
+  }
+
+  /** A cobrança da renovação do período ANTERIOR a `periodEnd` (a mais recente antes dele), ou nada. */
+  static async previousRenewal(periodEnd) {
+    const chave = String(periodEnd ?? '').slice(0, 10);
+    if (!chave) return null;
+    return (await soRenovacao(tdb('billing_charges').where('period_end', '<', chave))
+      .orderBy('period_end', 'desc')
+      .first()) || null;
+  }
+
+  /** As faturas de só excedente deste provedor, de qualquer estado. */
+  static async overageCharges() {
+    return tdb('billing_charges').where({ kind: 'overage' }).orderBy('id');
+  }
+
+  /**
    * As faturas de pró-rata deste provedor que ainda não chegaram ao gateway —
    * a criação falhou, ou o gateway nem estava configurado — e que o agendador
    * retoma (`ChargeIssuingService.retryProrations`).
    */
   static async unissuedProrations() {
     return tdb('billing_charges')
-      .where({ kind: 'proration' })
+      .whereIn('kind', SIDE_CHARGE_KINDS)
       .whereIn('status', ['pending', 'failed'])
       .whereNull('gateway_charge_id')
       .orderBy('id');
@@ -265,7 +362,7 @@ class BillingCharge {
   /** As faturas de pró-rata deste provedor ainda em aberto. */
   static async openProrations() {
     return tdb('billing_charges')
-      .where({ kind: 'proration' })
+      .whereIn('kind', SIDE_CHARGE_KINDS)
       .whereIn('status', OPEN_CHARGE_STATUSES)
       .orderBy('id');
   }
@@ -328,6 +425,7 @@ class BillingCharge {
     const detalhe = BillingCharge.prorationDetailOf(linha);
     if (!detalhe) return null;
     return {
+      ...(isOverageCharge(linha) ? { overage: true, slices: Array.isArray(detalhe.slices) ? detalhe.slices : [] } : {}),
       fromPlanId: detalhe.fromPlanId ?? null,
       toPlanId: detalhe.toPlanId ?? null,
       fromPriceCents: detalhe.fromPriceCents ?? null,
@@ -466,7 +564,8 @@ class BillingCharge {
    * @returns {Promise<boolean>}
    */
   static async resetForReissue(id, {
-    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined
+    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined, pricingDetail = undefined,
+    billingCycle = undefined
   }) {
     const linha = await BillingCharge.findById(id);
     if (!linha) return false;
@@ -475,6 +574,17 @@ class BillingCharge {
       anteriores.push({
         id: String(linha.gateway_charge_id),
         amountCents: Number(linha.amount_cents),
+        // O crédito que ela levava (0106): o preço do plano que ela cobrava
+        // é o valor mais isto.
+        ...(BillingCharge.creditReservedOf(linha) ? { creditCents: BillingCharge.creditReservedOf(linha) } : {}),
+        // O plano, o cupom e o ciclo com que ela saiu (0093/0104): o
+        // pagamento do boleto velho compra o período DAQUELE plano e ciclo, e
+        // não o da linha reemitida — ver `recordPayment`.
+        ...(linha.plan_id !== null && linha.plan_id !== undefined ? {
+          planId: Number(linha.plan_id),
+          couponId: linha.coupon_id === null || linha.coupon_id === undefined ? null : Number(linha.coupon_id),
+          billingCycle: linha.billing_cycle ?? null
+        } : {}),
         currency: String(linha.currency || 'BRL').toUpperCase(),
         at: new Date().toISOString()
       });
@@ -511,9 +621,127 @@ class BillingCharge {
       // diz; sem eles (a reabertura da isenção, que mantém o valor), ficam.
       ...(planId !== undefined ? { plan_id: planId } : {}),
       ...(couponId !== undefined ? { coupon_id: couponId } : {}),
+      // A conta do valor novo (0105), quando quem reprecifica a diz; sem ela
+      // fica a que a linha tinha — o excedente congelado vai junto.
+      ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
+      ...(billingCycle !== undefined ? { billing_cycle: billingCycle } : {}),
       updated_at: new Date()
     });
+    // A reserva de crédito da cobrança velha volta ao saldo (0106): a
+    // reemissão reserva de novo, pelo preço de então (`issueCurrent`).
+    if (changed > 0) {
+      try {
+        await TenantCredit.releaseForCharge(id);
+      } catch (error) {
+        console.error(`Charge ${id} was reset for reissue but its reserved credit could not be released: ${error.message}`);
+      }
+    }
     return changed > 0;
+  }
+
+  // ── A conta do valor (0105) ──────────────────────────────────────────
+
+  /**
+   * A conta do valor de uma cobrança, lida de `pricing_detail` — um objeto
+   * `{ base, overage: [...], ... }`, ou nulo (linha de antes da coluna, valor
+   * mudado à mão sem conta, lixo). Nunca lança.
+   *
+   *   - `base`: o preço do plano do período, já com o cupom — o cupom vale
+   *     só sobre ele, nunca sobre o excedente;
+   *   - `overage`: as parcelas do excedente do período que a renovação fecha
+   *     (`[{ resource, peak, limit, unitCents, units, cents }]`), CONGELADAS
+   *     na primeira vez que a linha as calculou: a reemissão (troca de plano,
+   *     cupom, "Reemitir", a cancelada reaberta) reaproveita estas, e não
+   *     reconta — o mesmo período nunca vira duas contas;
+   *   - outras chaves (o crédito de indicação, `credit`) são de quem as grava,
+   *     e `mergePricingDetail` as preserva.
+   */
+  static pricingDetailOf(linha) {
+    const bruto = linha?.pricing_detail;
+    if (!bruto) return null;
+    try {
+      const lido = typeof bruto === 'string' ? JSON.parse(bruto) : bruto;
+      return lido && typeof lido === 'object' && !Array.isArray(lido) ? lido : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** O JSON de `pricing_detail`, ou nulo para objeto nenhum. */
+  static serializePricingDetail(detalhe) {
+    if (detalhe === null || detalhe === undefined) return null;
+    return JSON.stringify(detalhe);
+  }
+
+  /**
+   * A conta de `linha` (ou de um objeto já lido) com as chaves de `patch` por
+   * cima — as outras ficam. É a porta de quem acrescenta uma parcela sem
+   * conhecer as dos outros (o excedente, o crédito). Devolve o OBJETO; quem
+   * grava passa por `serializePricingDetail` (ou pelo `pricingDetail` de
+   * `open`/`resetForReissue`, que serializam).
+   */
+  static mergePricingDetail(linhaOuDetalhe, patch = {}) {
+    const atual = linhaOuDetalhe && typeof linhaOuDetalhe === 'object' && 'pricing_detail' in linhaOuDetalhe
+      ? BillingCharge.pricingDetailOf(linhaOuDetalhe)
+      : (linhaOuDetalhe && typeof linhaOuDetalhe === 'object' ? linhaOuDetalhe : null);
+    return { ...(atual ?? {}), ...(patch ?? {}) };
+  }
+
+  /**
+   * As parcelas de excedente congeladas na linha — ou nulo quando a linha
+   * nunca as calculou (aí quem emite calcula, e congela).
+   */
+  static frozenOverageOf(linha) {
+    const detalhe = BillingCharge.pricingDetailOf(linha);
+    if (!detalhe || !Array.isArray(detalhe.overage)) return null;
+    return detalhe.overage
+      .filter((item) => item && Number.isInteger(Number(item.cents)) && Number(item.cents) > 0)
+      .map((item) => ({
+        resource: String(item.resource),
+        peak: Number(item.peak),
+        limit: Number(item.limit),
+        unitCents: Number(item.unitCents),
+        units: Number(item.units ?? (Number(item.peak) - Number(item.limit))),
+        cents: Number(item.cents),
+        // De que período (a chave dos picos) a parcela é, e se é o acerto
+        // (`true_up`) de um período que uma fatura anterior congelou cedo.
+        ...(item.periodKey ? { periodKey: String(item.periodKey).slice(0, 10) } : {}),
+        ...(item.kind ? { kind: String(item.kind) } : {})
+      }));
+  }
+
+  /** O total do excedente congelado na linha, em centavos (zero sem nenhum). */
+  static overageCentsOf(linha) {
+    return (BillingCharge.frozenOverageOf(linha) ?? []).reduce((soma, item) => soma + item.cents, 0);
+  }
+
+  /**
+   * A conta como as telas a mostram — o provedor e o console: o preço do
+   * plano, as parcelas do excedente e o resto que a conta tiver (o crédito).
+   * Nulo quando a linha não tem conta.
+   */
+  static presentPricing(linha) {
+    const detalhe = BillingCharge.pricingDetailOf(linha);
+    if (!detalhe) return null;
+    const base = Number(detalhe.base);
+    const credit = detalhe.credit && typeof detalhe.credit === 'object'
+      ? Number(detalhe.credit.cents ?? detalhe.credit.amountCents ?? 0)
+      : Number(detalhe.credit ?? 0);
+    return {
+      baseCents: Number.isFinite(base) ? base : null,
+      overage: (BillingCharge.frozenOverageOf(linha) ?? []).map((item) => ({
+        resource: item.resource,
+        peak: item.peak,
+        limit: item.limit,
+        units: item.units,
+        unitCents: item.unitCents,
+        cents: item.cents,
+        ...(item.periodKey ? { periodKey: item.periodKey } : {}),
+        ...(item.kind ? { kind: item.kind } : {})
+      })),
+      overageCents: BillingCharge.overageCentsOf(linha),
+      creditCents: Number.isFinite(credit) && credit > 0 ? credit : 0
+    };
   }
 
   /**
@@ -706,7 +934,11 @@ class BillingCharge {
       // `renewal` ou `proration` (0101) — o selo "Pró-rata" da tela.
       kind: row.kind || 'renewal',
       proration: BillingCharge.presentProration(row),
+      // A conta do valor (0105): preço do plano e excedente.
+      pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
+      // O crédito abatido nela (0106) — o preço do plano é a soma dos dois.
+      creditCents: BillingCharge.creditReservedOf(row),
       currency: row.currency,
       status: row.status,
       dueDate: isoDateOf(row.due_date),
@@ -720,7 +952,8 @@ class BillingCharge {
       // de um plano. A emissão não reprecifica uma cobrança marcada assim.
       amountOverriddenAt: row.amount_overridden_at ?? null,
       // A marca da isenção não é erro de ninguém (ver `EXEMPT_CANCEL_MARKER`).
-      lastError: row.last_error && row.last_error !== EXEMPT_CANCEL_MARKER ? row.last_error : null,
+      lastError: row.last_error && row.last_error !== EXEMPT_CANCEL_MARKER && row.last_error !== RETENTION_CANCEL_MARKER
+        ? row.last_error : null,
       createdAt: row.created_at ?? null,
       updatedAt: row.updated_at ?? null,
       superseded: BillingCharge.supersededOf(row).map((item) => ({
@@ -753,7 +986,10 @@ class BillingCharge {
       periodEnd: BillingCharge.periodEndOf(row),
       kind: row.kind || 'renewal',
       proration: BillingCharge.presentProration(row),
+      // A conta do valor (0105): preço do plano e excedente.
+      pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
+      creditCents: BillingCharge.creditReservedOf(row),
       currency: row.currency,
       status: row.status,
       dueDate: row.due_date ?? null,
@@ -763,6 +999,8 @@ class BillingCharge {
       invoiceUrl: OPEN_CHARGE_STATUSES.includes(row.status) ? (row.invoice_url ?? null) : null,
       // Se ela é cobrada sozinha no cartão salvo (0100) — o meio, nunca o cartão.
       billingType: row.billing_type ?? null,
+      // O ciclo que ela paga (0104) — nulo nas de antes, que são mensais.
+      billingCycle: row.billing_cycle ?? null,
       createdAt: row.created_at ?? null,
       // A nota fiscal (NFS-e) desta cobrança: estado, número e PDF — sem o erro.
       invoice: BillingInvoice.present(invoiceRow)

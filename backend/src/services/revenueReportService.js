@@ -175,7 +175,8 @@ export function instanteMs(valor) {
  * relatório inteiro.
  */
 export async function precoEfetivo(sub, plan) {
-  const doPlano = Number(plan?.price_cents ?? 0) || 0;
+  // O preço do ciclo da assinatura (0104): o anual cobra o ano.
+  const doPlano = SubscriptionService.cyclePriceCents(sub, plan);
   if (typeof SubscriptionService.effectivePriceCents === 'function') {
     try {
       const preco = Number(await SubscriptionService.effectivePriceCents(sub, plan));
@@ -259,9 +260,9 @@ function detalheDe(evento) {
   }
 }
 
-/** Os dias de um período do plano (trinta quando o plano não diz). */
-function diasDoPlano(plan) {
-  return SubscriptionService.periodDaysOf(plan);
+/** Os dias de um período da assinatura no plano — 365 no anual (0104). */
+function diasDoPeriodo(sub, plan) {
+  return SubscriptionService.cyclePeriodDays(sub, plan);
 }
 
 /**
@@ -273,7 +274,7 @@ function diasDoPlano(plan) {
  * - **MRR**: só assinatura cujo estado que VALE é `active`, sem isenção de
  *   cobrança e com preço efetivo acima de zero — trial não paga ainda,
  *   `past_due` já não está pagando, isento e plano grátis não pagam nunca. O
- *   preço do período vira mensal por `× 30 / period_days`.
+ *   preço do período vira mensal por `× 30 / dias do ciclo` (365 no anual).
  * - **Recebido**: os pagamentos do extrato com o evento no período, pelo valor
  *   que entrou; por plano, o plano que o pagamento pagou (`detail.planId`)
  *   ou, sem ele, o de agora. **Estornado**: os estornos do extrato no
@@ -322,9 +323,10 @@ export function aggregateRevenue({
     if (sub.billing_exempt_at) continue;
     const plano = planos.get(Number(sub.plan_id));
     if (!plano) continue;
-    const preco = Number(prices.get(Number(sub.id)) ?? plano.price_cents ?? 0);
+    const preco = Number(prices.get(Number(sub.id)) ?? SubscriptionService.cyclePriceCents(sub, plano));
     if (!(preco > 0)) continue;
-    const mensal = Math.round((preco * 30) / diasDoPlano(plano));
+    // Normalizado para trinta dias: o anual entra como 1/12 (× 30 / 365).
+    const mensal = Math.round((preco * 30) / diasDoPeriodo(sub, plano));
     mrrCents += mensal;
     activeCount += 1;
     const linha = linhaDoPlano(plano.id);
@@ -381,8 +383,13 @@ export function aggregateRevenue({
     // mas não no desconto: o valor pedido nela é uma fração do período, e
     // compará-lo com o preço cheio do plano inventaria um abatimento.
     if (!aceite && !detalhe?.proration && plano && !estornados.has(`${tenantId}|${evento.external_id}`)) {
-      const cheio = Number(plano.price_cents) || 0;
-      const esperado = detalhe?.expectedCents;
+      // O preço cheio do ciclo que o pagamento pagou (0104): o do ano, se anual.
+      const cheio = SubscriptionService.cyclePriceCents({ billing_cycle: detalhe?.billingCycle ?? 'monthly' }, plano);
+      // O preço do plano (com o cupom) gravado no pagamento, quando há: o
+      // pedido inteiro traz o excedente (que não é preço) e já vem sem o
+      // crédito (que não é desconto). Sem ele (os eventos de antes), o pedido.
+      const base = detalhe?.baseCents;
+      const esperado = base !== null && base !== undefined && Number.isFinite(Number(base)) ? base : detalhe?.expectedCents;
       const pedido = esperado === null || esperado === undefined || !Number.isFinite(Number(esperado))
         ? valor : Number(esperado);
       if (pedido < cheio) discountCents += cheio - pedido;

@@ -103,6 +103,14 @@ class PlatformAudit {
     COUPON_UPDATED: 'coupon.updated',
     COUPON_DELETED: 'coupon.deleted',
     SUBSCRIPTION_COUPON_CHANGED: 'subscription.coupon_changed',
+    // O ajuste manual do saldo de créditos de um provedor (0106): crédito
+    // dado ou tirado pelo console, com o motivo. É a trilha que responde
+    // "de onde veio este desconto na fatura?" quando não foi uma indicação.
+    TENANT_CREDIT_ADJUSTED: 'tenant.credit_adjusted',
+    // A retenção no cancelamento (0107): o provedor pediu para cancelar e
+    // aceitou o desconto ou a pausa, agendou o cancelamento, ou o desfez — ou
+    // o console o desfez. O detalhe diz qual (`action`).
+    SUBSCRIPTION_CANCELLATION_CHANGED: 'subscription.cancellation_changed',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem

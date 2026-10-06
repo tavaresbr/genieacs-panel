@@ -19,6 +19,7 @@ import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResol
 import { normalizeTaxId, isValidTaxId, isValidCnpj } from '../utils/taxId.js';
 import { lookupCnpj } from '../services/cnpjLookupService.js';
 import { lookupCep, geocodeAddress } from '../services/addressLookupService.js';
+import ReferralService from '../services/referralService.js';
 
 /**
  * O cadastro fiscal vindo do corpo, normalizado — ou o motivo de recusa.
@@ -392,6 +393,21 @@ class TenantController {
   }
 
   /**
+   * `GET /api/tenant/referrals` — a indicação de provedores, na tela de Plano
+   * (0106): o código e o link (gerados na primeira vez), o saldo de créditos
+   * e quem este provedor indicou, com o nome mascarado. `settings.read`, como
+   * `/subscription`: é a mesma tela.
+   */
+  static async getReferrals(req, res) {
+    try {
+      return res.json(createResponse(req.t('referrals.retrieved'), await ReferralService.presentForTenant(req.tenantId)));
+    } catch (error) {
+      console.error('Get referrals error:', error);
+      return res.status(500).json(createErrorResponse(req.t('referrals.retrieveFailed'), error.message));
+    }
+  }
+
+  /**
    * `GET /api/tenant/plans`: o catálogo de onde o provedor escolhe, com o
    * preço de cada plano e o dele marcado — ver `SelfBillingService.listPlans`
    * para por que o atual entra mesmo fora de linha.
@@ -410,7 +426,7 @@ class TenantController {
   }
 
   /**
-   * `PUT /api/tenant/subscription/plan` — `{ planId }`: o provedor troca de
+   * `PUT /api/tenant/subscription/plan` — `{ planId, cycle? }`: o provedor troca de
    * plano — na hora quando sobe, na renovação quando desce com um período
    * pago correndo (`subscription.pendingPlan` na resposta), e escolher o plano
    * atual com uma descida agendada desiste dela.
@@ -429,6 +445,8 @@ class TenantController {
     try {
       const resultado = await SelfBillingService.changePlan({
         planId: req.body?.planId,
+        // O ciclo (0104): `monthly` ou `annual`; sem ele, o de agora.
+        cycle: req.body?.cycle ?? null,
         actorUserId: req.user?.userId ?? null,
         countDevices: () => DeviceService.countDevicesFromGenieAcs()
       });
@@ -443,6 +461,8 @@ class TenantController {
           toCode: resultado.plan?.code ?? null,
           selfService: true,
           scheduled: Boolean(resultado.scheduled),
+          billingCycle: resultado.billingCycle ?? null,
+          ...(resultado.cycleFrom ? { cycleFrom: resultado.cycleFrom } : {}),
           ...(resultado.scheduled && resultado.effectiveAt
             ? { effectiveAt: new Date(resultado.effectiveAt).toISOString() } : {}),
           ...(resultado.pendingCanceled

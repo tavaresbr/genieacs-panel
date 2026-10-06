@@ -807,6 +807,8 @@ export const authAPI = {
   signup: (payload: {
     providerName: string; slug: string; username: string; email: string; password: string
     planCode?: string; taxId?: string; phone?: string; legalName?: string; city?: string; state?: string
+    /** O código do link de indicação (`?ref=`); inválido é ignorado pelo servidor. */
+    referralCode?: string
   }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
 
@@ -1504,11 +1506,63 @@ export interface PlanLimits {
   devices: number | null
 }
 
+/**
+ * O preço, em centavos, de cada unidade acima do teto (0105). Nulo é "sem
+ * preço": o teto barra, como sempre. Com preço, quem passa paga as unidades a
+ * mais na fatura da renovação.
+ */
+export interface PlanOveragePrices {
+  operators: number | null
+  subscribers: number | null
+  devices: number | null
+}
+
+/** O que o console manda para mudar os preços de excedente; ausente é "não mexer". */
+export interface PlanOveragePayload {
+  overagePriceCents?: Partial<PlanOveragePrices> | null
+}
+
+/** Uma parcela do excedente: `units` (pico − teto) × `unitCents` = `cents`. */
+export interface OverageItem {
+  resource: 'operators' | 'subscribers' | 'devices'
+  peak: number
+  limit: number
+  units: number
+  unitCents: number
+  cents: number
+  /** De que período (YYYY-MM-DD) é a parcela — a fatia mensal, no anual. */
+  periodKey?: string
+  /** `true_up`: o acerto do pico que subiu depois de a fatura do período sair. */
+  kind?: 'true_up'
+}
+
+/** O excedente do período corrente, como a tela de Plano o mostra. */
+export interface SubscriptionOverage {
+  prices: PlanOveragePrices
+  /** A renovação que fecha o período (YYYY-MM-DD) — nulo sem período pago. No anual, o fim da fatia mensal. */
+  periodEnd: string | null
+  /** `monthly`: no anual, o excedente sai todo mês numa fatura só dele; `renewal`: na fatura da renovação. */
+  billing?: 'renewal' | 'monthly'
+  items: OverageItem[]
+  totalCents: number
+  currency: string
+}
+
+/** A conta do valor de uma cobrança: o plano (com o cupom), o excedente e o crédito. */
+export interface ChargePricing {
+  baseCents: number | null
+  overage: OverageItem[]
+  overageCents: number
+  creditCents: number
+}
+
 export interface Plan {
   id: number
   code: string
   name: string
   limits: PlanLimits
+  /** Preço por unidade acima do teto (0105). Opcional: servidores antigos não mandam. */
+  overagePriceCents?: PlanOveragePrices
   priceCents: number
   currency: string
   trialDays: number
@@ -1529,7 +1583,7 @@ export interface Plan {
   sortOrder: number
   description: string | null
   features: string[]
-  /** Preço anunciado da opção anual, em centavos; null é sem opção anual. */
+  /** Preço COBRADO no ciclo anual (365 dias), em centavos; null é sem opção anual. */
   priceYearlyCents: number | null
   createdAt: string | null
   /** How many providers are on it — only from the console's list. */
@@ -1565,17 +1619,26 @@ export interface PlatformProfile {
   /** De onde vem cada valor: gravado no console, do `.env`, ou nenhum. */
   sources: Record<PlatformProfileField, 'db' | 'env' | null>
   /** A política de suspensão automática (0102), já com o padrão aplicado. */
-  billing?: PlatformBillingPolicy
-  billingDefaults?: PlatformBillingPolicy
+  billing?: PlatformBillingPolicy & PlatformReferralPolicy
+  billingDefaults?: PlatformBillingPolicy & PlatformReferralPolicy
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
+}
+
+/** O crédito da indicação de provedores, em centavos (0106); 0 desliga o programa. */
+export interface PlatformReferralPolicy {
+  referralRewardCents?: number
 }
 
 /** Dias de atraso até a suspensão automática (0 desliga) e de aviso antes dela. */
 export interface PlatformBillingPolicy {
   autoSuspendDays: number
   autoSuspendWarnDays: number
+  /** A retenção no cancelamento (0107): o desconto (% e faturas) e o máximo de meses de pausa. 0 desliga. */
+  retentionDiscountPercent: number
+  retentionDiscountMonths: number
+  retentionPauseMaxMonths: number
 }
 
 export interface PublicInfo {
@@ -1681,7 +1744,7 @@ export interface SubscriptionView {
    * sozinhos: o teste e o período pago — e a fatura de pró-rata de uma subida
    * vencida sem pagamento (`proration_overdue`). Nulo quando a coluna é a verdade.
    */
-  reason: 'trial_expired' | 'renewal_expired' | 'proration_overdue' | 'auto_nonpayment' | null
+  reason: 'trial_expired' | 'renewal_expired' | 'proration_overdue' | 'auto_nonpayment' | 'paused' | null
   /**
    * Por que está suspensa (0102): `auto_nonpayment` é a suspensão automática
    * por inadimplência, que o pagamento desfaz; `manual` (ou nulo) é o console.
@@ -1691,6 +1754,8 @@ export interface SubscriptionView {
   trialEndsAt: string | null
   renewsAt: string | null
   canceledAt: string | null
+  /** O ciclo de cobrança de agora (0104). Opcional: servidores antigos não mandam. */
+  billingCycle?: BillingCycle
   /**
    * A descida de plano agendada para a renovação. Só existe com a assinatura
    * em dia e renovação futura: até `effectiveAt` o plano atual continua
@@ -1711,6 +1776,14 @@ export interface SubscriptionView {
   coupon?: SubscriptionCoupon | null
   /** O cartão recorrente. Opcional: servidores antigos não mandam. */
   card?: SubscriptionCard | null
+  /**
+   * A retenção no cancelamento (0107): o cancelamento agendado pelo próprio
+   * provedor (o fim do período pago) e a pausa — de `renewsAt` até
+   * `pausedUntil`, sem cobrança. Opcionais: servidores antigos não mandam.
+   */
+  cancelAt?: string | null
+  pausedUntil?: string | null
+  pauseStartedAt?: string | null
 }
 
 /**
@@ -1735,10 +1808,16 @@ export interface SubscriptionCard {
  * uso atual passa de um teto do plano novo: enquanto passar, a troca não se
  * aplica.
  */
+/** O ciclo de cobrança (0104): mensal (`price_cents` por `period_days`) ou anual (`price_yearly_cents` por 365 dias). */
+export type BillingCycle = 'monthly' | 'annual'
+
 export interface PendingPlan {
   id: number
   name: string
+  /** O preço do ciclo agendado — o do ano, quando a troca é para o anual. */
   priceCents: number
+  /** O ciclo agendado (0104). Opcional: servidores antigos não mandam. */
+  billingCycle?: BillingCycle
   /** ISO 8601. */
   effectiveAt: string
   /**
@@ -1763,6 +1842,8 @@ export interface SubscriptionUsage {
   /** Os tetos de retenção do plano. Todos nulos na self-hosted. */
   retention?: RetentionCaps
   over: { operators: boolean; subscribers: boolean; devices: boolean }
+  /** O excedente do período (0105) — nulo sem preço de excedente no plano. Opcional: servidores antigos não mandam. */
+  overage?: SubscriptionOverage | null
 }
 
 /**
@@ -1778,7 +1859,17 @@ export interface TenantPlanOption {
   priceCents: number
   currency: string
   periodDays: number
+  /**
+   * O ciclo anual (0104): o preço por 365 dias, se o plano o oferece, e a
+   * economia sobre doze meses (inteira, para baixo). Opcionais: servidores
+   * antigos não mandam.
+   */
+  priceYearlyCents?: number | null
+  annualAvailable?: boolean
+  annualSavingsPercent?: number | null
   limits: PlanLimits
+  /** Preço por unidade acima do teto (0105). Opcional: servidores antigos não mandam. */
+  overagePriceCents?: PlanOveragePrices
   current: boolean
   /**
    * Quanto subir para este plano cobraria AGORA, de pró-rata — nulo quando a
@@ -1798,7 +1889,7 @@ export interface PlanProrationPreview {
 }
 
 /** O tipo de uma cobrança: a da renovação do período, ou a avulsa da subida. */
-export type ChargeKind = 'renewal' | 'proration'
+export type ChargeKind = 'renewal' | 'proration' | 'overage'
 
 /** A conta de uma fatura de pró-rata, para a tela explicar o valor. */
 export interface ChargeProrationDetail {
@@ -1843,6 +1934,10 @@ export interface TenantChargeView {
   /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
   kind?: ChargeKind
   proration?: ChargeProrationDetail | null
+  /** A conta do valor: plano e excedente (0105). Opcional: servidores antigos não mandam. */
+  pricing?: ChargePricing | null
+  /** O crédito (indicação, ajuste) abatido nela, em centavos. Opcional: servidores antigos não mandam. */
+  creditCents?: number
 }
 
 /**
@@ -1854,6 +1949,8 @@ export interface ChargeConsoleView {
   id: number
   periodEnd: string
   amountCents: number
+  /** O crédito abatido nela (0106). Opcional: servidores antigos não mandam. */
+  creditCents?: number
   currency: string
   status: TenantChargeView['status']
   dueDate: string | null
@@ -1872,6 +1969,8 @@ export interface ChargeConsoleView {
   /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
   kind?: ChargeKind
   proration?: ChargeProrationDetail | null
+  /** A conta do valor: plano e excedente (0105). Opcional: servidores antigos não mandam. */
+  pricing?: ChargePricing | null
 }
 
 /** A assinatura resumida de uma linha da aba Assinaturas do console. */
@@ -1883,11 +1982,16 @@ export interface SubscriptionConsoleSubscription {
   planId: number | null
   planCode: string | null
   planName: string | null
+  /** O preço de UM ciclo — o do ano, no anual. */
   priceCents: number | null
+  /** O ciclo de cobrança (0104). Opcional: servidores antigos não mandam. */
+  billingCycle?: BillingCycle
   currency: string | null
   trialEndsAt: string | null
   renewsAt: string | null
-  pendingPlan: { id: number; name: string; priceCents: number; effectiveAt: string; locked: boolean } | null
+  pendingPlan: {
+    id: number; name: string; priceCents: number; effectiveAt: string; locked: boolean; billingCycle?: BillingCycle
+  } | null
   /**
    * Isento de cobrança: a plataforma manteve a assinatura ativa sem gerar
    * fatura nem vencer, até desligar. Opcional porque servidores antigos não
@@ -1902,6 +2006,9 @@ export interface SubscriptionConsoleSubscription {
   coupon?: SubscriptionCoupon | null
   /** O cartão recorrente. Opcional: servidores antigos não mandam. */
   card?: SubscriptionCard | null
+  /** Os selos "Cancela em" e "Pausada até" (0107). Opcionais: servidores antigos não mandam. */
+  cancelAt?: string | null
+  pausedUntil?: string | null
 }
 
 export type CouponKind = 'percent' | 'fixed'
@@ -1998,7 +2105,8 @@ export const SUBSCRIPTION_GATE_CODES = [
   'subscription_trial_expired',
   'subscription_suspended',
   'subscription_canceled',
-  'subscription_missing'
+  'subscription_missing',
+  'subscription_paused'
 ] as const
 export type SubscriptionGateCode = typeof SUBSCRIPTION_GATE_CODES[number]
 
@@ -2163,7 +2271,8 @@ export const platformAPI = {
   /** Ausente mantém; vazio apaga o gravado (o `.env` volta a valer). */
   /** Os números da política: `null` volta ao padrão. */
   updatePlatformProfile: (
-    payload: Partial<Record<PlatformProfileField, string>> & Partial<Record<keyof PlatformBillingPolicy, number | null>>
+    payload: Partial<Record<PlatformProfileField, string>>
+      & Partial<Record<keyof PlatformBillingPolicy | keyof PlatformReferralPolicy, number | null>>
   ) =>
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
@@ -2224,14 +2333,14 @@ export const platformAPI = {
     maxDevices: number | null; priceCents: number; currency: string; trialDays: number
     periodDays?: number; active?: boolean
     maxAuditRetentionDays?: number | null; maxMessageRetentionDays?: number | null; maxMediaRetentionDays?: number | null
-  } & PlanMarketingPayload) =>
+  } & PlanMarketingPayload & PlanOveragePayload) =>
     apiClient.post<{ plan: Plan }>('/platform/plans', payload),
 
   updatePlan: (id: number, payload: Partial<{
     name: string; maxOperators: number | null; maxSubscribers: number | null; maxDevices: number | null
     priceCents: number; currency: string; trialDays: number; periodDays: number; active: boolean
     maxAuditRetentionDays: number | null; maxMessageRetentionDays: number | null; maxMediaRetentionDays: number | null
-  }> & PlanMarketingPayload) =>
+  }> & PlanMarketingPayload & PlanOveragePayload) =>
     apiClient.requestWithBody<{ plan: Plan }>('PATCH', `/platform/plans/${id}`, payload),
 
   // ── Os pedidos de demonstração da página pública ─────────────────────
@@ -2554,8 +2663,10 @@ export const subscriptionAPI = {
    * traduzido, diz qual dos três aconteceu. Recusa com `over_limit` (e
    * `resource`/`used`/`limit`) quando o uso atual não cabe no plano escolhido.
    */
-  changePlan: (planId: number) =>
-    apiClient.put<SubscriptionUsage & { proration?: PlanChangeProration }>('/tenant/subscription/plan', { planId }),
+  changePlan: (planId: number, cycle?: BillingCycle) =>
+    apiClient.put<SubscriptionUsage & { proration?: PlanChangeProration }>(
+      '/tenant/subscription/plan', cycle ? { planId, cycle } : { planId }
+    ),
 
   /**
    * Emite (ou reaproveita) a cobrança do período e devolve o link de
@@ -2590,7 +2701,108 @@ export const subscriptionAPI = {
 
   /** Esquece o cartão salvo; a cobrança de cartão em aberto vira Pix/boleto. */
   removeCard: () =>
-    apiClient.delete<SubscriptionUsage>('/tenant/subscription/card')
+    apiClient.delete<SubscriptionUsage>('/tenant/subscription/card'),
+
+  /**
+   * A retenção no cancelamento (0107) — só o dono (403 `owner_only` para os
+   * outros). `cancellation()` lê os motivos e as ofertas;
+   * `requestCancellation` grava o motivo e devolve as ofertas;
+   * `acceptRetention` aceita o desconto ou a pausa; `confirmCancellation`
+   * recusa e cancela no fim do período pago (ou na hora, sem período pago);
+   * `revertCancellation` desfaz o agendado.
+   */
+  cancellation: () =>
+    apiClient.get<CancellationStatus>('/tenant/subscription/cancellation'),
+  requestCancellation: (reason: CancellationReason, comment?: string) =>
+    apiClient.post<{ request: CancellationRequestView; offers: CancellationOffers }>(
+      '/tenant/subscription/cancellation', { reason, ...(comment ? { comment } : {}) }
+    ),
+  acceptRetention: (offer: 'discount' | 'pause', months?: number) =>
+    apiClient.post<{ offer: 'discount' | 'pause'; subscription: SubscriptionView; pausedUntil?: string; priceCents?: number }>(
+      '/tenant/subscription/cancellation/accept', { offer, ...(months ? { months } : {}) }
+    ),
+  confirmCancellation: () =>
+    apiClient.post<{ immediate: boolean; cancelAt: string; subscription: SubscriptionView }>(
+      '/tenant/subscription/cancellation/confirm', {}
+    ),
+  revertCancellation: () =>
+    apiClient.delete<{ reverted: boolean; subscription: SubscriptionView }>('/tenant/subscription/cancellation')
+}
+
+/** Os motivos de cancelamento, na ordem da tela (0107). */
+export const CANCELLATION_REASONS = [
+  'too_expensive', 'not_using', 'missing_features', 'switching_provider',
+  'technical_issues', 'business_closed', 'temporary', 'other'
+] as const
+export type CancellationReason = typeof CANCELLATION_REASONS[number]
+
+/** As ofertas de retenção e, na que não vale, por quê. */
+export interface CancellationOffers {
+  discount: {
+    available: boolean
+    reason: 'disabled' | 'not_eligible' | 'used_recently' | 'better_coupon' | null
+    percent: number
+    /** Quantas faturas o desconto cobre: no ciclo anual (0104), uma — a anual seguinte. */
+    months: number
+    billingCycle?: BillingCycle
+    priceCents: number
+    availableAgainAt: string | null
+    /** No anual: a configuração (% por meses) que `percent` traduz para uma fatura anual. */
+    configPercent?: number
+    configMonths?: number
+  }
+  pause: {
+    available: boolean
+    reason: 'disabled' | 'not_eligible' | 'already_paused' | 'pause_cooldown' | null
+    /** Na carência (uma pausa a cada doze meses), quando volta a valer. */
+    availableAgainAt?: string | null
+    maxMonths: number
+    /** Quando a pausa começaria: o fim do período pago. */
+    from: string | null
+  }
+}
+
+export interface CancellationRequestView {
+  id: number
+  reason: CancellationReason
+  comment: string | null
+  offersPresented: Array<'discount' | 'pause'>
+  offer: 'discount' | 'pause' | 'none' | null
+  outcome: 'retained_discount' | 'retained_pause' | 'canceled' | 'reverted' | null
+  months: number | null
+  discountPercent: number | null
+  /** O ciclo da fatura que o desconto aceito cobre (0104). */
+  billingCycle?: BillingCycle | null
+  cancelAt: string | null
+  createdAt: string | null
+  decidedAt: string | null
+  revertedAt: string | null
+  revertedBy: 'provider' | 'console' | null
+}
+
+export interface CancellationStatus {
+  reasons: CancellationReason[]
+  canCancel: boolean
+  offers: CancellationOffers
+  request: CancellationRequestView | null
+  scheduled: CancellationRequestView | null
+  cancelAt: string | null
+  pausedUntil: string | null
+  /** Quando o cancelamento valeria se confirmado agora; nulo é na hora. */
+  cancelWouldTakeEffectAt: string | null
+}
+
+/** O relatório de cancelamentos do console (`GET /platform/reports/cancellations`). */
+export interface CancellationReport {
+  total: number
+  byReason: Record<CancellationReason, number>
+  byOutcome: Record<'retained_discount' | 'retained_pause' | 'canceled' | 'reverted' | 'pending', number>
+  offers: Record<'discount' | 'pause', { presented: number; accepted: number }>
+  retained: number
+  decided: number
+  /** Retidos ÷ decididos, de 0 a 1; nulo sem nenhum decidido. */
+  retentionRate: number | null
+  requests: Array<CancellationRequestView & { tenant: { id: number; name: string | null; slug: string | null } }>
 }
 
 export const usersAPI = {
@@ -5745,4 +5957,109 @@ export const platformReportsAPI = {
     apiClient.getBlob(
       `/platform/reports/revenue.csv?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
     ),
+  /** Os pedidos de cancelamento (0107), desde `from` (YYYY-MM-DD) ou todos. */
+  cancellations: (from?: string) =>
+    apiClient.get<CancellationReport>(
+      `/platform/reports/cancellations${from ? `?from=${encodeURIComponent(from)}` : ''}`
+    ),
+  /** O console desfaz o cancelamento agendado de um provedor. 409 `not_scheduled` sem agendamento. */
+  revertCancellation: (tenantId: number) =>
+    apiClient.delete<{ reverted: boolean }>(`/platform/tenants/${tenantId}/subscription/cancellation`),
+}
+
+// ── A indicação de provedores (0106) ─────────────────────────────────────
+
+export type ReferralStatus = 'pending' | 'credited' | 'canceled'
+
+/** Um crédito do saldo do provedor: a recompensa de uma indicação, ou o ajuste do console. */
+export interface TenantCreditView {
+  id: number
+  amountCents: number
+  remainingCents: number
+  source: 'referral' | 'manual'
+  reference: string | null
+  canceled: boolean
+  canceledAt: string | null
+  createdAt: string | null
+}
+
+/** A tela de Plano do provedor: o link, o saldo e os indicados (nome mascarado). */
+export interface TenantReferrals {
+  enabled: boolean
+  rewardCents: number
+  code: string | null
+  /** Nulo quando o deploy não sabe o próprio endereço; a tela monta pela origem. */
+  signupUrl: string | null
+  balanceCents: number
+  reservedCents: number
+  referrals: {
+    id: number
+    name: string
+    status: ReferralStatus
+    amountCents: number
+    createdAt: string | null
+    creditedAt: string | null
+  }[]
+  credits: TenantCreditView[]
+}
+
+/** Uma indicação vista do console: o nome inteiro e o pagamento que a pagou. */
+export interface ConsoleReferral {
+  id: number
+  tenantId: number
+  name: string | null
+  slug: string | null
+  status: ReferralStatus
+  amountCents: number
+  paymentExternalId: string | null
+  createdAt: string | null
+  creditedAt: string | null
+  canceledAt: string | null
+}
+
+export interface CreditAllocationView {
+  id: number
+  creditId: number
+  chargeId: number
+  amountCents: number
+  status: 'reserved' | 'consumed' | 'released'
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface ConsoleReferrals {
+  code: string | null
+  rewardCents: number
+  balanceCents: number
+  reservedCents: number
+  referredBy: ConsoleReferral | null
+  referrals: ConsoleReferral[]
+  credits: TenantCreditView[]
+  allocations: CreditAllocationView[]
+}
+
+export interface CreditAdjustResult {
+  creditId: number
+  amountCents: number
+  balanceBefore: number
+  balanceAfter: number
+  referrals: ConsoleReferrals
+}
+
+export const referralsAPI = {
+  /** O link de indicação (o código nasce na primeira leitura), o saldo e os indicados. */
+  mine: () =>
+    apiClient.get<TenantReferrals>('/tenant/referrals'),
+
+  /** O console: indicações e créditos de um provedor. */
+  ofTenant: (tenantId: number) =>
+    apiClient.get<ConsoleReferrals>(`/platform/tenants/${tenantId}/referrals`),
+
+  /**
+   * O ajuste manual do saldo, com motivo (auditado). Negativo tira do saldo;
+   * 409 `insufficient_credit` (com `balanceCents`) quando passa dele, 400
+   * `invalid_amount` e `reason_required`.
+   */
+  adjust: (tenantId: number, payload: { amountCents: number; reason: string }) =>
+    apiClient.post<CreditAdjustResult>(`/platform/tenants/${tenantId}/credits`, payload),
 }

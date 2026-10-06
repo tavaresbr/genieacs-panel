@@ -1,5 +1,6 @@
 import express from 'express';
 import TenantController from '../controllers/tenantController.js';
+import CancellationController from '../controllers/cancellationController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -40,6 +41,10 @@ router.get('/charges', authenticateToken, requirePermission('settings.read'), Te
 // escolhe o plano, e quem está em `past_due` é quem mais precisa dela.
 router.get('/plans', authenticateToken, requirePermission('settings.read'), TenantController.listPlans);
 
+// A indicação de provedores (0106): o link de indicação, os indicados e o
+// saldo de créditos. Na tela de Plano, com a mesma capacidade dela.
+router.get('/referrals', authenticateToken, requirePermission('settings.read'), TenantController.getReferrals);
+
 // O provedor troca de plano, e "pagar agora". Os dois são a conta do
 // provedor mudando — `settings.write`, que é de `owner` e `admin`, os mesmos
 // que gravam o cadastro fiscal que vai na fatura. Fora da porta da
@@ -58,6 +63,16 @@ router.post('/subscription/coupon', authenticateToken, requirePermission('settin
 // o cartão recusado por Pix/boleto. O cartão em si nunca passa por aqui.
 router.put('/subscription/autopay', authenticateToken, requirePermission('settings.write'), TenantController.setCardAutopay);
 router.delete('/subscription/card', authenticateToken, requirePermission('settings.write'), TenantController.removeCard);
+// A retenção no cancelamento (0107): o motivo, as ofertas (desconto ou
+// pausa), o cancelamento no fim do período e o desfazer. `settings.write` na
+// rota e o papel de DONO no controlador — cancelar a empresa não é decisão de
+// um admin contratado. Fora da porta da assinatura: quem está atrasado
+// também pode querer sair.
+router.get('/subscription/cancellation', authenticateToken, requirePermission('settings.write'), CancellationController.status);
+router.post('/subscription/cancellation', authenticateToken, requirePermission('settings.write'), CancellationController.request);
+router.post('/subscription/cancellation/accept', authenticateToken, requirePermission('settings.write'), CancellationController.accept);
+router.post('/subscription/cancellation/confirm', authenticateToken, requirePermission('settings.write'), CancellationController.confirm);
+router.delete('/subscription/cancellation', authenticateToken, requirePermission('settings.write'), CancellationController.revert);
 
 // O nome do provedor, escrito por quem administra. É o antigo `appName` das
 // configurações, agora na linha do provedor — ver o controlador.

@@ -41,7 +41,15 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   // `detail` do pagamento que o gastou (`coupon`), e a devolução no do
   // estorno (`couponRestored`).
   COUPON_APPLIED: 'coupon.applied',
-  COUPON_REMOVED: 'coupon.removed'
+  COUPON_REMOVED: 'coupon.removed',
+  // A retenção no cancelamento (0107): a pausa aceita e o fim dela (pelo
+  // agendador na data, ou pelo pagamento antes), e o cancelamento agendado
+  // pelo próprio provedor e desfeito antes da data. O cancelamento em si,
+  // quando a data chega, é `status.changed` com o motivo `self_cancel`.
+  SUBSCRIPTION_PAUSED: 'subscription.paused',
+  SUBSCRIPTION_RESUMED: 'subscription.resumed',
+  CANCELLATION_SCHEDULED: 'cancellation.scheduled',
+  CANCELLATION_REVERTED: 'cancellation.reverted'
 });
 
 class BillingEvent {

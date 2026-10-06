@@ -171,7 +171,7 @@ describe('a migração que derruba o IP dos leads', () => {
    * Então o passo recria a coluna, semeia uma linha com IP, e só então chama o
    * `up`. É o molde de `schema-migrations.test.js`.
    */
-  const PASSO = '0104_drop_lead_ip';
+  const PASSO = '0108_drop_lead_ip';
   let comIp;
 
   before(async () => {

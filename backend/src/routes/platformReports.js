@@ -1,5 +1,6 @@
 import express from 'express';
 import PlatformReportsController from '../controllers/platformReportsController.js';
+import CancellationController from '../controllers/cancellationController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -15,5 +16,7 @@ const guard = [authenticateToken, requirePlatformAdmin];
 
 router.get('/reports/revenue.csv', ...guard, PlatformReportsController.revenueCsv);
 router.get('/reports/revenue', ...guard, PlatformReportsController.revenue);
+// Os pedidos de cancelamento (0107): motivos, ofertas aceitas e retenção.
+router.get('/reports/cancellations', ...guard, CancellationController.report);
 
 export default router;

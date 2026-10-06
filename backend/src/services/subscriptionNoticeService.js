@@ -396,10 +396,15 @@ class SubscriptionNoticeService {
       centavos = Number(cobranca.amount_cents);
       moeda = cobranca.currency || plan?.currency || 'BRL';
     } else {
-      const daFatura = (subscription && await SelfBillingService.invoicePlanFor(subscription).catch(() => null)) || plan;
+      // No ciclo da fatura (0104): a troca para o anual agendada para este
+      // prazo cobra o preço do ano, e o lembrete diz esse valor.
+      const fatura = subscription
+        ? await SelfBillingService.invoicePricingFor(subscription).catch(() => null)
+        : null;
+      const daFatura = fatura?.plan || plan;
       centavos = subscription
-        ? await SubscriptionService.effectivePriceCents(subscription, daFatura)
-        : Number(daFatura?.price_cents ?? 0);
+        ? await SubscriptionService.effectivePriceCents(fatura?.plan ? fatura.subscription : subscription, daFatura)
+        : SubscriptionService.cyclePriceCents(null, daFatura);
       moeda = daFatura?.currency || plan?.currency || 'BRL';
     }
 

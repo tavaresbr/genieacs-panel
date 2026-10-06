@@ -1,4 +1,6 @@
-import type { ApiResponse, PendingPlan, SubscriptionStatus, SubscriptionView, TenantChargeView, TenantPlanOption } from '@/lib/api'
+import type {
+  ApiResponse, BillingCycle, PendingPlan, SubscriptionStatus, SubscriptionView, TenantChargeView, TenantPlanOption
+} from '@/lib/api'
 import type { TranslationKey, TranslationVars } from '@/lib/i18n/dictionary'
 
 /**
@@ -34,6 +36,73 @@ export function periodLabel(periodDays: number, price: string): { key: Translati
   if (periodDays === 30) return { key: 'plan.options.perMonth', vars: { price } }
   if (periodDays === 365 || periodDays === 366) return { key: 'plan.options.perYear', vars: { price } }
   return { key: 'plan.options.perDays', vars: { price, days: periodDays } }
+}
+
+// ── O ciclo de cobrança (0104) ─────────────────────────────────────────
+
+/** Os dias do ciclo anual — fixos, como no backend (`ANNUAL_PERIOD_DAYS`). */
+export const ANNUAL_PERIOD_DAYS = 365
+
+/** O plano com o que basta para precificar um ciclo. */
+type PricedPlan = Pick<TenantPlanOption, 'id' | 'priceCents'>
+  & Partial<Pick<TenantPlanOption, 'periodDays' | 'priceYearlyCents' | 'annualAvailable'>>
+
+/** Se o plano oferece o ciclo anual: só com o preço anual. */
+export function annualAvailable(plan: PricedPlan | null | undefined) {
+  if (!plan) return false
+  if (plan.annualAvailable !== undefined) return plan.annualAvailable
+  return typeof plan.priceYearlyCents === 'number' && plan.priceYearlyCents > 0
+}
+
+/**
+ * O preço e os dias de UM ciclo de `plan` — a mesma conta do backend
+ * (`cyclePriceCents`/`cyclePeriodDays`): o anual cobra o preço anual por 365
+ * dias; sem preço anual, o plano só tem o mensal.
+ */
+export function cyclePricing(plan: PricedPlan, cycle: BillingCycle): { priceCents: number; periodDays: number } {
+  if (cycle === 'annual' && annualAvailable(plan)) {
+    return { priceCents: plan.priceYearlyCents ?? 0, periodDays: ANNUAL_PERIOD_DAYS }
+  }
+  const dias = plan.periodDays && plan.periodDays > 0 ? plan.periodDays : 30
+  return { priceCents: plan.priceCents, periodDays: dias }
+}
+
+/** O preço por dia no ciclo — é por ele que se decide subida ou descida. */
+export function dailyPrice(plan: PricedPlan, cycle: BillingCycle) {
+  const { priceCents, periodDays } = cyclePricing(plan, cycle)
+  return priceCents / periodDays
+}
+
+/** O ciclo de agora da assinatura; sem o campo (servidor antigo), o mensal. */
+export function currentCycle(subscription: Pick<SubscriptionView, 'billingCycle'> | null | undefined): BillingCycle {
+  return subscription?.billingCycle === 'annual' ? 'annual' : 'monthly'
+}
+
+/**
+ * O cupom `repeating` conta ciclos por FATURA: no anual, cada ciclo dele é um
+ * ano. A tela avisa quando há um cupom assim e o anual está em vista.
+ */
+/**
+ * Se o cupom SAI na troca para o anual (0104): o de N faturas (`once`,
+ * `repeating`) resgatado no mensal não desconta a fatura do ano, e o servidor
+ * o tira quando o anual passa a valer. Fica o `forever` — e o desconto de
+ * retenção do anual, que já é calculado para ele.
+ */
+export function couponDroppedOnAnnual(
+  coupon: { duration: string; code?: string } | null | undefined,
+  currentCycle: BillingCycle,
+  cycle: BillingCycle
+) {
+  if (!coupon || cycle !== 'annual' || currentCycle === 'annual') return false
+  if (coupon.duration === 'forever') return false
+  return !String(coupon.code ?? '').startsWith('RETENCAO-ANUAL-')
+}
+
+export function couponCountsYears(
+  coupon: { duration: string } | null | undefined,
+  cycle: BillingCycle
+) {
+  return cycle === 'annual' && coupon?.duration === 'repeating'
 }
 
 /**
@@ -93,12 +162,22 @@ export function isPendingLocked(pending: Pick<PendingPlan, 'locked'> | null | un
 export function canSwitchTo(
   plan: TenantPlanOption,
   canWrite: boolean,
-  subscription: Pick<SubscriptionView, 'status' | 'pendingPlan'> | null | undefined
+  subscription: (Pick<SubscriptionView, 'status' | 'pendingPlan'> & Partial<Pick<SubscriptionView, 'billingCycle' | 'cancelAt' | 'pausedUntil'>>) | null | undefined,
+  cycle?: BillingCycle
 ) {
-  if (!canWrite || plan.current || !subscriptionAllowsChanges(subscription)) return false
+  if (!canWrite || !subscriptionAllowsChanges(subscription)) return false
+  // A retenção (0107): com o cancelamento agendado ou a pausa, a troca é
+  // recusada (`cancel_scheduled`, `subscription_paused`).
+  if (subscription?.cancelAt || subscription?.pausedUntil) return false
+  // O ciclo (0104): o do seletor, ou o de agora. O plano atual entra quando o
+  // ciclo é outro — é a troca de ciclo; o plano sem anual, não, no anual.
+  const agora = currentCycle(subscription)
+  const alvo = cycle ?? agora
+  if (alvo === 'annual' && !annualAvailable(plan)) return false
+  if (plan.current && alvo === agora) return false
   const pending = subscription?.pendingPlan ?? null
   if (isPendingLocked(pending)) return false
-  return plan.id !== pending?.id
+  return !(plan.id === pending?.id && (pending?.billingCycle ?? agora) === alvo)
 }
 
 /** O botão "Cancelar agendamento": quem escreve, com agendamento que ainda não foi pago. */
@@ -109,7 +188,7 @@ export function canCancelPending(
   return canWrite && Boolean(pending) && !isPendingLocked(pending)
 }
 
-export type PlanChangeKind = 'upgrade' | 'downgrade-now' | 'downgrade-scheduled' | 'same'
+export type PlanChangeKind = 'upgrade' | 'downgrade-now' | 'downgrade-scheduled' | 'cycle-scheduled' | 'same'
 
 /**
  * O que a troca para `target` vai fazer, pela mesma regra do backend: subir de
@@ -121,21 +200,29 @@ export type PlanChangeKind = 'upgrade' | 'downgrade-now' | 'downgrade-scheduled'
  * da resposta é o que a tela mostra depois.
  */
 export function planChangeKind(
-  current: Pick<TenantPlanOption, 'id' | 'priceCents'> | null | undefined,
-  target: Pick<TenantPlanOption, 'id' | 'priceCents'>,
-  subscription: Pick<SubscriptionView, 'status' | 'renewsAt'> | null | undefined,
-  now: number = Date.now()
+  current: PricedPlan | null | undefined,
+  target: PricedPlan,
+  subscription: (Pick<SubscriptionView, 'status' | 'renewsAt'> & Partial<Pick<SubscriptionView, 'billingCycle'>>) | null | undefined,
+  now: number = Date.now(),
+  cycle?: BillingCycle
 ): PlanChangeKind {
-  if (current && current.id === target.id) return 'same'
-  if (!current || target.priceCents >= current.priceCents) return 'upgrade'
+  const agora = currentCycle(subscription)
+  const alvo = cycle ?? agora
+  if (current && current.id === target.id && alvo === agora) return 'same'
   const renova = subscription?.renewsAt ? new Date(subscription.renewsAt).getTime() : Number.NaN
-  if (subscription?.status === 'active' && !Number.isNaN(renova) && renova > now) return 'downgrade-scheduled'
+  const correndo = subscription?.status === 'active' && !Number.isNaN(renova) && renova > now
+  // Trocar de ciclo com o período pago correndo é sempre na renovação (0104).
+  if (alvo !== agora) return correndo ? 'cycle-scheduled' : 'upgrade'
+  // Pelo preço POR DIA, como o backend: o mesmo ciclo dos dois lados.
+  if (!current || dailyPrice(target, alvo) >= dailyPrice(current, agora)) return 'upgrade'
+  if (correndo) return 'downgrade-scheduled'
   return 'downgrade-now'
 }
 
 /** A chave da confirmação de cada tipo de troca. */
 export function confirmKey(kind: Exclude<PlanChangeKind, 'same'>): TranslationKey {
   if (kind === 'downgrade-scheduled') return 'plan.options.confirmScheduled'
+  if (kind === 'cycle-scheduled') return 'plan.options.confirmCycleScheduled'
   if (kind === 'downgrade-now') return 'plan.options.confirmDowngradeNow'
   return 'plan.options.confirm'
 }
@@ -150,10 +237,11 @@ export function confirmKey(kind: Exclude<PlanChangeKind, 'same'>): TranslationKe
 export function canPayNow(
   plans: TenantPlanOption[] | null | undefined,
   canWrite: boolean,
-  subscription: Pick<SubscriptionView, 'status' | 'billingExempt'> | null | undefined
+  subscription: Pick<SubscriptionView, 'status' | 'billingExempt' | 'cancelAt'> | null | undefined
 ) {
+  // Com o cancelamento agendado (0107) não há renovação a pagar (`cancel_scheduled`).
   return canWrite && subscriptionAllowsChanges(subscription) && !isBillingExempt(subscription)
-    && currentPlanIsPaid(plans)
+    && !subscription?.cancelAt && currentPlanIsPaid(plans)
 }
 
 /**
@@ -241,7 +329,8 @@ export function isPendingLockedRefusal(code: string | undefined) {
  * `SubscriptionService.decide`). Suspenso e cancelado são decisão da
  * plataforma — pagar não os desfaz — e "sem assinatura" não tem o que cobrar.
  */
-const PAYABLE_GATE_CODES = new Set<string>(['subscription_past_due', 'subscription_trial_expired'])
+// A pausa de retenção (0107) também: pagar a renovação é o "retomar antes".
+const PAYABLE_GATE_CODES = new Set<string>(['subscription_past_due', 'subscription_trial_expired', 'subscription_paused'])
 
 /**
  * O muro do 402 oferece "gerar cobrança e pagar"? Só quando o bloqueio se

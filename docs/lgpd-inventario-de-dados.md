@@ -71,7 +71,8 @@ configuração do provedor (`settings`, `app_state`, `map_settings`), catálogo
 (`vendors`, `wifi_security_config`), equipe (`tenant_invites`, `wa_agents`), modelos e
 campanhas (`wa_templates`, `wa_meta_templates`, `wa_broadcasts` — o destinatário sai na
 tabela de recipients, que está no grupo acima), a conta do provedor conosco (`subscriptions`,
-`billing_*`, `coupon_redemptions`, `subscription_reminder_sends`) e os eventos de rede por
+`billing_*`, `coupon_redemptions`, `subscription_reminder_sends`,
+`cancellation_requests`) e os eventos de rede por
 **nó do mapa**, não por pessoa (`outage_events`, `outage_incidents`, `maintenance_windows`).
 
 ---
@@ -102,7 +103,7 @@ escrito, e vale registrar o que eram:
 - A tabela guardava **endereço IP**, e esse campo era **gravado e nunca lido** — `Lead.js` não o
   mencionava em nenhum método e `presentLead` não o entregava ao console, que portanto nunca o
   mostrou. Era coleta sem finalidade em exercício (art. 6º). A migração
-  `0104_drop_lead_ip` **derrubou a coluna**, e `publicController.createLead` deixou de gravá-la.
+  `0108_drop_lead_ip` **derrubou a coluna**, e `publicController.createLead` deixou de gravá-la.
   O controle de abuso da rota continua sendo o `publicLeadLimiter` e o campo-armadilha
   `website`, que nunca dependeram do IP.
 - Ela **não era podada por nada**. Agora há prazo — ver a seção seguinte.
@@ -206,7 +207,7 @@ leitura.
    um dossiê que entrega menos do que existe e uma exclusão que deixa dado para trás. É a
    lacuna que este trabalho fecha, com `backend/test/lgpd-inventario.test.js`.
 2. ~~**`leads` não tem retenção e guarda IP.**~~ **Fechado.** O IP era gravado e nunca lido, e
-   a coluna foi derrubada (`0104_drop_lead_ip`); a retenção existe e é configurável por
+   a coluna foi derrubada (`0108_drop_lead_ip`); a retenção existe e é configurável por
    `LEAD_RETENTION_DAYS`, desligada por padrão. **O que esta correção não alcança:**
    `createLead` manda o conteúdo do lead para a equipe por e-mail
    (`PlatformNotifyService.notifyTeam`), e apagar a linha não recolhe aquela cópia. Quem lê
