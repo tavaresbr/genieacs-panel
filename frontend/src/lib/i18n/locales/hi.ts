@@ -3713,6 +3713,8 @@ const hi: Dictionary = {
   'integrations.saved': 'इंटीग्रेशन सहेजा गया',
   'integrations.updatedAt': 'अंतिम बदलाव {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'कनेक्शन',
+  'integrations.asaas.webhookTitle': 'वेबहुक',
   'integrations.asaas.description': 'वह पेमेंट गेटवे जिससे प्लेटफ़ॉर्म प्रदाताओं से वसूली करता है: यह सब्सक्रिप्शन के बिल जारी करता है और भुगतान आने पर webhook को कॉल करता है।',
   'integrations.asaas.apiKeyConfigured': 'API कुंजी कॉन्फ़िगर है',
   'integrations.asaas.apiKeyMissing': 'API कुंजी नहीं है',

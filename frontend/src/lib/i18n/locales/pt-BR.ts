@@ -3705,6 +3705,8 @@ const ptBR: Dictionary = {
   'integrations.saved': 'Integração salva',
   'integrations.updatedAt': 'Última alteração {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'Conexão',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': 'O gateway com que a plataforma cobra os provedores: emite as cobranças das assinaturas e avisa pelo webhook quando um pagamento entra.',
   'integrations.asaas.apiKeyConfigured': 'Chave de API configurada',
   'integrations.asaas.apiKeyMissing': 'Chave de API ausente',

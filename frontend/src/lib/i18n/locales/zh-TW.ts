@@ -3706,6 +3706,8 @@ const zhTW: Dictionary = {
   'integrations.saved': '整合已儲存',
   'integrations.updatedAt': '最後修改 {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': '連線',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': '平台向服務商收費所使用的支付閘道：它開立訂閱帳單，並在收到付款時呼叫 Webhook。',
   'integrations.asaas.apiKeyConfigured': 'API 金鑰已設定',
   'integrations.asaas.apiKeyMissing': '缺少 API 金鑰',

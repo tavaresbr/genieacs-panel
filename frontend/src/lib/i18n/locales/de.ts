@@ -3709,6 +3709,8 @@ const de: Dictionary = {
   'integrations.saved': 'Integration gespeichert',
   'integrations.updatedAt': 'Zuletzt geändert {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'Verbindung',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': 'Das Zahlungs-Gateway, über das die Plattform die Anbieter abrechnet: Es stellt die Abo-Rechnungen aus und ruft den Webhook auf, wenn eine Zahlung eingeht.',
   'integrations.asaas.apiKeyConfigured': 'API-Schlüssel konfiguriert',
   'integrations.asaas.apiKeyMissing': 'API-Schlüssel fehlt',

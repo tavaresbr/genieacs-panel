@@ -3705,6 +3705,8 @@ const ja: Dictionary = {
   'integrations.saved': '連携を保存しました',
   'integrations.updatedAt': '最終変更 {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': '接続',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': 'プラットフォームがプロバイダーへの請求に使う決済ゲートウェイです。サブスクリプションの請求を発行し、入金時に Webhook を呼び出します。',
   'integrations.asaas.apiKeyConfigured': 'API キー設定済み',
   'integrations.asaas.apiKeyMissing': 'API キー未設定',

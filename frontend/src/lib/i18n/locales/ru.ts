@@ -3713,6 +3713,8 @@ const ru: Dictionary = {
   'integrations.saved': 'Интеграция сохранена',
   'integrations.updatedAt': 'Последнее изменение {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'Подключение',
+  'integrations.asaas.webhookTitle': 'Вебхук',
   'integrations.asaas.description': 'Платёжный шлюз, через который платформа выставляет счета провайдерам: он выпускает счета по подпискам и вызывает вебхук, когда поступает платёж.',
   'integrations.asaas.apiKeyConfigured': 'API-ключ настроен',
   'integrations.asaas.apiKeyMissing': 'API-ключ отсутствует',

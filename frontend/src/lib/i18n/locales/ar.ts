@@ -3714,6 +3714,8 @@ const ar: Dictionary = {
   'integrations.saved': 'تم حفظ التكامل',
   'integrations.updatedAt': 'آخر تعديل {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'الاتصال',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': 'بوابة الدفع التي تُحصِّل بها المنصة من المزوّدين: تُصدر فواتير الاشتراكات وتستدعي الـ webhook عند وصول دفعة.',
   'integrations.asaas.apiKeyConfigured': 'مفتاح API مُهيَّأ',
   'integrations.asaas.apiKeyMissing': 'مفتاح API مفقود',

@@ -3705,6 +3705,8 @@ const es: Dictionary = {
   'integrations.saved': 'Integración guardada',
   'integrations.updatedAt': 'Último cambio {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': 'Conexión',
+  'integrations.asaas.webhookTitle': 'Webhook',
   'integrations.asaas.description': 'La pasarela con la que la plataforma cobra a los proveedores: emite los cobros de las suscripciones y avisa por webhook cuando entra un pago.',
   'integrations.asaas.apiKeyConfigured': 'Clave de API configurada',
   'integrations.asaas.apiKeyMissing': 'Falta la clave de API',

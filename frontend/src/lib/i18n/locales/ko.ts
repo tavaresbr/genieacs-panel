@@ -3712,6 +3712,8 @@ const ko: Dictionary = {
   'integrations.saved': '연동이 저장되었습니다',
   'integrations.updatedAt': '마지막 변경 {when}',
   'integrations.asaas.title': 'Asaas',
+  'integrations.asaas.connectionTitle': '연결',
+  'integrations.asaas.webhookTitle': '웹훅',
   'integrations.asaas.description': '플랫폼이 공급자에게 요금을 청구하는 결제 게이트웨이입니다. 구독 청구서를 발행하고 결제가 들어오면 웹훅을 호출합니다.',
   'integrations.asaas.apiKeyConfigured': 'API 키 설정됨',
   'integrations.asaas.apiKeyMissing': 'API 키 없음',
