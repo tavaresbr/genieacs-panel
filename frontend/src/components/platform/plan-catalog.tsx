@@ -346,7 +346,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
 
       {/* A vitrine: o que a página pública do ápice mostra deste plano. */}
       <fieldset className="space-y-4 rounded-md border border-border p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">{t('platform.plans.showcase')}</legend>
+        <legend className="mb-4 px-1 text-sm font-semibold text-foreground">{t('platform.plans.showcase')}</legend>
         <p className="field-hint">{t('platform.plans.showcaseHint')}</p>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <label className="flex items-center gap-2 text-sm text-foreground">
