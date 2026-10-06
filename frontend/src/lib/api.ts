@@ -4632,8 +4632,16 @@ export interface WhatsAppContact {
   lastMessageAt: string | null
 }
 
+/** How many contacts each filter button would show if clicked now (see `WaContactService.counts`). */
+export interface WhatsAppContactCounts {
+  states: { all: number; active: number; blocked: number; cancelled: number; none: number }
+  noPhone: number
+  imported: number
+}
+
 export interface WhatsAppContactPage {
   total: number
+  counts: WhatsAppContactCounts
   contacts: WhatsAppContact[]
 }
 
