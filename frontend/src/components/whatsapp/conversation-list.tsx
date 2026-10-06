@@ -72,6 +72,12 @@ interface ConversationListProps {
  * clears when a thread is opened have to be settled in one place, and that
  * place is the page.
  */
+/** Minutos inteiros desde `iso`, nunca negativo. */
+export function minutesSince(iso: string, now = Date.now()): number {
+  const t = new Date(iso).getTime()
+  return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 60_000)) : 0
+}
+
 export function ConversationList({ conversations, accounts, selectedId, onSelect, filtered, waiting }: ConversationListProps) {
   const { t, intlLocale } = useTranslation()
 
@@ -96,6 +102,10 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
         // A faixa da esquerda é a cor do NÚMERO que recebeu, sempre que ele é
         // conhecido — e a linha aberta continua reconhecível pelo fundo. Sem
         // número conhecido, a faixa volta a ser só a da seleção, como antes.
+        // O cliente falou por último e ninguém respondeu: a linha pisca até
+        // alguém (ou o bot) responder. `motion-safe`: quem pediu menos
+        // movimento ao sistema vê a marca parada.
+        const aguardando = conversation.awaitingSince ? minutesSince(conversation.awaitingSince) : null
         const faixa = numero
           ? `${numero.className} shadow-[inset_4px_0_0_0_hsl(var(--wa-account))]`
           : active ? 'shadow-[inset_3px_0_0_0_hsl(var(--primary))]' : ''
@@ -108,10 +118,18 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
               className={`flex w-full flex-col gap-1.5 px-3 py-3 text-start transition-colors ${faixa} ${
                 active
                   ? 'bg-[hsl(var(--surface-subtle))]'
-                  : 'hover:bg-[hsl(var(--surface-subtle))]'
+                  : aguardando !== null
+                    ? 'bg-[hsl(var(--status-warning)/0.08)] hover:bg-[hsl(var(--status-warning)/0.14)]'
+                    : 'hover:bg-[hsl(var(--surface-subtle))]'
               }`}
             >
               <span className="flex items-baseline gap-2">
+                {aguardando !== null && (
+                  <span className="relative inline-flex size-2.5 shrink-0 self-center" aria-hidden="true">
+                    <span className="absolute inline-flex size-full rounded-full bg-[hsl(var(--status-warning))] opacity-75 motion-safe:animate-ping" />
+                    <span className="relative inline-flex size-2.5 rounded-full bg-[hsl(var(--status-warning))]" />
+                  </span>
+                )}
                 <span
                   className={`min-w-0 flex-1 truncate text-sm text-foreground ${
                     conversation.unreadCount > 0 ? 'font-bold' : 'font-semibold'
@@ -136,6 +154,11 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                   <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
                     <Icon name="check" size={12} />
                     {t('whatsapp.inbox.closed')}
+                  </span>
+                )}
+                {aguardando !== null && !waiting?.has(conversation.id) && (
+                  <span className="modern-badge-warning" title={t('whatsapp.inbox.awaitingHint')}>
+                    {t('whatsapp.inbox.awaiting', { minutes: aguardando })}
                   </span>
                 )}
                 {conversation.unreadCount > 0 && (

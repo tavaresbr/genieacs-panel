@@ -2,7 +2,7 @@ import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
 
 /**
- * Os pedidos de cancelamento de um provedor (0106) — ver
+ * Os pedidos de cancelamento de um provedor (0107) — ver
  * `cancellationRequestsTable` na migração e `CancellationService`.
  *
  * Só por `tdb`/`tinsertReturningId` no caminho do provedor: quem chama abre

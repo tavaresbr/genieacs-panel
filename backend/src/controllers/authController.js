@@ -321,7 +321,7 @@ class AuthController {
             await trx('tenants').where({ id: tenantId }).update(fiscal);
           }
           await seedDefaults(trx, { tenantIds: [tenantId], planId: chosenPlan?.id ?? null });
-          // A indicação (0105): `?ref=CÓDIGO` no link de quem indicou. Código
+          // A indicação (0106): `?ref=CÓDIGO` no link de quem indicou. Código
           // inválido e a indicação de si mesmo são ignorados — e uma falha
           // aqui também, num savepoint: a indicação nunca derruba o cadastro.
           if (body.referralCode) {

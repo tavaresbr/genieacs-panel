@@ -1182,7 +1182,7 @@ const OUTAGE_HISTORY_TABLES = [
  * site só porque alguém o criou. É o console que decide o que se vende ali.
  * `features` é uma lista JSON de frases curtas, a mesma forma de
  * `plan_patterns`. `price_yearly_cents` nasceu só como o preço anunciado da
- * opção anual; desde a 0103 é o que se COBRA no ciclo anual (365 dias).
+ * opção anual; desde a 0104 é o que se COBRA no ciclo anual (365 dias).
  */
 const PLAN_MARKETING_COLUMNS = [
   ['public', (t) => t.boolean('public').notNullable().defaultTo(false)],
@@ -1492,7 +1492,7 @@ const SUBSCRIPTION_SUSPENDED_REASON_COLUMNS = [
 ];
 
 /**
- * As colunas da 0103 — o ciclo de cobrança (mensal ou anual).
+ * As colunas da 0104 — o ciclo de cobrança (mensal ou anual).
  *
  * `billing_cycle` é o ciclo que vale AGORA: `monthly` cobra `price_cents` por
  * `period_days`; `annual`, `price_yearly_cents` por 365 dias. Toda assinatura
@@ -1508,7 +1508,7 @@ const SUBSCRIPTION_BILLING_CYCLE_COLUMNS = [
 ];
 
 /**
- * O ciclo com que a cobrança saiu (0103), ao lado de `plan_id`/`coupon_id`:
+ * O ciclo com que a cobrança saiu (0104), ao lado de `plan_id`/`coupon_id`:
  * com a troca de ciclo no MESMO plano, o plano sozinho não diz mais se a
  * fatura paga foi a do mês ou a do ano. Nula nas linhas de antes — que são
  * todas mensais.
@@ -1693,6 +1693,19 @@ const WA_ACCOUNT_CLOUD_COLUMNS = [
   ['meta_waba_id', (t) => t.string('meta_waba_id', 32)],
   ['meta_templates_synced_at', (t) => t.timestamp('meta_templates_synced_at').nullable()],
   ['meta_templates_error', (t) => t.string('meta_templates_error', 255)]
+];
+
+/**
+ * O webhook da conta WABA registrado pelo painel na Graph API
+ * (`POST /{waba}/subscribed_apps` com `override_callback_uri`). O provedor não
+ * cola mais URL nem token no app dele na Meta: o painel faz isso com o token
+ * do próprio número, e o resultado da última tentativa fica aqui para a tela
+ * mostrar e oferecer "registrar de novo". Nulo é "ainda não tentado".
+ */
+const WA_ACCOUNT_META_WEBHOOK_COLUMNS = [
+  ['meta_webhook_status', (t) => t.string('meta_webhook_status', 8).nullable()],
+  ['meta_webhook_error', (t) => t.string('meta_webhook_error', 255).nullable()],
+  ['meta_webhook_at', (t) => t.timestamp('meta_webhook_at').nullable()]
 ];
 
 /**
@@ -2049,7 +2062,7 @@ const DUNNING_PAUSE_TABLES = [
 ];
 
 /**
- * A cobrança por excedente (0104): o preço, em centavos, de cada unidade acima
+ * A cobrança por excedente (0105): o preço, em centavos, de cada unidade acima
  * do teto do plano — por operador, por assinante, por ONT. Nulo é "sem preço",
  * e aí o teto continua bloqueando como sempre (o 402 de operador, a
  * sincronização que não cria assinante, a troca de plano recusada). Com preço,
@@ -2063,7 +2076,7 @@ const PLAN_OVERAGE_COLUMNS = [
 ];
 
 /**
- * A conta do valor de uma cobrança (0104), em JSON: `{ base, overage: [...] }`
+ * A conta do valor de uma cobrança (0105), em JSON: `{ base, overage: [...] }`
  * — o preço do plano (já com o cupom) e o excedente do período que fecha —,
  * e outras parcelas que vierem depois (o crédito de indicação). Nula nas
  * linhas de antes: o valor delas é o preço do plano, e só.
@@ -2073,7 +2086,7 @@ const BILLING_CHARGE_PRICING_DETAIL_COLUMNS = [
 ];
 
 /**
- * O maior uso de cada recurso em cada período (0104). `period_end` é a chave
+ * O maior uso de cada recurso em cada período (0105). `period_end` é a chave
  * do período no fuso da cobrança (`ChargeIssuingService.periodKey`, o mesmo
  * texto de `billing_charges.period_end`), e o pico só sobe — o agendador grava
  * o maior entre o guardado e o de agora. Do provedor (escopada), e some com
@@ -2567,7 +2580,7 @@ const SUBSCRIPTION_REMINDER_TABLES = [
 ];
 
 /**
- * A indicação de provedores (0105) — ver `referralService.js`.
+ * A indicação de provedores (0106) — ver `referralService.js`.
  *
  * `referral_code` é o código curto e legível do link de indicação de cada
  * provedor, gerado sob demanda (nulo até alguém abrir a tela de Plano) e único.
@@ -2582,7 +2595,7 @@ const TENANT_REFERRAL_COLUMNS = [
 ];
 
 /**
- * Quanto de crédito a cobrança tem RESERVADO (0105): o preço do plano menos
+ * Quanto de crédito a cobrança tem RESERVADO (0106): o preço do plano menos
  * isto é o `amount_cents` que foi ao gateway. Nula (ou zero) é a cobrança sem
  * crédito. O detalhe — de quais créditos saiu — está em `credit_allocations`.
  */
@@ -2591,7 +2604,7 @@ const BILLING_CHARGE_CREDIT_COLUMNS = [
 ];
 
 /**
- * A recompensa de uma indicação (0105). Uma linha por provedor INDICADO
+ * A recompensa de uma indicação (0106). Uma linha por provedor INDICADO
  * (`referred_tenant_id` único): nasce `pending` no cadastro e vira `credited`
  * no primeiro pagamento que estende o período dele — por atualização
  * condicional, dentro da transação do pagamento, e é isso que a faz valer uma
@@ -2617,7 +2630,7 @@ const referralRewardsTable = (db) => (t) => {
 };
 
 /**
- * O saldo de créditos de um provedor (0105): uma linha por crédito, e
+ * O saldo de créditos de um provedor (0106): uma linha por crédito, e
  * `remaining_cents` é quanto dele ainda está livre (o reservado numa cobrança
  * em aberto já saiu daqui; volta se a reserva for solta). `source`:
  * `referral` (a recompensa de uma indicação) ou `manual` (o ajuste do console
@@ -2640,7 +2653,7 @@ const tenantCreditsTable = (db) => (t) => {
 };
 
 /**
- * Quanto de cada crédito foi para cada cobrança (0105): `reserved` na emissão,
+ * Quanto de cada crédito foi para cada cobrança (0106): `reserved` na emissão,
  * `consumed` quando ela é paga, `released` quando ela é cancelada, reemitida
  * ou estornada (o valor volta ao crédito). As transições são atualizações
  * condicionais sobre `status`, e é isso que as faz idempotentes.
@@ -2668,7 +2681,7 @@ const REFERRAL_TABLES = [
 ];
 
 /**
- * A retenção no cancelamento (0106): cada vez que o dono de um provedor pede
+ * A retenção no cancelamento (0107): cada vez que o dono de um provedor pede
  * para cancelar, uma linha — o motivo, o comentário, o que lhe foi oferecido
  * e o que ele decidiu. É a memória que segura o desconto de retenção a uma vez
  * por doze meses, e é o relatório de cancelamentos do console.
@@ -2696,7 +2709,7 @@ const cancellationRequestsTable = (db) => (t) => {
   // Os meses da pausa ou do desconto aceito, e a porcentagem do desconto.
   t.integer('months').unsigned();
   t.integer('discount_percent').unsigned();
-  // O ciclo da fatura que o desconto aceito cobre (0103): no anual, o
+  // O ciclo da fatura que o desconto aceito cobre (0104): no anual, o
   // desconto vira UMA fatura anual, e a carência conta doze meses dela.
   t.string('billing_cycle', 8);
   // A data do cancelamento agendado (o fim do período pago), quando foi o caso.
@@ -2720,7 +2733,7 @@ const CANCELLATION_REQUEST_LATE_COLUMNS = [
 ];
 
 /**
- * As colunas da 0106 na assinatura:
+ * As colunas da 0107 na assinatura:
  *
  *   cancel_at         o cancelamento agendado pelo próprio provedor — o fim do
  *                     período pago. Até lá tudo funciona; nenhuma fatura nova
@@ -2737,7 +2750,7 @@ const SUBSCRIPTION_RETENTION_COLUMNS = [
 ];
 
 /**
- * O cupom do sistema (0106): `retention` é o desconto de retenção, criado
+ * O cupom do sistema (0107): `retention` é o desconto de retenção, criado
  * pelo próprio painel. O provedor não o resgata digitando o código — só o
  * fluxo de cancelamento o aplica.
  */
@@ -5940,8 +5953,24 @@ export const migrations = [
     }
   },
   {
+    /** O webhook da Meta registrado pelo painel — ver `WA_ACCOUNT_META_WEBHOOK_COLUMNS`. */
+    id: '0103_wa_meta_webhook',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_WEBHOOK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const missing = await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_WEBHOOK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
     /** O ciclo de cobrança anual — ver `SUBSCRIPTION_BILLING_CYCLE_COLUMNS`. */
-    id: '0103_subscription_billing_cycle',
+    id: '0104_subscription_billing_cycle',
     async isApplied(db) {
       for (const [tabela, colunas] of [
         ['subscriptions', SUBSCRIPTION_BILLING_CYCLE_COLUMNS],
@@ -5978,7 +6007,7 @@ export const migrations = [
      * ver `PLAN_OVERAGE_COLUMNS`, `BILLING_CHARGE_PRICING_DETAIL_COLUMNS` e
      * `usagePeaksTable`.
      */
-    id: '0104_usage_overage',
+    id: '0105_usage_overage',
     async isApplied(db) {
       for (const [tabela, colunas] of [['plans', PLAN_OVERAGE_COLUMNS], ['billing_charges', BILLING_CHARGE_PRICING_DETAIL_COLUMNS]]) {
         // eslint-disable-next-line no-await-in-loop -- duas tabelas só
@@ -6020,7 +6049,7 @@ export const migrations = [
      * código à parte das colunas, como o do gateway (0047): a base que já tem
      * a coluna por outro caminho ainda ganha o índice.
      */
-    id: '0105_referrals_and_credits',
+    id: '0106_referrals_and_credits',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       if ((await missingColumns(db, 'tenants', TENANT_REFERRAL_COLUMNS)).length) return false;
@@ -6068,7 +6097,7 @@ export const migrations = [
      * A retenção no cancelamento — ver `cancellationRequestsTable`,
      * `SUBSCRIPTION_RETENTION_COLUMNS` e `COUPON_SYSTEM_COLUMNS`.
      */
-    id: '0106_cancellation_retention',
+    id: '0107_cancellation_retention',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       if (!(await db.schema.hasTable('cancellation_requests'))) return false;

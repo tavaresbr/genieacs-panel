@@ -2,7 +2,7 @@ import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 
 /**
  * O saldo de créditos de um provedor e o que dele foi para cada cobrança
- * (0105) — `tenant_credits` e `credit_allocations`, as duas escopadas.
+ * (0106) — `tenant_credits` e `credit_allocations`, as duas escopadas.
  *
  * Só por `tdb`/`tinsert`, como a cobrança: quem chama abre o escopo do
  * provedor antes, e é ele que garante que o crédito de um nunca abate a fatura

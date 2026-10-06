@@ -21,7 +21,7 @@ const { resolveTenant } = await import('../src/middleware/tenantResolver.js');
 const { default: platformBillingRoutes } = await import('../src/routes/platformBilling.js');
 
 /**
- * A indicação de provedores e os créditos (0105) — o dinheiro. O cadastro com
+ * A indicação de provedores e os créditos (0106) — o dinheiro. O cadastro com
  * `?ref=` está em `referrals-signup.test.js`, que precisa do SaaS.
  *
  * A montagem de `platform-coupons.test.js`: o roteador do console de verdade

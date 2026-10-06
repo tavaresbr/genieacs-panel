@@ -128,7 +128,7 @@ function readMarketing(body, target) {
 }
 
 /**
- * Os preços de excedente (0104) do corpo em `target` — `overagePriceCents:
+ * Os preços de excedente (0105) do corpo em `target` — `overagePriceCents:
  * { operators, subscribers, devices }`, cada um em centavos (inteiro ≥ 1) ou
  * nulo/vazio para "sem preço" (o teto barra). Ausente é "não mexer"; devolve
  * a mensagem de erro, ou `null`.
@@ -171,7 +171,7 @@ function presentPlan(plan) {
     code: plan.code,
     name: plan.name,
     limits: SubscriptionService.limitsOf(plan),
-    // O preço por unidade acima do teto (0104); nulo é "o teto barra".
+    // O preço por unidade acima do teto (0105); nulo é "o teto barra".
     overagePriceCents: SubscriptionService.overagePricesOf(plan),
     priceCents: Number(plan.price_cents ?? 0),
     currency: plan.currency,
@@ -434,7 +434,7 @@ class PlatformBillingController {
       if (Object.keys(patch).length === 0) {
         return res.status(400).json(createErrorResponse('Nothing to update'));
       }
-      // O preço anual é COBRADO (0103): tirá-lo de um plano com assinaturas
+      // O preço anual é COBRADO (0104): tirá-lo de um plano com assinaturas
       // no anual as faria voltar ao mensal em silêncio — preço e prazo de
       // outro ciclo do que foi contratado. Mudar o valor pode; apagar, não.
       if ('price_yearly_cents' in patch && !(Number(patch.price_yearly_cents) > 0)

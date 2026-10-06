@@ -541,6 +541,8 @@ export default {
   'whatsapp.error.notCloud': "Esta ação só existe para número da API oficial da Meta.",
   'whatsapp.error.cloudInstanceStillExists': "O servidor Evolution ainda tem a instância deste número; o token não foi trocado. Tente de novo em alguns segundos.",
   'whatsapp.metaTokenUpdated': "Token da Meta atualizado.",
+  'whatsapp.metaWebhook.registered': "Webhook registrado na Meta.",
+  'whatsapp.metaWebhook.failed': "A Meta recusou o registro do webhook: {reason}",
   'whatsapp.error.notSupportedCloud': "A consulta de números exige um número conectado por QR Code; a API oficial não a oferece.",
   'whatsapp.error.invalidCloudCallbackUrl': "A URL de callback da Meta é inválida",
   'whatsapp.error.noDestination': 'Este contato não tem telefone nem identificador do WhatsApp',

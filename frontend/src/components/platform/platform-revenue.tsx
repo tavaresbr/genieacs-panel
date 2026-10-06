@@ -216,7 +216,7 @@ export function PlatformRevenue() {
         <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
       )}
 
-      {/* Os pedidos de cancelamento (0106), desde o início do período da aba. */}
+      {/* Os pedidos de cancelamento (0107), desde o início do período da aba. */}
       <PlatformCancellations from={range.from} />
     </div>
   )

@@ -30,7 +30,7 @@ import {
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
 const PRUNE_INTERVAL_MS = 24 * 3600_000;
-/** De quanto em quanto tempo o pico de uso do período é medido (0104). */
+/** De quanto em quanto tempo o pico de uso do período é medido (0105). */
 const USAGE_PEAK_INTERVAL_MS = 10 * 60_000;
 /**
  * O prazo da trilha, e por que ele deixou de ser uma constante.
@@ -273,7 +273,7 @@ class SchedulerService {
     // emissão pergunta pelo plano, e a pergunta tem de ver o plano de agora.
     // As ONTs só são contadas se o plano novo as limita — e só quando há uma
     // descida vencida, que é quase nunca.
-    // A retenção no cancelamento (0106), antes de tudo que cobra: o
+    // A retenção no cancelamento (0107), antes de tudo que cobra: o
     // cancelamento agendado cuja data chegou, e a pausa que acabou — esta
     // devolve a cobrança, e a emissão logo abaixo abre a fatura na mesma volta.
     summary.cancellation = await CancellationService.processDue({ tenant }).catch((error) => {
@@ -305,7 +305,7 @@ class SchedulerService {
       return { error: error.message };
     });
 
-    // O pico de uso do período corrente (0104), ANTES da emissão: é ele que a
+    // O pico de uso do período corrente (0105), ANTES da emissão: é ele que a
     // cobrança da renovação lê para somar o excedente. A cada
     // `USAGE_PEAK_INTERVAL_MS`, e não a cada minuto — um pico que dure menos
     // que isso não muda a conta de um mês, e a contagem de ONTs vai ao ACS.
@@ -330,7 +330,7 @@ class SchedulerService {
         console.warn(`Could not issue the subscription charge: ${error.message}`);
         return { issued: false, reason: 'error' };
       });
-    // O excedente mensal de quem é ANUAL (0104 + 0103): a fatura de só
+    // O excedente mensal de quem é ANUAL (0105 + 0104): a fatura de só
     // excedente das fatias mensais que já terminaram. Antes da retentativa
     // das avulsas, que leva ao gateway a que falhar aqui.
     summary.overageSlices = await ChargeIssuingService.issueOverageSlices({ tenant })

@@ -155,15 +155,15 @@ export const SCOPED_TABLES = new Set([
   // mesmo cupom de valer duas vezes para ele. O cupom é do catálogo (`coupons`,
   // compartilhada); o resgate é do provedor, e some junto com ele.
   'coupon_redemptions',
-  // O pico de uso de cada período (0104), que a cobrança por excedente lê:
+  // O pico de uso de cada período (0105), que a cobrança por excedente lê:
   // contagens do provedor, sem assinante nenhum.
   'usage_peaks',
-  // O saldo de créditos do provedor (0105) e o que dele foi para cada uma das
+  // O saldo de créditos do provedor (0106) e o que dele foi para cada uma das
   // suas cobranças. Dinheiro de UM provedor: o crédito de um nunca abate a
   // fatura do outro.
   'tenant_credits',
   'credit_allocations',
-  // Os pedidos de cancelamento do provedor (0106): o motivo que ele deu e o
+  // Os pedidos de cancelamento do provedor (0107): o motivo que ele deu e o
   // que aceitou. Do provedor, como a assinatura de que falam.
   'cancellation_requests'
 ]);
@@ -226,7 +226,7 @@ export const SHARED_TABLES = new Set([
   // Os cupons de desconto. Do catálogo comercial, como `plans`: o provedor
   // resgata um cupom da plataforma, e só o console escreve nesta tabela.
   'coupons',
-  // As indicações (0105): cada linha fala de DOIS provedores — quem indicou e
+  // As indicações (0106): cada linha fala de DOIS provedores — quem indicou e
   // quem foi indicado —, e cada lado a lê pelo próprio id, sempre nomeado
   // (`ReferralReward`). O crédito que ela gera mora em `tenant_credits`, essa
   // sim escopada.

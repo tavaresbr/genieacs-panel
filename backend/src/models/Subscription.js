@@ -61,7 +61,7 @@ class Subscription {
 
   /**
    * Quantas assinaturas estão (ou vão estar, pela troca agendada) no ciclo
-   * ANUAL deste plano (0103). É a pergunta do console antes de tirar o preço
+   * ANUAL deste plano (0104). É a pergunta do console antes de tirar o preço
    * anual de um plano: sem ele, essas assinaturas voltariam ao mensal em
    * silêncio.
    */
@@ -114,7 +114,7 @@ class Subscription {
       .where({ tenant_id: tenantId, pending_plan_id: pendingPlanId })
       .update({
         plan_id: pendingPlanId,
-        // O ciclo agendado junto (0103), quando há um; nulo é "o mesmo".
+        // O ciclo agendado junto (0104), quando há um; nulo é "o mesmo".
         billing_cycle: db.raw('COALESCE(pending_billing_cycle, billing_cycle)'),
         pending_plan_id: null,
         pending_plan_at: null,
@@ -288,7 +288,7 @@ class Subscription {
   }
 
   /**
-   * Uma mudança da retenção no cancelamento (0106) — a pausa, o cancelamento
+   * Uma mudança da retenção no cancelamento (0107) — a pausa, o cancelamento
    * agendado, o desfazer, e o que o agendador cumpre na data — só se a linha
    * ainda está como se leu: `condicao` recebe a consulta já filtrada pelo
    * provedor e acrescenta o resto (o estado, a coluna ainda nula ou ainda

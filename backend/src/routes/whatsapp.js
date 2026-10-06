@@ -48,6 +48,9 @@ router.post('/accounts/:id/templates/sync', authenticateToken, requirePermission
 // Token da Meta vencido ou revogado: a instância é recriada no servidor com o
 // mesmo nome e o mesmo webhook, só com o token novo.
 router.post('/accounts/:id/meta-token', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMetaToken);
+// O webhook da conta WABA, registrado de novo na Meta pelo painel. Mesma
+// permissão da troca de token: mexe na configuração do número na Meta.
+router.post('/accounts/:id/meta-webhook', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.registerMetaWebhook);
 // Criar pede a mesma permissão da sincronização: o modelo vai para a conta
 // WABA do número (custo por categoria, nota de qualidade, revisão da Meta) —
 // é configuração do número, não campanha.

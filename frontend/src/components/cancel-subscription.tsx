@@ -17,7 +17,7 @@ import { displayDate } from '@/lib/date-format'
 import { formatMoney } from '@/lib/money'
 
 /**
- * "Cancelar assinatura" na tela de Plano (0106): o motivo, depois as ofertas
+ * "Cancelar assinatura" na tela de Plano (0107): o motivo, depois as ofertas
  * de retenção — desconto ou pausa — e, recusando, o cancelamento no fim do
  * período pago. Com o cancelamento agendado, a nota e o "Desfazer"; com a
  * pausa, até quando.

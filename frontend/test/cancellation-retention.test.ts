@@ -7,7 +7,7 @@ import { CANCELLATION_REASON_KEYS } from '@/components/cancel-subscription'
 import en from '@/lib/i18n/locales/en'
 
 /**
- * A retenção no cancelamento (0106) do lado da tela: com o cancelamento
+ * A retenção no cancelamento (0107) do lado da tela: com o cancelamento
  * agendado ou a pausa, os botões que o servidor recusaria somem — e a pausa
  * oferece "gerar cobrança e pagar", que é o jeito de voltar antes.
  */

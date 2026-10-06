@@ -3,7 +3,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { parseAmountToCents } from '@/lib/utils'
 
 /**
- * A indicação de provedores na tela (0105): o link, o selo de cada indicado e
+ * A indicação de provedores na tela (0106): o link, o selo de cada indicado e
  * o valor digitado no ajuste do console e na configuração do programa.
  *
  * Quem decide o dinheiro é o servidor — a recompensa, o abatimento na fatura

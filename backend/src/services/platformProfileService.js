@@ -46,14 +46,14 @@ export const PROFILE_FIELDS = Object.freeze(Object.keys(ENV_FALLBACK));
  *   autoSuspendWarnDays  quantos dias antes da suspensão sai o aviso. Zero
  *                        desliga só o aviso; menor que `autoSuspendDays`.
  *   referralRewardCents  o crédito, em centavos, que quem indicou ganha
- *                        quando o indicado paga o primeiro período (0105).
+ *                        quando o indicado paga o primeiro período (0106).
  *                        Zero desliga o programa de indicação.
  */
 export const BILLING_POLICY_FIELDS = Object.freeze({
   autoSuspendDays: { default: 15, min: 0, max: 90 },
   autoSuspendWarnDays: { default: 3, min: 0, max: 30 },
   referralRewardCents: { default: 0, min: 0, max: 1_000_000 },
-  // A retenção no cancelamento (0106): o desconto oferecido a quem pede para
+  // A retenção no cancelamento (0107): o desconto oferecido a quem pede para
   // cancelar (porcentagem e por quantas faturas) e o máximo de meses de
   // pausa. Zero desliga a oferta correspondente.
   retentionDiscountPercent: { default: 20, min: 0, max: 90 },
@@ -154,7 +154,7 @@ export async function autoSuspendConfig() {
 }
 
 /**
- * O crédito da indicação como o pagamento o lê (0105): centavos, zero quando
+ * O crédito da indicação como o pagamento o lê (0106): centavos, zero quando
  * desligado. Nunca lança — sem caixa da plataforma, ou com o banco fora, vale
  * o padrão (desligado). Sem o cache de quinze segundos: é dinheiro, e o
  * console que acabou de mudar o valor espera que o próximo pagamento o use.

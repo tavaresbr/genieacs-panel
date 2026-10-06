@@ -90,7 +90,7 @@ export function exemptUntilLabel(
 }
 
 /**
- * Os selos da retenção no cancelamento (0106): "Cancela em dd/mm" (o
+ * Os selos da retenção no cancelamento (0107): "Cancela em dd/mm" (o
  * cancelamento agendado pelo próprio provedor) e "Pausada até dd/mm". Nada
  * quando não há nenhum dos dois.
  */
@@ -109,7 +109,7 @@ export function RetentionBadges({ subscription }: {
 }
 
 /**
- * O console desfaz o cancelamento agendado de um provedor (0106): a cobrança
+ * O console desfaz o cancelamento agendado de um provedor (0107): a cobrança
  * volta normalmente, e a fatura que o agendamento cancelou é reaberta.
  */
 export function RevertCancellationButton({ tenantId, cancelAt, onChanged }: {
@@ -784,7 +784,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
         </div>
       )}
 
-      {/* A indicação e os créditos do provedor (0105), com o ajuste manual. */}
+      {/* A indicação e os créditos do provedor (0106), com o ajuste manual. */}
       <TenantReferrals tenantId={tenantId} />
 
       {/* Extrato */}

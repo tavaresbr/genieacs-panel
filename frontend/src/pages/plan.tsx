@@ -107,7 +107,7 @@ export default function PlanPage() {
   const [cupom, setCupom] = useState('')
   const [aplicandoCupom, setAplicandoCupom] = useState(false)
   const [cupomErro, setCupomErro] = useState<string | null>(null)
-  // O seletor Mensal/Anual (0103): nulo é "o ciclo de agora da assinatura".
+  // O seletor Mensal/Anual (0104): nulo é "o ciclo de agora da assinatura".
   const [cicloEscolhido, setCicloEscolhido] = useState<BillingCycle | null>(null)
   const cadastroRef = useRef<HTMLDivElement>(null)
 
@@ -203,7 +203,7 @@ export default function PlanPage() {
     const vars = { name: plan.name, price: preco, date: formatDate(data?.subscription?.renewsAt) ?? '' }
     // A pró-rata, ANTES do clique que a cobra: "você vai pagar R$ X agora".
     const prorata = tipo === 'upgrade' ? prorationLine(plan) : null
-    // O cupom de N faturas que a troca para o anual tira (0103), dito ANTES do clique.
+    // O cupom de N faturas que a troca para o anual tira (0104), dito ANTES do clique.
     const cupomSai = couponDroppedOnAnnual(data?.subscription?.coupon, currentCycle(data?.subscription), ciclo)
       ? t('plan.cycle.couponDropped', { code: data?.subscription?.coupon?.code ?? '' })
       : null
@@ -290,7 +290,7 @@ export default function PlanPage() {
   }, [load])
 
   const subscription = data?.subscription ?? null
-  // O ciclo de agora e o que o seletor mostra (0103).
+  // O ciclo de agora e o que o seletor mostra (0104).
   const cicloAtual = currentCycle(subscription)
   const cicloVisto: BillingCycle = cicloEscolhido ?? cicloAtual
   const rotuloCiclo = (ciclo: BillingCycle) => t(ciclo === 'annual' ? 'plan.cycle.annual' : 'plan.cycle.monthly')
@@ -344,7 +344,7 @@ export default function PlanPage() {
               <h2 className="section-heading">{t('platform.subscription.plan')}</h2>
               <p className="mt-1 wrap-break-word text-2xl font-semibold text-foreground">{subscription.plan?.name ?? '—'}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                {/* Pausada (0106) não é atraso: o selo dela, logo abaixo, diz até quando. */}
+                {/* Pausada (0107) não é atraso: o selo dela, logo abaixo, diz até quando. */}
                 {subscription.reason !== 'paused' && (
                   <span className={badgeClass(subscription.status)}>
                     {t(STATUS_KEYS[subscription.status] ?? 'platform.subscription.suspended')}
@@ -359,7 +359,7 @@ export default function PlanPage() {
                 {!isento && subscription.reason === 'proration_overdue' && (
                   <span className="text-muted-foreground">{t('platform.subscription.prorationOverdueNote')}</span>
                 )}
-                {/* A retenção no cancelamento (0106). */}
+                {/* A retenção no cancelamento (0107). */}
                 {subscription.cancelAt && (
                   <span className="modern-badge-warning">
                     {t('platform.subs.cancelsOn', { date: displayDayMonth(subscription.cancelAt) ?? '—' })}
@@ -500,7 +500,7 @@ export default function PlanPage() {
                 })}
               </ul>
               {/* O aviso de bloqueio só para o recurso SEM preço de excedente: o
-                  com preço não bloqueia (0104), e o que ele custa vem logo abaixo. */}
+                  com preço não bloqueia (0105), e o que ele custa vem logo abaixo. */}
               {blockingOver(data!.over, data!.overage?.prices).length > 0 && (
                 <p className="mt-4 text-sm text-destructive">{t('plan.overHint')}</p>
               )}
@@ -601,7 +601,7 @@ export default function PlanPage() {
                 <h2 className="section-heading">{t('plan.options.title')}</h2>
                 <p className="section-description">{t('plan.options.description')}</p>
               </div>
-              {/* Mensal ou Anual (0103): o preço que os cartões mostram e o
+              {/* Mensal ou Anual (0104): o preço que os cartões mostram e o
                   ciclo que a troca pede. Só quando algum plano tem o anual. */}
               {algumAnual && (
                 <div role="radiogroup" aria-label={t('plan.cycle.label')} className="flex shrink-0 flex-wrap items-center gap-2">
@@ -725,7 +725,7 @@ export default function PlanPage() {
           <TenantCharges refreshKey={chargesKey} />
         </div>
 
-        {/* A indicação de provedores (0105): o link, o saldo de créditos e os
+        {/* A indicação de provedores (0106): o link, o saldo de créditos e os
             indicados. Depois das cobranças, porque o crédito é abatido nelas. */}
         <div className="mt-6">
           <ReferralCard />
@@ -746,7 +746,7 @@ export default function PlanPage() {
         )}
 
         {/* O cancelamento, por último: o motivo, as ofertas de retenção e o
-            agendamento (0106). Só o dono o vê — o bloco se esconde sozinho. */}
+            agendamento (0107). Só o dono o vê — o bloco se esconde sozinho. */}
         {!loading && subscription && !isento && (
           <CancelSubscription
             subscription={subscription}

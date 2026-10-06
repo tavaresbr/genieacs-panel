@@ -4,7 +4,7 @@ import { tdb, tinsert, isUniqueViolation } from '../config/database.js';
 export const USAGE_RESOURCES = Object.freeze(['operators', 'subscribers', 'devices']);
 
 /**
- * O maior uso de cada recurso em cada período (0104), que a cobrança por
+ * O maior uso de cada recurso em cada período (0105), que a cobrança por
  * excedente lê na renovação.
  *
  * Só por `tdb`/`tinsert`: quem chama abre o escopo do provedor antes, como em
@@ -54,7 +54,7 @@ class UsagePeak {
   }
 
   /**
-   * A fotografia do plano em vigor (0104): o teto e o preço por unidade de
+   * A fotografia do plano em vigor (0105): o teto e o preço por unidade de
    * agora, com o uso de agora. Fica a fotografia que DEVE MAIS — o máximo,
    * ao longo do período, de `(uso − teto) × preço` medido com o plano de cada
    * instante. Subir de plano (teto maior) antes da fatura não troca uma

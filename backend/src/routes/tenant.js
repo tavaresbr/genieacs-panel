@@ -41,7 +41,7 @@ router.get('/charges', authenticateToken, requirePermission('settings.read'), Te
 // escolhe o plano, e quem está em `past_due` é quem mais precisa dela.
 router.get('/plans', authenticateToken, requirePermission('settings.read'), TenantController.listPlans);
 
-// A indicação de provedores (0105): o link de indicação, os indicados e o
+// A indicação de provedores (0106): o link de indicação, os indicados e o
 // saldo de créditos. Na tela de Plano, com a mesma capacidade dela.
 router.get('/referrals', authenticateToken, requirePermission('settings.read'), TenantController.getReferrals);
 
@@ -63,7 +63,7 @@ router.post('/subscription/coupon', authenticateToken, requirePermission('settin
 // o cartão recusado por Pix/boleto. O cartão em si nunca passa por aqui.
 router.put('/subscription/autopay', authenticateToken, requirePermission('settings.write'), TenantController.setCardAutopay);
 router.delete('/subscription/card', authenticateToken, requirePermission('settings.write'), TenantController.removeCard);
-// A retenção no cancelamento (0106): o motivo, as ofertas (desconto ou
+// A retenção no cancelamento (0107): o motivo, as ofertas (desconto ou
 // pausa), o cancelamento no fim do período e o desfazer. `settings.write` na
 // rota e o papel de DONO no controlador — cancelar a empresa não é decisão de
 // um admin contratado. Fora da porta da assinatura: quem está atrasado

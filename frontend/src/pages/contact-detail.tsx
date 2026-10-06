@@ -278,7 +278,7 @@ export default function ContactDetailPage() {
           </Card>
 
           <Card title={t('contacts.profile.notes')}>
-            <p className="whitespace-pre-wrap wrap-break-word text-sm wrap-anywhere">{profile.notes || <span className="text-muted-foreground">—</span>}</p>
+            <p className="whitespace-pre-wrap text-sm wrap-anywhere">{profile.notes || <span className="text-muted-foreground">—</span>}</p>
           </Card>
         </div>
 
@@ -312,7 +312,7 @@ export default function ContactDetailPage() {
                         <td>{day(contract.createdAt)}</td>
                         <td>
                           {contract.deviceId
-                            ? <Link className="text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
+                            ? <Link className="text-primary hover:underline wrap-anywhere" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
                             : <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>}
                         </td>
                       </tr>
@@ -377,7 +377,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="border-b border-border pb-3">
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-1 wrap-break-word text-sm wrap-anywhere">{children || <span className="text-muted-foreground">—</span>}</dd>
+      <dd className="mt-1 text-sm wrap-anywhere">{children || <span className="text-muted-foreground">—</span>}</dd>
     </div>
   )
 }

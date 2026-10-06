@@ -19,7 +19,7 @@ import { getDb, isUniqueViolation } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
 
 /**
- * A retenção no cancelamento (0106): o dono de um provedor pede para cancelar,
+ * A retenção no cancelamento (0107): o dono de um provedor pede para cancelar,
  * diz o motivo, e o painel oferece — antes de cancelar — um desconto ou uma
  * pausa.
  *
@@ -272,7 +272,7 @@ async function proximaFatura(subscription, plan) {
 
 /**
  * Quantos ciclos o desconto de retenção cobre nesta assinatura: os
- * `discountMonths` da configuração no mensal; UM no anual (0103). O cupom
+ * `discountMonths` da configuração no mensal; UM no anual (0104). O cupom
  * `repeating` conta ciclos pagos, e no anual cada ciclo é um ano — "20% por 3
  * meses" lá seriam três faturas anuais, três anos de desconto. Um ciclo anual
  * já cobre doze meses, o maior desconto em tempo que a configuração permite
@@ -310,7 +310,7 @@ class CancellationService {
    */
   static async offersFor(subscription, plan, coupon, { now = new Date(), config = null } = {}) {
     const politica = config ?? await retentionConfig();
-    // O preço do CICLO (0103): no anual, o da fatura anual.
+    // O preço do CICLO (0104): no anual, o da fatura anual.
     const preco = SubscriptionService.cyclePriceCents(subscription, plan);
     const vivo = Boolean(subscription && ESTADOS_VIVOS.has(subscription.status)
       && !subscription.billing_exempt_at && preco > 0 && !isCancelScheduled(subscription));
@@ -322,7 +322,7 @@ class CancellationService {
     const anual = billingCycle === 'annual';
     const percentDaConfig = politica.discountPercent;
     // `months` é quantas FATURAS o desconto cobre (o cupom `repeating` conta
-    // ciclos pagos). No ciclo anual (0103) cada ciclo é um ano: lá o desconto
+    // ciclos pagos). No ciclo anual (0104) cada ciclo é um ano: lá o desconto
     // vira UMA fatura anual com o equivalente — `percent × meses ÷ 12`.
     const months = retentionCyclesFor(proxima.view, proxima.plan, politica.discountMonths);
     let percent = percentDaConfig;
@@ -617,7 +617,7 @@ class CancellationService {
       await CancellationRequest.decide(aberto.id, {
         offer: 'none', outcome: CANCELLATION_OUTCOMES.CANCELED, cancel_at: aoSegundo(now), decided_at: aoSegundo(now)
       });
-      // O excedente do período que fecha (0104), numa fatura final de só
+      // O excedente do período que fecha (0105), numa fatura final de só
       // excedente — as de renovação acabaram de ser canceladas.
       await ChargeIssuingService.issueFinalOverage({ subscription, now });
       return {
@@ -786,7 +786,7 @@ class CancellationService {
     } catch (error) {
       console.warn(`Could not cancel the open renewal charges of provider ${tenantId} after its cancellation: ${error.message}`);
     }
-    // O excedente do período que fecha com o cancelamento (0104): a
+    // O excedente do período que fecha com o cancelamento (0105): a
     // renovação não sai para quem cancela, então ele vai numa fatura final
     // de só excedente. Melhor esforço.
     const excedenteFinal = await ChargeIssuingService.issueFinalOverage({ subscription, now });
@@ -852,7 +852,7 @@ class CancellationService {
   }
 
   /**
-   * O excedente (0104) do período pago ANTES da pausa, levado para a chave do
+   * O excedente (0105) do período pago ANTES da pausa, levado para a chave do
    * período que a volta da pausa fecha. A fatura daquele período (que trazia
    * o excedente) foi cancelada pela pausa, e a da volta sai pela chave nova
    * (`renews_at = paused_until`): sem isto o excedente do período usado
@@ -870,7 +870,7 @@ class CancellationService {
       const linhas = await UsagePeak.rowsForPeriod(de);
       for (const [recurso, linha] of Object.entries(linhas)) {
         if (!linha) continue;
-        // A fotografia do plano vai junto (0104): a cobrança da volta lê o
+        // A fotografia do plano vai junto (0105): a cobrança da volta lê o
         // teto e o preço de quando o excedente foi medido.
         const foto = linha.unitCents !== null && linha.limit !== null
           ? { limit: linha.limit, unitCents: linha.unitCents } : null;

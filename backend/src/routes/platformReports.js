@@ -16,7 +16,7 @@ const guard = [authenticateToken, requirePlatformAdmin];
 
 router.get('/reports/revenue.csv', ...guard, PlatformReportsController.revenueCsv);
 router.get('/reports/revenue', ...guard, PlatformReportsController.revenue);
-// Os pedidos de cancelamento (0106): motivos, ofertas aceitas e retenção.
+// Os pedidos de cancelamento (0107): motivos, ofertas aceitas e retenção.
 router.get('/reports/cancellations', ...guard, CancellationController.report);
 
 export default router;

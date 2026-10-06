@@ -32,7 +32,7 @@ export default function Signup() {
   const { tenant, name: hostName, isPlatformHost } = useTenant()
   const base = tenant?.panelBaseDomain ?? null
   const [params] = useSearchParams()
-  // O código do link de indicação (0105). O servidor ignora o inválido e a
+  // O código do link de indicação (0106). O servidor ignora o inválido e a
   // indicação de si mesmo; aqui só se lê e se mostra.
   const referralCode = referralCodeFromQuery(params.get('ref'))
   const [form, setForm] = useState({
@@ -155,7 +155,7 @@ export default function Signup() {
             <p className="text-sm text-muted-foreground">{t('signup.unavailable')}</p>
           ) : done ? (
             <div className="space-y-4">
-              <p className="page-kicker">{t('signup.doneKicker')}</p>
+              <p className="page-kicker mb-4">{t('signup.doneKicker')}</p>
               <h1 className="text-2xl font-bold text-foreground">{t('signup.doneTitle', { name: done.tenant.name })}</h1>
               <p className="text-sm leading-6 text-muted-foreground">{t('signup.doneText')}</p>
               {/* A prova do endereço saiu agora, e a pessoa precisa saber que

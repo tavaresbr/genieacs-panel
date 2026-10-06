@@ -6,7 +6,7 @@ import { referralRewardCents } from './platformProfileService.js';
 import { panelBaseDomain, platformExtraHosts } from '../middleware/tenantResolver.js';
 
 /**
- * A indicação de provedores (0105).
+ * A indicação de provedores (0106).
  *
  * Um provedor tem um código curto (`tenants.referral_code`, gerado na primeira
  * vez que alguém abre a tela de Plano) e um link `…/signup?ref=CÓDIGO`. Quem se

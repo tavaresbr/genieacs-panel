@@ -1507,7 +1507,7 @@ export interface PlanLimits {
 }
 
 /**
- * O preço, em centavos, de cada unidade acima do teto (0104). Nulo é "sem
+ * O preço, em centavos, de cada unidade acima do teto (0105). Nulo é "sem
  * preço": o teto barra, como sempre. Com preço, quem passa paga as unidades a
  * mais na fatura da renovação.
  */
@@ -1561,7 +1561,7 @@ export interface Plan {
   code: string
   name: string
   limits: PlanLimits
-  /** Preço por unidade acima do teto (0104). Opcional: servidores antigos não mandam. */
+  /** Preço por unidade acima do teto (0105). Opcional: servidores antigos não mandam. */
   overagePriceCents?: PlanOveragePrices
   priceCents: number
   currency: string
@@ -1626,7 +1626,7 @@ export interface PlatformProfile {
   updatedAt: string | null
 }
 
-/** O crédito da indicação de provedores, em centavos (0105); 0 desliga o programa. */
+/** O crédito da indicação de provedores, em centavos (0106); 0 desliga o programa. */
 export interface PlatformReferralPolicy {
   referralRewardCents?: number
 }
@@ -1635,7 +1635,7 @@ export interface PlatformReferralPolicy {
 export interface PlatformBillingPolicy {
   autoSuspendDays: number
   autoSuspendWarnDays: number
-  /** A retenção no cancelamento (0106): o desconto (% e faturas) e o máximo de meses de pausa. 0 desliga. */
+  /** A retenção no cancelamento (0107): o desconto (% e faturas) e o máximo de meses de pausa. 0 desliga. */
   retentionDiscountPercent: number
   retentionDiscountMonths: number
   retentionPauseMaxMonths: number
@@ -1754,7 +1754,7 @@ export interface SubscriptionView {
   trialEndsAt: string | null
   renewsAt: string | null
   canceledAt: string | null
-  /** O ciclo de cobrança de agora (0103). Opcional: servidores antigos não mandam. */
+  /** O ciclo de cobrança de agora (0104). Opcional: servidores antigos não mandam. */
   billingCycle?: BillingCycle
   /**
    * A descida de plano agendada para a renovação. Só existe com a assinatura
@@ -1777,7 +1777,7 @@ export interface SubscriptionView {
   /** O cartão recorrente. Opcional: servidores antigos não mandam. */
   card?: SubscriptionCard | null
   /**
-   * A retenção no cancelamento (0106): o cancelamento agendado pelo próprio
+   * A retenção no cancelamento (0107): o cancelamento agendado pelo próprio
    * provedor (o fim do período pago) e a pausa — de `renewsAt` até
    * `pausedUntil`, sem cobrança. Opcionais: servidores antigos não mandam.
    */
@@ -1808,7 +1808,7 @@ export interface SubscriptionCard {
  * uso atual passa de um teto do plano novo: enquanto passar, a troca não se
  * aplica.
  */
-/** O ciclo de cobrança (0103): mensal (`price_cents` por `period_days`) ou anual (`price_yearly_cents` por 365 dias). */
+/** O ciclo de cobrança (0104): mensal (`price_cents` por `period_days`) ou anual (`price_yearly_cents` por 365 dias). */
 export type BillingCycle = 'monthly' | 'annual'
 
 export interface PendingPlan {
@@ -1816,7 +1816,7 @@ export interface PendingPlan {
   name: string
   /** O preço do ciclo agendado — o do ano, quando a troca é para o anual. */
   priceCents: number
-  /** O ciclo agendado (0103). Opcional: servidores antigos não mandam. */
+  /** O ciclo agendado (0104). Opcional: servidores antigos não mandam. */
   billingCycle?: BillingCycle
   /** ISO 8601. */
   effectiveAt: string
@@ -1842,7 +1842,7 @@ export interface SubscriptionUsage {
   /** Os tetos de retenção do plano. Todos nulos na self-hosted. */
   retention?: RetentionCaps
   over: { operators: boolean; subscribers: boolean; devices: boolean }
-  /** O excedente do período (0104) — nulo sem preço de excedente no plano. Opcional: servidores antigos não mandam. */
+  /** O excedente do período (0105) — nulo sem preço de excedente no plano. Opcional: servidores antigos não mandam. */
   overage?: SubscriptionOverage | null
 }
 
@@ -1860,7 +1860,7 @@ export interface TenantPlanOption {
   currency: string
   periodDays: number
   /**
-   * O ciclo anual (0103): o preço por 365 dias, se o plano o oferece, e a
+   * O ciclo anual (0104): o preço por 365 dias, se o plano o oferece, e a
    * economia sobre doze meses (inteira, para baixo). Opcionais: servidores
    * antigos não mandam.
    */
@@ -1868,7 +1868,7 @@ export interface TenantPlanOption {
   annualAvailable?: boolean
   annualSavingsPercent?: number | null
   limits: PlanLimits
-  /** Preço por unidade acima do teto (0104). Opcional: servidores antigos não mandam. */
+  /** Preço por unidade acima do teto (0105). Opcional: servidores antigos não mandam. */
   overagePriceCents?: PlanOveragePrices
   current: boolean
   /**
@@ -1934,7 +1934,7 @@ export interface TenantChargeView {
   /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
   kind?: ChargeKind
   proration?: ChargeProrationDetail | null
-  /** A conta do valor: plano e excedente (0104). Opcional: servidores antigos não mandam. */
+  /** A conta do valor: plano e excedente (0105). Opcional: servidores antigos não mandam. */
   pricing?: ChargePricing | null
   /** O crédito (indicação, ajuste) abatido nela, em centavos. Opcional: servidores antigos não mandam. */
   creditCents?: number
@@ -1949,7 +1949,7 @@ export interface ChargeConsoleView {
   id: number
   periodEnd: string
   amountCents: number
-  /** O crédito abatido nela (0105). Opcional: servidores antigos não mandam. */
+  /** O crédito abatido nela (0106). Opcional: servidores antigos não mandam. */
   creditCents?: number
   currency: string
   status: TenantChargeView['status']
@@ -1969,7 +1969,7 @@ export interface ChargeConsoleView {
   /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
   kind?: ChargeKind
   proration?: ChargeProrationDetail | null
-  /** A conta do valor: plano e excedente (0104). Opcional: servidores antigos não mandam. */
+  /** A conta do valor: plano e excedente (0105). Opcional: servidores antigos não mandam. */
   pricing?: ChargePricing | null
 }
 
@@ -1984,7 +1984,7 @@ export interface SubscriptionConsoleSubscription {
   planName: string | null
   /** O preço de UM ciclo — o do ano, no anual. */
   priceCents: number | null
-  /** O ciclo de cobrança (0103). Opcional: servidores antigos não mandam. */
+  /** O ciclo de cobrança (0104). Opcional: servidores antigos não mandam. */
   billingCycle?: BillingCycle
   currency: string | null
   trialEndsAt: string | null
@@ -2006,7 +2006,7 @@ export interface SubscriptionConsoleSubscription {
   coupon?: SubscriptionCoupon | null
   /** O cartão recorrente. Opcional: servidores antigos não mandam. */
   card?: SubscriptionCard | null
-  /** Os selos "Cancela em" e "Pausada até" (0106). Opcionais: servidores antigos não mandam. */
+  /** Os selos "Cancela em" e "Pausada até" (0107). Opcionais: servidores antigos não mandam. */
   cancelAt?: string | null
   pausedUntil?: string | null
 }
@@ -2704,7 +2704,7 @@ export const subscriptionAPI = {
     apiClient.delete<SubscriptionUsage>('/tenant/subscription/card'),
 
   /**
-   * A retenção no cancelamento (0106) — só o dono (403 `owner_only` para os
+   * A retenção no cancelamento (0107) — só o dono (403 `owner_only` para os
    * outros). `cancellation()` lê os motivos e as ofertas;
    * `requestCancellation` grava o motivo e devolve as ofertas;
    * `acceptRetention` aceita o desconto ou a pausa; `confirmCancellation`
@@ -2729,7 +2729,7 @@ export const subscriptionAPI = {
     apiClient.delete<{ reverted: boolean; subscription: SubscriptionView }>('/tenant/subscription/cancellation')
 }
 
-/** Os motivos de cancelamento, na ordem da tela (0106). */
+/** Os motivos de cancelamento, na ordem da tela (0107). */
 export const CANCELLATION_REASONS = [
   'too_expensive', 'not_using', 'missing_features', 'switching_provider',
   'technical_issues', 'business_closed', 'temporary', 'other'
@@ -2742,7 +2742,7 @@ export interface CancellationOffers {
     available: boolean
     reason: 'disabled' | 'not_eligible' | 'used_recently' | 'better_coupon' | null
     percent: number
-    /** Quantas faturas o desconto cobre: no ciclo anual (0103), uma — a anual seguinte. */
+    /** Quantas faturas o desconto cobre: no ciclo anual (0104), uma — a anual seguinte. */
     months: number
     billingCycle?: BillingCycle
     priceCents: number
@@ -2771,7 +2771,7 @@ export interface CancellationRequestView {
   outcome: 'retained_discount' | 'retained_pause' | 'canceled' | 'reverted' | null
   months: number | null
   discountPercent: number | null
-  /** O ciclo da fatura que o desconto aceito cobre (0103). */
+  /** O ciclo da fatura que o desconto aceito cobre (0104). */
   billingCycle?: BillingCycle | null
   cancelAt: string | null
   createdAt: string | null
@@ -4196,7 +4196,11 @@ export interface WhatsAppConfig {
   managedAdminKeyConfigured: boolean
   /** Para onde a Meta chama (API oficial) e o token que ela confere. */
   cloudCallbackUrl?: string
-  cloudWebhook?: { callbackUrl: string; verifyToken: string }
+  /**
+   * `auto`: a SaaS, onde o painel registra o webhook na conta WABA sozinho e o
+   * token de verificação do servidor NÃO vem. No self-host vêm a URL e o token.
+   */
+  cloudWebhook?: { auto?: boolean; callbackUrl?: string; verifyToken?: string }
   /**
    * Se o servidor (endereço, chave, hosts, webhook) é o da plataforma. Na SaaS
    * é, para todo provedor: a tela esconde esses campos e mostra só o uso.
@@ -4228,6 +4232,10 @@ export interface WhatsAppAccount {
   metaWabaId?: string | null
   metaTemplatesSyncedAt?: string | null
   metaTemplatesError?: string | null
+  /** O último registro do webhook na Meta pelo painel; nulo é "ainda não tentado". */
+  metaWebhookStatus?: 'ok' | 'error' | null
+  metaWebhookError?: string | null
+  metaWebhookAt?: string | null
   baseUrl: string
   status: WhatsAppStatus
   /**
@@ -4859,6 +4867,8 @@ export interface WhatsAppConversation {
   assignedTo?: string | null
   /** Desde quando espera um atendente (a fila da distribuição); null fora dela. */
   waitingSince?: string | null
+  /** O cliente falou por último e ninguém respondeu: desde a primeira mensagem sem resposta. */
+  awaitingSince?: string | null
   /** As etiquetas da conversa, em ordem de nome. */
   tags?: WhatsAppTag[]
   createdAt: string | null
@@ -5347,6 +5357,10 @@ export const whatsappAPI = {
       metaToken,
       ...(adminKey ? { adminKey } : {})
     }),
+
+  /** Registra de novo o webhook da conta WABA na Meta, pelo servidor do painel. */
+  registerMetaWebhook: (id: number) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-webhook`, {}),
 
   /** Sai PENDING: a Meta revisa, e só a sincronização depois da aprovação o libera. */
   createMetaTemplate: (accountId: number, payload: MetaTemplateCreatePayload) =>
@@ -5943,7 +5957,7 @@ export const platformReportsAPI = {
     apiClient.getBlob(
       `/platform/reports/revenue.csv?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
     ),
-  /** Os pedidos de cancelamento (0106), desde `from` (YYYY-MM-DD) ou todos. */
+  /** Os pedidos de cancelamento (0107), desde `from` (YYYY-MM-DD) ou todos. */
   cancellations: (from?: string) =>
     apiClient.get<CancellationReport>(
       `/platform/reports/cancellations${from ? `?from=${encodeURIComponent(from)}` : ''}`
@@ -5953,7 +5967,7 @@ export const platformReportsAPI = {
     apiClient.delete<{ reverted: boolean }>(`/platform/tenants/${tenantId}/subscription/cancellation`),
 }
 
-// ── A indicação de provedores (0105) ─────────────────────────────────────
+// ── A indicação de provedores (0106) ─────────────────────────────────────
 
 export type ReferralStatus = 'pending' | 'credited' | 'canceled'
 

@@ -14,7 +14,7 @@ const { default: ChargeIssuingService } = await import('../src/services/chargeIs
 const { aggregateRevenue, parseRange } = await import('../src/services/revenueReportService.js');
 
 /**
- * O ciclo anual com desconto (0103).
+ * O ciclo anual com desconto (0104).
  *
  * Self-hosted, com o gateway de mentira em `127.0.0.1`, como
  * `billing-proration.test.js`. O que não pode dar errado, em dinheiro:

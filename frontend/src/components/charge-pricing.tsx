@@ -7,7 +7,7 @@ import { formatDay } from '@/lib/subscription-console'
 import { resourceLabelKey } from '@/lib/plan-options'
 
 /**
- * A conta do valor de uma cobrança (0104): o plano (já com o cupom) e cada
+ * A conta do valor de uma cobrança (0105): o plano (já com o cupom) e cada
  * parcela do excedente — "Excedente (Operadores): 3 × R$ 10,00 = R$ 30,00".
  *
  * Só aparece quando há excedente: a cobrança que é só o plano não precisa de

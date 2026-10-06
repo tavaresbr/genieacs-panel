@@ -661,10 +661,10 @@ export default function DevicesPage() {
                                 <span className="mt-1 block text-[0.68rem] text-muted-foreground 3xl:hidden">{formatDate(device._lastInform)}</span>
                               </td>
                               <td className="max-w-40 xl:max-w-[18rem]">
-                                <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="block break-all font-mono text-sm font-semibold text-primary hover:underline lg:truncate lg:break-normal">
+                                <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="block break-all font-mono text-sm font-semibold text-primary hover:underline xl:truncate xl:break-normal">
                                   {device.SerialNumber || device._id}
                                 </Link>
-                                {device.SerialNumber && <span className="mt-1 block break-all font-mono text-[0.68rem] text-muted-foreground lg:truncate lg:break-normal">{device._id}</span>}
+                                {device.SerialNumber && <span className="mt-1 block break-all font-mono text-[0.68rem] text-muted-foreground xl:truncate xl:break-normal">{device._id}</span>}
                                 <span className="mt-0.5 block truncate text-xs text-muted-foreground xl:hidden">{device.brand} · {device.productclass || t('devices.modelNotReported')}</span>
                               </td>
                               <td className="hidden xl:table-cell">

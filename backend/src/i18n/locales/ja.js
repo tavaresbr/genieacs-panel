@@ -543,6 +543,8 @@ export default {
   'whatsapp.error.notCloud': "この操作は Meta 公式 API の番号でのみ使えます。",
   'whatsapp.error.cloudInstanceStillExists': "Evolution サーバーにこの番号のインスタンスがまだ残っているため、トークンは変更されませんでした。数秒後にもう一度お試しください。",
   'whatsapp.metaTokenUpdated': "Meta のトークンを更新しました。",
+  'whatsapp.metaWebhook.registered': "Meta に Webhook を登録しました。",
+  'whatsapp.metaWebhook.failed': "Meta が Webhook の登録を拒否しました: {reason}",
   'whatsapp.error.notSupportedCloud': "番号の確認には QR コードで接続した番号が必要です。公式 API では利用できません。",
   'whatsapp.error.invalidCloudCallbackUrl': "Meta のコールバック URL が無効です",
   'whatsapp.error.noDestination': 'この連絡先には電話番号も WhatsApp の識別子もありません',

@@ -3,7 +3,7 @@ import { parseAmountToCents } from '@/lib/utils'
 import { PLAN_RESOURCES, type PlanResource } from '@/lib/plan-options'
 
 /**
- * A cobrança por excedente (0104), no que a tela decide sem React.
+ * A cobrança por excedente (0105), no que a tela decide sem React.
  *
  * Com preço de excedente, passar do teto não bloqueia: as unidades a mais vão
  * à fatura da renovação. Sem preço, o teto bloqueia como sempre. A tela só

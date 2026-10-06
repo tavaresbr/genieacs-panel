@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 /**
- * A indicação de provedores (0105): o código, o link e o cadastro com
+ * A indicação de provedores (0106): o código, o link e o cadastro com
  * `?ref=CÓDIGO`.
  *
  * SaaS com subdomínio, porque o cadastro só existe ali (ver

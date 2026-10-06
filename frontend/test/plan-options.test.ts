@@ -127,7 +127,7 @@ describe('plan-options', () => {
     })
   })
 
-  describe('o ciclo anual (0103)', () => {
+  describe('o ciclo anual (0104)', () => {
     const agora = Date.parse('2026-09-27T12:00:00Z')
     const anualavel = plano({ id: 2, priceCents: 10000, priceYearlyCents: 100000, annualAvailable: true, current: true })
     const soMensal = plano({ id: 3, priceCents: 12000, priceYearlyCents: null, annualAvailable: false })

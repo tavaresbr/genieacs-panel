@@ -270,6 +270,14 @@
   &::-webkit-scrollbar {
     display: none;
   }
+
+  /* Com mouse a rolagem de lado sem barra não se descobre: num notebook as
+     últimas abas das Configurações e do WhatsApp simplesmente sumiam. Daqui
+     para cima as abas quebram em outra linha. */
+  @media (width >= 64rem) {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
 }
 
 @utility tab-button {

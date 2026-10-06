@@ -191,7 +191,7 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/genieacs/agent-token', 'plano de controle; prova em genieacs-agent-saas.test.js — a chave vai só para o provedor pedido, e id que não existe é 404'],
   ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro'],
   ['POST /api/platform/tenants/:id/gateway/asaas-customer', 'plano de controle; prova em platform-integrations.test.js — inclusive o 404 da caixa da plataforma e de quem não existe'],
-  // A indicação e os créditos (0105): provedor visto de cima; a prova de que o
+  // A indicação e os créditos (0106): provedor visto de cima; a prova de que o
   // crédito de um não aparece nem é abatido no outro está no mesmo arquivo.
   ['GET /api/platform/tenants/:id/referrals', 'plano de controle; prova em referrals.test.js — inclusive o 404 da caixa da plataforma'],
   ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
@@ -410,13 +410,13 @@ describe('toda rota endereçada por um parâmetro', () => {
   // firmware-upload.test.js. São 69. (O apagar do PROVEDOR leva o nome na
   // query, e por isso não entra nesta conta.)
   //
-  // E as duas da indicação de provedores (0105): a lista de indicações e
+  // E as duas da indicação de provedores (0106): a lista de indicações e
   // créditos de um provedor e o ajuste manual do saldo. Provedor visto de
   // cima; duas linhas em `DO_CONSOLE` e duas aqui; prova em
   // referrals.test.js. São 71.
   //
   // E o desfazer do cancelamento agendado de um provedor pelo console
-  // (`DELETE .../subscription/cancellation`, 0106). Mesmo pedágio: uma linha
+  // (`DELETE .../subscription/cancellation`, 0107). Mesmo pedágio: uma linha
   // em `DO_CONSOLE` e mais uma aqui; a prova de que só mexe no provedor da URL
   // está em cancellation-retention.test.js. São 72.
   const TETO_DE_EXCECOES = 72;

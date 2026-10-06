@@ -107,7 +107,7 @@ describe('plans', () => {
     assert.equal((await platform(`/plans/${proId}`, { method: 'PATCH', body: { code: 'only' } })).status, 400);
   });
 
-  it('the annual price is billed (0103): it cannot be removed while a subscription is on the annual cycle', async () => {
+  it('the annual price is billed (0104): it cannot be removed while a subscription is on the annual cycle', async () => {
     const criado = await platform('/plans', {
       method: 'POST', body: { code: 'anual-teste', name: 'Anual', priceCents: 10000, priceYearlyCents: 100000 }
     });

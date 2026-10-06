@@ -38,7 +38,7 @@ export function periodLabel(periodDays: number, price: string): { key: Translati
   return { key: 'plan.options.perDays', vars: { price, days: periodDays } }
 }
 
-// ── O ciclo de cobrança (0103) ─────────────────────────────────────────
+// ── O ciclo de cobrança (0104) ─────────────────────────────────────────
 
 /** Os dias do ciclo anual — fixos, como no backend (`ANNUAL_PERIOD_DAYS`). */
 export const ANNUAL_PERIOD_DAYS = 365
@@ -83,7 +83,7 @@ export function currentCycle(subscription: Pick<SubscriptionView, 'billingCycle'
  * ano. A tela avisa quando há um cupom assim e o anual está em vista.
  */
 /**
- * Se o cupom SAI na troca para o anual (0103): o de N faturas (`once`,
+ * Se o cupom SAI na troca para o anual (0104): o de N faturas (`once`,
  * `repeating`) resgatado no mensal não desconta a fatura do ano, e o servidor
  * o tira quando o anual passa a valer. Fica o `forever` — e o desconto de
  * retenção do anual, que já é calculado para ele.
@@ -166,10 +166,10 @@ export function canSwitchTo(
   cycle?: BillingCycle
 ) {
   if (!canWrite || !subscriptionAllowsChanges(subscription)) return false
-  // A retenção (0106): com o cancelamento agendado ou a pausa, a troca é
+  // A retenção (0107): com o cancelamento agendado ou a pausa, a troca é
   // recusada (`cancel_scheduled`, `subscription_paused`).
   if (subscription?.cancelAt || subscription?.pausedUntil) return false
-  // O ciclo (0103): o do seletor, ou o de agora. O plano atual entra quando o
+  // O ciclo (0104): o do seletor, ou o de agora. O plano atual entra quando o
   // ciclo é outro — é a troca de ciclo; o plano sem anual, não, no anual.
   const agora = currentCycle(subscription)
   const alvo = cycle ?? agora
@@ -211,7 +211,7 @@ export function planChangeKind(
   if (current && current.id === target.id && alvo === agora) return 'same'
   const renova = subscription?.renewsAt ? new Date(subscription.renewsAt).getTime() : Number.NaN
   const correndo = subscription?.status === 'active' && !Number.isNaN(renova) && renova > now
-  // Trocar de ciclo com o período pago correndo é sempre na renovação (0103).
+  // Trocar de ciclo com o período pago correndo é sempre na renovação (0104).
   if (alvo !== agora) return correndo ? 'cycle-scheduled' : 'upgrade'
   // Pelo preço POR DIA, como o backend: o mesmo ciclo dos dois lados.
   if (!current || dailyPrice(target, alvo) >= dailyPrice(current, agora)) return 'upgrade'
@@ -239,7 +239,7 @@ export function canPayNow(
   canWrite: boolean,
   subscription: Pick<SubscriptionView, 'status' | 'billingExempt' | 'cancelAt'> | null | undefined
 ) {
-  // Com o cancelamento agendado (0106) não há renovação a pagar (`cancel_scheduled`).
+  // Com o cancelamento agendado (0107) não há renovação a pagar (`cancel_scheduled`).
   return canWrite && subscriptionAllowsChanges(subscription) && !isBillingExempt(subscription)
     && !subscription?.cancelAt && currentPlanIsPaid(plans)
 }
@@ -329,7 +329,7 @@ export function isPendingLockedRefusal(code: string | undefined) {
  * `SubscriptionService.decide`). Suspenso e cancelado são decisão da
  * plataforma — pagar não os desfaz — e "sem assinatura" não tem o que cobrar.
  */
-// A pausa de retenção (0106) também: pagar a renovação é o "retomar antes".
+// A pausa de retenção (0107) também: pagar a renovação é o "retomar antes".
 const PAYABLE_GATE_CODES = new Set<string>(['subscription_past_due', 'subscription_trial_expired', 'subscription_paused'])
 
 /**

@@ -175,7 +175,7 @@ export function instanteMs(valor) {
  * relatório inteiro.
  */
 export async function precoEfetivo(sub, plan) {
-  // O preço do ciclo da assinatura (0103): o anual cobra o ano.
+  // O preço do ciclo da assinatura (0104): o anual cobra o ano.
   const doPlano = SubscriptionService.cyclePriceCents(sub, plan);
   if (typeof SubscriptionService.effectivePriceCents === 'function') {
     try {
@@ -260,7 +260,7 @@ function detalheDe(evento) {
   }
 }
 
-/** Os dias de um período da assinatura no plano — 365 no anual (0103). */
+/** Os dias de um período da assinatura no plano — 365 no anual (0104). */
 function diasDoPeriodo(sub, plan) {
   return SubscriptionService.cyclePeriodDays(sub, plan);
 }
@@ -383,7 +383,7 @@ export function aggregateRevenue({
     // mas não no desconto: o valor pedido nela é uma fração do período, e
     // compará-lo com o preço cheio do plano inventaria um abatimento.
     if (!aceite && !detalhe?.proration && plano && !estornados.has(`${tenantId}|${evento.external_id}`)) {
-      // O preço cheio do ciclo que o pagamento pagou (0103): o do ano, se anual.
+      // O preço cheio do ciclo que o pagamento pagou (0104): o do ano, se anual.
       const cheio = SubscriptionService.cyclePriceCents({ billing_cycle: detalhe?.billingCycle ?? 'monthly' }, plano);
       // O preço do plano (com o cupom) gravado no pagamento, quando há: o
       // pedido inteiro traz o excedente (que não é preço) e já vem sem o

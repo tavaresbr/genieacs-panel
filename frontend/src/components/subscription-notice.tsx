@@ -123,7 +123,7 @@ export function SubscriptionNotice() {
 
   // A pró-rata vencida tem o aviso dela: o período está pago, o que falta é
   // a diferença da troca de plano.
-  // A pausa de retenção (0106) diz até quando — e que pagar a encerra antes.
+  // A pausa de retenção (0107) diz até quando — e que pagar a encerra antes.
   const pausadaAte = blocked.code === 'subscription_paused' ? displayDayMonth(blocked.subscription?.pausedUntil) : null
   const message = (pausadaAte
     ? t('subscription.pausedUntil', { date: pausadaAte })

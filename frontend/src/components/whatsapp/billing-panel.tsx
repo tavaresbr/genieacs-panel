@@ -491,7 +491,7 @@ export function BillingPanel() {
                       <td className={MOBILE_CELL}>
                         {editing === row.contract ? (
                           <div className="space-y-2" data-testid={`wa-phone-editor-${row.contract}`}>
-                            <label htmlFor={`wa-phone-${row.contract}`} className="field-label">
+                            <label htmlFor={`wa-phone-${row.contract}`} className="field-label mb-2">
                               {t('whatsapp.billing.phoneManual')}
                             </label>
                             <input

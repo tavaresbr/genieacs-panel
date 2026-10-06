@@ -9,7 +9,7 @@ import { displayDate } from '@/lib/date-format'
 import { REFERRAL_STATUS_KEYS, parseSignedAmountToCents, referralBadgeClass } from '@/lib/referrals'
 
 /**
- * A indicação e os créditos de UM provedor, no console (0105): o código, quem
+ * A indicação e os créditos de UM provedor, no console (0106): o código, quem
  * o indicou, quem ele indicou (com o nome inteiro), o saldo, os créditos e o
  * ajuste manual — positivo dá, negativo tira, sempre com motivo, e o servidor
  * grava nas duas trilhas.

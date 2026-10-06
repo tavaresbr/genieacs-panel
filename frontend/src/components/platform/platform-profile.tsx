@@ -22,7 +22,7 @@ const VAZIO = Object.fromEntries(PLATFORM_PROFILE_FIELDS.map((campo) => [campo, 
 
 /** A suspensão automática (0102): números, digitados como texto. */
 type CampoPolitica = keyof PlatformBillingPolicy
-// `grupo`: a suspensão automática e, à parte, a retenção no cancelamento (0106).
+// `grupo`: a suspensão automática e, à parte, a retenção no cancelamento (0107).
 const CAMPOS_POLITICA: {
   campo: CampoPolitica; rotulo: TranslationKey; dica: TranslationKey; max: number; grupo: 'billing' | 'retention'
 }[] = [
@@ -153,7 +153,7 @@ export function PlatformProfileForm() {
   const [perfil, setPerfil] = useState<PlatformProfile | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho>(VAZIO)
   const [politica, setPolitica] = useState<Record<CampoPolitica, string>>(POLITICA_VAZIA)
-  // O crédito da indicação de provedores (0105), digitado em reais.
+  // O crédito da indicação de provedores (0106), digitado em reais.
   const [recompensa, setRecompensa] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)

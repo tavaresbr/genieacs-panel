@@ -380,7 +380,7 @@ function PlanCell({ row }: { row: SubscriptionRow }) {
   return (
     <span className="block">
       <span>{sub.planName ?? sub.planCode ?? '—'}</span>
-      {/* O ciclo (0103): o preço é o de UM ciclo — o do ano, no anual. */}
+      {/* O ciclo (0104): o preço é o de UM ciclo — o do ano, no anual. */}
       {sub.billingCycle === 'annual' && <span className="modern-badge-info ml-1 text-xs">{t('plan.cycle.annual')}</span>}
       {sub.priceCents !== null && (
         <span className="block text-xs text-muted-foreground">
@@ -697,7 +697,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
             )}
           </div>
           <p className="field-hint">{t('platform.subscription.statusHint')}</p>
-          {/* O cancelamento agendado pelo próprio provedor (0106). */}
+          {/* O cancelamento agendado pelo próprio provedor (0107). */}
           {sub?.cancelAt && (
             <div className="mt-2">
               <RevertCancellationButton tenantId={tenantId} cancelAt={sub.cancelAt} onChanged={recarregar} />
@@ -889,13 +889,13 @@ function ChargeItem({
         <span className="font-mono font-semibold tabular-nums">{formatMoney(charge.amountCents, charge.currency)}</span>
         {/* A avulsa da subida no meio do período (a diferença proporcional). */}
         {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
-        {/* A de só excedente (0104): a fatia mensal do anual, ou a final de quem cancela. */}
+        {/* A de só excedente (0105): a fatia mensal do anual, ou a final de quem cancela. */}
         {charge.kind === 'overage' && <span className="modern-badge-info">{t('charges.overage')}</span>}
         <span className="text-muted-foreground">{t('charges.period')}: {formatDay(charge.periodEnd)}</span>
         <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
           {t('charges.dueDate')}: {formatDay(charge.dueDate)}
         </span>
-        {/* O plano e o excedente do período (0104), quando há excedente. */}
+        {/* O plano e o excedente do período (0105), quando há excedente. */}
         <ChargePricingBreakdown pricing={charge.pricing} currency={charge.currency} className="w-full text-xs text-muted-foreground" />
         {tentativas && (
           <span

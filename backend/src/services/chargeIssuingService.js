@@ -76,7 +76,7 @@ function reais(centavos) {
 }
 
 /**
- * O resumo do excedente que vai na descrição da fatura (0104):
+ * O resumo do excedente que vai na descrição da fatura (0105):
  * " + excedente R$ 45,00 (3 operadores × R$ 10,00; 5 ONTs × R$ 3,00)".
  * Vazio sem excedente.
  */
@@ -379,7 +379,7 @@ class ChargeIssuingService {
   }
 
   /**
-   * A reserva de crédito (0105) de uma linha que esta passada reservou e
+   * A reserva de crédito (0106) de uma linha que esta passada reservou e
    * depois decidiu NÃO emitir (o status, o cancelamento agendado ou a pausa
    * que entraram no meio): volta ao saldo, e a linha volta a dizer o preço
    * sem crédito — a próxima emissão reserva de novo, pelo saldo de então.
@@ -398,7 +398,7 @@ class ChargeIssuingService {
 
   /**
    * O mesmo de `reopenExemptCanceled`, para a cobrança que o fluxo de
-   * cancelamento (0106) cancelou (`RETENTION_CANCEL_MARKER`): desfeito o
+   * cancelamento (0107) cancelou (`RETENTION_CANCEL_MARKER`): desfeito o
    * cancelamento agendado, a fatura do período volta à emissão.
    */
   static async reopenRetentionCanceled(periodEnd, { now = new Date() } = {}) {
@@ -408,7 +408,7 @@ class ChargeIssuingService {
   /**
    * Cancela as cobranças de RENOVAÇÃO em aberto do provedor em escopo — as do
    * período `periodEnd`, ou todas quando nulo — para a retenção no
-   * cancelamento (0106): a pausa aceita e o cancelamento agendado não deixam
+   * cancelamento (0107): a pausa aceita e o cancelamento agendado não deixam
    * fatura viva na mão do provedor.
    *
    * Estrita, ao contrário da varredura da isenção: quem chama cancela ANTES
@@ -549,7 +549,7 @@ class ChargeIssuingService {
   }
 
   /**
-   * O excedente que a cobrança da renovação `periodo` soma (0104).
+   * O excedente que a cobrança da renovação `periodo` soma (0105).
    *
    * ## Que período, e em que fatura
    *
@@ -586,7 +586,7 @@ class ChargeIssuingService {
   /**
    * O excedente que FECHA o período `periodo` (a chave de `renews_at`):
    *
-   *   - no anual (0103), as fatias mensais anteriores que nenhuma fatura de
+   *   - no anual (0104), as fatias mensais anteriores que nenhuma fatura de
    *     só excedente cobriu (as que ficaram abaixo do mínimo do gateway, ou
    *     que o agendador não alcançou) — além da última, que é a deste prazo;
    *   - o do próprio período, pelas fotografias do plano (`overageFromRows`);
@@ -633,7 +633,7 @@ class ChargeIssuingService {
   }
 
   /**
-   * O acerto do período ANTERIOR a `periodo` (0104): a fatura da renovação
+   * O acerto do período ANTERIOR a `periodo` (0105): a fatura da renovação
    * dele congelou o excedente ao sair, `LEAD_DAYS` antes do fim — o pico que
    * subiu nesses dias não entrou. Aqui, por recurso, `max(0, o que o período
    * deve agora − o que a fatura dele congelou)`, numa parcela `true_up` com a
@@ -679,7 +679,7 @@ class ChargeIssuingService {
   }
 
   /**
-   * A fatura de só excedente das fatias mensais do ANUAL (0104 + 0103), a
+   * A fatura de só excedente das fatias mensais do ANUAL (0105 + 0104), a
    * passada do agendador por provedor: as fatias que já terminaram (menos a
    * última, que a renovação fecha) e que nenhuma fatura cobriu viram UMA
    * fatura avulsa (`kind: 'overage'`), pelo preço por unidade da fotografia
@@ -720,7 +720,7 @@ class ChargeIssuingService {
   }
 
   /**
-   * A fatura FINAL de só excedente de quem cancela (0104 + 0106): o
+   * A fatura FINAL de só excedente de quem cancela (0105 + 0107): o
    * cancelamento agendado que chegou, ou o feito na hora. A renovação não sai
    * para quem cancela, então o excedente do período que fecha (e as fatias do
    * anual que sobraram, e o acerto do anterior) iria embora sem ela.
@@ -897,7 +897,7 @@ class ChargeIssuingService {
     if (!isBillableStatus(subscription)) {
       return { issued: false, reason: 'not_billable' };
     }
-    // A retenção no cancelamento (0106). O cancelamento agendado não renova:
+    // A retenção no cancelamento (0107). O cancelamento agendado não renova:
     // nenhuma fatura nova, nem pelo clique — quem quer continuar desfaz o
     // agendamento. A pausa também não gera fatura; o clique é a exceção, e é
     // o "retomar antes": a fatura do período que a pausa segurava (a que ela
@@ -989,14 +989,14 @@ class ChargeIssuingService {
     // minuto, e contar uso (às vezes no ACS) semanas antes da janela de
     // emissão seria carga sem resposta a dar.
     let planoDoPeriodo = plan;
-    // A assinatura no ciclo do período que esta cobrança paga (0103).
+    // A assinatura no ciclo do período que esta cobrança paga (0104).
     let assinaturaDoPeriodo = subscription;
     let descidaBloqueada = null;
     if (subscription.pending_plan_id && subscription.pending_plan_at) {
       const agendada = new Date(subscription.pending_plan_at);
       if (!Number.isNaN(agendada.getTime()) && this.periodKey(agendada) === periodo) {
         const agendado = await Plan.findById(subscription.pending_plan_id);
-        // No ciclo AGENDADO (0103): a troca do mensal para o anual faz a
+        // No ciclo AGENDADO (0104): a troca do mensal para o anual faz a
         // fatura desta renovação sair pelo preço do ano.
         const agendadaView = SubscriptionService.scheduledView(subscription);
         if (agendado && SubscriptionService.cyclePriceCents(agendadaView, agendado) > 0) {
@@ -1044,7 +1044,7 @@ class ChargeIssuingService {
     // Só o "pagar agora" (`cardNow`) é o provedor pedindo para pagar já.
     const adiarCartao = Boolean(manual && cartao && !cardNow && periodo > this.isoDate(now));
     let existente = await BillingCharge.forPeriod(periodo);
-    // O excedente do período que esta renovação fecha (0104), somado ao preço
+    // O excedente do período que esta renovação fecha (0105), somado ao preço
     // do plano DEPOIS do cupom — o cupom vale só sobre o plano. Congelado na
     // linha: ver `overageForPeriod`. `conta` é o que vai a `pricing_detail`,
     // com as outras chaves que a linha já tiver (o crédito) preservadas.
@@ -1084,7 +1084,7 @@ class ChargeIssuingService {
       // teto viraria uma fatura nova por oscilação na caixa de quem paga.
       // Nunca a de valor mudado à mão pelo console (0078): o desconto dado a
       // ela é decisão de gente, e reprecificá-la pelo plano o desfaria.
-      // Pelo preço ANTES do crédito reservado (0105): o valor que foi ao
+      // Pelo preço ANTES do crédito reservado (0106): o valor que foi ao
       // gateway é menor que o do plano de propósito, e não é reprecificação.
       if (existente.gateway_charge_id && descidaBloqueada && !existente.amount_overridden_at
         && BillingCharge.baseAmountOf(existente) !== preco) {
@@ -1172,7 +1172,7 @@ class ChargeIssuingService {
       if (!existente.amount_overridden_at) {
         if (Number(existente.plan_id ?? 0) !== Number(precificacao.planId ?? 0)) patch.plan_id = precificacao.planId;
         if (Number(existente.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0)) patch.coupon_id = precificacao.couponId;
-        // A conta do valor que vai ao gateway (0104) — o excedente congelado
+        // A conta do valor que vai ao gateway (0105) — o excedente congelado
         // na primeira vez, o preço do plano de agora.
         const contaGravada = BillingCharge.serializePricingDetail(conta);
         if ((existente.pricing_detail ?? null) !== contaGravada) patch.pricing_detail = contaGravada;
@@ -1214,7 +1214,7 @@ class ChargeIssuingService {
       }
     }
 
-    // O crédito do provedor (0105) — a recompensa de indicação, o ajuste do
+    // O crédito do provedor (0106) — a recompensa de indicação, o ajuste do
     // console — abate o preço desta renovação, nunca abaixo do piso de
     // R$ 5,00. Reservado na linha AGORA, com a garra dela: o que vai ao
     // gateway logo abaixo é o preço menos o reservado, e a reserva só vira
@@ -1258,8 +1258,8 @@ class ChargeIssuingService {
       return { issued: false, reason: 'not_billable' };
     }
     // O cancelamento agendado (ou a pausa, para o agendador) que entrou no
-    // meio desta passada (0106): nada sai, pela mesma razão — e o crédito
-    // (0105) que esta passada acabou de reservar volta ao saldo: uma linha
+    // meio desta passada (0107): nada sai, pela mesma razão — e o crédito
+    // (0106) que esta passada acabou de reservar volta ao saldo: uma linha
     // que não vai ao gateway não segura o crédito de ninguém.
     if (releitura && (isCancelScheduled(releitura) || (!manual && isPauseScheduled(releitura)))) {
       await this.soltarCreditoNaoEmitido(chargeId, creditoReservado, precoAntesDoCredito);
@@ -1283,9 +1283,9 @@ class ChargeIssuingService {
       currency: moeda,
       dueDate: vencimentoDoGateway,
       description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`
-        // O ciclo anual (0103) dito na fatura: é um valor maior, e é de um ano.
+        // O ciclo anual (0104) dito na fatura: é um valor maior, e é de um ano.
         + (precificacao.billingCycle === 'annual' ? ' (anual)' : '')
-        // O excedente (0104) vai resumido na descrição: quem paga vê do que é o
+        // O excedente (0105) vai resumido na descrição: quem paga vê do que é o
         // valor a mais. A de valor mudado à mão (0078) não leva — o valor dela
         // não é a conta.
         + (existente?.amount_overridden_at ? '' : overageDescription(excedente)),
@@ -1362,7 +1362,7 @@ class ChargeIssuingService {
       }
       return { issued: false, reason: 'raced', charge: await BillingCharge.findById(chargeId) };
     }
-    // A retenção (0106) que entrou DURANTE o `createCharge`: a pausa ou o
+    // A retenção (0107) que entrou DURANTE o `createCharge`: a pausa ou o
     // cancelamento agendado gravados enquanto o gateway respondia não acharam
     // a linha (ela estava com a garra desta passada). Relida agora: se a
     // assinatura passou a não renovar, a cobrança recém-criada é cancelada lá
@@ -1522,7 +1522,7 @@ class ChargeIssuingService {
       });
       return { issued: false, reason: 'billing_exempt' };
     }
-    // A fatura FINAL de excedente (0104) é de quem cancelou: o cancelamento
+    // A fatura FINAL de excedente (0105) é de quem cancelou: o cancelamento
     // não a cancela — é justamente a conta do que foi usado até ele.
     const finalDeExcedente = isOverageCharge(linha) && Boolean(BillingCharge.prorationDetailOf(linha)?.final);
     // Cancelada ou suspensa à mão depois da subida: a diferença não se cobra
@@ -1532,7 +1532,7 @@ class ChargeIssuingService {
       await this.cancelUnbillableProration(linha.id);
       return { issued: false, reason: 'not_billable', charge: await BillingCharge.findById(linha.id) };
     }
-    // A retenção (0106): pausada ou com o cancelamento agendado, a pró-rata
+    // A retenção (0107): pausada ou com o cancelamento agendado, a pró-rata
     // que não chegou ao gateway ESPERA — sem ser cancelada: desfeito o
     // agendamento (ou acabada a pausa), ela sai pela passada seguinte.
     if (!finalDeExcedente && assinatura && (isPauseScheduled(assinatura) || isCancelScheduled(assinatura))) {
@@ -1725,7 +1725,7 @@ class ChargeIssuingService {
     if (!isBillableStatus(subscription)) {
       const canceladas = await BillingCharge.cancelUnissuedProrations({ reason: 'not_billable', now });
       for (const linha of await BillingCharge.unissuedProrations()) {
-        // A fatura final de excedente (0104) é de quem cancelou: segue.
+        // A fatura final de excedente (0105) é de quem cancelou: segue.
         const final = isOverageCharge(linha) && BillingCharge.prorationDetailOf(linha)?.final;
         if (linha.billing_type !== 'CREDIT_CARD' && !final) continue;
         if (final && !manual) {
@@ -1740,7 +1740,7 @@ class ChargeIssuingService {
       }
       return { ...resumo, reason: 'not_billable', ...(canceladas ? { canceled: canceladas } : {}) };
     }
-    // A retenção (0106): a pró-rata espera, sem cancelar (ver `emitProration`).
+    // A retenção (0107): a pró-rata espera, sem cancelar (ver `emitProration`).
     if (isPauseScheduled(subscription) || isCancelScheduled(subscription)) return { ...resumo, reason: 'retention_hold' };
 
     const provider = providerFor(tenant.billing_gateway);

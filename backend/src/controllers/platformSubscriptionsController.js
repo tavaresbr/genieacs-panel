@@ -372,7 +372,7 @@ class PlatformSubscriptionsController {
             planId: sub.plan_id ?? null,
             planCode: sub.plan_code ?? null,
             planName: sub.plan_name ?? null,
-            // O preço de UM ciclo (0103) — o do ano, no anual — e o ciclo.
+            // O preço de UM ciclo (0104) — o do ano, no anual — e o ciclo.
             priceCents: planos.get(Number(sub.plan_id))
               ? SubscriptionService.cyclePriceCents(sub, planos.get(Number(sub.plan_id)))
               : Number(sub.plan_price_cents ?? 0),
@@ -386,7 +386,7 @@ class PlatformSubscriptionsController {
             ),
             // O cartão recorrente (0100): bandeira e dígitos, nunca o token.
             card: SubscriptionService.presentCard(sub),
-            // A retenção (0106): os selos "Cancela em" e "Pausada até".
+            // A retenção (0107): os selos "Cancela em" e "Pausada até".
             ...SubscriptionService.presentRetention(sub),
             ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
@@ -886,7 +886,7 @@ class PlatformSubscriptionsController {
               if (cobranca.status === 'overdue') patch.status = 'pending';
             }
             await BillingCharge.update(cobranca.id, patch);
-            // O valor digitado pelo console é o final (0105): o crédito que
+            // O valor digitado pelo console é o final (0106): o crédito que
             // estava reservado nela volta ao saldo do provedor, para a
             // próxima fatura.
             if (mudaValor) await TenantCredit.releaseForCharge(cobranca.id);

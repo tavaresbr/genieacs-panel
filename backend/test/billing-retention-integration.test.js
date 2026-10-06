@@ -31,8 +31,8 @@ const { default: platformBillingRoutes } = await import('../src/routes/platformB
 const { default: platformReportsRoutes } = await import('../src/routes/platformReports.js');
 
 /**
- * A retenção no cancelamento (0106) cruzada com o plano anual (0103), o
- * excedente (0104) e os créditos de indicação (0105) — as regras que só
+ * A retenção no cancelamento (0107) cruzada com o plano anual (0104), o
+ * excedente (0105) e os créditos de indicação (0106) — as regras que só
  * existem quando as quatro estão juntas:
  *
  *   - a pausa e o cancelamento agendado não emitem nada, e a reserva de
@@ -43,7 +43,7 @@ const { default: platformReportsRoutes } = await import('../src/routes/platformR
  *   - no anual, o desconto de retenção vale uma fatura (um ciclo = um ano).
  *
  * (Cabeçalho herdado de cancellation-retention.test.js:)
- * A retenção no cancelamento (0106).
+ * A retenção no cancelamento (0107).
  *
  * O dono pede para cancelar, diz o motivo, e recebe as ofertas: desconto
  * (cupom de retenção, uma vez a cada doze meses) ou pausa (sem cobrança até
@@ -283,7 +283,7 @@ const medir = (devices, now) => runInTenant(alfa, () => SubscriptionService.reco
 const picos = (renova) => runInTenant(alfa, () => UsagePeak.forPeriod(ChargeIssuingService.periodKey(renova)));
 const alocacoes = (chargeId) => getDb()('credit_allocations').where({ tenant_id: alfa, charge_id: chargeId });
 
-describe('o crédito (0105) e a retenção', () => {
+describe('o crédito (0106) e a retenção', () => {
   it('a pausa cancela a renovação com crédito reservado, e a reserva volta ao saldo', async () => {
     await darCredito(3000);
     const emissao = await emitir();
@@ -351,7 +351,7 @@ describe('o crédito (0105) e a retenção', () => {
   });
 });
 
-describe('o excedente (0104) e a pausa', () => {
+describe('o excedente (0105) e a pausa', () => {
   it('o tempo pausado não vira excedente; o do período usado vai para a fatura da volta', async () => {
     const renova = daquiA(2);
     await assinar({ renews_at: renova });
@@ -397,7 +397,7 @@ describe('o excedente (0104) e a pausa', () => {
   });
 });
 
-describe('o plano anual (0103) e a retenção', () => {
+describe('o plano anual (0104) e a retenção', () => {
   it('a troca agendada espera o fim da pausa, e se aplica na volta', async () => {
     const renova = daquiA(2);
     await assinar({ renews_at: renova });

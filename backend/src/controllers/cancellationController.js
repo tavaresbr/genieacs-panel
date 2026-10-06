@@ -13,7 +13,7 @@ import DeviceService from '../services/deviceService.js';
 import { recordBoth, subscriptionView } from './platformBillingController.js';
 
 /**
- * A retenção no cancelamento (0106), dos dois lados.
+ * A retenção no cancelamento (0107), dos dois lados.
  *
  * ## O provedor — só o dono
  *

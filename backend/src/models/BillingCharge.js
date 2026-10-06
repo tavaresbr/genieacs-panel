@@ -25,7 +25,7 @@ import TenantCredit from './TenantCredit.js';
 export const EXEMPT_CANCEL_MARKER = 'billing_exempt: canceled by the billing exemption';
 
 /**
- * O `last_error` da cobrança de renovação que o fluxo de cancelamento (0106)
+ * O `last_error` da cobrança de renovação que o fluxo de cancelamento (0107)
  * cancelou — a pausa aceita, o cancelamento agendado. Como a da isenção, não
  * é erro: é a marca que o "desfazer o cancelamento" procura para devolver a
  * cobrança do período à emissão (`ChargeIssuingService.reopenRetentionCanceled`).
@@ -83,7 +83,7 @@ export const CHARGE_KINDS = Object.freeze(['renewal', 'proration', 'overage']);
 
 /**
  * As faturas AVULSAS — as que não compram período: a pró-rata da subida
- * (0101) e a de só excedente (0104: a fatia mensal do excedente de quem é
+ * (0101) e a de só excedente (0105: a fatia mensal do excedente de quem é
  * anual, e a final de quem cancela). Todas seguem o mesmo caminho: chave que
  * não é data, emissão e retentativa pela porta da pró-rata
  * (`ChargeIssuingService.emitProration`/`retryProrations`), pagamento que não
@@ -98,7 +98,7 @@ export const SIDE_CHARGE_KINDS = Object.freeze(['proration', 'overage']);
  */
 export const isProration = (row) => SIDE_CHARGE_KINDS.includes(row?.kind);
 
-/** Se a linha é a fatura de só excedente (0104). */
+/** Se a linha é a fatura de só excedente (0105). */
 export const isOverageCharge = (row) => row?.kind === 'overage';
 
 /**
@@ -181,7 +181,7 @@ class BillingCharge {
     planId = null, couponId = null, billingType = null, pricingDetail = undefined, billingCycle = null
   }) {
     return tinsertReturningId('billing_charges', {
-      // A conta do valor (0104) — ver `pricingDetailOf`.
+      // A conta do valor (0105) — ver `pricingDetailOf`.
       ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
       // A linha nasce JÁ garrada por quem a inseriu — ver `claim`. Sem isto,
       // entre a inserção e a chamada ao gateway, outra passada que lesse a
@@ -199,7 +199,7 @@ class BillingCharge {
       // `BILLING_CHARGE_PRICING_COLUMNS`.
       plan_id: planId ?? null,
       coupon_id: couponId ?? null,
-      // E em que ciclo (0103): `monthly` ou `annual`.
+      // E em que ciclo (0104): `monthly` ou `annual`.
       billing_cycle: billingCycle ? String(billingCycle).slice(0, 16) : null,
       // Com que meio ela vai ao gateway (0100) — `UNDEFINED` ou `CREDIT_CARD`.
       billing_type: billingType ? String(billingType).slice(0, 16) : null
@@ -209,7 +209,7 @@ class BillingCharge {
   static async update(id, patch) {
     const changed = await tdb('billing_charges').where({ id })
       .update({ ...patch, updated_at: new Date() });
-    // O crédito reservado na cobrança (0105) segue o estado dela, aqui e não
+    // O crédito reservado na cobrança (0106) segue o estado dela, aqui e não
     // em cada um dos que chamam, pelo mesmo motivo da pró-rata logo abaixo:
     // paga, a reserva vira gasto; cancelada, volta ao saldo; estornada, o que
     // ela gastou volta também. Cada passo é idempotente (`TenantCredit`).
@@ -242,7 +242,7 @@ class BillingCharge {
   }
 
   /**
-   * Quanto de crédito a linha tem reservado (0105) — o preço do plano é
+   * Quanto de crédito a linha tem reservado (0106) — o preço do plano é
    * `amount_cents` mais isto. Zero na linha sem crédito.
    */
   static creditReservedOf(linha) {
@@ -250,7 +250,7 @@ class BillingCharge {
     return Number.isFinite(valor) && valor > 0 ? Math.floor(valor) : 0;
   }
 
-  /** O preço da linha antes do crédito (0105): `amount_cents` + o reservado. */
+  /** O preço da linha antes do crédito (0106): `amount_cents` + o reservado. */
   static baseAmountOf(linha) {
     return Number(linha?.amount_cents ?? 0) + BillingCharge.creditReservedOf(linha);
   }
@@ -316,7 +316,7 @@ class BillingCharge {
   }
 
   /**
-   * A chave (`period_end`) da fatura de só excedente (0104): `o` e a data do
+   * A chave (`period_end`) da fatura de só excedente (0105): `o` e a data do
    * fim do período que ela fecha, sem os traços (`o20261106`) — não é data,
    * como a da pró-rata, e o `o` fica depois de todo dígito na ordem do texto
    * (`openBefore` nunca a alcança). Uma por fim de período: o índice único é
@@ -574,10 +574,10 @@ class BillingCharge {
       anteriores.push({
         id: String(linha.gateway_charge_id),
         amountCents: Number(linha.amount_cents),
-        // O crédito que ela levava (0105): o preço do plano que ela cobrava
+        // O crédito que ela levava (0106): o preço do plano que ela cobrava
         // é o valor mais isto.
         ...(BillingCharge.creditReservedOf(linha) ? { creditCents: BillingCharge.creditReservedOf(linha) } : {}),
-        // O plano, o cupom e o ciclo com que ela saiu (0093/0103): o
+        // O plano, o cupom e o ciclo com que ela saiu (0093/0104): o
         // pagamento do boleto velho compra o período DAQUELE plano e ciclo, e
         // não o da linha reemitida — ver `recordPayment`.
         ...(linha.plan_id !== null && linha.plan_id !== undefined ? {
@@ -621,13 +621,13 @@ class BillingCharge {
       // diz; sem eles (a reabertura da isenção, que mantém o valor), ficam.
       ...(planId !== undefined ? { plan_id: planId } : {}),
       ...(couponId !== undefined ? { coupon_id: couponId } : {}),
-      // A conta do valor novo (0104), quando quem reprecifica a diz; sem ela
+      // A conta do valor novo (0105), quando quem reprecifica a diz; sem ela
       // fica a que a linha tinha — o excedente congelado vai junto.
       ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
       ...(billingCycle !== undefined ? { billing_cycle: billingCycle } : {}),
       updated_at: new Date()
     });
-    // A reserva de crédito da cobrança velha volta ao saldo (0105): a
+    // A reserva de crédito da cobrança velha volta ao saldo (0106): a
     // reemissão reserva de novo, pelo preço de então (`issueCurrent`).
     if (changed > 0) {
       try {
@@ -639,7 +639,7 @@ class BillingCharge {
     return changed > 0;
   }
 
-  // ── A conta do valor (0104) ──────────────────────────────────────────
+  // ── A conta do valor (0105) ──────────────────────────────────────────
 
   /**
    * A conta do valor de uma cobrança, lida de `pricing_detail` — um objeto
@@ -934,10 +934,10 @@ class BillingCharge {
       // `renewal` ou `proration` (0101) — o selo "Pró-rata" da tela.
       kind: row.kind || 'renewal',
       proration: BillingCharge.presentProration(row),
-      // A conta do valor (0104): preço do plano e excedente.
+      // A conta do valor (0105): preço do plano e excedente.
       pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
-      // O crédito abatido nela (0105) — o preço do plano é a soma dos dois.
+      // O crédito abatido nela (0106) — o preço do plano é a soma dos dois.
       creditCents: BillingCharge.creditReservedOf(row),
       currency: row.currency,
       status: row.status,
@@ -986,7 +986,7 @@ class BillingCharge {
       periodEnd: BillingCharge.periodEndOf(row),
       kind: row.kind || 'renewal',
       proration: BillingCharge.presentProration(row),
-      // A conta do valor (0104): preço do plano e excedente.
+      // A conta do valor (0105): preço do plano e excedente.
       pricing: BillingCharge.presentPricing(row),
       amountCents: Number(row.amount_cents),
       creditCents: BillingCharge.creditReservedOf(row),
@@ -999,7 +999,7 @@ class BillingCharge {
       invoiceUrl: OPEN_CHARGE_STATUSES.includes(row.status) ? (row.invoice_url ?? null) : null,
       // Se ela é cobrada sozinha no cartão salvo (0100) — o meio, nunca o cartão.
       billingType: row.billing_type ?? null,
-      // O ciclo que ela paga (0103) — nulo nas de antes, que são mensais.
+      // O ciclo que ela paga (0104) — nulo nas de antes, que são mensais.
       billingCycle: row.billing_cycle ?? null,
       createdAt: row.created_at ?? null,
       // A nota fiscal (NFS-e) desta cobrança: estado, número e PDF — sem o erro.

@@ -21,7 +21,7 @@ interface Rascunho {
   maxOperators: string
   maxSubscribers: string
   maxDevices: string
-  /** O preço por unidade acima do teto (0104), em reais. Vazio é "sem preço": o teto bloqueia. */
+  /** O preço por unidade acima do teto (0105), em reais. Vazio é "sem preço": o teto bloqueia. */
   overageOperators: string
   overageSubscribers: string
   overageDevices: string
@@ -193,7 +193,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
       return
     }
 
-    // Os preços de excedente (0104): vazio é "sem preço", inválido para tudo.
+    // Os preços de excedente (0105): vazio é "sem preço", inválido para tudo.
     const excedente = {
       operators: overagePriceFromInput(rascunho.overageOperators),
       subscribers: overagePriceFromInput(rascunho.overageSubscribers),
@@ -236,7 +236,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
       if (!res.success) {
         // 409 quando o código já existe, 400 quando um número não serve: o
         // backend diz qual, e isso ajuda mais do que uma frase genérica. O
-        // preço anual em uso (0103) tem frase própria, traduzida.
+        // preço anual em uso (0104) tem frase própria, traduzida.
         toast.error(res.code === 'plan_has_annual_subscriptions'
           ? t('platform.plans.annualInUse')
           : res.message || t('platform.plans.saveFailed'))
@@ -387,7 +387,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
         </div>
       </div>
 
-      {/* O preço anual é COBRADO (0103): o provedor que escolhe o ciclo anual
+      {/* O preço anual é COBRADO (0104): o provedor que escolhe o ciclo anual
           paga este valor por 365 dias. Por isso mora junto do preço, e não na
           vitrine. Vazio é "sem opção anual". */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -427,7 +427,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
 
       {/* A vitrine: o que a página pública do ápice mostra deste plano. */}
       <fieldset className="space-y-4 rounded-md border border-border p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">{t('platform.plans.showcase')}</legend>
+        <legend className="mb-4 px-1 text-sm font-semibold text-foreground">{t('platform.plans.showcase')}</legend>
         <p className="field-hint">{t('platform.plans.showcaseHint')}</p>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <label className="flex items-center gap-2 text-sm text-foreground">

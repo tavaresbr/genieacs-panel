@@ -545,6 +545,8 @@ export default {
   'whatsapp.error.notCloud': "Это действие доступно только для номера официального API Meta.",
   'whatsapp.error.cloudInstanceStillExists': "На сервере Evolution всё ещё есть экземпляр этого номера; токен не изменён. Повторите попытку через несколько секунд.",
   'whatsapp.metaTokenUpdated': "Токен Meta обновлён.",
+  'whatsapp.metaWebhook.registered': "Вебхук зарегистрирован в Meta.",
+  'whatsapp.metaWebhook.failed': "Meta отклонила регистрацию вебхука: {reason}",
   'whatsapp.error.notSupportedCloud': "Проверка номеров требует номера, подключённого по QR-коду; официальный API её не поддерживает.",
   'whatsapp.error.invalidCloudCallbackUrl': "Недопустимый URL обратного вызова Meta",
   'whatsapp.error.noDestination': 'У этого контакта нет ни номера телефона, ни идентификатора WhatsApp',

@@ -5,7 +5,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { recordBoth } from './platformBillingController.js';
 
 /**
- * A indicação e os créditos de UM provedor, vistos do console (0105).
+ * A indicação e os créditos de UM provedor, vistos do console (0106).
  *
  * O `:id` é de provedor visto de cima, como o resto de `/tenants/:id/…`; a
  * caixa da plataforma responde 404 como um id que não existe. Os créditos são

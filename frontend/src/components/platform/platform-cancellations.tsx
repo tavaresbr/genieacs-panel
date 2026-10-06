@@ -13,7 +13,7 @@ import { displayDate } from '@/lib/date-format'
 import { CANCELLATION_REASON_KEYS } from '@/components/cancel-subscription'
 
 /**
- * Os cancelamentos, na aba Receita do console (0106): quantos provedores
+ * Os cancelamentos, na aba Receita do console (0107): quantos provedores
  * pediram para sair, por quê, quantas ofertas de retenção foram aceitas, a
  * taxa de retenção e os pedidos recentes — desde o início do período da aba.
  *

@@ -91,10 +91,10 @@ const EXEMPT_PATHS = new Set([
   // devolve a fatura de quem está atrasado para Pix/boleto.
   '/api/tenant/subscription/autopay',
   '/api/tenant/subscription/card',
-  // A indicação (0105): o saldo de crédito na mesma tela de Plano que quem
+  // A indicação (0106): o saldo de crédito na mesma tela de Plano que quem
   // está bloqueado usa para pagar — e o crédito é parte do que ele vai pagar.
   '/api/tenant/referrals',
-  // A retenção no cancelamento (0106): pedir para cancelar, aceitar uma
+  // A retenção no cancelamento (0107): pedir para cancelar, aceitar uma
   // oferta, confirmar e desfazer — quem está atrasado (ou pausado) também
   // pode querer sair, ou ficar.
   '/api/tenant/subscription/cancellation',

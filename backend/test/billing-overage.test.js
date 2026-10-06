@@ -17,7 +17,7 @@ const { default: ChargeIssuingService, overageDescription } = await import('../s
 const { default: CancellationService } = await import('../src/services/cancellationService.js');
 
 /**
- * A cobrança por excedente (0104).
+ * A cobrança por excedente (0105).
  *
  * Self-hosted, com o gateway de mentira em `127.0.0.1` de
  * `billing-proration.test.js`: o valor está no que SAI para o gateway.
@@ -105,7 +105,7 @@ before(async () => {
   planos.folgado = await criar({
     code: 'ex-folgado', name: 'Folgado', price_cents: 30000, max_operators: 10, overage_price_cents_operators: 1000
   });
-  // O anual (0103) com excedente: R$ 100/mês ou R$ 1.000/ano, R$ 10 por operador a mais.
+  // O anual (0104) com excedente: R$ 100/mês ou R$ 1.000/ano, R$ 10 por operador a mais.
   planos.anual = await criar({
     code: 'ex-anual', name: 'Anual', price_cents: 10000, price_yearly_cents: 100000,
     max_operators: 1, overage_price_cents_operators: 1000
@@ -494,7 +494,7 @@ const fotografar = (periodo, recurso, valor, limit, unitCents) => runInTenant(al
 ));
 const avulsas = async () => (await getDb()('billing_charges').where({ tenant_id: alfa, kind: 'overage' }).orderBy('id'));
 
-describe('a fotografia do plano no pico (0104)', () => {
+describe('a fotografia do plano no pico (0105)', () => {
   it('subir de plano antes da fatura não apaga o excedente já medido', async () => {
     const periodo = chaveDe((await linha()).renews_at);
     await fotografar(periodo, 'operators', 3, 1, 1000); // 2 a mais × R$ 10 no plano de teto 1

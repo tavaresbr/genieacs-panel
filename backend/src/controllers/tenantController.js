@@ -394,7 +394,7 @@ class TenantController {
 
   /**
    * `GET /api/tenant/referrals` — a indicação de provedores, na tela de Plano
-   * (0105): o código e o link (gerados na primeira vez), o saldo de créditos
+   * (0106): o código e o link (gerados na primeira vez), o saldo de créditos
    * e quem este provedor indicou, com o nome mascarado. `settings.read`, como
    * `/subscription`: é a mesma tela.
    */
@@ -445,7 +445,7 @@ class TenantController {
     try {
       const resultado = await SelfBillingService.changePlan({
         planId: req.body?.planId,
-        // O ciclo (0103): `monthly` ou `annual`; sem ele, o de agora.
+        // O ciclo (0104): `monthly` ou `annual`; sem ele, o de agora.
         cycle: req.body?.cycle ?? null,
         actorUserId: req.user?.userId ?? null,
         countDevices: () => DeviceService.countDevicesFromGenieAcs()

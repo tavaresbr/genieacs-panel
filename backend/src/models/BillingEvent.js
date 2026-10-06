@@ -42,7 +42,7 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   // estorno (`couponRestored`).
   COUPON_APPLIED: 'coupon.applied',
   COUPON_REMOVED: 'coupon.removed',
-  // A retenção no cancelamento (0106): a pausa aceita e o fim dela (pelo
+  // A retenção no cancelamento (0107): a pausa aceita e o fim dela (pelo
   // agendador na data, ou pelo pagamento antes), e o cancelamento agendado
   // pelo próprio provedor e desfeito antes da data. O cancelamento em si,
   // quando a data chega, é `status.changed` com o motivo `self_cancel`.

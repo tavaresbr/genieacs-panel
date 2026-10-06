@@ -396,7 +396,7 @@ class SubscriptionNoticeService {
       centavos = Number(cobranca.amount_cents);
       moeda = cobranca.currency || plan?.currency || 'BRL';
     } else {
-      // No ciclo da fatura (0103): a troca para o anual agendada para este
+      // No ciclo da fatura (0104): a troca para o anual agendada para este
       // prazo cobra o preço do ano, e o lembrete diz esse valor.
       const fatura = subscription
         ? await SelfBillingService.invoicePricingFor(subscription).catch(() => null)

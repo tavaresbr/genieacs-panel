@@ -35,3 +35,23 @@ describe('breakpoints arbitrários', () => {
     expect(offenders).toEqual([])
   })
 })
+
+/**
+ * Mesma família de defeito: duas classes que mexem na mesma propriedade, e a
+ * ordem do CSS da v4 escolhe outra vencedora. O v3 tinha `break-words
+ * [overflow-wrap:anywhere]` e a propriedade arbitrária saía por último; a
+ * ferramenta de migração trocou por `wrap-break-word … wrap-anywhere`, e na v4
+ * o `break-word` vence. Um código PIX sem espaço deixou de quebrar e alargou a
+ * conversa do WhatsApp para além do cartão.
+ */
+describe('quebra de linha', () => {
+  it('wrap-break-word e wrap-anywhere não aparecem na mesma classe', () => {
+    const offenders = sources(SRC).flatMap((file) => {
+      const text = readFileSync(file, 'utf8')
+      return [...text.matchAll(/className=(?:"[^"]*"|\{`[^`]*`\})/g)]
+        .filter((match) => /\bwrap-break-word\b/.test(match[0]) && /\bwrap-anywhere\b/.test(match[0]))
+        .map((match) => `${path.relative(SRC, file)}: ${match[0]}`)
+    })
+    expect(offenders).toEqual([])
+  })
+})

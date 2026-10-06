@@ -10,7 +10,7 @@ import { displayDate } from '@/lib/date-format'
 import { REFERRAL_STATUS_KEYS, referralBadgeClass, referralLink } from '@/lib/referrals'
 
 /**
- * "Indique e ganhe" na tela de Plano (0105): o link de indicação do provedor,
+ * "Indique e ganhe" na tela de Plano (0106): o link de indicação do provedor,
  * o saldo de créditos e quem ele indicou — com o nome mascarado, que é o que o
  * servidor manda.
  *

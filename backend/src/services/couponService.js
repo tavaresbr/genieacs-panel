@@ -118,7 +118,7 @@ class CouponService {
     tenantId, code, actorUserId = null, source = 'provider', countDevices = null, now = new Date()
   }) {
     const doConsole = source === 'console';
-    // O desconto de retenção (0106): aplicado pelo fluxo de cancelamento, com
+    // O desconto de retenção (0107): aplicado pelo fluxo de cancelamento, com
     // o cupom do sistema. Substitui o que houver como o console — quem decide
     // se substitui (só um desconto maior que o atual) é `CancellationService`
     // — e, como o console, não toma vaga nova de quem já o resgatou um dia.
@@ -140,7 +140,7 @@ class CouponService {
       if (!codigo || codigo.length > 32) throw COUPON_ERRORS.invalid();
       const cupom = await Coupon.findByCode(codigo);
       if (!cupom || !cupom.active) throw COUPON_ERRORS.invalid();
-      // O cupom do sistema (0106) não se resgata digitando: para o provedor
+      // O cupom do sistema (0107) não se resgata digitando: para o provedor
       // ele não existe. E a retenção só aplica o dela.
       if (cupom.system_kind && !comoConsole) throw COUPON_ERRORS.invalid();
       if (daRetencao && cupom.system_kind !== 'retention' && cupom.system_kind !== ANNUAL_RETENTION_KIND) {
