@@ -158,6 +158,51 @@ class SubscriptionNoticeService {
     };
   }
 
+  /**
+   * O aviso de que o cartão salvo foi recusado (0100) e de que a fatura foi
+   * reemitida como Pix/boleto — com o link dela, quando já há um.
+   *
+   * A memória (uma vez por recusa) é de `CardAutopayService.notifyRefusal`,
+   * que toma `card_failure_notified_at` antes de chamar isto; aqui é só a
+   * mensagem, pelos mesmos destinatários e canais dos lembretes. Devolve
+   * `{ sent, reason }` como `notifyCurrent`.
+   */
+  static async notifyCardRefused({ tenant: doLaco = null } = {}) {
+    const tenant = doLaco ?? await Tenant.findById(currentTenantId());
+    if (!tenant) return { sent: false, reason: 'tenant_gone' };
+    if (tenant.kind === 'platform') return { sent: false, reason: 'platform_tenant' };
+    const transporte = mailTransport();
+    const temEmail = transporte.name !== 'none';
+    const para = temEmail ? await this.recipients(tenant) : [];
+    const fone = String(tenant.billing_phone ?? '').trim();
+    if (!para.length && !fone) return { sent: false, reason: temEmail ? 'no_recipient' : 'no_transport' };
+
+    const cobranca = await BillingCharge.currentOpen().catch(() => null);
+    const vars = {
+      provider: tenant.name || PRODUCT_NAME,
+      link: cobranca?.invoice_url || panelUrlFor(tenant) || ''
+    };
+    const assunto = translate(DEFAULT_LOCALE, 'subscription.cardRefusedSubject', vars);
+    const texto = translate(DEFAULT_LOCALE, 'subscription.cardRefusedBody', vars);
+    const canais = await this.send({ para, fone, transporte, assunto, texto });
+    if (!canais.length) return { sent: false, reason: 'send_failed' };
+    return { sent: true, channels: canais };
+  }
+
+  /** Manda por e-mail e WhatsApp; devolve os canais por onde saiu. */
+  static async send({ para, fone, transporte, assunto, texto }) {
+    const enviados = await Promise.all(para.map((endereco) => transporte.send({
+      to: endereco, subject: assunto, text: texto
+    }).catch(() => false)));
+    const porWhatsapp = fone
+      ? await PlatformNotifyService.sendWhatsapp(fone, `*${assunto}*\n\n${texto}`)
+      : false;
+    const canais = [];
+    if (enviados.some(Boolean)) canais.push('email');
+    if (porWhatsapp) canais.push('whatsapp');
+    return canais;
+  }
+
   /** Monta e manda a mensagem; devolve os canais por onde ela saiu. */
   static async deliver({
     tenant, pendente, dueAt, para, fone, transporte, now, plan, subscription = null

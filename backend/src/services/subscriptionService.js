@@ -511,7 +511,28 @@ class SubscriptionService {
       canceledAt: subscription.canceled_at ?? null,
       pendingPlan: this.presentPendingPlan(subscription, pendingPlan),
       coupon: this.presentCoupon(subscription, plan, coupon),
+      card: this.presentCard(subscription),
       ...this.presentBillingExempt(subscription, { withReason: withExemptReason })
+    };
+  }
+
+  /**
+   * O cartão recorrente (0100), como a tela e o console o veem: a intenção,
+   * a bandeira, os quatro últimos dígitos e as datas — NUNCA o token, nem o IP
+   * de quem ligou. `failure` é um código (`charge_refused`, `capture_refused`)
+   * que a tela traduz, e não o texto do gateway.
+   */
+  static presentCard(subscription) {
+    const salvo = Boolean(subscription?.card_token_ciphertext);
+    return {
+      autopayEnabled: Boolean(subscription?.card_autopay_at),
+      autopaySince: isoOf(subscription?.card_autopay_at),
+      saved: salvo,
+      brand: salvo ? (subscription.card_brand ?? null) : null,
+      last4: salvo ? (subscription.card_last4 ?? null) : null,
+      savedAt: salvo ? isoOf(subscription.card_saved_at) : null,
+      failedAt: salvo ? isoOf(subscription.card_failed_at) : null,
+      failure: salvo && subscription.card_failed_at ? (subscription.card_failure ?? null) : null
     };
   }
 

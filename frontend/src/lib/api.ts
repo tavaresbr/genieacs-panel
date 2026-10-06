@@ -1628,6 +1628,25 @@ export interface SubscriptionView {
   billingExemptUntil?: string | null
   /** O cupom de desconto na assinatura. Opcional: servidores antigos não mandam. */
   coupon?: SubscriptionCoupon | null
+  /** O cartão recorrente. Opcional: servidores antigos não mandam. */
+  card?: SubscriptionCard | null
+}
+
+/**
+ * O cartão recorrente: a cobrança automática no cartão salvo pela página do
+ * Asaas. Só bandeira, quatro dígitos e datas — o token nunca sai do servidor.
+ * `failure` é um código (`charge_refused`, `capture_refused`): enquanto há
+ * falha, as faturas saem como Pix/boleto até um novo pagamento com cartão.
+ */
+export interface SubscriptionCard {
+  autopayEnabled: boolean
+  autopaySince: string | null
+  saved: boolean
+  brand: string | null
+  last4: string | null
+  savedAt: string | null
+  failedAt: string | null
+  failure: string | null
 }
 
 /**
@@ -1698,6 +1717,8 @@ export interface TenantChargeView {
   dueDate: string | null
   invoiceUrl: string | null
   createdAt: string | null
+  /** `CREDIT_CARD` quando é cobrada sozinha no cartão salvo. Opcional: servidores antigos não mandam. */
+  billingType?: string | null
   /** A nota fiscal desta cobrança. Opcional: servidores antigos não mandam. */
   invoice?: TenantInvoiceView | null
 }
@@ -1716,6 +1737,8 @@ export interface ChargeConsoleView {
   dueDate: string | null
   invoiceUrl: string | null
   provider: string
+  /** `CREDIT_CARD` quando saiu no cartão salvo. Opcional: servidores antigos não mandam. */
+  billingType?: string | null
   gatewayChargeId: string | null
   attempts: number
   lastError: string | null
@@ -1750,6 +1773,8 @@ export interface SubscriptionConsoleSubscription {
   billingExemptUntil?: string | null
   /** O cupom de desconto. Opcional: servidores antigos não mandam. */
   coupon?: SubscriptionCoupon | null
+  /** O cartão recorrente. Opcional: servidores antigos não mandam. */
+  card?: SubscriptionCard | null
 }
 
 export type CouponKind = 'percent' | 'fixed'
@@ -2422,7 +2447,20 @@ export const subscriptionAPI = {
    * (este provedor já resgatou o cupom).
    */
   applyCoupon: (code: string) =>
-    apiClient.post<SubscriptionUsage>('/tenant/subscription/coupon', { code })
+    apiClient.post<SubscriptionUsage>('/tenant/subscription/coupon', { code }),
+
+  /**
+   * Liga ou desliga a cobrança automática no cartão. Ligar só registra a
+   * intenção: o cartão é salvo quando uma fatura é paga com cartão na página
+   * do Asaas. Devolve a mesma tela de `current()`. 409 `not_changeable`
+   * (assinatura parada) e `not_billable` (outro gateway).
+   */
+  setCardAutopay: (enabled: boolean) =>
+    apiClient.put<SubscriptionUsage>('/tenant/subscription/autopay', { enabled }),
+
+  /** Esquece o cartão salvo; a cobrança de cartão em aberto vira Pix/boleto. */
+  removeCard: () =>
+    apiClient.delete<SubscriptionUsage>('/tenant/subscription/card')
 }
 
 export const usersAPI = {

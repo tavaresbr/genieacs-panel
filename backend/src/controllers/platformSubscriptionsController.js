@@ -373,6 +373,8 @@ class PlatformSubscriptionsController {
             coupon: SubscriptionService.presentCoupon(
               sub, planos.get(Number(sub.plan_id)) ?? null, sub.coupon_id ? cupons.get(Number(sub.coupon_id)) ?? null : null
             ),
+            // O cartão recorrente (0100): bandeira e dígitos, nunca o token.
+            card: SubscriptionService.presentCard(sub),
             ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra
@@ -841,7 +843,9 @@ class PlatformSubscriptionsController {
             if (gateway) {
               respondido = await noGateway(() => gateway.updateCharge(cobranca.gateway_charge_id, {
                 ...(mudaData ? { dueDate } : {}),
-                ...(mudaValor ? { value: amount } : {})
+                ...(mudaValor ? { value: amount } : {}),
+                // O meio com que ela nasceu (0100): a de cartão continua de cartão.
+                ...(cobranca.billing_type ? { billingType: cobranca.billing_type } : {})
               }));
             }
             const patch = { issuing_until: null };

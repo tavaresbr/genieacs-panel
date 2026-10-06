@@ -19,6 +19,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { exemptUntilFromDateInput, todayIso, toIsoDay } from '@/lib/subscription-console'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
+import { CardBadge } from '@/components/card-badge'
 
 interface Props {
   tenant: Tenant
@@ -523,6 +524,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
             <span className="modern-badge-info">{exemptUntilLabel(subscription, t) ?? t('platform.subs.exempt')}</span>
           )}
           {subscription.coupon && <CouponBadge coupon={subscription.coupon} currency={moedaDoPlano} />}
+          <CardBadge card={subscription.card} />
           {subscription.reason === 'trial_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
           )}

@@ -10,6 +10,7 @@ import { asaasBilling } from './billing/asaasBillingProvider.js';
 import { AsaasCustomerError, ensureAsaasCustomer } from './billing/asaasCustomerService.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import CardAutopayService from './billing/cardAutopayService.js';
 
 /**
  * O provedor cuidando da própria conta: ver os planos, trocar de plano e
@@ -633,6 +634,14 @@ class SelfBillingService {
       throw new SelfBillingError('charges.gatewayNotConfigured', { code: 'gateway_not_configured', status: 503 });
     }
 
+    // A cobrança de cartão em aberto cujo cartão deixou de servir (recusado,
+    // removido, cobrança automática desligada) sai daqui já como Pix/boleto
+    // (0100): o clique de quem quer pagar não pode devolver a fatura que o
+    // cartão não pagou. Melhor esforço — a falha fica para o agendador.
+    await CardAutopayService.reissueIneligible({ tenant }).catch((error) => {
+      console.warn(`Could not reissue the card charge of provider ${tenantId} before paying: ${error.message}`);
+    });
+
     let customerCreated = false;
     let atual = tenant;
     if (!tenant.billing_customer_ref) {
@@ -724,6 +733,87 @@ class SelfBillingService {
     }
     const reissue = await reemitir(cobranca, tenant, { countDevices, pendingBlockedBy: bloqueio });
     return { result, charge: cobranca.acao, ...(reissue ? { reissue } : {}) };
+  }
+
+  /**
+   * Liga ou desliga a cobrança automática no cartão (0100) — o "Cobrar
+   * automaticamente no cartão" da tela de Plano.
+   *
+   * Ligar só registra a intenção e o IP de quem pediu (`remoteIp`, que o
+   * gateway exige em toda cobrança por token): o cartão é salvo depois, pelo
+   * pagamento de uma fatura com cartão na página do gateway
+   * (`CardAutopayService.captureToken`). Ligar de novo renova o IP e mantém a
+   * data. Desligar mantém o cartão salvo, mas ele deixa de ser usado — e a
+   * cobrança de cartão em aberto é reemitida como Pix/boleto.
+   *
+   * Recusas: `enabled` que não é booleano (400 `invalid`); a plataforma, ou
+   * ligar numa assinatura parada por gente (409 `not_changeable`); ligar num
+   * provedor cobrado por outro gateway (409 `not_billable`).
+   *
+   * @returns {Promise<{ changed: boolean, enabled: boolean }>}
+   */
+  static async setCardAutopay({ enabled, remoteIp = null, now = new Date() }) {
+    if (typeof enabled !== 'boolean') {
+      throw new SelfBillingError('subscription.cardAutopayInvalid', { code: 'invalid', status: 400 });
+    }
+    const tenantId = currentTenantId();
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant || tenant.kind === 'platform') {
+      throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+    }
+    const subscription = await Subscription.forTenant(tenantId);
+    if (!subscription) {
+      throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+    }
+    const ligada = Boolean(subscription.card_autopay_at);
+    if (enabled) {
+      if (!ESTADOS_VIVOS.has(subscription.status)) {
+        throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+      }
+      if (tenant.billing_gateway && tenant.billing_gateway !== asaasBilling.name) {
+        throw new SelfBillingError('charges.notBillable', { code: 'not_billable', status: 409 });
+      }
+      const ip = String(remoteIp ?? '').trim().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '').slice(0, 45);
+      if (!ip) throw new SelfBillingError('subscription.cardUpdateFailed', { code: 'no_remote_ip', status: 400 });
+      await Subscription.upsertForTenant(tenantId, {
+        card_autopay_at: subscription.card_autopay_at ?? new Date(Math.floor(now.getTime() / 1000) * 1000),
+        card_remote_ip: ip
+      });
+    } else if (ligada) {
+      await Subscription.upsertForTenant(tenantId, { card_autopay_at: null, card_capture_payment_id: null });
+    }
+    await SubscriptionService.invalidate(tenantId);
+    if (!enabled && ligada) {
+      await CardAutopayService.reissueIneligible({ tenant, now }).catch((error) => {
+        console.warn(`Could not reissue the card charge of provider ${tenantId} after autopay was turned off: ${error.message}`);
+      });
+    }
+    return { changed: enabled !== ligada, enabled };
+  }
+
+  /**
+   * Esquece o cartão salvo (0100): o token cifrado, a bandeira, os dígitos, a
+   * falha. A intenção de cobrança automática fica como está — com ela ligada,
+   * pagar a próxima fatura com outro cartão salva o novo. A cobrança de
+   * cartão em aberto é reemitida como Pix/boleto. Idempotente: sem cartão
+   * salvo, nada muda.
+   *
+   * @returns {Promise<{ removed: boolean, brand?: string|null, last4?: string|null }>}
+   */
+  static async removeCard({ now = new Date() } = {}) {
+    const tenantId = currentTenantId();
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant || tenant.kind === 'platform') {
+      throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+    }
+    const subscription = await Subscription.forTenant(tenantId);
+    if (!subscription || !CardAutopayService.hasToken(subscription)) return { removed: false };
+    await Subscription.upsertForTenant(tenantId, { ...CardAutopayService.CLEARED_CARD });
+    await SubscriptionService.invalidate(tenantId);
+    await CardAutopayService.reissueIneligible({ tenant, now }).catch((error) => {
+      console.warn(`Could not reissue the card charge of provider ${tenantId} after the card was removed: ${error.message}`);
+    });
+    return { removed: true, brand: subscription.card_brand ?? null, last4: subscription.card_last4 ?? null };
   }
 
   /** Quanto o "pagar agora" espera pela cobrança que outra passada está emitindo. */

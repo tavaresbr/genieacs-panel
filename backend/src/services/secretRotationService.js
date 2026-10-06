@@ -105,6 +105,14 @@ const COLUNAS = Object.freeze([
     prefixo: 'webhook_token',
     versao: 'webhook_token_key_version',
     contexto: 'skygenpanel-evolution-webhook-token-v1'
+  },
+  {
+    // O token do cartão recorrente (0100) — ver `cardAutopayService`. A
+    // assinatura é escopada, então entra no laço dos provedores como as outras.
+    tabela: 'subscriptions',
+    prefixo: 'card_token',
+    versao: 'card_token_key_version',
+    contexto: 'skygenpanel-subscription-card-token-v1'
   }
 ]);
 

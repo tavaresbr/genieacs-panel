@@ -52,6 +52,12 @@ router.post('/charges/pay', authenticateToken, requirePermission('settings.write
 // capacidade e mesmo lado da porta da assinatura que a troca de plano: um
 // desconto é uma das saídas de quem está atrasado.
 router.post('/subscription/coupon', authenticateToken, requirePermission('settings.write'), TenantController.applyCoupon);
+// O cartão recorrente (0100): ligar/desligar a cobrança automática no cartão
+// e esquecer o cartão salvo. Mesma capacidade e mesmo lado da porta da
+// assinatura que a troca de plano — quem está atrasado precisa poder trocar
+// o cartão recusado por Pix/boleto. O cartão em si nunca passa por aqui.
+router.put('/subscription/autopay', authenticateToken, requirePermission('settings.write'), TenantController.setCardAutopay);
+router.delete('/subscription/card', authenticateToken, requirePermission('settings.write'), TenantController.removeCard);
 
 // O nome do provedor, escrito por quem administra. É o antigo `appName` das
 // configurações, agora na linha do provedor — ver o controlador.

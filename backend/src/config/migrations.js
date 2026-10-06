@@ -2091,6 +2091,49 @@ const SUBSCRIPTION_COUPON_COLUMNS = [
   ['coupon_applied_at', (t) => t.timestamp('coupon_applied_at').nullable()]
 ];
 
+/**
+ * O cartão recorrente na assinatura (0100) — ver `cardAutopayService`.
+ *
+ * O cartão em si nunca passa por aqui: quem o digita é o provedor, na página
+ * do Asaas. O que se guarda é o `creditCardToken` que o gateway devolve depois
+ * de um pagamento com cartão, cifrado com `secretBox` no envelope de colunas
+ * de sempre (`_ciphertext`/`_iv`/`_tag`/`_key_version` — o sufixo é o que
+ * tira a coluna do export do provedor), mais o que a tela mostra (bandeira e
+ * os quatro últimos dígitos) e o IP de quem ligou a cobrança automática, que
+ * o gateway exige em toda cobrança por token (`remoteIp`).
+ *
+ * `card_autopay_at` é a intenção (nulo = desligada); `card_failed_at` e
+ * `card_failure` (um código, nunca o texto do gateway) param o uso do cartão
+ * até um novo pagamento com cartão trocar o token; `card_capture_payment_id`
+ * é o pagamento cujo token ainda falta ler (a captura sai fora do webhook);
+ * `card_failure_notified_at` é a memória do aviso de recusa.
+ */
+const SUBSCRIPTION_CARD_COLUMNS = [
+  ['card_autopay_at', (t) => t.timestamp('card_autopay_at').nullable()],
+  ['card_token_ciphertext', (t) => t.text('card_token_ciphertext').nullable()],
+  ['card_token_iv', (t) => t.string('card_token_iv', 32).nullable()],
+  ['card_token_tag', (t) => t.string('card_token_tag', 32).nullable()],
+  ['card_token_key_version', (t) => t.integer('card_token_key_version').nullable()],
+  ['card_brand', (t) => t.string('card_brand', 32).nullable()],
+  ['card_last4', (t) => t.string('card_last4', 4).nullable()],
+  ['card_saved_at', (t) => t.timestamp('card_saved_at').nullable()],
+  ['card_remote_ip', (t) => t.string('card_remote_ip', 45).nullable()],
+  ['card_failed_at', (t) => t.timestamp('card_failed_at').nullable()],
+  ['card_failure', (t) => t.string('card_failure', 32).nullable()],
+  ['card_failure_notified_at', (t) => t.timestamp('card_failure_notified_at').nullable()],
+  ['card_capture_payment_id', (t) => t.string('card_capture_payment_id', 128).nullable()]
+];
+
+/**
+ * Com que meio a cobrança foi pedida ao gateway (0100): `UNDEFINED` (a página
+ * de Pix-ou-boleto, nulo nas linhas de antes) ou `CREDIT_CARD` (o token
+ * salvo). É o que `updateCharge` reenvia, e o que diz que uma tentativa por
+ * cartão já foi feita nesta linha.
+ */
+const BILLING_CHARGE_CARD_COLUMNS = [
+  ['billing_type', (t) => t.string('billing_type', 16).nullable()]
+];
+
 /** A conversa com dono: quem atende, desde quando, e desde quando espera um. */
 const WA_ASSIGNMENT_COLUMNS = [
   ['assigned_user_id', (t) => t.integer('assigned_user_id').unsigned().nullable()],
@@ -5519,6 +5562,27 @@ export const migrations = [
       await db.schema.alterTable('sgp_contacts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** O cartão recorrente — ver `SUBSCRIPTION_CARD_COLUMNS` e `BILLING_CHARGE_CARD_COLUMNS`. */
+    id: '0100_subscription_card',
+    async isApplied(db) {
+      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_CARD_COLUMNS], ['billing_charges', BILLING_CHARGE_CARD_COLUMNS]]) {
+        if (!(await db.schema.hasTable(tabela))) continue;
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_CARD_COLUMNS], ['billing_charges', BILLING_CHARGE_CARD_COLUMNS]]) {
+        if (!(await db.schema.hasTable(tabela))) continue;
+        const missing = await missingColumns(db, tabela, colunas);
+        if (!missing.length) continue;
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
     }
   }
 ];
