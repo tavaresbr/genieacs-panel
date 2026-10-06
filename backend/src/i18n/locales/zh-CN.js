@@ -544,6 +544,8 @@ export default {
   'whatsapp.error.notCloud': "此操作仅适用于 Meta 官方 API 号码。",
   'whatsapp.error.cloudInstanceStillExists': "Evolution 服务器上仍有此号码的实例，令牌未更换。请几秒后重试。",
   'whatsapp.metaTokenUpdated': "Meta 令牌已更新。",
+  'whatsapp.metaWebhook.registered': "已在 Meta 注册 Webhook。",
+  'whatsapp.metaWebhook.failed': "Meta 拒绝了 Webhook 注册：{reason}",
   'whatsapp.error.notSupportedCloud': "号码查询需要通过二维码连接的号码；官方 API 不提供此功能。",
   'whatsapp.error.invalidCloudCallbackUrl': "Meta 回调 URL 无效",
   'whatsapp.error.noDestination': '该联系人既没有电话号码也没有 WhatsApp 标识',

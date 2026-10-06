@@ -1,6 +1,7 @@
 import WaMetaTemplateService from '../services/waMetaTemplateService.js';
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
+import MetaWebhookService from '../services/metaWebhookService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
 import WaAiService from '../services/waAiService.js';
 import WaBotReportService from '../services/waBotReportService.js';
@@ -222,6 +223,22 @@ class WhatsAppController {
         adminKey: req.body?.adminKey
       });
       return res.json(createResponse(req.t('whatsapp.metaTokenUpdated'), {
+        account: WhatsAppConfigService.publicAccount(account)
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /**
+   * Registra de novo o webhook da conta WABA na Meta (`override_callback_uri`
+   * com o token de verificação do servidor), com o token do próprio número.
+   * Falha da Meta fica gravada no número e volta como 502.
+   */
+  static async registerMetaWebhook(req, res) {
+    try {
+      const { account } = await MetaWebhookService.retry(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.metaWebhook.registered'), {
         account: WhatsAppConfigService.publicAccount(account)
       }));
     } catch (error) {

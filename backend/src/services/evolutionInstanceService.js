@@ -481,6 +481,10 @@ class EvolutionInstanceService {
     } catch (error) {
       account = await WhatsAppAccount.update(account.id, { last_error: describeFailure(error) });
     }
+    // O webhook da conta WABA, registrado pelo painel na Meta com o token do
+    // número — o provedor não precisa (nem pode) ver o token de verificação do
+    // servidor. O resultado fica na linha; recusa da Meta não desfaz o número.
+    account = (await this.registerMetaWebhook(account, token)) || account;
     // Os modelos aprovados já na criação, para a tela de modelos não abrir
     // vazia. Falha aqui fica gravada no número e não desfaz nada.
     try {
@@ -584,6 +588,9 @@ class EvolutionInstanceService {
     } catch (error) {
       updated = await WhatsAppAccount.update(updated.id, { last_error: describeFailure(error) });
     }
+    // O token novo pode ser de outro usuário do sistema: o webhook é
+    // registrado de novo com ele, como na criação.
+    updated = (await this.registerMetaWebhook(updated, readApiKey(created.data) || token)) || updated;
     try {
       const { default: WaMetaTemplateService } = await import('./waMetaTemplateService.js');
       await WaMetaTemplateService.sync(updated.id);
@@ -591,6 +598,19 @@ class EvolutionInstanceService {
       // melhor esforço, como na criação
     }
     return { account: await WhatsAppAccount.getById(updated.id) };
+  }
+
+  /**
+   * Registra o webhook da Meta do número oficial (`MetaWebhookService`) sem
+   * nunca lançar: devolve a linha atualizada, ou `null` se nem isso deu.
+   */
+  static async registerMetaWebhook(account, metaToken) {
+    try {
+      const { default: MetaWebhookService } = await import('./metaWebhookService.js');
+      return (await MetaWebhookService.register(account, metaToken)).account;
+    } catch {
+      return null;
+    }
   }
 
   /** The server's own id for an instance it says it already has. */
