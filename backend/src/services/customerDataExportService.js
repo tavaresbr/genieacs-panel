@@ -50,8 +50,16 @@ import { timestampMs } from '../utils/helpers.js';
  * painel escondeu alguma coisa.
  */
 
-/** As tabelas escopadas que não guardam dado de assinante, e por quê. */
-const SEM_DADO_DE_ASSINANTE = Object.freeze({
+/**
+ * As tabelas escopadas que não guardam dado de assinante, e por quê.
+ *
+ * Exportada para `backend/test/lgpd-inventario.test.js`, que exige que TODA
+ * tabela escopada esteja aqui ou seja alcançada pelo dossiê — nunca em nenhum
+ * dos dois. Uma tabela nova que escape das duas listas não dá erro: ela
+ * simplesmente não entra no arquivo que o titular pediu, e não é apagada quando
+ * ele pede exclusão. O teste é o que transforma esse silêncio em falha.
+ */
+export const SEM_DADO_DE_ASSINANTE = Object.freeze({
   settings: 'configuração do provedor',
   wa_agents: 'disponibilidade da equipe no WhatsApp',
   wa_tags: 'as etiquetas que o provedor criou para as conversas',
