@@ -745,7 +745,9 @@ describe('a customer waiting for a person tells the team', () => {
   });
 
   it('a rota da caixa de entrada lista quem espera', async () => {
-    await msg('in', 25, { external_id: 'ESPERA-IN-3' });
+    // 26 e não 25: o MySQL guarda o segundo inteiro, arredondado, e uma
+    // mensagem de 25 min com 600 ms vira 24 min 59 s — o chão daria 24.
+    await msg('in', 26, { external_id: 'ESPERA-IN-3' });
     await setRules(onlyRule('wa_waiting', { threshold: 15 }));
     const { status, body } = await call(`${panelUrl}/api/whatsapp/waiting`, { headers: authHeaders(token) });
     assert.equal(status, 200);
