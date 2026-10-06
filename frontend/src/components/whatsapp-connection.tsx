@@ -45,6 +45,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   ai_blocked_host: 'whatsapp.ai.err.blockedHost',
   ai_invalid_url: 'whatsapp.ai.err.invalidUrl',
   ai_key_required: 'whatsapp.ai.err.keyRequired',
+  ai_key_required_for_new_url: 'whatsapp.ai.err.keyRequiredForNewUrl',
   ai_disabled: 'whatsapp.ai.err.disabled',
   ai_failed: 'whatsapp.ai.err.failed',
   not_configured: 'whatsapp.error.notConfigured',

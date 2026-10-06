@@ -997,6 +997,7 @@ const it: Dictionary = {
   'settings.chatbot.aiModelHint': 'Su z.ai: glm-4.5-flash (gratuito), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Chiave API',
   'settings.chatbot.aiKeySaved': 'Chiave configurata',
+  'settings.chatbot.aiKeyEnds': 'termina con …{hint}',
   'settings.chatbot.aiKeyRemove': 'Rimuovi chiave',
   'settings.chatbot.aiKeyWillRemove': 'La chiave verrà rimossa al salvataggio.',
   'settings.chatbot.aiKeyReplace': 'Incolla una nuova chiave per sostituirla',
@@ -2761,6 +2762,7 @@ const it: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Indirizzo IA non consentito',
   'whatsapp.ai.err.invalidUrl': 'Indirizzo API non valido',
   'whatsapp.ai.err.keyRequired': 'Inserisci la chiave API per attivare l’IA',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Cambiando l’indirizzo dell’API, inserisci di nuovo la chiave',
   'whatsapp.ai.err.disabled': 'I suggerimenti dell’IA sono disattivati',
   'whatsapp.ai.err.failed': 'Errore dell’IA',
   'whatsapp.tags.button': 'Etichette',
@@ -4278,6 +4280,26 @@ const it: Dictionary = {
   'plan.coupon.have': "Ho un coupon",
   'plan.coupon.hint': "Lo sconto vale per le prossime fatture, compresa quella già aperta.",
   'plan.coupon.nextInvoice': "Prossima fattura: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navigazione",
+  'siteMap.title': "Mappa del pannello",
+  'siteMap.description': "Tutte le schermate di questo pannello, raggruppate, con la funzione di ciascuna: solo quelle che il tuo accesso apre.",
+  'siteMap.group.operation': "Operatività quotidiana",
+  'siteMap.group.administration': "Amministrazione",
+  'siteMap.group.platform': "Piattaforma",
+  'siteMap.settings.title': "Sezioni della Configurazione",
+  'siteMap.settings.description': "Ognuna apre la Configurazione già su quella scheda.",
+  'siteMap.inner.title': "Schermate raggiunte da un'altra",
+  'siteMap.inner.description': "Non hanno un link proprio: ognuna dipende dall'elemento da cui si arriva.",
+  'siteMap.inner.device': "Dettaglio dispositivo",
+  'siteMap.inner.deviceReached': "Fai clic su un dispositivo nell'inventario",
+  'siteMap.inner.contact': "Dettaglio contatto",
+  'siteMap.inner.contactReached': "Fai clic su un contatto in Contatti",
+  'siteMap.inner.onboarding': "Prima configurazione",
+  'siteMap.inner.onboardingReached': "Si apre da sola al primo accesso senza ACS configurato",
+  'sidebar.siteMap': "Mappa del pannello",
 }
 
 export default it

@@ -994,6 +994,7 @@ const zhTW: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai 上：glm-4.5-flash（免費）、glm-4.5-air、glm-4.6。',
   'settings.chatbot.aiKey': 'API 金鑰',
   'settings.chatbot.aiKeySaved': '金鑰已設定',
+  'settings.chatbot.aiKeyEnds': '結尾為 …{hint}',
   'settings.chatbot.aiKeyRemove': '移除金鑰',
   'settings.chatbot.aiKeyWillRemove': '儲存後將移除金鑰。',
   'settings.chatbot.aiKeyReplace': '貼上新金鑰以替換',
@@ -2755,6 +2756,7 @@ const zhTW: Dictionary = {
   'whatsapp.ai.err.blockedHost': '不允許使用該 AI 位址',
   'whatsapp.ai.err.invalidUrl': 'API 位址無效',
   'whatsapp.ai.err.keyRequired': '請輸入 API 金鑰以開啟 AI',
+  'whatsapp.ai.err.keyRequiredForNewUrl': '變更 API 位址時，請重新輸入 API 金鑰',
   'whatsapp.ai.err.disabled': 'AI 建議已關閉',
   'whatsapp.ai.err.failed': 'AI 發生錯誤',
   'whatsapp.tags.button': '標籤',
@@ -4273,6 +4275,26 @@ const zhTW: Dictionary = {
   'plan.coupon.have': "我有優惠券",
   'plan.coupon.hint': "折扣適用於你接下來的帳單，包括已開立的未付帳單。",
   'plan.coupon.nextInvoice': "下一張帳單：{price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "導覽",
+  'siteMap.title': "面板地圖",
+  'siteMap.description': "本面板的所有畫面，依組別列出並說明用途——僅顯示你的權限能開啟的畫面。",
+  'siteMap.group.operation': "日常運維",
+  'siteMap.group.administration': "管理",
+  'siteMap.group.platform': "平台",
+  'siteMap.settings.title': "設定的各個區塊",
+  'siteMap.settings.description': "每個連結都會直接開啟設定的對應標籤頁。",
+  'siteMap.inner.title': "從其他畫面進入的畫面",
+  'siteMap.inner.description': "它們沒有自己的連結：每個都需要從所屬項目進入。",
+  'siteMap.inner.device': "設備詳情",
+  'siteMap.inner.deviceReached': "在設備清單中點選一台設備",
+  'siteMap.inner.contact': "聯絡人詳情",
+  'siteMap.inner.contactReached': "在「聯絡人」中點選一位聯絡人",
+  'siteMap.inner.onboarding': "首次設定",
+  'siteMap.inner.onboardingReached': "在尚未設定 ACS 的情況下首次登入時自動開啟",
+  'sidebar.siteMap': "面板地圖",
 }
 
 export default zhTW

@@ -997,6 +997,7 @@ const de: Dictionary = {
   'settings.chatbot.aiModelHint': 'Bei z.ai: glm-4.5-flash (kostenlos), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'API-Schlüssel',
   'settings.chatbot.aiKeySaved': 'Schlüssel konfiguriert',
+  'settings.chatbot.aiKeyEnds': 'endet auf …{hint}',
   'settings.chatbot.aiKeyRemove': 'Schlüssel entfernen',
   'settings.chatbot.aiKeyWillRemove': 'Der Schlüssel wird beim Speichern entfernt.',
   'settings.chatbot.aiKeyReplace': 'Neuen Schlüssel einfügen, um ihn zu ersetzen',
@@ -2638,6 +2639,7 @@ const de: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'KI-Adresse nicht erlaubt',
   'whatsapp.ai.err.invalidUrl': 'Ungültige API-Adresse',
   'whatsapp.ai.err.keyRequired': 'Geben Sie den API-Schlüssel ein, um die KI zu aktivieren',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Geben Sie beim Ändern der API-Adresse den API-Schlüssel erneut ein',
   'whatsapp.ai.err.disabled': 'KI-Vorschläge sind deaktiviert',
   'whatsapp.ai.err.failed': 'Die KI ist fehlgeschlagen',
   'whatsapp.tags.button': 'Labels',
@@ -4276,6 +4278,26 @@ const de: Dictionary = {
   'plan.coupon.have': "Ich habe einen Gutschein",
   'plan.coupon.hint': "Der Rabatt gilt für Ihre nächsten Rechnungen, auch für eine bereits offene.",
   'plan.coupon.nextInvoice': "Nächste Rechnung: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navigation",
+  'siteMap.title': "Panel-Übersicht",
+  'siteMap.description': "Alle Bildschirme dieses Panels, gruppiert, mit ihrer jeweiligen Aufgabe — nur die, die Ihr Zugang öffnet.",
+  'siteMap.group.operation': "Täglicher Betrieb",
+  'siteMap.group.administration': "Verwaltung",
+  'siteMap.group.platform': "Plattform",
+  'siteMap.settings.title': "Bereiche der Konfiguration",
+  'siteMap.settings.description': "Jeder öffnet die Konfiguration direkt auf diesem Tab.",
+  'siteMap.inner.title': "Bildschirme, die aus einem anderen erreicht werden",
+  'siteMap.inner.description': "Sie haben keinen eigenen Link: jeder braucht das Element, von dem man kommt.",
+  'siteMap.inner.device': "Gerätedetails",
+  'siteMap.inner.deviceReached': "Auf ein Gerät im Inventar klicken",
+  'siteMap.inner.contact': "Kontaktdetails",
+  'siteMap.inner.contactReached': "Auf einen Kontakt unter Kontakte klicken",
+  'siteMap.inner.onboarding': "Erste Einrichtung",
+  'siteMap.inner.onboardingReached': "Öffnet sich beim ersten Anmelden ohne konfiguriertes ACS von selbst",
+  'sidebar.siteMap': "Panel-Übersicht",
 }
 
 export default de

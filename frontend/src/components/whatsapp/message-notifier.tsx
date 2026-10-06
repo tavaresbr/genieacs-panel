@@ -5,10 +5,12 @@ import { useNavigate } from 'react-router'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { Icon } from '@/components/ui/icon'
-import { whatsappAPI } from '@/lib/api'
+import { storedSession, whatsappAPI } from '@/lib/api'
+import { sessionOwner } from '@/lib/session-owner'
 import {
   focusedConversation,
   latestPerConversation,
+  notifierActive,
   playChime,
   readNotifyPref,
   shouldNotify,
@@ -23,7 +25,19 @@ const PREF_EVENT = 'wa-notify-change'
 
 const suportado = () => typeof window !== 'undefined' && 'Notification' in window
 
-const ligado = () => suportado() && readNotifyPref() && Notification.permission === 'granted'
+const ligado = (owner: string | null) => suportado() && readNotifyPref(owner) && Notification.permission === 'granted'
+
+/**
+ * O dono da sessão desta aba e se o vigia vale para ela. A aba de
+ * personificação fica de fora: a sessão é da aba (`storedSession`), e o
+ * `user.impersonation` confirma mesmo antes de a gaveta ser lida de novo.
+ */
+function useNotifierSession() {
+  const { user } = useAuth()
+  const owner = sessionOwner(user)
+  const tabScoped = Boolean(user?.impersonation) || storedSession().tabScoped
+  return { owner, active: notifierActive({ owner, tabScoped }) }
+}
 
 /**
  * O vigia das mensagens novas: toca e mostra a notificação do sistema quando
@@ -36,18 +50,33 @@ const ligado = () => suportado() && readNotifyPref() && Notification.permission 
  */
 export function WhatsAppMessageNotifier() {
   const { can } = useAuth()
+  const { owner, active } = useNotifierSession()
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const allowed = can('whatsapp.read')
+  const allowed = can('whatsapp.read') && active
   const cursor = useRef<string | null>(null)
   const inFlight = useRef(false)
+  const montado = useRef(false)
+  const ownerRef = useRef(owner)
+  // As notificações que este vigia abriu: fechadas ao sair da sessão, para o
+  // aviso do provedor A não ficar na tela de quem entra depois.
+  const abertas = useRef(new Set<Notification>())
   const tRef = useRef(t)
   const navigateRef = useRef(navigate)
   useEffect(() => { tRef.current = t }, [t])
   useEffect(() => { navigateRef.current = navigate }, [navigate])
+  useEffect(() => { ownerRef.current = owner }, [owner])
+
+  const fecharTodas = useCallback(() => {
+    for (const n of abertas.current) {
+      try { n.close() } catch { /* já fechada */ }
+    }
+    abertas.current.clear()
+  }, [])
 
   const tick = useCallback(async () => {
-    if (!ligado()) {
+    const dono = ownerRef.current
+    if (!ligado(dono)) {
       // Desligado, esquece o cursor: religar começa do agora, não do passado.
       cursor.current = null
       return
@@ -56,10 +85,13 @@ export function WhatsAppMessageNotifier() {
     inFlight.current = true
     try {
       const res = await whatsappAPI.getNotifications(cursor.current)
+      // A resposta é da sessão que perguntou: se o vigia saiu de cena ou a
+      // sessão trocou de dono no meio, ela não vale para quem está aqui agora.
+      if (!montado.current || ownerRef.current !== dono) return
       if (!res.success || !res.data) return
       const primeira = cursor.current === null
       cursor.current = res.data.cursor
-      if (primeira || !ligado()) return
+      if (primeira || !ligado(dono)) return
       const visible = document.visibilityState === 'visible'
       const avisar = latestPerConversation(res.data.items)
         .filter((item) => shouldNotify(item, { focusedConversationId: focusedConversation.id, visible }))
@@ -71,6 +103,8 @@ export function WhatsAppMessageNotifier() {
           body: item.preview || (item.hasAttachment ? tr('whatsapp.notify.attachment') : ''),
           tag: `wa-conv-${item.conversationId}`
         })
+        abertas.current.add(n)
+        n.onclose = () => { abertas.current.delete(n) }
         n.onclick = () => {
           window.focus()
           navigateRef.current(`/whatsapp?conversation=${item.conversationId}`)
@@ -82,8 +116,21 @@ export function WhatsAppMessageNotifier() {
     }
   }, [])
 
+  // Saiu da sessão (logout, token expirado, outra aba saiu): fecha o que ficou aberto.
+  useEffect(() => {
+    montado.current = true
+    window.addEventListener('auth:unauthorized', fecharTodas)
+    return () => {
+      montado.current = false
+      window.removeEventListener('auth:unauthorized', fecharTodas)
+      fecharTodas()
+    }
+  }, [fecharTodas])
+
   useEffect(() => {
     if (!allowed || !suportado()) return
+    // Dono novo, cursor novo: o da sessão anterior não diz nada a esta.
+    cursor.current = null
     void tick()
     const timer = window.setInterval(() => void tick(), POLL_MS)
     const mudou = () => void tick()
@@ -91,42 +138,50 @@ export function WhatsAppMessageNotifier() {
     return () => {
       window.clearInterval(timer)
       window.removeEventListener(PREF_EVENT, mudou)
+      fecharTodas()
     }
-  }, [allowed, tick])
+  }, [allowed, owner, tick, fecharTodas])
 
   return null
 }
 
 type Estado = 'on' | 'off' | 'blocked'
 
-function estadoAtual(): Estado {
+function estadoAtual(owner: string | null): Estado {
   if (Notification.permission === 'denied') return 'blocked'
-  return ligado() ? 'on' : 'off'
+  return ligado(owner) ? 'on' : 'off'
 }
 
 /**
  * O sino ao lado de "Disponível": liga e desliga as notificações neste
- * navegador. Ligar pede a permissão do sistema na primeira vez; bloqueada,
- * o botão diz como liberar. Sem suporte no navegador, não aparece.
+ * navegador, para a sessão de quem está nele. Ligar pede a permissão do
+ * sistema na primeira vez; bloqueada, o botão diz como liberar. Sem suporte
+ * no navegador, ou numa aba de personificação, não aparece.
  */
 export function NotifyToggle() {
   const { t } = useTranslation()
   const { can } = useAuth()
-  const [estado, setEstado] = useState<Estado>(() => (suportado() ? estadoAtual() : 'off'))
+  const { owner, active } = useNotifierSession()
+  const [estado, setEstado] = useState<Estado>(() => (suportado() ? estadoAtual(owner) : 'off'))
 
-  if (!suportado() || !can('whatsapp.read')) return null
+  // Trocou o dono, relê a preferência dele.
+  useEffect(() => {
+    if (suportado()) setEstado(estadoAtual(owner))
+  }, [owner])
+
+  if (!suportado() || !active || !can('whatsapp.read')) return null
 
   const alternar = async () => {
     if (estado === 'on') {
-      writeNotifyPref(false)
+      writeNotifyPref(owner, false)
     } else {
       let permissao = Notification.permission
       if (permissao === 'default') permissao = await Notification.requestPermission()
-      writeNotifyPref(permissao === 'granted')
+      writeNotifyPref(owner, permissao === 'granted')
       // Um toque agora: confirma o som e destrava o áudio do navegador.
       if (permissao === 'granted') playChime()
     }
-    setEstado(estadoAtual())
+    setEstado(estadoAtual(owner))
     window.dispatchEvent(new Event(PREF_EVENT))
   }
 
