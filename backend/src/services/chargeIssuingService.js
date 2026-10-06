@@ -1,4 +1,6 @@
-import BillingCharge, { OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER } from '../models/BillingCharge.js';
+import BillingCharge, {
+  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, isProration, isoDateOf
+} from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
@@ -7,7 +9,8 @@ import Plan from '../models/Plan.js';
 import Coupon from '../models/Coupon.js';
 import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
-import SubscriptionService from './subscriptionService.js';
+import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
+import CardAutopayService from './billing/cardAutopayService.js';
 
 /**
  * A régua de emissão: quem cobra o provedor, e quando.
@@ -69,8 +72,25 @@ export class ChargeFollowError extends Error {
 }
 
 class ChargeIssuingService {
-  /** Quantos dias antes do vencimento a cobrança sai. */
+  /** Quantos dias antes do vencimento a cobrança sai — a de Pix/boleto; a do cartão salvo sai no dia (`chargesSavedCard`). */
   static LEAD_DAYS = 5;
+
+  /**
+   * Se a próxima cobrança deste provedor sai no cartão salvo (0100): o
+   * gateway sabe cobrar cartão salvo e a cobrança automática está utilizável
+   * (`CardAutopayService.usable`). A mesma decisão que a emissão toma, para a
+   * antecedência da emissão e para a régua de lembretes.
+   */
+  static chargesSavedCard(provider, subscription) {
+    return Boolean(provider?.canChargeSavedCard && CardAutopayService.usable(subscription));
+  }
+
+  /** `chargesSavedCard` a partir da linha do provedor (o gateway ligado a ele). */
+  static cardAutopayFor(tenant, subscription) {
+    if (!tenant?.billing_customer_ref) return false;
+    const provider = providerFor(tenant.billing_gateway);
+    return Boolean(provider?.canIssue) && this.chargesSavedCard(provider, subscription);
+  }
 
   /**
    * Quantas vezes se insiste numa emissão que falhou.
@@ -397,11 +417,19 @@ class ChargeIssuingService {
       }
       let respondido = null;
       if (typeof provider?.updateCharge === 'function') {
-        respondido = await noGateway(() => provider.updateCharge(cobranca.gateway_charge_id, { dueDate: vencimento }));
+        respondido = await noGateway(() => provider.updateCharge(cobranca.gateway_charge_id, {
+          dueDate: vencimento,
+          // O valor de agora, para o desconto por antecipação ir junto com o piso.
+          amountCents: Number(cobranca.amount_cents),
+          // O meio com que ela nasceu (0100): a de cartão continua de cartão.
+          ...(cobranca.billing_type ? { billingType: cobranca.billing_type } : {})
+        }));
       }
       await BillingCharge.update(cobranca.id, {
         period_end: chaveNova,
         due_date: respondido?.dueDate || vencimento,
+        // Os termos do desconto que foram junto (0100): a conferência os lê.
+        ...(respondido?.discountTerms ? { discount_terms: BillingCharge.serializeDiscountTerms(respondido.discountTerms) } : {}),
         ...(cobranca.status === 'overdue' ? { status: 'pending' } : {}),
         issuing_until: null
       });
@@ -450,7 +478,8 @@ class ChargeIssuingService {
    * na mão do provedor é pagar ESSA, e não emitir outra.
    */
   static async issueCurrent({
-    now = new Date(), tenant: doLaco = null, manual = false, countDevices = null, pendingBlockedBy = undefined
+    now = new Date(), tenant: doLaco = null, manual = false, countDevices = null, pendingBlockedBy = undefined,
+    cardNow = false
   } = {}) {
     const tenant = doLaco ?? await Tenant.findById(currentTenantId());
     if (!tenant) return { issued: false, reason: 'tenant_gone' };
@@ -513,9 +542,10 @@ class ChargeIssuingService {
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
 
     // `suspended` e `canceled` são decisões de gente. Emitir cobrança a quem
-    // alguém desligou a dedo é o painel contrariando quem o opera.
-    const estado = subscription.status;
-    if (estado !== 'trial' && estado !== 'active' && estado !== 'past_due') {
+    // alguém desligou a dedo é o painel contrariando quem o opera. A exceção
+    // é a suspensão AUTOMÁTICA por inadimplência (0102): é pagando que se sai
+    // dela, então a fatura continua saindo (`isBillableStatus`).
+    if (!isBillableStatus(subscription)) {
       return { issued: false, reason: 'not_billable' };
     }
 
@@ -565,8 +595,18 @@ class ChargeIssuingService {
     // responder errado a cada ciclo.
     await this.cancelStale(periodo, { now });
 
-    const antecedencia = now.getTime() + this.LEAD_DAYS * 86_400_000;
-    if (!manual && vencimento.getTime() > antecedencia) return { issued: false, reason: 'not_due_yet' };
+    // A antecedência depende do meio. Pix/boleto sai `LEAD_DAYS` antes, para
+    // o dinheiro ter tempo de chegar. No cartão salvo (0100) a Asaas cobra o
+    // cartão NA CRIAÇÃO da cobrança — emitir cinco dias antes seria cobrar o
+    // cartão cinco dias antes do vencimento. Então a do cartão sai no dia do
+    // vencimento (no fuso da cobrança, desde a meia-noite: o pagamento chega
+    // antes de o prazo virar `past_due`). O clique (`manual`) não espera.
+    if (!manual) {
+      const aindaNao = this.chargesSavedCard(provider, subscription)
+        ? periodo > this.isoDate(now)
+        : vencimento.getTime() > now.getTime() + this.LEAD_DAYS * 86_400_000;
+      if (aindaNao) return { issued: false, reason: 'not_due_yet' };
+    }
 
     // O plano que ESTE prazo cobra. Quase sempre o atual; a exceção é a
     // descida agendada (0074) para exatamente este prazo: a cobrança que sai
@@ -627,7 +667,21 @@ class ChargeIssuingService {
     // `SubscriptionService.chargePricing`.
     const precificacao = SubscriptionService.chargePricing(subscription, planoDoPeriodo, cupom);
     const garraAte = new Date(now.getTime() + this.CLAIM_MS);
+    // O cartão recorrente (0100): com o cartão salvo e utilizável, a cobrança
+    // sai no cartão e o gateway a cobra sozinho; senão, a página de
+    // Pix-ou-boleto de sempre. Decidido pela assinatura lida agora, sem cache.
+    let cartao = provider.canChargeSavedCard ? CardAutopayService.chargeOptions(subscription) : null;
+    let meio = cartao ? 'CREDIT_CARD' : 'UNDEFINED';
+    const referencia = `tenant:${tenant.id}:${periodo}`;
+    // A reemissão por clique que NÃO é "pagar agora" (a troca de plano, o
+    // cupom, o "Reemitir" do console) numa assinatura com cartão salvo: a
+    // Asaas cobra o cartão na criação, e criar agora seria cobrar o cartão
+    // antes do vencimento sem que o provedor tenha pedido. A linha fica sem
+    // id no gateway, e a passada do agendador a emite no dia do vencimento.
+    // Só o "pagar agora" (`cardNow`) é o provedor pedindo para pagar já.
+    const adiarCartao = Boolean(manual && cartao && !cardNow && periodo > this.isoDate(now));
     let existente = await BillingCharge.forPeriod(periodo);
+    if (!existente && adiarCartao) return { issued: false, reason: 'card_deferred', charge: null };
     if (existente) {
       // Reaberta pelo clique, com o preço de agora — ver o comentário do método.
       // Só a cancelada: paga e devolvida continuam fechadas para todo mundo.
@@ -666,6 +720,7 @@ class ChargeIssuingService {
         });
       }
       if (existente.gateway_charge_id) return { issued: false, reason: 'already_issued', charge: existente };
+      if (adiarCartao) return this.deferCardCharge(existente);
       if (!manual) {
         if (Number(existente.attempts ?? 0) >= this.MAX_ATTEMPTS) {
           return { issued: false, reason: 'gave_up', charge: existente };
@@ -690,6 +745,33 @@ class ChargeIssuingService {
         const agora = await BillingCharge.findById(existente.id);
         if (agora?.gateway_charge_id) return { issued: false, reason: 'already_issued', charge: agora };
         return { issued: false, reason: 'raced', charge: agora };
+      }
+
+      // A tentativa de CARTÃO anterior que terminou sem resposta (0100): a
+      // cobrança pode existir no gateway — e no cartão ela é dinheiro saindo
+      // sozinho, não uma fatura a mais. Antes de qualquer outra, pergunta-se
+      // ao gateway pela nossa referência: achada, ela vira a cobrança desta
+      // linha; sem resposta, nada é criado e a linha espera.
+      //
+      // Sem olhar `attempts`: o processo que morreu DEPOIS de o gateway criar
+      // a cobrança e ANTES de `markIssued` deixa a linha com `CREDIT_CARD`,
+      // sem id e com zero tentativas (a garra vence sozinha). Toda linha de
+      // cartão sem id no gateway é uma tentativa que começou e não terminou.
+      if (existente.billing_type === 'CREDIT_CARD' && typeof provider.findChargesByReference === 'function') {
+        let achadas;
+        try {
+          achadas = await provider.findChargesByReference(referencia);
+        } catch (error) {
+          await BillingCharge.markFailed(existente.id, `card charge lookup failed: ${error.message}`, {
+            retryAfterMs: this.RETRY_AFTER_MS
+          });
+          return { issued: false, reason: 'gateway_failed', error: error.message };
+        }
+        const viva = achadas.find((item) => item.billingType === 'CREDIT_CARD') ?? achadas[0] ?? null;
+        if (viva) {
+          const adotada = await this.adoptFound({ linha: existente, viva, provider, now });
+          return { issued: false, reason: 'already_issued', adopted: true, ...adotada };
+        }
       }
 
       const patch = {};
@@ -718,6 +800,9 @@ class ChargeIssuingService {
         if (Number(existente.plan_id ?? 0) !== Number(precificacao.planId ?? 0)) patch.plan_id = precificacao.planId;
         if (Number(existente.coupon_id ?? 0) !== Number(precificacao.couponId ?? 0)) patch.coupon_id = precificacao.couponId;
       }
+      // O meio desta tentativa, gravado ANTES da chamada (0100): é ele que diz,
+      // se a resposta se perder, que houve uma tentativa no cartão.
+      if ((existente.billing_type ?? null) !== meio) patch.billing_type = meio;
       if (Object.keys(patch).length) await BillingCharge.update(existente.id, patch);
     }
 
@@ -734,6 +819,7 @@ class ChargeIssuingService {
           provider: provider.name,
           dueDate: vencimentoDoGateway,
           claimUntil: garraAte,
+          billingType: meio,
           ...precificacao
         });
       } catch (error) {
@@ -761,23 +847,74 @@ class ChargeIssuingService {
       });
       return { issued: false, reason: 'billing_exempt' };
     }
+    // Cancelada ou suspensa à mão no meio: nada sai, e a linha fica sem id
+    // (a faxina e a próxima emissão decidem por ela).
+    if (releitura && !isBillableStatus(releitura)) {
+      await BillingCharge.release(chargeId);
+      return { issued: false, reason: 'not_billable' };
+    }
+    // O cartão relido logo antes da chamada (0100): desligar a cobrança
+    // automática ou remover o cartão enquanto esta passada estava no meio
+    // não pode terminar numa cobrança no cartão.
+    if (cartao) {
+      cartao = provider.canChargeSavedCard ? CardAutopayService.chargeOptions(releitura) : null;
+      if (!cartao) {
+        meio = 'UNDEFINED';
+        await BillingCharge.update(chargeId, { billing_type: 'UNDEFINED' });
+      }
+    }
+
+    const criar = (comCartao) => provider.createCharge({
+      customerRef: tenant.billing_customer_ref,
+      amountCents: preco,
+      currency: moeda,
+      dueDate: vencimentoDoGateway,
+      description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`,
+      // O formato que o webhook espera de volta, com o período junto: é por
+      // ele que a entrega acha o provedor sem depender do cadastro do cliente
+      // no gateway estar ligado a quem se pensa.
+      reference: referencia,
+      ...(comCartao ?? {})
+    });
 
     let criada;
+    let cartaoRecusado = false;
     try {
-      criada = await provider.createCharge({
-        customerRef: tenant.billing_customer_ref,
-        amountCents: preco,
-        currency: moeda,
-        dueDate: vencimentoDoGateway,
-        description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`,
-        // O formato que o webhook espera de volta, com o período junto: é por
-        // ele que a entrega acha o provedor sem depender do cadastro do cliente
-        // no gateway estar ligado a quem se pensa.
-        reference: `tenant:${tenant.id}:${periodo}`
-      });
+      criada = await criar(cartao);
     } catch (error) {
-      await BillingCharge.markFailed(chargeId, error.message, { retryAfterMs: this.RETRY_AFTER_MS });
-      return { issued: false, reason: 'gateway_failed', error: error.message };
+      // O cartão recusado na criação (0100): a falha fica no cartão, e a
+      // fatura sai NA HORA como Pix/boleto, pela mesma linha — o provedor não
+      // pode ficar sem ter como pagar porque o cartão dele não passou.
+      // `safe` (a chamada nem foi processada) deixa a próxima tentativa usar
+      // o cartão; `ambiguous` deixa a linha marcada como tentativa de cartão,
+      // e a próxima pergunta ao gateway antes de qualquer coisa (acima).
+      // `rejected` é a recusa do PEDIDO que não é do cartão: a cobrança não
+      // foi criada, sai já como Pix/boleto — sem marcar o cartão nem avisar.
+      const leitura = cartao ? CardAutopayService.classifyError(error) : null;
+      if (leitura !== 'refused' && leitura !== 'rejected') {
+        if (leitura === 'safe') await BillingCharge.update(chargeId, { billing_type: null });
+        await BillingCharge.markFailed(chargeId, error.message, { retryAfterMs: this.RETRY_AFTER_MS });
+        return { issued: false, reason: 'gateway_failed', error: error.message };
+      }
+      // A mensagem do gateway já vem sem o token (`asaasClient` o tira).
+      if (leitura === 'refused') {
+        console.warn(`The saved card of provider ${tenant.id} was refused (${error.message}); charge ${chargeId} goes out as Pix/boleto`);
+        await CardAutopayService.markRefused({ reason: 'charge_refused', now });
+        cartaoRecusado = true;
+      } else {
+        console.warn(`The card charge of provider ${tenant.id} was rejected (${error.message}); charge ${chargeId} goes out as Pix/boleto`);
+      }
+      await BillingCharge.update(chargeId, { billing_type: 'UNDEFINED' });
+      meio = 'UNDEFINED';
+      try {
+        criada = await criar(null);
+      } catch (segundo) {
+        await BillingCharge.markFailed(chargeId, segundo.message, { retryAfterMs: this.RETRY_AFTER_MS });
+        if (cartaoRecusado) await this.avisarRecusa(tenant, now);
+        return {
+          issued: false, reason: 'gateway_failed', error: segundo.message, ...(cartaoRecusado ? { cardRefused: true } : {})
+        };
+      }
     }
 
     // A tradução entre os dois vocabulários, num ponto só: o cliente fala a
@@ -786,7 +923,8 @@ class ChargeIssuingService {
     const gravada = await BillingCharge.markIssued(chargeId, {
       gatewayChargeId: criada.chargeId,
       invoiceUrl: criada.invoiceUrl,
-      dueDate: criada.dueDate
+      dueDate: criada.dueDate,
+      discountTerms: criada.discountTerms
     });
     if (!gravada) {
       // A garra venceu no meio de uma chamada lenta, outra passada a tomou e
@@ -805,13 +943,495 @@ class ChargeIssuingService {
       }
       return { issued: false, reason: 'raced', charge: await BillingCharge.findById(chargeId) };
     }
+    if (cartaoRecusado) await this.avisarRecusa(tenant, now);
     return {
       issued: true,
       periodEnd: periodo,
       amountCents: preco,
       chargeId: criada.chargeId,
+      billingType: meio,
+      ...(cartaoRecusado ? { cardRefused: true } : {}),
       charge: await BillingCharge.findById(chargeId)
     };
+  }
+
+  // ── A fatura de pró-rata da subida (0101) ────────────────────────────
+
+  /**
+   * Quantos dias a fatura de pró-rata dá para ser paga. Curto de propósito:
+   * o plano novo já vale, e a diferença é do período que está correndo.
+   */
+  static PRORATION_DUE_DAYS = 3;
+
+  /**
+   * Abre e emite a fatura de pró-rata de uma subida que JÁ foi gravada.
+   *
+   * Depois da troca, e não antes: a subida vale na hora, e a fatura é a
+   * consequência dela — se a troca falhasse depois de a fatura sair, seria
+   * cobrar por um plano que o provedor não ganhou. E a falha daqui não desfaz
+   * a troca: a linha fica `failed` (ou `pending`, sem gateway configurado) e
+   * o agendador a retoma (`retryProrations`), com a mesma referência.
+   *
+   * `quote` é a conta de `SubscriptionService.prorationQuote`, feita com o
+   * estado de ANTES da troca. Nunca lança por causa do gateway.
+   *
+   * @returns {Promise<{ issued: boolean, reason?: string, charge?: object, error?: string }>}
+   */
+  static async createProration({
+    tenant, subscription, quote, couponId = null, now = new Date()
+  }) {
+    if (!quote?.eligible) return { issued: false, reason: 'not_eligible' };
+    if (quote.skipped) return { issued: false, reason: quote.skipped };
+    if (!tenant || tenant.kind === 'platform') return { issued: false, reason: 'platform_tenant' };
+    // Sem gateway que emita, como a renovação: quem é cobrado por fora (o
+    // `manual`) ou nunca foi ligado não ganha fatura daqui — e nem linha, que
+    // ficaria em aberto para sempre sem ninguém para emiti-la.
+    const provider = providerFor(tenant.billing_gateway);
+    if (!provider || !tenant.billing_customer_ref) return { issued: false, reason: 'not_linked' };
+    if (!provider.canIssue) return { issued: false, reason: 'provider_cannot_issue' };
+
+    const renovacao = new Date(quote.renewsAt);
+    const periodEnd = this.periodKey(renovacao);
+    // A chave da subida: a primeira cujo dono não é uma fatura JÁ FECHADA
+    // (paga, cancelada, estornada). Uma em aberto com a mesma chave é o outro
+    // clique da mesma subida, e o índice único o deduplica abaixo; uma fechada
+    // é a mesma subida feita antes neste período, e a de agora é outra.
+    let key = null;
+    for (let seq = 0; seq < 50; seq += 1) {
+      const candidata = BillingCharge.prorationKey({
+        fromPlanId: quote.fromPlanId, toPlanId: quote.toPlanId, periodEnd, seq
+      });
+      // eslint-disable-next-line no-await-in-loop -- quase sempre uma leitura
+      const dona = await BillingCharge.prorationByKey(candidata);
+      if (!dona || OPEN_CHARGE_STATUSES.includes(dona.status)) {
+        key = candidata;
+        break;
+      }
+    }
+    if (!key) return { issued: false, reason: 'duplicate' };
+    let chargeId;
+    try {
+      chargeId = await BillingCharge.openProration({
+        key,
+        subscriptionId: subscription?.id ?? null,
+        amountCents: quote.amountCents,
+        currency: quote.currency || 'BRL',
+        provider: provider.name,
+        dueDate: this.isoDate(now.getTime() + this.PRORATION_DUE_DAYS * 86_400_000),
+        claimUntil: new Date(now.getTime() + this.CLAIM_MS),
+        planId: quote.toPlanId,
+        couponId,
+        detail: {
+          fromPlanId: quote.fromPlanId,
+          toPlanId: quote.toPlanId,
+          fromPriceCents: quote.fromPriceCents,
+          toPriceCents: quote.toPriceCents,
+          remainingSeconds: quote.remainingSeconds,
+          periodSeconds: quote.periodSeconds,
+          remainingDays: quote.remainingDays,
+          // O fim do período cuja diferença esta fatura cobra, na chave de
+          // sempre — é o que a tela e a NFS-e mostram como "período".
+          periodEnd,
+          renewsAt: quote.renewsAt,
+          at: now.toISOString()
+        }
+      });
+    } catch (error) {
+      // A mesma subida, no mesmo período, já tem a sua fatura — o outro
+      // clique que leu o mesmo plano de antes. Não se abre a segunda.
+      if (isUniqueViolation(error)) {
+        console.warn(`Proration ${key} of provider ${tenant.id} already exists; not charging the same upgrade twice`);
+        return { issued: false, reason: 'duplicate', charge: await BillingCharge.prorationByKey(key) };
+      }
+      throw error;
+    }
+    return this.emitProration({ tenant, provider, chargeId, now });
+  }
+
+  /**
+   * Leva ao gateway uma fatura de pró-rata que esta passada JÁ garrou.
+   *
+   * A mesma dança da renovação (`issueCurrent`): a isenção relida logo antes
+   * de falar com o gateway, a falha que vira `failed` com espera, e a gravação
+   * condicional do id (`markIssued`) que, perdida, cancela a duplicata lá. A
+   * referência é `tenant:<id>:proration:<id da linha>` — a mesma em toda
+   * retentativa, para o gateway e o webhook acharem a mesma fatura.
+   *
+   * O vencimento é o da linha, ou — se ela ficou parada até ele passar — três
+   * dias a partir de hoje: o gateway recusa cobrança que nasce vencida.
+   */
+  static async emitProration({ tenant, provider, chargeId, now = new Date() }) {
+    const linha = await BillingCharge.findById(chargeId);
+    if (!linha || !isProration(linha)) return { issued: false, reason: 'not_found' };
+    if (linha.gateway_charge_id) {
+      await BillingCharge.release(linha.id);
+      return { issued: false, reason: 'already_issued', charge: linha };
+    }
+    if (typeof provider.isConfigured === 'function' && !(await provider.isConfigured())) {
+      // Sem a chave, a linha espera — sem queimar tentativa, como a renovação.
+      await BillingCharge.release(linha.id);
+      return { issued: false, reason: 'gateway_not_configured', charge: linha };
+    }
+    const assinatura = await Subscription.forTenant(currentTenantId());
+    if (assinatura?.billing_exempt_at) {
+      await BillingCharge.update(linha.id, {
+        status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: EXEMPT_CANCEL_MARKER
+      });
+      return { issued: false, reason: 'billing_exempt' };
+    }
+    // Cancelada ou suspensa à mão depois da subida: a diferença não se cobra
+    // mais — a linha sai cancelada, sem nunca ter ido ao gateway. A de cartão
+    // pergunta antes ao gateway (abaixo): a cobrança pode já existir lá.
+    if ((!assinatura || !isBillableStatus(assinatura)) && linha.billing_type !== 'CREDIT_CARD') {
+      await this.cancelUnbillableProration(linha.id);
+      return { issued: false, reason: 'not_billable', charge: await BillingCharge.findById(linha.id) };
+    }
+
+    const hoje = this.isoDate(now);
+    const daLinha = isoDateOf(linha.due_date);
+    const vencimento = daLinha && daLinha >= hoje
+      ? daLinha
+      : this.isoDate(now.getTime() + this.PRORATION_DUE_DAYS * 86_400_000);
+    if (vencimento !== daLinha) await BillingCharge.update(linha.id, { due_date: vencimento });
+
+    const detalhe = BillingCharge.prorationDetailOf(linha);
+    const plano = detalhe?.toPlanId ? await Plan.findById(detalhe.toPlanId) : null;
+    const nomeDoPlano = plano?.name || plano?.code || '';
+    const referencia = `tenant:${tenant.id}:proration:${linha.id}`;
+
+    // O cartão salvo (0100), pela mesma decisão da renovação: com a cobrança
+    // automática utilizável, a pró-rata sai no cartão e o gateway a cobra na
+    // hora; senão, Pix/boleto com multa, juros e desconto (`chargeTermsFor`,
+    // aplicado por `createCharge` só fora do cartão).
+    let cartao = provider.canChargeSavedCard ? CardAutopayService.chargeOptions(assinatura) : null;
+    let meio = cartao ? 'CREDIT_CARD' : 'UNDEFINED';
+
+    // A tentativa de cartão anterior que terminou sem resposta: a cobrança
+    // pode existir lá, e no cartão é dinheiro que já saiu. Pergunta-se pela
+    // referência antes de criar outra — como `issueCurrent`. Sem olhar
+    // `attempts`: o clique do console (`retryProrations` manual) as zera antes
+    // de chegar aqui, e a linha só ganha `CREDIT_CARD` sem id no gateway
+    // quando uma tentativa no cartão começou e não terminou.
+    if (linha.billing_type === 'CREDIT_CARD' && typeof provider.findChargesByReference === 'function') {
+      let achadas;
+      try {
+        achadas = await provider.findChargesByReference(referencia);
+      } catch (error) {
+        await BillingCharge.markFailed(linha.id, `card charge lookup failed: ${error.message}`, {
+          retryAfterMs: this.RETRY_AFTER_MS
+        });
+        return { issued: false, reason: 'gateway_failed', error: error.message, charge: await BillingCharge.findById(linha.id) };
+      }
+      const viva = achadas.find((item) => item.billingType === 'CREDIT_CARD') ?? achadas[0] ?? null;
+      if (viva) {
+        const adotada = await this.adoptFound({ linha, viva, provider, now });
+        return { issued: false, reason: 'already_issued', adopted: true, ...adotada };
+      }
+    }
+
+    // Relida logo antes da chamada: cancelada ou suspensa à mão, isenta, ou
+    // o cartão desligado/removido enquanto esta passada estava no meio.
+    const releitura = await Subscription.forTenant(currentTenantId());
+    if (releitura?.billing_exempt_at) {
+      await BillingCharge.update(linha.id, {
+        status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: EXEMPT_CANCEL_MARKER
+      });
+      return { issued: false, reason: 'billing_exempt' };
+    }
+    if (!releitura || !isBillableStatus(releitura)) {
+      await this.cancelUnbillableProration(linha.id);
+      return { issued: false, reason: 'not_billable', charge: await BillingCharge.findById(linha.id) };
+    }
+    if (cartao) {
+      cartao = provider.canChargeSavedCard ? CardAutopayService.chargeOptions(releitura) : null;
+      if (!cartao) meio = 'UNDEFINED';
+    }
+
+    // O meio desta tentativa, gravado ANTES da chamada: é ele que diz, se a
+    // resposta se perder, que houve uma tentativa no cartão.
+    if ((linha.billing_type ?? null) !== meio) await BillingCharge.update(linha.id, { billing_type: meio });
+
+    const criar = (comCartao) => provider.createCharge({
+      customerRef: tenant.billing_customer_ref,
+      amountCents: Number(linha.amount_cents),
+      currency: linha.currency || 'BRL',
+      dueDate: vencimento,
+      description: `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(pró-rata)`,
+      reference: referencia,
+      ...(comCartao ?? {})
+    });
+    const falhou = async (error) => {
+      await BillingCharge.markFailed(linha.id, error.message, { retryAfterMs: this.RETRY_AFTER_MS });
+      console.warn(`Proration charge ${linha.id} of provider ${tenant.id} was not issued: ${error.message}`);
+    };
+
+    let criada;
+    let cartaoRecusado = false;
+    try {
+      criada = await criar(cartao);
+    } catch (error) {
+      // A recusa do cartão como na renovação: o cartão fica marcado, e a
+      // fatura sai na hora como Pix/boleto, pela mesma linha, com o aviso.
+      const leitura = cartao ? CardAutopayService.classifyError(error) : null;
+      if (leitura !== 'refused' && leitura !== 'rejected') {
+        if (leitura === 'safe') await BillingCharge.update(linha.id, { billing_type: null });
+        await falhou(error);
+        return { issued: false, reason: 'gateway_failed', error: error.message, charge: await BillingCharge.findById(linha.id) };
+      }
+      if (leitura === 'refused') {
+        console.warn(`The saved card of provider ${tenant.id} was refused (${error.message}); proration ${linha.id} goes out as Pix/boleto`);
+        await CardAutopayService.markRefused({ reason: 'charge_refused', now });
+        cartaoRecusado = true;
+      } else {
+        console.warn(`The card charge of provider ${tenant.id} was rejected (${error.message}); proration ${linha.id} goes out as Pix/boleto`);
+      }
+      await BillingCharge.update(linha.id, { billing_type: 'UNDEFINED' });
+      meio = 'UNDEFINED';
+      try {
+        criada = await criar(null);
+      } catch (segundo) {
+        await falhou(segundo);
+        if (cartaoRecusado) await this.avisarRecusa(tenant, now);
+        return {
+          issued: false,
+          reason: 'gateway_failed',
+          error: segundo.message,
+          ...(cartaoRecusado ? { cardRefused: true } : {}),
+          charge: await BillingCharge.findById(linha.id)
+        };
+      }
+    }
+
+    const gravada = await BillingCharge.markIssued(linha.id, {
+      gatewayChargeId: criada.chargeId,
+      invoiceUrl: criada.invoiceUrl,
+      dueDate: criada.dueDate,
+      discountTerms: criada.discountTerms
+    });
+    if (!gravada) {
+      try {
+        if (typeof provider.cancelCharge === 'function') await provider.cancelCharge(criada.chargeId);
+        console.warn(`Proration row ${linha.id} was issued by another pass; duplicate gateway charge ${criada.chargeId} was canceled`);
+      } catch (error) {
+        console.error(
+          `Proration row ${linha.id} was issued by another pass and duplicate gateway charge ${criada.chargeId} `
+          + `could NOT be canceled — cancel it by hand: ${error.message}`
+        );
+      }
+      return { issued: false, reason: 'raced', charge: await BillingCharge.findById(linha.id) };
+    }
+    const emitida = await BillingCharge.findById(linha.id);
+    if (cartaoRecusado) await this.avisarRecusa(tenant, now, emitida);
+    return {
+      issued: true,
+      billingType: meio,
+      ...(cartaoRecusado ? { cardRefused: true } : {}),
+      charge: emitida
+    };
+  }
+
+  /**
+   * A passada do agendador pelas faturas de pró-rata que não chegaram ao
+   * gateway: a criação falhou, ou a chave da API não estava configurada.
+   *
+   * As mesmas guardas da renovação — o teto de tentativas (`MAX_ATTEMPTS`), a
+   * espera entre elas (`next_attempt_at`) e a garra (`claim`), que só toma
+   * linha sem id no gateway — e a mesma referência em toda tentativa. O
+   * clique do console (`manual`) zera a paciência do agendador, como na
+   * renovação.
+   *
+   * De quebra, regrava `proration_due_at` quando há o que regravar: é o que
+   * conserta a cópia se algum caminho a deixou para trás.
+   *
+   * @returns {Promise<{ retried: number, issued: number }>}
+   */
+  static async retryProrations({ tenant: doLaco = null, now = new Date(), manual = false, chargeId = null } = {}) {
+    const tenant = doLaco ?? await Tenant.findById(currentTenantId());
+    const resumo = { retried: 0, issued: 0 };
+    if (!tenant || tenant.kind === 'platform') return { ...resumo, reason: 'platform_tenant' };
+    const subscription = await Subscription.forTenant(currentTenantId());
+    if (!subscription) return { ...resumo, reason: 'no_subscription' };
+    const abertas = await BillingCharge.openProrations();
+    if (abertas.length || subscription.proration_due_at) await BillingCharge.syncProrationDue();
+    if (!abertas.length) return resumo;
+    if (subscription.billing_exempt_at) return { ...resumo, reason: 'billing_exempt' };
+    // Cancelada ou suspensa à mão: a diferença da subida não vai mais ao
+    // gateway. A que não chegou lá sai cancelada; a que já tem link fica.
+    // A de cartão sem id passa antes pelo gateway (`emitProration` pergunta
+    // pela referência, adota a que existir e cancela a que não existe).
+    if (!isBillableStatus(subscription)) {
+      const canceladas = await BillingCharge.cancelUnissuedProrations({ reason: 'not_billable', now });
+      for (const linha of await BillingCharge.unissuedProrations()) {
+        if (linha.billing_type !== 'CREDIT_CARD') continue;
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await BillingCharge.claim(linha.id, { until: new Date(now.getTime() + this.CLAIM_MS), now }))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await this.emitProration({ tenant, provider: providerFor(tenant.billing_gateway), chargeId: linha.id, now });
+      }
+      return { ...resumo, reason: 'not_billable', ...(canceladas ? { canceled: canceladas } : {}) };
+    }
+
+    const provider = providerFor(tenant.billing_gateway);
+    if (!provider || !tenant.billing_customer_ref) return { ...resumo, reason: 'not_linked' };
+    if (!provider.canIssue) return { ...resumo, reason: 'provider_cannot_issue' };
+    if (typeof provider.isConfigured === 'function' && !(await provider.isConfigured())) {
+      return { ...resumo, reason: 'gateway_not_configured' };
+    }
+
+    for (const linha of await BillingCharge.unissuedProrations()) {
+      if (chargeId && Number(linha.id) !== Number(chargeId)) continue;
+      if (!manual) {
+        if (Number(linha.attempts ?? 0) >= this.MAX_ATTEMPTS) continue;
+        const espera = linha.next_attempt_at ? new Date(linha.next_attempt_at) : null;
+        if (espera && !Number.isNaN(espera.getTime()) && espera.getTime() > now.getTime()) continue;
+      }
+      // eslint-disable-next-line no-await-in-loop -- uma ou duas por provedor, e cada uma fala com o gateway
+      const minha = await BillingCharge.claim(linha.id, { until: new Date(now.getTime() + this.CLAIM_MS), now });
+      if (!minha) continue;
+      if (manual) {
+        // eslint-disable-next-line no-await-in-loop
+        await BillingCharge.update(linha.id, { attempts: 0, next_attempt_at: null });
+      }
+      resumo.retried += 1;
+      // eslint-disable-next-line no-await-in-loop
+      const resultado = await this.emitProration({ tenant, provider, chargeId: linha.id, now });
+      if (resultado.issued) resumo.issued += 1;
+      if (chargeId) return { ...resumo, result: resultado };
+    }
+    return resumo;
+  }
+
+  /**
+   * A reemissão por clique de uma assinatura com cartão salvo, adiada para o
+   * dia do vencimento (ver `adiarCartao` em `issueCurrent`). A linha fica sem
+   * id no gateway e com a paciência do agendador zerada: é a passada dele, no
+   * dia, que a emite no cartão.
+   */
+  static async deferCardCharge(linha) {
+    if (Number(linha.attempts ?? 0) > 0 || linha.next_attempt_at) {
+      await BillingCharge.update(linha.id, { attempts: 0, next_attempt_at: null });
+    }
+    return { issued: false, reason: 'card_deferred', charge: await BillingCharge.findById(linha.id) };
+  }
+
+  /** A pró-rata sem id no gateway de quem deixou de ser cobrável, cancelada. */
+  static async cancelUnbillableProration(id) {
+    await BillingCharge.update(id, {
+      status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: 'not_billable'
+    });
+  }
+
+  /** Os estados do gateway em que a cobrança já foi paga. */
+  static PAID_GATEWAY_STATUSES = new Set(['CONFIRMED', 'RECEIVED', 'RECEIVED_IN_CASH']);
+
+  /**
+   * A cobrança achada no gateway pela nossa referência — a tentativa de
+   * cartão cuja resposta se perdeu — vira a cobrança da linha. Se lá ela já
+   * está PAGA (o cartão é cobrado na criação), quita-se aqui também, pelo
+   * mesmo caminho do webhook (`settleAdopted`).
+   *
+   * @returns {Promise<{ charge: object, settled?: string }>}
+   */
+  static async adoptFound({ linha, viva, provider, now = new Date() }) {
+    await BillingCharge.markIssued(linha.id, {
+      gatewayChargeId: viva.chargeId, invoiceUrl: viva.invoiceUrl, dueDate: viva.dueDate
+    });
+    await BillingCharge.update(linha.id, {
+      billing_type: viva.billingType === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'UNDEFINED'
+    });
+    let settled;
+    if (this.PAID_GATEWAY_STATUSES.has(String(viva.status ?? '').toUpperCase())) {
+      try {
+        settled = await this.settleAdopted({ chargeId: linha.id, gatewayChargeId: viva.chargeId, provider, now });
+      } catch (error) {
+        console.warn(`Could not settle adopted charge ${linha.id} (${viva.chargeId}): ${error.message}`);
+        settled = 'error';
+      }
+    }
+    return { charge: await BillingCharge.findById(linha.id), ...(settled ? { settled } : {}) };
+  }
+
+  /**
+   * Quita a linha adotada cuja cobrança o gateway já tem como paga.
+   *
+   *   - O webhook do pagamento JÁ chegou (há evento com o id do gateway): ele
+   *     foi conferido sem a linha (que ainda não tinha o id) — contra o preço
+   *     do plano. Se por isso ficou "a menos" mas cobre o valor da linha (a
+   *     pró-rata, a de valor mudado à mão), a diferença é aceita pela porta
+   *     do console (`<id>:accepted`, com a linha nomeada: a pró-rata não
+   *     estende prazo, a renovação estende). A linha fecha paga.
+   *   - Não chegou: o pagamento é registrado aqui, como o webhook faria
+   *     (`recordPayment` com o id do gateway — agora a linha é achada por
+   *     ele), e a linha fecha paga se o valor fechou. O webhook que chegar
+   *     depois cai como `duplicate`.
+   *
+   * @returns {Promise<string>} o que foi feito.
+   */
+  static async settleAdopted({ chargeId, gatewayChargeId, provider, now = new Date() }) {
+    const { default: BillingEvent } = await import('../models/BillingEvent.js');
+    const { default: BillingInvoiceService } = await import('./billing/billingInvoiceService.js');
+    const linha = await BillingCharge.findById(chargeId);
+    if (!linha || linha.status === 'paid') return 'already_paid';
+    const fechar = async () => {
+      await BillingCharge.update(linha.id, { status: 'paid', last_error: null, issuing_until: null });
+      try {
+        await BillingInvoiceService.enqueueForCharge({ ...linha, gateway_charge_id: gatewayChargeId, status: 'paid' });
+      } catch (error) {
+        console.warn(`Could not queue the invoice of adopted charge ${linha.id}: ${error.message}`);
+      }
+    };
+
+    const evento = await BillingEvent.findByExternalId(gatewayChargeId);
+    if (evento) {
+      let detalhe = null;
+      try { detalhe = evento.detail ? JSON.parse(evento.detail) : null; } catch { detalhe = null; }
+      if (detalhe?.underpaid) {
+        if (Number(evento.amount_cents ?? 0) < Number(linha.amount_cents)) return 'underpaid';
+        await SubscriptionService.recordPayment({
+          amountCents: 0,
+          currency: evento.currency || linha.currency || 'BRL',
+          provider: provider?.name ?? linha.provider ?? 'manual',
+          externalId: `${gatewayChargeId}:accepted`,
+          allowUnderpayment: true,
+          chargeId: linha.id,
+          now
+        });
+      }
+      await fechar();
+      return 'reconciled';
+    }
+
+    if (typeof provider?.getCharge !== 'function' || typeof provider?.recordPayment !== 'function') return 'left_for_webhook';
+    const lida = await provider.getCharge(gatewayChargeId);
+    if (!this.PAID_GATEWAY_STATUSES.has(String(lida?.status ?? '').toUpperCase()) || !(lida?.valueCents > 0)) {
+      return 'left_for_webhook';
+    }
+    const resultado = await provider.recordPayment({
+      amountCents: lida.valueCents,
+      currency: 'BRL',
+      externalId: gatewayChargeId,
+      paidOn: lida.paidOn ?? null,
+      actorUserId: null
+    });
+    if (resultado.duplicate) {
+      // O webhook entrou no meio: agora há o evento, e é por ele que se fecha.
+      if (await BillingEvent.findByExternalId(gatewayChargeId)) {
+        return this.settleAdopted({ chargeId, gatewayChargeId, provider, now });
+      }
+      return 'duplicate';
+    }
+    if (resultado.underpaid) return 'underpaid';
+    await fechar();
+    return 'recorded';
+  }
+
+  /** O aviso da recusa do cartão, já com o link da fatura nova. Nunca lança. */
+  static async avisarRecusa(tenant, now, charge = null) {
+    try {
+      await CardAutopayService.notifyRefusal({ tenant, now, charge });
+    } catch (error) {
+      console.warn(`Could not send the card refusal notice to provider ${tenant?.id}: ${error.message}`);
+    }
   }
 
   /**

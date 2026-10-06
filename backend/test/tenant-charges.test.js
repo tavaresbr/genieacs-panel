@@ -208,6 +208,17 @@ describe('o autoatendimento também passa pela porta', () => {
       method: 'PUT', headers: authHeaders(token), body: { planId: outro.id }
     });
     assert.equal(troca.status, 200, JSON.stringify(troca.body));
+
+    // O cartão recorrente (0100): desligar ou remover o cartão recusado é o
+    // que devolve a fatura de quem está atrasado para Pix/boleto.
+    const autopay = await call(`${panelUrl}/api/tenant/subscription/autopay`, {
+      method: 'PUT', headers: authHeaders(token), body: { enabled: false }
+    });
+    assert.equal(autopay.status, 200, JSON.stringify(autopay.body));
+    const cartao = await call(`${panelUrl}/api/tenant/subscription/card`, {
+      method: 'DELETE', headers: authHeaders(token)
+    });
+    assert.equal(cartao.status, 200, JSON.stringify(cartao.body));
   });
 
   it('e o suspenso chega ao controlador, que recusa com 409 e não 402', async () => {

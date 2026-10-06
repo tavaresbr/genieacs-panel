@@ -1483,6 +1483,14 @@ const SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS = [
   ['billing_exempt_until', (t) => t.timestamp('billing_exempt_until').nullable()]
 ];
 
+/**
+ * A coluna da 0102 — ver a migração. Nula em todo `suspended` de antes dela,
+ * que é suspensão à mão: o pagamento não o reativa, como nunca reativou.
+ */
+const SUBSCRIPTION_SUSPENDED_REASON_COLUMNS = [
+  ['suspended_reason', (t) => t.string('suspended_reason', 32).nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -2079,6 +2087,35 @@ const BILLING_CHARGE_PRICING_COLUMNS = [
 ];
 
 /**
+ * A fatura de pró-rata da subida no meio do período (0101).
+ *
+ * `kind` separa a cobrança da RENOVAÇÃO (a de sempre, uma por período, com a
+ * chave `period_end`) da avulsa da subida (`proration`). A avulsa não pode
+ * usar a chave do período — a renovação daquele prazo já é dona dela, no
+ * índice único `(tenant_id, period_end)` —, então ela grava em `period_end`
+ * uma chave própria que não é data (`p…`, ver `BillingCharge.openProration`),
+ * e o fim de período de verdade vai em `proration_detail`, com a conta inteira
+ * (planos, preços, segundos restantes) para quem precisar conferir depois.
+ *
+ * Nas linhas que já existem, `renewal`: é o que todas elas são.
+ */
+const BILLING_CHARGE_PRORATION_COLUMNS = [
+  ['kind', (t) => t.string('kind', 16).notNullable().defaultTo('renewal')],
+  ['proration_detail', (t) => t.text('proration_detail').nullable()]
+];
+
+/**
+ * Quando a fatura de pró-rata em aberto mais antiga vence (0101) — a cópia que
+ * o estado da assinatura lê sem consulta (`effectiveStatus` é síncrono e roda
+ * a cada requisição, pelo gate). Mantida por `BillingCharge.syncProrationDue`
+ * a cada mudança de estado de uma cobrança de pró-rata; nula quando não há
+ * nenhuma em aberto.
+ */
+const SUBSCRIPTION_PRORATION_COLUMNS = [
+  ['proration_due_at', (t) => t.timestamp('proration_due_at').nullable()]
+];
+
+/**
  * O cupom na assinatura (0093). Sem `.references`, pelo motivo de
  * `pending_plan_id`: acrescentar chave estrangeira a uma tabela que já existe
  * é recriá-la no SQLite, e quem escreve a coluna acabou de ler o cupom.
@@ -2089,6 +2126,53 @@ const SUBSCRIPTION_COUPON_COLUMNS = [
   ['coupon_id', (t) => t.integer('coupon_id').unsigned().nullable()],
   ['coupon_cycles_left', (t) => t.integer('coupon_cycles_left').unsigned().nullable()],
   ['coupon_applied_at', (t) => t.timestamp('coupon_applied_at').nullable()]
+];
+
+/**
+ * O cartão recorrente na assinatura (0100) — ver `cardAutopayService`.
+ *
+ * O cartão em si nunca passa por aqui: quem o digita é o provedor, na página
+ * do Asaas. O que se guarda é o `creditCardToken` que o gateway devolve depois
+ * de um pagamento com cartão, cifrado com `secretBox` no envelope de colunas
+ * de sempre (`_ciphertext`/`_iv`/`_tag`/`_key_version` — o sufixo é o que
+ * tira a coluna do export do provedor), mais o que a tela mostra (bandeira e
+ * os quatro últimos dígitos) e o IP de quem ligou a cobrança automática, que
+ * o gateway exige em toda cobrança por token (`remoteIp`).
+ *
+ * `card_autopay_at` é a intenção (nulo = desligada); `card_failed_at` e
+ * `card_failure` (um código, nunca o texto do gateway) param o uso do cartão
+ * até um novo pagamento com cartão trocar o token; `card_capture_payment_id`
+ * é o pagamento cujo token ainda falta ler (a captura sai fora do webhook);
+ * `card_failure_notified_at` é a memória do aviso de recusa.
+ */
+const SUBSCRIPTION_CARD_COLUMNS = [
+  ['card_autopay_at', (t) => t.timestamp('card_autopay_at').nullable()],
+  ['card_token_ciphertext', (t) => t.text('card_token_ciphertext').nullable()],
+  ['card_token_iv', (t) => t.string('card_token_iv', 32).nullable()],
+  ['card_token_tag', (t) => t.string('card_token_tag', 32).nullable()],
+  ['card_token_key_version', (t) => t.integer('card_token_key_version').nullable()],
+  ['card_brand', (t) => t.string('card_brand', 32).nullable()],
+  ['card_last4', (t) => t.string('card_last4', 4).nullable()],
+  ['card_saved_at', (t) => t.timestamp('card_saved_at').nullable()],
+  ['card_remote_ip', (t) => t.string('card_remote_ip', 45).nullable()],
+  ['card_failed_at', (t) => t.timestamp('card_failed_at').nullable()],
+  ['card_failure', (t) => t.string('card_failure', 32).nullable()],
+  ['card_failure_notified_at', (t) => t.timestamp('card_failure_notified_at').nullable()],
+  ['card_capture_payment_id', (t) => t.string('card_capture_payment_id', 128).nullable()]
+];
+
+/**
+ * Com que meio a cobrança foi pedida ao gateway (0100): `UNDEFINED` (a página
+ * de Pix-ou-boleto, nulo nas linhas de antes) ou `CREDIT_CARD` (o token
+ * salvo). É o que `updateCharge` reenvia, e o que diz que uma tentativa por
+ * cartão já foi feita nesta linha.
+ */
+const BILLING_CHARGE_CARD_COLUMNS = [
+  ['billing_type', (t) => t.string('billing_type', 16).nullable()],
+  // Os termos do desconto por antecipação com que a cobrança saiu (JSON,
+  // `{ discount: {...} | null }`): a conferência do pagamento lê ESTES, e não
+  // a configuração de hoje. Nulo nas linhas de antes — e aí vale a de hoje.
+  ['discount_terms', (t) => t.text('discount_terms').nullable()]
 ];
 
 /** A conversa com dono: quem atende, desde quando, e desde quando espera um. */
@@ -5517,6 +5601,74 @@ export const migrations = [
       const missing = await missingColumns(db, 'sgp_contacts', SGP_CONTACT_IMPORT_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('sgp_contacts', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** O cartão recorrente — ver `SUBSCRIPTION_CARD_COLUMNS` e `BILLING_CHARGE_CARD_COLUMNS`. */
+    id: '0100_subscription_card',
+    async isApplied(db) {
+      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_CARD_COLUMNS], ['billing_charges', BILLING_CHARGE_CARD_COLUMNS]]) {
+        if (!(await db.schema.hasTable(tabela))) continue;
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_CARD_COLUMNS], ['billing_charges', BILLING_CHARGE_CARD_COLUMNS]]) {
+        if (!(await db.schema.hasTable(tabela))) continue;
+        const missing = await missingColumns(db, tabela, colunas);
+        if (!missing.length) continue;
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
+    }
+  },
+  {
+    /** A fatura de pró-rata da subida — ver `BILLING_CHARGE_PRORATION_COLUMNS`. */
+    id: '0101_billing_charge_proration',
+    async isApplied(db) {
+      if (await db.schema.hasTable('billing_charges')
+        && (await missingColumns(db, 'billing_charges', BILLING_CHARGE_PRORATION_COLUMNS)).length) return false;
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PRORATION_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [
+        ['billing_charges', BILLING_CHARGE_PRORATION_COLUMNS],
+        ['subscriptions', SUBSCRIPTION_PRORATION_COLUMNS]
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+    }
+  },
+  {
+    /**
+     * Por que a assinatura está `suspended` (`SubscriptionService`):
+     * `auto_nonpayment` é a suspensão automática por inadimplência, que o
+     * pagamento desfaz sozinho; `manual` é o console, que só o console desfaz.
+     * Nula nas linhas que já existem — toda suspensão de antes era à mão.
+     */
+    id: '0102_subscription_suspended_reason',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_SUSPENDED_REASON_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_SUSPENDED_REASON_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
       });
     }

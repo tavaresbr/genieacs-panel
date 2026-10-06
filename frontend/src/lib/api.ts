@@ -1426,6 +1426,16 @@ export interface AsaasIntegration {
   issPercent?: number
   retainIss?: boolean
   observations?: string | null
+  /**
+   * Multa (%), juros (% ao mês) e desconto por antecipação das cobranças no
+   * Asaas. `discountValue` é % com `percent` e CENTAVOS com `fixed`. Zero é
+   * desligado; opcionais porque servidores antigos não mandam os campos.
+   */
+  finePercent?: number
+  interestMonthlyPercent?: number
+  discountKind?: 'percent' | 'fixed'
+  discountValue?: number
+  discountDaysBefore?: number
 }
 
 /**
@@ -1444,6 +1454,11 @@ export interface AsaasIntegrationUpdate {
   issPercent?: number
   retainIss?: boolean
   observations?: string
+  finePercent?: number
+  interestMonthlyPercent?: number
+  discountKind?: 'percent' | 'fixed'
+  discountValue?: number
+  discountDaysBefore?: number
 }
 
 /** O estado da NFS-e de uma cobrança. */
@@ -1549,9 +1564,18 @@ export interface PlatformProfile {
   values: Record<PlatformProfileField, string | null>
   /** De onde vem cada valor: gravado no console, do `.env`, ou nenhum. */
   sources: Record<PlatformProfileField, 'db' | 'env' | null>
+  /** A política de suspensão automática (0102), já com o padrão aplicado. */
+  billing?: PlatformBillingPolicy
+  billingDefaults?: PlatformBillingPolicy
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
+}
+
+/** Dias de atraso até a suspensão automática (0 desliga) e de aviso antes dela. */
+export interface PlatformBillingPolicy {
+  autoSuspendDays: number
+  autoSuspendWarnDays: number
 }
 
 export interface PublicInfo {
@@ -1654,9 +1678,15 @@ export interface SubscriptionView {
   storedStatus: SubscriptionStatus
   /**
    * Por que o estado que vale difere do gravado. São os dois prazos que vencem
-   * sozinhos: o teste e o período pago. Nulo quando a coluna é a verdade.
+   * sozinhos: o teste e o período pago — e a fatura de pró-rata de uma subida
+   * vencida sem pagamento (`proration_overdue`). Nulo quando a coluna é a verdade.
    */
-  reason: 'trial_expired' | 'renewal_expired' | null
+  reason: 'trial_expired' | 'renewal_expired' | 'proration_overdue' | 'auto_nonpayment' | null
+  /**
+   * Por que está suspensa (0102): `auto_nonpayment` é a suspensão automática
+   * por inadimplência, que o pagamento desfaz; `manual` (ou nulo) é o console.
+   */
+  suspendedReason?: 'auto_nonpayment' | 'manual' | null
   plan: { code: string; name: string; limits: PlanLimits } | null
   trialEndsAt: string | null
   renewsAt: string | null
@@ -1679,6 +1709,25 @@ export interface SubscriptionView {
   billingExemptUntil?: string | null
   /** O cupom de desconto na assinatura. Opcional: servidores antigos não mandam. */
   coupon?: SubscriptionCoupon | null
+  /** O cartão recorrente. Opcional: servidores antigos não mandam. */
+  card?: SubscriptionCard | null
+}
+
+/**
+ * O cartão recorrente: a cobrança automática no cartão salvo pela página do
+ * Asaas. Só bandeira, quatro dígitos e datas — o token nunca sai do servidor.
+ * `failure` é um código (`charge_refused`, `capture_refused`): enquanto há
+ * falha, as faturas saem como Pix/boleto até um novo pagamento com cartão.
+ */
+export interface SubscriptionCard {
+  autopayEnabled: boolean
+  autopaySince: string | null
+  saved: boolean
+  brand: string | null
+  last4: string | null
+  savedAt: string | null
+  failedAt: string | null
+  failure: string | null
 }
 
 /**
@@ -1731,6 +1780,44 @@ export interface TenantPlanOption {
   periodDays: number
   limits: PlanLimits
   current: boolean
+  /**
+   * Quanto subir para este plano cobraria AGORA, de pró-rata — nulo quando a
+   * troca não cobra nada (não é subida, ou não há período pago correndo).
+   * `skipped: 'below_minimum'` é a diferença abaixo de R$ 5,00, que não vira
+   * fatura. Opcional: servidores antigos não mandam.
+   */
+  proration?: PlanProrationPreview | null
+}
+
+/** A prévia da pró-rata de uma subida, na lista de planos. */
+export interface PlanProrationPreview {
+  amountCents: number
+  remainingDays: number
+  currency: string
+  skipped?: 'below_minimum'
+}
+
+/** O tipo de uma cobrança: a da renovação do período, ou a avulsa da subida. */
+export type ChargeKind = 'renewal' | 'proration'
+
+/** A conta de uma fatura de pró-rata, para a tela explicar o valor. */
+export interface ChargeProrationDetail {
+  fromPlanId: number | null
+  toPlanId: number | null
+  fromPriceCents: number | null
+  toPriceCents: number | null
+  remainingDays: number | null
+}
+
+/** O que a troca de plano responde sobre a pró-rata que a subida abriu. */
+export interface PlanChangeProration {
+  amountCents: number
+  remainingDays: number
+  currency?: string
+  issued: boolean
+  reason?: string
+  skipped?: 'below_minimum'
+  charge?: TenantChargeView | null
 }
 
 /**
@@ -1749,8 +1836,13 @@ export interface TenantChargeView {
   dueDate: string | null
   invoiceUrl: string | null
   createdAt: string | null
+  /** `CREDIT_CARD` quando é cobrada sozinha no cartão salvo. Opcional: servidores antigos não mandam. */
+  billingType?: string | null
   /** A nota fiscal desta cobrança. Opcional: servidores antigos não mandam. */
   invoice?: TenantInvoiceView | null
+  /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
+  kind?: ChargeKind
+  proration?: ChargeProrationDetail | null
 }
 
 /**
@@ -1767,6 +1859,8 @@ export interface ChargeConsoleView {
   dueDate: string | null
   invoiceUrl: string | null
   provider: string
+  /** `CREDIT_CARD` quando saiu no cartão salvo. Opcional: servidores antigos não mandam. */
+  billingType?: string | null
   gatewayChargeId: string | null
   attempts: number
   lastError: string | null
@@ -1775,12 +1869,17 @@ export interface ChargeConsoleView {
   superseded: { gatewayChargeId: string; amountCents: number }[]
   /** A NFS-e desta cobrança. Opcional: servidores antigos não mandam. */
   invoice?: InvoiceConsoleView | null
+  /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
+  kind?: ChargeKind
+  proration?: ChargeProrationDetail | null
 }
 
 /** A assinatura resumida de uma linha da aba Assinaturas do console. */
 export interface SubscriptionConsoleSubscription {
   status: SubscriptionStatus
   storedStatus: SubscriptionStatus
+  /** `auto_nonpayment` ganha o selo "Suspenso (inadimplência)". */
+  suspendedReason?: 'auto_nonpayment' | 'manual' | null
   planId: number | null
   planCode: string | null
   planName: string | null
@@ -1801,6 +1900,8 @@ export interface SubscriptionConsoleSubscription {
   billingExemptUntil?: string | null
   /** O cupom de desconto. Opcional: servidores antigos não mandam. */
   coupon?: SubscriptionCoupon | null
+  /** O cartão recorrente. Opcional: servidores antigos não mandam. */
+  card?: SubscriptionCard | null
 }
 
 export type CouponKind = 'percent' | 'fixed'
@@ -1882,7 +1983,7 @@ export interface BillingEventView {
  * Um lembrete de cobrança que a plataforma mandou ao provedor (0092): a etapa
  * da régua, o prazo a que ela se refere (data ISO) e por onde saiu.
  */
-export type SubscriptionReminderStep = 'before' | 'due' | 'after'
+export type SubscriptionReminderStep = 'before' | 'due' | 'after' | 'suspension_warning' | 'suspended'
 
 export interface SubscriptionReminderView {
   dueAt: string
@@ -2060,8 +2161,11 @@ export const platformAPI = {
   getPlatformProfile: () => apiClient.get<PlatformProfile>('/platform/settings/profile'),
 
   /** Ausente mantém; vazio apaga o gravado (o `.env` volta a valer). */
-  updatePlatformProfile: (payload: Partial<Record<PlatformProfileField, string>>) =>
-    apiClient.put<PlatformProfile & { changed: PlatformProfileField[] }>('/platform/settings/profile', payload),
+  /** Os números da política: `null` volta ao padrão. */
+  updatePlatformProfile: (
+    payload: Partial<Record<PlatformProfileField, string>> & Partial<Record<keyof PlatformBillingPolicy, number | null>>
+  ) =>
+    apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
   testAsaasIntegration: () =>
     apiClient.post<AsaasConnectionTest>('/platform/integrations/asaas/test'),
@@ -2451,7 +2555,7 @@ export const subscriptionAPI = {
    * `resource`/`used`/`limit`) quando o uso atual não cabe no plano escolhido.
    */
   changePlan: (planId: number) =>
-    apiClient.put<SubscriptionUsage>('/tenant/subscription/plan', { planId }),
+    apiClient.put<SubscriptionUsage & { proration?: PlanChangeProration }>('/tenant/subscription/plan', { planId }),
 
   /**
    * Emite (ou reaproveita) a cobrança do período e devolve o link de
@@ -2473,7 +2577,20 @@ export const subscriptionAPI = {
    * (este provedor já resgatou o cupom).
    */
   applyCoupon: (code: string) =>
-    apiClient.post<SubscriptionUsage>('/tenant/subscription/coupon', { code })
+    apiClient.post<SubscriptionUsage>('/tenant/subscription/coupon', { code }),
+
+  /**
+   * Liga ou desliga a cobrança automática no cartão. Ligar só registra a
+   * intenção: o cartão é salvo quando uma fatura é paga com cartão na página
+   * do Asaas. Devolve a mesma tela de `current()`. 409 `not_changeable`
+   * (assinatura parada) e `not_billable` (outro gateway).
+   */
+  setCardAutopay: (enabled: boolean) =>
+    apiClient.put<SubscriptionUsage>('/tenant/subscription/autopay', { enabled }),
+
+  /** Esquece o cartão salvo; a cobrança de cartão em aberto vira Pix/boleto. */
+  removeCard: () =>
+    apiClient.delete<SubscriptionUsage>('/tenant/subscription/card')
 }
 
 export const usersAPI = {

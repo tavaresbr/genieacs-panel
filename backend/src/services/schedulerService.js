@@ -20,6 +20,7 @@ import MaintenanceService from './maintenanceService.js';
 import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import BillingInvoiceService from './billing/billingInvoiceService.js';
+import CardAutopayService from './billing/cardAutopayService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -285,6 +286,14 @@ class SchedulerService {
         return { ended: false, reason: 'error' };
       });
 
+    // O cartão recorrente (0100), antes da emissão: o token que um webhook
+    // anotou, a cobrança de cartão que deixou de servir reemitida como
+    // Pix/boleto, e o aviso da recusa. Nunca lança (ver `processDue`).
+    summary.card = await CardAutopayService.processDue({ tenant }).catch((error) => {
+      console.warn(`Card autopay pass failed: ${error.message}`);
+      return { error: error.message };
+    });
+
     // A mesma contagem de ONTs vai à emissão: é ela que decide se a cobrança
     // da renovação já sai pelo preço da descida agendada (ver `issueCurrent`).
     summary.chargeIssued = await ChargeIssuingService.issueCurrent({
@@ -293,6 +302,12 @@ class SchedulerService {
       .catch((error) => {
         console.warn(`Could not issue the subscription charge: ${error.message}`);
         return { issued: false, reason: 'error' };
+      });
+    // As faturas de pró-rata (0101) que não chegaram ao gateway na subida.
+    summary.prorations = await ChargeIssuingService.retryProrations({ tenant })
+      .catch((error) => {
+        console.warn(`Could not retry the proration charges: ${error.message}`);
+        return { retried: 0, issued: 0, error: error.message };
       });
 
     // A NFS-e das cobranças pagas que a fila guardou (ver
@@ -311,6 +326,15 @@ class SchedulerService {
       .catch((error) => {
         console.warn(`Could not send the subscription reminder: ${error.message}`);
         return { sent: false, reason: 'error' };
+      });
+    // A suspensão automática por inadimplência (0102), DEPOIS da régua: o
+    // aviso de suspensão e a suspensão são as últimas etapas dela, e no dia
+    // em que suspende a mensagem do prazo já saiu. Ver
+    // `SubscriptionNoticeService.autoSuspendCurrent`.
+    summary.autoSuspend = await SubscriptionNoticeService.autoSuspendCurrent({ tenant })
+      .catch((error) => {
+        console.warn(`Could not run the automatic suspension: ${error.message}`);
+        return { action: 'none', reason: 'error' };
       });
 
     const provisioningConfig = await ProvisioningService.getConfig();

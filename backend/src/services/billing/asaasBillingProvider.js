@@ -4,6 +4,8 @@ import {
   createCharge as criarCobranca,
   cancelCharge as cancelarCobranca,
   getCharge as lerCobranca,
+  getPaymentCard as lerCartaoDoPagamento,
+  findChargesByReference as cobrancasDaReferencia,
   receiveInCash as receberEmDinheiro,
   refundCharge as estornarCobranca,
   undoReceivedInCash as desfazerRecebimentoEmDinheiro,
@@ -52,7 +54,11 @@ const EVENTOS_QUE_CREDITAM = new Set(['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED']);
 const EVENTOS_DO_CICLO = new Map([
   ['PAYMENT_OVERDUE', 'overdue'],
   ['PAYMENT_DELETED', 'canceled'],
-  ['PAYMENT_REFUNDED', 'refunded']
+  ['PAYMENT_REFUNDED', 'refunded'],
+  // O cartão salvo recusado na captura (0100). Não é etiqueta de cobrança:
+  // `card_refused` não está em `TRANSICOES_DO_CICLO`, e o controlador o leva
+  // ao cartão recorrente (marca a falha, reemite como Pix/boleto e avisa).
+  ['PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', 'card_refused']
 ]);
 
 /** Reais como o gateway manda (número JSON) para centavos inteiros. */
@@ -63,6 +69,22 @@ function paraCentavos(valor) {
   // 1998.9999999999998 em binário de ponto flutuante, e um `Math.floor` ali
   // cobraria um centavo a menos de todo mundo, para sempre.
   return Math.round(numero * 100);
+}
+
+/**
+ * O dia em que quem pagou pagou, `YYYY-MM-DD` — ou nulo.
+ *
+ * `clientPaymentDate` antes de `paymentDate`: o boleto pago no último dia do
+ * desconto compensa um ou dois dias úteis depois, e é o dia do CLIENTE que o
+ * gateway usou para decidir se o desconto valia. Sem nenhum dos dois, quem
+ * confere usa o dia da entrega.
+ */
+function diaDoPagamento(pagamento) {
+  for (const campo of ['clientPaymentDate', 'paymentDate']) {
+    const valor = String(pagamento?.[campo] ?? '').trim().slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return valor;
+  }
+  return null;
 }
 
 export class AsaasBillingProvider extends BillingProvider {
@@ -139,6 +161,25 @@ export class AsaasBillingProvider extends BillingProvider {
     return desfazerRecebimentoEmDinheiro(gatewayChargeId);
   }
 
+  /**
+   * Se este gateway cobra sozinho com o token de um cartão salvo (0100). Uma
+   * propriedade, como `canIssue`: quem emite pergunta antes de montar a
+   * cobrança de cartão.
+   */
+  get canChargeSavedCard() {
+    return true;
+  }
+
+  /** O cartão com que um pagamento foi pago — só para `cardAutopayService`. */
+  async getPaymentCard(gatewayChargeId) {
+    return lerCartaoDoPagamento(gatewayChargeId);
+  }
+
+  /** As cobranças vivas com uma referência nossa — ver `findChargesByReference`. */
+  async findChargesByReference(reference) {
+    return cobrancasDaReferencia(reference);
+  }
+
   /** Muda vencimento e/ou valor de uma cobrança já emitida. Mesma costura. */
   async updateCharge(gatewayChargeId, mudanca) {
     return atualizarCobranca(gatewayChargeId, mudanca);
@@ -190,7 +231,15 @@ export class AsaasBillingProvider extends BillingProvider {
       // A nossa própria referência, quando fomos nós que criamos a cobrança.
       // Preferida sobre a de cima: ela é escrita por este painel e não depende
       // de o cadastro do cliente no gateway estar ligado ao provedor certo.
-      reference: pagamento.externalReference ? String(pagamento.externalReference) : null
+      reference: pagamento.externalReference ? String(pagamento.externalReference) : null,
+      // O dia do pagamento, para a janela do desconto por antecipação
+      // (`recordPayment`). O valor do desconto em si NÃO se lê daqui: o
+      // `discount` do corpo é a configuração da cobrança, não o que foi
+      // abatido — o abatido é a diferença entre `value` e o que se pediu.
+      paidOn: diaDoPagamento(pagamento),
+      // O meio com que foi pago (0100): `CREDIT_CARD` é o que faz o cartão
+      // recorrente ir ler o token. Só uma pista — o token vem do `GET`.
+      billingType: pagamento.billingType ? String(pagamento.billingType).toUpperCase() : null
     };
   }
 
@@ -263,9 +312,12 @@ export class AsaasBillingProvider extends BillingProvider {
     };
   }
 
-  async recordPayment({ amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, now }) {
+  async recordPayment({
+    amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, paidOn = null, now
+  }) {
     return SubscriptionService.recordPayment({
       amountCents,
+      paidOn,
       currency,
       provider: this.name,
       externalId,

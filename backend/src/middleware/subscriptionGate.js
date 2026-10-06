@@ -87,6 +87,10 @@ const EXEMPT_PATHS = new Set([
   '/api/tenant/charges/pay',
   // O cupom (0093): como a troca de plano, uma saída de quem está atrasado.
   '/api/tenant/subscription/coupon',
+  // O cartão recorrente (0100): desligar ou remover o cartão recusado é o que
+  // devolve a fatura de quem está atrasado para Pix/boleto.
+  '/api/tenant/subscription/autopay',
+  '/api/tenant/subscription/card',
   '/api/auth'
 ]);
 // Os caminhos EXATOS das entregas de fora. `/api/sgp/events` sem o

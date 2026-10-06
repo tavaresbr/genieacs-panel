@@ -1,6 +1,8 @@
 import { PinnedTransport } from '../../utils/net/pinnedFetch.js';
 import { deploymentIsShared } from '../genieacsEgress.js';
-import { effectiveApiKey, effectiveBaseUrl } from './asaasSettingsService.js';
+import {
+  effectiveApiKey, effectiveBaseUrl, effectiveChargesConfig, earlyDiscountFor
+} from './asaasSettingsService.js';
 
 /**
  * O cliente HTTP do gateway de pagamento — a única coisa deste repositório que
@@ -43,11 +45,29 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 const ERROR_BODY_LIMIT = 500;
 
 export class AsaasError extends Error {
-  constructor(message, { status = null, code = 'gateway_error' } = {}) {
+  constructor(message, { status = null, code = 'gateway_error', errors = [] } = {}) {
     super(message);
     this.name = 'AsaasError';
     this.status = status;
     this.code = code;
+    // Os `errors` que o gateway devolveu no corpo (`[{ code, description }]`),
+    // lidos — é por eles que uma recusa do CARTÃO se separa de uma recusa
+    // qualquer do pedido (ver `CardAutopayService.classifyError`).
+    this.errors = Array.isArray(errors) ? errors : [];
+  }
+}
+
+/** Os `errors` de um corpo de erro do gateway, lidos — nunca lança. */
+function errosDoCorpo(texto) {
+  try {
+    const corpo = JSON.parse(texto || '{}');
+    if (!Array.isArray(corpo?.errors)) return [];
+    return corpo.errors.slice(0, 10).map((item) => ({
+      code: String(item?.code ?? '').slice(0, 64),
+      description: String(item?.description ?? '').slice(0, ERROR_BODY_LIMIT)
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -158,7 +178,7 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
       : resposta.status < 500 ? 'refused' : 'gateway_error';
     throw new AsaasError(
       `gateway answered ${resposta.status}: ${texto.slice(0, ERROR_BODY_LIMIT)}`,
-      { status: resposta.status, code: codigo }
+      { status: resposta.status, code: codigo, errors: errosDoCorpo(texto) }
     );
   }
 
@@ -172,6 +192,59 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
 }
 
 /**
+ * A multa, os juros e o desconto por antecipação de uma cobrança, nos nomes
+ * do gateway — ou um objeto vazio.
+ *
+ * Só o que está ligado vai (`asaasSettingsService`, bloco `charges`): um
+ * `fine: { value: 0 }` mandado à toa seria uma linha a mais para o gateway
+ * recusar no dia em que mudar a regra dele. E nada disso vai numa cobrança de
+ * cartão: ela é paga na hora, o gateway ignora os três campos, e mandá-los só
+ * faria a página mostrar um desconto que nunca se aplica.
+ *
+ * O desconto sai de `earlyDiscountFor`, a mesma conta que a conferência do
+ * pagamento faz — e com o piso: quando a porcentagem levaria a fatura abaixo
+ * de R$ 5,00, vai o fixo que para exatamente no piso. Sem `amountCents` (a
+ * atualização que só muda o vencimento) o desconto não vai, e o que o gateway
+ * já tem fica como está.
+ */
+export async function chargeTermsFor(amountCents, { billingType = 'UNDEFINED' } = {}) {
+  return (await termosDaCobranca(amountCents, { billingType })).campos;
+}
+
+/**
+ * Os termos de uma cobrança: os campos para o gateway (`campos`) e o
+ * desconto que foi junto (`discountTerms`, `{ discount: {...} | null }`) — que
+ * a emissão grava na linha (`billing_charges.discount_terms`), para a
+ * conferência do pagamento ler o desconto COM QUE a cobrança saiu, e não o da
+ * configuração de hoje. `discountTerms` indefinido quando o valor não é
+ * conhecido (o desconto não vai, e o que o gateway tem fica).
+ */
+async function termosDaCobranca(amountCents, { billingType = 'UNDEFINED' } = {}) {
+  if (String(billingType).toUpperCase() === 'CREDIT_CARD') return { campos: {}, discountTerms: { discount: null } };
+  const termos = await effectiveChargesConfig();
+  const campos = {};
+  if (termos.finePercent > 0) campos.fine = { value: termos.finePercent, type: 'PERCENTAGE' };
+  if (termos.interestMonthlyPercent > 0) campos.interest = { value: termos.interestMonthlyPercent };
+  const desconto = amountCents === undefined || amountCents === null
+    ? null
+    : earlyDiscountFor(Number(amountCents), termos);
+  if (desconto) {
+    campos.discount = desconto.kind === 'percent'
+      ? { value: desconto.percent, dueDateLimitDays: desconto.daysBefore, type: 'PERCENTAGE' }
+      : { value: paraReais(desconto.cents), dueDateLimitDays: desconto.daysBefore, type: 'FIXED' };
+  }
+  const semValor = amountCents === undefined || amountCents === null;
+  return {
+    campos,
+    discountTerms: semValor ? undefined : {
+      discount: desconto
+        ? { cents: desconto.cents, kind: desconto.kind, percent: desconto.percent ?? null, daysBefore: desconto.daysBefore }
+        : null
+    }
+  };
+}
+
+/**
  * Cria a cobrança e devolve o que o painel precisa guardar.
  *
  * `billingType: 'UNDEFINED'` de propósito: devolve uma página onde quem paga
@@ -179,7 +252,10 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
  * e um ISP que prefere um ou outro não precisa que a plataforma adivinhe. Pedir
  * `PIX` fecharia a porta do boleto, que é como metade deste mercado paga.
  */
-export async function createCharge({ customerRef, amountCents, currency = 'BRL', dueDate, description, reference }) {
+export async function createCharge({
+  customerRef, amountCents, currency = 'BRL', dueDate, description, reference,
+  billingType = 'UNDEFINED', creditCardToken = null, remoteIp = null
+}) {
   // O gateway é brasileiro e cobra em reais; ele não tem campo de moeda. Um
   // plano em outra moeda gravaria essa moeda na tabela e cobraria reais no
   // gateway — a cobrança sairia com o número certo e a unidade errada. Recusar
@@ -191,18 +267,31 @@ export async function createCharge({ customerRef, amountCents, currency = 'BRL',
     });
   }
 
-  const resposta = await chamar('/payments', {
-    payload: {
-      customer: customerRef,
-      billingType: 'UNDEFINED',
-      // O gateway fala em reais; o painel guarda centavos, como toda coluna de
-      // dinheiro daqui. A conversão mora neste ponto e em nenhum outro.
-      value: Number((amountCents / 100).toFixed(2)),
-      dueDate,
-      description,
-      externalReference: reference
-    }
-  });
+  // O cartão recorrente (0100): com o token salvo e o IP de quem ligou a
+  // cobrança automática, o gateway cobra sozinho no cartão. Sem os dois, a
+  // página de sempre — nunca uma cobrança de cartão sem token.
+  const porCartao = billingType === 'CREDIT_CARD';
+  if (porCartao && (!creditCardToken || !remoteIp)) {
+    throw new AsaasError('a card charge needs the saved card token and the remote IP', { code: 'bad_request' });
+  }
+  const payload = {
+    customer: customerRef,
+    billingType: porCartao ? 'CREDIT_CARD' : 'UNDEFINED',
+    // O gateway fala em reais; o painel guarda centavos, como toda coluna de
+    // dinheiro daqui. A conversão mora neste ponto e em nenhum outro.
+    value: Number((amountCents / 100).toFixed(2)),
+    dueDate,
+    description,
+    externalReference: reference
+  };
+  // Multa, juros e desconto, quando ligados — e nunca no cartão.
+  const termos = await termosDaCobranca(amountCents, { billingType: porCartao ? 'CREDIT_CARD' : 'UNDEFINED' });
+  Object.assign(payload, termos.campos);
+  if (porCartao) {
+    payload.creditCardToken = String(creditCardToken);
+    payload.remoteIp = String(remoteIp);
+  }
+  const resposta = await semToken(creditCardToken, () => chamar('/payments', { payload }));
 
   const chargeId = String(resposta?.id ?? '').trim();
   if (!chargeId) {
@@ -212,8 +301,90 @@ export async function createCharge({ customerRef, amountCents, currency = 'BRL',
     chargeId,
     invoiceUrl: resposta?.invoiceUrl ? String(resposta.invoiceUrl) : null,
     dueDate: resposta?.dueDate ? String(resposta.dueDate).slice(0, 10) : null,
-    status: resposta?.status ? String(resposta.status) : null
+    status: resposta?.status ? String(resposta.status) : null,
+    discountTerms: termos.discountTerms
   };
+}
+
+/**
+ * Roda `fn` e, se ela lançar, tira o token do cartão da mensagem do erro.
+ *
+ * O erro do gateway reflete o corpo da resposta, e o erro sobe para
+ * `last_error` (que o console mostra) e para o log. O token é credencial de
+ * cobrança: não pode aparecer em nenhum dos dois, nem que o gateway o ecoe.
+ */
+async function semToken(token, fn) {
+  try {
+    return await fn();
+  } catch (error) {
+    const segredo = token ? String(token) : '';
+    if (segredo && error && typeof error.message === 'string' && error.message.includes(segredo)) {
+      error.message = error.message.split(segredo).join('[redacted]');
+    }
+    if (segredo && Array.isArray(error?.errors)) {
+      for (const item of error.errors) {
+        if (typeof item?.description === 'string' && item.description.includes(segredo)) {
+          item.description = item.description.split(segredo).join('[redacted]');
+        }
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * O cartão com que um pagamento foi pago — `GET /payments/{id}` lido só pelo
+ * que o cartão recorrente precisa: o meio (`billingType`) e, quando foi
+ * cartão, o token, a bandeira e os quatro últimos dígitos (`creditCard`).
+ *
+ * Separado de `getCharge` de propósito: aquela volta para o console, para o
+ * log e para quem mais a chamar; esta é a ÚNICA leitura que devolve o token, e
+ * quem a chama é só `cardAutopayService`, que o cifra na hora.
+ *
+ * @returns {Promise<{ billingType: string|null, token: string|null,
+ *   brand: string|null, last4: string|null }>}
+ */
+export async function getPaymentCard(paymentId) {
+  const resposta = await chamar(`/payments/${idNoCaminho(paymentId)}`, { method: 'GET' });
+  const cartao = resposta?.creditCard && typeof resposta.creditCard === 'object' ? resposta.creditCard : {};
+  const texto = (valor, max) => (valor === null || valor === undefined || String(valor).trim() === ''
+    ? null : String(valor).trim().slice(0, max));
+  const digitos = String(cartao.creditCardNumber ?? '').replace(/\D/g, '');
+  return {
+    billingType: texto(resposta?.billingType, 32),
+    token: texto(cartao.creditCardToken, 512),
+    brand: texto(cartao.creditCardBrand, 32),
+    last4: digitos ? digitos.slice(-4) : null
+  };
+}
+
+/**
+ * As cobranças que o gateway tem com uma `externalReference` nossa —
+ * `GET /payments?externalReference=…`.
+ *
+ * É a pergunta que o cartão recorrente faz antes de tentar de novo uma
+ * cobrança de cartão cuja criação pode ter dado certo com a resposta perdida
+ * no caminho: no cartão, uma segunda cobrança é dinheiro saindo duas vezes
+ * da conta de alguém, e não uma fatura a mais na caixa dele. As apagadas não
+ * contam.
+ *
+ * @returns {Promise<Array<{ chargeId: string, status: string|null, billingType: string|null,
+ *   invoiceUrl: string|null, dueDate: string|null }>>}
+ */
+export async function findChargesByReference(reference) {
+  const ref = String(reference ?? '').trim();
+  if (!ref) throw new AsaasError('no external reference', { code: 'bad_request' });
+  const resposta = await chamar(`/payments?externalReference=${encodeURIComponent(ref)}&limit=20`, { method: 'GET' });
+  const lista = Array.isArray(resposta?.data) ? resposta.data : [];
+  return lista
+    .filter((item) => item && item.id && item.deleted !== true)
+    .map((item) => ({
+      chargeId: String(item.id),
+      status: item.status ? String(item.status) : null,
+      billingType: item.billingType ? String(item.billingType).toUpperCase() : null,
+      invoiceUrl: item.invoiceUrl ? String(item.invoiceUrl) : null,
+      dueDate: item.dueDate ? String(item.dueDate).slice(0, 10) : null
+    }));
 }
 
 /**
@@ -306,7 +477,12 @@ export async function getCharge(chargeId) {
     id: String(resposta?.id ?? chargeId),
     status: resposta?.status ? String(resposta.status) : null,
     // Arredondado sobre o produto, pelo motivo de `paraCentavos` no provider.
-    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null
+    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null,
+    // O dia do pagamento, quando já foi pago — o desconto por antecipação é
+    // conferido por ele (ver `SubscriptionService.recordPayment`).
+    paidOn: /^\d{4}-\d{2}-\d{2}/.test(String(resposta?.paymentDate ?? resposta?.confirmedDate ?? ''))
+      ? String(resposta.paymentDate ?? resposta.confirmedDate).slice(0, 10)
+      : null
   };
 }
 
@@ -367,15 +543,26 @@ export async function undoReceivedInCash(chargeId) {
  * guarda dela — o vencimento que o gateway de fato aceitou, que é o que vale
  * se ele arredondar para um dia útil.
  */
-export async function updateCharge(chargeId, { dueDate = undefined, value = undefined } = {}) {
-  const payload = { billingType: 'UNDEFINED' };
+export async function updateCharge(chargeId, {
+  dueDate = undefined, value = undefined, amountCents = undefined, billingType = 'UNDEFINED'
+} = {}) {
+  // O meio com que a cobrança nasceu (0100, `billing_charges.billing_type`):
+  // a de cartão continua de cartão — o token já está nela, do lado de lá.
+  const payload = { billingType: billingType === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'UNDEFINED' };
   if (dueDate !== undefined) payload.dueDate = dueDate;
   if (value !== undefined) payload.value = paraReais(value);
+  // Os termos de hoje vão junto: o desconto é sobre o valor que a cobrança
+  // passa a ter (`value`), ou sobre o que ela já tem (`amountCents`, quando
+  // quem chama o sabe) — o piso de R$ 5,00 depende dele.
+  const termos = await termosDaCobranca(value !== undefined ? value : amountCents, { billingType });
+  Object.assign(payload, termos.campos);
   const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { payload });
   return {
     dueDate: resposta?.dueDate ? String(resposta.dueDate).slice(0, 10) : null,
     invoiceUrl: resposta?.invoiceUrl ? String(resposta.invoiceUrl) : null,
-    status: resposta?.status ? String(resposta.status) : null
+    status: resposta?.status ? String(resposta.status) : null,
+    // Os termos que foram junto — quem atualiza a linha os grava.
+    ...(termos.discountTerms !== undefined ? { discountTerms: termos.discountTerms } : {})
   };
 }
 
@@ -493,7 +680,7 @@ export async function cancelInvoice(invoiceId) {
 }
 
 export default {
-  createCharge, cancelCharge, getCharge, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
+  createCharge, chargeTermsFor, cancelCharge, getCharge, getPaymentCard, findChargesByReference, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
   createCustomer, testConnection, apiKey, baseUrl, AsaasError,
   createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment
 };

@@ -12,9 +12,10 @@ import {
   type SubscriptionReminderView,
   type SubscriptionStatus
 } from '@/lib/api'
-import { BillingExemptControl, STATUS_LABEL_KEYS, exemptUntilLabel, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { BillingExemptControl, exemptUntilLabel, statusBadgeClass, statusLabelKey } from '@/components/platform/tenant-plan'
 import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
+import { CardBadge } from '@/components/card-badge'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -356,13 +357,14 @@ function StatusBadge({ row }: { row: SubscriptionRow }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <span className={statusBadgeClass(row.subscription.status)}>
-        {t(STATUS_LABEL_KEYS[row.subscription.status])}
+        {t(statusLabelKey(row.subscription))}
       </span>
       {isBillingExempt(row.subscription) && (
         <span className="modern-badge-info" title={row.subscription.billingExemptReason ?? undefined}>
           {exemptUntilLabel(row.subscription, t) ?? t('platform.subs.exempt')}
         </span>
       )}
+      <CardBadge card={row.subscription.card} />
     </span>
   )
 }
@@ -425,6 +427,7 @@ function OpenChargeCell({ row }: { row: SubscriptionRow }) {
   return (
     <span className="flex flex-wrap items-center gap-2">
       <span className="font-mono tabular-nums">{formatMoney(charge.amountCents, charge.currency)}</span>
+      {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
       <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
         {t('platform.subs.dueOn', { date: formatDay(charge.dueDate) })}
       </span>
@@ -788,7 +791,10 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
 const REMINDER_STEP_KEYS = {
   before: 'platform.subs.reminders.step.before',
   due: 'platform.subs.reminders.step.due',
-  after: 'platform.subs.reminders.step.after'
+  after: 'platform.subs.reminders.step.after',
+  // A suspensão automática (0102): o aviso antes, e o aviso dela.
+  suspension_warning: 'platform.subs.reminders.step.suspensionWarning',
+  suspended: 'platform.subs.reminders.step.suspended'
 } as const
 
 const REMINDER_CHANNEL_KEYS: Record<string, 'platform.subs.reminders.channel.email' | 'platform.subs.reminders.channel.whatsapp'> = {
@@ -862,6 +868,8 @@ function ChargeItem({
           {late && charge.status === 'pending' ? t('charges.status.overdue') : t(CHARGE_STATUS_LABEL_KEYS[charge.status])}
         </span>
         <span className="font-mono font-semibold tabular-nums">{formatMoney(charge.amountCents, charge.currency)}</span>
+        {/* A avulsa da subida no meio do período (a diferença proporcional). */}
+        {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
         <span className="text-muted-foreground">{t('charges.period')}: {formatDay(charge.periodEnd)}</span>
         <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
           {t('charges.dueDate')}: {formatDay(charge.dueDate)}

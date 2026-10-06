@@ -2,12 +2,12 @@ import Tenant from '../models/Tenant.js';
 import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
-import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf, isProration } from '../models/BillingCharge.js';
 import BillingInvoice from '../models/BillingInvoice.js';
 import BillingInvoiceService, { InvoiceRequestError } from '../services/billing/billingInvoiceService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import BillingEvent from '../models/BillingEvent.js';
-import SubscriptionService from '../services/subscriptionService.js';
+import SubscriptionService, { isBillableStatus } from '../services/subscriptionService.js';
 import ChargeIssuingService, { ChargeFollowError } from '../services/chargeIssuingService.js';
 import { providerFor } from '../services/billing/registry.js';
 import { AsaasError } from '../services/billing/asaasClient.js';
@@ -246,7 +246,11 @@ async function fecharPeloRegistro(evento, { cobranca, externalId, allowUnderpaym
         externalId: referenciaDoAceite,
         actorUserId,
         allowUnderpayment: true,
-        now
+        now,
+        // A referência do aceite não acha cobrança nenhuma; a de pró-rata
+        // (0101) é nomeada, para o aceite não estender o período como se
+        // fosse a renovação.
+        ...(isProration(cobranca) ? { chargeId: cobranca.id } : {})
       });
       aceitou = !aceite.duplicate;
     }
@@ -362,6 +366,8 @@ class PlatformSubscriptionsController {
           subscription: sub ? {
             status,
             storedStatus: sub.status,
+            // A suspensão automática por inadimplência (0102) ganha selo próprio.
+            suspendedReason: sub.status === 'suspended' ? (sub.suspended_reason ?? null) : null,
             planId: sub.plan_id ?? null,
             planCode: sub.plan_code ?? null,
             planName: sub.plan_name ?? null,
@@ -373,6 +379,8 @@ class PlatformSubscriptionsController {
             coupon: SubscriptionService.presentCoupon(
               sub, planos.get(Number(sub.plan_id)) ?? null, sub.coupon_id ? cupons.get(Number(sub.coupon_id)) ?? null : null
             ),
+            // O cartão recorrente (0100): bandeira e dígitos, nunca o token.
+            card: SubscriptionService.presentCard(sub),
             ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra
@@ -529,7 +537,9 @@ class PlatformSubscriptionsController {
    *      pagamento seria registrado e o período NÃO andaria (é a regra de
    *      `recordPayment`: pagamento não reativa quem alguém desligou) — e uma
    *      baixa que fecha a cobrança sem mudar nada no acesso é a surpresa que
-   *      a pessoa precisa ver antes, e não depois.
+   *      a pessoa precisa ver antes, e não depois. A suspensão AUTOMÁTICA
+   *      por inadimplência (0102) não é "parada por gente": o pagamento a
+   *      reativa, e a baixa passa.
    *   1. **A garra**, antes de qualquer leitura que decida: ninguém reemite,
    *      cancela ou quita esta linha no meio.
    *   2. **O que já foi registrado por esta referência.** O webhook pode ter
@@ -587,7 +597,9 @@ class PlatformSubscriptionsController {
         resultado = await runInTenant(tenant.id, async () => {
           const cobranca = await cobrancaEmAberto(chargeId);
           const assinatura = await Subscription.forTenant(tenant.id);
-          if (!force && (assinatura?.status === 'suspended' || assinatura?.status === 'canceled')) {
+          // A suspensão AUTOMÁTICA (0102) passa: o pagamento a reativa.
+          if (!force && assinatura && !isBillableStatus(assinatura)
+            && (assinatura.status === 'suspended' || assinatura.status === 'canceled')) {
             throw new ConsoleChargeError(
               409,
               `The subscription is ${assinatura.status}: a payment would not extend it (send force to settle anyway)`,
@@ -686,7 +698,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_SETTLED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: amount,
           expectedCents: Number(resultado.cobranca.amount_cents),
           currency: resultado.cobranca.currency,
@@ -758,7 +770,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_CANCELED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: Number(resultado.cobranca.amount_cents),
           statusBefore: resultado.cobranca.status,
           atGateway: resultado.gateway,
@@ -841,10 +853,19 @@ class PlatformSubscriptionsController {
             if (gateway) {
               respondido = await noGateway(() => gateway.updateCharge(cobranca.gateway_charge_id, {
                 ...(mudaData ? { dueDate } : {}),
-                ...(mudaValor ? { value: amount } : {})
+                ...(mudaValor ? { value: amount } : {}),
+                // O valor que ela fica tendo: é sobre ele que o desconto vai.
+                amountCents: mudaValor ? amount : antes.amountCents,
+                // O meio com que ela nasceu (0100): a de cartão continua de cartão.
+                ...(cobranca.billing_type ? { billingType: cobranca.billing_type } : {})
               }));
             }
             const patch = { issuing_until: null };
+            // Os termos do desconto que foram com a atualização (0100): é por
+            // eles que o pagamento desta cobrança é conferido.
+            if (respondido?.discountTerms !== undefined && respondido?.discountTerms !== null) {
+              patch.discount_terms = BillingCharge.serializeDiscountTerms(respondido.discountTerms);
+            }
             // Marcada (0078): daqui em diante o valor desta linha não é o preço
             // de plano nenhum, e a emissão não o reprecifica.
             if (mudaValor) {
@@ -880,7 +901,7 @@ class PlatformSubscriptionsController {
           platformAction: PlatformAudit.ACTIONS.CHARGE_UPDATED,
           detail: {
             chargeId: resultado.cobranca.id,
-            periodEnd: resultado.cobranca.period_end,
+            periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
             before: resultado.antes,
             after: resultado.depois,
             atGateway: resultado.gateway
@@ -1059,7 +1080,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_REFUNDED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: Number(resultado.cobranca.amount_cents),
           currency: resultado.cobranca.currency,
           renewsAtBefore: estorno.renewsAtBefore,
@@ -1120,6 +1141,36 @@ class PlatformSubscriptionsController {
               status: cobranca.status
             });
           }
+          // A fatura de pró-rata (0101) não é do período: a reemissão dela é a
+          // retentativa da que FALHOU no gateway, pela porta do agendador
+          // (`retryProrations`), com a mesma referência. A cancelada fica
+          // cancelada — cobrar de novo a diferença é uma decisão nova.
+          if (isProration(cobranca)) {
+            if (cobranca.status !== 'failed' || cobranca.gateway_charge_id) {
+              throw new ConsoleChargeError(409, `A ${cobranca.status} proration charge cannot be reissued`, 'not_reissuable', {
+                status: cobranca.status
+              });
+            }
+            const retentativa = await ChargeIssuingService.retryProrations({ tenant, manual: true, chargeId: cobranca.id });
+            const emissao = retentativa.result;
+            if (!emissao) {
+              const motivo = retentativa.reason ?? 'busy';
+              throw new ConsoleChargeError(409, `The charge was not reissued: ${motivo}`, motivo);
+            }
+            if (emissao.reason === 'gateway_failed') {
+              throw new ConsoleChargeError(502, `The payment gateway refused: ${emissao.error}`, 'gateway_failed', {
+                detail: emissao.error
+              });
+            }
+            if (!emissao.issued && emissao.reason !== 'already_issued') {
+              throw new ConsoleChargeError(409, `The charge was not reissued: ${emissao.reason}`, emissao.reason);
+            }
+            return {
+              cobranca,
+              issued: emissao.issued,
+              charge: emissao.charge ?? await BillingCharge.findById(cobranca.id)
+            };
+          }
           const assinatura = await Subscription.forTenant(tenant.id);
           // O mesmo prazo que `issueCurrent` lê, na mesma ordem.
           const prazo = assinatura?.renews_at ?? assinatura?.trial_ends_at ?? null;
@@ -1141,7 +1192,10 @@ class PlatformSubscriptionsController {
           }
           // `already_issued` é sucesso: a cobrança do período está viva no
           // gateway, emitida por outra passada no meio — que é o que se pediu.
-          if (!emissao.issued && emissao.reason !== 'already_issued') {
+          // `card_deferred` também: a assinatura tem cartão salvo, e a linha
+          // reaberta sai no cartão no dia do vencimento, pelo agendador — o
+          // console não cobra o cartão antes da hora.
+          if (!emissao.issued && emissao.reason !== 'already_issued' && emissao.reason !== 'card_deferred') {
             throw new ConsoleChargeError(409, `The charge was not reissued: ${emissao.reason}`, emissao.reason);
           }
           return {
@@ -1160,7 +1214,7 @@ class PlatformSubscriptionsController {
           platformAction: PlatformAudit.ACTIONS.CHARGE_REISSUED,
           detail: {
             chargeId: resultado.cobranca.id,
-            periodEnd: resultado.cobranca.period_end,
+            periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
             statusBefore: resultado.cobranca.status,
             amountCents: Number(resultado.charge?.amount_cents ?? 0)
           }
@@ -1211,7 +1265,7 @@ class PlatformSubscriptionsController {
         platformAction: PlatformAudit.ACTIONS.CHARGE_INVOICE_REQUESTED,
         detail: {
           chargeId: resultado.cobranca.id,
-          periodEnd: resultado.cobranca.period_end,
+          periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
           amountCents: Number(resultado.cobranca.amount_cents),
           invoiceStatusBefore: resultado.statusBefore
         }

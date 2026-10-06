@@ -2,11 +2,13 @@ import crypto from 'node:crypto';
 import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { asaasBilling, AsaasBillingProvider } from '../services/billing/asaasBillingProvider.js';
-import BillingCharge from '../models/BillingCharge.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES } from '../models/BillingCharge.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import BillingEvent from '../models/BillingEvent.js';
 import { effectiveWebhookToken } from '../services/billing/asaasSettingsService.js';
 import BillingInvoiceService from '../services/billing/billingInvoiceService.js';
+import CardAutopayService from '../services/billing/cardAutopayService.js';
+import Tenant from '../models/Tenant.js';
 
 /**
  * A entrega do gateway de pagamento: o provedor pagou, e o painel volta a
@@ -110,7 +112,13 @@ export async function resolveTenantDaEntrega({ reference, customerRef }, gateway
   return null;
 }
 
-/** Marca como paga a cobrança que o gateway nomeia. Nunca derruba o crédito. */
+/**
+ * Marca como paga a cobrança que o gateway nomeia. Nunca derruba o crédito.
+ *
+ * Vale igual para a de pró-rata (0101): `recordPayment` já a reconheceu (não
+ * estendeu o prazo), e o `update` do modelo regrava `proration_due_at` — o
+ * provedor que estava `past_due` por ela volta a escrever na hora.
+ */
 async function marcarCobrancaPaga(gatewayChargeId) {
   try {
     const cobranca = await BillingCharge.byGatewayId(gatewayChargeId);
@@ -180,6 +188,9 @@ class BillingWebhookController {
       );
       return res.json({ success: true, code: 'unattributed' });
     }
+
+    // O cartão salvo recusado na captura (0100) não é etiqueta de cobrança.
+    if (ciclo.status === 'card_refused') return BillingWebhookController.recusaDeCartao(ciclo, tenantId, res);
 
     // O estorno PARCIAL: o console só sabe desfazer o período inteiro, e uma
     // parte do dinheiro de volta não diz qual parte do período se desfaz.
@@ -270,6 +281,52 @@ class BillingWebhookController {
     return pendente;
   }
 
+  /**
+   * `PAYMENT_CREDIT_CARD_CAPTURE_REFUSED` (0100): o gateway não conseguiu
+   * cobrar no cartão salvo a cobrança que saiu com o token.
+   *
+   * Aqui só a anotação — a falha no cartão, uma escrita no escopo do
+   * provedor —, e só para uma cobrança NOSSA, de cartão e ainda em aberto: a
+   * recusa de um cartão digitado na página de uma fatura de Pix-ou-boleto
+   * não diz nada do cartão salvo. Reemitir como Pix/boleto e avisar falam
+   * com o gateway e com o SMTP, e saem depois da resposta
+   * (`agendarCartao`) — e de novo pelo agendador, se este processo cair.
+   */
+  static async recusaDeCartao(ciclo, tenantId, res) {
+    try {
+      const code = await runInTenant(tenantId, async () => {
+        const cobranca = await BillingCharge.byGatewayId(ciclo.externalId);
+        if (!cobranca) return 'no_charge';
+        if (cobranca.billing_type !== 'CREDIT_CARD' || !OPEN_CHARGE_STATUSES.includes(cobranca.status)) return 'unchanged';
+        await CardAutopayService.markRefused({ reason: 'capture_refused' });
+        return 'card_refused';
+      });
+      if (code === 'card_refused') BillingWebhookController.agendarCartao(tenantId);
+      return res.json({ success: true, code });
+    } catch (error) {
+      console.error(`Billing webhook: could not apply ${ciclo.event} for provider ${tenantId}:`, error.message);
+      return res.json({ success: true, code: 'update_failed' });
+    }
+  }
+
+  /**
+   * O trabalho do cartão recorrente que fala com o gateway, FORA desta
+   * entrega — a mesma regra da NFS-e: ler o token, reemitir a fatura recusada
+   * como Pix/boleto, avisar (`CardAutopayService.processDue`). Sem `await`; a
+   * promessa fica em `pendingCardWork` para o teste esperar, e a falha fica
+   * no log — a anotação no banco é o que o agendador retoma.
+   */
+  static agendarCartao(tenantId) {
+    const pendente = runInTenant(tenantId, async () => {
+      const tenant = await Tenant.findById(tenantId);
+      return CardAutopayService.processDue({ tenant });
+    }).catch((error) => {
+      console.error(`Billing webhook: card autopay work failed for provider ${tenantId}: ${error.message}`);
+    });
+    BillingWebhookController.pendingCardWork = pendente;
+    return pendente;
+  }
+
   static async receive(req, res) {
     const esperado = await tokenConfigurado();
     if (!esperado) {
@@ -345,7 +402,9 @@ class BillingWebhookController {
       // Daqui para baixo, como o provedor que pagou. É o escopo que diz de quem
       // é o dinheiro — `recordPayment` não recebe `tenantId` justamente para
       // que ninguém credite o provedor errado passando o id errado.
-      const { duplicate, underpaid, expectedCents, paidCents, refundedReference } = await runInTenant(tenantId, async () => {
+      const {
+        duplicate, underpaid, expectedCents, paidCents, refundedReference, cardCapture
+      } = await runInTenant(tenantId, async () => {
         // O pagamento cujo estorno JÁ está no extrato. O caso que importa é o
         // da baixa em dinheiro desfeita pelo console: se o cancelamento no
         // gateway não pegou, a cobrança voltou a ser pagável lá, e um
@@ -361,6 +420,7 @@ class BillingWebhookController {
           amountCents: leitura.amountCents,
           currency: 'BRL',
           externalId: leitura.externalId,
+          paidOn: leitura.paidOn ?? null,
           actorUserId: null
         });
         // E a cobrança que o painel emitiu para isto, se houver, deixa de estar
@@ -393,7 +453,20 @@ class BillingWebhookController {
         // Na reentrega também: a fila é idempotente, e a primeira entrega pode
         // ter caído antes de enfileirar. Só a cobrança PAGA entra.
         if (!resultado.underpaid) await enfileirarNota(leitura.externalId);
-        return resultado;
+        // O cartão recorrente (0100): um pagamento NOVO com cartão, com a
+        // cobrança automática ligada, deixa anotado que o token dele falta
+        // ler. Só o primeiro crédito — a reentrega e o `RECEIVED` de trinta
+        // dias depois chegam como `duplicate` e não trocariam por um token
+        // velho o cartão salvo depois. Nunca derruba o crédito.
+        let cardCapture = false;
+        if (!resultado.duplicate && leitura.billingType === 'CREDIT_CARD') {
+          try {
+            cardCapture = await CardAutopayService.requestCapture(leitura.externalId);
+          } catch (error) {
+            console.warn(`Billing webhook: could not note the card of payment ${leitura.externalId}: ${error.message}`);
+          }
+        }
+        return { ...resultado, cardCapture };
       });
 
       if (refundedReference) {
@@ -414,6 +487,8 @@ class BillingWebhookController {
           + `${paidCents} of ${expectedCents} cents — recorded, period NOT extended`
         );
       }
+
+      if (cardCapture) BillingWebhookController.agendarCartao(tenantId);
 
       // 200 nos três: o dinheiro chegou e foi registrado, e o que o gateway
       // precisa saber é que não há o que reentregar. A diferença entre eles é

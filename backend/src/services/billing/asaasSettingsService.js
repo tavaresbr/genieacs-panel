@@ -158,6 +158,179 @@ function nfseDoPatch(patch, anterior) {
 }
 
 /**
+ * Multa, juros e desconto por antecipação: os termos que vão em cada cobrança
+ * que a plataforma emite no Asaas. Nada aqui é segredo, e o molde é o da
+ * `nfse` logo acima — um subbloco `charges` no blob, desligado por padrão.
+ *
+ * As unidades, porque elas não são as mesmas:
+ *
+ * - `finePercent`: a multa, em % do valor, cobrada uma vez depois do
+ *   vencimento (0 a 10).
+ * - `interestMonthlyPercent`: os juros, em % ao mês, que o gateway rateia por
+ *   dia de atraso (0 a 10).
+ * - `discountKind`: `percent` ou `fixed`. Com `percent`, `discountValue` é a
+ *   porcentagem (0 a 100); com `fixed`, é em CENTAVOS, como todo dinheiro
+ *   deste painel — quem converte para reais é o cliente do gateway.
+ * - `discountDaysBefore`: até quantos dias ANTES do vencimento o desconto vale
+ *   (0 = até o próprio vencimento, 30 no máximo).
+ *
+ * Zero em qualquer um é "desligado": não vai campo nenhum ao gateway.
+ */
+export const CHARGES_FIELDS = Object.freeze([
+  'finePercent', 'interestMonthlyPercent', 'discountKind', 'discountValue', 'discountDaysBefore'
+]);
+export const DISCOUNT_KINDS = Object.freeze(['percent', 'fixed']);
+
+/** A configuração dos termos quando nada foi gravado: tudo desligado. */
+export const CHARGES_DEFAULTS = Object.freeze({
+  finePercent: 0,
+  interestMonthlyPercent: 0,
+  discountKind: 'percent',
+  discountValue: 0,
+  discountDaysBefore: 0
+});
+
+/**
+ * O piso de uma fatura com desconto: R$ 5,00, o mesmo do cupom
+ * (`COUPON_FLOOR_CENTS`) e o mínimo que o gateway aceita numa cobrança.
+ */
+export const CHARGE_FLOOR_CENTS = 500;
+
+/** Os tetos de cada número — a validação e a leitura usam os mesmos. */
+const CHARGES_LIMITS = Object.freeze({
+  finePercent: 10,
+  interestMonthlyPercent: 10,
+  discountPercent: 100,
+  discountFixedCents: 100_000_000,
+  discountDaysBefore: 30
+});
+
+const duasCasas = (numero) => Math.round(numero * 100) / 100;
+
+/** O bloco `charges` guardado, completo e com os tipos certos — nunca lança. */
+function chargesGuardada(stored) {
+  const bruto = stored?.charges && typeof stored.charges === 'object' ? stored.charges : {};
+  const entre = (valor, max) => {
+    const numero = Number(valor);
+    return Number.isFinite(numero) && numero >= 0 && numero <= max ? numero : 0;
+  };
+  const discountKind = DISCOUNT_KINDS.includes(bruto.discountKind) ? bruto.discountKind : 'percent';
+  const discountValue = discountKind === 'fixed'
+    ? Math.floor(entre(bruto.discountValue, CHARGES_LIMITS.discountFixedCents))
+    : entre(bruto.discountValue, CHARGES_LIMITS.discountPercent);
+  return {
+    finePercent: entre(bruto.finePercent, CHARGES_LIMITS.finePercent),
+    interestMonthlyPercent: entre(bruto.interestMonthlyPercent, CHARGES_LIMITS.interestMonthlyPercent),
+    discountKind,
+    discountValue,
+    discountDaysBefore: Math.floor(entre(bruto.discountDaysBefore, CHARGES_LIMITS.discountDaysBefore))
+  };
+}
+
+/**
+ * O que o patch muda nos termos da cobrança, validado — ou nada.
+ *
+ * Mesmo contrato da `nfse`: campo ausente não é tocado; nulo ou texto vazio
+ * num número é zero (desligado). A conferência do desconto é sobre o
+ * resultado da mescla, porque o mesmo `discountValue` quer dizer coisas
+ * diferentes conforme o `discountKind` — trocar só o tipo numa gravação não
+ * pode deixar 1500 "por cento" de pé.
+ */
+function chargesDoPatch(patch, anterior) {
+  const presentes = CHARGES_FIELDS.filter((campo) => patch[campo] !== undefined);
+  if (!presentes.length) return undefined;
+  const proxima = { ...anterior };
+  const numero = (campo, valor) => {
+    const lido = valor === null || valor === '' ? 0 : Number(valor);
+    if (typeof valor === 'boolean' || !Number.isFinite(lido) || lido < 0) {
+      throw new AsaasSettingsError(`${campo} must be a non-negative number`, { code: 'invalid_charges' });
+    }
+    return lido;
+  };
+  for (const campo of presentes) {
+    const valor = patch[campo];
+    if (campo === 'discountKind') {
+      if (!DISCOUNT_KINDS.includes(valor)) {
+        throw new AsaasSettingsError(`discountKind must be one of ${DISCOUNT_KINDS.join(', ')}`, {
+          code: 'invalid_charges'
+        });
+      }
+      proxima.discountKind = valor;
+    } else if (campo === 'finePercent' || campo === 'interestMonthlyPercent') {
+      const lido = numero(campo, valor);
+      if (lido > CHARGES_LIMITS[campo]) {
+        throw new AsaasSettingsError(`${campo} must be between 0 and ${CHARGES_LIMITS[campo]}`, {
+          code: 'invalid_charges'
+        });
+      }
+      proxima[campo] = duasCasas(lido);
+    } else if (campo === 'discountDaysBefore') {
+      const lido = numero(campo, valor);
+      if (!Number.isInteger(lido) || lido > CHARGES_LIMITS.discountDaysBefore) {
+        throw new AsaasSettingsError(
+          `discountDaysBefore must be a whole number between 0 and ${CHARGES_LIMITS.discountDaysBefore}`,
+          { code: 'invalid_charges' }
+        );
+      }
+      proxima.discountDaysBefore = lido;
+    } else {
+      proxima.discountValue = numero(campo, valor);
+    }
+  }
+  if (proxima.discountKind === 'fixed') {
+    if (!Number.isInteger(proxima.discountValue) || proxima.discountValue > CHARGES_LIMITS.discountFixedCents) {
+      throw new AsaasSettingsError('a fixed discountValue must be a whole number of cents', {
+        code: 'invalid_charges'
+      });
+    }
+  } else {
+    if (proxima.discountValue > CHARGES_LIMITS.discountPercent) {
+      throw new AsaasSettingsError('a percent discountValue must be between 0 and 100', { code: 'invalid_charges' });
+    }
+    proxima.discountValue = duasCasas(proxima.discountValue);
+  }
+  return proxima;
+}
+
+/**
+ * Quanto o desconto por antecipação tira de uma fatura de `amountCents`, já
+ * com o piso — ou nada.
+ *
+ * Pura, e é a MESMA conta nas duas pontas: a emissão manda ao gateway o que
+ * ela diz, e a conferência do pagamento (`recordPayment`) aceita como inteiro
+ * o valor que ela diz. Duas contas parecidas em dois lugares dariam um
+ * centavo de diferença, e um centavo a menos é "pago a menos".
+ *
+ * Com o piso: o desconto nunca leva a fatura abaixo de `CHARGE_FLOOR_CENTS`.
+ * Um desconto que passaria disso vira o FIXO que para exatamente no piso
+ * (`clamped`); uma fatura que já está no piso não tem desconto nenhum.
+ *
+ * @returns {{ cents: number, kind: 'percent'|'fixed', percent: number|null,
+ *   daysBefore: number, clamped: boolean }|null}
+ */
+export function earlyDiscountFor(amountCents, config) {
+  const valor = Number(amountCents);
+  if (!Number.isInteger(valor) || valor <= CHARGE_FLOOR_CENTS) return null;
+  const termos = config ?? CHARGES_DEFAULTS;
+  const desconto = Number(termos.discountValue);
+  if (!Number.isFinite(desconto) || desconto <= 0) return null;
+  const daysBefore = Number.isInteger(termos.discountDaysBefore) ? termos.discountDaysBefore : 0;
+  const folga = valor - CHARGE_FLOOR_CENTS;
+  if (termos.discountKind === 'fixed') {
+    const cents = Math.min(Math.floor(desconto), folga);
+    return cents > 0
+      ? { cents, kind: 'fixed', percent: null, daysBefore, clamped: cents < Math.floor(desconto) }
+      : null;
+  }
+  // O gateway calcula a porcentagem do lado dele, em reais com duas casas:
+  // arredondado, como ele arredonda.
+  const cents = Math.round((valor * desconto) / 100);
+  if (cents <= 0) return null;
+  if (cents > folga) return { cents: folga, kind: 'fixed', percent: null, daysBefore, clamped: true };
+  return { cents, kind: 'percent', percent: desconto, daysBefore, clamped: false };
+}
+
+/**
  * Quanto tempo o blob lido fica em memória.
  *
  * Curto de propósito: o job de emissão pergunta por isto a cada provedor, a
@@ -167,7 +340,17 @@ function nfseDoPatch(patch, anterior) {
  */
 const CACHE_TTL_MS = 15_000;
 
-const box = createSecretBox(SECRET_CONTEXT);
+/**
+ * Criada na primeira vez que é usada, não no carregamento do módulo: este
+ * arquivo entra na cadeia de import do middleware de sessão, e um processo de
+ * produção sem segredo tem de ouvir primeiro que falta o JWT_SECRET — não que
+ * falta a chave da caixa de segredos.
+ */
+let caixa = null;
+function box() {
+  if (!caixa) caixa = createSecretBox(SECRET_CONTEXT);
+  return caixa;
+}
 
 let cache = null;
 
@@ -191,13 +374,13 @@ function envValue(nome) {
 }
 
 function selar(valor) {
-  return { v: 1, ...box.encrypt(valor) };
+  return { v: 1, ...box().encrypt(valor) };
 }
 
 /** O segredo aberto, ou nulo — inclusive quando a chave da caixa não o abre. */
 function abrir(envelope) {
   if (!envelope || typeof envelope !== 'object') return null;
-  const valor = box.decrypt(envelope);
+  const valor = box().decrypt(envelope);
   return valor ? String(valor) : null;
 }
 
@@ -264,6 +447,7 @@ async function resolver() {
     webhookToken,
     webhookTokenSource,
     nfse: nfseGuardada(stored),
+    charges: chargesGuardada(stored),
     updatedAt: stored?.updatedAt ?? null
   };
 }
@@ -278,6 +462,7 @@ export async function readPublic() {
     webhookTokenConfigured: Boolean(efetivo.webhookToken),
     webhookTokenSource: efetivo.webhookTokenSource,
     ...efetivo.nfse,
+    ...efetivo.charges,
     updatedAt: efetivo.updatedAt
   };
 }
@@ -285,6 +470,11 @@ export async function readPublic() {
 /** A configuração da NFS-e que vale agora — ver `NFSE_FIELDS`. */
 export async function effectiveNfseConfig() {
   return (await resolver()).nfse;
+}
+
+/** A multa, os juros e o desconto que valem agora — ver `CHARGES_FIELDS`. */
+export async function effectiveChargesConfig() {
+  return (await resolver()).charges;
 }
 
 /** A chave com que o painel CHAMA o gateway, ou nulo. */
@@ -365,6 +555,8 @@ export async function save(patch = {}) {
   const anterior = stored ?? {};
   const nfseAnterior = nfseGuardada(anterior);
   const nfse = nfseDoPatch(patch, nfseAnterior);
+  const chargesAnterior = chargesGuardada(anterior);
+  const charges = chargesDoPatch(patch, chargesAnterior);
   const proximo = {
     v: 1,
     environment: ENVIRONMENTS.includes(anterior.environment) ? anterior.environment : null,
@@ -373,9 +565,11 @@ export async function save(patch = {}) {
     // O bloco da nota só é gravado quando existe: um blob de antes dela
     // continua sem ele, e a leitura devolve os padrões.
     ...(anterior.nfse ? { nfse: nfseAnterior } : {}),
+    ...(anterior.charges ? { charges: chargesAnterior } : {}),
     updatedAt: anterior.updatedAt ?? null
   };
   if (nfse !== undefined) proximo.nfse = nfse;
+  if (charges !== undefined) proximo.charges = charges;
   if (environment !== undefined) proximo.environment = environment;
   if (apiKey !== undefined) proximo.apiKey = apiKey ? selar(apiKey) : null;
   if (webhookToken !== undefined) proximo.webhookToken = webhookToken ? selar(webhookToken) : null;
@@ -390,7 +584,8 @@ export async function save(patch = {}) {
       environment: environment !== undefined && environment !== anterior.environment,
       apiKey: apiKey !== undefined,
       webhookToken: webhookToken !== undefined,
-      nfse: nfse !== undefined && JSON.stringify(nfse) !== JSON.stringify(nfseAnterior)
+      nfse: nfse !== undefined && JSON.stringify(nfse) !== JSON.stringify(nfseAnterior),
+      charges: charges !== undefined && JSON.stringify(charges) !== JSON.stringify(chargesAnterior)
     }
   };
 }
@@ -413,6 +608,7 @@ export default {
   effectiveEnvironment,
   effectiveBaseUrl,
   effectiveNfseConfig,
+  effectiveChargesConfig,
   save,
   generateWebhookToken,
   invalidateAsaasSettings

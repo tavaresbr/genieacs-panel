@@ -33,14 +33,17 @@ import {
 import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { couponAppliesToPlan, couponDurationLabel, couponPriceCents } from '@/lib/coupon'
 import { CouponBadge } from '@/components/platform/coupon-control'
+import { CardAutopay } from '@/components/card-autopay'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
  * está em uso — e, para quem tem `settings.write`, a troca de plano e o
  * "pagar agora".
  *
- * Sem proporcional: a próxima cobrança já sai com o preço novo. Subir vale na
- * hora; descer com a assinatura em dia fica agendado para a renovação
+ * A próxima cobrança já sai com o preço novo. Subir vale na hora — e, com um
+ * período pago correndo, cobra agora a diferença proporcional ao que falta
+ * (a pró-rata, que a lista de planos já traz calculada e a confirmação
+ * mostra); descer com a assinatura em dia fica agendado para a renovação
  * (`pendingPlan`), e o agendamento se cancela pedindo o plano atual. A tela
  * adianta na confirmação qual dos casos é, mas quem decide é o servidor — a
  * frase dele é o que aparece depois. É o backend quem recusa a troca para um plano que não comporta o
@@ -134,6 +137,16 @@ export default function PlanPage() {
       setData(res.data)
       setError(null)
       toast.success(res.message || fallback)
+      // A fatura de pró-rata que a subida abriu: o link fica nas cobranças,
+      // logo abaixo, e o aviso diz que ela está lá.
+      const prorata = res.data.proration
+      if (prorata && !prorata.skipped && prorata.amountCents > 0) {
+        const valor = formatMoney(prorata.amountCents, prorata.currency ?? 'BRL')
+        setAviso({
+          tipo: prorata.issued ? 'ok' : 'info',
+          texto: t(prorata.issued ? 'plan.proration.issued' : 'plan.proration.pending', { amount: valor })
+        })
+      }
       const [atual, catalogo] = await Promise.all([subscriptionAPI.current(), subscriptionAPI.plans()])
       if (atual.success && atual.data) setData(atual.data)
       if (catalogo.success && catalogo.data) setPlans(catalogo.data)
@@ -159,6 +172,18 @@ export default function PlanPage() {
     })
   }
 
+  /** A frase da pró-rata de subir para `plan`, ou nulo quando não há o que cobrar. */
+  const prorationLine = (plan: TenantPlanOption) => {
+    const previa = plan.proration
+    if (!previa) return null
+    if (previa.skipped) return t('plan.proration.belowMinimum')
+    if (!(previa.amountCents > 0)) return null
+    return t('plan.proration.confirm', {
+      amount: formatMoney(previa.amountCents, previa.currency || plan.currency),
+      days: previa.remainingDays
+    })
+  }
+
   const mudarPara = async (plan: TenantPlanOption) => {
     const periodo = periodLabel(plan.periodDays, formatMoney(plan.priceCents, plan.currency))
     const preco = t(periodo.key, periodo.vars)
@@ -166,7 +191,10 @@ export default function PlanPage() {
     const tipo = planChangeKind(atual, plan, data?.subscription)
     if (tipo === 'same') return
     const vars = { name: plan.name, price: preco, date: formatDate(data?.subscription?.renewsAt) ?? '' }
-    if (!window.confirm(t(confirmKey(tipo), vars))) return
+    // A pró-rata, ANTES do clique que a cobra: "você vai pagar R$ X agora".
+    const prorata = tipo === 'upgrade' ? prorationLine(plan) : null
+    const pergunta = prorata ? `${t(confirmKey(tipo), vars)}\n\n${prorata}` : t(confirmKey(tipo), vars)
+    if (!window.confirm(pergunta)) return
     setMudando(plan.id)
     await trocar(plan.id, t('plan.options.changed', { name: plan.name }))
     setMudando(null)
@@ -304,6 +332,9 @@ export default function PlanPage() {
                 {!isento && subscription.reason === 'renewal_expired' && (
                   <span className="text-muted-foreground">{t('platform.subscription.renewalExpiredNote')}</span>
                 )}
+                {!isento && subscription.reason === 'proration_overdue' && (
+                  <span className="text-muted-foreground">{t('platform.subscription.prorationOverdueNote')}</span>
+                )}
               </div>
               {isento && (
                 <p role="status" className="mt-3 flex items-start gap-2 text-sm text-foreground">
@@ -384,6 +415,20 @@ export default function PlanPage() {
                   <Icon name="invoice" size={17} />
                   {pagando ? t('plan.paying') : t('plan.payNow')}
                 </button>
+              )}
+              {/* O cartão recorrente: a quem paga (plano pago, sem isenção), e
+                  a quem já tem cartão ou cobrança automática para desligar. */}
+              {subscription.card && !isento
+                && (canPayNow(plans, true, subscription) || subscription.card.saved || subscription.card.autopayEnabled) && (
+                <CardAutopay
+                  card={subscription.card}
+                  canWrite={podeEscrever}
+                  canEnable={subscriptionAllowsChanges(subscription)}
+                  onChanged={(novo) => {
+                    setData(novo)
+                    setChargesKey((k) => k + 1)
+                  }}
+                />
               )}
             </section>
 
@@ -513,6 +558,16 @@ export default function PlanPage() {
                         <p className="text-sm font-medium text-[hsl(var(--status-success))]">
                           {t('coupons.priceWithCoupon', {
                             price: formatMoney(couponPriceCents(plan.priceCents, cupomAtual), plan.currency)
+                          })}
+                        </p>
+                      )}
+                      {/* Quanto subir para este plano cobra agora (a pró-rata). */}
+                      {!plan.current && canSwitchTo(plan, podeEscrever, subscription) && plan.proration
+                        && !plan.proration.skipped && plan.proration.amountCents > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {t('plan.proration.preview', {
+                            amount: formatMoney(plan.proration.amountCents, plan.proration.currency || plan.currency),
+                            days: plan.proration.remainingDays
                           })}
                         </p>
                       )}

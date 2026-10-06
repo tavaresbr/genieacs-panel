@@ -449,7 +449,17 @@ class TenantController {
             ? { pendingCanceled: true, canceledPlanId: resultado.canceledPlanId ?? null } : {}),
           ...(resultado.replacedPlanId ? { replacedPlanId: resultado.replacedPlanId } : {}),
           ...(resultado.deferredByUpgrade ? { deferredByUpgrade: true } : {}),
-          ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
+          ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {}),
+          // A pró-rata da subida (0101): quanto, e se saiu.
+          ...(resultado.proration ? {
+            proration: {
+              amountCents: resultado.proration.amountCents,
+              issued: resultado.proration.issued,
+              ...(resultado.proration.skipped ? { skipped: resultado.proration.skipped } : {}),
+              ...(resultado.proration.reason ? { reason: resultado.proration.reason } : {}),
+              ...(resultado.proration.charge?.id ? { chargeId: resultado.proration.charge.id } : {})
+            }
+          } : {})
         };
         await AuditLog.fromRequest(req, {
           action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
@@ -466,7 +476,12 @@ class TenantController {
         if (!registrada) console.warn(`Provider ${req.tenantId} changed its plan without a platform trail line`);
       }
 
-      return res.json(createResponse(planChangeMessage(req, resultado), await subscriptionPayload(req)));
+      // `proration` (0101): a fatura de pró-rata que a subida abriu — com o
+      // link de pagamento, para a tela levar o provedor direto a ela.
+      return res.json(createResponse(planChangeMessage(req, resultado), {
+        ...await subscriptionPayload(req),
+        ...(resultado.proration ? { proration: resultado.proration } : {})
+      }));
     } catch (error) {
       if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
       console.error('Self-service plan change error:', error);
@@ -520,6 +535,62 @@ class TenantController {
       if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
       console.error('Apply coupon error:', error);
       return res.status(500).json(createErrorResponse(req.t('coupon.applyFailed'), error.message));
+    }
+  }
+
+  /**
+   * `PUT /api/tenant/subscription/autopay` — `{ enabled }`: liga ou desliga a
+   * cobrança automática no cartão (0100). Mesma capacidade e mesmo lado da
+   * porta da assinatura que a troca de plano.
+   *
+   * O IP gravado é o de quem pediu (`req.ip`, que respeita o `trust proxy` do
+   * deploy): o gateway o exige em toda cobrança por token. A trilha do
+   * provedor diz quem ligou ou desligou — sem cartão nem IP no `detail`.
+   */
+  static async setCardAutopay(req, res) {
+    try {
+      const resultado = await SelfBillingService.setCardAutopay({
+        enabled: req.body?.enabled,
+        remoteIp: req.ip
+      });
+      if (resultado.changed) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+          subjectType: 'subscription',
+          subjectId: req.tenantId,
+          detail: { cardAutopay: resultado.enabled, selfService: true }
+        });
+      }
+      const chave = resultado.enabled ? 'subscription.cardAutopayEnabled' : 'subscription.cardAutopayDisabled';
+      return res.json(createResponse(req.t(chave), await subscriptionPayload(req)));
+    } catch (error) {
+      if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
+      console.error('Card autopay change error:', error.message);
+      return res.status(500).json(createErrorResponse(req.t('subscription.cardUpdateFailed'), error.message));
+    }
+  }
+
+  /**
+   * `DELETE /api/tenant/subscription/card`: esquece o cartão salvo (0100). A
+   * cobrança de cartão em aberto vira Pix/boleto. Idempotente — sem cartão,
+   * 200 e nada muda. A trilha leva bandeira e quatro dígitos, nunca o token.
+   */
+  static async removeCard(req, res) {
+    try {
+      const resultado = await SelfBillingService.removeCard();
+      if (resultado.removed) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+          subjectType: 'subscription',
+          subjectId: req.tenantId,
+          detail: { cardRemoved: true, brand: resultado.brand ?? null, last4: resultado.last4 ?? null, selfService: true }
+        });
+      }
+      return res.json(createResponse(req.t('subscription.cardRemoved'), await subscriptionPayload(req)));
+    } catch (error) {
+      if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
+      console.error('Remove card error:', error.message);
+      return res.status(500).json(createErrorResponse(req.t('subscription.cardUpdateFailed'), error.message));
     }
   }
 

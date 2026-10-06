@@ -128,7 +128,8 @@ describe('a leitura', () => {
     const res = await platform('/integrations/asaas');
     assert.equal(res.status, 200);
     assert.deepEqual(Object.keys(res.body.data).sort(), [
-      'apiKeyConfigured', 'apiKeySource', 'environment', 'issPercent', 'municipalServiceCode',
+      'apiKeyConfigured', 'apiKeySource', 'discountDaysBefore', 'discountKind', 'discountValue', 'environment',
+      'finePercent', 'interestMonthlyPercent', 'issPercent', 'municipalServiceCode',
       'municipalServiceId', 'municipalServiceName', 'nfseEnabled', 'observations', 'retainIss',
       'serviceDescription', 'updatedAt', 'webhookTokenConfigured', 'webhookTokenSource', 'webhookUrl'
     ]);
@@ -246,6 +247,81 @@ describe('a gravação', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.data.configured.billingGateway, true);
     assert.equal(res.body.data.configured.billingWebhookToken, true);
+  });
+});
+
+describe('multa, juros e desconto', () => {
+  it('nascem desligados', async () => {
+    const res = await platform('/integrations/asaas');
+    assert.equal(res.status, 200);
+    const { finePercent, interestMonthlyPercent, discountKind, discountValue, discountDaysBefore } = res.body.data;
+    assert.deepEqual(
+      { finePercent, interestMonthlyPercent, discountKind, discountValue, discountDaysBefore },
+      { finePercent: 0, interestMonthlyPercent: 0, discountKind: 'percent', discountValue: 0, discountDaysBefore: 0 }
+    );
+  });
+
+  it('gravam, voltam na leitura e entram na trilha sem tocar no resto', async () => {
+    const res = await platform('/integrations/asaas', {
+      method: 'PUT',
+      body: { finePercent: 2, interestMonthlyPercent: 1, discountKind: 'percent', discountValue: 5, discountDaysBefore: 3 }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.finePercent, 2);
+    assert.equal(res.body.data.interestMonthlyPercent, 1);
+    assert.equal(res.body.data.discountValue, 5);
+    assert.equal(res.body.data.discountDaysBefore, 3);
+    assert.equal(res.body.data.nfseEnabled, false, 'a nota continua como estava');
+
+    const trilha = await getDb()('platform_audit')
+      .where({ action: 'platform.integration_changed' }).orderBy('id', 'desc').first();
+    const detalhe = JSON.parse(trilha.detail);
+    assert.equal(detalhe.chargesChanged, true);
+    assert.deepEqual(detalhe.charges, {
+      finePercent: 2, interestMonthlyPercent: 1, discountKind: 'percent', discountValue: 5, discountDaysBefore: 3
+    });
+
+    // Ausente mantém; trocar só o tipo reconfere o valor que ficou.
+    const fixo = await platform('/integrations/asaas', {
+      method: 'PUT', body: { discountKind: 'fixed', discountValue: 1000 }
+    });
+    assert.equal(fixo.status, 200);
+    assert.equal(fixo.body.data.finePercent, 2);
+    assert.equal(fixo.body.data.discountKind, 'fixed');
+    assert.equal(fixo.body.data.discountValue, 1000);
+
+    const desligado = await platform('/integrations/asaas', {
+      method: 'PUT', body: { finePercent: null, interestMonthlyPercent: '', discountValue: 0 }
+    });
+    assert.equal(desligado.body.data.finePercent, 0);
+    assert.equal(desligado.body.data.interestMonthlyPercent, 0);
+    assert.equal(desligado.body.data.discountValue, 0);
+  });
+
+  for (const [nome, corpo] of [
+    ['multa acima de 10%', { finePercent: 10.5 }],
+    ['multa negativa', { finePercent: -1 }],
+    ['juros acima de 10% ao mês', { interestMonthlyPercent: 11 }],
+    ['juros que não são número', { interestMonthlyPercent: 'muito' }],
+    ['tipo de desconto que não existe', { discountKind: 'brinde' }],
+    ['desconto percentual acima de 100', { discountKind: 'percent', discountValue: 150 }],
+    ['desconto fixo em fração de centavo', { discountKind: 'fixed', discountValue: 10.5 }],
+    ['prazo do desconto acima de 30 dias', { discountDaysBefore: 31 }],
+    ['prazo do desconto fracionado', { discountDaysBefore: 1.5 }],
+    ['booleano no lugar de número', { finePercent: true }]
+  ]) {
+    it(`recusa ${nome} com 400 invalid_charges`, async () => {
+      const res = await platform('/integrations/asaas', { method: 'PUT', body: corpo });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.code, 'invalid_charges');
+    });
+  }
+
+  it('e trocar para percentual com um fixo grande guardado é recusado', async () => {
+    await platform('/integrations/asaas', { method: 'PUT', body: { discountKind: 'fixed', discountValue: 5000 } });
+    const res = await platform('/integrations/asaas', { method: 'PUT', body: { discountKind: 'percent' } });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'invalid_charges');
   });
 });
 

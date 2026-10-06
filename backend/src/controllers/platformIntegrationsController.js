@@ -4,6 +4,7 @@ import { BILLING_WEBHOOK_PATH } from '../config/billingWebhookPath.js';
 import { panelBaseDomain } from '../middleware/tenantResolver.js';
 import {
   AsaasSettingsError,
+  CHARGES_FIELDS,
   NFSE_FIELDS,
   generateWebhookToken,
   readPublic,
@@ -93,17 +94,22 @@ class PlatformIntegrationsController {
    * `PUT /api/platform/integrations/asaas` — `{ environment?, apiKey?,
    * webhookToken?, nfseEnabled?, serviceDescription?, municipalServiceId?,
    * municipalServiceCode?, municipalServiceName?, issPercent?, retainIss?,
-   * observations? }`. 400 `invalid_nfse` quando a nota não fecha.
+   * observations?, finePercent?, interestMonthlyPercent?, discountKind?,
+   * discountValue?, discountDaysBefore? }`. 400 `invalid_nfse` quando a nota
+   * não fecha; 400 `invalid_charges` quando multa, juros ou desconto saem da
+   * faixa.
    */
   static async updateAsaas(req, res) {
     try {
       const corpo = req.body ?? {};
       const nfse = Object.fromEntries(NFSE_FIELDS.map((campo) => [campo, corpo[campo]]));
+      const termos = Object.fromEntries(CHARGES_FIELDS.map((campo) => [campo, corpo[campo]]));
       const { changed } = await save({
         environment: corpo.environment,
         apiKey: corpo.apiKey,
         webhookToken: corpo.webhookToken,
-        ...nfse
+        ...nfse,
+        ...termos
       });
       const atual = await presentAsaas();
 
@@ -115,7 +121,11 @@ class PlatformIntegrationsController {
           apiKeyChanged: changed.apiKey,
           webhookTokenChanged: changed.webhookToken,
           // A nota não é segredo: vai inteira, para a trilha dizer quem ligou.
-          ...(changed.nfse ? { nfseChanged: true, nfseEnabled: atual.nfseEnabled } : {})
+          ...(changed.nfse ? { nfseChanged: true, nfseEnabled: atual.nfseEnabled } : {}),
+          // Multa, juros e desconto também não são segredo: vão os números.
+          ...(changed.charges
+            ? { chargesChanged: true, charges: Object.fromEntries(CHARGES_FIELDS.map((campo) => [campo, atual[campo]])) }
+            : {})
         }
       });
       if (!registrada) console.warn('Asaas integration changed without a platform trail line');

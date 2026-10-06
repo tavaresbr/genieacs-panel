@@ -1,15 +1,16 @@
 import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
-import BillingCharge, { OPEN_CHARGE_STATUSES } from '../models/BillingCharge.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
-import SubscriptionService from './subscriptionService.js';
+import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import { providerFor } from './billing/registry.js';
 import { asaasBilling } from './billing/asaasBillingProvider.js';
 import { AsaasCustomerError, ensureAsaasCustomer } from './billing/asaasCustomerService.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import CardAutopayService from './billing/cardAutopayService.js';
 
 /**
  * O provedor cuidando da própria conta: ver os planos, trocar de plano e
@@ -24,11 +25,22 @@ import { currentTenantId } from '../config/tenantContext.js';
  * ## As decisões comerciais, e onde cada uma mora
  *
  *   - SUBIR vale NA HORA; DESCER, com um período pago correndo, vale na
- *     RENOVAÇÃO (ver `changePlan`). Não há proporcional: a próxima cobrança
- *     sai pelo preço do plano que o período seguinte vai ter, e o período já
- *     pago continua valendo até o fim como está. Proporcional é uma conta que
- *     o provedor não consegue conferir de cabeça, e o que não se confere de
- *     cabeça vira chamado.
+ *     RENOVAÇÃO (ver `changePlan`). A próxima cobrança sai pelo preço do
+ *     plano que o período seguinte vai ter.
+ *   - A SUBIDA com um período pago correndo (`active`, `renews_at` no futuro)
+ *     cobra na hora a diferença do que falta dele (0101): uma fatura avulsa
+ *     (`kind = 'proration'`) de
+ *     ⌈(preço efetivo novo − antigo) × segundos restantes ÷ segundos do período⌉
+ *     centavos, com o cupom nos dois preços, vencendo em três dias
+ *     (`SubscriptionService.prorationQuote`, `ChargeIssuingService.createProration`).
+ *     A conta não precisa ser feita de cabeça: a tela a mostra antes do
+ *     clique ("você vai pagar R$ X agora"), pela mesma função. Abaixo de
+ *     R$ 5,00 não sai fatura — o extrato registra o porquê. A fatura sai
+ *     DEPOIS de a troca estar gravada, e a falha do gateway não desfaz a
+ *     troca: a linha fica para o agendador retomar. Paga, ela não move o
+ *     prazo nem gasta ciclo de cupom; vencida, deixa o provedor `past_due`
+ *     (`proration_overdue`). Descer, ou desistir de uma descida agendada,
+ *     não cobra nada.
  *   - A cobrança do período que ainda está em aberto é do preço velho. Ela é
  *     CANCELADA no gateway e reemitida com o preço novo — duas faturas do
  *     mesmo mês na mão de quem paga é o erro que este serviço mais precisa não
@@ -83,7 +95,7 @@ const GARRA_DA_TROCA_MS = 2 * 60 * 1000;
 
 const ocupado = () => new SelfBillingError('billing.busy', { code: 'busy', status: 409 });
 
-function presentPlan(plan, currentId) {
+function presentPlan(plan, currentId, proration = null) {
   return {
     id: plan.id,
     code: plan.code,
@@ -92,7 +104,22 @@ function presentPlan(plan, currentId) {
     currency: plan.currency || 'BRL',
     periodDays: Number(plan.period_days ?? 30),
     limits: SubscriptionService.limitsOf(plan),
-    current: currentId !== null && Number(plan.id) === Number(currentId)
+    current: currentId !== null && Number(plan.id) === Number(currentId),
+    // O que subir para este plano cobraria AGORA (0101), pela mesma conta da
+    // troca — ou nulo, quando a troca não cobraria nada (não é subida, não há
+    // período pago correndo, ou fica abaixo do mínimo: `skipped`).
+    proration: proration
+  };
+}
+
+/** A prévia da pró-rata que a lista de planos mostra — ver `presentPlan`. */
+function previaDaProrata(quote) {
+  if (!quote?.eligible) return null;
+  return {
+    amountCents: quote.skipped ? 0 : quote.amountCents,
+    remainingDays: quote.remainingDays,
+    currency: quote.currency,
+    ...(quote.skipped ? { skipped: quote.skipped } : {})
   };
 }
 
@@ -339,6 +366,37 @@ async function reemitir(cobranca, tenant, { countDevices = null, pendingBlockedB
   }
 }
 
+/**
+ * A fatura de pró-rata de uma subida já gravada — melhor esforço, como a
+ * reemissão: o que der errado aqui fica na linha (`failed`, para o agendador)
+ * ou no log, e a troca continua feita.
+ *
+ * @returns {Promise<{ amountCents: number, remainingDays: number, issued: boolean,
+ *   reason?: string, skipped?: string, charge?: object|null }>}
+ */
+async function cobrarProrata(tenant, subscription, plan, quote, cupom, now) {
+  const resumo = { amountCents: quote.amountCents, remainingDays: quote.remainingDays, currency: quote.currency };
+  if (quote.skipped) return { ...resumo, issued: false, skipped: quote.skipped };
+  try {
+    const resultado = await ChargeIssuingService.createProration({
+      tenant,
+      subscription,
+      quote,
+      couponId: SubscriptionService.chargePricing(subscription, plan, cupom).couponId,
+      now
+    });
+    return {
+      ...resumo,
+      issued: Boolean(resultado.issued),
+      ...(resultado.issued ? {} : { reason: resultado.reason }),
+      charge: resultado.charge ? BillingCharge.present(resultado.charge) : null
+    };
+  } catch (error) {
+    console.error(`Proration charge after the upgrade of provider ${tenant.id} failed:`, error.message);
+    return { ...resumo, issued: false, reason: 'error' };
+  }
+}
+
 class SelfBillingService {
   /**
    * Os planos que o provedor pode escolher, com o preço — e o dele, sempre.
@@ -355,9 +413,12 @@ class SelfBillingService {
    * oferecê-lo aqui seria um botão "pare de pagar" ao lado do preço. Quem já
    * está num deles o vê marcado como o seu, e só.
    */
-  static async listPlans() {
+  static async listPlans({ now = new Date() } = {}) {
     const subscription = await Subscription.forTenant(currentTenantId());
     const atual = subscription?.plan_id ?? null;
+    // A prévia da pró-rata (0101): o plano e o cupom de agora, lidos uma vez.
+    const planoAtual = atual ? await Plan.findById(atual) : null;
+    const cupom = subscription?.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
     const planos = (await Plan.list({ activeOnly: true }))
       .filter((plano) => ehPago(plano) || Number(plano.id) === Number(atual));
     if (atual && !planos.some((plano) => Number(plano.id) === Number(atual))) {
@@ -367,7 +428,9 @@ class SelfBillingService {
         planos.sort((a, b) => Number(a.id) - Number(b.id));
       }
     }
-    return planos.map((plano) => presentPlan(plano, atual));
+    return planos.map((plano) => presentPlan(plano, atual, Number(plano.id) === Number(atual)
+      ? null
+      : previaDaProrata(SubscriptionService.prorationQuote(subscription, planoAtual, plano, cupom, now))));
   }
 
   /**
@@ -529,8 +592,10 @@ class SelfBillingService {
 
     // QUANDO a descida vale. Na renovação — a não ser que o plano de agora
     // tenha sido alcançado por uma SUBIDA neste mesmo período pago
-    // (`upgraded_at`, 0075). A subida não é cobrada no período em que
-    // acontece (não há proporcional); quem a paga é a cobrança seguinte.
+    // (`upgraded_at`, 0075). A pró-rata (0101) cobra a diferença do resto do
+    // período, mas pode não ter saído (abaixo do mínimo) ou não ter sido
+    // paga; a regra continua a mesma: quem paga a subida por inteiro é a
+    // cobrança seguinte.
     // Descer já na renovação seria usar o plano de cima o período inteiro sem
     // nunca pagá-lo — então a descida vai para a renovação SEGUINTE, e o
     // próximo período é cobrado pelo preço de cima.
@@ -564,16 +629,49 @@ class SelfBillingService {
     // apaga a primeira). Preço igual a mantém. Descer na hora a apaga — não há
     // período pago correndo a proteger.
     let upgradedAt = null;
+    // A pró-rata da subida (0101), calculada com o estado de ANTES — o plano
+    // e o prazo que o provedor pagou — e cobrada só depois de a troca estar
+    // gravada. Na descida (agendada ou na hora) não há o que cobrar.
+    let prorata = null;
+    let cupomDaProrata = null;
     if (!agendar && periodoCorrendo) {
       const sobe = Number(plan.price_cents ?? 0) > Number(atual?.price_cents ?? 0);
       upgradedAt = subscription.upgraded_at ?? (sobe ? now : null);
+      cupomDaProrata = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+      prorata = SubscriptionService.prorationQuote(subscription, atual, plan, cupomDaProrata, now);
+      if (!prorata.eligible) prorata = null;
+    }
+
+    // O provedor que não está ligado a um gateway que emita não ganha a fatura
+    // de pró-rata (`createProration` para em `not_linked`): o extrato da troca
+    // diz isso, para quem procurar por que a diferença não foi cobrada.
+    let prorataNaoCobrada = null;
+    if (prorata && !prorata.skipped) {
+      const gatewayDoProvedor = providerFor(tenant.billing_gateway);
+      if (!gatewayDoProvedor || !tenant.billing_customer_ref) prorataNaoCobrada = 'not_linked';
+      else if (!gatewayDoProvedor.canIssue) prorataNaoCobrada = 'provider_cannot_issue';
     }
 
     await gravarSegurando(cobranca, () => (agendar
       ? SubscriptionService.schedulePlanChange({ planId: plan.id, at: quando })
-      : SubscriptionService.changePlan({ planId: plan.id, actorUserId, upgradedAt })));
+      : SubscriptionService.changePlan({
+        planId: plan.id,
+        actorUserId,
+        upgradedAt,
+        eventDetail: prorata ? {
+          proration: {
+            amountCents: prorata.amountCents,
+            remainingDays: prorata.remainingDays,
+            fromPriceCents: prorata.fromPriceCents,
+            toPriceCents: prorata.toPriceCents,
+            ...(prorata.skipped ? { skipped: prorata.skipped } : {}),
+            ...(prorataNaoCobrada ? { notCharged: prorataNaoCobrada } : {})
+          }
+        } : null
+      })));
 
     const reissue = await reemitir(cobranca, tenant, { countDevices, pendingBlockedBy: bloqueio });
+    const proration = prorata ? await cobrarProrata(tenant, subscription, plan, prorata, cupomDaProrata, now) : null;
     return {
       ...base,
       changed: true,
@@ -583,7 +681,8 @@ class SelfBillingService {
       ...(agendadoId && agendadoId !== id ? { replacedPlanId: agendadoId } : {}),
       plan,
       charge: cobranca.acao,
-      ...(reissue ? { reissue } : {})
+      ...(reissue ? { reissue } : {}),
+      ...(proration ? { proration } : {})
     };
   }
 
@@ -607,7 +706,9 @@ class SelfBillingService {
     // para quem está num plano de graça é deixar um cliente sem cobrança
     // nenhuma na conta da plataforma, para sempre.
     const subscription = await Subscription.forTenant(tenantId);
-    if (!subscription || !ESTADOS_VIVOS.has(subscription.status)) {
+    // A suspensão AUTOMÁTICA por inadimplência (0102) paga também: é por aqui
+    // que se sai dela. A à mão continua recusada.
+    if (!subscription || !isBillableStatus(subscription)) {
       throw new SelfBillingError('charges.notBillable', { code: 'not_billable', status: 409 });
     }
     // Isento de cobrança pelo console: não há fatura a pagar, e o clique não
@@ -615,6 +716,17 @@ class SelfBillingService {
     // e não `not_billable`, para a tela dizer por quê.
     if (subscription.billing_exempt_at) {
       throw new SelfBillingError('charges.billingExempt', { code: 'billing_exempt', status: 409 });
+    }
+    // Bloqueado pela pró-rata vencida (0101): o que se paga agora é ELA — a
+    // renovação pode nem ter saído ainda, e emiti-la não desbloquearia nada.
+    // Pela data que a assinatura guarda (`proration_due_at`), em QUALQUER
+    // estado: o suspenso por inadimplência (0102) por causa dela também —
+    // pagar a renovação no lugar estenderia o prazo e o deixaria suspenso.
+    const prorataVence = subscription.proration_due_at ? new Date(subscription.proration_due_at) : null;
+    if (prorataVence && !Number.isNaN(prorataVence.getTime()) && prorataVence.getTime() <= Date.now()) {
+      const abertas = (await BillingCharge.openProrations()).filter((linha) => linha.gateway_charge_id && linha.invoice_url);
+      abertas.sort((a, b) => String(isoDateOf(a.due_date) ?? '').localeCompare(String(isoDateOf(b.due_date) ?? '')));
+      if (abertas[0]) return { charge: abertas[0], issued: false, customerCreated: false };
     }
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
     // O preço que a fatura vai pedir, com o cupom (0093). O cupom nunca leva
@@ -633,6 +745,14 @@ class SelfBillingService {
       throw new SelfBillingError('charges.gatewayNotConfigured', { code: 'gateway_not_configured', status: 503 });
     }
 
+    // A cobrança de cartão em aberto cujo cartão deixou de servir (recusado,
+    // removido, cobrança automática desligada) sai daqui já como Pix/boleto
+    // (0100): o clique de quem quer pagar não pode devolver a fatura que o
+    // cartão não pagou. Melhor esforço — a falha fica para o agendador.
+    await CardAutopayService.reissueIneligible({ tenant }).catch((error) => {
+      console.warn(`Could not reissue the card charge of provider ${tenantId} before paying: ${error.message}`);
+    });
+
     let customerCreated = false;
     let atual = tenant;
     if (!tenant.billing_customer_ref) {
@@ -646,7 +766,9 @@ class SelfBillingService {
       }
     }
 
-    const resultado = await ChargeIssuingService.issueCurrent({ tenant: atual, manual: true, countDevices });
+    // `cardNow`: é o provedor pedindo para pagar JÁ — com o cartão salvo, a
+    // cobrança sai no cartão agora, e não no dia do vencimento.
+    const resultado = await ChargeIssuingService.issueCurrent({ tenant: atual, manual: true, countDevices, cardNow: true });
     const recusa = SelfBillingService.issueRefusal(resultado);
     if (recusa) throw recusa;
 
@@ -724,6 +846,87 @@ class SelfBillingService {
     }
     const reissue = await reemitir(cobranca, tenant, { countDevices, pendingBlockedBy: bloqueio });
     return { result, charge: cobranca.acao, ...(reissue ? { reissue } : {}) };
+  }
+
+  /**
+   * Liga ou desliga a cobrança automática no cartão (0100) — o "Cobrar
+   * automaticamente no cartão" da tela de Plano.
+   *
+   * Ligar só registra a intenção e o IP de quem pediu (`remoteIp`, que o
+   * gateway exige em toda cobrança por token): o cartão é salvo depois, pelo
+   * pagamento de uma fatura com cartão na página do gateway
+   * (`CardAutopayService.captureToken`). Ligar de novo renova o IP e mantém a
+   * data. Desligar mantém o cartão salvo, mas ele deixa de ser usado — e a
+   * cobrança de cartão em aberto é reemitida como Pix/boleto.
+   *
+   * Recusas: `enabled` que não é booleano (400 `invalid`); a plataforma, ou
+   * ligar numa assinatura parada por gente (409 `not_changeable`); ligar num
+   * provedor cobrado por outro gateway (409 `not_billable`).
+   *
+   * @returns {Promise<{ changed: boolean, enabled: boolean }>}
+   */
+  static async setCardAutopay({ enabled, remoteIp = null, now = new Date() }) {
+    if (typeof enabled !== 'boolean') {
+      throw new SelfBillingError('subscription.cardAutopayInvalid', { code: 'invalid', status: 400 });
+    }
+    const tenantId = currentTenantId();
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant || tenant.kind === 'platform') {
+      throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+    }
+    const subscription = await Subscription.forTenant(tenantId);
+    if (!subscription) {
+      throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+    }
+    const ligada = Boolean(subscription.card_autopay_at);
+    if (enabled) {
+      if (!ESTADOS_VIVOS.has(subscription.status)) {
+        throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+      }
+      if (tenant.billing_gateway && tenant.billing_gateway !== asaasBilling.name) {
+        throw new SelfBillingError('charges.notBillable', { code: 'not_billable', status: 409 });
+      }
+      const ip = String(remoteIp ?? '').trim().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '').slice(0, 45);
+      if (!ip) throw new SelfBillingError('subscription.cardUpdateFailed', { code: 'no_remote_ip', status: 400 });
+      await Subscription.upsertForTenant(tenantId, {
+        card_autopay_at: subscription.card_autopay_at ?? new Date(Math.floor(now.getTime() / 1000) * 1000),
+        card_remote_ip: ip
+      });
+    } else if (ligada) {
+      await Subscription.upsertForTenant(tenantId, { card_autopay_at: null, card_capture_payment_id: null });
+    }
+    await SubscriptionService.invalidate(tenantId);
+    if (!enabled && ligada) {
+      await CardAutopayService.reissueIneligible({ tenant, now }).catch((error) => {
+        console.warn(`Could not reissue the card charge of provider ${tenantId} after autopay was turned off: ${error.message}`);
+      });
+    }
+    return { changed: enabled !== ligada, enabled };
+  }
+
+  /**
+   * Esquece o cartão salvo (0100): o token cifrado, a bandeira, os dígitos, a
+   * falha. A intenção de cobrança automática fica como está — com ela ligada,
+   * pagar a próxima fatura com outro cartão salva o novo. A cobrança de
+   * cartão em aberto é reemitida como Pix/boleto. Idempotente: sem cartão
+   * salvo, nada muda.
+   *
+   * @returns {Promise<{ removed: boolean, brand?: string|null, last4?: string|null }>}
+   */
+  static async removeCard({ now = new Date() } = {}) {
+    const tenantId = currentTenantId();
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant || tenant.kind === 'platform') {
+      throw new SelfBillingError('subscription.notChangeable', { code: 'not_changeable', status: 409 });
+    }
+    const subscription = await Subscription.forTenant(tenantId);
+    if (!subscription || !CardAutopayService.hasToken(subscription)) return { removed: false };
+    await Subscription.upsertForTenant(tenantId, { ...CardAutopayService.CLEARED_CARD });
+    await SubscriptionService.invalidate(tenantId);
+    await CardAutopayService.reissueIneligible({ tenant, now }).catch((error) => {
+      console.warn(`Could not reissue the card charge of provider ${tenantId} after the card was removed: ${error.message}`);
+    });
+    return { removed: true, brand: subscription.card_brand ?? null, last4: subscription.card_last4 ?? null };
   }
 
   /** Quanto o "pagar agora" espera pela cobrança que outra passada está emitindo. */

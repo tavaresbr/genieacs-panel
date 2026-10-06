@@ -19,6 +19,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { exemptUntilFromDateInput, todayIso, toIsoDay } from '@/lib/subscription-console'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
+import { CardBadge } from '@/components/card-badge'
 
 interface Props {
   tenant: Tenant
@@ -37,6 +38,17 @@ export const STATUS_LABEL_KEYS = {
   suspended: 'platform.subscription.suspended',
   canceled: 'platform.subscription.canceled'
 } as const
+
+/**
+ * O rótulo do estado, com a suspensão automática por inadimplência (0102)
+ * separada da suspensão à mão: a primeira sai pagando, a segunda só pelo console.
+ */
+export function statusLabelKey(subscription: { status: SubscriptionStatus; suspendedReason?: string | null }) {
+  if (subscription.status === 'suspended' && subscription.suspendedReason === 'auto_nonpayment') {
+    return 'platform.subscription.suspendedNonpayment' as const
+  }
+  return STATUS_LABEL_KEYS[subscription.status]
+}
 
 /** A data de renovação já passou? Nulo e data inválida não venceram. */
 function expirou(value: string | null | undefined) {
@@ -517,17 +529,21 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
       {subscription && (
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className={statusBadgeClass(subscription.status)}>
-            {t(STATUS_LABEL_KEYS[subscription.status])}
+            {t(statusLabelKey(subscription))}
           </span>
           {subscription.billingExempt && (
             <span className="modern-badge-info">{exemptUntilLabel(subscription, t) ?? t('platform.subs.exempt')}</span>
           )}
           {subscription.coupon && <CouponBadge coupon={subscription.coupon} currency={moedaDoPlano} />}
+          <CardBadge card={subscription.card} />
           {subscription.reason === 'trial_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
           )}
           {subscription.reason === 'renewal_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.renewalExpiredNote')}</span>
+          )}
+          {subscription.reason === 'proration_overdue' && (
+            <span className="text-muted-foreground">{t('platform.subscription.prorationOverdueNote')}</span>
           )}
           {subscription.trialEndsAt && subscription.storedStatus === 'trial' && (
             <span className="text-muted-foreground">
@@ -712,6 +728,8 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
               <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span>
                   <span className="modern-badge mr-2">{event.type}</span>
+                  {/* O pagamento (ou a troca) da pró-rata de uma subida. */}
+                  {event.detail?.proration ? <span className="modern-badge-info mr-2">{t('charges.proration')}</span> : null}
                   {event.amountCents !== null && <span>{formatMoney(event.amountCents, event.currency)}</span>}
                   {event.externalId && <span className="ml-2 font-mono text-xs text-muted-foreground">{event.externalId}</span>}
                 </span>

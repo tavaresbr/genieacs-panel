@@ -9,6 +9,9 @@ import type { TranslationKey } from '@/lib/i18n'
 import { copyToClipboard, formatRelativeTime } from '@/lib/utils'
 import { absoluteWebhookUrl } from '@/lib/webhook-url'
 import { parsePercent } from '@/lib/subscription-console'
+import {
+  CHARGE_TERMS_LIMITS, chargeTermsFormOf, chargeTermsPayload, type ChargeTermsField, type ChargeTermsForm
+} from '@/lib/charge-terms'
 
 /**
  * As integrações da PLATAFORMA — os serviços de terceiro com que o SaaS cobra
@@ -358,6 +361,10 @@ function AsaasCard() {
           <NfseSection info={info} onSaved={setInfo} />
         </Balao>
 
+        <Balao icon="invoice" title="chargeTerms.title">
+          <ChargeTermsSection info={info} onSaved={setInfo} />
+        </Balao>
+
         <Balao icon="document" title="integrations.asaas.stepsTitle">
           <ol className="list-decimal space-y-1.5 ps-5 text-sm text-muted-foreground">
             <li>{t('integrations.asaas.step1')}</li>
@@ -543,6 +550,128 @@ function NfseSection({ info, onSaved }: { info: AsaasIntegration; onSaved: (dado
         type="button"
         className="modern-button"
         disabled={!mudou || saving || !issValido || faltaObrigatorio}
+        onClick={() => void salvar()}
+      >
+        {saving ? t('common.saving') : t('common.save')}
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Multa, juros e desconto por antecipação das cobranças da plataforma no
+ * Asaas. Salva à parte, como a NFS-e: o backend confere as faixas e o piso de
+ * R$ 5,00 é aplicado na emissão de cada cobrança.
+ */
+function ChargeTermsSection({ info, onSaved }: { info: AsaasIntegration; onSaved: (dados: AsaasIntegration) => void }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [form, setForm] = useState<ChargeTermsForm>(() => chargeTermsFormOf(info))
+  const [saving, setSaving] = useState(false)
+
+  const original = chargeTermsFormOf(info)
+  const mudou = JSON.stringify(form) !== JSON.stringify(original)
+  const conferido = chargeTermsPayload(form)
+  const invalido = (campo: ChargeTermsField) => !conferido.ok && conferido.invalid.includes(campo)
+
+  const campo = <K extends keyof ChargeTermsForm>(nome: K, valor: ChargeTermsForm[K]) =>
+    setForm((atual) => ({ ...atual, [nome]: valor }))
+
+  const salvar = async () => {
+    if (!mudou || saving || !conferido.ok) return
+    setSaving(true)
+    try {
+      const res = await platformAPI.saveAsaasIntegration(conferido.body)
+      if (res.success && res.data) {
+        onSaved(res.data)
+        setForm(chargeTermsFormOf(res.data))
+        toast.success(t('integrations.saved'))
+      } else {
+        toast.error(res.message || t('platform.saveFailed'))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="field-hint">{t('chargeTerms.description')}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label htmlFor="charge-fine" className="field-label">{t('chargeTerms.finePercent')}</label>
+          <input
+            id="charge-fine"
+            type="text"
+            inputMode="decimal"
+            value={form.finePercent}
+            onChange={(e) => campo('finePercent', e.target.value)}
+            className="modern-input w-full"
+            aria-invalid={invalido('finePercent')}
+          />
+          <p className="field-hint">{t('chargeTerms.rangeHint', { max: CHARGE_TERMS_LIMITS.finePercent })}</p>
+        </div>
+        <div>
+          <label htmlFor="charge-interest" className="field-label">{t('chargeTerms.interestMonthlyPercent')}</label>
+          <input
+            id="charge-interest"
+            type="text"
+            inputMode="decimal"
+            value={form.interestMonthlyPercent}
+            onChange={(e) => campo('interestMonthlyPercent', e.target.value)}
+            className="modern-input w-full"
+            aria-invalid={invalido('interestMonthlyPercent')}
+          />
+          <p className="field-hint">
+            {t('chargeTerms.rangeHint', { max: CHARGE_TERMS_LIMITS.interestMonthlyPercent })}
+          </p>
+        </div>
+        <div>
+          <label htmlFor="charge-discount-kind" className="field-label">{t('chargeTerms.discountKind')}</label>
+          <select
+            id="charge-discount-kind"
+            value={form.discountKind}
+            onChange={(e) => campo('discountKind', e.target.value === 'fixed' ? 'fixed' : 'percent')}
+            className="modern-input w-full"
+          >
+            <option value="percent">{t('chargeTerms.discountPercent')}</option>
+            <option value="fixed">{t('chargeTerms.discountFixed')}</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="charge-discount-value" className="field-label">
+            {form.discountKind === 'fixed' ? t('chargeTerms.discountValueFixed') : t('chargeTerms.discountValuePercent')}
+          </label>
+          <input
+            id="charge-discount-value"
+            type="text"
+            inputMode="decimal"
+            value={form.discountValue}
+            onChange={(e) => campo('discountValue', e.target.value)}
+            className="modern-input w-full"
+            aria-invalid={invalido('discountValue')}
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label htmlFor="charge-discount-days" className="field-label">{t('chargeTerms.discountDaysBefore')}</label>
+          <input
+            id="charge-discount-days"
+            type="text"
+            inputMode="numeric"
+            value={form.discountDaysBefore}
+            onChange={(e) => campo('discountDaysBefore', e.target.value)}
+            className="modern-input w-full md:w-40"
+            aria-invalid={invalido('discountDaysBefore')}
+          />
+          <p className="field-hint">{t('chargeTerms.discountHint')}</p>
+        </div>
+      </div>
+      <p className="field-hint">{t('chargeTerms.cardHint')}</p>
+      {!conferido.ok && mudou && <p className="text-sm text-destructive">{t('chargeTerms.invalid')}</p>}
+      <button
+        type="button"
+        className="modern-button"
+        disabled={!mudou || saving || !conferido.ok}
         onClick={() => void salvar()}
       >
         {saving ? t('common.saving') : t('common.save')}

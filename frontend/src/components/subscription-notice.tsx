@@ -12,7 +12,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { BrandMark } from '@/components/brand-mark'
-import { cobrancaEmAberto } from '@/components/tenant-charges'
+import { cobrancaDeProrata, cobrancaEmAberto } from '@/components/tenant-charges'
 import { canGenerateCharge, isBillingExemptRefusal, payInNewTab } from '@/lib/plan-options'
 import type { TenantPlanOption } from '@/lib/api'
 
@@ -76,7 +76,12 @@ export function SubscriptionNotice() {
       })
       void subscriptionAPI.charges().then((res) => {
         if (res.success && res.data) {
-          setPaymentUrl(cobrancaEmAberto(res.data.charges)?.invoiceUrl ?? null)
+          // Bloqueado pela pró-rata vencida: o link é o DELA, e não o da
+          // renovação que pode estar em aberto ao lado.
+          const daProrata = detail.subscription?.reason === 'proration_overdue'
+            ? cobrancaDeProrata(res.data.charges)
+            : null
+          setPaymentUrl((daProrata ?? cobrancaEmAberto(res.data.charges))?.invoiceUrl ?? null)
           setChargesLoaded(true)
         }
       })
@@ -90,9 +95,12 @@ export function SubscriptionNotice() {
   // Sem boleto em aberto, a saída do muro é gerar um — quando o bloqueio se
   // resolve pagando (atraso, teste vencido) e o plano é pago. As regras
   // moram em `canGenerateCharge`.
+  // A suspensão automática por inadimplência (0102) sai pagando: o muro dela
+  // diz isso, e oferece a cobrança como o do atraso.
+  const autoSuspended = blocked.code === 'subscription_suspended' && blocked.subscription?.reason === 'auto_nonpayment'
   const canGenerate = canGenerateCharge({
     code: blocked.code, paymentUrl, chargesLoaded, canWrite: can('settings.write'), plans,
-    billingExempt: blocked.subscription?.billingExempt === true
+    billingExempt: blocked.subscription?.billingExempt === true, autoSuspended
   })
 
   // Síncrono até o `payInNewTab`: a aba nova precisa nascer dentro do clique.
@@ -111,7 +119,13 @@ export function SubscriptionNotice() {
     })
   }
 
-  const message = t(MESSAGE_KEYS[blocked.code]) || blocked.message
+  // A pró-rata vencida tem o aviso dela: o período está pago, o que falta é
+  // a diferença da troca de plano.
+  const message = t(autoSuspended
+    ? 'subscription.suspendedNonpayment'
+    : blocked.code === 'subscription_past_due' && blocked.subscription?.reason === 'proration_overdue'
+      ? 'subscription.prorationOverdue'
+      : MESSAGE_KEYS[blocked.code]) || blocked.message
   const wall = WALL_CODES.has(blocked.code)
 
   if (!wall) {

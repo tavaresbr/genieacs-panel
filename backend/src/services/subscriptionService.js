@@ -1,7 +1,7 @@
 import Plan from '../models/Plan.js';
 import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
-import BillingCharge from '../models/BillingCharge.js';
+import BillingCharge, { isoDateOf, prorationOverdueAt } from '../models/BillingCharge.js';
 import AuditLog from '../models/AuditLog.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import Coupon, { parseCouponPlanIds } from '../models/Coupon.js';
@@ -9,6 +9,7 @@ import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { IS_SAAS } from '../config/edition.js';
+import { effectiveChargesConfig, earlyDiscountFor } from './billing/asaasSettingsService.js';
 
 /**
  * O ciclo de vida da assinatura, e o que cada estado deixa fazer.
@@ -27,6 +28,12 @@ import { IS_SAAS } from '../config/edition.js';
  *              Derrubar o autoatendimento dos clientes finais de um ISP por
  *              fatura atrasada é um tiro no pé comercial — o plano é explícito.
  *   suspended  402. Nós desligamos: inadimplência longa, abuso, o que for.
+ *              Dois motivos (`suspended_reason`, 0102): `auto_nonpayment` é
+ *              a suspensão automática do agendador, `autoSuspendDays` depois
+ *              do vencimento (ver `autoSuspensionStep`), e o PAGAMENTO a
+ *              desfaz sozinho — a cobrança, o "pagar agora" e o webhook
+ *              continuam valendo para ela. `manual` (ou nulo, de antes da
+ *              coluna) é gente, e só gente desfaz: o console.
  *   canceled   402. O contrato acabou; o que resta é exportar e apagar.
  *
  * `suspended` aqui e `tenants.status = 'suspended'` são DUAS chaves, de
@@ -51,6 +58,9 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 /** Quanto tempo o gate confia na última leitura antes de perguntar de novo. */
 const CACHE_TTL_MS = 15_000;
 const cache = new TenantCache(CACHE_TTL_MS);
+// O vencimento da pró-rata (0101) entra no estado que vale: quem o regrava
+// (`BillingCharge.syncProrationDue`) esquece a leitura em cache do provedor.
+BillingCharge.onProrationDueChanged = () => cache.invalidate();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -112,7 +122,7 @@ function periodoDoPlano(plano) {
  * não é a da referência: comparar centavos de moedas diferentes não é uma
  * conferência frouxa, é uma conta errada.
  */
-async function valorPedido({ externalId, plano, currency, precoDoPlano = null }) {
+async function valorPedido({ externalId, plano, currency, precoDoPlano = null, chargeId = null }) {
   const moedaPaga = String(currency || '').toUpperCase();
 
   // 1a. A cobrança que NUNCA chegou ao gateway, marcada paga à mão pelo
@@ -123,11 +133,16 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
   //     seria conferida contra um número que não é o que se pediu. `tdb` por
   //     baixo: o id de uma linha do vizinho simplesmente não é achado.
   const daLinha = /^charge:(\d+)$/.exec(String(externalId ?? ''));
-  const cobranca = !externalId
+  let cobranca = !externalId
     ? null
     : daLinha
       ? await BillingCharge.findById(Number(daLinha[1]))
       : await BillingCharge.byGatewayId(externalId);
+  // 1c. A cobrança nomeada por quem chama — o aceite da diferença de uma
+  //     pró-rata paga a menos (`<referência>:accepted`), cuja referência não
+  //     acha linha nenhuma: sem isto ele seria conferido contra o preço do
+  //     plano e estenderia o período como uma renovação.
+  if (!cobranca && chargeId) cobranca = await BillingCharge.findById(Number(chargeId));
   if (cobranca) {
     const valor = Number(cobranca.amount_cents);
     if (Number.isFinite(valor) && valor > 0) {
@@ -143,7 +158,17 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
         cents: Math.floor(valor),
         motivo: null,
         fonte: 'charge',
+        // A fatura de pró-rata (0101) não compra período: ver `recordPayment`.
+        kind: cobranca.kind || 'renewal',
+        chargeId: Number(cobranca.id),
         overridden: Boolean(cobranca.amount_overridden_at),
+        // Quem emitiu e para quando: é o que diz se um desconto por
+        // antecipação podia ter valido (`descontoAntecipado`).
+        provider: cobranca.provider ? String(cobranca.provider) : null,
+        dueDate: isoDateOf(cobranca.due_date),
+        // O desconto com que ela saiu (0100, `discount_terms`), ou nulo —
+        // linha de antes da coluna, e aí vale a configuração de hoje.
+        discountTerms: BillingCharge.discountTermsOf(cobranca),
         planId: temPreco ? Number(cobranca.plan_id) : null,
         couponId: temPreco && cobranca.coupon_id !== null && cobranca.coupon_id !== undefined
           ? Number(cobranca.coupon_id) : null
@@ -173,7 +198,16 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
       if (Number.isFinite(valor) && valor > 0) {
         const moeda = String(trocada.superseded.currency || '').toUpperCase();
         if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
-        return { cents: Math.floor(valor), motivo: null, fonte: 'superseded_charge' };
+        return {
+          cents: Math.floor(valor),
+          motivo: null,
+          fonte: 'superseded_charge',
+          // A linha que a cobrança velha era diz o que ela pagava: o id velho
+          // de uma pró-rata reemitida continua sendo pró-rata, e não compra
+          // período (ver `recordPayment`).
+          kind: trocada.row.kind || 'renewal',
+          chargeId: Number(trocada.row.id)
+        };
       }
     }
   }
@@ -186,6 +220,59 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
   const moedaPlano = String(plano?.currency || '').toUpperCase();
   if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
   return { cents: Math.floor(preco), motivo: null, fonte: 'plan' };
+}
+
+/** O fuso das datas de cobrança — o mesmo de `ChargeIssuingService.BILLING_TIMEZONE`. */
+const FUSO_DA_COBRANCA = 'America/Sao_Paulo';
+
+/** `YYYY-MM-DD` menos `dias`, em datas de calendário (sem fuso no meio). */
+function diasAntes(dataIso, dias) {
+  const instante = Date.parse(`${dataIso}T00:00:00Z`);
+  if (!Number.isFinite(instante)) return null;
+  return new Date(instante - dias * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * O desconto por antecipação que explica um pagamento a menos — ou nulo.
+ *
+ * A cobrança que a plataforma emite no Asaas pode levar um desconto para quem
+ * paga até `discountDaysBefore` dias antes do vencimento (bloco `charges` de
+ * Integrações). Quem aproveita paga MENOS do que a linha pede, e isso não é
+ * "pago a menos": é o combinado. Vale como inteiro quando as três coisas
+ * fecham:
+ *
+ *   1. a cobrança é uma que o painel emitiu NO ASAAS (é só lá que o desconto
+ *      vai), com vencimento conhecido;
+ *   2. o valor pago cobre o pedido menos o desconto que a configuração de hoje
+ *      dá para ele — a mesma conta da emissão (`earlyDiscountFor`), com o piso
+ *      de R$ 5,00. Um centavo de folga na porcentagem, porque o gateway
+ *      arredonda do lado dele;
+ *   3. o pagamento caiu até o limite (`dueDate − discountDaysBefore`), pelo dia
+ *      do pagamento que o gateway informa ou, sem ele, pelo dia de hoje no
+ *      fuso da cobrança.
+ *
+ * Qualquer uma falhando, o pagamento continua sendo o que era: a menos.
+ */
+async function descontoAntecipado({ pedido, amount, paidOn, now }) {
+  if (pedido.fonte !== 'charge' || pedido.provider !== 'asaas' || !pedido.dueDate) return null;
+  // Os termos com que a cobrança SAIU, quando a linha os tem: a configuração
+  // pode ter mudado depois da emissão, e quem pagou com o desconto que estava
+  // na fatura pagou o inteiro. Sem eles (linha de antes), a de hoje.
+  const desconto = pedido.discountTerms
+    ? pedido.discountTerms.discount
+    : earlyDiscountFor(pedido.cents, await effectiveChargesConfig());
+  if (!desconto) return null;
+  const folga = desconto.kind === 'percent' ? 1 : 0;
+  const comDesconto = pedido.cents - desconto.cents;
+  if (amount < comDesconto - folga) return null;
+  const limite = diasAntes(pedido.dueDate, desconto.daysBefore);
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(String(paidOn ?? ''))
+    ? String(paidOn)
+    : new Intl.DateTimeFormat('en-CA', {
+      timeZone: FUSO_DA_COBRANCA, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(now);
+  if (!limite || dia > limite) return null;
+  return { discountCents: desconto.cents, discountedCents: comDesconto, paidOn: dia, limitDate: limite };
 }
 
 /**
@@ -276,6 +363,76 @@ function detalheDe(evento) {
 const ESTADOS_QUE_ESTENDEM = new Set(['trial', 'active', 'past_due']);
 
 /**
+ * Por que a assinatura está `suspended` (0102). `auto_nonpayment` é a do
+ * agendador e o pagamento a desfaz; `manual` é o console, e só ele desfaz.
+ */
+export const SUSPENDED_REASONS = Object.freeze({
+  AUTO_NONPAYMENT: 'auto_nonpayment',
+  MANUAL: 'manual'
+});
+
+/** A suspensão automática por inadimplência — a única que o pagamento desfaz. */
+export function isAutoSuspended(subscription) {
+  return subscription?.status === 'suspended'
+    && subscription?.suspended_reason === SUSPENDED_REASONS.AUTO_NONPAYMENT;
+}
+
+/**
+ * Se ainda se cobra esta assinatura: emitir a fatura, "pagar agora", dar
+ * baixa. Os estados vivos e, além deles, a suspensão AUTOMÁTICA — é pagando
+ * que se sai dela, e recusar a cobrança a quem está tentando pagar trancaria
+ * a porta pelo lado de dentro. A suspensão à mão continua fora.
+ */
+export function isBillableStatus(subscription) {
+  return ESTADOS_QUE_ESTENDEM.has(subscription?.status) || isAutoSuspended(subscription);
+}
+
+/**
+ * Desde quando esta assinatura está devendo — o instante do prazo que venceu
+ * sem pagamento —, ou nulo quando ela não está devendo (ou não dá para
+ * dizer desde quando).
+ *
+ * É a âncora da suspensão automática (`autoSuspensionStep`): suspende-se
+ * `autoSuspendDays` depois DESTE instante. Parte do estado que VALE
+ * (`effectiveStatus`) e não do gravado, pela razão de sempre: um `active`
+ * com `renews_at` vencido é `past_due` desde o segundo em que venceu. As
+ * causas, e o prazo de cada uma:
+ *
+ *   trial_expired      `trial_ends_at`;
+ *   renewal_expired    `renews_at`;
+ *   (gravado past_due) o prazo que houver, se já passou;
+ *   proration_overdue  o vencimento da fatura de pró-rata, que não mora na
+ *                      assinatura — quem chama o lê da cobrança e o passa em
+ *                      `prorationDueAt`.
+ *
+ * Com mais de uma causa, vale a MAIS ANTIGA: é desde ela que se deve.
+ * `prorationDueAt` vencido conta mesmo que `effectiveStatus` não o veja (ele
+ * é síncrono e não lê cobrança). Isento, cancelado e suspenso não devem nada
+ * a esta conta: os dois primeiros não são cobrados, e o suspenso já foi.
+ *
+ * @returns {{ since: Date, reason: string } | null}
+ */
+export function overdueSince(subscription, now = new Date(), { prorationDueAt = null } = {}) {
+  if (!subscription || subscription.billing_exempt_at) return null;
+  if (!ESTADOS_QUE_ESTENDEM.has(subscription.status)) return null;
+  const causas = [];
+  const vencido = (data) => data && data.getTime() <= now.getTime();
+  const efetivo = SubscriptionService.effectiveStatus(subscription, now);
+  if (efetivo.status === 'past_due') {
+    let prazo = null;
+    if (efetivo.reason === 'trial_expired') prazo = asDate(subscription.trial_ends_at);
+    else if (efetivo.reason === 'renewal_expired') prazo = asDate(subscription.renews_at);
+    else if (efetivo.reason === null) prazo = asDate(subscription.renews_at) ?? asDate(subscription.trial_ends_at);
+    if (vencido(prazo)) causas.push({ since: prazo, reason: efetivo.reason ?? 'past_due' });
+  }
+  const proRata = asDate(prorationDueAt);
+  if (vencido(proRata)) causas.push({ since: proRata, reason: 'proration_overdue' });
+  if (!causas.length) return null;
+  causas.sort((a, b) => a.since.getTime() - b.since.getTime());
+  return causas[0];
+}
+
+/**
  * O que o pagamento de `detalhe` comprou, e de onde saiu a conta. Ver
  * `reversePayment`, que é quem decide QUANTO disto se desfaz.
  *
@@ -299,7 +456,13 @@ const ESTADOS_QUE_ESTENDEM = new Set(['trial', 'active', 'past_due']);
  */
 async function duracaoCreditada(detalhe, planoAtual) {
   if (!detalhe || detalhe.underpaid) return { ms: 0, basis: 'not_extended', from: null, to: null };
-  if (detalhe.statusBefore && !ESTADOS_QUE_ESTENDEM.has(detalhe.statusBefore)) {
+  // O pagamento de uma pró-rata (0101) não empurrou prazo nenhum: estorná-lo
+  // devolve o dinheiro, e só.
+  if (detalhe.proration) return { ms: 0, basis: 'not_extended', from: null, to: null };
+  // A suspensão automática reativada pelo pagamento (0102) estendeu, e o
+  // estorno desfaz o que ela comprou como o de qualquer outro.
+  const reativou = detalhe.statusBefore === 'suspended' && detalhe.suspendedReason === SUSPENDED_REASONS.AUTO_NONPAYMENT;
+  if (detalhe.statusBefore && !ESTADOS_QUE_ESTENDEM.has(detalhe.statusBefore) && !reativou) {
     return { ms: 0, basis: 'not_extended', from: null, to: null };
   }
   const from = asDate(detalhe.renewsBefore);
@@ -359,7 +522,19 @@ class SubscriptionService {
       if (ends && ends.getTime() <= now.getTime()) {
         return { status: 'past_due', reason: 'renewal_expired' };
       }
+      // A fatura de pró-rata da subida (0101) vencida sem pagamento: o mesmo
+      // `past_due` da renovação vencida — lê, não escreve —, com o motivo
+      // próprio para a tela dizer qual fatura falta. A data é a cópia que
+      // `BillingCharge.syncProrationDue` mantém na linha, para esta conta
+      // continuar sem consulta.
+      const prorata = asDate(subscription.proration_due_at);
+      if (prorata && prorata.getTime() <= now.getTime()) {
+        return { status: 'past_due', reason: 'proration_overdue' };
+      }
     }
+    // A suspensão automática diz o porquê, para a tela de bloqueio e o
+    // console mostrarem "por inadimplência" — e que pagar resolve.
+    if (isAutoSuspended(subscription)) return { status: 'suspended', reason: SUSPENDED_REASONS.AUTO_NONPAYMENT };
     return { status: stored, reason: null };
   }
 
@@ -420,6 +595,142 @@ class SubscriptionService {
       step,
       deadline: prazo,
       expired: desde >= 0
+    };
+  }
+
+  /**
+   * Onde o provedor está na suspensão automática (0102), ou nulo.
+   *
+   * `config` é `{ days, warnDays }` (`platformProfileService.autoSuspendConfig`):
+   * suspende-se `days` dias depois de o provedor passar a dever
+   * (`overdueSince`), e avisa-se `warnDays` antes disso. `days` zero desliga
+   * tudo; `warnDays` zero desliga só o aviso.
+   *
+   *   suspension_warning  da data do aviso até a da suspensão;
+   *   suspend             da data da suspensão em diante.
+   *
+   * Fora: isento, plano de graça (ou sem plano), cancelado e o que já está
+   * suspenso — os dois primeiros não devem, os dois últimos já pararam. Pura,
+   * sem banco: quem grava é `autoSuspend`, que relê a linha antes.
+   *
+   * @returns {{ step: 'suspension_warning'|'suspend', since: Date, reason: string,
+   *   suspendAt: Date, warnAt: Date|null } | null}
+   */
+  static autoSuspensionStep(subscription, now = new Date(), plano = null, config = {}, {
+    prorationDueAt = null, warnedAt = undefined
+  } = {}) {
+    const dias = Math.floor(Number(config?.days ?? 0));
+    if (!subscription || !(dias > 0)) return null;
+    if (subscription.billing_exempt_at) return null;
+    if (!(Number(plano?.price_cents ?? 0) > 0)) return null;
+    const devendo = overdueSince(subscription, now, { prorationDueAt });
+    if (!devendo) return null;
+    const suspendAt = new Date(devendo.since.getTime() + dias * DAY_MS);
+    const aviso = Math.floor(Number(config?.warnDays ?? 0));
+    const warnAt = aviso > 0 ? new Date(suspendAt.getTime() - aviso * DAY_MS) : null;
+    let step = null;
+    let suspendeEm = suspendAt;
+    if (now.getTime() >= suspendAt.getTime()) step = 'suspend';
+    else if (warnAt && now.getTime() >= warnAt.getTime()) step = 'suspension_warning';
+    // Nunca suspender sem o aviso antes: quem chama diz quando o aviso deste
+    // prazo saiu (`warnedAt`, nulo se não saiu). Sem aviso — o dia do deploy,
+    // os dias diminuídos na configuração, o agendador parado na janela —, a
+    // etapa é o aviso agora, e a suspensão fica para `warnDays` depois dele.
+    // `warnedAt` indefinido é quem não pergunta (a conta pura).
+    if (step === 'suspend' && aviso > 0 && warnedAt !== undefined) {
+      const avisado = asDate(warnedAt);
+      const liberada = avisado ? new Date(avisado.getTime() + aviso * DAY_MS) : null;
+      if (!liberada || now.getTime() < liberada.getTime()) {
+        step = 'suspension_warning';
+        suspendeEm = liberada ?? new Date(now.getTime() + aviso * DAY_MS);
+      }
+    }
+    if (!step) return null;
+    return { step, since: devendo.since, reason: devendo.reason, suspendAt: suspendeEm, warnAt };
+  }
+
+  /**
+   * Suspende o provedor em escopo por inadimplência — se, relida a linha
+   * agora, ele ainda está na etapa `suspend` de `autoSuspensionStep`.
+   *
+   * A gravação é CONDICIONAL (`Subscription.suspendForNonpayment`): só sai de
+   * `trial`/`active`/`past_due` — o estado lido —, sem isenção, e com o prazo
+   * que venceu ainda vencido há `days` dias. É o que impede as duas corridas
+   * que importam: duas voltas do agendador (a segunda não acha mais o estado
+   * de antes e não grava nem audita de novo) e o pagamento que chega no mesmo
+   * minuto (ele empurra o prazo, e a condição deixa de casar — ou, se ele
+   * gravou depois, regrava `active` e limpa o motivo; ver `recordPayment`).
+   *
+   * A cobrança em aberto NÃO é cancelada: é por ela que se sai daqui.
+   *
+   * @returns {Promise<{ suspended: boolean, reason?: string, since?: string,
+   *   overdueReason?: string, suspendAt?: string }>}
+   */
+  static async autoSuspend({
+    tenant = null, now = new Date(), config = {}, prorationDueAt = null, warnedAt = undefined
+  } = {}) {
+    const tenantId = currentTenantId();
+    const before = await Subscription.forTenant(tenantId);
+    if (!before) return { suspended: false, reason: 'no_subscription' };
+    const plano = before.plan_id ? await Plan.findById(before.plan_id) : null;
+    const etapa = this.autoSuspensionStep(before, now, plano, config, { prorationDueAt, warnedAt });
+    if (!etapa || etapa.step !== 'suspend') return { suspended: false, reason: 'not_due' };
+
+    // A coluna do prazo que venceu, para a condição. A da pró-rata é a cópia
+    // que a assinatura guarda (`proration_due_at`): paga no meio, ela anda
+    // (ou some) e a condição deixa de casar.
+    let coluna;
+    if (etapa.reason === 'trial_expired') coluna = 'trial_ends_at';
+    else if (etapa.reason === 'renewal_expired') coluna = 'renews_at';
+    else if (etapa.reason === 'proration_overdue') coluna = 'proration_due_at';
+    else coluna = before.renews_at ? 'renews_at' : 'trial_ends_at';
+    const limite = new Date(now.getTime() - Math.floor(Number(config.days)) * DAY_MS);
+
+    const detail = {
+      from: before.status,
+      to: 'suspended',
+      reason: SUSPENDED_REASONS.AUTO_NONPAYMENT,
+      automatic: true,
+      overdueReason: etapa.reason,
+      overdueSince: etapa.since.toISOString(),
+      days: Math.floor(Number(config.days))
+    };
+    const gravou = await getDb().transaction(async (trx) => {
+      const mudou = await Subscription.suspendForNonpayment(
+        tenantId, { fromStatus: before.status, deadlineColumn: coluna, deadlineBy: limite }, trx
+      );
+      if (!mudou) return false;
+      await BillingEvent.record({
+        subscriptionId: before.id,
+        type: BILLING_EVENT_TYPES.STATUS_CHANGED,
+        detail
+      }, trx);
+      return true;
+    });
+    cache.invalidate();
+    if (!gravou) return { suspended: false, reason: 'raced' };
+
+    const linha = tenant?.slug ? tenant : ((await getDb()('tenants').where({ id: tenantId }).first()) ?? { id: tenantId });
+    await PlatformAudit.record({
+      action: PlatformAudit.ACTIONS.SUBSCRIPTION_STATUS_CHANGED,
+      tenant: linha,
+      detail: { ...detail, source: 'scheduler' }
+    });
+    await AuditLog.record({
+      action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+      actorKind: 'system',
+      subjectType: 'subscription',
+      subjectId: tenantId,
+      detail: { ...detail, source: 'scheduler', platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_STATUS_CHANGED }
+    });
+    console.warn(
+      `Provider ${tenantId} was suspended for nonpayment: overdue (${etapa.reason}) since ${etapa.since.toISOString()}`
+    );
+    return {
+      suspended: true,
+      since: etapa.since.toISOString(),
+      overdueReason: etapa.reason,
+      suspendAt: etapa.suspendAt.toISOString()
     };
   }
 
@@ -509,9 +820,33 @@ class SubscriptionService {
       trialEndsAt: subscription.trial_ends_at ?? null,
       renewsAt: subscription.renews_at ?? null,
       canceledAt: subscription.canceled_at ?? null,
+      // Por que está suspensa (0102): `auto_nonpayment` sai pagando; `manual`
+      // (ou nulo, de antes da coluna) só pelo console. Nulo fora do suspenso.
+      suspendedReason: subscription.status === 'suspended' ? (subscription.suspended_reason ?? null) : null,
       pendingPlan: this.presentPendingPlan(subscription, pendingPlan),
       coupon: this.presentCoupon(subscription, plan, coupon),
+      card: this.presentCard(subscription),
       ...this.presentBillingExempt(subscription, { withReason: withExemptReason })
+    };
+  }
+
+  /**
+   * O cartão recorrente (0100), como a tela e o console o veem: a intenção,
+   * a bandeira, os quatro últimos dígitos e as datas — NUNCA o token, nem o IP
+   * de quem ligou. `failure` é um código (`charge_refused`, `capture_refused`)
+   * que a tela traduz, e não o texto do gateway.
+   */
+  static presentCard(subscription) {
+    const salvo = Boolean(subscription?.card_token_ciphertext);
+    return {
+      autopayEnabled: Boolean(subscription?.card_autopay_at),
+      autopaySince: isoOf(subscription?.card_autopay_at),
+      saved: salvo,
+      brand: salvo ? (subscription.card_brand ?? null) : null,
+      last4: salvo ? (subscription.card_last4 ?? null) : null,
+      savedAt: salvo ? isoOf(subscription.card_saved_at) : null,
+      failedAt: salvo ? isoOf(subscription.card_failed_at) : null,
+      failure: salvo && subscription.card_failed_at ? (subscription.card_failure ?? null) : null
     };
   }
 
@@ -596,6 +931,57 @@ class SubscriptionService {
       planId: plan?.id ? Number(plan.id) : null,
       couponId: this.couponApplies(subscription, plan, coupon) ? Number(coupon.id) : null
     };
+  }
+
+  /** O menor valor de uma fatura de pró-rata: o mesmo piso do Asaas que o do cupom. */
+  static PRORATION_MIN_CENTS = COUPON_FLOOR_CENTS;
+
+  /**
+   * Quanto a SUBIDA de `fromPlan` para `toPlan` cobra agora (0101): a
+   * diferença entre os preços efetivos (com o cupom, `priceFor`) proporcional
+   * ao que falta do período pago —
+   *
+   *   ⌈ (novo − antigo) × segundos restantes ÷ segundos do período ⌉ centavos
+   *
+   * — com o período do plano de antes (é ele que o provedor pagou) e os
+   * segundos até `renews_at`. Sem teto na fração: quem pagou adiantado mais
+   * de um período pagou o preço velho por todo ele.
+   *
+   * Pura e síncrona: a tela mostra o valor antes do clique (`listPlans`) e a
+   * troca o cobra depois, e as duas contas têm de ser a mesma.
+   *
+   * `eligible: false` quando não há o que cobrar: fora de `active` com o
+   * período correndo, isento, não é subida. `skipped: 'below_minimum'` quando
+   * há diferença mas ela não chega a `PRORATION_MIN_CENTS` — não sai fatura,
+   * e o extrato registra.
+   */
+  static prorationQuote(subscription, fromPlan, toPlan, coupon, now = new Date()) {
+    const nada = { eligible: false, amountCents: 0 };
+    if (!subscription || !toPlan) return nada;
+    if (subscription.status !== 'active' || subscription.billing_exempt_at) return nada;
+    const renovacao = asDate(subscription.renews_at);
+    if (!renovacao || renovacao.getTime() <= now.getTime()) return nada;
+    const antigo = this.priceFor(subscription, fromPlan, coupon);
+    const novo = this.priceFor(subscription, toPlan, coupon);
+    if (!(novo > antigo)) return nada;
+    const periodoS = periodoDoPlano(fromPlan ?? toPlan) * 86_400;
+    const restantesS = Math.floor((renovacao.getTime() - now.getTime()) / 1000);
+    const valor = Math.ceil(((novo - antigo) * restantesS) / periodoS);
+    const quote = {
+      eligible: true,
+      amountCents: valor,
+      fromPlanId: fromPlan?.id ? Number(fromPlan.id) : null,
+      toPlanId: Number(toPlan.id),
+      fromPriceCents: antigo,
+      toPriceCents: novo,
+      remainingSeconds: restantesS,
+      periodSeconds: periodoS,
+      remainingDays: Math.ceil(restantesS / 86_400),
+      renewsAt: renovacao.toISOString(),
+      currency: String(toPlan.currency || 'BRL').toUpperCase()
+    };
+    if (valor < this.PRORATION_MIN_CENTS) return { ...quote, skipped: 'below_minimum' };
+    return quote;
   }
 
   /**
@@ -909,7 +1295,7 @@ class SubscriptionService {
    * plano escolhido agora ser trocado de novo na renovação por uma decisão
    * que a de agora já substituiu.
    */
-  static async changePlan({ planId, actorUserId = null, upgradedAt = null }) {
+  static async changePlan({ planId, actorUserId = null, upgradedAt = null, eventDetail = null }) {
     const tenantId = currentTenantId();
     const plan = await Plan.findById(planId);
     if (!plan) throw new Error('Plan not found');
@@ -934,7 +1320,11 @@ class SubscriptionService {
         from: before?.plan_id ?? null,
         to: plan.id,
         toCode: plan.code,
-        ...(before?.pending_plan_id ? { pendingCleared: Number(before.pending_plan_id) } : {})
+        ...(before?.pending_plan_id ? { pendingCleared: Number(before.pending_plan_id) } : {}),
+        // O que a troca disse sobre a pró-rata (0101), quando quem troca é o
+        // provedor subindo — inclusive a que não saiu por ser menor que o
+        // mínimo: é aqui que alguém procura "por que não cobrou?".
+        ...(eventDetail ?? {})
       }
     });
     cache.invalidate();
@@ -1055,12 +1445,19 @@ class SubscriptionService {
    * `recordPayment`, que estende o período; isto é o botão de "libera" que
    * um humano aperta com razão própria, e a razão vai no extrato.
    */
-  static async setStatus({ status, reason = null, actorUserId = null, trialEndsAt, renewsAt }) {
+  static async setStatus({
+    status, reason = null, actorUserId = null, trialEndsAt, renewsAt, suspendedReason = SUSPENDED_REASONS.MANUAL
+  }) {
     if (!STATUSES.includes(status)) throw new Error(`Status must be one of: ${STATUSES.join(', ')}`);
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
     if (!before) throw new Error('Subscription not found');
-    const patch = { status };
+    // O motivo da suspensão (0102): suspender por aqui é gente (`manual`, que
+    // o pagamento não desfaz); qualquer outro estado o apaga.
+    const patch = {
+      status,
+      suspended_reason: status === 'suspended' ? (suspendedReason || SUSPENDED_REASONS.MANUAL) : null
+    };
     if (trialEndsAt !== undefined) patch.trial_ends_at = asDate(trialEndsAt);
     if (renewsAt !== undefined) patch.renews_at = asDate(renewsAt);
     patch.canceled_at = status === 'canceled' ? new Date() : null;
@@ -1068,11 +1465,28 @@ class SubscriptionService {
     // ANTES de ser gravado — ver `followOpenCharge`.
     if (trialEndsAt !== undefined || renewsAt !== undefined) await followOpenCharge(before, patch);
     const subscription = await Subscription.upsertForTenant(tenantId, patch);
+    // Cancelada ou suspensa à mão (0101): a fatura de pró-rata que ainda não
+    // chegou ao gateway não vai mais — a retentativa do agendador a levaria
+    // depois da decisão. A que já tem link fica como está.
+    let prorationsCanceled = 0;
+    if (!isBillableStatus(subscription)) {
+      try {
+        prorationsCanceled = await BillingCharge.cancelUnissuedProrations({ reason: 'not_billable' });
+      } catch (error) {
+        console.warn(`Could not cancel the unissued proration charges of provider ${tenantId}: ${error.message}`);
+      }
+    }
     await BillingEvent.record({
       subscriptionId: subscription.id,
       type: BILLING_EVENT_TYPES.STATUS_CHANGED,
       createdBy: actorUserId,
-      detail: { from: before.status, to: status, reason }
+      detail: {
+        from: before.status,
+        to: status,
+        reason,
+        ...(status === 'suspended' ? { suspendedReason: patch.suspended_reason } : {}),
+        ...(prorationsCanceled ? { prorationsCanceled } : {})
+      }
     });
     cache.invalidate();
     return subscription;
@@ -1330,7 +1744,10 @@ class SubscriptionService {
         patch.billing_exempt_reason = motivo;
         patch.billing_exempt_until = ate ?? null;
         if (ate) detalhe.until = ate.toISOString();
-        if (before.status === 'past_due' || before.status === 'suspended') patch.status = 'active';
+        if (before.status === 'past_due' || before.status === 'suspended') {
+          patch.status = 'active';
+          patch.suspended_reason = null;
+        }
       } else {
         patch.billing_exempt_at = null;
         patch.billing_exempt_reason = null;
@@ -1542,7 +1959,7 @@ class SubscriptionService {
    */
   static async recordPayment({
     amountCents, currency = 'BRL', provider = 'manual', externalId = null,
-    actorUserId = null, periodDays = null, allowUnderpayment = false, now = new Date()
+    actorUserId = null, periodDays = null, allowUnderpayment = false, paidOn = null, now = new Date(), chargeId = null
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -1627,9 +2044,23 @@ class SubscriptionService {
     // onde alguém que pagou a menos deve ficar: visível, avisado e recuperável,
     // não trancado do lado de fora.
     const pedido = await valorPedido({
-      externalId, plano, currency, precoDoPlano: this.priceFor(before, plano, cupom)
+      externalId, plano, currency, precoDoPlano: this.priceFor(before, plano, cupom), chargeId
     });
-    const faltou = pedido.cents !== null && amount < pedido.cents;
+    // A fatura de pró-rata da subida (0101): o dinheiro entra no extrato como
+    // qualquer pagamento (e na receita e na NFS-e), conferido contra o valor
+    // DELA — mas não compra período: não estende `renews_at`, não reativa,
+    // não mexe na descida agendada nem gasta ciclo de cupom. O período que
+    // ela completa já está pago; o que ela paga é a diferença de preço dele.
+    // (A reativação de quem foi suspenso por inadimplência, quando paga a
+    // pró-rata, volta a `active` SEM estender o prazo — é por esta marca.)
+    const isProration = pedido.kind === 'proration';
+    // Pagar a menos POR CAUSA do desconto por antecipação é pagar o inteiro:
+    // ver `descontoAntecipado`. A multa e os juros, do outro lado, chegam como
+    // pagamento a mais — e a mais já credita, logo acima.
+    const antecipado = pedido.cents !== null && amount < pedido.cents
+      ? await descontoAntecipado({ pedido, amount, paidOn, now })
+      : null;
+    const faltou = pedido.cents !== null && amount < pedido.cents && !antecipado;
     const underpaid = faltou && !allowUnderpayment;
     if (pedido.motivo === 'currency_mismatch') {
       // Nem credita errado nem bloqueia por uma condição que quem recebeu o
@@ -1641,8 +2072,13 @@ class SubscriptionService {
     }
 
     const patch = {};
-    const reactivates = !underpaid
-      && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due');
+    // A suspensão AUTOMÁTICA por inadimplência (0102) também: foi o atraso
+    // que a pôs, e é o pagamento que a tira — o período conta a partir do
+    // pagamento (`base`, que é agora, já que o prazo venceu há dias). A
+    // suspensão à mão continua parada: quem a pôs tem razão própria.
+    const autoSuspensa = isAutoSuspended(before);
+    const reactivates = !underpaid && !isProration
+      && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due' || autoSuspensa);
 
     // O destino da descida agendada, decidido pelo PREÇO que este pagamento
     // pagou pelo período que começa nela — e não pelo uso, que é o que um
@@ -1688,9 +2124,38 @@ class SubscriptionService {
     const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();
     const descida = destinoDaDescida === 'lock' && descidaVenceu ? planoAgendado : null;
 
+    // As OUTRAS faturas de pró-rata em aberto, sem a que este pagamento paga
+    // (0101): é por elas que se sabe se o provedor continua devendo depois
+    // deste pagamento — a reativação segue o pagamento do que suspendeu.
+    const outrasProrratas = (await BillingCharge.openProrations())
+      .filter((linha) => !(isProration && Number(linha.id) === Number(pedido.chargeId)));
+    let proximaProrata = null;
+    for (const linha of outrasProrratas) {
+      if (!linha.gateway_charge_id) continue;
+      const quando = prorationOverdueAt(linha.due_date);
+      if (quando && (!proximaProrata || quando.getTime() < proximaProrata.getTime())) proximaProrata = quando;
+    }
+    // Ainda devendo DEPOIS deste pagamento? O estado de depois, com a
+    // suspensão automática tirada, lido por `overdueSince`.
+    const aindaDevendo = (depois) => Boolean(overdueSince({
+      ...before,
+      ...depois,
+      status: before.status === 'suspended' ? 'active' : (depois.status ?? before.status),
+      suspended_reason: null
+    }, now, { prorationDueAt: proximaProrata }));
+
+    // A renovação paga por quem a suspensão automática parou enquanto uma
+    // pró-rata vencida continua em aberto: o período anda (o pagamento é da
+    // renovação), mas a suspensão fica — a dívida que suspendeu não foi paga.
+    const continuaSuspensa = reactivates && autoSuspensa
+      && aindaDevendo({ renews_at: new Date(base.getTime() + dias * DAY_MS), trial_ends_at: null });
+
     if (reactivates) {
       patch.renews_at = new Date(base.getTime() + dias * DAY_MS);
-      patch.status = 'active';
+      patch.status = continuaSuspensa ? before.status : 'active';
+      // Sempre, e não só quando estava suspensa: a suspensão automática que
+      // entrou entre a leitura e esta gravação também sai.
+      patch.suspended_reason = continuaSuspensa ? before.suspended_reason : null;
       patch.trial_ends_at = null;
       // A subida no meio do período (0075) foi paga: o período que este
       // pagamento compra é cobrado pelo plano de agora.
@@ -1704,6 +2169,24 @@ class SubscriptionService {
         patch.pending_plan_at = patch.renews_at;
         patch.pending_plan_locked_at = null;
       }
+    }
+    // A pró-rata paga por quem a suspensão automática parou (0101 + 0102):
+    // a dívida que suspendeu era ela, então o provedor volta a `active` — mas
+    // SEM estender o prazo, que ela não compra. Estender aqui seria dar de
+    // graça um período que ninguém pagou.
+    //
+    // Só quando ela era a ÚLTIMA dívida (`aindaDevendo`): com a renovação
+    // vencida, ou outra pró-rata vencida, a suspensão continua. E a decisão
+    // vale sobre a linha GRAVADA, e não só sobre `before`: a suspensão que o
+    // agendador gravou entre a leitura e o pagamento também sai (a gravação
+    // condicional na transação, abaixo).
+    const podeReativarPelaProrata = isProration && !underpaid && !aindaDevendo({});
+    // A subida paga por inteiro (0101): a diferença do resto do período
+    // entrou, e a marca da subida (`upgraded_at`, que adia a descida para a
+    // renovação seguinte) não tem mais o que proteger — se não sobrou outra
+    // pró-rata em aberto.
+    if (isProration && !underpaid && before.upgraded_at && !outrasProrratas.length) {
+      patch.upgraded_at = null;
     }
     const statusAfter = patch.status ?? before.status;
     const renewsAt = patch.renews_at ?? before.renews_at ?? null;
@@ -1735,6 +2218,11 @@ class SubscriptionService {
         // no índice único do evento logo abaixo, e o ciclo gasto aqui volta
         // junto no rollback — o cupom é consumido uma vez por pagamento.
         const consumo = gastaCupom ? await Subscription.consumeCouponCycle(tenantId, cupom.id, trx) : null;
+        // A pró-rata que era a última dívida tira a suspensão automática da
+        // linha como ela está AGORA (condicional), e não como se leu.
+        const reativouPelaProrata = podeReativarPelaProrata
+          ? await Subscription.liftAutoSuspension(tenantId, trx)
+          : false;
         await BillingEvent.record({
           subscriptionId: before.id,
           type: BILLING_EVENT_TYPES.PAYMENT_RECORDED,
@@ -1745,7 +2233,10 @@ class SubscriptionService {
           createdBy: actorUserId,
           detail: {
             statusBefore: before.status,
-            statusAfter,
+            statusAfter: reativouPelaProrata ? 'active' : statusAfter,
+            ...(autoSuspensa ? { suspendedReason: SUSPENDED_REASONS.AUTO_NONPAYMENT } : {}),
+            ...((autoSuspensa && reactivates && !continuaSuspensa) || reativouPelaProrata ? { reactivated: true } : {}),
+            ...(continuaSuspensa ? { stillSuspended: 'proration_overdue' } : {}),
             renewsAt,
             // O prazo de ANTES, e quantos dias o plano deu, viajam junto para
             // o estorno (`reversePayment`): desfazer um pagamento é devolver o
@@ -1767,9 +2258,14 @@ class SubscriptionService {
             ...(pedido.motivo ? { amountCheck: pedido.motivo } : {}),
             ...(underpaid ? { underpaid: true, shortfallCents: pedido.cents - amount } : {}),
             ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {}),
+            // O desconto por antecipação que fez o valor menor valer como
+            // inteiro — quanto, até quando, e em que dia se pagou.
+            ...(antecipado ? { earlyPaymentDiscount: antecipado } : {}),
             // O ciclo do cupom que este pagamento gastou, para o estorno o
             // devolver (`reversePayment`) — e, se o zerou, o cupom inteiro.
-            ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {})
+            ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {}),
+            // A pró-rata (0101): o estorno lê isto e não desfaz prazo nenhum.
+            ...(isProration ? { proration: true, chargeId: pedido.chargeId } : {})
           }
         }, trx);
         // Na mesma transação do pagamento: um período novo que começasse no
@@ -1801,7 +2297,8 @@ class SubscriptionService {
         duplicate: false,
         underpaid,
         expectedCents: pedido.cents,
-        paidCents: amount
+        paidCents: amount,
+        ...(isProration ? { proration: true } : {})
       };
     } catch (error) {
       // A corrida: a outra entrega igual chegou primeiro e já está gravada. A

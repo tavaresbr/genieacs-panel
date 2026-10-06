@@ -19,14 +19,25 @@ import { tdb, tinsertReturningId, isUniqueViolation } from '../config/database.j
  * de novo; se o processo morre no meio, `claimed_until` vence e outra passada a
  * retoma (`claim`).
  */
-export const REMINDER_STEPS = Object.freeze(['before', 'due', 'after']);
+export const REMINDER_STEPS = Object.freeze(['before', 'due', 'after', 'suspension_warning', 'suspended']);
+
+/**
+ * As etapas da suspensão automática (0102) como a coluna as guarda: `step`
+ * tem oito caracteres (0092), e os nomes delas não cabem. A tradução fica
+ * aqui, nas duas direções, e nenhum outro lugar vê o nome curto.
+ */
+const STEP_NA_COLUNA = Object.freeze({ suspension_warning: 'suspwarn', suspended: 'suspend' });
+const STEP_DA_COLUNA = Object.freeze(Object.fromEntries(Object.entries(STEP_NA_COLUNA).map(([a, b]) => [b, a])));
+
+const naColuna = (step) => STEP_NA_COLUNA[step] ?? step;
 
 class SubscriptionReminderSend {
   /**
    * Toma a etapa do prazo para mandar. Devolve o id da linha, ou nulo quando
    * ela já foi mandada ou está nas mãos de outra passada.
    */
-  static async claim({ dueAt, step, until, now = new Date() }) {
+  static async claim({ dueAt, step: etapa, until, now = new Date() }) {
+    const step = naColuna(etapa);
     try {
       return await tinsertReturningId('subscription_reminder_sends', {
         due_at: dueAt, step, claimed_until: until, created_at: now
@@ -45,6 +56,15 @@ class SubscriptionReminderSend {
       .where((q) => q.whereNull('claimed_until').orWhere('claimed_until', '<', now))
       .update({ claimed_until: until });
     return mudou > 0 ? linha.id : null;
+  }
+
+  /**
+   * Quando a etapa daquele prazo SAIU — ou nulo. É o que a suspensão
+   * automática lê para nunca suspender sem o aviso antes (0102).
+   */
+  static async sentAt({ dueAt, step: etapa }) {
+    const linha = await tdb('subscription_reminder_sends').where({ due_at: dueAt, step: naColuna(etapa) }).first();
+    return linha?.sent_at ? new Date(linha.sent_at) : null;
   }
 
   /** O lembrete saiu: grava por onde e quando, e solta a garra. */
@@ -68,7 +88,7 @@ class SubscriptionReminderSend {
       .limit(limit);
     return linhas.map((linha) => ({
       dueAt: String(linha.due_at).slice(0, 10),
-      step: linha.step,
+      step: STEP_DA_COLUNA[linha.step] ?? linha.step,
       channels: String(linha.channels ?? '').split(',').filter(Boolean),
       sentAt: linha.sent_at ? new Date(linha.sent_at).toISOString() : null
     }));

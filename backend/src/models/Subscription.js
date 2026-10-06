@@ -130,6 +130,47 @@ class Subscription {
   }
 
   /**
+   * A suspensão automática por inadimplência (0102) — só se a linha ainda
+   * está como se leu: no estado `fromStatus` (um dos três vivos), sem
+   * isenção e, quando há a coluna do prazo que venceu (`deadlineColumn`),
+   * com ele ainda vencido desde `deadlineBy` ou antes.
+   *
+   * Condicional pelo mesmo motivo de `applyPendingPlan`: duas voltas do
+   * agendador suspenderiam e auditariam duas vezes, e um pagamento que
+   * empurrou o prazo no mesmo minuto seria suspenso depois de pagar. Quem
+   * muda a linha é quem suspendeu; o outro recebe `false` e não grava nada.
+   */
+  static async suspendForNonpayment(tenantId, { fromStatus, deadlineColumn = null, deadlineBy = null }, db = getDb()) {
+    if (!tenantId || !['trial', 'active', 'past_due'].includes(fromStatus)) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const query = db('subscriptions')
+      .where({ tenant_id: tenantId, status: fromStatus })
+      .whereNull('billing_exempt_at');
+    if (deadlineColumn) query.whereNotNull(deadlineColumn).where(deadlineColumn, '<=', deadlineBy);
+    const changed = await query.update({
+      status: 'suspended',
+      suspended_reason: 'auto_nonpayment',
+      updated_at: new Date()
+    });
+    return changed > 0;
+  }
+
+  /**
+   * Tira a suspensão automática por inadimplência (0102) — só se a linha
+   * AGORA está suspensa por ela. Quem chama é o pagamento da pró-rata que era
+   * a última dívida: a suspensão que o agendador gravou depois da leitura do
+   * pagamento também sai, e a suspensão à mão nunca.
+   */
+  static async liftAutoSuspension(tenantId, db = getDb()) {
+    if (!tenantId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const changed = await db('subscriptions')
+      .where({ tenant_id: tenantId, status: 'suspended', suspended_reason: 'auto_nonpayment' })
+      .update({ status: 'active', suspended_reason: null, updated_at: new Date() });
+    return changed > 0;
+  }
+
+  /**
    * Põe (ou tira) o cupom da assinatura — só se o cupom de agora ainda é o que
    * se leu (`expectCouponId`, nulo para "sem cupom").
    *
