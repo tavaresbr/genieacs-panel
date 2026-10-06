@@ -321,7 +321,7 @@ export function ProvisioningTab() {
       )}
 
       <div className="space-y-4 rounded-md border border-border p-4">
-        <h4 className="field-label">
+        <h4 className="field-label mb-4">
           {t(editingId ? 'settings.provisioning.profileEdit' : 'settings.provisioning.profileNew')}
         </h4>
 

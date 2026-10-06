@@ -156,7 +156,7 @@ export function TagPicker({ conversation, onChange }: {
           {canManage && tags !== null && (
             <div className="mt-2 grid gap-2 border-t border-border pt-2">
               <input
-                className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                className="h-8 rounded-md border border-border bg-background px-2 text-xs placeholder:text-muted-foreground"
                 placeholder={t('whatsapp.tags.newPlaceholder')}
                 maxLength={TAG_NAME_MAX}
                 value={newName}

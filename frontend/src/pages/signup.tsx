@@ -150,7 +150,7 @@ export default function Signup() {
             <p className="text-sm text-muted-foreground">{t('signup.unavailable')}</p>
           ) : done ? (
             <div className="space-y-4">
-              <p className="page-kicker">{t('signup.doneKicker')}</p>
+              <p className="page-kicker mb-4">{t('signup.doneKicker')}</p>
               <h1 className="text-2xl font-bold text-foreground">{t('signup.doneTitle', { name: done.tenant.name })}</h1>
               <p className="text-sm leading-6 text-muted-foreground">{t('signup.doneText')}</p>
               {/* A prova do endereço saiu agora, e a pessoa precisa saber que

@@ -305,7 +305,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
   const attachment = message.attachment && <Attachment message={message} />
 
   const body = message.body
-    ? <p className="whitespace-pre-wrap wrap-break-word text-sm leading-6 wrap-anywhere">{message.body}</p>
+    ? <p className="whitespace-pre-wrap text-sm leading-6 wrap-anywhere">{message.body}</p>
     : !message.attachment
       ? <p className="text-sm italic text-muted-foreground">{t('whatsapp.inbox.attachment')}</p>
       : null
@@ -388,7 +388,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
         {failed && (
           <div className="mt-2 border-t border-[hsl(var(--status-danger))]/25 pt-2">
             <p
-              className="wrap-break-word text-xs leading-5 text-[hsl(var(--status-danger))] wrap-anywhere"
+              className="text-xs leading-5 text-[hsl(var(--status-danger))] wrap-anywhere"
               title={message.deliveryError || undefined}
             >
               {/* A recusa por janela tem frase própria: o código cru não diz ao
