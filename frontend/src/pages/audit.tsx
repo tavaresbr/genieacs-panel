@@ -183,14 +183,14 @@ export default function AuditPage() {
                         {formatDateTime(entry.at)}
                       </td>
                       <td className="py-2 pe-3"><Acao action={entry.action} /></td>
-                      <td className="whitespace-nowrap py-2 pe-3"><Ator actor={entry.actor} /></td>
+                      <td className="py-2 pe-3 wrap-anywhere"><Ator actor={entry.actor} /></td>
                       <td className="py-2 pe-3 text-xs text-muted-foreground">
                         {entry.subject.type
                           ? <>{entry.subject.type}{entry.subject.id ? ` #${entry.subject.id}` : ''}</>
                           : '—'}
                       </td>
-                      <td className="py-2 pe-3 text-xs"><Detalhe detail={entry.detail} /></td>
-                      <td className="whitespace-nowrap py-2 text-xs text-muted-foreground">
+                      <td className="min-w-56 py-2 pe-3 text-xs"><Detalhe detail={entry.detail} /></td>
+                      <td className="max-w-40 py-2 text-xs text-muted-foreground wrap-anywhere">
                         {entry.ip || '—'}
                       </td>
                     </tr>

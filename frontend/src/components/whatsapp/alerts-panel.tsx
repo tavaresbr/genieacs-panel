@@ -543,7 +543,7 @@ export function AlertsPanel() {
                 nunca volta do servidor: o campo vazio mantém o guardado, e
                 remover é um botão próprio. */}
             <fieldset className="space-y-3 rounded-md border border-border p-4">
-              <legend className="px-1 text-sm font-semibold text-foreground">{t('whatsapp.alerts.telegramTitle')}</legend>
+              <legend className="mb-3 px-1 text-sm font-semibold text-foreground">{t('whatsapp.alerts.telegramTitle')}</legend>
               <ol className="list-decimal space-y-1 ps-5 text-sm text-muted-foreground">
                 <li>{t('whatsapp.alerts.telegramStep1')}</li>
                 <li>{t('whatsapp.alerts.telegramStep2')}</li>

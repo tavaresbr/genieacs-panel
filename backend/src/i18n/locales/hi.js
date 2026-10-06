@@ -543,6 +543,8 @@ export default {
   'whatsapp.error.notCloud': "यह क्रिया केवल Meta के आधिकारिक API नंबर के लिए है।",
   'whatsapp.error.cloudInstanceStillExists': "Evolution सर्वर पर इस नंबर का इंस्टेंस अभी भी है; टोकन नहीं बदला गया। कुछ सेकंड बाद फिर से कोशिश करें।",
   'whatsapp.metaTokenUpdated': "Meta टोकन अपडेट किया गया।",
+  'whatsapp.metaWebhook.registered': "Meta पर webhook पंजीकृत किया गया।",
+  'whatsapp.metaWebhook.failed': "Meta ने webhook पंजीकरण अस्वीकार किया: {reason}",
   'whatsapp.error.notSupportedCloud': "नंबर जाँच के लिए QR कोड से जुड़ा नंबर चाहिए; आधिकारिक API यह सुविधा नहीं देती।",
   'whatsapp.error.invalidCloudCallbackUrl': "Meta कॉलबैक URL अमान्य है",
   'whatsapp.error.noDestination': 'इस संपर्क का कोई फ़ोन नंबर या WhatsApp पहचानकर्ता नहीं है',

@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { copyToClipboard, formatRelativeTime } from '@/lib/utils'
+import { metaWebhookAuto, metaWebhookState } from '@/lib/meta-webhook'
 import {
   WA_ACCOUNT_CLASS,
   WA_ACCOUNT_COLORS,
@@ -134,7 +135,8 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   no_alert_number: 'whatsapp.alerts.noAlertNumber',
   alerts_disabled: 'whatsapp.alerts.disabledSkip',
   no_devices: 'whatsapp.alerts.noDevices',
-  scan_failed: 'whatsapp.error.scanFailed'
+  scan_failed: 'whatsapp.error.scanFailed',
+  meta_webhook_failed: 'whatsapp.error.metaWebhookFailed'
 }
 
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string
@@ -503,17 +505,82 @@ function CopyField({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** O selo do registro do webhook de um número, com a explicação e o "registrar de novo". */
+function MetaWebhookStatus({
+  account,
+  busy,
+  onRetry
+}: {
+  account: WhatsAppAccount
+  busy: boolean
+  onRetry: () => void
+}) {
+  const { t, formatDateTime } = useTranslation()
+  const state = metaWebhookState(account)
+  const badge = state.tone === 'ok'
+    ? 'modern-badge-success'
+    : state.tone === 'error' ? 'modern-badge-error' : 'modern-badge'
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-foreground">{t('whatsapp.cloud.webhookStatus')}</span>
+        <span className={badge}>{t(state.label)}</span>
+        {account.metaWebhookAt && (
+          <span className="text-xs text-muted-foreground">{formatDateTime(account.metaWebhookAt)}</span>
+        )}
+        <button
+          type="button"
+          className="modern-button-secondary min-h-9 px-3 py-1 text-xs"
+          disabled={busy}
+          onClick={onRetry}
+        >
+          <Icon name="refresh" size={14} />
+          {t('whatsapp.cloud.webhookRetry')}
+        </button>
+      </div>
+      {state.tone === 'error' && (state.detailKey || state.detailText) && (
+        <p className="break-words text-xs text-[hsl(var(--status-danger))]">
+          {state.detailKey ? t(state.detailKey) : state.detailText}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /**
- * O que o provedor precisa colar no app dele na Meta para o número oficial
- * receber mensagens. A Meta não fala com o painel: ela chama o
- * `/webhook/meta` do servidor Evolution, que repassa ao painel.
+ * O webhook da Meta de um número oficial. A Meta não fala com o painel: ela
+ * chama o `/webhook/meta` do servidor Evolution, que repassa ao painel.
+ *
+ * Com `auto` (SaaS) o painel registra o webhook na conta WABA pela Graph API,
+ * e o token de verificação do servidor — um só para todos os provedores —
+ * nem chega ao navegador: aqui só aparece o resultado e o "registrar de
+ * novo". No self-host o servidor é de quem opera o painel, e a URL e o token
+ * continuam aqui para colar no app da Meta.
  */
-export function MetaWebhookGuide({ callbackUrl, verifyToken }: { callbackUrl: string; verifyToken: string }) {
+export function MetaWebhookGuide({
+  callbackUrl,
+  verifyToken,
+  auto = false,
+  account,
+  busy = false,
+  onRetry
+}: {
+  callbackUrl: string
+  verifyToken: string
+  auto?: boolean
+  account?: WhatsAppAccount
+  busy?: boolean
+  onRetry?: () => void
+}) {
   const { t } = useTranslation()
   return (
     <div className="space-y-3 rounded-md border border-border bg-muted/20 p-4">
-      <p className="text-sm font-semibold text-foreground">{t('whatsapp.cloud.guideTitle')}</p>
-      {callbackUrl && verifyToken ? (
+      <p className="text-sm font-semibold text-foreground">
+        {t(auto ? 'whatsapp.cloud.autoTitle' : 'whatsapp.cloud.guideTitle')}
+      </p>
+      {auto ? (
+        <p className="text-xs text-muted-foreground">{t('whatsapp.cloud.autoHint')}</p>
+      ) : callbackUrl && verifyToken ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <CopyField label={t('whatsapp.cloud.callbackUrl')} value={callbackUrl} />
           <CopyField label={t('whatsapp.cloud.verifyToken')} value={verifyToken} />
@@ -521,6 +588,7 @@ export function MetaWebhookGuide({ callbackUrl, verifyToken }: { callbackUrl: st
       ) : (
         <p className="text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.cloud.notConfigured')}</p>
       )}
+      {account && onRetry && <MetaWebhookStatus account={account} busy={busy} onRetry={onRetry} />}
       <div className="flex flex-wrap gap-2">
         {META_LINKS.map((link) => (
           <a
@@ -537,10 +605,20 @@ export function MetaWebhookGuide({ callbackUrl, verifyToken }: { callbackUrl: st
       </div>
       <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
         <li>{t('whatsapp.cloud.step0')}</li>
-        <li>{t('whatsapp.cloud.step1')}</li>
-        <li>{t('whatsapp.cloud.step2')}</li>
-        <li>{t('whatsapp.cloud.step3')}</li>
-        <li>{t('whatsapp.cloud.step4')}</li>
+        {auto ? (
+          <>
+            <li>{t('whatsapp.cloud.step2')}</li>
+            <li>{t('whatsapp.cloud.step4')}</li>
+            <li>{t('whatsapp.cloud.autoStep')}</li>
+          </>
+        ) : (
+          <>
+            <li>{t('whatsapp.cloud.step1')}</li>
+            <li>{t('whatsapp.cloud.step2')}</li>
+            <li>{t('whatsapp.cloud.step3')}</li>
+            <li>{t('whatsapp.cloud.step4')}</li>
+          </>
+        )}
       </ol>
     </div>
   )
@@ -594,6 +672,8 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
   const metaCallback = (baseUrl: string) =>
     config?.cloudWebhook?.callbackUrl || (baseUrl ? `${baseUrl.replace(/\/+$/, '')}/webhook/meta` : '')
   const metaVerifyToken = config?.cloudWebhook?.verifyToken ?? ''
+  /** SaaS: o painel registra o webhook na Meta, e URL e token não vêm. */
+  const metaAuto = metaWebhookAuto(config)
 
   const load = useCallback(async () => {
     const res = await whatsappAPI.listAccounts()
@@ -746,6 +826,22 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
       setBusyId(null)
     }
   }, [load, managed, t, toast, tokenEdit])
+
+  const retryMetaWebhook = useCallback(async (account: WhatsAppAccount) => {
+    setBusyId(account.id)
+    try {
+      const res = await whatsappAPI.registerMetaWebhook(account.id)
+      if (!res.success) {
+        toast.error(res.message || whatsappErrorMessage(t, res.code))
+        await load()
+        return
+      }
+      toast.success(t('whatsapp.cloud.webhookRegistered'))
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }, [load, t, toast])
 
   const saveEdit = useCallback(async (account: WhatsAppAccount) => {
     setBusyId(account.id)
@@ -927,7 +1023,11 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                 </div>
                 <p className="field-hint sm:col-span-2">{t('whatsapp.cloud.idsHint')}</p>
               </div>
-              <MetaWebhookGuide callbackUrl={metaCallback(form.baseUrl)} verifyToken={metaVerifyToken} />
+              <MetaWebhookGuide
+                callbackUrl={metaAuto ? '' : metaCallback(form.baseUrl)}
+                verifyToken={metaVerifyToken}
+                auto={metaAuto}
+              />
             </>
           )}
 
@@ -1332,7 +1432,14 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                       {t('whatsapp.cloud.guideTitle')}
                     </summary>
                     <div className="mt-2">
-                      <MetaWebhookGuide callbackUrl={metaCallback(account.baseUrl)} verifyToken={metaVerifyToken} />
+                      <MetaWebhookGuide
+                        callbackUrl={metaAuto ? '' : metaCallback(account.baseUrl)}
+                        verifyToken={metaVerifyToken}
+                        auto={metaAuto}
+                        account={account}
+                        busy={busy}
+                        onRetry={() => void retryMetaWebhook(account)}
+                      />
                     </div>
                   </details>
                 )}

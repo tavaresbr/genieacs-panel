@@ -543,6 +543,8 @@ export default {
   'whatsapp.error.notCloud': "此操作僅適用於 Meta 官方 API 號碼。",
   'whatsapp.error.cloudInstanceStillExists': "Evolution 伺服器上仍有此號碼的執行個體，權杖未更換。請幾秒後再試一次。",
   'whatsapp.metaTokenUpdated': "Meta 權杖已更新。",
+  'whatsapp.metaWebhook.registered': "已在 Meta 註冊 Webhook。",
+  'whatsapp.metaWebhook.failed': "Meta 拒絕了 Webhook 註冊：{reason}",
   'whatsapp.error.notSupportedCloud': "號碼查詢需要以 QR 碼連線的號碼；官方 API 不提供此功能。",
   'whatsapp.error.invalidCloudCallbackUrl': "Meta 回呼 URL 無效",
   'whatsapp.error.noDestination': '該聯絡人既沒有電話號碼也沒有 WhatsApp 識別碼',

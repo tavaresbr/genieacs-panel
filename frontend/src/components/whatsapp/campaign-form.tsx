@@ -227,7 +227,7 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
 
           <fieldset className="space-y-4">
             <legend className="field-label">{t('whatsapp.campaign.audience')}</legend>
-            <p className="field-hint -mt-2">{t('whatsapp.campaign.audienceHint')}</p>
+            <p className="field-hint">{t('whatsapp.campaign.audienceHint')}</p>
             {GROUPS.map(([group, labelKey]) => {
               const list = options?.[group] ?? []
               if (list.length === 0) return null
@@ -274,7 +274,7 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
           </fieldset>
 
           <fieldset className="space-y-3">
-            <legend className="field-label">{t('whatsapp.campaign.message')}</legend>
+            <legend className="field-label mb-3">{t('whatsapp.campaign.message')}</legend>
             <div className="tab-rail" role="tablist">
               {(['text', 'template'] as const).map((id) => (
                 <button
@@ -354,7 +354,7 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
           </div>
 
           <fieldset className="space-y-2">
-            <legend className="field-label">{t('whatsapp.campaign.when')}</legend>
+            <legend className="field-label mb-2">{t('whatsapp.campaign.when')}</legend>
             <label className="flex items-center gap-2 text-sm">
               <input type="radio" name="campaign-when" checked={when === 'draft'} onChange={() => setWhen('draft')} />
               {t('whatsapp.campaign.whenDraft')}

@@ -258,7 +258,7 @@ function EditWanModal({
           {/* 2. VLAN */}
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.vlan')}</label>
-            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+            <div className="flex items-center space-x-3">
               <input
                 type="checkbox"
                 id="vlanEnabled"
@@ -369,7 +369,7 @@ function EditWanModal({
                 <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">{t('detail.wan.lanPorts')}</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {([1, 2, 3, 4] as const).map(i => (
-                    <label key={`lan-${i}`} className="flex items-center space-x-2 rtl:space-x-reverse p-2 border dark:border-gray-700 rounded-md">
+                    <label key={`lan-${i}`} className="flex items-center space-x-2 p-2 border dark:border-gray-700 rounded-md">
                       <input
                         type="checkbox"
                         name={`LAN${i}`}
@@ -388,7 +388,7 @@ function EditWanModal({
                 <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">{t('detail.wan.wifiNetworks')}</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {([1, 2, 3, 4, 5, 6, 7, 8] as const).map(i => (
-                    <label key={`ssid-${i}`} className="flex items-center space-x-2 rtl:space-x-reverse p-2 border dark:border-gray-700 rounded-md">
+                    <label key={`ssid-${i}`} className="flex items-center space-x-2 p-2 border dark:border-gray-700 rounded-md">
                       <input
                         type="checkbox"
                         name={`SSID${i}`}
@@ -627,7 +627,7 @@ function IrreversibleActionModal({
           {action === 'factoryReset' && provisioningAvailable && (
             <p className="text-muted-foreground">{t('detail.factoryReset.provisionHint')}</p>
           )}
-          <label htmlFor="factory-reset-serial" className="field-label pt-1 wrap-anywhere">
+          <label htmlFor="factory-reset-serial" className="field-label mb-3 pt-1 wrap-anywhere">
             {t('detail.factoryReset.typeSerial', { serial: alvo })}
           </label>
           <input
@@ -2294,7 +2294,7 @@ export default function DeviceDetailPage() {
                       {wan.editable ? (
                         <button
                           onClick={() => handleOpenEditModal(wan)}
-                          className="w-full modern-button-secondary flex items-center justify-center space-x-2 rtl:space-x-reverse"
+                          className="w-full modern-button-secondary flex items-center justify-center space-x-2"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>

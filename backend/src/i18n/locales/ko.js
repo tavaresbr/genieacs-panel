@@ -546,6 +546,8 @@ export default {
   'whatsapp.error.notCloud': "이 작업은 Meta 공식 API 번호에서만 사용할 수 있습니다.",
   'whatsapp.error.cloudInstanceStillExists': "Evolution 서버에 이 번호의 인스턴스가 아직 남아 있어 토큰이 변경되지 않았습니다. 몇 초 후 다시 시도하세요.",
   'whatsapp.metaTokenUpdated': "Meta 토큰을 업데이트했습니다.",
+  'whatsapp.metaWebhook.registered': "Meta에 웹훅을 등록했습니다.",
+  'whatsapp.metaWebhook.failed': "Meta가 웹훅 등록을 거부했습니다: {reason}",
   'whatsapp.error.notSupportedCloud': "번호 확인에는 QR 코드로 연결된 번호가 필요합니다. 공식 API는 이를 제공하지 않습니다.",
   'whatsapp.error.invalidCloudCallbackUrl': "Meta 콜백 URL이 올바르지 않습니다",
   'whatsapp.error.noDestination': '이 연락처에는 전화번호나 WhatsApp 식별자가 없습니다',

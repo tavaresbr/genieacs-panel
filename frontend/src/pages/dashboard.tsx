@@ -544,7 +544,7 @@ function DashboardView({ owner }: { owner: string | null }) {
                     <td className="whitespace-nowrap text-xs">{formatFaultTime(fault.timestamp)}</td>
                     <td className="max-w-60 break-all font-mono text-xs">{fault.deviceId || '—'}</td>
                     <td><span className="modern-badge-error">{fault.code}</span><small className="mt-1 block text-muted-foreground">{fault.channel}{fault.retries ? ` · ${t('dashboard.faults.retry', { count: fault.retries })}` : ''}</small></td>
-                    <td className="min-w-72 max-w-xl text-sm">{fault.message}</td>
+                    <td className="min-w-72 max-w-xl text-sm wrap-anywhere">{fault.message}</td>
                     {canWrite && <td><button type="button" className="modern-button-secondary" disabled={clearingFault === fault.id} onClick={() => void clearFault(fault)}>{clearingFault === fault.id ? t('dashboard.faults.clearing') : t('dashboard.faults.clear')}</button></td>}
                   </tr>
                 ))}

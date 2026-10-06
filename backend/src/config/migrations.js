@@ -1211,7 +1211,7 @@ const leadsTable = (db) => (t) => {
   t.string('status', 16).notNullable().defaultTo('new');
   t.text('notes');
   t.string('source', 32).notNullable().defaultTo('landing');
-  // Sem `ip`: ver `0103_drop_lead_ip`. Era gravado e nunca lido.
+  // Sem `ip`: ver `0104_drop_lead_ip`. Era gravado e nunca lido.
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
   t.index(['status', 'created_at'], 'leads_status_created_idx');
@@ -1667,6 +1667,19 @@ const WA_ACCOUNT_CLOUD_COLUMNS = [
   ['meta_waba_id', (t) => t.string('meta_waba_id', 32)],
   ['meta_templates_synced_at', (t) => t.timestamp('meta_templates_synced_at').nullable()],
   ['meta_templates_error', (t) => t.string('meta_templates_error', 255)]
+];
+
+/**
+ * O webhook da conta WABA registrado pelo painel na Graph API
+ * (`POST /{waba}/subscribed_apps` com `override_callback_uri`). O provedor não
+ * cola mais URL nem token no app dele na Meta: o painel faz isso com o token
+ * do próprio número, e o resultado da última tentativa fica aqui para a tela
+ * mostrar e oferecer "registrar de novo". Nulo é "ainda não tentado".
+ */
+const WA_ACCOUNT_META_WEBHOOK_COLUMNS = [
+  ['meta_webhook_status', (t) => t.string('meta_webhook_status', 8).nullable()],
+  ['meta_webhook_error', (t) => t.string('meta_webhook_error', 255).nullable()],
+  ['meta_webhook_at', (t) => t.timestamp('meta_webhook_at').nullable()]
 ];
 
 /**
@@ -5674,6 +5687,22 @@ export const migrations = [
     }
   },
   {
+    /** O webhook da Meta registrado pelo painel — ver `WA_ACCOUNT_META_WEBHOOK_COLUMNS`. */
+    id: '0103_wa_meta_webhook',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_WEBHOOK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const missing = await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_WEBHOOK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
     /**
      * O IP de quem pediu contato na vitrine, que era gravado e NUNCA lido.
      *
@@ -5704,7 +5733,7 @@ export const migrations = [
      * onde um índice se perde sem avisar. `backend/test/lead-retention.test.js`
      * confere isso nos três dialetos.
      */
-    id: '0103_drop_lead_ip',
+    id: '0104_drop_lead_ip',
     async isApplied(db) {
       if (!(await db.schema.hasTable('leads'))) return true;
       return !(await db.schema.hasColumn('leads', 'ip'));
@@ -5717,7 +5746,7 @@ export const migrations = [
       const total = Number(linha?.n || 0);
       if (total > 0) {
         console.warn(
-          `0103_drop_lead_ip: descartando o IP de ${total} lead(s) — dado pessoal que `
+          `0104_drop_lead_ip: descartando o IP de ${total} lead(s) — dado pessoal que `
           + 'nenhum código lia. Ver o comentário desta migration.'
         );
       }
