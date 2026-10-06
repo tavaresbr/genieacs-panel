@@ -3,7 +3,7 @@ import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
-import SubscriptionService from './subscriptionService.js';
+import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import { providerFor } from './billing/registry.js';
 import { asaasBilling } from './billing/asaasBillingProvider.js';
@@ -607,7 +607,9 @@ class SelfBillingService {
     // para quem está num plano de graça é deixar um cliente sem cobrança
     // nenhuma na conta da plataforma, para sempre.
     const subscription = await Subscription.forTenant(tenantId);
-    if (!subscription || !ESTADOS_VIVOS.has(subscription.status)) {
+    // A suspensão AUTOMÁTICA por inadimplência (0102) paga também: é por aqui
+    // que se sai dela. A à mão continua recusada.
+    if (!subscription || !isBillableStatus(subscription)) {
       throw new SelfBillingError('charges.notBillable', { code: 'not_billable', status: 409 });
     }
     // Isento de cobrança pelo console: não há fatura a pagar, e o clique não

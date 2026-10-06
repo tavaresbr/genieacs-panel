@@ -7,7 +7,7 @@ import Plan from '../models/Plan.js';
 import Coupon from '../models/Coupon.js';
 import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
-import SubscriptionService from './subscriptionService.js';
+import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
 
 /**
  * A régua de emissão: quem cobra o provedor, e quando.
@@ -517,9 +517,10 @@ class ChargeIssuingService {
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
 
     // `suspended` e `canceled` são decisões de gente. Emitir cobrança a quem
-    // alguém desligou a dedo é o painel contrariando quem o opera.
-    const estado = subscription.status;
-    if (estado !== 'trial' && estado !== 'active' && estado !== 'past_due') {
+    // alguém desligou a dedo é o painel contrariando quem o opera. A exceção
+    // é a suspensão AUTOMÁTICA por inadimplência (0102): é pagando que se sai
+    // dela, então a fatura continua saindo (`isBillableStatus`).
+    if (!isBillableStatus(subscription)) {
       return { issued: false, reason: 'not_billable' };
     }
 

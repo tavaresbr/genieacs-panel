@@ -38,6 +38,17 @@ export const STATUS_LABEL_KEYS = {
   canceled: 'platform.subscription.canceled'
 } as const
 
+/**
+ * O rótulo do estado, com a suspensão automática por inadimplência (0102)
+ * separada da suspensão à mão: a primeira sai pagando, a segunda só pelo console.
+ */
+export function statusLabelKey(subscription: { status: SubscriptionStatus; suspendedReason?: string | null }) {
+  if (subscription.status === 'suspended' && subscription.suspendedReason === 'auto_nonpayment') {
+    return 'platform.subscription.suspendedNonpayment' as const
+  }
+  return STATUS_LABEL_KEYS[subscription.status]
+}
+
 /** A data de renovação já passou? Nulo e data inválida não venceram. */
 function expirou(value: string | null | undefined) {
   if (!value) return false
@@ -517,7 +528,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
       {subscription && (
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className={statusBadgeClass(subscription.status)}>
-            {t(STATUS_LABEL_KEYS[subscription.status])}
+            {t(statusLabelKey(subscription))}
           </span>
           {subscription.billingExempt && (
             <span className="modern-badge-info">{exemptUntilLabel(subscription, t) ?? t('platform.subs.exempt')}</span>

@@ -28,6 +28,12 @@ import { effectiveChargesConfig, earlyDiscountFor } from './billing/asaasSetting
  *              Derrubar o autoatendimento dos clientes finais de um ISP por
  *              fatura atrasada é um tiro no pé comercial — o plano é explícito.
  *   suspended  402. Nós desligamos: inadimplência longa, abuso, o que for.
+ *              Dois motivos (`suspended_reason`, 0102): `auto_nonpayment` é
+ *              a suspensão automática do agendador, `autoSuspendDays` depois
+ *              do vencimento (ver `autoSuspensionStep`), e o PAGAMENTO a
+ *              desfaz sozinho — a cobrança, o "pagar agora" e o webhook
+ *              continuam valendo para ela. `manual` (ou nulo, de antes da
+ *              coluna) é gente, e só gente desfaz: o console.
  *   canceled   402. O contrato acabou; o que resta é exportar e apagar.
  *
  * `suspended` aqui e `tenants.status = 'suspended'` são DUAS chaves, de
@@ -329,6 +335,76 @@ function detalheDe(evento) {
 const ESTADOS_QUE_ESTENDEM = new Set(['trial', 'active', 'past_due']);
 
 /**
+ * Por que a assinatura está `suspended` (0102). `auto_nonpayment` é a do
+ * agendador e o pagamento a desfaz; `manual` é o console, e só ele desfaz.
+ */
+export const SUSPENDED_REASONS = Object.freeze({
+  AUTO_NONPAYMENT: 'auto_nonpayment',
+  MANUAL: 'manual'
+});
+
+/** A suspensão automática por inadimplência — a única que o pagamento desfaz. */
+export function isAutoSuspended(subscription) {
+  return subscription?.status === 'suspended'
+    && subscription?.suspended_reason === SUSPENDED_REASONS.AUTO_NONPAYMENT;
+}
+
+/**
+ * Se ainda se cobra esta assinatura: emitir a fatura, "pagar agora", dar
+ * baixa. Os estados vivos e, além deles, a suspensão AUTOMÁTICA — é pagando
+ * que se sai dela, e recusar a cobrança a quem está tentando pagar trancaria
+ * a porta pelo lado de dentro. A suspensão à mão continua fora.
+ */
+export function isBillableStatus(subscription) {
+  return ESTADOS_QUE_ESTENDEM.has(subscription?.status) || isAutoSuspended(subscription);
+}
+
+/**
+ * Desde quando esta assinatura está devendo — o instante do prazo que venceu
+ * sem pagamento —, ou nulo quando ela não está devendo (ou não dá para
+ * dizer desde quando).
+ *
+ * É a âncora da suspensão automática (`autoSuspensionStep`): suspende-se
+ * `autoSuspendDays` depois DESTE instante. Parte do estado que VALE
+ * (`effectiveStatus`) e não do gravado, pela razão de sempre: um `active`
+ * com `renews_at` vencido é `past_due` desde o segundo em que venceu. As
+ * causas, e o prazo de cada uma:
+ *
+ *   trial_expired      `trial_ends_at`;
+ *   renewal_expired    `renews_at`;
+ *   (gravado past_due) o prazo que houver, se já passou;
+ *   proration_overdue  o vencimento da fatura de pró-rata, que não mora na
+ *                      assinatura — quem chama o lê da cobrança e o passa em
+ *                      `prorationDueAt`.
+ *
+ * Com mais de uma causa, vale a MAIS ANTIGA: é desde ela que se deve.
+ * `prorationDueAt` vencido conta mesmo que `effectiveStatus` não o veja (ele
+ * é síncrono e não lê cobrança). Isento, cancelado e suspenso não devem nada
+ * a esta conta: os dois primeiros não são cobrados, e o suspenso já foi.
+ *
+ * @returns {{ since: Date, reason: string } | null}
+ */
+export function overdueSince(subscription, now = new Date(), { prorationDueAt = null } = {}) {
+  if (!subscription || subscription.billing_exempt_at) return null;
+  if (!ESTADOS_QUE_ESTENDEM.has(subscription.status)) return null;
+  const causas = [];
+  const vencido = (data) => data && data.getTime() <= now.getTime();
+  const efetivo = SubscriptionService.effectiveStatus(subscription, now);
+  if (efetivo.status === 'past_due') {
+    let prazo = null;
+    if (efetivo.reason === 'trial_expired') prazo = asDate(subscription.trial_ends_at);
+    else if (efetivo.reason === 'renewal_expired') prazo = asDate(subscription.renews_at);
+    else if (efetivo.reason === null) prazo = asDate(subscription.renews_at) ?? asDate(subscription.trial_ends_at);
+    if (vencido(prazo)) causas.push({ since: prazo, reason: efetivo.reason ?? 'past_due' });
+  }
+  const proRata = asDate(prorationDueAt);
+  if (vencido(proRata)) causas.push({ since: proRata, reason: 'proration_overdue' });
+  if (!causas.length) return null;
+  causas.sort((a, b) => a.since.getTime() - b.since.getTime());
+  return causas[0];
+}
+
+/**
  * O que o pagamento de `detalhe` comprou, e de onde saiu a conta. Ver
  * `reversePayment`, que é quem decide QUANTO disto se desfaz.
  *
@@ -352,7 +428,10 @@ const ESTADOS_QUE_ESTENDEM = new Set(['trial', 'active', 'past_due']);
  */
 async function duracaoCreditada(detalhe, planoAtual) {
   if (!detalhe || detalhe.underpaid) return { ms: 0, basis: 'not_extended', from: null, to: null };
-  if (detalhe.statusBefore && !ESTADOS_QUE_ESTENDEM.has(detalhe.statusBefore)) {
+  // A suspensão automática reativada pelo pagamento (0102) estendeu, e o
+  // estorno desfaz o que ela comprou como o de qualquer outro.
+  const reativou = detalhe.statusBefore === 'suspended' && detalhe.suspendedReason === SUSPENDED_REASONS.AUTO_NONPAYMENT;
+  if (detalhe.statusBefore && !ESTADOS_QUE_ESTENDEM.has(detalhe.statusBefore) && !reativou) {
     return { ms: 0, basis: 'not_extended', from: null, to: null };
   }
   const from = asDate(detalhe.renewsBefore);
@@ -413,6 +492,9 @@ class SubscriptionService {
         return { status: 'past_due', reason: 'renewal_expired' };
       }
     }
+    // A suspensão automática diz o porquê, para a tela de bloqueio e o
+    // console mostrarem "por inadimplência" — e que pagar resolve.
+    if (isAutoSuspended(subscription)) return { status: 'suspended', reason: SUSPENDED_REASONS.AUTO_NONPAYMENT };
     return { status: stored, reason: null };
   }
 
@@ -473,6 +555,122 @@ class SubscriptionService {
       step,
       deadline: prazo,
       expired: desde >= 0
+    };
+  }
+
+  /**
+   * Onde o provedor está na suspensão automática (0102), ou nulo.
+   *
+   * `config` é `{ days, warnDays }` (`platformProfileService.autoSuspendConfig`):
+   * suspende-se `days` dias depois de o provedor passar a dever
+   * (`overdueSince`), e avisa-se `warnDays` antes disso. `days` zero desliga
+   * tudo; `warnDays` zero desliga só o aviso.
+   *
+   *   suspension_warning  da data do aviso até a da suspensão;
+   *   suspend             da data da suspensão em diante.
+   *
+   * Fora: isento, plano de graça (ou sem plano), cancelado e o que já está
+   * suspenso — os dois primeiros não devem, os dois últimos já pararam. Pura,
+   * sem banco: quem grava é `autoSuspend`, que relê a linha antes.
+   *
+   * @returns {{ step: 'suspension_warning'|'suspend', since: Date, reason: string,
+   *   suspendAt: Date, warnAt: Date|null } | null}
+   */
+  static autoSuspensionStep(subscription, now = new Date(), plano = null, config = {}, { prorationDueAt = null } = {}) {
+    const dias = Math.floor(Number(config?.days ?? 0));
+    if (!subscription || !(dias > 0)) return null;
+    if (subscription.billing_exempt_at) return null;
+    if (!(Number(plano?.price_cents ?? 0) > 0)) return null;
+    const devendo = overdueSince(subscription, now, { prorationDueAt });
+    if (!devendo) return null;
+    const suspendAt = new Date(devendo.since.getTime() + dias * DAY_MS);
+    const aviso = Math.floor(Number(config?.warnDays ?? 0));
+    const warnAt = aviso > 0 ? new Date(suspendAt.getTime() - aviso * DAY_MS) : null;
+    let step = null;
+    if (now.getTime() >= suspendAt.getTime()) step = 'suspend';
+    else if (warnAt && now.getTime() >= warnAt.getTime()) step = 'suspension_warning';
+    if (!step) return null;
+    return { step, since: devendo.since, reason: devendo.reason, suspendAt, warnAt };
+  }
+
+  /**
+   * Suspende o provedor em escopo por inadimplência — se, relida a linha
+   * agora, ele ainda está na etapa `suspend` de `autoSuspensionStep`.
+   *
+   * A gravação é CONDICIONAL (`Subscription.suspendForNonpayment`): só sai de
+   * `trial`/`active`/`past_due` — o estado lido —, sem isenção, e com o prazo
+   * que venceu ainda vencido há `days` dias. É o que impede as duas corridas
+   * que importam: duas voltas do agendador (a segunda não acha mais o estado
+   * de antes e não grava nem audita de novo) e o pagamento que chega no mesmo
+   * minuto (ele empurra o prazo, e a condição deixa de casar — ou, se ele
+   * gravou depois, regrava `active` e limpa o motivo; ver `recordPayment`).
+   *
+   * A cobrança em aberto NÃO é cancelada: é por ela que se sai daqui.
+   *
+   * @returns {Promise<{ suspended: boolean, reason?: string, since?: string,
+   *   overdueReason?: string, suspendAt?: string }>}
+   */
+  static async autoSuspend({ tenant = null, now = new Date(), config = {}, prorationDueAt = null } = {}) {
+    const tenantId = currentTenantId();
+    const before = await Subscription.forTenant(tenantId);
+    if (!before) return { suspended: false, reason: 'no_subscription' };
+    const plano = before.plan_id ? await Plan.findById(before.plan_id) : null;
+    const etapa = this.autoSuspensionStep(before, now, plano, config, { prorationDueAt });
+    if (!etapa || etapa.step !== 'suspend') return { suspended: false, reason: 'not_due' };
+
+    // A coluna do prazo que venceu, para a condição: a pró-rata não mora na
+    // assinatura, e aí só o estado lido segura a corrida.
+    let coluna = null;
+    if (etapa.reason === 'trial_expired') coluna = 'trial_ends_at';
+    else if (etapa.reason === 'renewal_expired') coluna = 'renews_at';
+    else if (etapa.reason !== 'proration_overdue') coluna = before.renews_at ? 'renews_at' : 'trial_ends_at';
+    const limite = new Date(now.getTime() - Math.floor(Number(config.days)) * DAY_MS);
+
+    const detail = {
+      from: before.status,
+      to: 'suspended',
+      reason: SUSPENDED_REASONS.AUTO_NONPAYMENT,
+      automatic: true,
+      overdueReason: etapa.reason,
+      overdueSince: etapa.since.toISOString(),
+      days: Math.floor(Number(config.days))
+    };
+    const gravou = await getDb().transaction(async (trx) => {
+      const mudou = await Subscription.suspendForNonpayment(
+        tenantId, { fromStatus: before.status, deadlineColumn: coluna, deadlineBy: limite }, trx
+      );
+      if (!mudou) return false;
+      await BillingEvent.record({
+        subscriptionId: before.id,
+        type: BILLING_EVENT_TYPES.STATUS_CHANGED,
+        detail
+      }, trx);
+      return true;
+    });
+    cache.invalidate();
+    if (!gravou) return { suspended: false, reason: 'raced' };
+
+    const linha = tenant?.slug ? tenant : ((await getDb()('tenants').where({ id: tenantId }).first()) ?? { id: tenantId });
+    await PlatformAudit.record({
+      action: PlatformAudit.ACTIONS.SUBSCRIPTION_STATUS_CHANGED,
+      tenant: linha,
+      detail: { ...detail, source: 'scheduler' }
+    });
+    await AuditLog.record({
+      action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+      actorKind: 'system',
+      subjectType: 'subscription',
+      subjectId: tenantId,
+      detail: { ...detail, source: 'scheduler', platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_STATUS_CHANGED }
+    });
+    console.warn(
+      `Provider ${tenantId} was suspended for nonpayment: overdue (${etapa.reason}) since ${etapa.since.toISOString()}`
+    );
+    return {
+      suspended: true,
+      since: etapa.since.toISOString(),
+      overdueReason: etapa.reason,
+      suspendAt: etapa.suspendAt.toISOString()
     };
   }
 
@@ -562,6 +760,9 @@ class SubscriptionService {
       trialEndsAt: subscription.trial_ends_at ?? null,
       renewsAt: subscription.renews_at ?? null,
       canceledAt: subscription.canceled_at ?? null,
+      // Por que está suspensa (0102): `auto_nonpayment` sai pagando; `manual`
+      // (ou nulo, de antes da coluna) só pelo console. Nulo fora do suspenso.
+      suspendedReason: subscription.status === 'suspended' ? (subscription.suspended_reason ?? null) : null,
       pendingPlan: this.presentPendingPlan(subscription, pendingPlan),
       coupon: this.presentCoupon(subscription, plan, coupon),
       ...this.presentBillingExempt(subscription, { withReason: withExemptReason })
@@ -1108,12 +1309,19 @@ class SubscriptionService {
    * `recordPayment`, que estende o período; isto é o botão de "libera" que
    * um humano aperta com razão própria, e a razão vai no extrato.
    */
-  static async setStatus({ status, reason = null, actorUserId = null, trialEndsAt, renewsAt }) {
+  static async setStatus({
+    status, reason = null, actorUserId = null, trialEndsAt, renewsAt, suspendedReason = SUSPENDED_REASONS.MANUAL
+  }) {
     if (!STATUSES.includes(status)) throw new Error(`Status must be one of: ${STATUSES.join(', ')}`);
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
     if (!before) throw new Error('Subscription not found');
-    const patch = { status };
+    // O motivo da suspensão (0102): suspender por aqui é gente (`manual`, que
+    // o pagamento não desfaz); qualquer outro estado o apaga.
+    const patch = {
+      status,
+      suspended_reason: status === 'suspended' ? (suspendedReason || SUSPENDED_REASONS.MANUAL) : null
+    };
     if (trialEndsAt !== undefined) patch.trial_ends_at = asDate(trialEndsAt);
     if (renewsAt !== undefined) patch.renews_at = asDate(renewsAt);
     patch.canceled_at = status === 'canceled' ? new Date() : null;
@@ -1125,7 +1333,12 @@ class SubscriptionService {
       subscriptionId: subscription.id,
       type: BILLING_EVENT_TYPES.STATUS_CHANGED,
       createdBy: actorUserId,
-      detail: { from: before.status, to: status, reason }
+      detail: {
+        from: before.status,
+        to: status,
+        reason,
+        ...(status === 'suspended' ? { suspendedReason: patch.suspended_reason } : {})
+      }
     });
     cache.invalidate();
     return subscription;
@@ -1383,7 +1596,10 @@ class SubscriptionService {
         patch.billing_exempt_reason = motivo;
         patch.billing_exempt_until = ate ?? null;
         if (ate) detalhe.until = ate.toISOString();
-        if (before.status === 'past_due' || before.status === 'suspended') patch.status = 'active';
+        if (before.status === 'past_due' || before.status === 'suspended') {
+          patch.status = 'active';
+          patch.suspended_reason = null;
+        }
       } else {
         patch.billing_exempt_at = null;
         patch.billing_exempt_reason = null;
@@ -1700,8 +1916,13 @@ class SubscriptionService {
     }
 
     const patch = {};
+    // A suspensão AUTOMÁTICA por inadimplência (0102) também: foi o atraso
+    // que a pôs, e é o pagamento que a tira — o período conta a partir do
+    // pagamento (`base`, que é agora, já que o prazo venceu há dias). A
+    // suspensão à mão continua parada: quem a pôs tem razão própria.
+    const autoSuspensa = isAutoSuspended(before);
     const reactivates = !underpaid
-      && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due');
+      && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due' || autoSuspensa);
 
     // O destino da descida agendada, decidido pelo PREÇO que este pagamento
     // pagou pelo período que começa nela — e não pelo uso, que é o que um
@@ -1750,6 +1971,9 @@ class SubscriptionService {
     if (reactivates) {
       patch.renews_at = new Date(base.getTime() + dias * DAY_MS);
       patch.status = 'active';
+      // Sempre, e não só quando estava suspensa: a suspensão automática que
+      // entrou entre a leitura e esta gravação também sai.
+      patch.suspended_reason = null;
       patch.trial_ends_at = null;
       // A subida no meio do período (0075) foi paga: o período que este
       // pagamento compra é cobrado pelo plano de agora.
@@ -1805,6 +2029,8 @@ class SubscriptionService {
           detail: {
             statusBefore: before.status,
             statusAfter,
+            ...(autoSuspensa ? { suspendedReason: SUSPENDED_REASONS.AUTO_NONPAYMENT } : {}),
+            ...(autoSuspensa && reactivates ? { reactivated: true } : {}),
             renewsAt,
             // O prazo de ANTES, e quantos dias o plano deu, viajam junto para
             // o estorno (`reversePayment`): desfazer um pagamento é devolver o
