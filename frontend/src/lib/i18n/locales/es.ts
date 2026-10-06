@@ -2272,6 +2272,8 @@ const es: Dictionary = {
   'whatsapp.inbox.deliveryFailed': 'No entregada: {reason}',
   'whatsapp.inbox.loadMore': 'Cargar más antiguas',
   'whatsapp.inbox.unread': '{count} sin leer',
+  'whatsapp.inbox.awaiting': 'Esperando respuesta · {minutes} min',
+  'whatsapp.inbox.awaitingHint': 'El cliente habló último y nadie respondió todavía',
   'whatsapp.inbox.receivedBy': 'Recibida por {number}',
   'whatsapp.accounts.color': 'Color',
   'whatsapp.color.blue': 'Azul',

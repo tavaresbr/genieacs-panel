@@ -2277,6 +2277,8 @@ const ko: Dictionary = {
   'whatsapp.inbox.deliveryFailed': '전달되지 않음: {reason}',
   'whatsapp.inbox.loadMore': '이전 메시지 불러오기',
   'whatsapp.inbox.unread': '읽지 않음 {count}건',
+  'whatsapp.inbox.awaiting': '답변 대기 · {minutes}분',
+  'whatsapp.inbox.awaitingHint': '고객이 마지막으로 말했고 아직 아무도 답하지 않았습니다',
   'whatsapp.inbox.receivedBy': '{number}(으)로 수신',
   'whatsapp.accounts.color': '색상',
   'whatsapp.color.blue': '파랑',

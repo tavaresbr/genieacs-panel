@@ -2274,6 +2274,8 @@ const en = {
   'whatsapp.inbox.deliveryFailed': 'Not delivered: {reason}',
   'whatsapp.inbox.loadMore': 'Load older',
   'whatsapp.inbox.unread': '{count} unread',
+  'whatsapp.inbox.awaiting': 'Awaiting reply · {minutes} min',
+  'whatsapp.inbox.awaitingHint': 'The customer spoke last and nobody has replied yet',
   'whatsapp.inbox.receivedBy': 'Received by {number}',
   'whatsapp.accounts.color': 'Colour',
   'whatsapp.color.blue': 'Blue',

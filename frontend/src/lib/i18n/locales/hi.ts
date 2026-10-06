@@ -2252,6 +2252,8 @@ const hi: Dictionary = {
   'whatsapp.inbox.deliveryFailed': 'नहीं पहुँचा: {reason}',
   'whatsapp.inbox.loadMore': 'पुराने लोड करें',
   'whatsapp.inbox.unread': '{count} अपठित',
+  'whatsapp.inbox.awaiting': 'जवाब का इंतज़ार · {minutes} मिनट',
+  'whatsapp.inbox.awaitingHint': 'ग्राहक ने आख़िरी संदेश भेजा और अभी तक किसी ने जवाब नहीं दिया',
   'whatsapp.inbox.receivedBy': '{number} पर प्राप्त',
   'whatsapp.accounts.color': 'रंग',
   'whatsapp.color.blue': 'नीला',

@@ -2272,6 +2272,8 @@ const ptBR: Dictionary = {
   'whatsapp.inbox.deliveryFailed': 'Não entregue: {reason}',
   'whatsapp.inbox.loadMore': 'Carregar mais antigas',
   'whatsapp.inbox.unread': '{count} não lidas',
+  'whatsapp.inbox.awaiting': 'Aguardando resposta · {minutes} min',
+  'whatsapp.inbox.awaitingHint': 'O cliente falou por último e ninguém respondeu ainda',
   'whatsapp.inbox.receivedBy': 'Recebida pelo número {number}',
   'whatsapp.accounts.color': 'Cor',
   'whatsapp.color.blue': 'Azul',

@@ -2271,6 +2271,8 @@ const ja: Dictionary = {
   'whatsapp.inbox.deliveryFailed': '未配信: {reason}',
   'whatsapp.inbox.loadMore': '古いものを読み込む',
   'whatsapp.inbox.unread': '未読 {count} 件',
+  'whatsapp.inbox.awaiting': '返信待ち · {minutes}分',
+  'whatsapp.inbox.awaitingHint': '最後に顧客が発言し、まだ誰も返信していません',
   'whatsapp.inbox.receivedBy': '{number} で受信',
   'whatsapp.accounts.color': '色',
   'whatsapp.color.blue': '青',

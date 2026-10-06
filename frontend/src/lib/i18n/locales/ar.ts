@@ -2252,6 +2252,8 @@ const ar: Dictionary = {
   'whatsapp.inbox.deliveryFailed': 'لم تُسلَّم: {reason}',
   'whatsapp.inbox.loadMore': 'تحميل الأقدم',
   'whatsapp.inbox.unread': '{count} غير مقروءة',
+  'whatsapp.inbox.awaiting': 'بانتظار الرد · {minutes} د',
+  'whatsapp.inbox.awaitingHint': 'العميل آخر من كتب ولم يرد أحد بعد',
   'whatsapp.inbox.receivedBy': 'استُلمت عبر {number}',
   'whatsapp.accounts.color': 'اللون',
   'whatsapp.color.blue': 'أزرق',
