@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { contactsAPI, type ContactImportResult, whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
+import { contactsAPI, type ContactImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -537,6 +537,28 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   const [fileName, setFileName] = useState('')
   const [preview, setPreview] = useState<ContactImportResult | null>(null)
   const [busy, setBusy] = useState(false)
+  const [source, setSource] = useState<'sheet' | 'whatsapp'>('sheet')
+  const [book, setBook] = useState<ContactWhatsappImportResult | null>(null)
+
+  const switchSource = (next: 'sheet' | 'whatsapp') => {
+    if (busy) return
+    setSource(next)
+    setPreview(null)
+    setBook(null)
+    setCsv(null)
+  }
+
+  const readBook = async () => {
+    setBook(null)
+    setBusy(true)
+    const res = await contactsAPI.importWhatsapp('preview')
+    setBusy(false)
+    if (!res.success || !res.data) {
+      toast.error(res.message || t('contacts.sheet.whatsappFailed'))
+      return
+    }
+    setBook(res.data)
+  }
 
   const readFile = async (file: File | undefined) => {
     setPreview(null)
@@ -555,6 +577,18 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   }
 
   const apply = async () => {
+    if (source === 'whatsapp') {
+      setBusy(true)
+      const done = await contactsAPI.importWhatsapp('apply')
+      setBusy(false)
+      if (!done.success || !done.data) {
+        toast.error(done.message || t('contacts.sheet.whatsappFailed'))
+        return
+      }
+      toast.success(done.message || t('contacts.sheet.applied'))
+      onApplied()
+      return
+    }
     if (!csv) return
     setBusy(true)
     const res = await contactsAPI.importSheet(csv, 'apply')
@@ -570,7 +604,58 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="import-sheet-title">
       <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6" data-testid="import-sheet">
-        <h2 id="import-sheet-title" className="section-heading mb-1">{t('contacts.sheet.importTitle')}</h2>
+        <h2 id="import-sheet-title" className="section-heading mb-1">{t(source === 'whatsapp' ? 'contacts.sheet.whatsappTitle' : 'contacts.sheet.importTitle')}</h2>
+        <div className="tab-rail mb-4" role="tablist">
+          {(['sheet', 'whatsapp'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={source === id}
+              data-active={source === id}
+              className="tab-button"
+              data-testid={`import-source-${id}`}
+              onClick={() => switchSource(id)}
+            >
+              {t(id === 'sheet' ? 'contacts.sheet.sourceSheet' : 'contacts.sheet.sourceWhatsapp')}
+            </button>
+          ))}
+        </div>
+
+        {source === 'whatsapp' ? (
+          <>
+            <p className="section-description mb-4">{t('contacts.sheet.whatsappHint')}</p>
+            <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void readBook()} data-testid="import-whatsapp-load">
+              {t('contacts.sheet.whatsappLoad')}
+            </button>
+            {busy && <p className="mt-3 text-sm text-muted-foreground" role="status">{t('contacts.sheet.whatsappReading')}</p>}
+            {book && (
+              <div className="mt-5 space-y-3 text-sm" data-testid="import-whatsapp-summary">
+                <p className="font-semibold">{t('contacts.sheet.whatsappSummary', {
+                  total: book.total,
+                  creates: book.creates,
+                  existing: book.existing,
+                  duplicated: book.duplicated,
+                  invalid: book.invalid
+                })}</p>
+                {book.truncated && <p className="text-muted-foreground">{t('contacts.sheet.whatsappTruncated', { max: book.maxCreates })}</p>}
+                {book.rows.length === 0 ? (
+                  <p className="text-muted-foreground">{t('contacts.sheet.whatsappEmpty')}</p>
+                ) : (
+                  <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border p-3">
+                    {book.rows.map((row) => (
+                      <li key={row.phone}>
+                        <span className="modern-badge-info">{t('contacts.sheet.create')}</span> {row.name}{' '}
+                        <span className="font-mono text-xs text-muted-foreground">{row.phone}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
         <p className="section-description mb-5">{t('contacts.sheet.importHint')}</p>
 
         <label className="field-label" htmlFor="import-sheet-file">{t('contacts.sheet.file')}</label>
@@ -618,13 +703,15 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
             )}
           </div>
         )}
+          </>
+        )}
 
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
           <button
             type="button"
             className="modern-button"
-            disabled={busy || !preview || preview.updates + preview.creates === 0}
+            disabled={busy || (source === 'whatsapp' ? !book || book.creates === 0 : !preview || preview.updates + preview.creates === 0)}
             onClick={() => void apply()}
           >
             {t('contacts.sheet.apply')}

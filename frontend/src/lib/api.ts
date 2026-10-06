@@ -3150,6 +3150,19 @@ export interface ContactImportResult {
   created?: number
 }
 
+/** What importing the connected WhatsApp's phone book did — or, in a preview, would do. */
+export interface ContactWhatsappImportResult {
+  total: number
+  creates: number
+  existing: number
+  invalid: number
+  duplicated: number
+  truncated: boolean
+  maxCreates: number
+  rows: { name: string; phone: string }[]
+  created?: number
+}
+
 export const contactsAPI = {
   get: (key: string) =>
     apiClient.get<ContactProfile>(`/contacts/${encodeURIComponent(key)}`),
@@ -3187,6 +3200,10 @@ export const contactsAPI = {
   /** `preview` says what the sheet would change; `apply` changes it. */
   importSheet: (csv: string, mode: 'preview' | 'apply') =>
     apiClient.postText<ContactImportResult>(`/contacts/import?mode=${mode}`, csv),
+
+  /** The phone book of the connected WhatsApp: `preview` lists who is new; `apply` creates them. */
+  importWhatsapp: (mode: 'preview' | 'apply') =>
+    apiClient.post<ContactWhatsappImportResult>(`/contacts/import/whatsapp?mode=${mode}`, {}),
 
   /** Open invoices of each contract, asked of the SGP now. */
   invoices: (key: string) =>

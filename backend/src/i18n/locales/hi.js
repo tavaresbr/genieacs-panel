@@ -1036,6 +1036,8 @@ export default {
   'contacts.import.badHeader': 'पहली पंक्ति में निर्यात के कॉलम होने चाहिए (Chave, Contrato, CPF/CNPJ या Nome)',
   'contacts.import.rowNotFound': 'कुंजी या अनुबंध नहीं मिला',
   'contacts.import.rowNoName': 'नया ग्राहक बिना नाम के',
+  'contacts.import.whatsappPreviewed': 'WhatsApp संपर्कों का पूर्वावलोकन तैयार है',
+  'contacts.import.whatsappApplied': 'WhatsApp संपर्क आयात हुए: {created} बनाए गए',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid कॉन्फ़िगरेशन लोड हुआ',

@@ -1036,6 +1036,8 @@ export default {
   'contacts.import.badHeader': '第一行需要导出时的列（Chave、Contrato、CPF/CNPJ 或 Nome）',
   'contacts.import.rowNotFound': '未找到键或合同',
   'contacts.import.rowNoName': '新客户没有姓名',
+  'contacts.import.whatsappPreviewed': 'WhatsApp 联系人预览已就绪',
+  'contacts.import.whatsappApplied': '已导入 WhatsApp 联系人：创建 {created} 个',
 
   // TeiaH Valid
   'teiah.configLoaded': '已加载 TeiaH Valid 配置',

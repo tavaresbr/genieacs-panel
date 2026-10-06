@@ -1039,6 +1039,8 @@ export default {
   'contacts.import.badHeader': '첫 줄에 내보내기 열(Chave, Contrato, CPF/CNPJ 또는 Nome)이 있어야 합니다',
   'contacts.import.rowNotFound': '키 또는 계약을 찾을 수 없습니다',
   'contacts.import.rowNoName': '이름 없는 새 고객',
+  'contacts.import.whatsappPreviewed': 'WhatsApp 연락처 미리보기가 준비되었습니다',
+  'contacts.import.whatsappApplied': 'WhatsApp 연락처를 가져왔습니다: {created}건 생성',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid 설정을 불러왔습니다',
