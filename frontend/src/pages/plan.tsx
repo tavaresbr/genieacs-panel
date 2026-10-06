@@ -293,7 +293,7 @@ export default function PlanPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
             <section className="modern-card p-5 sm:p-6">
               <h2 className="section-heading">{t('platform.subscription.plan')}</h2>
-              <p className="mt-1 break-words text-2xl font-semibold text-foreground">{subscription.plan?.name ?? '—'}</p>
+              <p className="mt-1 wrap-break-word text-2xl font-semibold text-foreground">{subscription.plan?.name ?? '—'}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                 <span className={badgeClass(subscription.status)}>
                   {t(STATUS_KEYS[subscription.status] ?? 'platform.subscription.suspended')}
@@ -428,7 +428,7 @@ export default function PlanPage() {
             <div className="flex min-w-0 gap-3">
               <Icon name="info" size={18} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
               <div className="min-w-0 text-sm">
-                <p className="break-words font-medium text-foreground">
+                <p className="wrap-break-word font-medium text-foreground">
                   {t('plan.pending.title', { plan: pendente.name, date: formatDate(pendente.effectiveAt) ?? '—' })}
                 </p>
                 <p className="mt-1 text-muted-foreground">{t('plan.pending.hint')}</p>
@@ -499,7 +499,7 @@ export default function PlanPage() {
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="min-w-0 break-words font-semibold text-foreground">{plan.name}</h3>
+                        <h3 className="min-w-0 wrap-break-word font-semibold text-foreground">{plan.name}</h3>
                         {plan.current && <span className="modern-badge-success">{t('plan.options.current')}</span>}
                         {!plan.current && plan.id === pendente?.id && (
                           <span className="modern-badge-info">{t('plan.options.scheduled')}</span>
@@ -558,7 +558,7 @@ export default function PlanPage() {
         {/* `tabIndex` para o "pagar agora" poder levar o foco até aqui quando a
             cobrança é recusada por falta de CNPJ ou razão social. */}
         {data && (
-          <div ref={cadastroRef} tabIndex={-1} className="mt-6 scroll-mt-4 outline-none">
+          <div ref={cadastroRef} tabIndex={-1} className="mt-6 scroll-mt-4 outline-hidden">
             <BillingProfile
               billing={data.billing}
               onSaved={(billing) => setData((atual) => (atual ? { ...atual, billing } : atual))}

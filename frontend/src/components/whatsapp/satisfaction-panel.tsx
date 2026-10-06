@@ -158,7 +158,7 @@ export function SatisfactionPanel() {
                         {[item.agent, item.answeredAt ? formatDateTime(item.answeredAt) : null].filter(Boolean).join(' · ')}
                       </span>
                     </div>
-                    <p className={`mt-2 whitespace-pre-wrap [overflow-wrap:anywhere] ${item.comment ? '' : 'text-muted-foreground'}`}>
+                    <p className={`mt-2 whitespace-pre-wrap wrap-anywhere ${item.comment ? '' : 'text-muted-foreground'}`}>
                       {item.comment ?? t('whatsapp.satisfaction.noComment')}
                     </p>
                   </li>

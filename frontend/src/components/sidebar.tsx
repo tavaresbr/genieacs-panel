@@ -100,7 +100,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[1200] flex h-16 items-center justify-between border-b border-border bg-card pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-1200 flex h-16 items-center justify-between border-b border-border bg-card pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:hidden">
         <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label={t('sidebar.operationsAria')}>
           <BrandMark className="size-8 shrink-0" />
           <div className="min-w-0">
@@ -120,7 +120,7 @@ export default function Sidebar() {
       </header>
 
       {isMobileOpen && (
-        <div className="fixed inset-0 z-[2000] lg:hidden" role="dialog" aria-modal="true" aria-label={t('sidebar.mainNavigation')}>
+        <div className="fixed inset-0 z-2000 lg:hidden" role="dialog" aria-modal="true" aria-label={t('sidebar.mainNavigation')}>
           <button
             type="button"
             className="absolute inset-0 bg-black/55"
@@ -134,8 +134,8 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`sticky top-0 z-[1000] hidden h-screen max-h-screen shrink-0 self-start flex-col overflow-visible bg-[#18211d] text-[#f4f3ed] transition-[width] duration-200 lg:flex ${
-          isCollapsed ? 'w-[4.75rem]' : 'w-[16.5rem]'
+        className={`sticky top-0 z-1000 hidden h-screen max-h-screen shrink-0 self-start flex-col overflow-visible bg-[#18211d] text-[#f4f3ed] transition-[width] duration-200 lg:flex ${
+          isCollapsed ? 'w-19' : 'w-66'
         }`}
       >
         <SidebarContent isCollapsed={isCollapsed} isActive={isActive} />
@@ -143,7 +143,7 @@ export default function Sidebar() {
           type="button"
           onClick={() => setIsCollapsed((value) => !value)}
           aria-label={isCollapsed ? t('sidebar.expandNavigation') : t('sidebar.collapseNavigation')}
-          className="absolute -end-3 top-[5.1rem] z-10 flex size-7 items-center justify-center rounded-full border border-[#3a4942] bg-[#202c27] text-[#cad3ce] shadow-sm transition-colors hover:bg-[#2b3933] hover:text-white"
+          className="absolute -inset-e-3 top-[5.1rem] z-10 flex size-7 items-center justify-center rounded-full border border-[#3a4942] bg-[#202c27] text-[#cad3ce] shadow-xs transition-colors hover:bg-[#2b3933] hover:text-white"
         >
           <Icon name={isCollapsed ? 'chevron-right' : 'chevron-left'} size={15} />
         </button>
@@ -213,7 +213,7 @@ function SidebarContent({
           Na tela da plataforma isso é a PLATAFORMA, e o mesmo texto que o
           console usa no endereço dele (`console.header`) — dois nomes para a
           mesma coisa seriam duas coisas para quem lê. */}
-      <div className={`flex h-[4.75rem] items-center border-b border-white/10 ${isCollapsed ? 'justify-center px-2' : 'px-4'}`}>
+      <div className={`flex h-19 items-center border-b border-white/10 ${isCollapsed ? 'justify-center px-2' : 'px-4'}`}>
         <Link
           to={naPlataforma ? '/platform' : '/dashboard'}
           onClick={closeMobile}

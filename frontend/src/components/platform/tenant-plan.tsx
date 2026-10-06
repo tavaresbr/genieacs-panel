@@ -228,7 +228,7 @@ export function BillingExemptControl({
             <span className="modern-badge-info ml-1">{exemptUntilLabel(subscription, t)}</span>
           )}
           {subscription?.billingExemptReason && (
-            <p className="text-muted-foreground [overflow-wrap:anywhere]">{subscription.billingExemptReason}</p>
+            <p className="text-muted-foreground wrap-anywhere">{subscription.billingExemptReason}</p>
           )}
           {!editingUntil ? (
             <button

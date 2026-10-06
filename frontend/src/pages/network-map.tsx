@@ -124,10 +124,10 @@ const MAINTENANCE_NODE_TYPES = new Set(['olt', 'odc', 'odp', 'htb'])
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useTranslation()
   return (
-    <div className="modal-backdrop z-[2200] bg-black/65" role="dialog" aria-modal="true">
+    <div className="modal-backdrop z-2200 bg-black/65" role="dialog" aria-modal="true">
       <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 className="section-heading min-w-0 break-words">{title}</h2>
+          <h2 className="section-heading min-w-0 wrap-break-word">{title}</h2>
           <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')}>
             <Icon name="x" size={20} />
           </button>
@@ -1009,7 +1009,7 @@ export default function NetworkMap() {
           </div>
         </header>
 
-        <section className="mb-4 grid grid-cols-2 overflow-hidden rounded-[var(--radius)] border border-border bg-card sm:grid-cols-4">
+        <section className="mb-4 grid grid-cols-2 overflow-hidden rounded-(--radius) border border-border bg-card sm:grid-cols-4">
           <div className="border-b border-e border-border p-4 sm:border-b-0"><p className="metric-label">{t('map.metric.nodes')}</p><p className="metric-value">{nodes.length}</p></div>
           <div className="border-b border-border p-4 sm:border-b-0 sm:border-e"><p className="metric-label">{t('map.metric.cables')}</p><p className="metric-value">{edges.length}</p></div>
           <div className="border-e border-border p-4"><p className="metric-label">{t('map.metric.oltOdc')}</p><p className="metric-value">{nodes.filter((n) => n.type === 'olt' || n.type === 'odc').length}</p></div>
@@ -1038,7 +1038,7 @@ export default function NetworkMap() {
         </div>
 
         {(live?.outages ?? []).length > 0 && (
-          <div className="mb-3 rounded-[var(--radius)] border-2 p-3" style={{ borderColor: LIVE_COLORS.offline, background: `${LIVE_COLORS.offline}14` }} role="alert">
+          <div className="mb-3 rounded-(--radius) border-2 p-3" style={{ borderColor: LIVE_COLORS.offline, background: `${LIVE_COLORS.offline}14` }} role="alert">
             <p className="flex items-center gap-2 font-semibold" style={{ color: LIVE_COLORS.offline }}>
               <Icon name="warning" size={18} />{t('map.outage.title', { count: live?.outages?.length ?? 0 })}
             </p>
@@ -1057,7 +1057,7 @@ export default function NetworkMap() {
         )}
 
         {weak.length > 0 && (
-          <div className="mb-3 rounded-[var(--radius)] border-2 p-3" style={{ borderColor: LIVE_COLORS.weak, background: `${LIVE_COLORS.weak}14` }}>
+          <div className="mb-3 rounded-(--radius) border-2 p-3" style={{ borderColor: LIVE_COLORS.weak, background: `${LIVE_COLORS.weak}14` }}>
             <button type="button" className="flex w-full items-center gap-2 text-start font-semibold" style={{ color: LIVE_COLORS.weak }}
               aria-expanded={weak.length <= 3 || weakExpanded} onClick={() => setWeakExpanded((value) => !value)}>
               <Icon name="signal" size={18} />{t('map.weak.title', { count: weak.length })}
@@ -1095,7 +1095,7 @@ export default function NetworkMap() {
               <div className="inline-flex rounded-md border border-border bg-muted p-1">
                 {([['osm', 'OpenStreetMap'], ['google', 'Google Maps']] as const).map(([value, label]) => (
                   <button key={value} type="button" onClick={() => { setBasemap(value); localStorage.setItem('networkMapBasemap', value) }}
-                    className={`min-h-10 rounded px-3 text-xs font-semibold sm:min-h-9 ${basemap === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+                    className={`min-h-10 rounded px-3 text-xs font-semibold sm:min-h-9 ${basemap === value ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
                     {label}
                   </button>
                 ))}
@@ -1106,10 +1106,10 @@ export default function NetworkMap() {
                 28rem fixos o mapa engolia a tela deitada, e arrastar nele não rola
                 a página. `isolate` prende os z-index do Leaflet (até 1000) aqui
                 dentro, abaixo do cabeçalho fixo e da gaveta. */}
-            <div className="relative h-[60dvh] min-h-[18rem] max-h-[54rem] sm:h-[62vh] sm:min-h-[28rem]">
+            <div className="relative h-[60dvh] min-h-72 max-h-216 sm:h-[62vh] sm:min-h-112">
               <div ref={mapContainerRef} className="isolate h-full w-full" />
               {foundPlace && (
-                <div className="absolute bottom-3 start-3 z-[500] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs shadow-sm sm:max-w-md">
+                <div className="absolute bottom-3 inset-s-3 z-500 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs shadow-xs sm:max-w-md">
                   <Icon name="pin" size={15} className="shrink-0 text-amber-500" />
                   <span className="min-w-0 flex-1 truncate" title={foundPlace.label}>{foundPlace.label}</span>
                   {canEditMap && (
@@ -1134,7 +1134,7 @@ export default function NetworkMap() {
                     <button type="button" className="flex w-full items-start gap-3 px-4 py-3 text-start hover:bg-[hsl(var(--surface-subtle))]" onClick={() => setSelectedNode(node)}>
                       <Icon name={nodeIconName(node.type)} size={18} className="mt-0.5 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1">
-                        <span className="block break-words font-semibold">{node.name}</span>
+                        <span className="block wrap-break-word font-semibold">{node.name}</span>
                         <span className="mt-0.5 block break-all font-mono text-xs text-muted-foreground">{node.node_id} · {nodeTypeLabel(node.type)}</span>
                         <span className="mt-0.5 block font-mono text-xs text-muted-foreground">{node.latitude.toFixed(6)}, {node.longitude.toFixed(6)}</span>
                       </span>
@@ -1209,7 +1209,7 @@ export default function NetworkMap() {
           )}
           {mapView === 'outages' && <OutageHistoryView onSelectBox={(nodeId) => focusBox(nodeId)} />}
           {loading && (
-            <div className="pointer-events-none absolute end-3 top-3 z-[500] flex items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold shadow-sm">
+            <div className="pointer-events-none absolute inset-e-3 top-3 z-500 flex items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold shadow-xs">
               <Icon name="refresh" size={15} className="animate-spin" />
               {t('map.loadingTopology')}
             </div>
@@ -1242,7 +1242,7 @@ export default function NetworkMap() {
                   </div>
                 )
               })()}
-              {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{selectedNode.notes}</dd></div>}
+              {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap wrap-break-word">{selectedNode.notes}</dd></div>}
             </dl>
             {outageByBox.get(selectedNode.node_id) && (
               <p className="mt-4 flex items-start gap-2 rounded-md border-2 p-3 text-sm font-semibold" style={{ borderColor: LIVE_COLORS.offline, color: LIVE_COLORS.offline }} role="alert">
@@ -1296,7 +1296,7 @@ export default function NetworkMap() {
               <div><dt className="metric-label">{t('map.edge.fiberType')}</dt><dd className="mt-1">{t(getFiberMeta(selectedEdge.fiber_type).labelKey)}</dd></div>
               <div><dt className="metric-label">{t('map.table.distance')}</dt><dd className="mt-1">{selectedEdge.distance == null ? '—' : `${selectedEdge.distance} m`}</dd></div>
               <div><dt className="metric-label">{t('map.edge.waypoints')}</dt><dd className="mt-1">{selectedEdge.waypoints?.length || 0}</dd></div>
-              {selectedEdge.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{selectedEdge.notes}</dd></div>}
+              {selectedEdge.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap wrap-break-word">{selectedEdge.notes}</dd></div>}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               {canEditMap && <button className="modern-button-secondary" onClick={() => { setEditingEdge(true); setEdgeEditor({ ...selectedEdge }); setSelectedEdge(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}

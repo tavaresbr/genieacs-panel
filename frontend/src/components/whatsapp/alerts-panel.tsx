@@ -452,7 +452,7 @@ export function AlertsPanel() {
                 min={INTERVAL_MIN_S}
                 max={INTERVAL_MAX_S}
                 step={30}
-                className="modern-input sm:max-w-[12rem]"
+                className="modern-input sm:max-w-48"
                 value={form.intervalSeconds}
                 onChange={(event) => setForm((current) => (current
                   ? { ...current, intervalSeconds: event.target.value }

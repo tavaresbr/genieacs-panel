@@ -43,7 +43,7 @@ export function FeasibilityDialog<T extends OccupancyNode>({ nodes, edges, cente
   const freeText = (free: number | null) => (free === null ? t('map.feasibility.unknownPorts') : t('map.feasibility.freePorts', { count: free }))
 
   return (
-    <div className="modal-backdrop z-[2300] bg-black/65" role="dialog" aria-modal="true">
+    <div className="modal-backdrop z-2300 bg-black/65" role="dialog" aria-modal="true">
       <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6">
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="section-heading">{t('map.feasibility.title')}</h2>

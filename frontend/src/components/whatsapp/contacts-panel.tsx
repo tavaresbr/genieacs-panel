@@ -226,12 +226,12 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const nameOf = (contact: WhatsAppContact) => (canOpenProfile ? (
     <Link
       to={`/contacts/${encodeURIComponent(contact.key)}`}
-      className="block break-words font-semibold hover:text-primary hover:underline"
+      className="block wrap-break-word font-semibold hover:text-primary hover:underline"
     >
       {contact.clientName || '—'}
     </Link>
   ) : (
-    <span className="block break-words font-semibold">{contact.clientName || '—'}</span>
+    <span className="block wrap-break-word font-semibold">{contact.clientName || '—'}</span>
   ))
 
   const tagsOf = (contact: WhatsAppContact) => (

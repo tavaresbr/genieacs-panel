@@ -747,7 +747,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
           // página, nesta aba, troca o respiro de baixo pela área segura do
           // iPhone (ver `WhatsAppPage`), e a conta desconta o mesmo.
           <section
-            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[22rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-6.875rem)] lg:min-h-[32rem] ${
+            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-88 grid-cols-1 overflow-hidden lg:h-[calc(100vh-6.875rem)] lg:min-h-128 ${
               // Uma classe de colunas por vez: duas `lg:grid-cols-*` juntas
               // dependem da ordem do CSS gerado, e o painel caía numa segunda linha.
               // Com o Módulo SGP aberto, o painel é sempre uma coluna (nunca por
@@ -827,7 +827,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   ))}
                   {tagOptions.length > 0 && (
                     <select
-                      className="h-7 max-w-[10rem] rounded-full border border-border bg-background px-2 text-xs text-foreground"
+                      className="h-7 max-w-40 rounded-full border border-border bg-background px-2 text-xs text-foreground"
                       aria-label={t('whatsapp.tags.filter')}
                       value={tagFilter ?? ''}
                       onChange={(event) => setTagFilter(event.target.value ? Number(event.target.value) : null)}
@@ -923,13 +923,13 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               // Fundo escuro só enquanto é gaveta: tocar fora fecha, como
               // qualquer gaveta de celular.
               <div
-                className="fixed inset-0 z-[1499] bg-black/40 lg:hidden"
+                className="fixed inset-0 z-1499 bg-black/40 lg:hidden"
                 aria-hidden="true"
                 onClick={toggleSgpPanel}
               />
             )}
             {showSgpPanel && conversation && (
-              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border bg-card pr-[env(safe-area-inset-right)] shadow-xl lg:static lg:pr-0 lg:z-auto lg:h-full lg:min-h-0 lg:w-auto lg:shadow-none">
+              <div className="fixed inset-y-0 inset-e-0 z-1500 w-[min(22rem,100vw)] border-s border-border bg-card pr-[env(safe-area-inset-right)] shadow-xl lg:static lg:pr-0 lg:z-auto lg:h-full lg:min-h-0 lg:w-auto lg:shadow-none">
                 <SubscriberPanel
                   conversationId={conversation.id}
                   boundContract={conversation.contract}

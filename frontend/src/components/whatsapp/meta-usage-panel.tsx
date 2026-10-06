@@ -159,7 +159,7 @@ export function MetaUsagePanel() {
 
         {report && !vazio && (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[32rem] text-left text-sm">
+            <table className="w-full min-w-lg text-left text-sm">
               <thead>
                 <tr className="text-muted-foreground">
                   <th className="py-1 font-medium">{t('whatsapp.metaUsage.month')}</th>
@@ -221,7 +221,7 @@ export function MetaUsagePanel() {
                 <tbody>
                   {report.templates.slice(0, TOP).map((m) => (
                     <tr key={`${m.name}|${m.language}`} className="border-t border-border">
-                      <td className="py-1.5 font-mono text-xs [overflow-wrap:anywhere]">{m.name || '—'}</td>
+                      <td className="py-1.5 font-mono text-xs wrap-anywhere">{m.name || '—'}</td>
                       <td className="py-1.5 text-muted-foreground">{m.language || '—'}</td>
                       <td className="py-1.5">{nomeCategoria(m.category)}</td>
                       <td className="py-1.5 text-right tabular-nums font-medium">{inteiro.format(m.count)}</td>

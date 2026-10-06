@@ -171,7 +171,7 @@ export default function ContactDetailPage() {
             <Link to="/contacts" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
               <Icon name="back" size={14} /> {t('contacts.profile.back')}
             </Link>
-            <h1 className="page-title break-words">{fields.name.value || '—'}</h1>
+            <h1 className="page-title wrap-break-word">{fields.name.value || '—'}</h1>
             <p className="page-description flex flex-wrap items-center gap-2">
               {profile.source === 'panel'
                 ? <span className="modern-badge-info">{t('contacts.profile.sourcePanel')}</span>
@@ -278,7 +278,7 @@ export default function ContactDetailPage() {
           </Card>
 
           <Card title={t('contacts.profile.notes')}>
-            <p className="whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{profile.notes || <span className="text-muted-foreground">—</span>}</p>
+            <p className="whitespace-pre-wrap wrap-break-word text-sm wrap-anywhere">{profile.notes || <span className="text-muted-foreground">—</span>}</p>
           </Card>
         </div>
 
@@ -330,7 +330,7 @@ export default function ContactDetailPage() {
                       <span>{contract.status || '—'}</span>
                     </div>
                     {contract.statusReason && <p className="text-xs text-muted-foreground">{contract.statusReason}</p>}
-                    <p className="break-words">{contract.plan || '—'}</p>
+                    <p className="wrap-break-word">{contract.plan || '—'}</p>
                     <p className="text-xs text-muted-foreground">
                       {t('contacts.profile.dueDay')}: {contract.dueDay || '—'} · {t('contacts.profile.since')}: {day(contract.createdAt)}
                     </p>
@@ -377,7 +377,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="border-b border-border pb-3">
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-1 break-words text-sm [overflow-wrap:anywhere]">{children || <span className="text-muted-foreground">—</span>}</dd>
+      <dd className="mt-1 wrap-break-word text-sm wrap-anywhere">{children || <span className="text-muted-foreground">—</span>}</dd>
     </div>
   )
 }

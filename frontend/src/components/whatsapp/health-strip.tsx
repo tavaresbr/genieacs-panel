@@ -448,7 +448,7 @@ export function HealthBell({ actions }: { actions?: (available: HealthActions) =
         <Icon name="bell" className="h-5 w-5" />
         {(badge.unreadable || badge.count > 0) && (
           <span
-            className={`absolute -end-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[0.6875rem] font-bold leading-none tabular-nums ring-2 ring-background ${badgeClass}`}
+            className={`absolute -inset-e-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[0.6875rem] font-bold leading-none tabular-nums ring-2 ring-background ${badgeClass}`}
             aria-hidden="true"
           >
             {badge.unreadable ? '!' : badge.count > 99 ? '99+' : formatNumber(badge.count)}
@@ -466,7 +466,7 @@ export function HealthBell({ actions }: { actions?: (available: HealthActions) =
           role="dialog"
           aria-label={t('whatsapp.health.title')}
           data-testid="health-panel"
-          className="absolute end-0 top-full z-40 mt-2 w-[24rem] max-w-[calc(100vw-2rem)] rounded-[var(--radius)] border border-border bg-card p-3 text-card-foreground shadow-lg"
+          className="absolute inset-e-0 top-full z-40 mt-2 w-[24rem] max-w-[calc(100vw-2rem)] rounded-(--radius) border border-border bg-card p-3 text-card-foreground shadow-lg"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -506,7 +506,7 @@ export function HealthBell({ actions }: { actions?: (available: HealthActions) =
                   className={`flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs leading-5 ${TONE_CLASS[note.tone]}`}
                 >
                   <Icon name={TONE_ICON[note.tone]} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 break-words tabular-nums">{note.text}</span>
+                  <span className="min-w-0 wrap-break-word tabular-nums">{note.text}</span>
                 </li>
               ))}
             </ul>

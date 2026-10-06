@@ -102,7 +102,7 @@ export function PlatformAudit() {
                 <code className="break-all text-xs font-semibold">{entry.action}</code>
                 <span className="text-xs text-muted-foreground">{quando(entry.at)}</span>
               </div>
-              <p className="mt-1 break-words">
+              <p className="mt-1 wrap-break-word">
                 {entry.actor.username || '—'}
                 {' · '}
                 {entry.tenant.name || entry.tenant.slug || '—'}
@@ -117,7 +117,7 @@ export function PlatformAudit() {
           ))}
         </ul>
         <div className="desktop-table mt-4 overflow-x-auto">
-          <table className="w-full min-w-[44rem] text-sm">
+          <table className="w-full min-w-176 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="py-2 pe-3 font-medium">{t('platform.audit.when')}</th>

@@ -326,7 +326,7 @@ export default function DevicesPage() {
       <div className="page-shell">
         <div className="page-frame">
           <div className="mb-5 h-24 animate-pulse rounded-md bg-muted" />
-          <div className="modern-card h-[28rem] animate-pulse bg-muted" aria-label={t('devices.loadingAria')} />
+          <div className="modern-card h-112 animate-pulse bg-muted" aria-label={t('devices.loadingAria')} />
         </div>
       </div>
     )
@@ -496,11 +496,11 @@ export default function DevicesPage() {
           </section>
         ) : (
           <>
-            <section className={`mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 sm:grid-cols-2 lg:items-end ${sgpAvailable ? 'lg:grid-cols-[minmax(14rem,1fr)_11rem_12rem_13rem_auto]' : 'lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]'}`}>
+            <section className={`mb-4 grid gap-3 rounded-(--radius) border border-border bg-card p-3 sm:grid-cols-2 lg:items-end ${sgpAvailable ? 'lg:grid-cols-[minmax(14rem,1fr)_11rem_12rem_13rem_auto]' : 'lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]'}`}>
               <div className="sm:col-span-2 lg:col-span-1">
                 <label htmlFor="device-search" className="field-label">{t('devices.filter.searchLabel')}</label>
                 <div className="relative">
-                  <Icon name="search" size={18} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Icon name="search" size={18} className="pointer-events-none absolute inset-s-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="device-search"
                     type="search"
@@ -528,7 +528,7 @@ export default function DevicesPage() {
                     <option value="offline">{t('devices.filter.offlineOnly')}</option>
                     <option value="stale">{t('devices.filter.staleOnly')}</option>
                   </select>
-                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute inset-e-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
               </div>
               {/* Os recortes que o painel aponta. Cada opção daqui é um número
@@ -553,7 +553,7 @@ export default function DevicesPage() {
                     <option value="hot">{t('devices.filter.focusHot')}</option>
                     <option value="many-clients">{t('devices.filter.focusManyClients')}</option>
                   </select>
-                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute inset-e-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
               </div>
               {sgpAvailable && (
@@ -567,7 +567,7 @@ export default function DevicesPage() {
                       <option value="cancelled">{t('devices.sgp.filterCancelled')}</option>
                       <option value="unlinked">{t('devices.sgp.filterUnlinked')}</option>
                     </select>
-                    <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Icon name="chevron-down" size={17} className="pointer-events-none absolute inset-e-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </div>
               )}
@@ -657,7 +657,7 @@ export default function DevicesPage() {
                                 {/* Entre 768 e 1023 px as colunas escondidas viram segunda linha. */}
                                 <span className="mt-1 block whitespace-nowrap text-[0.68rem] text-muted-foreground lg:hidden">{formatDate(device._lastInform)}</span>
                               </td>
-                              <td className="max-w-[12rem] lg:max-w-[18rem]">
+                              <td className="max-w-48 lg:max-w-[18rem]">
                                 <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="block break-all font-mono text-sm font-semibold text-primary hover:underline lg:truncate lg:break-normal">
                                   {device.SerialNumber || device._id}
                                 </Link>
@@ -668,12 +668,12 @@ export default function DevicesPage() {
                                 <span className="block font-semibold">{device.brand}</span>
                                 <span className="mt-0.5 block text-xs text-muted-foreground">{device.productclass || t('devices.modelNotReported')}</span>
                               </td>
-                              <td className="max-w-[12rem] break-all font-mono text-xs lg:max-w-none lg:break-normal">
+                              <td className="max-w-48 break-all font-mono text-xs lg:max-w-none lg:break-normal">
                                 {device.pppoe || t('devices.notReported')}
                                 <span className="mt-0.5 block font-semibold text-muted-foreground lg:hidden">{device.customerId || t('devices.notGenerated')}</span>
                               </td>
                               <td className="hidden font-mono text-xs font-semibold lg:table-cell">{device.customerId || t('devices.notGenerated')}</td>
-                              {sgpAvailable && <td className="hidden max-w-[14rem] lg:table-cell">{renderSgpCell(device)}</td>}
+                              {sgpAvailable && <td className="hidden max-w-56 lg:table-cell">{renderSgpCell(device)}</td>}
                               <td>
                                 <span className={`font-mono text-sm font-semibold ${signalInfo.color}`}>
                                   {device.rxpower !== null && device.rxpower !== undefined ? `${device.rxpower} dBm` : t('common.na')}

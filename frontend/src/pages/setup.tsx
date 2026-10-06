@@ -85,7 +85,7 @@ export default function Setup() {
             <div className="flex min-w-0 items-center gap-3 lg:hidden">
               <BrandMark className="size-10 shrink-0" title={name} />
               <div className="min-w-0">
-                <div className="font-bold [overflow-wrap:anywhere]">{name}</div>
+                <div className="font-bold wrap-anywhere">{name}</div>
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('setup.firstRun')}</div>
               </div>
             </div>

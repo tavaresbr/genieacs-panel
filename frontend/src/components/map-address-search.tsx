@@ -69,7 +69,7 @@ export function MapAddressSearch({ onPick, initialQuery = '', className }: {
         </button>
       </form>
       {(error || results) && (
-        <div className="absolute inset-x-0 top-full z-[1100] mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
+        <div className="absolute inset-x-0 top-full z-1100 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
           {error && <p className="px-3 py-2 text-xs text-destructive">{error}</p>}
           {results && !results.length && <p className="px-3 py-2 text-xs text-muted-foreground">{t('map.search.empty')}</p>}
           {results?.map((place) => (
@@ -80,7 +80,7 @@ export function MapAddressSearch({ onPick, initialQuery = '', className }: {
               className="flex min-h-11 w-full items-start gap-2 border-t border-border px-3 py-2 text-start sm:min-h-0 text-xs first:border-t-0 hover:bg-muted"
             >
               <Icon name="pin" size={14} className="mt-0.5 shrink-0" />
-              <span className="min-w-0 [overflow-wrap:anywhere]">{place.label}</span>
+              <span className="min-w-0 wrap-anywhere">{place.label}</span>
             </button>
           ))}
         </div>

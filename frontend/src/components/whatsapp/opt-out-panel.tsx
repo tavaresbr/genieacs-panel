@@ -367,7 +367,7 @@ export function OptOutPanel() {
                   </div>
                 )}
                 {entry.reasonText && (
-                  <p className="mt-1.5 break-words text-sm leading-5 text-muted-foreground">{entry.reasonText}</p>
+                  <p className="mt-1.5 wrap-break-word text-sm leading-5 text-muted-foreground">{entry.reasonText}</p>
                 )}
                 {entry.createdAt && (
                   <p className="mt-1.5 font-mono text-[0.68rem] tabular-nums text-muted-foreground">

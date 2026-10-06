@@ -24,9 +24,9 @@ function Detalhe({ detail }: { detail: Record<string, unknown> | null }) {
   return (
     <div className="space-y-0.5">
       {visiveis.map(([chave, valor]) => (
-        <div key={chave} className="break-words">
+        <div key={chave} className="wrap-break-word">
           <span className="text-muted-foreground">{chave}: </span>
-          <span className="text-foreground [overflow-wrap:anywhere]">
+          <span className="text-foreground wrap-anywhere">
             {valor === null || valor === undefined
               ? '—'
               : typeof valor === 'object'
@@ -165,7 +165,7 @@ export default function AuditPage() {
         ) : (
           <div className="modern-card p-4 sm:p-5">
             <div className="desktop-table overflow-x-auto">
-              <table className="w-full min-w-[52rem] text-sm">
+              <table className="w-full min-w-208 text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="py-2 pe-3 font-medium">{t('audit.column.when')}</th>
@@ -205,12 +205,12 @@ export default function AuditPage() {
               {entries.map((entry) => (
                 <li key={entry.id} className="space-y-1.5 py-3 text-sm first:pt-0">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <span className="min-w-0 font-medium [overflow-wrap:anywhere]"><Acao action={entry.action} /></span>
+                    <span className="min-w-0 font-medium wrap-anywhere"><Acao action={entry.action} /></span>
                     <span className="text-xs text-muted-foreground">{formatDateTime(entry.at)}</span>
                   </div>
-                  <div className="text-xs [overflow-wrap:anywhere]"><Ator actor={entry.actor} /></div>
+                  <div className="text-xs wrap-anywhere"><Ator actor={entry.actor} /></div>
                   {(entry.subject.type || entry.ip) && (
-                    <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                    <p className="text-xs text-muted-foreground wrap-anywhere">
                       {entry.subject.type && <>{entry.subject.type}{entry.subject.id ? ` #${entry.subject.id}` : ''}</>}
                       {entry.subject.type && entry.ip ? ' · ' : ''}
                       {entry.ip}

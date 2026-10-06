@@ -47,7 +47,7 @@ export function IntegrationsHub({ onOpen, canTeiah, canChatbot }: Props) {
             key={card.tab}
             type="button"
             onClick={() => onOpen(card.tab)}
-            className="modern-card group flex h-full flex-col items-start gap-3 p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            className="modern-card group flex h-full flex-col items-start gap-3 p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary"
           >
             <span className="inline-flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Icon name={card.icon} size={22} />

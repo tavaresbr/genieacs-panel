@@ -156,7 +156,7 @@ export function DeviceDiagnosticsCard({ deviceId }: { deviceId: string }) {
             </button>
           ))}
         </div>
-        <div className="min-w-0 flex-1 basis-full sm:min-w-[14rem] sm:basis-0">
+        <div className="min-w-0 flex-1 basis-full sm:min-w-56 sm:basis-0">
           <label htmlFor="diagnostic-host" className="field-label">{t('detail.diagnostics.host')}</label>
           <input
             id="diagnostic-host"

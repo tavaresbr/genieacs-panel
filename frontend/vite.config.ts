@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
 
@@ -23,7 +24,7 @@ function buildCommit(): string {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   define: {
     __APP_COMMIT__: JSON.stringify(buildCommit()),
   },

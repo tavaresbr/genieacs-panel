@@ -153,7 +153,7 @@ export function AssigneeControl({ conversation, onChange }: {
       <label className="sr-only" htmlFor={`assignee-${conversation.id}`}>{t('whatsapp.assign.agent')}</label>
       <select
         id={`assignee-${conversation.id}`}
-        className="h-8 max-w-[12rem] rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-8 max-w-48 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         value={conversation.assignedUserId ?? ''}
         disabled={saving}
         onFocus={() => void loadAgents()}

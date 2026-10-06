@@ -118,14 +118,14 @@ export function ProvisioningCard({ deviceId }: Props) {
               </span>
             </div>
             {(latest.errorMessage ?? latest.error) && (
-              <p className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+              <p className="mt-2 text-sm text-muted-foreground wrap-anywhere">
                 {latest.errorMessage ?? latest.error}
               </p>
             )}
             {latest.steps.length > 0 && (
               <ul className="mt-3 space-y-1 text-xs">
                 {latest.steps.map((step, index) => (
-                  <li key={`${step.step}-${index}`} className="flex flex-wrap gap-2 [overflow-wrap:anywhere]">
+                  <li key={`${step.step}-${index}`} className="flex flex-wrap gap-2 wrap-anywhere">
                     <span className="font-medium">{step.step}</span>
                     <span className="text-muted-foreground">{step.status}</span>
                     {step.detail && <span className="min-w-0 text-muted-foreground">· {step.detail}</span>}
@@ -148,7 +148,7 @@ export function ProvisioningCard({ deviceId }: Props) {
             </p>
           ) : (
             <>
-              <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+              <p className="mt-1 text-xs text-muted-foreground wrap-anywhere">
                 {t('detail.provisioning.previewSummary', {
                   profile: preview.profile?.name ?? '—',
                   contract: preview.contract?.contract ?? '—',

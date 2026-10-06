@@ -305,7 +305,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
   const attachment = message.attachment && <Attachment message={message} />
 
   const body = message.body
-    ? <p className="whitespace-pre-wrap break-words text-sm leading-6 [overflow-wrap:anywhere]">{message.body}</p>
+    ? <p className="whitespace-pre-wrap wrap-break-word text-sm leading-6 wrap-anywhere">{message.body}</p>
     : !message.attachment
       ? <p className="text-sm italic text-muted-foreground">{t('whatsapp.inbox.attachment')}</p>
       : null
@@ -321,7 +321,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
   if (message.isNote) {
     return (
       <li className="my-1 w-full">
-        <div className="rounded-[var(--radius)] border border-dashed border-[hsl(var(--status-warning))]/60 bg-[hsl(var(--status-warning))]/[0.07] px-3 py-2.5">
+        <div className="rounded-(--radius) border border-dashed border-[hsl(var(--status-warning))]/60 bg-[hsl(var(--status-warning))]/[0.07] px-3 py-2.5">
           <p className="mb-1.5 flex items-center gap-1.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-[hsl(var(--status-warning))]">
             <Icon name="lock" size={12} />
             {t('whatsapp.inbox.note')}
@@ -340,7 +340,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
   return (
     <li className={`flex w-full ${inbound ? 'justify-start' : 'justify-end'}`}>
       <div
-        className={`min-w-0 max-w-[min(38rem,85%)] rounded-[var(--radius)] border px-3 py-2 ${
+        className={`min-w-0 max-w-[min(38rem,85%)] rounded-(--radius) border px-3 py-2 ${
           inbound
             ? accountTinted
               ? 'border-[hsl(var(--wa-account))]/40 bg-[hsl(var(--wa-account))]/[0.07] text-card-foreground'
@@ -388,7 +388,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
         {failed && (
           <div className="mt-2 border-t border-[hsl(var(--status-danger))]/25 pt-2">
             <p
-              className="break-words text-xs leading-5 text-[hsl(var(--status-danger))] [overflow-wrap:anywhere]"
+              className="wrap-break-word text-xs leading-5 text-[hsl(var(--status-danger))] wrap-anywhere"
               title={message.deliveryError || undefined}
             >
               {/* A recusa por janela tem frase própria: o código cru não diz ao

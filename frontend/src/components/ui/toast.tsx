@@ -38,19 +38,19 @@ function genId() {
 
 const typeStyles: Record<ToastType, { base: string; icon: string }> = {
   success: {
-    base: 'border-[hsl(var(--status-success)/.3)] bg-card [background-image:linear-gradient(hsl(var(--status-success)/.08),hsl(var(--status-success)/.08))] text-[hsl(var(--status-success))]',
+    base: 'border-[hsl(var(--status-success)/.3)] bg-card bg-[linear-gradient(hsl(var(--status-success)/.08),hsl(var(--status-success)/.08))] text-[hsl(var(--status-success))]',
     icon: 'check'
   },
   error: {
-    base: 'border-[hsl(var(--status-danger)/.3)] bg-card [background-image:linear-gradient(hsl(var(--status-danger)/.08),hsl(var(--status-danger)/.08))] text-[hsl(var(--status-danger))]',
+    base: 'border-[hsl(var(--status-danger)/.3)] bg-card bg-[linear-gradient(hsl(var(--status-danger)/.08),hsl(var(--status-danger)/.08))] text-[hsl(var(--status-danger))]',
     icon: 'x'
   },
   info: {
-    base: 'border-[hsl(var(--status-info)/.3)] bg-card [background-image:linear-gradient(hsl(var(--status-info)/.08),hsl(var(--status-info)/.08))] text-[hsl(var(--status-info))]',
+    base: 'border-[hsl(var(--status-info)/.3)] bg-card bg-[linear-gradient(hsl(var(--status-info)/.08),hsl(var(--status-info)/.08))] text-[hsl(var(--status-info))]',
     icon: 'info'
   },
   warning: {
-    base: 'border-[hsl(var(--status-warning)/.3)] bg-card [background-image:linear-gradient(hsl(var(--status-warning)/.08),hsl(var(--status-warning)/.08))] text-[hsl(var(--status-warning))]',
+    base: 'border-[hsl(var(--status-warning)/.3)] bg-card bg-[linear-gradient(hsl(var(--status-warning)/.08),hsl(var(--status-warning)/.08))] text-[hsl(var(--status-warning))]',
     icon: 'warning'
   }
 }
@@ -161,7 +161,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {/* Toast Container */ }
-      <div className="pointer-events-none fixed start-4 end-4 top-20 z-[2200] flex flex-col gap-2 sm:start-auto sm:end-5 sm:w-[24rem]">
+      <div className="pointer-events-none fixed inset-s-4 inset-e-4 top-20 z-2200 flex flex-col gap-2 sm:inset-s-auto sm:inset-e-5 sm:w-[24rem]">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -171,7 +171,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             aria-atomic="true"
           >
             <Icon name={typeStyles[t.type].icon} size={19} className="mt-0.5 shrink-0" />
-            <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+            <div className="min-w-0 flex-1 wrap-anywhere">
               {t.title ? (
                 <div className="font-semibold mb-0.5">{t.title}</div>
               ) : null}

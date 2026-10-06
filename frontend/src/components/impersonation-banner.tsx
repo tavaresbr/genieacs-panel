@@ -34,7 +34,7 @@ export function ImpersonationBanner() {
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-destructive/40 bg-background bg-gradient-to-r from-destructive/10 to-destructive/10 px-4 py-2 text-xs text-destructive [overflow-wrap:anywhere] sm:text-sm"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-destructive/40 bg-background bg-linear-to-r from-destructive/10 to-destructive/10 px-4 py-2 text-xs text-destructive wrap-anywhere sm:text-sm"
     >
       <Icon name="warning" size={17} className="shrink-0" />
       <span className="font-semibold">{t('impersonate.bannerTitle')}</span>

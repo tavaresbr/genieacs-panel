@@ -1524,7 +1524,7 @@ export default function Settings() {
           <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
         ))}
       </select>
-      <p className="field-hint max-w-[15rem]">
+      <p className="field-hint max-w-60">
         {lockedByOwner
           ? t('settings.operators.ownerLocked')
           : t(ROLE_SUMMARY_KEYS[operator.role])}
@@ -2932,7 +2932,7 @@ export default function Settings() {
                           <Icon name={note.icon} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           <span className="min-w-0">
                             <span className="font-semibold">{note.label}: </span>
-                            <span className="break-words">{note.text}</span>
+                            <span className="wrap-break-word">{note.text}</span>
                           </span>
                         </li>
                       ))}
@@ -3295,7 +3295,7 @@ export default function Settings() {
                         <li key={operator.id} className="rounded-md border border-border bg-card p-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="break-words font-medium text-foreground">{operator.username}</p>
+                              <p className="wrap-break-word font-medium text-foreground">{operator.username}</p>
                               <div className="mt-1 flex flex-wrap gap-1.5">
                                 {isSelf && <span className="modern-badge">{t('settings.operators.you')}</span>}
                                 <span className={operator.mfaEnabled ? 'modern-badge-success' : 'modern-badge'}>
@@ -3369,7 +3369,7 @@ export default function Settings() {
                               <tr>
                                 <td className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="font-medium [overflow-wrap:anywhere]">{operator.username}</span>
+                                    <span className="font-medium wrap-anywhere">{operator.username}</span>
                                     {isSelf && (
                                       <span className="modern-badge">{t('settings.operators.you')}</span>
                                     )}
@@ -3384,11 +3384,11 @@ export default function Settings() {
                                       ainda falta. */}
                                   <div className="mt-1 text-sm">
                                     {operator.email
-                                      ? <span className="text-muted-foreground [overflow-wrap:anywhere]">{operator.email}</span>
+                                      ? <span className="text-muted-foreground wrap-anywhere">{operator.email}</span>
                                       : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
                                   </div>
                                 </td>
-                                <td className="w-56 xl:w-64">{renderOperatorRole(operator, lockedByOwner, 'w-full max-w-[15rem]')}</td>
+                                <td className="w-56 xl:w-64">{renderOperatorRole(operator, lockedByOwner, 'w-full max-w-60')}</td>
                                 <td className="w-28 text-sm text-muted-foreground xl:w-auto xl:whitespace-nowrap">{formatDateTime(operator.createdAt)}</td>
                                 <td className="w-px"><div className="flex justify-end">{renderOperatorActions(operator, isSelf)}</div></td>
                               </tr>
@@ -3622,7 +3622,7 @@ export default function Settings() {
                     <li key={v.id} className="rounded-md border border-border bg-card p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="break-words font-medium text-foreground">{v.name}</p>
+                          <p className="wrap-break-word font-medium text-foreground">{v.name}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {t('settings.vendors.priority')}: {v.priority}
                             <span className={`ms-2 ${v.enabled ? 'modern-badge-success' : 'modern-badge-error'}`}>

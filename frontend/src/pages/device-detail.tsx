@@ -28,7 +28,7 @@ import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
 
 /* Linha rótulo/valor dos cartões: no celular o valor (ID, série, usuário
    PPPoE) quebra dentro da coluna em vez de empurrar a página para o lado. */
-const KV_ROW = 'flex justify-between gap-4 [&>:first-child]:shrink-0 [&>:last-child]:min-w-0 [&>:last-child]:text-end [&>:last-child]:[overflow-wrap:anywhere]'
+const KV_ROW = 'flex justify-between gap-4 *:first:shrink-0 *:last:min-w-0 *:last:text-end *:last:wrap-anywhere'
 
 interface WanBindingData {
   lan: string[];
@@ -627,7 +627,7 @@ function IrreversibleActionModal({
           {action === 'factoryReset' && provisioningAvailable && (
             <p className="text-muted-foreground">{t('detail.factoryReset.provisionHint')}</p>
           )}
-          <label htmlFor="factory-reset-serial" className="field-label pt-1 [overflow-wrap:anywhere]">
+          <label htmlFor="factory-reset-serial" className="field-label pt-1 wrap-anywhere">
             {t('detail.factoryReset.typeSerial', { serial: alvo })}
           </label>
           <input
@@ -1628,7 +1628,7 @@ export default function DeviceDetailPage() {
             Repete o que o bloco de baixo mostra, e não o substitui: lá ficam as
             faturas, o chamado e o desvincular. Aqui é só quem é o cliente. */}
         {sgpAvailable && sgpLink && (
-          <div className="mb-6 rounded-[var(--radius)] border border-border bg-card p-4">
+          <div className="mb-6 rounded-(--radius) border border-border bg-card p-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="min-w-0">
                 <p className="metric-label">{t('detail.sgp.client')}</p>
@@ -1657,7 +1657,7 @@ export default function DeviceDetailPage() {
         )}
 
         {/* Device Info Cards */}
-        <div className="mb-6 grid grid-cols-2 overflow-hidden rounded-[var(--radius)] border border-border bg-card lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 overflow-hidden rounded-(--radius) border border-border bg-card lg:grid-cols-4">
           <div className="min-w-0 border-b border-e border-border p-4 lg:border-b-0">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.signal')}</span>
@@ -1690,7 +1690,7 @@ export default function DeviceDetailPage() {
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.model')}</span>
               <Icon name="server" size={20} className="text-gray-400 dark:text-gray-500" />
             </div>
-            <div className="text-lg font-bold text-gray-900 dark:text-gray-100 [overflow-wrap:anywhere]">
+            <div className="text-lg font-bold text-gray-900 dark:text-gray-100 wrap-anywhere">
               {deviceInfo.productclass || t('common.na')}
             </div>
           </div>
@@ -1966,11 +1966,11 @@ export default function DeviceDetailPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="metric-label">{t('detail.sgp.client')}</p>
-                        <p className="mt-1 font-semibold [overflow-wrap:anywhere]">{sgpLink.clientName || '—'}</p>
+                        <p className="mt-1 font-semibold wrap-anywhere">{sgpLink.clientName || '—'}</p>
                       </div>
                       <div className="min-w-0">
                         <p className="metric-label">{t('detail.sgp.plan')}</p>
-                        <p className="mt-1 font-semibold [overflow-wrap:anywhere]">{sgpLink.plan || '—'}</p>
+                        <p className="mt-1 font-semibold wrap-anywhere">{sgpLink.plan || '—'}</p>
                       </div>
                       <div>
                         <p className="metric-label">{t('detail.sgp.status')}</p>
@@ -1984,7 +1984,7 @@ export default function DeviceDetailPage() {
                         </p>
                       </div>
                     </div>
-                    <p className="mt-3 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                    <p className="mt-3 text-xs text-muted-foreground wrap-anywhere">
                       {t(sgpLink.linkMode === 'manual' ? 'detail.sgp.linkManual' : 'detail.sgp.linkAuto')}
                       {sgpLink.login ? ` · ${t('detail.sgp.linkLogin', { login: sgpLink.login })}` : ''}
                       {sgpLink.lastSyncedAt
@@ -2035,7 +2035,7 @@ export default function DeviceDetailPage() {
                                   {t('detail.sgp.dueOn', { date: invoiceDueDate(invoice.dueDate) })}
                                 </span>
                               </div>
-                              <p className="mt-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                              <p className="mt-1 text-sm text-muted-foreground wrap-anywhere">
                                 {invoice.description || t('detail.sgp.invoiceFallback')}
                                 {invoice.status ? ` · ${invoice.status}` : ''}
                               </p>
@@ -2187,7 +2187,7 @@ export default function DeviceDetailPage() {
                   <div key={wan.index} className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-md">
                     <div className="p-5 space-y-3">
                       <div className="flex justify-between items-start gap-3">
-                        <h3 className="min-w-0 text-md font-semibold text-gray-900 dark:text-gray-100 [overflow-wrap:anywhere]">
+                        <h3 className="min-w-0 text-md font-semibold text-gray-900 dark:text-gray-100 wrap-anywhere">
                           {wan.name || t('detail.wan.connection', { index: wan.index })}
                         </h3>
                         <span className="shrink-0">{getStatusBadge(wan.status || 'Disconnected')}</span>
@@ -2429,7 +2429,7 @@ export default function DeviceDetailPage() {
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted-foreground">{t('detail.wifi.security')}</dt>
-                        <dd className="min-w-0 text-end [overflow-wrap:anywhere]">{ssid.security || t('detail.wifi.notReported')}</dd>
+                        <dd className="min-w-0 text-end wrap-anywhere">{ssid.security || t('detail.wifi.notReported')}</dd>
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted-foreground">{t('detail.wifi.associatedClients')}</dt>
@@ -2460,7 +2460,7 @@ export default function DeviceDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
                     <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.superadmin')}</h4>
-                    <p className="text-sm text-gray-500 [overflow-wrap:anywhere]">{t('detail.advanced.user')}: {vp.superAdmin?.value || t('common.na')}</p>
+                    <p className="text-sm text-gray-500 wrap-anywhere">{t('detail.advanced.user')}: {vp.superAdmin?.value || t('common.na')}</p>
                     <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.superPassword?.value ? '******' : t('common.na')}</p>
                     <button
                       onClick={() => handleOpenCredentialModal('super')}
@@ -2471,7 +2471,7 @@ export default function DeviceDetailPage() {
                   </div>
                   <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
                     <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.useradmin')}</h4>
-                    <p className="text-sm text-gray-500 [overflow-wrap:anywhere]">{t('detail.advanced.user')}: {vp.userAdmin?.value || t('common.na')}</p>
+                    <p className="text-sm text-gray-500 wrap-anywhere">{t('detail.advanced.user')}: {vp.userAdmin?.value || t('common.na')}</p>
                     <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.userPassword?.value ? '******' : t('common.na')}</p>
                     <button
                       onClick={() => handleOpenCredentialModal('user')}
