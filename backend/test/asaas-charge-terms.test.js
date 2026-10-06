@@ -343,6 +343,53 @@ describe('a conferência do pagamento', () => {
   });
 });
 
+describe('os termos com que a cobrança saiu (revisão)', () => {
+  const emitir = () => runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
+    tenant: await Tenant.findById(alfa), manual: true
+  }));
+  const pagar = (amountCents) => runInTenant(alfa, () => SubscriptionService.recordPayment({
+    amountCents, currency: 'BRL', provider: 'asaas', externalId: 'pay_termos_1',
+    paidOn: ChargeIssuingService.isoDate(new Date())
+  }));
+
+  it('a configuração mudada depois da emissão não tira o desconto que a fatura levou', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    await termos({ discountKind: 'percent', discountValue: 10, discountDaysBefore: 0 });
+    const emissao = await emitir();
+    assert.equal(emissao.issued, true, JSON.stringify(emissao));
+    const [linha] = await getDb()('billing_charges').where({ tenant_id: alfa });
+    assert.deepEqual(JSON.parse(linha.discount_terms), {
+      discount: { cents: 1999, kind: 'percent', percent: 10, daysBefore: 0 }
+    });
+
+    // O console desliga o desconto depois de a fatura sair…
+    await termos();
+    // …e quem pagou o valor com desconto que estava na fatura pagou o inteiro.
+    const res = await pagar(17991);
+    assert.equal(res.underpaid, false, JSON.stringify(res));
+  });
+
+  it('e o desconto ligado depois não vale para a fatura que saiu sem ele', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    const emissao = await emitir();
+    assert.equal(emissao.issued, true, JSON.stringify(emissao));
+    const [linha] = await getDb()('billing_charges').where({ tenant_id: alfa });
+    assert.deepEqual(JSON.parse(linha.discount_terms), { discount: null });
+    await termos({ discountKind: 'percent', discountValue: 10, discountDaysBefore: 0 });
+    const res = await pagar(17991);
+    assert.equal(res.underpaid, true);
+  });
+
+  it('a linha de antes da coluna continua conferida pela configuração de hoje', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    await emitir();
+    await getDb()('billing_charges').where({ tenant_id: alfa }).update({ discount_terms: null });
+    await termos({ discountKind: 'percent', discountValue: 10, discountDaysBefore: 0 });
+    const res = await pagar(17991);
+    assert.equal(res.underpaid, false);
+  });
+});
+
 describe('pela rota do webhook', () => {
   const entregar = (corpo) => call(`${panelUrl}/api/billing-webhook`, {
     method: 'POST', headers: { 'asaas-access-token': TOKEN }, body: corpo

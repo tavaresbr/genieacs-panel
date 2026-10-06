@@ -1,7 +1,7 @@
 import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
-import BillingCharge, { OPEN_CHARGE_STATUSES } from '../models/BillingCharge.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
@@ -642,6 +642,16 @@ class SelfBillingService {
       if (!prorata.eligible) prorata = null;
     }
 
+    // O provedor que não está ligado a um gateway que emita não ganha a fatura
+    // de pró-rata (`createProration` para em `not_linked`): o extrato da troca
+    // diz isso, para quem procurar por que a diferença não foi cobrada.
+    let prorataNaoCobrada = null;
+    if (prorata && !prorata.skipped) {
+      const gatewayDoProvedor = providerFor(tenant.billing_gateway);
+      if (!gatewayDoProvedor || !tenant.billing_customer_ref) prorataNaoCobrada = 'not_linked';
+      else if (!gatewayDoProvedor.canIssue) prorataNaoCobrada = 'provider_cannot_issue';
+    }
+
     await gravarSegurando(cobranca, () => (agendar
       ? SubscriptionService.schedulePlanChange({ planId: plan.id, at: quando })
       : SubscriptionService.changePlan({
@@ -654,7 +664,8 @@ class SelfBillingService {
             remainingDays: prorata.remainingDays,
             fromPriceCents: prorata.fromPriceCents,
             toPriceCents: prorata.toPriceCents,
-            ...(prorata.skipped ? { skipped: prorata.skipped } : {})
+            ...(prorata.skipped ? { skipped: prorata.skipped } : {}),
+            ...(prorataNaoCobrada ? { notCharged: prorataNaoCobrada } : {})
           }
         } : null
       })));
@@ -708,9 +719,14 @@ class SelfBillingService {
     }
     // Bloqueado pela pró-rata vencida (0101): o que se paga agora é ELA — a
     // renovação pode nem ter saído ainda, e emiti-la não desbloquearia nada.
-    if (SubscriptionService.effectiveStatus(subscription).reason === 'proration_overdue') {
-      const prorata = (await BillingCharge.openProrations()).find((linha) => linha.gateway_charge_id && linha.invoice_url);
-      if (prorata) return { charge: prorata, issued: false, customerCreated: false };
+    // Pela data que a assinatura guarda (`proration_due_at`), em QUALQUER
+    // estado: o suspenso por inadimplência (0102) por causa dela também —
+    // pagar a renovação no lugar estenderia o prazo e o deixaria suspenso.
+    const prorataVence = subscription.proration_due_at ? new Date(subscription.proration_due_at) : null;
+    if (prorataVence && !Number.isNaN(prorataVence.getTime()) && prorataVence.getTime() <= Date.now()) {
+      const abertas = (await BillingCharge.openProrations()).filter((linha) => linha.gateway_charge_id && linha.invoice_url);
+      abertas.sort((a, b) => String(isoDateOf(a.due_date) ?? '').localeCompare(String(isoDateOf(b.due_date) ?? '')));
+      if (abertas[0]) return { charge: abertas[0], issued: false, customerCreated: false };
     }
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
     // O preço que a fatura vai pedir, com o cupom (0093). O cupom nunca leva
@@ -750,7 +766,9 @@ class SelfBillingService {
       }
     }
 
-    const resultado = await ChargeIssuingService.issueCurrent({ tenant: atual, manual: true, countDevices });
+    // `cardNow`: é o provedor pedindo para pagar JÁ — com o cartão salvo, a
+    // cobrança sai no cartão agora, e não no dia do vencimento.
+    const resultado = await ChargeIssuingService.issueCurrent({ tenant: atual, manual: true, countDevices, cardNow: true });
     const recusa = SelfBillingService.issueRefusal(resultado);
     if (recusa) throw recusa;
 

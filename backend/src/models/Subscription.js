@@ -156,6 +156,21 @@ class Subscription {
   }
 
   /**
+   * Tira a suspensão automática por inadimplência (0102) — só se a linha
+   * AGORA está suspensa por ela. Quem chama é o pagamento da pró-rata que era
+   * a última dívida: a suspensão que o agendador gravou depois da leitura do
+   * pagamento também sai, e a suspensão à mão nunca.
+   */
+  static async liftAutoSuspension(tenantId, db = getDb()) {
+    if (!tenantId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const changed = await db('subscriptions')
+      .where({ tenant_id: tenantId, status: 'suspended', suspended_reason: 'auto_nonpayment' })
+      .update({ status: 'active', suspended_reason: null, updated_at: new Date() });
+    return changed > 0;
+  }
+
+  /**
    * Põe (ou tira) o cupom da assinatura — só se o cupom de agora ainda é o que
    * se leu (`expectCouponId`, nulo para "sem cupom").
    *

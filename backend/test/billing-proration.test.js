@@ -374,6 +374,127 @@ describe('o gateway fora', () => {
   });
 });
 
+describe('a pró-rata de quem deixou de ser cobrável (revisão)', () => {
+  const falhada = async () => {
+    recusarCriacao = true;
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    const [pr] = await prorratas();
+    assert.equal(pr.status, 'failed');
+    recusarCriacao = false;
+    recebidas = [];
+    await getDb()('billing_charges').where({ id: pr.id }).update({ next_attempt_at: null });
+    return pr;
+  };
+
+  it('cancelar pelo console cancela a pró-rata que não chegou ao gateway', async () => {
+    const pr = await falhada();
+    await runInTenant(alfa, () => SubscriptionService.setStatus({ status: 'canceled', reason: 'teste' }));
+    const [depois] = await prorratas();
+    assert.equal(depois.id, pr.id);
+    assert.equal(depois.status, 'canceled');
+    await runInTenant(alfa, () => ChargeIssuingService.retryProrations({ manual: true }));
+    assert.deepEqual(postsDeProrata(), [], 'nada vai ao gateway depois do cancelamento');
+  });
+
+  it('suspender à mão também; a retentativa do agendador não a emite', async () => {
+    const pr = await falhada();
+    // Gravado direto, como um caminho que não passe por `setStatus`.
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ status: 'suspended', suspended_reason: 'manual' });
+    await SubscriptionService.invalidate(alfa);
+    const passada = await runInTenant(alfa, () => ChargeIssuingService.retryProrations());
+    assert.equal(passada.reason, 'not_billable');
+    assert.deepEqual(postsDeProrata(), []);
+    const [depois] = await prorratas();
+    assert.equal(depois.id, pr.id);
+    assert.equal(depois.status, 'canceled');
+    assert.equal((await linha()).proration_due_at, null);
+  });
+
+  it('emitProration relê a assinatura e não emite para quem foi cancelado no meio', async () => {
+    const pr = await falhada();
+    assert.equal(await runInTenant(alfa, () => BillingCharge.claim(pr.id, { until: new Date(Date.now() + 60_000) })), true);
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ status: 'canceled' });
+    const resultado = await runInTenant(alfa, async () => ChargeIssuingService.emitProration({
+      tenant: await getDb()('tenants').where({ id: alfa }).first(),
+      provider: (await import('../src/services/billing/registry.js')).providerFor('asaas'),
+      chargeId: pr.id
+    }));
+    assert.equal(resultado.reason, 'not_billable');
+    assert.deepEqual(postsDeProrata(), []);
+    assert.equal((await prorratas())[0].status, 'canceled');
+  });
+
+  it('a suspensão automática continua cobrável: a pró-rata sai', async () => {
+    await falhada();
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ status: 'suspended', suspended_reason: 'auto_nonpayment' });
+    await SubscriptionService.invalidate(alfa);
+    const passada = await runInTenant(alfa, () => ChargeIssuingService.retryProrations());
+    assert.equal(passada.issued, 1, JSON.stringify(passada));
+    assert.equal(postsDeProrata().length, 1);
+  });
+});
+
+describe('a subida e a pró-rata (revisão C/D)', () => {
+  const pagarPorWebhook = (pr, id = pr.gateway_charge_id) => entregar({
+    event: 'PAYMENT_RECEIVED',
+    payment: {
+      id, value: Number(pr.amount_cents) / 100, customer: 'cus_alfa', externalReference: `tenant:${alfa}:proration:${pr.id}`
+    }
+  });
+
+  it('a pró-rata paga tira a marca da subida (a descida não fica adiada à toa)', async () => {
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    assert.ok((await linha()).upgraded_at, 'a subida marcou');
+    const [pr] = await prorratas();
+    assert.equal((await pagarPorWebhook(pr)).body.code, 'recorded');
+    assert.equal((await linha()).upgraded_at, null, 'paga a diferença, a marca sai');
+  });
+
+  it('o pagamento no id VELHO de uma pró-rata reemitida continua sendo pró-rata', async () => {
+    const antes = await linha();
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    const [pr] = await prorratas();
+    const velho = pr.gateway_charge_id;
+    await runInTenant(alfa, async () => {
+      assert.ok(await BillingCharge.resetForReissue(pr.id, { amountCents: Number(pr.amount_cents), currency: 'BRL' }));
+      await BillingCharge.markIssued(pr.id, { gatewayChargeId: 'pay_pr_novo', dueDate: pr.due_date });
+    });
+    const res = await pagarPorWebhook(pr, velho);
+    assert.equal(res.body.code, 'recorded', JSON.stringify(res.body));
+    const depois = await linha();
+    assert.equal(new Date(depois.renews_at).getTime(), new Date(antes.renews_at).getTime(), 'não compra período');
+    const evento = await getDb()('billing_events').where({ tenant_id: alfa, external_id: velho }).first();
+    const detalhe = JSON.parse(evento.detail);
+    assert.equal(detalhe.proration, true);
+    assert.equal(detalhe.chargeId, pr.id);
+  });
+
+  it('a mesma subida de novo no período, depois de a primeira fechar, ganha fatura própria', async () => {
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    const [primeira] = await prorratas();
+    assert.equal((await pagarPorWebhook(primeira)).body.code, 'recorded');
+    // O console devolve o plano de antes…
+    await Subscription.upsertForTenant(alfa, { plan_id: planos.basico.id });
+    await SubscriptionService.invalidate(alfa);
+    // …e o provedor sobe de novo: outra diferença, outra fatura.
+    const de_novo = await trocar(planos.pro.id);
+    assert.equal(de_novo.status, 200, JSON.stringify(de_novo.body));
+    assert.equal(de_novo.body.data.proration.issued, true, JSON.stringify(de_novo.body.data.proration));
+    const todas = await prorratas();
+    assert.equal(todas.length, 2);
+    assert.notEqual(todas[0].period_end, todas[1].period_end);
+  });
+
+  it('o provedor sem gateway: a troca registra por que a diferença não foi cobrada', async () => {
+    await getDb()('tenants').where({ id: alfa }).update({ billing_gateway: null, billing_customer_ref: null });
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    assert.deepEqual(await prorratas(), []);
+    const evento = await getDb()('billing_events')
+      .where({ tenant_id: alfa, type: BILLING_EVENT_TYPES.PLAN_CHANGED }).orderBy('id', 'desc').first();
+    assert.equal(JSON.parse(evento.detail).proration.notCharged, 'not_linked');
+  });
+});
+
 describe('o pagamento da pró-rata', () => {
   it('pelo webhook: quita a fatura, não estende o prazo nem gasta ciclo de cupom', async () => {
     sequencia += 1;

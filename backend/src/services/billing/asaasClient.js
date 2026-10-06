@@ -45,11 +45,29 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 const ERROR_BODY_LIMIT = 500;
 
 export class AsaasError extends Error {
-  constructor(message, { status = null, code = 'gateway_error' } = {}) {
+  constructor(message, { status = null, code = 'gateway_error', errors = [] } = {}) {
     super(message);
     this.name = 'AsaasError';
     this.status = status;
     this.code = code;
+    // Os `errors` que o gateway devolveu no corpo (`[{ code, description }]`),
+    // lidos — é por eles que uma recusa do CARTÃO se separa de uma recusa
+    // qualquer do pedido (ver `CardAutopayService.classifyError`).
+    this.errors = Array.isArray(errors) ? errors : [];
+  }
+}
+
+/** Os `errors` de um corpo de erro do gateway, lidos — nunca lança. */
+function errosDoCorpo(texto) {
+  try {
+    const corpo = JSON.parse(texto || '{}');
+    if (!Array.isArray(corpo?.errors)) return [];
+    return corpo.errors.slice(0, 10).map((item) => ({
+      code: String(item?.code ?? '').slice(0, 64),
+      description: String(item?.description ?? '').slice(0, ERROR_BODY_LIMIT)
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -160,7 +178,7 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
       : resposta.status < 500 ? 'refused' : 'gateway_error';
     throw new AsaasError(
       `gateway answered ${resposta.status}: ${texto.slice(0, ERROR_BODY_LIMIT)}`,
-      { status: resposta.status, code: codigo }
+      { status: resposta.status, code: codigo, errors: errosDoCorpo(texto) }
     );
   }
 
@@ -190,7 +208,19 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
  * já tem fica como está.
  */
 export async function chargeTermsFor(amountCents, { billingType = 'UNDEFINED' } = {}) {
-  if (String(billingType).toUpperCase() === 'CREDIT_CARD') return {};
+  return (await termosDaCobranca(amountCents, { billingType })).campos;
+}
+
+/**
+ * Os termos de uma cobrança: os campos para o gateway (`campos`) e o
+ * desconto que foi junto (`discountTerms`, `{ discount: {...} | null }`) — que
+ * a emissão grava na linha (`billing_charges.discount_terms`), para a
+ * conferência do pagamento ler o desconto COM QUE a cobrança saiu, e não o da
+ * configuração de hoje. `discountTerms` indefinido quando o valor não é
+ * conhecido (o desconto não vai, e o que o gateway tem fica).
+ */
+async function termosDaCobranca(amountCents, { billingType = 'UNDEFINED' } = {}) {
+  if (String(billingType).toUpperCase() === 'CREDIT_CARD') return { campos: {}, discountTerms: { discount: null } };
   const termos = await effectiveChargesConfig();
   const campos = {};
   if (termos.finePercent > 0) campos.fine = { value: termos.finePercent, type: 'PERCENTAGE' };
@@ -203,7 +233,15 @@ export async function chargeTermsFor(amountCents, { billingType = 'UNDEFINED' } 
       ? { value: desconto.percent, dueDateLimitDays: desconto.daysBefore, type: 'PERCENTAGE' }
       : { value: paraReais(desconto.cents), dueDateLimitDays: desconto.daysBefore, type: 'FIXED' };
   }
-  return campos;
+  const semValor = amountCents === undefined || amountCents === null;
+  return {
+    campos,
+    discountTerms: semValor ? undefined : {
+      discount: desconto
+        ? { cents: desconto.cents, kind: desconto.kind, percent: desconto.percent ?? null, daysBefore: desconto.daysBefore }
+        : null
+    }
+  };
 }
 
 /**
@@ -244,10 +282,11 @@ export async function createCharge({
     value: Number((amountCents / 100).toFixed(2)),
     dueDate,
     description,
-    externalReference: reference,
-    // Multa, juros e desconto, quando ligados — e nunca no cartão.
-    ...(await chargeTermsFor(amountCents, { billingType: porCartao ? 'CREDIT_CARD' : 'UNDEFINED' }))
+    externalReference: reference
   };
+  // Multa, juros e desconto, quando ligados — e nunca no cartão.
+  const termos = await termosDaCobranca(amountCents, { billingType: porCartao ? 'CREDIT_CARD' : 'UNDEFINED' });
+  Object.assign(payload, termos.campos);
   if (porCartao) {
     payload.creditCardToken = String(creditCardToken);
     payload.remoteIp = String(remoteIp);
@@ -262,7 +301,8 @@ export async function createCharge({
     chargeId,
     invoiceUrl: resposta?.invoiceUrl ? String(resposta.invoiceUrl) : null,
     dueDate: resposta?.dueDate ? String(resposta.dueDate).slice(0, 10) : null,
-    status: resposta?.status ? String(resposta.status) : null
+    status: resposta?.status ? String(resposta.status) : null,
+    discountTerms: termos.discountTerms
   };
 }
 
@@ -280,6 +320,13 @@ async function semToken(token, fn) {
     const segredo = token ? String(token) : '';
     if (segredo && error && typeof error.message === 'string' && error.message.includes(segredo)) {
       error.message = error.message.split(segredo).join('[redacted]');
+    }
+    if (segredo && Array.isArray(error?.errors)) {
+      for (const item of error.errors) {
+        if (typeof item?.description === 'string' && item.description.includes(segredo)) {
+          item.description = item.description.split(segredo).join('[redacted]');
+        }
+      }
     }
     throw error;
   }
@@ -430,7 +477,12 @@ export async function getCharge(chargeId) {
     id: String(resposta?.id ?? chargeId),
     status: resposta?.status ? String(resposta.status) : null,
     // Arredondado sobre o produto, pelo motivo de `paraCentavos` no provider.
-    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null
+    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null,
+    // O dia do pagamento, quando já foi pago — o desconto por antecipação é
+    // conferido por ele (ver `SubscriptionService.recordPayment`).
+    paidOn: /^\d{4}-\d{2}-\d{2}/.test(String(resposta?.paymentDate ?? resposta?.confirmedDate ?? ''))
+      ? String(resposta.paymentDate ?? resposta.confirmedDate).slice(0, 10)
+      : null
   };
 }
 
@@ -502,12 +554,15 @@ export async function updateCharge(chargeId, {
   // Os termos de hoje vão junto: o desconto é sobre o valor que a cobrança
   // passa a ter (`value`), ou sobre o que ela já tem (`amountCents`, quando
   // quem chama o sabe) — o piso de R$ 5,00 depende dele.
-  Object.assign(payload, await chargeTermsFor(value !== undefined ? value : amountCents, { billingType }));
+  const termos = await termosDaCobranca(value !== undefined ? value : amountCents, { billingType });
+  Object.assign(payload, termos.campos);
   const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { payload });
   return {
     dueDate: resposta?.dueDate ? String(resposta.dueDate).slice(0, 10) : null,
     invoiceUrl: resposta?.invoiceUrl ? String(resposta.invoiceUrl) : null,
-    status: resposta?.status ? String(resposta.status) : null
+    status: resposta?.status ? String(resposta.status) : null,
+    // Os termos que foram junto — quem atualiza a linha os grava.
+    ...(termos.discountTerms !== undefined ? { discountTerms: termos.discountTerms } : {})
   };
 }
 

@@ -2168,7 +2168,11 @@ const SUBSCRIPTION_CARD_COLUMNS = [
  * cartão já foi feita nesta linha.
  */
 const BILLING_CHARGE_CARD_COLUMNS = [
-  ['billing_type', (t) => t.string('billing_type', 16).nullable()]
+  ['billing_type', (t) => t.string('billing_type', 16).nullable()],
+  // Os termos do desconto por antecipação com que a cobrança saiu (JSON,
+  // `{ discount: {...} | null }`): a conferência do pagamento lê ESTES, e não
+  // a configuração de hoje. Nulo nas linhas de antes — e aí vale a de hoje.
+  ['discount_terms', (t) => t.text('discount_terms').nullable()]
 ];
 
 /** A conversa com dono: quem atende, desde quando, e desde quando espera um. */

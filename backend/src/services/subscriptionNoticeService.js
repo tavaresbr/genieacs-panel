@@ -174,7 +174,7 @@ class SubscriptionNoticeService {
    * quando nada saiu. O miolo comum da régua e da suspensão automática.
    */
   static async sendStep({
-    tenant, pendente, dueAt, now, plan, subscription, transporte = mailTransport()
+    tenant, pendente, dueAt, now, plan, subscription, transporte = mailTransport(), charge = null
   }) {
     const temEmail = transporte.name !== 'none';
     const para = temEmail ? await this.recipients(tenant) : [];
@@ -191,7 +191,7 @@ class SubscriptionNoticeService {
     let canais = [];
     try {
       canais = await this.deliver({
-        tenant, pendente, dueAt, para, fone, transporte, now, plan, subscription
+        tenant, pendente, dueAt, para, fone, transporte, now, plan, subscription, charge
       });
     } catch (error) {
       await SubscriptionReminderSend.release(garra).catch(() => {});
@@ -212,20 +212,27 @@ class SubscriptionNoticeService {
   }
 
   /**
-   * Desde quando a fatura de pró-rata vencida (0101) está em atraso — só
-   * quando é ela que deixa o provedor `past_due` (`proration_overdue`). A
-   * cobrança vence no fim do `due_date` em São Paulo; o atraso começa no dia
-   * seguinte. A mais antiga em aberto, porque é desde ela que se deve.
+   * Desde quando a fatura de pró-rata vencida (0101) está em atraso: a cópia
+   * que a assinatura guarda (`proration_due_at`, mantida por
+   * `BillingCharge.syncProrationDue` — só conta a que CHEGOU ao gateway, com
+   * link para pagar). A cobrança vence no fim do `due_date` em São Paulo; o
+   * atraso começa no dia seguinte.
    */
-  static async prorationOverdueSince() {
+  static prorationOverdueSince(subscription) {
+    const data = subscription?.proration_due_at ? new Date(subscription.proration_due_at) : null;
+    return data && !Number.isNaN(data.getTime()) ? data : null;
+  }
+
+  /** A fatura de pró-rata vencida mais antiga, emitida no gateway — ou nada. */
+  static async overdueProration() {
     const linha = await tdb('billing_charges')
       .where({ kind: 'proration' })
       .whereIn('status', OPEN_CHARGE_STATUSES)
+      .whereNotNull('gateway_charge_id')
       .orderBy('due_date', 'asc')
+      .orderBy('id', 'asc')
       .first();
-    const dia = isoDateOf(linha?.due_date);
-    if (!dia) return null;
-    return new Date(new Date(`${dia}T00:00:00-03:00`).getTime() + 86_400_000);
+    return linha ?? null;
   }
 
   /**
@@ -251,11 +258,18 @@ class SubscriptionNoticeService {
     const subscription = await Subscription.forTenant(tenant.id);
     if (!subscription) return { action: 'none', reason: 'no_subscription' };
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
-    const efetivo = SubscriptionService.effectiveStatus(subscription, now);
-    const prorationDueAt = efetivo.reason === 'proration_overdue' ? await this.prorationOverdueSince() : null;
-    const etapa = SubscriptionService.autoSuspensionStep(subscription, now, plan, config, { prorationDueAt });
+    const prorationDueAt = this.prorationOverdueSince(subscription);
+    const conta = SubscriptionService.autoSuspensionStep(subscription, now, plan, config, { prorationDueAt });
+    if (!conta) return { action: 'none', reason: 'nothing_due' };
+    const dueAt = ChargeIssuingService.periodKey(conta.since);
+    // Quando o aviso DESTE prazo saiu: sem ele, não se suspende (a etapa vira
+    // o aviso, e a suspensão fica para `warnDays` depois dele).
+    const warnedAt = await SubscriptionReminderSend.sentAt({ dueAt, step: 'suspension_warning' });
+    const etapa = SubscriptionService.autoSuspensionStep(subscription, now, plan, config, { prorationDueAt, warnedAt });
     if (!etapa) return { action: 'none', reason: 'nothing_due' };
-    const dueAt = ChargeIssuingService.periodKey(etapa.since);
+    // A dívida é a pró-rata (0101): o valor, o link e a data do aviso são os
+    // DELA, e não os da renovação em aberto.
+    const cobranca = etapa.reason === 'proration_overdue' ? await this.overdueProration() : null;
 
     if (etapa.step === 'suspension_warning') {
       const notice = await this.sendStep({
@@ -264,6 +278,7 @@ class SubscriptionNoticeService {
         now,
         plan,
         subscription,
+        charge: cobranca,
         pendente: {
           step: 'suspension_warning',
           // `days` na mensagem: quantos faltam para a suspensão.
@@ -272,10 +287,18 @@ class SubscriptionNoticeService {
           vars: { suspendDate: ChargeIssuingService.periodKey(etapa.suspendAt) }
         }
       });
+      // Ninguém a quem avisar: o aviso conta como dado (sem canal nenhum),
+      // senão a suspensão esperaria para sempre por um destinatário.
+      if (!notice.sent && (notice.reason === 'no_recipient' || notice.reason === 'no_transport')) {
+        const garra = await SubscriptionReminderSend.claim({
+          dueAt, step: 'suspension_warning', until: new Date(now.getTime() + this.CLAIM_MS), now
+        });
+        if (garra) await SubscriptionReminderSend.markSent(garra, { channels: [], at: now });
+      }
       return { action: notice.sent ? 'warned' : 'none', reason: notice.reason, notice };
     }
 
-    const suspensao = await SubscriptionService.autoSuspend({ tenant, now, config, prorationDueAt });
+    const suspensao = await SubscriptionService.autoSuspend({ tenant, now, config, prorationDueAt, warnedAt });
     if (!suspensao.suspended) return { action: 'none', reason: suspensao.reason };
     const depois = await Subscription.forTenant(tenant.id);
     let notice;
@@ -286,6 +309,7 @@ class SubscriptionNoticeService {
         now,
         plan,
         subscription: depois,
+        charge: cobranca,
         pendente: {
           step: 'suspended',
           // `days` na mensagem: há quantos o provedor deve.
@@ -356,12 +380,13 @@ class SubscriptionNoticeService {
 
   /** Monta e manda a mensagem; devolve os canais por onde ela saiu. */
   static async deliver({
-    tenant, pendente, dueAt, para, fone, transporte, now, plan, subscription = null
+    tenant, pendente, dueAt, para, fone, transporte, now, plan, subscription = null, charge = null
   }) {
     // A cobrança em aberto, se o painel já emitiu uma: é dela o link de pagar
     // e o valor de fato cobrado (que pode ser o da descida agendada, ou o que
     // o console mudou à mão). Sem ela, o preço do plano e o endereço do painel.
-    const cobranca = await BillingCharge.currentOpen().catch(() => null);
+    // A que quem chama passa (a pró-rata vencida da suspensão) vem antes.
+    const cobranca = charge ?? await BillingCharge.currentOpen().catch(() => null);
     const paraPagar = cobranca?.invoice_url || null;
     // Sem cobrança, o que a emissão pediria: o plano da fatura deste prazo (o
     // da descida agendada, quando é para ele) com o cupom da assinatura.
@@ -381,7 +406,9 @@ class SubscriptionNoticeService {
     const dias = Math.max(0, Math.ceil(Math.abs(pendente.deadline.getTime() - now.getTime()) / 86_400_000));
     const vars = {
       provider: tenant.name || PRODUCT_NAME,
-      date: dueAt,
+      // A data é a do vencimento da fatura passada por quem chama (a
+      // pró-rata), e não a chave da etapa — que é o dia SEGUINTE a ele.
+      date: (charge && isoDateOf(charge.due_date)) || dueAt,
       days: dias,
       amount: this.formatAmount(centavos, moeda),
       link: paraPagar || panelUrlFor(tenant) || ''

@@ -861,6 +861,11 @@ class PlatformSubscriptionsController {
               }));
             }
             const patch = { issuing_until: null };
+            // Os termos do desconto que foram com a atualização (0100): é por
+            // eles que o pagamento desta cobrança é conferido.
+            if (respondido?.discountTerms !== undefined && respondido?.discountTerms !== null) {
+              patch.discount_terms = BillingCharge.serializeDiscountTerms(respondido.discountTerms);
+            }
             // Marcada (0078): daqui em diante o valor desta linha não é o preço
             // de plano nenhum, e a emissão não o reprecifica.
             if (mudaValor) {
@@ -1187,7 +1192,10 @@ class PlatformSubscriptionsController {
           }
           // `already_issued` é sucesso: a cobrança do período está viva no
           // gateway, emitida por outra passada no meio — que é o que se pediu.
-          if (!emissao.issued && emissao.reason !== 'already_issued') {
+          // `card_deferred` também: a assinatura tem cartão salvo, e a linha
+          // reaberta sai no cartão no dia do vencimento, pelo agendador — o
+          // console não cobra o cartão antes da hora.
+          if (!emissao.issued && emissao.reason !== 'already_issued' && emissao.reason !== 'card_deferred') {
             throw new ConsoleChargeError(409, `The charge was not reissued: ${emissao.reason}`, emissao.reason);
           }
           return {

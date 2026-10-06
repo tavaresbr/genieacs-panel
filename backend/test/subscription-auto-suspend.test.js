@@ -135,6 +135,8 @@ beforeEach(async () => {
 describe('quando suspende', () => {
   it('suspende no dia 15 depois do vencimento, e não antes', async () => {
     await comAssinatura({ renews_at: vencimento });
+    // O aviso do dia 12 (sem ele, não se suspende — ver "nunca sem aviso").
+    assert.equal((await passada(em(12))).action, 'warned');
     const vespera = await passada(new Date(em(15).getTime() - 1000));
     assert.notEqual(vespera.action, 'suspended');
     assert.equal((await assinatura()).status, 'active');
@@ -163,6 +165,7 @@ describe('quando suspende', () => {
 
   it('o fim do teste também conta', async () => {
     await comAssinatura({ status: 'trial', trial_ends_at: vencimento });
+    await passada(em(12));
     assert.equal((await passada(em(14))).action === 'suspended', false);
     assert.equal((await passada(em(15))).action, 'suspended');
     assert.equal((await assinatura()).suspended_reason, 'auto_nonpayment');
@@ -170,6 +173,8 @@ describe('quando suspende', () => {
 
   it('não suspende duas vezes', async () => {
     await comAssinatura({ renews_at: vencimento });
+    await passada(em(12));
+    recebidas.length = 0;
     const agora = em(16);
     const resultados = await Promise.all([passada(agora), passada(agora), passada(agora)]);
     assert.equal(resultados.filter((r) => r.action === 'suspended').length, 1, JSON.stringify(resultados));
@@ -190,6 +195,51 @@ describe('quando suspende', () => {
     });
     assert.equal(mudou, false);
     assert.equal((await assinatura()).status, 'active');
+  });
+});
+
+describe('nunca sem aviso (revisão)', () => {
+  it('o dia do deploy: já vencido há 20 dias, avisa agora e suspende 3 dias depois do aviso', async () => {
+    await comAssinatura({ renews_at: vencimento });
+    const primeira = await passada(em(20));
+    assert.equal(primeira.action, 'warned', JSON.stringify(primeira));
+    assert.match(ultima(), new RegExp(ChargeIssuingService.isoDate(em(23))));
+    assert.equal((await passada(em(22))).action, 'none');
+    assert.equal((await assinatura()).status, 'active');
+    const depois = await passada(em(23));
+    assert.equal(depois.action, 'suspended', JSON.stringify(depois));
+  });
+
+  it('sem ninguém a quem avisar, o aviso conta como dado e a suspensão não espera para sempre', async () => {
+    await comAssinatura({ renews_at: vencimento });
+    const original = SubscriptionNoticeService.recipients;
+    SubscriptionNoticeService.recipients = async () => [];
+    try {
+      const aviso = await passada(em(20));
+      assert.equal(aviso.action, 'none');
+      assert.equal(aviso.reason, 'no_recipient');
+      assert.ok(await runInTenant(alfa, () => SubscriptionReminderSend.sentAt({
+        dueAt: ChargeIssuingService.periodKey(vencimento), step: 'suspension_warning'
+      })));
+      assert.equal((await passada(em(23))).action, 'suspended');
+    } finally {
+      SubscriptionNoticeService.recipients = original;
+    }
+  });
+
+  it('a conta pura: com warnedAt nulo a etapa é o aviso; com aviso velho, suspende', () => {
+    const agora = aoSegundo(Date.now());
+    const sub = { status: 'active', renews_at: new Date(agora.getTime() - 20 * DIA) };
+    const config = { days: 15, warnDays: 3 };
+    assert.equal(SubscriptionService.autoSuspensionStep(sub, agora, pago, config, { warnedAt: null }).step, 'suspension_warning');
+    assert.equal(SubscriptionService.autoSuspensionStep(
+      sub, agora, pago, config, { warnedAt: new Date(agora.getTime() - 2 * DIA) }
+    ).step, 'suspension_warning');
+    assert.equal(SubscriptionService.autoSuspensionStep(
+      sub, agora, pago, config, { warnedAt: new Date(agora.getTime() - 3 * DIA) }
+    ).step, 'suspend');
+    // Sem aviso configurado, suspende direto.
+    assert.equal(SubscriptionService.autoSuspensionStep(sub, agora, pago, { days: 15, warnDays: 0 }, { warnedAt: null }).step, 'suspend');
   });
 });
 
@@ -249,6 +299,7 @@ describe('o aviso antes', () => {
 describe('o pagamento', () => {
   it('reativa a suspensão automática: ativo, período a partir do pagamento, motivo limpo', async () => {
     await comAssinatura({ renews_at: vencimento });
+    await passada(em(12));
     assert.equal((await passada(em(16))).action, 'suspended');
     const agora = aoSegundo(Date.now());
     const resultado = await runInTenant(alfa, () => SubscriptionService.recordPayment({
@@ -360,14 +411,124 @@ describe('a pró-rata vencida também conta', () => {
   });
 
   it('e suspende pelo mesmo caminho', async () => {
-    await comAssinatura({ renews_at: aoSegundo(Date.now() + 10 * DIA) });
     const agora = aoSegundo(Date.now());
+    await comAssinatura({ renews_at: aoSegundo(Date.now() + 10 * DIA), proration_due_at: new Date(agora.getTime() - 15 * DIA) });
     const resultado = await runInTenant(alfa, () => SubscriptionService.autoSuspend({
       now: agora, config: { days: 15, warnDays: 3 }, prorationDueAt: new Date(agora.getTime() - 15 * DIA)
     }));
     assert.equal(resultado.suspended, true, JSON.stringify(resultado));
     assert.equal(resultado.overdueReason, 'proration_overdue');
     assert.equal((await assinatura()).suspended_reason, 'auto_nonpayment');
+  });
+});
+
+describe('a suspensão por pró-rata vencida (revisão C/D)', () => {
+  /** Uma fatura de pró-rata emitida, vencida em `dueDate`. */
+  async function prorataVencida(dueDate, { amountCents = 3000, id = 'pay_pr_vencida' } = {}) {
+    return runInTenant(alfa, async () => {
+      const { default: Charge } = await import('../src/models/BillingCharge.js');
+      const linhaId = await Charge.openProration({
+        key: `p${id.slice(-9)}`, amountCents, currency: 'BRL', provider: 'asaas', dueDate
+      });
+      await Charge.markIssued(linhaId, {
+        gatewayChargeId: id, invoiceUrl: `https://gateway.exemplo.test/i/${id}`, dueDate
+      });
+      return Charge.findById(linhaId);
+    });
+  }
+
+  it('o aviso fala da pró-rata: o valor, o link e a data de vencimento DELA', async () => {
+    await comAssinatura({ renews_at: aoSegundo(Date.now() + 10 * DIA) });
+    const vence = ChargeIssuingService.isoDate(Date.now() - 13 * DIA);
+    await prorataVencida(vence);
+    const resultado = await passada(aoSegundo(Date.now()));
+    assert.equal(resultado.action, 'warned', JSON.stringify(resultado));
+    const mensagem = ultima();
+    assert.match(mensagem, /pay_pr_vencida/, 'o link é o da pró-rata');
+    assert.match(mensagem, /30,00/, 'o valor é o da pró-rata');
+  });
+
+  it('pagar a renovação não tira da suspensão quem foi suspenso pela pró-rata; pagar a pró-rata tira', async () => {
+    const vence = ChargeIssuingService.isoDate(Date.now() - 20 * DIA);
+    const pr = await prorataVencida(vence);
+    await comAssinatura({
+      renews_at: aoSegundo(Date.now() + 2 * DIA), status: 'suspended', suspended_reason: 'auto_nonpayment'
+    });
+    await runInTenant(alfa, async () => {
+      const { default: Charge } = await import('../src/models/BillingCharge.js');
+      await Charge.syncProrationDue();
+    });
+    assert.ok((await assinatura()).proration_due_at);
+
+    // O "pagar agora" devolve a pró-rata, e não a renovação.
+    await getDb()('tenants').where({ id: alfa }).update({ billing_gateway: 'asaas', billing_customer_ref: 'cus_alfa' });
+    pedidosAoGateway = [];
+    const pagar = await runInTenant(alfa, () => SelfBillingService.payNow());
+    assert.equal(pagar.charge.id, pr.id, 'a fatura a pagar é a da pró-rata');
+    assert.deepEqual(pedidosAoGateway, [], 'nenhuma renovação emitida');
+
+    // A renovação paga mesmo assim: o período anda, a suspensão fica.
+    const renovacao = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 19990, externalId: 'pay_renovacao_suspenso'
+    }));
+    assert.equal(renovacao.underpaid, false);
+    let depois = await assinatura();
+    assert.equal(depois.status, 'suspended');
+    assert.equal(depois.suspended_reason, 'auto_nonpayment');
+    assert.ok(new Date(depois.renews_at).getTime() > Date.now() + 25 * DIA, 'o período pago anda');
+    const detalhe = JSON.parse((await getDb()('billing_events').where({ external_id: 'pay_renovacao_suspenso' }).first()).detail);
+    assert.equal(detalhe.stillSuspended, 'proration_overdue');
+    assert.equal(detalhe.reactivated, undefined);
+
+    // A pró-rata paga é a dívida que suspendeu: reativa.
+    await runInTenant(alfa, () => SubscriptionService.recordPayment({ amountCents: 3000, externalId: pr.gateway_charge_id }));
+    depois = await assinatura();
+    assert.equal(depois.status, 'active');
+    assert.equal(depois.suspended_reason, null);
+  });
+
+  it('a pró-rata paga não reativa quem ainda deve a renovação', async () => {
+    const pr = await prorataVencida(ChargeIssuingService.isoDate(Date.now() - 20 * DIA));
+    await comAssinatura({
+      renews_at: aoSegundo(Date.now() - 18 * DIA), status: 'suspended', suspended_reason: 'auto_nonpayment'
+    });
+    await runInTenant(alfa, () => SubscriptionService.recordPayment({ amountCents: 3000, externalId: pr.gateway_charge_id }));
+    const depois = await assinatura();
+    assert.equal(depois.status, 'suspended', 'a renovação vencida continua devida');
+  });
+
+  it('a suspensão gravada depois da leitura do pagamento da pró-rata também sai', async () => {
+    const pr = await prorataVencida(ChargeIssuingService.isoDate(Date.now() - 20 * DIA));
+    await comAssinatura({ renews_at: aoSegundo(Date.now() + 10 * DIA), status: 'suspended', suspended_reason: 'auto_nonpayment' });
+    const original = Subscription.forTenant;
+    let primeira = true;
+    Subscription.forTenant = async (...args) => {
+      const real = await original.apply(Subscription, args);
+      if (primeira && real) {
+        primeira = false;
+        // O pagamento leu o provedor ANTES de o agendador o suspender.
+        return { ...real, status: 'active', suspended_reason: null };
+      }
+      return real;
+    };
+    try {
+      await runInTenant(alfa, () => SubscriptionService.recordPayment({ amountCents: 3000, externalId: pr.gateway_charge_id }));
+    } finally {
+      Subscription.forTenant = original;
+    }
+    const depois = await assinatura();
+    assert.equal(depois.status, 'active');
+    assert.equal(depois.suspended_reason, null);
+  });
+
+  it('a gravação condicional confere a coluna da pró-rata', async () => {
+    const agora = aoSegundo(Date.now());
+    await comAssinatura({ renews_at: aoSegundo(Date.now() + 10 * DIA), proration_due_at: null });
+    const mudou = await Subscription.suspendForNonpayment(alfa, {
+      fromStatus: 'active', deadlineColumn: 'proration_due_at', deadlineBy: new Date(agora.getTime() - 15 * DIA)
+    });
+    assert.equal(mudou, false, 'a pró-rata paga no meio (coluna vazia) não suspende');
+    assert.equal((await assinatura()).status, 'active');
   });
 });
 

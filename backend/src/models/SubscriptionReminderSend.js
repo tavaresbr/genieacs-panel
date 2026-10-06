@@ -58,6 +58,15 @@ class SubscriptionReminderSend {
     return mudou > 0 ? linha.id : null;
   }
 
+  /**
+   * Quando a etapa daquele prazo SAIU — ou nulo. É o que a suspensão
+   * automática lê para nunca suspender sem o aviso antes (0102).
+   */
+  static async sentAt({ dueAt, step: etapa }) {
+    const linha = await tdb('subscription_reminder_sends').where({ due_at: dueAt, step: naColuna(etapa) }).first();
+    return linha?.sent_at ? new Date(linha.sent_at) : null;
+  }
+
   /** O lembrete saiu: grava por onde e quando, e solta a garra. */
   static async markSent(id, { channels, at = new Date() }) {
     await tdb('subscription_reminder_sends').where({ id }).update({

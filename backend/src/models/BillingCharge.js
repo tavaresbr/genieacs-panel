@@ -205,8 +205,11 @@ class BillingCharge {
    * depois de todo dígito na ordem do texto, então `openBefore` (`<` uma
    * data) nunca a alcança — a faxina de períodos velhos não cancela pró-rata.
    */
-  static prorationKey({ fromPlanId, toPlanId, periodEnd }) {
-    const base = `${fromPlanId ?? '-'}>${toPlanId}@${String(periodEnd).slice(0, 10)}`;
+  static prorationKey({ fromPlanId, toPlanId, periodEnd, seq = 0 }) {
+    // `seq`: a mesma subida repetida no mesmo período depois de a primeira
+    // fatura dela já ter fechado (o console voltou o plano, e o provedor subiu
+    // de novo) — outra chave, para a segunda fatura não colidir com a paga.
+    const base = `${fromPlanId ?? '-'}>${toPlanId}@${String(periodEnd).slice(0, 10)}${seq > 0 ? `#${seq}` : ''}`;
     return `p${crypto.createHash('sha256').update(base).digest('hex').slice(0, 9)}`;
   }
 
@@ -345,11 +348,17 @@ class BillingCharge {
    *
    * Solta a garra junto: a emissão acabou.
    */
-  static async markIssued(id, { gatewayChargeId, invoiceUrl = null, dueDate = null }) {
+  static async markIssued(id, {
+    gatewayChargeId, invoiceUrl = null, dueDate = null, discountTerms = undefined
+  }) {
     const changed = await tdb('billing_charges').where({ id }).whereNull('gateway_charge_id').update({
       gateway_charge_id: String(gatewayChargeId).slice(0, 128),
       invoice_url: invoiceUrl ? String(invoiceUrl).slice(0, 512) : null,
       ...(dueDate ? { due_date: dueDate } : {}),
+      // Os termos do desconto com que ela saiu (0100, `discount_terms`) —
+      // quando quem emitiu os sabe. A adoção de uma cobrança achada pela
+      // referência não sabe, e a linha fica com a configuração de hoje.
+      ...(discountTerms !== undefined ? { discount_terms: BillingCharge.serializeDiscountTerms(discountTerms) } : {}),
       status: 'pending',
       last_error: null,
       issuing_until: null,
@@ -496,6 +505,8 @@ class BillingCharge {
       // O meio é decidido de novo na reemissão (0100): o cartão, se ele ainda
       // for utilizável; senão a página de Pix-ou-boleto.
       billing_type: null,
+      // Os termos do desconto são os da emissão nova.
+      discount_terms: null,
       // O plano e o cupom do preço novo (0093), quando quem reprecifica os
       // diz; sem eles (a reabertura da isenção, que mantém o valor), ficam.
       ...(planId !== undefined ? { plan_id: planId } : {}),
@@ -503,6 +514,73 @@ class BillingCharge {
       updated_at: new Date()
     });
     return changed > 0;
+  }
+
+  /**
+   * Os termos do desconto por antecipação gravados na linha (0100,
+   * `discount_terms`): `{ discount: {...} | null }` quando a emissão os
+   * gravou, ou nulo — a linha de antes da coluna, ou adotada sem eles — e aí
+   * quem confere usa a configuração de hoje. Nunca lança.
+   */
+  static discountTermsOf(linha) {
+    if (!linha?.discount_terms) return null;
+    try {
+      const lido = JSON.parse(linha.discount_terms);
+      if (!lido || typeof lido !== 'object' || !('discount' in lido)) return null;
+      const d = lido.discount;
+      if (d === null) return { discount: null };
+      if (!d || typeof d !== 'object') return null;
+      const cents = Number(d.cents);
+      const daysBefore = Number(d.daysBefore);
+      if (!Number.isInteger(cents) || cents <= 0 || !Number.isInteger(daysBefore) || daysBefore < 0) return null;
+      return {
+        discount: {
+          cents, kind: d.kind === 'percent' ? 'percent' : 'fixed', percent: d.percent ?? null, daysBefore
+        }
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /** O JSON de `discount_terms` a partir do que o cliente do gateway devolveu. */
+  static serializeDiscountTerms(terms) {
+    if (terms === null || terms === undefined) return null;
+    const d = terms.discount ?? null;
+    return JSON.stringify({
+      discount: d ? {
+        cents: Number(d.cents), kind: d.kind, percent: d.percent ?? null, daysBefore: Number(d.daysBefore)
+      } : null
+    });
+  }
+
+  /**
+   * Cancela as faturas de pró-rata deste provedor que ainda NÃO chegaram ao
+   * gateway (sem id lá, sem garra viva): a assinatura deixou de ser cobrável
+   * (cancelada, suspensa à mão), e a retentativa do agendador não pode levá-la
+   * ao gateway depois. A que está nas mãos de uma emissão agora é relida por
+   * ela logo antes de falar com o gateway (`emitProration`).
+   *
+   * @returns {Promise<number>} quantas foram canceladas.
+   */
+  static async cancelUnissuedProrations({ reason = 'not_billable', now = new Date() } = {}) {
+    const changed = await tdb('billing_charges')
+      .where({ kind: 'proration' })
+      .whereIn('status', ['pending', 'failed'])
+      .whereNull('gateway_charge_id')
+      // A de cartão pode existir no gateway com a resposta perdida: quem a
+      // fecha é `emitProration`, depois de perguntar pela referência.
+      .where((meio) => meio.whereNull('billing_type').orWhere('billing_type', '!=', 'CREDIT_CARD'))
+      .where((livre) => livre.whereNull('issuing_until').orWhere('issuing_until', '<', now))
+      .update({
+        status: 'canceled',
+        issuing_until: null,
+        next_attempt_at: null,
+        last_error: String(reason).slice(0, 500),
+        updated_at: new Date()
+      });
+    if (changed > 0) await BillingCharge.syncProrationDue();
+    return changed;
   }
 
   /** As cobranças que esta linha já foi, lidas da coluna — nunca lança. */

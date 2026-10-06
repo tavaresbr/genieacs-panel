@@ -11,6 +11,7 @@ const { resetMailTransport } = await import('../src/services/mail/index.js');
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: Plan } = await import('../src/models/Plan.js');
 const { default: Tenant } = await import('../src/models/Tenant.js');
+const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
 const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
 const { default: ChargeIssuingService } = await import('../src/services/chargeIssuingService.js');
 const { default: CardAutopayService } = await import('../src/services/billing/cardAutopayService.js');
@@ -48,7 +49,10 @@ const TOKEN_NOVO = 'tok_OUTRO_cartao_1a2b3c4d5e6f';
 let gateway;
 let recebidas = [];
 let proximoId = 0;
-/** `ok`, `recusar` (400 com o token ecoado) ou `cair` (cria e responde 500). */
+/**
+ * `ok`, `recusar` (400 do cartão, com o token ecoado), `rejeitar` (400 que não
+ * é do cartão), `limite` (429) ou `cair` (cria e responde 502).
+ */
 let modoCartao = 'ok';
 /** Os pagamentos que o gateway de mentira conhece como pagos com cartão. */
 const pagosComCartao = new Map();
@@ -85,10 +89,16 @@ function subirGateway() {
             errors: [{ code: 'invalid_creditCard', description: `Transação não autorizada para ${payload.creditCardToken}` }]
           });
         }
+        if (payload?.billingType === 'CREDIT_CARD' && modoCartao === 'rejeitar') {
+          return responder(400, { errors: [{ code: 'invalid_object', description: 'O campo externalReference é inválido.' }] });
+        }
+        if (payload?.billingType === 'CREDIT_CARD' && modoCartao === 'limite') {
+          return responder(429, { errors: [{ code: 'too_many_requests', description: 'Limite de requisições atingido.' }] });
+        }
         proximoId += 1;
         const id = `pay_card_${proximoId}`;
         criadas.push({
-          id, billingType: payload.billingType, externalReference: payload.externalReference,
+          id, billingType: payload.billingType, externalReference: payload.externalReference, value: payload.value,
           status: 'PENDING', invoiceUrl: `https://gateway.exemplo.test/i/${id}`, dueDate: payload.dueDate
         });
         if (payload?.billingType === 'CREDIT_CARD' && modoCartao === 'cair') {
@@ -109,6 +119,16 @@ function subirGateway() {
       if (req.method === 'GET' && caminho.startsWith('/payments/')) {
         const id = decodeURIComponent(caminho.slice('/payments/'.length));
         const cartao = pagosComCartao.get(id);
+        const criada = criadas.find((item) => item.id === id);
+        if (!cartao && criada) {
+          return responder(200, {
+            id,
+            billingType: criada.billingType,
+            status: criada.status,
+            value: criada.value,
+            paymentDate: criada.status === 'PENDING' ? null : new Date().toISOString().slice(0, 10)
+          });
+        }
         if (!cartao) return responder(200, { id, billingType: 'PIX', status: 'RECEIVED' });
         return responder(200, {
           id,
@@ -168,8 +188,9 @@ const daquiA = (dias) => new Date(Math.floor((Date.now() + dias * 86_400_000) / 
 
 const assinatura = () => Subscription.forTenant(alfa);
 const cobrancas = () => getDb()('billing_charges').where({ tenant_id: alfa }).orderBy('id');
+/** O "pagar agora" do provedor: o clique explícito, que cobra o cartão já (`cardNow`). */
 const emitir = () => runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
-  tenant: await Tenant.findById(alfa), manual: true
+  tenant: await Tenant.findById(alfa), manual: true, cardNow: true
 }));
 const posts = () => recebidas.filter((r) => r.method === 'POST' && r.path === '/payments');
 
@@ -442,6 +463,178 @@ describe('a renovação', () => {
     assert.ok(recebidas.some((r) => r.method === 'GET' && r.path === '/payments' && r.query.includes('externalReference')));
     [linha] = await cobrancas();
     assert.equal(linha.gateway_charge_id, criadas[0].id);
+  });
+});
+
+
+describe('a cobrança de cartão sem resposta (revisão)', () => {
+  it('o processo morre depois de o gateway criar e antes de gravar: a próxima passada adota, um POST só', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const original = BillingCharge.markIssued;
+    BillingCharge.markIssued = async () => { throw new Error('o processo caiu aqui'); };
+    try {
+      await assert.rejects(emitir(), /o processo caiu/);
+    } finally {
+      BillingCharge.markIssued = original;
+    }
+    let [linha] = await cobrancas();
+    assert.equal(linha.billing_type, 'CREDIT_CARD');
+    assert.equal(linha.gateway_charge_id, null);
+    assert.equal(Number(linha.attempts), 0, 'nenhuma tentativa contada: o processo morreu');
+    assert.equal(posts().length, 1);
+    // A garra vence sozinha.
+    await getDb()('billing_charges').where({ id: linha.id }).update({ issuing_until: new Date(Date.now() - 1000) });
+
+    const depois = await runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
+      tenant: await Tenant.findById(alfa), now: new Date(Date.now() + 3 * 86_400_000)
+    }));
+    assert.equal(depois.reason, 'already_issued', JSON.stringify(depois));
+    assert.equal(depois.adopted, true);
+    assert.equal(posts().length, 1, 'o gateway recebeu um POST só: o cartão foi cobrado uma vez');
+    [linha] = await cobrancas();
+    assert.equal(linha.gateway_charge_id, criadas[0].id);
+  });
+
+  it('a adotada que o gateway já tem como paga é quitada pelo caminho do webhook', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const antes = new Date((await assinatura()).renews_at).getTime();
+    modoCartao = 'cair';
+    await emitir();
+    criadas[0].status = 'CONFIRMED';
+    modoCartao = 'ok';
+    const retentativa = await emitir();
+    assert.equal(retentativa.adopted, true, JSON.stringify(retentativa));
+    assert.equal(retentativa.settled, 'recorded');
+    const [linha] = await cobrancas();
+    assert.equal(linha.status, 'paid');
+    const evento = await getDb()('billing_events').where({ tenant_id: alfa, external_id: criadas[0].id }).first();
+    assert.ok(evento, 'o pagamento entrou no extrato');
+    assert.ok(new Date((await assinatura()).renews_at).getTime() > antes, 'o período andou');
+
+    // O webhook que chega depois é a reentrega: nada de crédito duplo.
+    const entrega = await entregar({
+      event: 'PAYMENT_CONFIRMED',
+      payment: {
+        id: criadas[0].id, value: 99.9, customer: 'cus_alfa', billingType: 'CREDIT_CARD', externalReference: `tenant:${alfa}:${linha.period_end}`
+      }
+    });
+    assert.equal(entrega.body.code, 'duplicate');
+    await BillingWebhookController.pendingCardWork;
+  });
+
+  it('a pró-rata de cartão paga lá cujo webhook chegou antes da adoção: reconciliada, sem estender o prazo', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const antes = await assinatura();
+    modoCartao = 'cair';
+    const quote = {
+      eligible: true, renewsAt: new Date(antes.renews_at).toISOString(), fromPlanId: basico.id, toPlanId: pro.id,
+      amountCents: 3000, currency: 'BRL', fromPriceCents: 9990, toPriceCents: 39990,
+      remainingSeconds: 86_400, periodSeconds: 30 * 86_400, remainingDays: 1
+    };
+    const criada = await runInTenant(alfa, async () => ChargeIssuingService.createProration({
+      tenant: await Tenant.findById(alfa), subscription: antes, quote
+    }));
+    assert.equal(criada.reason, 'gateway_failed', JSON.stringify(criada));
+    let [pr] = (await cobrancas()).filter((c) => c.kind === 'proration');
+    assert.equal(pr.billing_type, 'CREDIT_CARD');
+    assert.equal(pr.gateway_charge_id, null);
+
+    // O cartão foi cobrado lá, e o webhook chega ANTES de a linha conhecer o
+    // id: é conferido contra o preço do plano, e fica "a menos".
+    criadas[0].status = 'CONFIRMED';
+    const entrega = await entregar({
+      event: 'PAYMENT_CONFIRMED',
+      payment: {
+        id: criadas[0].id, value: 30, customer: 'cus_alfa', billingType: 'CREDIT_CARD', externalReference: `tenant:${alfa}:proration:${pr.id}`
+      }
+    });
+    assert.equal(entrega.body.code, 'underpaid');
+    await BillingWebhookController.pendingCardWork;
+
+    modoCartao = 'ok';
+    recebidas = [];
+    const retentativa = await runInTenant(alfa, async () => ChargeIssuingService.retryProrations({
+      tenant: await Tenant.findById(alfa), manual: true, chargeId: pr.id
+    }));
+    assert.equal(retentativa.result.adopted, true, JSON.stringify(retentativa));
+    assert.equal(retentativa.result.settled, 'reconciled');
+    assert.equal(posts().length, 0, 'nenhuma segunda cobrança no cartão');
+    [pr] = (await cobrancas()).filter((c) => c.kind === 'proration');
+    assert.equal(pr.status, 'paid');
+    assert.equal(pr.gateway_charge_id, criadas[0].id);
+    const depois = await assinatura();
+    assert.equal(depois.proration_due_at, null);
+    assert.equal(String(depois.renews_at), String(antes.renews_at), 'a pró-rata não compra período');
+    const aceite = await getDb()('billing_events').where({ tenant_id: alfa, external_id: `${criadas[0].id}:accepted` }).first();
+    assert.ok(aceite, 'a diferença conferida contra o plano foi aceita pela linha');
+  });
+
+  it('desligar a cobrança automática no meio da emissão: a cobrança sai como Pix/boleto', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const original = BillingCharge.open;
+    BillingCharge.open = async (args) => {
+      const id = await original.call(BillingCharge, args);
+      await getDb()('subscriptions').where({ tenant_id: alfa }).update({ card_autopay_at: null });
+      return id;
+    };
+    let resultado;
+    try {
+      resultado = await emitir();
+    } finally {
+      BillingCharge.open = original;
+    }
+    assert.equal(resultado.issued, true, JSON.stringify(resultado));
+    assert.equal(resultado.billingType, 'UNDEFINED');
+    assert.equal(posts().length, 1);
+    assert.equal(posts()[0].payload.billingType, 'UNDEFINED');
+    assert.equal('creditCardToken' in posts()[0].payload, false);
+    assert.equal((await cobrancas())[0].billing_type, 'UNDEFINED');
+  });
+});
+
+describe('o erro do gateway na cobrança de cartão (revisão)', () => {
+  it('classifyError: só a recusa que fala do cartão é do cartão', () => {
+    const erro = (status, errors, code = status === 401 ? 'unauthorized' : status < 500 ? 'refused' : 'gateway_error') => ({
+      status, code, errors, message: `gateway answered ${status}`
+    });
+    assert.equal(CardAutopayService.classifyError(erro(400, [{ code: 'invalid_creditCard', description: 'x' }])), 'refused');
+    assert.equal(CardAutopayService.classifyError(erro(400, [{ code: 'invalid_action', description: 'Cartão recusado pela operadora' }])), 'refused');
+    assert.equal(CardAutopayService.classifyError(erro(400, [{ code: 'invalid_customer', description: 'Cliente inexistente' }])), 'rejected');
+    assert.equal(CardAutopayService.classifyError(erro(429, [])), 'safe');
+    assert.equal(CardAutopayService.classifyError(erro(503, [])), 'ambiguous');
+    assert.equal(CardAutopayService.classifyError({ code: 'unreachable' }), 'ambiguous');
+    assert.equal(CardAutopayService.classifyError({ code: 'not_configured' }), 'safe');
+  });
+
+  it('a recusa que não é do cartão sai como Pix/boleto sem marcar o cartão nem avisar', async () => {
+    await autopay(true);
+    await salvarCartao();
+    modoCartao = 'rejeitar';
+    const resultado = await emitir();
+    assert.equal(resultado.issued, true, JSON.stringify(resultado));
+    assert.equal(resultado.billingType, 'UNDEFINED');
+    assert.equal(resultado.cardRefused, undefined);
+    const sub = await assinatura();
+    assert.equal(sub.card_failed_at, null, 'o cartão não é marcado');
+    assert.equal(emails.length, 0, 'nada de "cartão recusado"');
+    assert.equal(CardAutopayService.usable(sub), true);
+  });
+
+  it('429 é tentar de novo depois, com o cartão', async () => {
+    await autopay(true);
+    await salvarCartao();
+    modoCartao = 'limite';
+    const resultado = await emitir();
+    assert.equal(resultado.issued, false);
+    assert.equal(resultado.reason, 'gateway_failed');
+    const [linha] = await cobrancas();
+    assert.equal(linha.billing_type, null, 'nada foi processado: a próxima tentativa pode usar o cartão');
+    assert.equal((await assinatura()).card_failed_at, null);
+    assert.equal(emails.length, 0);
   });
 });
 
@@ -771,14 +964,65 @@ describe('a antecedência da renovação no cartão', () => {
     assert.equal(posts()[0].payload.dueDate, ChargeIssuingService.isoDate(prazo()));
   });
 
-  it('o clique (manual) emite no cartão antes do dia', async () => {
+  it('o "pagar agora" (cardNow) emite no cartão antes do dia', async () => {
     await autopay(true);
     await salvarCartao();
     const clique = await runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
-      tenant: await Tenant.findById(alfa), now: horasAntes(72), manual: true
+      tenant: await Tenant.findById(alfa), now: horasAntes(72), manual: true, cardNow: true
     }));
     assert.equal(clique.issued, true, JSON.stringify(clique));
     assert.equal(clique.billingType, 'CREDIT_CARD');
+  });
+
+  it('a reemissão por clique que não é "pagar agora" não cobra o cartão antes do dia', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const reemissao = await runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
+      tenant: await Tenant.findById(alfa), now: horasAntes(72), manual: true
+    }));
+    assert.equal(reemissao.issued, false, JSON.stringify(reemissao));
+    assert.equal(reemissao.reason, 'card_deferred');
+    assert.equal(posts().length, 0, 'nada vai ao gateway antes do vencimento');
+
+    // A linha reaberta (a cancelada pela troca de plano, o console) fica sem
+    // id, e o agendador a emite no cartão no dia.
+    await getDb()('billing_charges').insert({
+      tenant_id: alfa, period_end: ChargeIssuingService.periodKey(prazo()), amount_cents: 9990, currency: 'BRL',
+      provider: 'asaas', status: 'canceled', attempts: 5, created_at: new Date(), updated_at: new Date()
+    });
+    const console = await runInTenant(alfa, async () => ChargeIssuingService.issueCurrent({
+      tenant: await Tenant.findById(alfa), now: horasAntes(72), manual: true
+    }));
+    assert.equal(console.reason, 'card_deferred', JSON.stringify(console));
+    assert.equal(console.charge.status, 'pending');
+    assert.equal(console.charge.gateway_charge_id, null);
+    assert.equal(Number(console.charge.attempts), 0, 'a paciência do agendador volta a zero');
+    assert.equal(posts().length, 0);
+
+    const noDia = await agendador(horasAntes(1));
+    assert.equal(noDia.issued, true, JSON.stringify(noDia));
+    assert.equal(noDia.billingType, 'CREDIT_CARD');
+    assert.equal(posts().length, 1);
+  });
+
+  it('a troca de plano e o cupom não cobram o cartão antes do dia', async () => {
+    await autopay(true);
+    await salvarCartao();
+    const ate = daquiA(20);
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ renews_at: ate });
+    await SubscriptionService.invalidate(alfa);
+    // A cobrança do período já saiu no cartão pelo "pagar agora"…
+    const paga = await emitir();
+    assert.equal(paga.issued, true, JSON.stringify(paga));
+    recebidas = [];
+    // …e a subida cancela e reemite pela porta da troca: sem cartão agora.
+    const troca = await pedir('/subscription/plan', { method: 'PUT', body: { planId: pro.id } });
+    assert.equal(troca.status, 200, JSON.stringify(troca.body));
+    const novas = posts().filter((p) => !String(p.payload.externalReference).includes(':proration:'));
+    assert.equal(novas.length, 0, 'a renovação reemitida espera o vencimento');
+    const [linha] = (await cobrancas()).filter((c) => c.kind !== 'proration');
+    assert.equal(linha.gateway_charge_id, null);
+    assert.equal(linha.status, 'pending');
   });
 
   it('o cartão recusado volta à antecedência de Pix/boleto', async () => {

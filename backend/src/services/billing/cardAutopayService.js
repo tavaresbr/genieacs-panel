@@ -135,19 +135,39 @@ class CardAutopayService {
   /**
    * Como um erro do gateway na criação de uma cobrança de CARTÃO se lê:
    *
-   *   - `refused`: o gateway recusou o pedido (4xx) — o cartão, quase
-   *     sempre. Marca a falha e reemite como Pix/boleto na hora.
+   *   - `refused`: o gateway recusou o CARTÃO (4xx com um erro que fala do
+   *     cartão — `invalid_creditCard`, "cartão", "recusad"…). Marca a falha,
+   *     reemite como Pix/boleto na hora e avisa o provedor.
+   *   - `rejected`: o gateway recusou o PEDIDO por outro motivo (4xx que não
+   *     é do cartão — um campo, o cliente). A cobrança não foi criada, então
+   *     sair como Pix/boleto agora é seguro — mas o cartão não tem culpa: não
+   *     se marca a falha nem se avisa "cartão recusado".
    *   - `safe`: a cobrança não chegou a ser processada (ver
-   *     `ERROS_ANTES_DE_COBRAR`); a próxima tentativa pode usar o cartão.
+   *     `ERROS_ANTES_DE_COBRAR`, e o 429 de limite de requisições); a próxima
+   *     tentativa pode usar o cartão.
    *   - `ambiguous`: a rede caiu no meio, o gateway respondeu 5xx ou algo que
    *     não se lê. A cobrança PODE existir lá — e cartão é dinheiro que sai
    *     sozinho. A próxima tentativa pergunta ao gateway antes (`issueCurrent`).
    */
   static classifyError(error) {
     const codigo = String(error?.code ?? '');
-    if (codigo === 'refused') return 'refused';
+    const status = Number(error?.status ?? 0);
+    if (status === 429) return 'safe';
+    if (status >= 500) return 'ambiguous';
+    if (codigo === 'refused') return this.isCardError(error) ? 'refused' : 'rejected';
     if (ERROS_ANTES_DE_COBRAR.has(codigo)) return 'safe';
     return 'ambiguous';
+  }
+
+  /**
+   * Se a recusa do gateway fala do CARTÃO: pelos `errors` do corpo (o código
+   * e a descrição), ou, sem eles, pela mensagem.
+   */
+  static isCardError(error) {
+    const doCartao = (texto) => /credit_?card|cart[aã]o|\bcard\b|recusad|n[aã]o autorizad|declined/i.test(String(texto ?? ''));
+    const erros = Array.isArray(error?.errors) ? error.errors : [];
+    if (erros.length) return erros.some((item) => doCartao(item?.code) || doCartao(item?.description));
+    return doCartao(error?.message);
   }
 
   /**
