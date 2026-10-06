@@ -611,6 +611,7 @@ export default {
   'whatsapp.ai.error.timeout': 'AI ने जवाब देने में बहुत देर लगाई',
   'whatsapp.ai.error.unauthorized': 'AI प्रदाता ने API कुंजी अस्वीकार कर दी',
   'whatsapp.ai.error.rateLimited': 'AI उपयोग सीमा पूरी हो गई; बाद में फिर कोशिश करें',
+  'whatsapp.ai.error.noBalance': 'AI खाते में बैलेंस या सक्रिय पैकेज नहीं है; प्रदाता की साइट पर रिचार्ज करें',
   'whatsapp.ai.error.badResponse': 'AI ने अमान्य जवाब लौटाया',
   'whatsapp.ai.error.unreachable': 'AI से कनेक्ट नहीं हो सका',
   'whatsapp.ai.error.blockedHost': 'यह AI पता अनुमत नहीं है',

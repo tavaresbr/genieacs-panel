@@ -4749,8 +4749,16 @@ export interface WhatsAppContact {
   lastMessageAt: string | null
 }
 
+/** How many contacts each filter button would show if clicked now (see `WaContactService.counts`). */
+export interface WhatsAppContactCounts {
+  states: { all: number; active: number; blocked: number; cancelled: number; none: number }
+  noPhone: number
+  imported: number
+}
+
 export interface WhatsAppContactPage {
   total: number
+  counts: WhatsAppContactCounts
   contacts: WhatsAppContact[]
 }
 
@@ -4833,7 +4841,7 @@ export interface BotAiConfig {
   instructions: string
   hasApiKey: boolean
   /** A última falha da IA, para dizer por que o cliente recebeu o menu. */
-  lastError: { at: string; code: string } | null
+  lastError: { at: string; code: string; detail?: string | null } | null
 }
 
 /** O que a tela manda: `apiKey` nova troca a chave, `''` apaga, ausente mantém. */

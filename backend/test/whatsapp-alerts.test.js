@@ -685,16 +685,23 @@ const { default: WaBotConfigService } = await import('../src/services/waBotConfi
 describe('a customer waiting for a person tells the team', () => {
   let conversaId;
 
-  const msg = (direction, minutosAtras, extra = {}) => asTenant(() => tinsert('wa_messages', {
-    conversation_id: conversaId,
-    direction,
-    body: direction === 'in' ? 'alguém?' : 'oi, já vejo',
-    source: 'operator',
-    delivery_status: direction === 'in' ? null : 'sent',
-    created_at: new Date(Date.now() - minutosAtras * MINUTE),
-    updated_at: new Date(Date.now() - minutosAtras * MINUTE),
-    ...extra
-  }));
+  // O instante vai com os milissegundos zerados: o DATETIME do MySQL ARREDONDA a
+  // fração de segundo (,500 ou mais sobe 1 s), e "25 min atrás" virava 24 min 59 s
+  // na leitura — a asserção de minutos falhava só no MySQL, de vez em quando.
+  // Truncar para baixo deixa a espera pelo menos do tamanho pedido em todo banco.
+  const msg = (direction, minutosAtras, extra = {}) => {
+    const quando = new Date(Math.floor((Date.now() - minutosAtras * MINUTE) / 1000) * 1000);
+    return asTenant(() => tinsert('wa_messages', {
+      conversation_id: conversaId,
+      direction,
+      body: direction === 'in' ? 'alguém?' : 'oi, já vejo',
+      source: 'operator',
+      delivery_status: direction === 'in' ? null : 'sent',
+      created_at: quando,
+      updated_at: quando,
+      ...extra
+    }));
+  };
 
   before(async () => {
     const c = await asTenant(() => WaConversation.ensure({

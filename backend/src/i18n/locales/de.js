@@ -612,6 +612,7 @@ export default {
   'whatsapp.ai.error.timeout': 'Die KI hat zu lange für die Antwort gebraucht',
   'whatsapp.ai.error.unauthorized': 'Der KI-Anbieter hat den API-Schlüssel abgelehnt',
   'whatsapp.ai.error.rateLimited': 'KI-Nutzungslimit erreicht; versuchen Sie es später erneut',
+  'whatsapp.ai.error.noBalance': 'KI-Konto ohne Guthaben oder aktives Paket; beim Anbieter aufladen',
   'whatsapp.ai.error.badResponse': 'Die KI hat eine ungültige Antwort geliefert',
   'whatsapp.ai.error.unreachable': 'Verbindung zur KI nicht möglich',
   'whatsapp.ai.error.blockedHost': 'Diese KI-Adresse ist nicht erlaubt',

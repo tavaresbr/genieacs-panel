@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { platformAPI, type AsaasIntegration, type AsaasIntegrationUpdate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
@@ -74,6 +74,26 @@ function Selo({ ligado, sim, nao, source }: {
       {t(ligado ? sim : nao)}
       {chave && <span className="ms-1 font-normal opacity-80">· {t(chave)}</span>}
     </span>
+  )
+}
+
+/**
+ * Um "balão" dentro do cartão da integração: uma parte com ícone e título
+ * próprios. Antes as partes eram separadas só por uma linha fina, e a tela
+ * longa da Asaas virava uma coluna só de campos.
+ */
+function Balao({ icon, title, children }: { icon: string; title: TranslationKey; children: ReactNode }) {
+  const { t } = useTranslation()
+  return (
+    <div className="rounded-lg border border-border bg-[hsl(var(--surface-subtle))] p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon name={icon} size={18} />
+        </span>
+        <h3 className="text-base font-semibold text-foreground">{t(title)}</h3>
+      </div>
+      {children}
+    </div>
   )
 }
 
@@ -215,145 +235,154 @@ function AsaasCard() {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label htmlFor="asaas-environment" className="field-label">{t('integrations.asaas.environment')}</label>
-          <select
-            id="asaas-environment"
-            value={environment}
-            onChange={(e) => setEnvironment(e.target.value as AsaasIntegration['environment'])}
-            className="modern-input w-full"
-          >
-            <option value="sandbox">{t('integrations.asaas.sandbox')}</option>
-            <option value="production">{t('integrations.asaas.production')}</option>
-          </select>
-          <p className="field-hint">{t('integrations.asaas.environmentHint')}</p>
-        </div>
-        <div>
-          <label htmlFor="asaas-api-key" className="field-label">{t('integrations.asaas.apiKey')}</label>
-          <input
-            id="asaas-api-key"
-            type="password"
-            autoComplete="new-password"
-            value={apiKey}
-            disabled={clearApiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className="modern-input w-full font-mono"
-            placeholder={t(info.apiKeyConfigured
-              ? 'integrations.asaas.placeholderStored'
-              : 'integrations.asaas.placeholderEmpty')}
-          />
-          {/* Apagar só existe para o que o painel gravou: a variável de
-              ambiente não se apaga por aqui, e a caixa prometeria isso. */}
-          {info.apiKeySource === 'db' && (
-            <label className="mt-2 flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={clearApiKey} onChange={(e) => setClearApiKey(e.target.checked)} />
-              {t('integrations.asaas.clearApiKey')}
-            </label>
-          )}
-          <p className="field-hint">
-            {t(info.apiKeySource === 'env' ? 'integrations.asaas.envOverrideHint' : 'integrations.asaas.apiKeyHint')}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button type="button" className="modern-button" disabled={!mudou || saving} onClick={() => void salvar()}>
-          {saving ? t('common.saving') : t('common.save')}
-        </button>
-        {/* Testa o que está GRAVADO, não o que está digitado: é a chave que as
-            cobranças vão usar. Por isso fica desligado com alteração pendente. */}
-        <button
-          type="button"
-          className="modern-button-secondary"
-          disabled={testing || mudou || !info.apiKeyConfigured}
-          onClick={() => void testar()}
-        >
-          <Icon name="refresh" size={17} className={testing ? 'animate-spin' : ''} />
-          {testing ? t('integrations.asaas.testing') : t('integrations.asaas.test')}
-        </button>
-        {info.updatedAt && (
-          <span className="text-xs text-muted-foreground">
-            {t('integrations.updatedAt', { when: formatRelativeTime(info.updatedAt) })}
-          </span>
-        )}
-      </div>
-
-      <div className="mt-6 space-y-4 border-t border-border pt-5">
-        <div>
-          <label htmlFor="asaas-webhook-url" className="field-label">{t('integrations.asaas.webhookUrl')}</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              id="asaas-webhook-url"
-              type="text"
-              readOnly
-              className="modern-input w-full font-mono text-xs"
-              value={absoluteWebhookUrl(info.webhookUrl, window.location.origin)}
-            />
-            <button type="button" className="modern-button-secondary shrink-0" onClick={() => void copiar(absoluteWebhookUrl(info.webhookUrl, window.location.origin))}>
-              <Icon name="copy" size={16} /> {t('common.copy')}
-            </button>
+      <div className="mt-5 space-y-4">
+        <Balao icon="lock" title="integrations.asaas.connectionTitle">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="asaas-environment" className="field-label">{t('integrations.asaas.environment')}</label>
+              <select
+                id="asaas-environment"
+                value={environment}
+                onChange={(e) => setEnvironment(e.target.value as AsaasIntegration['environment'])}
+                className="modern-input w-full"
+              >
+                <option value="sandbox">{t('integrations.asaas.sandbox')}</option>
+                <option value="production">{t('integrations.asaas.production')}</option>
+              </select>
+              <p className="field-hint">{t('integrations.asaas.environmentHint')}</p>
+            </div>
+            <div>
+              <label htmlFor="asaas-api-key" className="field-label">{t('integrations.asaas.apiKey')}</label>
+              <input
+                id="asaas-api-key"
+                type="password"
+                autoComplete="new-password"
+                value={apiKey}
+                disabled={clearApiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="modern-input w-full font-mono"
+                placeholder={t(info.apiKeyConfigured
+                  ? 'integrations.asaas.placeholderStored'
+                  : 'integrations.asaas.placeholderEmpty')}
+              />
+              {/* Apagar só existe para o que o painel gravou: a variável de
+                  ambiente não se apaga por aqui, e a caixa prometeria isso. */}
+              {info.apiKeySource === 'db' && (
+                <label className="mt-2 flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={clearApiKey} onChange={(e) => setClearApiKey(e.target.checked)} />
+                  {t('integrations.asaas.clearApiKey')}
+                </label>
+              )}
+              <p className="field-hint">
+                {t(info.apiKeySource === 'env' ? 'integrations.asaas.envOverrideHint' : 'integrations.asaas.apiKeyHint')}
+              </p>
+            </div>
           </div>
-          <p className="field-hint">{t('integrations.asaas.webhookUrlHint')}</p>
-        </div>
 
-        <div>
-          <p className="field-label">{t('integrations.asaas.webhookToken')}</p>
-          {!info.webhookTokenConfigured && (
-            <p className="field-hint">{t('integrations.asaas.webhookTokenMissingHint')}</p>
-          )}
-          <button
-            type="button"
-            className="modern-button-secondary mt-2"
-            disabled={generating}
-            onClick={() => void gerarToken()}
-          >
-            {generating ? t('common.saving') : t('integrations.asaas.generateToken')}
-          </button>
-          {newToken && (
-            <div className="mt-3 rounded-md border border-border p-3">
-              <label htmlFor="asaas-new-token" className="field-label">{t('integrations.asaas.newTokenLabel')}</label>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button type="button" className="modern-button" disabled={!mudou || saving} onClick={() => void salvar()}>
+              {saving ? t('common.saving') : t('common.save')}
+            </button>
+            {/* Testa o que está GRAVADO, não o que está digitado: é a chave que as
+                cobranças vão usar. Por isso fica desligado com alteração pendente. */}
+            <button
+              type="button"
+              className="modern-button-secondary"
+              disabled={testing || mudou || !info.apiKeyConfigured}
+              onClick={() => void testar()}
+            >
+              <Icon name="refresh" size={17} className={testing ? 'animate-spin' : ''} />
+              {testing ? t('integrations.asaas.testing') : t('integrations.asaas.test')}
+            </button>
+            {info.updatedAt && (
+              <span className="text-xs text-muted-foreground">
+                {t('integrations.updatedAt', { when: formatRelativeTime(info.updatedAt) })}
+              </span>
+            )}
+          </div>
+        </Balao>
+
+        <Balao icon="globe" title="integrations.asaas.webhookTitle">
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="asaas-webhook-url" className="field-label">{t('integrations.asaas.webhookUrl')}</label>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
-                  id="asaas-new-token"
+                  id="asaas-webhook-url"
                   type="text"
                   readOnly
                   className="modern-input w-full font-mono text-xs"
-                  value={newToken}
-                  onFocus={(e) => e.target.select()}
+                  value={absoluteWebhookUrl(info.webhookUrl, window.location.origin)}
                 />
-                <button type="button" className="modern-button-secondary shrink-0" onClick={() => void copiar(newToken)}>
+                <button type="button" className="modern-button-secondary shrink-0" onClick={() => void copiar(absoluteWebhookUrl(info.webhookUrl, window.location.origin))}>
                   <Icon name="copy" size={16} /> {t('common.copy')}
                 </button>
               </div>
-              <p className="field-hint">{t('integrations.asaas.newTokenHint')}</p>
+              <p className="field-hint">{t('integrations.asaas.webhookUrlHint')}</p>
             </div>
+
+            <div>
+              <p className="field-label">{t('integrations.asaas.webhookToken')}</p>
+              {!info.webhookTokenConfigured && (
+                <p className="field-hint">{t('integrations.asaas.webhookTokenMissingHint')}</p>
+              )}
+              <button
+                type="button"
+                className="modern-button-secondary mt-2"
+                disabled={generating}
+                onClick={() => void gerarToken()}
+              >
+                {generating ? t('common.saving') : t('integrations.asaas.generateToken')}
+              </button>
+              {newToken && (
+                <div className="mt-3 rounded-md border border-border p-3">
+                  <label htmlFor="asaas-new-token" className="field-label">{t('integrations.asaas.newTokenLabel')}</label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      id="asaas-new-token"
+                      type="text"
+                      readOnly
+                      className="modern-input w-full font-mono text-xs"
+                      value={newToken}
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <button type="button" className="modern-button-secondary shrink-0" onClick={() => void copiar(newToken)}>
+                      <Icon name="copy" size={16} /> {t('common.copy')}
+                    </button>
+                  </div>
+                  <p className="field-hint">{t('integrations.asaas.newTokenHint')}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Balao>
+
+        <Balao icon="invoice" title="nfse.title">
+          <NfseSection info={info} onSaved={setInfo} />
+        </Balao>
+
+        <Balao icon="invoice" title="chargeTerms.title">
+          <ChargeTermsSection info={info} onSaved={setInfo} />
+        </Balao>
+
+        <Balao icon="document" title="integrations.asaas.stepsTitle">
+          <ol className="list-decimal space-y-1.5 ps-5 text-sm text-muted-foreground">
+            <li>{t('integrations.asaas.step1')}</li>
+            <li>{t('integrations.asaas.step2')}</li>
+            <li>{t('integrations.asaas.step3')}</li>
+            <li>
+              {t('integrations.asaas.step4')}{' '}
+              <span className="break-words font-mono text-xs text-foreground">{EVENTOS_ASAAS.join(', ')}</span>
+            </li>
+            <li>{t('integrations.asaas.step5')}</li>
+          </ol>
+          {info.nfseEnabled && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('nfse.webhookEvents')}{' '}
+              <span className="break-words font-mono text-xs text-foreground">{EVENTOS_NFSE.join(', ')}</span>
+            </p>
           )}
-        </div>
-      </div>
-
-      <NfseSection info={info} onSaved={setInfo} />
-
-      <ChargeTermsSection info={info} onSaved={setInfo} />
-
-      <div className="mt-6 border-t border-border pt-5">
-        <h3 className="text-sm font-semibold text-foreground">{t('integrations.asaas.stepsTitle')}</h3>
-        <ol className="mt-2 list-decimal space-y-1.5 ps-5 text-sm text-muted-foreground">
-          <li>{t('integrations.asaas.step1')}</li>
-          <li>{t('integrations.asaas.step2')}</li>
-          <li>{t('integrations.asaas.step3')}</li>
-          <li>
-            {t('integrations.asaas.step4')}{' '}
-            <span className="break-words font-mono text-xs text-foreground">{EVENTOS_ASAAS.join(', ')}</span>
-          </li>
-          <li>{t('integrations.asaas.step5')}</li>
-        </ol>
-        {info.nfseEnabled && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t('nfse.webhookEvents')}{' '}
-            <span className="break-words font-mono text-xs text-foreground">{EVENTOS_NFSE.join(', ')}</span>
-          </p>
-        )}
+        </Balao>
       </div>
     </section>
   )
@@ -431,11 +460,8 @@ function NfseSection({ info, onSaved }: { info: AsaasIntegration; onSaved: (dado
   }
 
   return (
-    <div className="mt-6 space-y-4 border-t border-border pt-5">
-      <div>
-        <h3 className="text-sm font-semibold text-foreground">{t('nfse.title')}</h3>
-        <p className="field-hint mt-1">{t('nfse.description')}</p>
-      </div>
+    <div className="space-y-4">
+      <p className="field-hint">{t('nfse.description')}</p>
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -569,11 +595,8 @@ function ChargeTermsSection({ info, onSaved }: { info: AsaasIntegration; onSaved
   }
 
   return (
-    <div className="mt-6 space-y-4 border-t border-border pt-5">
-      <div>
-        <h3 className="text-sm font-semibold text-foreground">{t('chargeTerms.title')}</h3>
-        <p className="field-hint mt-1">{t('chargeTerms.description')}</p>
-      </div>
+    <div className="space-y-4">
+      <p className="field-hint">{t('chargeTerms.description')}</p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label htmlFor="charge-fine" className="field-label">{t('chargeTerms.finePercent')}</label>

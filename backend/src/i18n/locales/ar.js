@@ -610,6 +610,7 @@ export default {
   'whatsapp.ai.error.timeout': 'استغرق الذكاء الاصطناعي وقتًا طويلًا للرد',
   'whatsapp.ai.error.unauthorized': 'رفض مزوّد الذكاء الاصطناعي مفتاح API',
   'whatsapp.ai.error.rateLimited': 'تم بلوغ حد استخدام الذكاء الاصطناعي؛ حاول لاحقًا',
+  'whatsapp.ai.error.noBalance': 'لا يوجد رصيد أو باقة نشطة في حساب الذكاء الاصطناعي؛ أعد الشحن من موقع المزوّد',
   'whatsapp.ai.error.badResponse': 'أعاد الذكاء الاصطناعي ردًا غير صالح',
   'whatsapp.ai.error.unreachable': 'تعذّر الاتصال بالذكاء الاصطناعي',
   'whatsapp.ai.error.blockedHost': 'عنوان الذكاء الاصطناعي هذا غير مسموح به',

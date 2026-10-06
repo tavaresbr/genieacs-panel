@@ -610,6 +610,7 @@ export default {
   'whatsapp.ai.error.timeout': 'AIの応答に時間がかかりすぎました',
   'whatsapp.ai.error.unauthorized': 'AIプロバイダーがAPIキーを拒否しました',
   'whatsapp.ai.error.rateLimited': 'AIの利用上限に達しました。しばらくしてから再試行してください',
+  'whatsapp.ai.error.noBalance': 'AIアカウントの残高または有効なパッケージがありません。提供元のサイトでチャージしてください',
   'whatsapp.ai.error.badResponse': 'AIが無効な応答を返しました',
   'whatsapp.ai.error.unreachable': 'AIに接続できませんでした',
   'whatsapp.ai.error.blockedHost': 'このAIアドレスは許可されていません',

@@ -18,7 +18,32 @@ export const AI_DEFAULT_MODEL = 'glm-4.5-flash';
 const TIMEOUT_MS = 25_000;
 const MAX_BYTES = 1024 * 1024;
 
-const erro = (code, status = 502) => new WaError(`whatsapp.ai.error.${code.replace(/^ai_/, '').replace(/_([a-z])/g, (_m, c) => c.toUpperCase())}`, { code, status });
+const erro = (code, status = 502, details = null) => new WaError(
+  `whatsapp.ai.error.${code.replace(/^ai_/, '').replace(/_([a-z])/g, (_m, c) => c.toUpperCase())}`,
+  { code, status, details }
+);
+
+/**
+ * O que o provedor disse ao recusar, para a tela mostrar: "HTTP 401 · 1000:
+ * Authentication failed". Só os campos de erro conhecidos, curto, numa linha,
+ * e nunca com a chave dentro.
+ */
+export function motivoDoProvedor(status, texto, apiKey) {
+  let corpo = null;
+  try {
+    corpo = JSON.parse(texto);
+  } catch {
+    corpo = null;
+  }
+  const err = corpo && typeof corpo.error === 'object' && corpo.error ? corpo.error : null;
+  const codigo = err?.code ?? corpo?.code ?? null;
+  const mensagem = err?.message ?? (typeof corpo?.error === 'string' ? corpo.error : null) ?? corpo?.msg ?? corpo?.message ?? null;
+  let motivo = [codigo, mensagem].filter((v) => v !== null && v !== undefined && String(v).trim()).join(': ');
+  motivo = motivo.replace(/\s+/g, ' ').trim();
+  if (apiKey && motivo.includes(apiKey)) motivo = motivo.split(apiKey).join('***');
+  if (motivo.length > 200) motivo = `${motivo.slice(0, 199)}…`;
+  return { details: motivo ? `HTTP ${status} · ${motivo}` : `HTTP ${status}`, codigo: codigo === null ? null : String(codigo), mensagem: String(mensagem ?? '') };
+}
 
 /** O endereço como o painel guarda: só http/https, sem credenciais, sem barra no fim. */
 export function normalizeAiBaseUrl(value) {
@@ -93,9 +118,20 @@ class WaAiClient {
       clearTimeout(timer);
     }
 
-    if (response.status === 401 || response.status === 403) throw erro('ai_unauthorized', 502);
-    if (response.status === 429) throw erro('ai_rate_limited', 502);
-    if (!response.ok) throw erro('ai_bad_response');
+    if (!response.ok) {
+      let texto = '';
+      try {
+        texto = await response.text();
+      } catch {
+        texto = '';
+      }
+      const { details, codigo, mensagem } = motivoDoProvedor(response.status, texto, apiKey);
+      if (response.status === 401 || response.status === 403) throw erro('ai_unauthorized', 502, details);
+      // A z.ai diz "sem saldo" com 429 e o código 1113: não é esperar, é recarregar.
+      if (codigo === '1113' || /balance|saldo|余额|resource package/i.test(mensagem)) throw erro('ai_no_balance', 502, details);
+      if (response.status === 429) throw erro('ai_rate_limited', 502, details);
+      throw erro('ai_bad_response', 502, details);
+    }
 
     let data;
     try {

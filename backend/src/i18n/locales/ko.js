@@ -609,6 +609,7 @@ export default {
   'whatsapp.ai.error.timeout': 'AI 응답 시간이 너무 오래 걸렸습니다',
   'whatsapp.ai.error.unauthorized': 'AI 제공업체가 API 키를 거부했습니다',
   'whatsapp.ai.error.rateLimited': 'AI 사용 한도에 도달했습니다. 나중에 다시 시도하세요',
+  'whatsapp.ai.error.noBalance': 'AI 계정에 잔액 또는 활성 패키지가 없습니다. 제공업체 사이트에서 충전하세요',
   'whatsapp.ai.error.badResponse': 'AI가 잘못된 응답을 반환했습니다',
   'whatsapp.ai.error.unreachable': 'AI에 연결할 수 없습니다',
   'whatsapp.ai.error.blockedHost': '이 AI 주소는 허용되지 않습니다',

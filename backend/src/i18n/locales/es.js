@@ -608,6 +608,7 @@ export default {
   'whatsapp.ai.error.timeout': 'La IA tardó demasiado en responder',
   'whatsapp.ai.error.unauthorized': 'El proveedor de IA rechazó la clave de API',
   'whatsapp.ai.error.rateLimited': 'Se alcanzó el límite de uso de la IA; inténtalo más tarde',
+  'whatsapp.ai.error.noBalance': 'La cuenta de IA no tiene saldo ni paquete activo; recárgala en el sitio del proveedor',
   'whatsapp.ai.error.badResponse': 'La IA devolvió una respuesta no válida',
   'whatsapp.ai.error.unreachable': 'No se pudo conectar con la IA',
   'whatsapp.ai.error.blockedHost': 'Esa dirección de IA no está permitida',
