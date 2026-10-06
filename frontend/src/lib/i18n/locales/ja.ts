@@ -4268,6 +4268,15 @@ const ja: Dictionary = {
   'plan.coupon.have': "クーポンをお持ちの方",
   'plan.coupon.hint': "割引は今後の請求書に適用されます。すでに発行済みの未払い請求書も含みます。",
   'plan.coupon.nextInvoice': "次回の請求額: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "日割り",
+  'plan.proration.preview': "今すぐ変更すると: 日割りで {amount}（残り {days} 日）",
+  'plan.proration.confirm': "今 {amount} をお支払いいただきます（残り {days} 日）。",
+  'plan.proration.belowMinimum': "この期間の差額は最低額を下回るため、今は請求されません。",
+  'plan.proration.issued': "{amount} の日割り請求書を発行しました。「請求」のボタンからお支払いください。",
+  'plan.proration.pending': "{amount} の日割り請求書はまだ発行されていません。発行され次第「請求」に表示されます。",
+  'platform.subscription.prorationOverdueNote': "プラン変更の日割り請求書が期限切れです。パネルは読み取り専用です。",
+  'subscription.prorationOverdue': "プラン変更の日割り請求書が期限切れです。お支払いまでパネルは読み取り専用になります。",
 }
 
 export default ja

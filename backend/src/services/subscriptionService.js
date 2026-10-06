@@ -51,6 +51,9 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 /** Quanto tempo o gate confia na última leitura antes de perguntar de novo. */
 const CACHE_TTL_MS = 15_000;
 const cache = new TenantCache(CACHE_TTL_MS);
+// O vencimento da pró-rata (0101) entra no estado que vale: quem o regrava
+// (`BillingCharge.syncProrationDue`) esquece a leitura em cache do provedor.
+BillingCharge.onProrationDueChanged = () => cache.invalidate();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -112,7 +115,7 @@ function periodoDoPlano(plano) {
  * não é a da referência: comparar centavos de moedas diferentes não é uma
  * conferência frouxa, é uma conta errada.
  */
-async function valorPedido({ externalId, plano, currency, precoDoPlano = null }) {
+async function valorPedido({ externalId, plano, currency, precoDoPlano = null, chargeId = null }) {
   const moedaPaga = String(currency || '').toUpperCase();
 
   // 1a. A cobrança que NUNCA chegou ao gateway, marcada paga à mão pelo
@@ -123,11 +126,16 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
   //     seria conferida contra um número que não é o que se pediu. `tdb` por
   //     baixo: o id de uma linha do vizinho simplesmente não é achado.
   const daLinha = /^charge:(\d+)$/.exec(String(externalId ?? ''));
-  const cobranca = !externalId
+  let cobranca = !externalId
     ? null
     : daLinha
       ? await BillingCharge.findById(Number(daLinha[1]))
       : await BillingCharge.byGatewayId(externalId);
+  // 1c. A cobrança nomeada por quem chama — o aceite da diferença de uma
+  //     pró-rata paga a menos (`<referência>:accepted`), cuja referência não
+  //     acha linha nenhuma: sem isto ele seria conferido contra o preço do
+  //     plano e estenderia o período como uma renovação.
+  if (!cobranca && chargeId) cobranca = await BillingCharge.findById(Number(chargeId));
   if (cobranca) {
     const valor = Number(cobranca.amount_cents);
     if (Number.isFinite(valor) && valor > 0) {
@@ -143,6 +151,9 @@ async function valorPedido({ externalId, plano, currency, precoDoPlano = null })
         cents: Math.floor(valor),
         motivo: null,
         fonte: 'charge',
+        // A fatura de pró-rata (0101) não compra período: ver `recordPayment`.
+        kind: cobranca.kind || 'renewal',
+        chargeId: Number(cobranca.id),
         overridden: Boolean(cobranca.amount_overridden_at),
         planId: temPreco ? Number(cobranca.plan_id) : null,
         couponId: temPreco && cobranca.coupon_id !== null && cobranca.coupon_id !== undefined
@@ -299,6 +310,9 @@ const ESTADOS_QUE_ESTENDEM = new Set(['trial', 'active', 'past_due']);
  */
 async function duracaoCreditada(detalhe, planoAtual) {
   if (!detalhe || detalhe.underpaid) return { ms: 0, basis: 'not_extended', from: null, to: null };
+  // O pagamento de uma pró-rata (0101) não empurrou prazo nenhum: estorná-lo
+  // devolve o dinheiro, e só.
+  if (detalhe.proration) return { ms: 0, basis: 'not_extended', from: null, to: null };
   if (detalhe.statusBefore && !ESTADOS_QUE_ESTENDEM.has(detalhe.statusBefore)) {
     return { ms: 0, basis: 'not_extended', from: null, to: null };
   }
@@ -358,6 +372,15 @@ class SubscriptionService {
       const ends = asDate(subscription.renews_at);
       if (ends && ends.getTime() <= now.getTime()) {
         return { status: 'past_due', reason: 'renewal_expired' };
+      }
+      // A fatura de pró-rata da subida (0101) vencida sem pagamento: o mesmo
+      // `past_due` da renovação vencida — lê, não escreve —, com o motivo
+      // próprio para a tela dizer qual fatura falta. A data é a cópia que
+      // `BillingCharge.syncProrationDue` mantém na linha, para esta conta
+      // continuar sem consulta.
+      const prorata = asDate(subscription.proration_due_at);
+      if (prorata && prorata.getTime() <= now.getTime()) {
+        return { status: 'past_due', reason: 'proration_overdue' };
       }
     }
     return { status: stored, reason: null };
@@ -596,6 +619,57 @@ class SubscriptionService {
       planId: plan?.id ? Number(plan.id) : null,
       couponId: this.couponApplies(subscription, plan, coupon) ? Number(coupon.id) : null
     };
+  }
+
+  /** O menor valor de uma fatura de pró-rata: o mesmo piso do Asaas que o do cupom. */
+  static PRORATION_MIN_CENTS = COUPON_FLOOR_CENTS;
+
+  /**
+   * Quanto a SUBIDA de `fromPlan` para `toPlan` cobra agora (0101): a
+   * diferença entre os preços efetivos (com o cupom, `priceFor`) proporcional
+   * ao que falta do período pago —
+   *
+   *   ⌈ (novo − antigo) × segundos restantes ÷ segundos do período ⌉ centavos
+   *
+   * — com o período do plano de antes (é ele que o provedor pagou) e os
+   * segundos até `renews_at`. Sem teto na fração: quem pagou adiantado mais
+   * de um período pagou o preço velho por todo ele.
+   *
+   * Pura e síncrona: a tela mostra o valor antes do clique (`listPlans`) e a
+   * troca o cobra depois, e as duas contas têm de ser a mesma.
+   *
+   * `eligible: false` quando não há o que cobrar: fora de `active` com o
+   * período correndo, isento, não é subida. `skipped: 'below_minimum'` quando
+   * há diferença mas ela não chega a `PRORATION_MIN_CENTS` — não sai fatura,
+   * e o extrato registra.
+   */
+  static prorationQuote(subscription, fromPlan, toPlan, coupon, now = new Date()) {
+    const nada = { eligible: false, amountCents: 0 };
+    if (!subscription || !toPlan) return nada;
+    if (subscription.status !== 'active' || subscription.billing_exempt_at) return nada;
+    const renovacao = asDate(subscription.renews_at);
+    if (!renovacao || renovacao.getTime() <= now.getTime()) return nada;
+    const antigo = this.priceFor(subscription, fromPlan, coupon);
+    const novo = this.priceFor(subscription, toPlan, coupon);
+    if (!(novo > antigo)) return nada;
+    const periodoS = periodoDoPlano(fromPlan ?? toPlan) * 86_400;
+    const restantesS = Math.floor((renovacao.getTime() - now.getTime()) / 1000);
+    const valor = Math.ceil(((novo - antigo) * restantesS) / periodoS);
+    const quote = {
+      eligible: true,
+      amountCents: valor,
+      fromPlanId: fromPlan?.id ? Number(fromPlan.id) : null,
+      toPlanId: Number(toPlan.id),
+      fromPriceCents: antigo,
+      toPriceCents: novo,
+      remainingSeconds: restantesS,
+      periodSeconds: periodoS,
+      remainingDays: Math.ceil(restantesS / 86_400),
+      renewsAt: renovacao.toISOString(),
+      currency: String(toPlan.currency || 'BRL').toUpperCase()
+    };
+    if (valor < this.PRORATION_MIN_CENTS) return { ...quote, skipped: 'below_minimum' };
+    return quote;
   }
 
   /**
@@ -909,7 +983,7 @@ class SubscriptionService {
    * plano escolhido agora ser trocado de novo na renovação por uma decisão
    * que a de agora já substituiu.
    */
-  static async changePlan({ planId, actorUserId = null, upgradedAt = null }) {
+  static async changePlan({ planId, actorUserId = null, upgradedAt = null, eventDetail = null }) {
     const tenantId = currentTenantId();
     const plan = await Plan.findById(planId);
     if (!plan) throw new Error('Plan not found');
@@ -934,7 +1008,11 @@ class SubscriptionService {
         from: before?.plan_id ?? null,
         to: plan.id,
         toCode: plan.code,
-        ...(before?.pending_plan_id ? { pendingCleared: Number(before.pending_plan_id) } : {})
+        ...(before?.pending_plan_id ? { pendingCleared: Number(before.pending_plan_id) } : {}),
+        // O que a troca disse sobre a pró-rata (0101), quando quem troca é o
+        // provedor subindo — inclusive a que não saiu por ser menor que o
+        // mínimo: é aqui que alguém procura "por que não cobrou?".
+        ...(eventDetail ?? {})
       }
     });
     cache.invalidate();
@@ -1542,7 +1620,7 @@ class SubscriptionService {
    */
   static async recordPayment({
     amountCents, currency = 'BRL', provider = 'manual', externalId = null,
-    actorUserId = null, periodDays = null, allowUnderpayment = false, now = new Date()
+    actorUserId = null, periodDays = null, allowUnderpayment = false, now = new Date(), chargeId = null
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -1627,8 +1705,16 @@ class SubscriptionService {
     // onde alguém que pagou a menos deve ficar: visível, avisado e recuperável,
     // não trancado do lado de fora.
     const pedido = await valorPedido({
-      externalId, plano, currency, precoDoPlano: this.priceFor(before, plano, cupom)
+      externalId, plano, currency, precoDoPlano: this.priceFor(before, plano, cupom), chargeId
     });
+    // A fatura de pró-rata da subida (0101): o dinheiro entra no extrato como
+    // qualquer pagamento (e na receita e na NFS-e), conferido contra o valor
+    // DELA — mas não compra período: não estende `renews_at`, não reativa,
+    // não mexe na descida agendada nem gasta ciclo de cupom. O período que
+    // ela completa já está pago; o que ela paga é a diferença de preço dele.
+    // (A reativação de quem foi suspenso por inadimplência, quando paga a
+    // pró-rata, volta a `active` SEM estender o prazo — é por esta marca.)
+    const isProration = pedido.kind === 'proration';
     const faltou = pedido.cents !== null && amount < pedido.cents;
     const underpaid = faltou && !allowUnderpayment;
     if (pedido.motivo === 'currency_mismatch') {
@@ -1641,7 +1727,7 @@ class SubscriptionService {
     }
 
     const patch = {};
-    const reactivates = !underpaid
+    const reactivates = !underpaid && !isProration
       && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due');
 
     // O destino da descida agendada, decidido pelo PREÇO que este pagamento
@@ -1769,7 +1855,9 @@ class SubscriptionService {
             ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {}),
             // O ciclo do cupom que este pagamento gastou, para o estorno o
             // devolver (`reversePayment`) — e, se o zerou, o cupom inteiro.
-            ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {})
+            ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {}),
+            // A pró-rata (0101): o estorno lê isto e não desfaz prazo nenhum.
+            ...(isProration ? { proration: true, chargeId: pedido.chargeId } : {})
           }
         }, trx);
         // Na mesma transação do pagamento: um período novo que começasse no
@@ -1801,7 +1889,8 @@ class SubscriptionService {
         duplicate: false,
         underpaid,
         expectedCents: pedido.cents,
-        paidCents: amount
+        paidCents: amount,
+        ...(isProration ? { proration: true } : {})
       };
     } catch (error) {
       // A corrida: a outra entrega igual chegou primeiro e já está gravada. A

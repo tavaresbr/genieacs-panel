@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
 import BillingInvoice from './BillingInvoice.js';
@@ -60,6 +61,31 @@ export const CHARGE_STATUSES = Object.freeze([
 export const OPEN_CHARGE_STATUSES = Object.freeze(['pending', 'failed', 'overdue']);
 
 /**
+ * Os dois tipos de cobrança (0101).
+ *
+ *   renewal    a de sempre: compra o período que começa em `period_end`, uma
+ *              por período — a chave única é dela.
+ *   proration  a avulsa da subida no meio do período pago: só a diferença
+ *              proporcional ao tempo que falta (`SubscriptionService.prorationQuote`).
+ *              Não compra período nenhum: paga, não move `renews_at`; vencida,
+ *              deixa o provedor `past_due` (`subscriptions.proration_due_at`).
+ */
+export const CHARGE_KINDS = Object.freeze(['renewal', 'proration']);
+
+/** Se a linha é a fatura de pró-rata de uma subida. */
+export const isProration = (row) => row?.kind === 'proration';
+
+/**
+ * As leituras que querem "a cobrança da renovação" — a do período, a mais
+ * recente em aberto, as sobras de períodos velhos — deixam a de pró-rata de
+ * fora. A chave dela (`p…`) já não é data e não casa com período nenhum, mas
+ * a condição fica escrita: é ela que diz a intenção, e não a coincidência.
+ */
+const soRenovacao = (query) => query.whereNot('kind', 'proration');
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
  * `due_date` como `YYYY-MM-DD`, venha como vier.
  *
  * A coluna é `date`, e cada banco a devolve de um jeito: o SQLite, como o texto
@@ -79,12 +105,26 @@ function isoDateOf(valor) {
   return String(valor).slice(0, 10);
 }
 
+/**
+ * O instante em que uma cobrança com vencimento `YYYY-MM-DD` passa a estar
+ * vencida: o dia seguinte, à meia-noite no fuso da cobrança (o de
+ * `ChargeIssuingService.BILLING_TIMEZONE`, sem horário de verão desde 2019) —
+ * o boleto vale o dia inteiro do vencimento.
+ */
+function venceEm(dueDate) {
+  const dia = isoDateOf(dueDate);
+  if (!dia) return null;
+  const meiaNoite = new Date(`${dia}T00:00:00-03:00`);
+  if (Number.isNaN(meiaNoite.getTime())) return null;
+  return new Date(meiaNoite.getTime() + DIA_MS);
+}
+
 class BillingCharge {
-  /** A cobrança de um período, ou nada. É a leitura de idempotência da emissão. */
+  /** A cobrança da renovação de um período, ou nada. É a leitura de idempotência da emissão. */
   static async forPeriod(periodEnd, trx = null) {
     const chave = String(periodEnd ?? '').slice(0, 10);
     if (!chave) return null;
-    return (await tdb('billing_charges', trx).where({ period_end: chave }).first()) || null;
+    return (await soRenovacao(tdb('billing_charges', trx).where({ period_end: chave })).first()) || null;
   }
 
   /** Uma cobrança pelo id da linha, dentro do provedor em escopo. */
@@ -137,7 +177,158 @@ class BillingCharge {
   static async update(id, patch) {
     const changed = await tdb('billing_charges').where({ id })
       .update({ ...patch, updated_at: new Date() });
+    // Quem muda o estado (ou o vencimento) de uma cobrança de pró-rata muda o
+    // que a assinatura diz sobre ela (`proration_due_at`). Aqui, e não em
+    // cada um dos que chamam — o webhook, os gestos do console, a faxina da
+    // isenção —: o que fosse esquecido num deles deixaria um provedor
+    // bloqueado por uma fatura que ele já pagou.
+    if (changed > 0 && ('status' in patch || 'due_date' in patch)) {
+      const linha = await BillingCharge.findById(id);
+      if (isProration(linha)) await BillingCharge.syncProrationDue();
+    }
     return changed > 0;
+  }
+
+  /**
+   * A chave (`period_end`) da fatura de pró-rata de uma subida: `p` e nove
+   * dígitos hexadecimais do hash de "de qual plano, para qual, em qual
+   * período".
+   *
+   * Não é data, de propósito: a renovação do mesmo prazo é dona da chave do
+   * período no índice único, e duas subidas no mesmo período (Básico → Médio
+   * → Pro) são duas faturas — cada uma com a sua. E é DETERMINÍSTICA, para o
+   * índice único ser também a trava da corrida: dois cliques "subir para o
+   * Pro" que leram o mesmo plano de antes calculam a mesma chave, e o segundo
+   * perde na inserção em vez de abrir a segunda fatura. O prefixo `p` fica
+   * depois de todo dígito na ordem do texto, então `openBefore` (`<` uma
+   * data) nunca a alcança — a faxina de períodos velhos não cancela pró-rata.
+   */
+  static prorationKey({ fromPlanId, toPlanId, periodEnd }) {
+    const base = `${fromPlanId ?? '-'}>${toPlanId}@${String(periodEnd).slice(0, 10)}`;
+    return `p${crypto.createHash('sha256').update(base).digest('hex').slice(0, 9)}`;
+  }
+
+  /**
+   * Abre a fatura de pró-rata de uma subida — já garrada por quem a abriu,
+   * como a da renovação (`open`) — com a chave de `prorationKey`. A
+   * referência que vai ao gateway (`tenant:<id>:proration:<id da linha>`) usa
+   * o id da linha; o fim do período de verdade e a conta vão em
+   * `proration_detail`.
+   *
+   * A violação do índice único sobe: quem chama a lê como "outra passada já
+   * abriu esta" (`isUniqueViolation`).
+   */
+  static async openProration({
+    key, subscriptionId = null, amountCents, currency, provider, dueDate, claimUntil = null,
+    planId = null, couponId = null, detail = null
+  }) {
+    return tinsertReturningId('billing_charges', {
+      issuing_until: claimUntil,
+      subscription_id: subscriptionId,
+      period_end: String(key).slice(0, 10),
+      kind: 'proration',
+      proration_detail: detail ? JSON.stringify(detail) : null,
+      amount_cents: amountCents,
+      currency: String(currency || 'BRL').toUpperCase().slice(0, 3),
+      provider: String(provider).slice(0, 32),
+      status: 'pending',
+      due_date: dueDate,
+      plan_id: planId ?? null,
+      coupon_id: couponId ?? null
+    });
+  }
+
+  /** A fatura de pró-rata com esta chave (`prorationKey`), ou nada. */
+  static async prorationByKey(key) {
+    return (await tdb('billing_charges').where({ period_end: String(key).slice(0, 10), kind: 'proration' }).first())
+      || null;
+  }
+
+  /**
+   * As faturas de pró-rata deste provedor que ainda não chegaram ao gateway —
+   * a criação falhou, ou o gateway nem estava configurado — e que o agendador
+   * retoma (`ChargeIssuingService.retryProrations`).
+   */
+  static async unissuedProrations() {
+    return tdb('billing_charges')
+      .where({ kind: 'proration' })
+      .whereIn('status', ['pending', 'failed'])
+      .whereNull('gateway_charge_id')
+      .orderBy('id');
+  }
+
+  /** As faturas de pró-rata deste provedor ainda em aberto. */
+  static async openProrations() {
+    return tdb('billing_charges')
+      .where({ kind: 'proration' })
+      .whereIn('status', OPEN_CHARGE_STATUSES)
+      .orderBy('id');
+  }
+
+  /**
+   * Regrava `subscriptions.proration_due_at` do provedor em escopo: quando
+   * vence a fatura de pró-rata em aberto mais antiga — ou nulo.
+   *
+   * Só conta a que CHEGOU ao gateway (tem id lá): a que falhou na criação não
+   * tem link de pagamento, e bloquear alguém por uma fatura que ele não tem
+   * como pagar seria cobrar dele a falha do gateway. Quando a retentativa a
+   * emite, a marca vem junto (`markIssued`).
+   *
+   * Recalcula do zero a cada vez, e não soma nem subtrai: idempotente, e
+   * qualquer caminho que chame duas vezes chega ao mesmo lugar.
+   */
+  static async syncProrationDue() {
+    const abertas = await BillingCharge.openProrations();
+    let maisCedo = null;
+    for (const linha of abertas) {
+      if (!linha.gateway_charge_id) continue;
+      const quando = venceEm(linha.due_date);
+      if (quando && (!maisCedo || quando.getTime() < maisCedo.getTime())) maisCedo = quando;
+    }
+    await tdb('subscriptions').update({ proration_due_at: maisCedo, updated_at: new Date() });
+    if (typeof BillingCharge.onProrationDueChanged === 'function') BillingCharge.onProrationDueChanged();
+    return maisCedo;
+  }
+
+  /**
+   * Avisado quando `proration_due_at` muda — `SubscriptionService` liga aqui
+   * a limpeza do cache dele, sem que o modelo precise importar o serviço.
+   */
+  static onProrationDueChanged = null;
+
+  /** A conta da pró-rata, lida de `proration_detail` — nunca lança. */
+  static prorationDetailOf(linha) {
+    if (!isProration(linha) || !linha.proration_detail) return null;
+    try {
+      const lido = JSON.parse(linha.proration_detail);
+      return lido && typeof lido === 'object' ? lido : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * O fim de período de que a linha fala: a chave, na renovação; o fim do
+   * período em que a subida aconteceu, na pró-rata (a chave dela não é data,
+   * ver `openProration`).
+   */
+  static periodEndOf(linha) {
+    if (!linha) return null;
+    if (isProration(linha)) return BillingCharge.prorationDetailOf(linha)?.periodEnd ?? null;
+    return linha.period_end ?? null;
+  }
+
+  /** O que a tela mostra da conta de uma pró-rata — nada de gateway. */
+  static presentProration(linha) {
+    const detalhe = BillingCharge.prorationDetailOf(linha);
+    if (!detalhe) return null;
+    return {
+      fromPlanId: detalhe.fromPlanId ?? null,
+      toPlanId: detalhe.toPlanId ?? null,
+      fromPriceCents: detalhe.fromPriceCents ?? null,
+      toPriceCents: detalhe.toPriceCents ?? null,
+      remainingDays: detalhe.remainingDays ?? null
+    };
   }
 
   /**
@@ -162,6 +353,9 @@ class BillingCharge {
       issuing_until: null,
       updated_at: new Date()
     });
+    // A pró-rata que chegou ao gateway passa a contar para o vencimento
+    // (`syncProrationDue` só conta a que tem link de pagamento).
+    if (changed > 0 && isProration(await BillingCharge.findById(id))) await BillingCharge.syncProrationDue();
     return changed > 0;
   }
 
@@ -348,9 +542,9 @@ class BillingCharge {
   static async openBefore(periodEnd) {
     const chave = String(periodEnd ?? '').slice(0, 10);
     if (!chave) return [];
-    return tdb('billing_charges')
+    return soRenovacao(tdb('billing_charges')
       .whereIn('status', OPEN_CHARGE_STATUSES)
-      .where('period_end', '<', chave)
+      .where('period_end', '<', chave))
       .orderBy('period_end');
   }
 
@@ -365,10 +559,14 @@ class BillingCharge {
       .orderBy('id');
   }
 
-  /** A cobrança em aberto mais recente deste provedor — a que o aviso linka. */
+  /**
+   * A cobrança da RENOVAÇÃO em aberto mais recente deste provedor — a que o
+   * aviso linka. A de pró-rata fica de fora: o lembrete de vencimento fala do
+   * período, e a avulsa da subida tem a linha dela na tela.
+   */
   static async currentOpen() {
-    return (await tdb('billing_charges')
-      .whereIn('status', OPEN_CHARGE_STATUSES)
+    return (await soRenovacao(tdb('billing_charges')
+      .whereIn('status', OPEN_CHARGE_STATUSES))
       .orderBy('period_end', 'desc')
       .first()) || null;
   }
@@ -394,8 +592,12 @@ class BillingCharge {
    */
   static async openAcrossTenants() {
     // tenant-scope-exempt: listagem do plano de controle, acima dos provedores.
+    // A renovação antes da pró-rata (`renewal` > `proration` na ordem do
+    // texto): a tela mostra a primeira de cada provedor, e a chave da
+    // pró-rata (`p…`) passaria à frente de qualquer data.
     return runUnscoped('the console sums every provider\'s open charges', () => getDb()('billing_charges')
       .whereIn('status', OPEN_CHARGE_STATUSES)
+      .orderBy('kind', 'desc')
       .orderBy('period_end', 'desc')
       .orderBy('id', 'desc'));
   }
@@ -417,7 +619,10 @@ class BillingCharge {
     if (!row) return null;
     return {
       id: row.id,
-      periodEnd: row.period_end,
+      periodEnd: BillingCharge.periodEndOf(row),
+      // `renewal` ou `proration` (0101) — o selo "Pró-rata" da tela.
+      kind: row.kind || 'renewal',
+      proration: BillingCharge.presentProration(row),
       amountCents: Number(row.amount_cents),
       currency: row.currency,
       status: row.status,
@@ -460,7 +665,9 @@ class BillingCharge {
     if (!row) return null;
     return {
       id: row.id,
-      periodEnd: row.period_end,
+      periodEnd: BillingCharge.periodEndOf(row),
+      kind: row.kind || 'renewal',
+      proration: BillingCharge.presentProration(row),
       amountCents: Number(row.amount_cents),
       currency: row.currency,
       status: row.status,
@@ -477,4 +684,4 @@ class BillingCharge {
 }
 
 export default BillingCharge;
-export { BillingCharge, isoDateOf };
+export { BillingCharge, isoDateOf, venceEm as prorationOverdueAt };

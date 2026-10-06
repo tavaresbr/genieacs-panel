@@ -65,7 +65,7 @@ export interface ChargeContext {
  *   o dinheiro volta por fora e o painel só registra.
  */
 export function chargeActions(
-  charge: Pick<ChargeConsoleView, 'status' | 'invoiceUrl' | 'gatewayChargeId' | 'periodEnd'>,
+  charge: Pick<ChargeConsoleView, 'status' | 'invoiceUrl' | 'gatewayChargeId' | 'periodEnd' | 'kind'>,
   context: ChargeContext
 ): ChargeActions {
   const open = isChargeOpen(charge.status)
@@ -89,8 +89,13 @@ export function chargeActions(
     changeDueDate: editable,
     changeAmount: editable,
     cancel: open,
-    reissue: (charge.status === 'canceled' || charge.status === 'failed')
-      && badge.kind === 'gateway' && !bloqueada && !isento && periodoAtual,
+    // A pró-rata (avulsa da subida) só se reemite quando a criação FALHOU no
+    // gateway — é a retentativa dela; cancelada fica cancelada, e o período
+    // dela não é a chave de nada.
+    reissue: charge.kind === 'proration'
+      ? charge.status === 'failed' && !charge.gatewayChargeId && badge.kind === 'gateway' && !isento
+      : (charge.status === 'canceled' || charge.status === 'failed')
+        && badge.kind === 'gateway' && !bloqueada && !isento && periodoAtual,
     refund: charge.status === 'paid'
   }
 }

@@ -4275,6 +4275,15 @@ const ko: Dictionary = {
   'plan.coupon.have': "쿠폰이 있어요",
   'plan.coupon.hint': "할인은 이미 발행된 미결 청구서를 포함해 다음 청구서부터 적용됩니다.",
   'plan.coupon.nextInvoice': "다음 청구서: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "일할 계산",
+  'plan.proration.preview': "지금 변경 시: 일할 계산 {amount} (남은 기간 {days}일)",
+  'plan.proration.confirm': "지금 {amount}을(를) 결제하게 됩니다 (남은 기간 {days}일).",
+  'plan.proration.belowMinimum': "이번 기간의 차액이 최소 금액보다 적어 지금은 청구되지 않습니다.",
+  'plan.proration.issued': "{amount}의 일할 계산 청구서가 발행되었습니다. 청구 항목의 버튼으로 결제하세요.",
+  'plan.proration.pending': "{amount}의 일할 계산 청구서가 아직 발행되지 않았습니다. 발행되면 청구 항목에 표시됩니다.",
+  'platform.subscription.prorationOverdueNote': "요금제 변경의 일할 계산 청구서가 연체되었습니다. 패널은 읽기 전용입니다.",
+  'subscription.prorationOverdue': "요금제 변경의 일할 계산 청구서가 연체되었습니다. 결제할 때까지 패널은 읽기 전용입니다.",
 }
 
 export default ko

@@ -4277,6 +4277,15 @@ const ar: Dictionary = {
   'plan.coupon.have': "لدي قسيمة",
   'plan.coupon.hint': "يسري الخصم على فواتيرك القادمة، بما فيها الفاتورة المفتوحة حاليًا.",
   'plan.coupon.nextInvoice': "الفاتورة القادمة: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "تناسبي",
+  'plan.proration.preview': "عند الترقية الآن: {amount} بشكل تناسبي (الأيام المتبقية: {days})",
+  'plan.proration.confirm': "ستدفع {amount} الآن (الأيام المتبقية: {days}).",
+  'plan.proration.belowMinimum': "الفرق لهذه الفترة أقل من الحد الأدنى ولن يُحصَّل الآن.",
+  'plan.proration.issued': "صدرت فاتورة تناسبية بقيمة {amount}: ادفعها من الزر في قسم الفواتير.",
+  'plan.proration.pending': "لم تصدر الفاتورة التناسبية بقيمة {amount} بعد؛ ستظهر في قسم الفواتير فور إصدارها.",
+  'platform.subscription.prorationOverdueNote': "الفاتورة التناسبية لتغيير الخطة متأخرة؛ اللوحة للقراءة فقط.",
+  'subscription.prorationOverdue': "الفاتورة التناسبية لتغيير خطتك متأخرة. تبقى اللوحة للقراءة فقط حتى الدفع.",
 }
 
 export default ar

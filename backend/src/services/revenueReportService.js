@@ -377,7 +377,10 @@ export function aggregateRevenue({
       if (!aceite) mes.count += 1;
     }
     if (valor) linhaDoPlano(plano ? plano.id : null).receivedCents += valor;
-    if (!aceite && plano && !estornados.has(`${tenantId}|${evento.external_id}`)) {
+    // A pró-rata da subida (0101) entra no recebido como qualquer pagamento,
+    // mas não no desconto: o valor pedido nela é uma fração do período, e
+    // compará-lo com o preço cheio do plano inventaria um abatimento.
+    if (!aceite && !detalhe?.proration && plano && !estornados.has(`${tenantId}|${evento.external_id}`)) {
       const cheio = Number(plano.price_cents) || 0;
       const esperado = detalhe?.expectedCents;
       const pedido = esperado === null || esperado === undefined || !Number.isFinite(Number(esperado))

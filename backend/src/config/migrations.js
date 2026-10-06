@@ -2079,6 +2079,35 @@ const BILLING_CHARGE_PRICING_COLUMNS = [
 ];
 
 /**
+ * A fatura de pró-rata da subida no meio do período (0101).
+ *
+ * `kind` separa a cobrança da RENOVAÇÃO (a de sempre, uma por período, com a
+ * chave `period_end`) da avulsa da subida (`proration`). A avulsa não pode
+ * usar a chave do período — a renovação daquele prazo já é dona dela, no
+ * índice único `(tenant_id, period_end)` —, então ela grava em `period_end`
+ * uma chave própria que não é data (`p…`, ver `BillingCharge.openProration`),
+ * e o fim de período de verdade vai em `proration_detail`, com a conta inteira
+ * (planos, preços, segundos restantes) para quem precisar conferir depois.
+ *
+ * Nas linhas que já existem, `renewal`: é o que todas elas são.
+ */
+const BILLING_CHARGE_PRORATION_COLUMNS = [
+  ['kind', (t) => t.string('kind', 16).notNullable().defaultTo('renewal')],
+  ['proration_detail', (t) => t.text('proration_detail').nullable()]
+];
+
+/**
+ * Quando a fatura de pró-rata em aberto mais antiga vence (0101) — a cópia que
+ * o estado da assinatura lê sem consulta (`effectiveStatus` é síncrono e roda
+ * a cada requisição, pelo gate). Mantida por `BillingCharge.syncProrationDue`
+ * a cada mudança de estado de uma cobrança de pró-rata; nula quando não há
+ * nenhuma em aberto.
+ */
+const SUBSCRIPTION_PRORATION_COLUMNS = [
+  ['proration_due_at', (t) => t.timestamp('proration_due_at').nullable()]
+];
+
+/**
  * O cupom na assinatura (0093). Sem `.references`, pelo motivo de
  * `pending_plan_id`: acrescentar chave estrangeira a uma tabela que já existe
  * é recriá-la no SQLite, e quem escreve a coluna acabou de ler o cupom.
@@ -5519,6 +5548,32 @@ export const migrations = [
       await db.schema.alterTable('sgp_contacts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** A fatura de pró-rata da subida — ver `BILLING_CHARGE_PRORATION_COLUMNS`. */
+    id: '0101_billing_charge_proration',
+    async isApplied(db) {
+      if (await db.schema.hasTable('billing_charges')
+        && (await missingColumns(db, 'billing_charges', BILLING_CHARGE_PRORATION_COLUMNS)).length) return false;
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PRORATION_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [
+        ['billing_charges', BILLING_CHARGE_PRORATION_COLUMNS],
+        ['subscriptions', SUBSCRIPTION_PRORATION_COLUMNS]
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
     }
   }
 ];

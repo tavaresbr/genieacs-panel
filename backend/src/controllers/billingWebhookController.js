@@ -110,7 +110,13 @@ export async function resolveTenantDaEntrega({ reference, customerRef }, gateway
   return null;
 }
 
-/** Marca como paga a cobrança que o gateway nomeia. Nunca derruba o crédito. */
+/**
+ * Marca como paga a cobrança que o gateway nomeia. Nunca derruba o crédito.
+ *
+ * Vale igual para a de pró-rata (0101): `recordPayment` já a reconheceu (não
+ * estendeu o prazo), e o `update` do modelo regrava `proration_due_at` — o
+ * provedor que estava `past_due` por ela volta a escrever na hora.
+ */
 async function marcarCobrancaPaga(gatewayChargeId) {
   try {
     const cobranca = await BillingCharge.byGatewayId(gatewayChargeId);

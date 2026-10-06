@@ -1603,9 +1603,10 @@ export interface SubscriptionView {
   storedStatus: SubscriptionStatus
   /**
    * Por que o estado que vale difere do gravado. São os dois prazos que vencem
-   * sozinhos: o teste e o período pago. Nulo quando a coluna é a verdade.
+   * sozinhos: o teste e o período pago — e a fatura de pró-rata de uma subida
+   * vencida sem pagamento (`proration_overdue`). Nulo quando a coluna é a verdade.
    */
-  reason: 'trial_expired' | 'renewal_expired' | null
+  reason: 'trial_expired' | 'renewal_expired' | 'proration_overdue' | null
   plan: { code: string; name: string; limits: PlanLimits } | null
   trialEndsAt: string | null
   renewsAt: string | null
@@ -1680,6 +1681,44 @@ export interface TenantPlanOption {
   periodDays: number
   limits: PlanLimits
   current: boolean
+  /**
+   * Quanto subir para este plano cobraria AGORA, de pró-rata — nulo quando a
+   * troca não cobra nada (não é subida, ou não há período pago correndo).
+   * `skipped: 'below_minimum'` é a diferença abaixo de R$ 5,00, que não vira
+   * fatura. Opcional: servidores antigos não mandam.
+   */
+  proration?: PlanProrationPreview | null
+}
+
+/** A prévia da pró-rata de uma subida, na lista de planos. */
+export interface PlanProrationPreview {
+  amountCents: number
+  remainingDays: number
+  currency: string
+  skipped?: 'below_minimum'
+}
+
+/** O tipo de uma cobrança: a da renovação do período, ou a avulsa da subida. */
+export type ChargeKind = 'renewal' | 'proration'
+
+/** A conta de uma fatura de pró-rata, para a tela explicar o valor. */
+export interface ChargeProrationDetail {
+  fromPlanId: number | null
+  toPlanId: number | null
+  fromPriceCents: number | null
+  toPriceCents: number | null
+  remainingDays: number | null
+}
+
+/** O que a troca de plano responde sobre a pró-rata que a subida abriu. */
+export interface PlanChangeProration {
+  amountCents: number
+  remainingDays: number
+  currency?: string
+  issued: boolean
+  reason?: string
+  skipped?: 'below_minimum'
+  charge?: TenantChargeView | null
 }
 
 /**
@@ -1700,6 +1739,9 @@ export interface TenantChargeView {
   createdAt: string | null
   /** A nota fiscal desta cobrança. Opcional: servidores antigos não mandam. */
   invoice?: TenantInvoiceView | null
+  /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
+  kind?: ChargeKind
+  proration?: ChargeProrationDetail | null
 }
 
 /**
@@ -1724,6 +1766,9 @@ export interface ChargeConsoleView {
   superseded: { gatewayChargeId: string; amountCents: number }[]
   /** A NFS-e desta cobrança. Opcional: servidores antigos não mandam. */
   invoice?: InvoiceConsoleView | null
+  /** `proration` é a fatura avulsa de uma subida. Opcional: servidores antigos não mandam. */
+  kind?: ChargeKind
+  proration?: ChargeProrationDetail | null
 }
 
 /** A assinatura resumida de uma linha da aba Assinaturas do console. */
@@ -2400,7 +2445,7 @@ export const subscriptionAPI = {
    * `resource`/`used`/`limit`) quando o uso atual não cabe no plano escolhido.
    */
   changePlan: (planId: number) =>
-    apiClient.put<SubscriptionUsage>('/tenant/subscription/plan', { planId }),
+    apiClient.put<SubscriptionUsage & { proration?: PlanChangeProration }>('/tenant/subscription/plan', { planId }),
 
   /**
    * Emite (ou reaproveita) a cobrança do período e devolve o link de

@@ -4274,6 +4274,15 @@ const it: Dictionary = {
   'plan.coupon.have': "Ho un coupon",
   'plan.coupon.hint': "Lo sconto vale per le prossime fatture, compresa quella già aperta.",
   'plan.coupon.nextInvoice': "Prossima fattura: {price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "Pro rata",
+  'plan.proration.preview': "Passando ora: {amount} pro rata ({days} giorni rimanenti)",
+  'plan.proration.confirm': "Pagherai {amount} ora ({days} giorni rimanenti).",
+  'plan.proration.belowMinimum': "La differenza per questo periodo è sotto il minimo e non viene addebitata ora.",
+  'plan.proration.issued': "Fattura pro rata di {amount} emessa: pagala con il pulsante in Addebiti.",
+  'plan.proration.pending': "La fattura pro rata di {amount} non è ancora stata emessa; comparirà in Addebiti appena emessa.",
+  'platform.subscription.prorationOverdueNote': "La fattura pro rata del cambio piano è scaduta; il pannello è in sola lettura.",
+  'subscription.prorationOverdue': "La fattura pro rata del tuo cambio piano è scaduta. Il pannello resta in sola lettura fino al pagamento.",
 }
 
 export default it

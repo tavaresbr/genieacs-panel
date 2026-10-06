@@ -4269,6 +4269,15 @@ const zhTW: Dictionary = {
   'plan.coupon.have': "我有優惠券",
   'plan.coupon.hint': "折扣適用於你接下來的帳單，包括已開立的未付帳單。",
   'plan.coupon.nextInvoice': "下一張帳單：{price}",
+  // Pró-rata da subida no meio do período (0101)
+  'charges.proration': "按比例",
+  'plan.proration.preview': "現在升級：按比例收取 {amount}（剩餘 {days} 天）",
+  'plan.proration.confirm': "您現在將支付 {amount}（剩餘 {days} 天）。",
+  'plan.proration.belowMinimum': "本期差額低於最低金額，現在不收取。",
+  'plan.proration.issued': "已開立 {amount} 的按比例帳單：請透過「帳單」中的按鈕付款。",
+  'plan.proration.pending': "{amount} 的按比例帳單尚未開立；開立後將顯示在「帳單」中。",
+  'platform.subscription.prorationOverdueNote': "方案變更的按比例帳單已逾期；面板為唯讀。",
+  'subscription.prorationOverdue': "您方案變更的按比例帳單已逾期。付款前面板保持唯讀。",
 }
 
 export default zhTW

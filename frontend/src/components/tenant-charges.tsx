@@ -59,6 +59,11 @@ export function cobrancaEmAberto(charges: TenantChargeView[]) {
   return charges.find((c) => c.invoiceUrl && (c.status === 'pending' || c.status === 'overdue' || c.status === 'failed')) ?? null
 }
 
+/** A fatura de pró-rata ainda pagável, se houver — a do aviso `proration_overdue`. */
+export function cobrancaDeProrata(charges: TenantChargeView[]) {
+  return cobrancaEmAberto(charges.filter((c) => c.kind === 'proration'))
+}
+
 /**
  * `refreshKey` é o jeito de a página pedir uma recarga de fora: ela muda o
  * número depois de trocar o plano ou gerar uma cobrança, e a lista busca de
@@ -109,8 +114,10 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
           {charges.map((charge) => (
             <li key={charge.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
                   {formatMoney(charge.amountCents, charge.currency)}
+                  {/* A avulsa da subida no meio do período: não é a do mês. */}
+                  {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {t('charges.period')}: {formatDate(charge.periodEnd) ?? charge.periodEnd}
