@@ -1575,7 +1575,7 @@ export interface Plan {
   sortOrder: number
   description: string | null
   features: string[]
-  /** Preço anunciado da opção anual, em centavos; null é sem opção anual. */
+  /** Preço COBRADO no ciclo anual (365 dias), em centavos; null é sem opção anual. */
   priceYearlyCents: number | null
   createdAt: string | null
   /** How many providers are on it — only from the console's list. */
@@ -1737,6 +1737,8 @@ export interface SubscriptionView {
   trialEndsAt: string | null
   renewsAt: string | null
   canceledAt: string | null
+  /** O ciclo de cobrança de agora (0103). Opcional: servidores antigos não mandam. */
+  billingCycle?: BillingCycle
   /**
    * A descida de plano agendada para a renovação. Só existe com a assinatura
    * em dia e renovação futura: até `effectiveAt` o plano atual continua
@@ -1781,10 +1783,16 @@ export interface SubscriptionCard {
  * uso atual passa de um teto do plano novo: enquanto passar, a troca não se
  * aplica.
  */
+/** O ciclo de cobrança (0103): mensal (`price_cents` por `period_days`) ou anual (`price_yearly_cents` por 365 dias). */
+export type BillingCycle = 'monthly' | 'annual'
+
 export interface PendingPlan {
   id: number
   name: string
+  /** O preço do ciclo agendado — o do ano, quando a troca é para o anual. */
   priceCents: number
+  /** O ciclo agendado (0103). Opcional: servidores antigos não mandam. */
+  billingCycle?: BillingCycle
   /** ISO 8601. */
   effectiveAt: string
   /**
@@ -1826,6 +1834,14 @@ export interface TenantPlanOption {
   priceCents: number
   currency: string
   periodDays: number
+  /**
+   * O ciclo anual (0103): o preço por 365 dias, se o plano o oferece, e a
+   * economia sobre doze meses (inteira, para baixo). Opcionais: servidores
+   * antigos não mandam.
+   */
+  priceYearlyCents?: number | null
+  annualAvailable?: boolean
+  annualSavingsPercent?: number | null
   limits: PlanLimits
   /** Preço por unidade acima do teto (0104). Opcional: servidores antigos não mandam. */
   overagePriceCents?: PlanOveragePrices
@@ -1937,11 +1953,16 @@ export interface SubscriptionConsoleSubscription {
   planId: number | null
   planCode: string | null
   planName: string | null
+  /** O preço de UM ciclo — o do ano, no anual. */
   priceCents: number | null
+  /** O ciclo de cobrança (0103). Opcional: servidores antigos não mandam. */
+  billingCycle?: BillingCycle
   currency: string | null
   trialEndsAt: string | null
   renewsAt: string | null
-  pendingPlan: { id: number; name: string; priceCents: number; effectiveAt: string; locked: boolean } | null
+  pendingPlan: {
+    id: number; name: string; priceCents: number; effectiveAt: string; locked: boolean; billingCycle?: BillingCycle
+  } | null
   /**
    * Isento de cobrança: a plataforma manteve a assinatura ativa sem gerar
    * fatura nem vencer, até desligar. Opcional porque servidores antigos não
@@ -2608,8 +2629,10 @@ export const subscriptionAPI = {
    * traduzido, diz qual dos três aconteceu. Recusa com `over_limit` (e
    * `resource`/`used`/`limit`) quando o uso atual não cabe no plano escolhido.
    */
-  changePlan: (planId: number) =>
-    apiClient.put<SubscriptionUsage & { proration?: PlanChangeProration }>('/tenant/subscription/plan', { planId }),
+  changePlan: (planId: number, cycle?: BillingCycle) =>
+    apiClient.put<SubscriptionUsage & { proration?: PlanChangeProration }>(
+      '/tenant/subscription/plan', cycle ? { planId, cycle } : { planId }
+    ),
 
   /**
    * Emite (ou reaproveita) a cobrança do período e devolve o link de

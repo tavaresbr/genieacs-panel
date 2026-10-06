@@ -895,6 +895,8 @@ export default {
   'subscription.planScheduled': '{date}에 요금제 다운그레이드가 예약되었습니다. 그때까지 현재 요금제가 유지됩니다',
   'subscription.pendingCanceled': '예약된 요금제 변경이 취소되었습니다. 현재 요금제가 유지됩니다',
   'subscription.pendingLocked': '예약된 요금제 변경은 이미 새 요금제 가격으로 결제되어 {date}부터 적용됩니다. 더 이상 변경하거나 취소할 수 없습니다.',
+  'subscription.invalidCycle': '결제 주기는 월간 또는 연간이어야 합니다.',
+  'subscription.cycleUnavailable': '이 요금제는 연간 주기를 제공하지 않습니다.',
   'subscription.planChangeFailed': '요금제를 변경하지 못했습니다',
   'subscription.planNotFound': '이 요금제는 존재하지 않거나 더 이상 제공되지 않습니다',
   'subscription.notChangeable': '이 구독의 요금제는 여기에서 변경할 수 없습니다',

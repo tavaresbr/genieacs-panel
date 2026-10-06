@@ -377,8 +377,14 @@ function PlanCell({ row }: { row: SubscriptionRow }) {
   return (
     <span className="block">
       <span>{sub.planName ?? sub.planCode ?? '—'}</span>
+      {/* O ciclo (0103): o preço é o de UM ciclo — o do ano, no anual. */}
+      {sub.billingCycle === 'annual' && <span className="modern-badge-info ml-1 text-xs">{t('plan.cycle.annual')}</span>}
       {sub.priceCents !== null && (
-        <span className="block text-xs text-muted-foreground">{formatMoney(sub.priceCents, sub.currency)}</span>
+        <span className="block text-xs text-muted-foreground">
+          {t(sub.billingCycle === 'annual' ? 'plan.options.perYear' : 'plan.options.perMonth', {
+            price: formatMoney(sub.priceCents, sub.currency)
+          })}
+        </span>
       )}
       {/* O cupom: o selo e o que a próxima fatura de fato pede. */}
       {sub.coupon && (
@@ -396,7 +402,9 @@ function PlanCell({ row }: { row: SubscriptionRow }) {
       {sub.pendingPlan && (
         <span className="mt-1 block text-xs text-[hsl(var(--status-warning))]">
           {t('platform.subs.pendingPlan', {
-            plan: sub.pendingPlan.name,
+            plan: sub.pendingPlan.billingCycle && sub.pendingPlan.billingCycle !== (sub.billingCycle ?? 'monthly')
+              ? `${sub.pendingPlan.name} (${t(sub.pendingPlan.billingCycle === 'annual' ? 'plan.cycle.annual' : 'plan.cycle.monthly')})`
+              : sub.pendingPlan.name,
             date: formatDay(sub.pendingPlan.effectiveAt)
           })}
           {sub.pendingPlan.locked && ` · ${t('platform.subs.pendingLocked')}`}

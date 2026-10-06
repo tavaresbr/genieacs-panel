@@ -152,7 +152,7 @@ class BillingCharge {
    */
   static async open({
     subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null,
-    planId = null, couponId = null, billingType = null, pricingDetail = undefined
+    planId = null, couponId = null, billingType = null, pricingDetail = undefined, billingCycle = null
   }) {
     return tinsertReturningId('billing_charges', {
       // A conta do valor (0104) — ver `pricingDetailOf`.
@@ -173,6 +173,8 @@ class BillingCharge {
       // `BILLING_CHARGE_PRICING_COLUMNS`.
       plan_id: planId ?? null,
       coupon_id: couponId ?? null,
+      // E em que ciclo (0103): `monthly` ou `annual`.
+      billing_cycle: billingCycle ? String(billingCycle).slice(0, 16) : null,
       // Com que meio ela vai ao gateway (0100) — `UNDEFINED` ou `CREDIT_CARD`.
       billing_type: billingType ? String(billingType).slice(0, 16) : null
     });
@@ -227,7 +229,7 @@ class BillingCharge {
    */
   static async openProration({
     key, subscriptionId = null, amountCents, currency, provider, dueDate, claimUntil = null,
-    planId = null, couponId = null, detail = null
+    planId = null, couponId = null, detail = null, billingCycle = null
   }) {
     return tinsertReturningId('billing_charges', {
       issuing_until: claimUntil,
@@ -241,7 +243,8 @@ class BillingCharge {
       status: 'pending',
       due_date: dueDate,
       plan_id: planId ?? null,
-      coupon_id: couponId ?? null
+      coupon_id: couponId ?? null,
+      billing_cycle: billingCycle ? String(billingCycle).slice(0, 16) : null
     });
   }
 
@@ -468,7 +471,8 @@ class BillingCharge {
    * @returns {Promise<boolean>}
    */
   static async resetForReissue(id, {
-    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined, pricingDetail = undefined
+    amountCents, currency, holdUntil = null, planId = undefined, couponId = undefined, pricingDetail = undefined,
+    billingCycle = undefined
   }) {
     const linha = await BillingCharge.findById(id);
     if (!linha) return false;
@@ -516,6 +520,7 @@ class BillingCharge {
       // A conta do valor novo (0104), quando quem reprecifica a diz; sem ela
       // fica a que a linha tinha — o excedente congelado vai junto.
       ...(pricingDetail !== undefined ? { pricing_detail: BillingCharge.serializePricingDetail(pricingDetail) } : {}),
+      ...(billingCycle !== undefined ? { billing_cycle: billingCycle } : {}),
       updated_at: new Date()
     });
     return changed > 0;
@@ -871,6 +876,8 @@ class BillingCharge {
       invoiceUrl: OPEN_CHARGE_STATUSES.includes(row.status) ? (row.invoice_url ?? null) : null,
       // Se ela é cobrada sozinha no cartão salvo (0100) — o meio, nunca o cartão.
       billingType: row.billing_type ?? null,
+      // O ciclo que ela paga (0103) — nulo nas de antes, que são mensais.
+      billingCycle: row.billing_cycle ?? null,
       createdAt: row.created_at ?? null,
       // A nota fiscal (NFS-e) desta cobrança: estado, número e PDF — sem o erro.
       invoice: BillingInvoice.present(invoiceRow)

@@ -229,6 +229,10 @@ describe('a lista de planos', () => {
       priceCents: 9990,
       currency: 'BRL',
       periodDays: 30,
+      // Sem preço anual, sem ciclo anual (0103).
+      priceYearlyCents: null,
+      annualAvailable: false,
+      annualSavingsPercent: null,
       limits: { operators: 5, subscribers: null, devices: null },
       current: false
     });
@@ -746,6 +750,7 @@ describe('a descida agendada', () => {
       id: planos.leve.id,
       name: 'Leve',
       priceCents: 6990,
+      billingCycle: 'monthly',
       effectiveAt: renova.toISOString(),
       locked: false,
       blockedBy: null

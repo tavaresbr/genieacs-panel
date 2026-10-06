@@ -1181,8 +1181,8 @@ const OUTAGE_HISTORY_TABLES = [
  * `public` nasce falso: um plano que existe no catálogo não vira oferta no
  * site só porque alguém o criou. É o console que decide o que se vende ali.
  * `features` é uma lista JSON de frases curtas, a mesma forma de
- * `plan_patterns`. `price_yearly_cents` é só o preço anunciado da opção anual;
- * o que se cobra continua sendo `price_cents` por `period_days`.
+ * `plan_patterns`. `price_yearly_cents` nasceu só como o preço anunciado da
+ * opção anual; desde a 0103 é o que se COBRA no ciclo anual (365 dias).
  */
 const PLAN_MARKETING_COLUMNS = [
   ['public', (t) => t.boolean('public').notNullable().defaultTo(false)],
@@ -1489,6 +1489,32 @@ const SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS = [
  */
 const SUBSCRIPTION_SUSPENDED_REASON_COLUMNS = [
   ['suspended_reason', (t) => t.string('suspended_reason', 32).nullable()]
+];
+
+/**
+ * As colunas da 0103 — o ciclo de cobrança (mensal ou anual).
+ *
+ * `billing_cycle` é o ciclo que vale AGORA: `monthly` cobra `price_cents` por
+ * `period_days`; `annual`, `price_yearly_cents` por 365 dias. Toda assinatura
+ * de antes é mensal, que é o que ela sempre pagou — daí o padrão.
+ * `pending_billing_cycle` é o ciclo da troca agendada para a renovação, ao
+ * lado de `pending_plan_id` (nulo é "o mesmo de agora"): a troca de ciclo
+ * reaproveita a descida agendada inteira — a fatura da renovação sai no preço
+ * do ciclo novo, o pagamento trava, a aplicação troca na data.
+ */
+const SUBSCRIPTION_BILLING_CYCLE_COLUMNS = [
+  ['billing_cycle', (t) => t.string('billing_cycle', 16).notNullable().defaultTo('monthly')],
+  ['pending_billing_cycle', (t) => t.string('pending_billing_cycle', 16).nullable()]
+];
+
+/**
+ * O ciclo com que a cobrança saiu (0103), ao lado de `plan_id`/`coupon_id`:
+ * com a troca de ciclo no MESMO plano, o plano sozinho não diz mais se a
+ * fatura paga foi a do mês ou a do ano. Nula nas linhas de antes — que são
+ * todas mensais.
+ */
+const BILLING_CHARGE_BILLING_CYCLE_COLUMNS = [
+  ['billing_cycle', (t) => t.string('billing_cycle', 16).nullable()]
 ];
 
 const BILLING_TABLES = [
@@ -5718,6 +5744,38 @@ export const migrations = [
       await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** O ciclo de cobrança anual — ver `SUBSCRIPTION_BILLING_CYCLE_COLUMNS`. */
+    id: '0103_subscription_billing_cycle',
+    async isApplied(db) {
+      for (const [tabela, colunas] of [
+        ['subscriptions', SUBSCRIPTION_BILLING_CYCLE_COLUMNS],
+        ['billing_charges', BILLING_CHARGE_BILLING_CYCLE_COLUMNS]
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [
+        ['subscriptions', SUBSCRIPTION_BILLING_CYCLE_COLUMNS],
+        ['billing_charges', BILLING_CHARGE_BILLING_CYCLE_COLUMNS]
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
     }
   },
   {

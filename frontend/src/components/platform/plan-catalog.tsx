@@ -235,8 +235,11 @@ export function PlanCatalog({ plans, onChange }: Props) {
         : await platformAPI.updatePlan(editandoId as number, comum)
       if (!res.success) {
         // 409 quando o código já existe, 400 quando um número não serve: o
-        // backend diz qual, e isso ajuda mais do que uma frase genérica.
-        toast.error(res.message || t('platform.plans.saveFailed'))
+        // backend diz qual, e isso ajuda mais do que uma frase genérica. O
+        // preço anual em uso (0103) tem frase própria, traduzida.
+        toast.error(res.code === 'plan_has_annual_subscriptions'
+          ? t('platform.plans.annualInUse')
+          : res.message || t('platform.plans.saveFailed'))
         return
       }
       fechar()
@@ -384,6 +387,22 @@ export function PlanCatalog({ plans, onChange }: Props) {
         </div>
       </div>
 
+      {/* O preço anual é COBRADO (0103): o provedor que escolhe o ciclo anual
+          paga este valor por 365 dias. Por isso mora junto do preço, e não na
+          vitrine. Vazio é "sem opção anual". */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="field-label" htmlFor="plan-price-yearly">{t('platform.plans.priceYearly')}</label>
+          <input
+            id="plan-price-yearly" className="modern-input w-full" inputMode="decimal"
+            value={rascunho.priceYearly}
+            onChange={(e) => setRascunho((r) => ({ ...r, priceYearly: e.target.value }))}
+            placeholder={t('platform.plans.priceYearlyPlaceholder')}
+          />
+          <p className="field-hint">{t('platform.plans.priceYearlyHint')}</p>
+        </div>
+      </div>
+
       {/* Até quando o provedor pode guardar o que é dado pessoal. Com teto, o
           valor que ele escolher continua valendo quando é menor; "para sempre"
           passa a ser o teto. */}
@@ -433,15 +452,6 @@ export function PlanCatalog({ plans, onChange }: Props) {
               id="plan-sort" type="number" className="modern-input w-full"
               value={rascunho.sortOrder}
               onChange={(e) => setRascunho((r) => ({ ...r, sortOrder: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="plan-price-yearly">{t('platform.plans.priceYearly')}</label>
-            <input
-              id="plan-price-yearly" className="modern-input w-full" inputMode="decimal"
-              value={rascunho.priceYearly}
-              onChange={(e) => setRascunho((r) => ({ ...r, priceYearly: e.target.value }))}
-              placeholder={t('platform.plans.priceYearlyPlaceholder')}
             />
           </div>
         </div>
@@ -523,6 +533,8 @@ export function PlanCatalog({ plans, onChange }: Props) {
                     price: dinheiro(plan.priceCents, plan.currency),
                     days: plan.periodDays
                   })}
+                  {plan.priceYearlyCents != null && plan.priceYearlyCents > 0
+                    && ` · ${t('platform.plans.summaryYearly', { price: dinheiro(plan.priceYearlyCents, plan.currency) })}`}
                   {' · '}
                   {t('platform.plans.summaryLimits', {
                     operators: plan.limits.operators ?? '∞',

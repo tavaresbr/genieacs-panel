@@ -899,6 +899,8 @@ export default {
   'subscription.planScheduled': 'छोटे प्लान पर बदलाव {date} के लिए निर्धारित; तब तक आपका मौजूदा प्लान जारी रहेगा',
   'subscription.pendingCanceled': 'निर्धारित प्लान बदलाव रद्द किया गया; आपका मौजूदा प्लान जारी रहेगा',
   'subscription.pendingLocked': 'निर्धारित प्लान बदलाव का भुगतान नए प्लान की कीमत पर हो चुका है और यह {date} से लागू होगा; इसे अब बदला या रद्द नहीं किया जा सकता।',
+  'subscription.invalidCycle': 'बिलिंग चक्र मासिक या वार्षिक होना चाहिए।',
+  'subscription.cycleUnavailable': 'यह प्लान वार्षिक चक्र प्रदान नहीं करता।',
   'subscription.planChangeFailed': 'प्लान बदला नहीं जा सका',
   'subscription.planNotFound': 'यह प्लान मौजूद नहीं है या अब उपलब्ध नहीं है',
   'subscription.notChangeable': 'इस सदस्यता का प्लान यहाँ से नहीं बदला जा सकता',

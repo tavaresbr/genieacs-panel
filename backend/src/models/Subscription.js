@@ -60,6 +60,23 @@ class Subscription {
   }
 
   /**
+   * Quantas assinaturas estão (ou vão estar, pela troca agendada) no ciclo
+   * ANUAL deste plano (0103). É a pergunta do console antes de tirar o preço
+   * anual de um plano: sem ele, essas assinaturas voltariam ao mensal em
+   * silêncio.
+   */
+  static async countAnnualOnPlan(planId) {
+    // tenant-scope-exempt: pergunta do plano de controle, acima dos provedores.
+    const linha = await runUnscoped('the console checks every provider on an annual plan', () => getDb()('subscriptions')
+      .where({ plan_id: planId, billing_cycle: 'annual' })
+      .orWhere((q) => q.where({ pending_plan_id: planId })
+        .whereRaw("COALESCE(pending_billing_cycle, billing_cycle) = 'annual'"))
+      .count({ total: '*' })
+      .first());
+    return Number(linha?.total ?? 0);
+  }
+
+  /**
    * Cria ou altera a assinatura de um provedor nomeado.
    *
    * `patch` só leva colunas; quem decide o que a mudança significa (extrato,
@@ -97,9 +114,12 @@ class Subscription {
       .where({ tenant_id: tenantId, pending_plan_id: pendingPlanId })
       .update({
         plan_id: pendingPlanId,
+        // O ciclo agendado junto (0103), quando há um; nulo é "o mesmo".
+        billing_cycle: db.raw('COALESCE(pending_billing_cycle, billing_cycle)'),
         pending_plan_id: null,
         pending_plan_at: null,
         pending_plan_locked_at: null,
+        pending_billing_cycle: null,
         // O plano novo é o de baixo: não há subida no período a proteger.
         upgraded_at: null,
         updated_at: new Date()
