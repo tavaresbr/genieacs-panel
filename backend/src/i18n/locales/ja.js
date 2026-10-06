@@ -1090,6 +1090,8 @@ export default {
   'contacts.import.rowNoName': '名前のない新規顧客',
   'contacts.import.whatsappPreviewed': 'WhatsApp連絡先のプレビューの準備ができました',
   'contacts.import.whatsappApplied': 'WhatsApp連絡先をインポートしました：{created}件作成',
+  'contacts.import.googlePreviewed': 'Google連絡先のプレビューの準備ができました',
+  'contacts.import.googleApplied': 'Google連絡先をインポートしました: {created} 件作成',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid の設定を読み込みました',
