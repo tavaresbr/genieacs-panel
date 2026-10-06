@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import type { LoginDestination, LoginDestinations } from '@/lib/api'
 import { sessionKind } from '@/lib/shell'
-import { apiClient, authAPI, settingsAPI, storedSession } from '@/lib/api'
+import { apiClient, authAPI, settingsAPI, storedSession, whatsappAPI } from '@/lib/api'
 import { destinosDaResposta } from '@/lib/login-destinations'
 import { contaBloqueadaNaResposta, mfaStepDaResposta, type MfaStep } from '@/lib/login-mfa'
 import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
@@ -248,7 +248,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const logout = () => {
-    void authAPI.logout()
+    // Quem sai deixa de estar "Disponível": senão a fila seguia mandando
+    // conversas para um atendente que já foi embora. É o melhor esforço — uma
+    // falha aqui não segura a saída. O aviso de saída espera por ele porque
+    // revoga a sessão, e a disponibilidade enviada depois seria recusada; vai
+    // com o token desta sessão na mão, já que a aba o esquece logo abaixo.
+    const token = storedSession().token
+    const indisponivel = roleHas(user?.role, 'whatsapp.send')
+      ? whatsappAPI.setAvailability(false).catch(() => null)
+      : Promise.resolve(null)
+    void indisponivel
+      .then(() => authAPI.logout(token ?? undefined))
+      .catch(() => {})
     apiClient.clearTokens()
     setUser(null)
     setIsAuthenticated(false)

@@ -30,19 +30,52 @@ export function latestPerConversation(items: readonly NotificationItem[]): Notif
   return [...porConversa.values()]
 }
 
-export const NOTIFY_PREF_KEY = 'wa-notify-enabled'
+/**
+ * A chave de antes, sem dono: valia para qualquer sessão deste navegador, e o
+ * provedor B herdava as notificações que o provedor A ligou. Não é mais lida;
+ * só apagada.
+ */
+export const LEGACY_NOTIFY_PREF_KEY = 'wa-notify-enabled'
 
-export function readNotifyPref(): boolean {
+/** A preferência mora por dono da sessão (`sessionOwner`); sem dono, em lugar nenhum. */
+export function notifyPrefKey(owner: string | null | undefined): string | null {
+  return owner ? `${LEGACY_NOTIFY_PREF_KEY}:${owner}` : null
+}
+
+/**
+ * O vigia roda? Só com dono e numa sessão do navegador: a aba de
+ * personificação é uma visita de leitura, e avisar ali das conversas do
+ * provedor seria tocar no computador de quem está no console.
+ */
+export function notifierActive(ctx: { owner: string | null | undefined; tabScoped: boolean }): boolean {
+  return Boolean(ctx.owner) && !ctx.tabScoped
+}
+
+function apagarChaveAntiga() {
   try {
-    return window.localStorage.getItem(NOTIFY_PREF_KEY) === '1'
+    localStorage.removeItem(LEGACY_NOTIFY_PREF_KEY)
+  } catch {
+    // Sem armazenamento, não há o que apagar.
+  }
+}
+
+export function readNotifyPref(owner: string | null | undefined): boolean {
+  const key = notifyPrefKey(owner)
+  if (!key) return false
+  apagarChaveAntiga()
+  try {
+    return localStorage.getItem(key) === '1'
   } catch {
     return false
   }
 }
 
-export function writeNotifyPref(on: boolean): void {
+export function writeNotifyPref(owner: string | null | undefined, on: boolean): void {
+  const key = notifyPrefKey(owner)
+  if (!key) return
+  apagarChaveAntiga()
   try {
-    window.localStorage.setItem(NOTIFY_PREF_KEY, on ? '1' : '0')
+    localStorage.setItem(key, on ? '1' : '0')
   } catch {
     // Sem armazenamento, a preferência dura só esta aba.
   }
