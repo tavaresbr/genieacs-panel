@@ -29,6 +29,7 @@ const SettingsPage = lazy(() => import('@/pages/settings'))
 const AuditPage = lazy(() => import('@/pages/audit'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
 const ContactsPage = lazy(() => import('@/pages/contacts'))
+const SiteMapPage = lazy(() => import('@/pages/site-map'))
 const ContactDetailPage = lazy(() => import('@/pages/contact-detail'))
 const PlatformPage = lazy(() => import('@/pages/platform'))
 const LoginPage = lazy(() => import('@/pages/login'))
@@ -378,6 +379,10 @@ function ProviderRoutes() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/devices" element={<DevicesPage />} />
                   <Route path="/devices/detail" element={<DeviceDetailPage />} />
+                  {/* Sem `PermissionRoute`: o mapa é a resposta a "onde fica
+                      X", e um `viewer` precisa dela tanto quanto um `owner`. A
+                      tela lista só o que a sessão abre. */}
+                  <Route path="/sitemap" element={<SiteMapPage />} />
                   <Route element={<PlatformRoute />}>
                     <Route path="/platform" element={<PlatformPage />} />
                   </Route>

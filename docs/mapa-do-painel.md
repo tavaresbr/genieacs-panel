@@ -33,6 +33,13 @@ responder "onde fica X" sem abrir o código.
 As quatro primeiras são as únicas que fazem sentido para um buscador; as outras são
 transacionais e dependem de token.
 
+**E o que um buscador alcança de verdade é decidido por host.** `GET /robots.txt` e
+`GET /sitemap.xml` (`backend/src/services/seoFiles.js`) respondem conforme o endereço seja o
+ápice da plataforma ou não: no ápice, `Disallow: /` com exceção de `/`, `/signup` e `/login`,
+mais o `Sitemap:`; em qualquer outro host — painel de provedor, deploy de endereço único,
+portal do assinante — `Disallow: /` e nada de mapa. Num deploy sem ápice, portanto, o efeito é
+só um: **manter o painel fora dos buscadores**.
+
 ---
 
 ## 2. Painel do provedor — os nove itens de menu
@@ -59,6 +66,11 @@ Telas fora do menu, alcançadas de dentro de outra:
 | `/devices/detail?id=…` | clique num aparelho | `devices.list` |
 | `/contacts/:key` | clique num contato | `whatsapp.read` |
 | `/onboarding` | automático, no primeiro acesso sem ACS configurado | `settings.write` |
+| `/sitemap` | o pé da barra lateral | nenhuma — todo papel abre |
+
+`/sitemap` é este documento virado tela: os mesmos grupos, com link para cada item e para as
+quinze seções da Configuração (`/settings?tab=…`). Lista só o que a sessão aberta alcança, então
+um `viewer` vê três telas ali.
 
 ### 2.1 A tela do aparelho — cinco abas
 
@@ -131,7 +143,7 @@ Os quatro papéis e o que cada um abre, do mais restrito ao mais amplo:
 
 | Papel | Alcança |
 | --- | --- |
-| **viewer** | exatamente três coisas: lista de aparelhos, mapa e catálogo. Dos nove itens de menu, abre dois |
+| **viewer** | três capacidades — lista de aparelhos, mapa e catálogo. Dos nove itens de menu, abre **três**: Operação, Inventário e Topologia |
 | **tech** | o acima, mais inspecionar e escrever no aparelho, provisionamento, SGP, segredos do cliente — e `whatsapp.read`, que lhe abre WhatsApp e Contatos |
 | **admin** | o acima, mais configuração, equipe, exportação, trilha, dossiê e exclusão de titular |
 | **owner** | **as mesmas permissões de `admin`** |
@@ -144,3 +156,8 @@ quem, não de qual tela abre — e o painel recusa remover o último `owner` de 
 
 A permissão exigida por cada tela está na seção 2. A fonte é `backend/src/config/permissions.js`,
 e `backend/test/role-reach.test.js` fixa o alcance de cada papel.
+
+> A primeira versão desta tabela dizia que um `viewer` abre **dois** dos nove itens. Era erro de
+> contagem minha: `devices.list` abre **duas** telas — Operação e Inventário —, não uma. Quem
+> mede isso agora é `frontend/test/screens.test.ts`, que afirma exatamente quais três itens o
+> papel alcança, em vez de confiar na conta de quem escreveu.

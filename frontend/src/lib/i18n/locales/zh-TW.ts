@@ -4273,6 +4273,26 @@ const zhTW: Dictionary = {
   'plan.coupon.have': "我有優惠券",
   'plan.coupon.hint': "折扣適用於你接下來的帳單，包括已開立的未付帳單。",
   'plan.coupon.nextInvoice': "下一張帳單：{price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "導覽",
+  'siteMap.title': "面板地圖",
+  'siteMap.description': "本面板的所有畫面，依組別列出並說明用途——僅顯示你的權限能開啟的畫面。",
+  'siteMap.group.operation': "日常運維",
+  'siteMap.group.administration': "管理",
+  'siteMap.group.platform': "平台",
+  'siteMap.settings.title': "設定的各個區塊",
+  'siteMap.settings.description': "每個連結都會直接開啟設定的對應標籤頁。",
+  'siteMap.inner.title': "從其他畫面進入的畫面",
+  'siteMap.inner.description': "它們沒有自己的連結：每個都需要從所屬項目進入。",
+  'siteMap.inner.device': "設備詳情",
+  'siteMap.inner.deviceReached': "在設備清單中點選一台設備",
+  'siteMap.inner.contact': "聯絡人詳情",
+  'siteMap.inner.contactReached': "在「聯絡人」中點選一位聯絡人",
+  'siteMap.inner.onboarding': "首次設定",
+  'siteMap.inner.onboardingReached': "在尚未設定 ACS 的情況下首次登入時自動開啟",
+  'sidebar.siteMap': "面板地圖",
 }
 
 export default zhTW

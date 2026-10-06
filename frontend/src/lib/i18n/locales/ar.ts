@@ -4281,6 +4281,26 @@ const ar: Dictionary = {
   'plan.coupon.have': "لدي قسيمة",
   'plan.coupon.hint': "يسري الخصم على فواتيرك القادمة، بما فيها الفاتورة المفتوحة حاليًا.",
   'plan.coupon.nextInvoice': "الفاتورة القادمة: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "التنقل",
+  'siteMap.title': "خريطة اللوحة",
+  'siteMap.description': "كل شاشات هذه اللوحة مجمّعة، وما تفعله كل واحدة — ولا تظهر إلا التي يفتحها وصولك.",
+  'siteMap.group.operation': "التشغيل اليومي",
+  'siteMap.group.administration': "الإدارة",
+  'siteMap.group.platform': "المنصة",
+  'siteMap.settings.title': "أقسام الإعدادات",
+  'siteMap.settings.description': "كل رابط يفتح الإعدادات مباشرة عند تلك العلامة.",
+  'siteMap.inner.title': "شاشات يُوصل إليها من شاشة أخرى",
+  'siteMap.inner.description': "ليس لها رابط خاص: كل واحدة تحتاج العنصر القادم منه.",
+  'siteMap.inner.device': "تفاصيل الجهاز",
+  'siteMap.inner.deviceReached': "انقر على جهاز في المخزون",
+  'siteMap.inner.contact': "تفاصيل جهة الاتصال",
+  'siteMap.inner.contactReached': "انقر على جهة اتصال في «جهات الاتصال»",
+  'siteMap.inner.onboarding': "الإعداد الأول",
+  'siteMap.inner.onboardingReached': "تُفتح وحدها عند أول دخول دون إعداد ACS",
+  'sidebar.siteMap': "خريطة اللوحة",
 }
 
 export default ar

@@ -9,7 +9,8 @@ import { testConnection } from './config/database.js';
 import { IS_SAAS, IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
-import { platformHostOnly, resolveTenant } from './middleware/tenantResolver.js';
+import { isPlatformHost, platformHostOnly, resolveTenant } from './middleware/tenantResolver.js';
+import { robotsFor, sitemapFor } from './services/seoFiles.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
@@ -386,6 +387,43 @@ app.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: req.t('common.routeNotFound') });
 });
 
+/**
+ * `robots.txt` e `sitemap.xml`. Ver `services/seoFiles.js` para a regra; aqui
+ * só três decisões, e nenhuma das três é livre:
+ *
+ * 1. **Fora de `/api`**, senão o 404 logo acima responderia por elas.
+ * 2. **Acima de `serveFrontend`**, para ganhar de um arquivo físico que alguém
+ *    largue no build depois — e porque o fallback da SPA não as alcança: ele
+ *    pula caminhos com extensão, então hoje as duas caem no 404 do Express.
+ * 3. **`app.get` escrito aqui, e não um roteador montado.** O vigia de ordem em
+ *    `test/route-coverage.test.js` casa com `app.use(CONST, nomeRoutes)` e
+ *    passaria a reclamar de uma montagem nova; e o inventário de rotas só varre
+ *    prefixos `/api`, então estas duas não pedem declaração em `PUBLICAS`.
+ *
+ * `resolveTenant` está montado em `/api` e não passa por aqui: o host é lido
+ * direto, como `publicPanelOrigin` já faz em `routes/genieacsAgentFiles.js`.
+ */
+function hostDoPedido(req) {
+  return String(req.headers.host || '').trim().toLowerCase().replace(/:\d+$/, '');
+}
+
+app.get('/robots.txt', (req, res) => {
+  const host = hostDoPedido(req);
+  res.type('text/plain; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(robotsFor({ platformHost: isPlatformHost(host), host }));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const host = hostDoPedido(req);
+  const xml = sitemapFor({ platformHost: isPlatformHost(host), host });
+  // Fora do ápice o arquivo realmente não existe, e 404 é o que ele é.
+  if (!xml) return res.status(404).type('text/plain; charset=utf-8').send('Not found\n');
+  res.type('application/xml; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  return res.send(xml);
+});
+
 function serveFrontend(target, htmlFile) {
   if (!fs.existsSync(FRONTEND_DIR)) return false;
   target.use(express.static(FRONTEND_DIR, {
@@ -498,6 +536,18 @@ portalApp.use('/api', resolveTenant);
 portalApp.use('/api/customer', customerPortalRoutes);
 portalApp.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: req.t('common.routeNotFound') });
+});
+
+/**
+ * O portal do assinante é privado por inteiro — não tem uma página que faça
+ * sentido indexar. Precisa da sua própria rota porque é outro app Express:
+ * `portalApp` divide o `FRONTEND_DIR` com o painel, mas não a cadeia de
+ * middleware, então o `/robots.txt` de cima não responde aqui.
+ */
+portalApp.get('/robots.txt', (req, res) => {
+  res.type('text/plain; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(robotsFor({ platformHost: false, host: '' }));
 });
 
 serveFrontend(portalApp, 'portal.html');

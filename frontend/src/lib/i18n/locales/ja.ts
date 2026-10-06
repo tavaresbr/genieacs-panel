@@ -4272,6 +4272,26 @@ const ja: Dictionary = {
   'plan.coupon.have': "クーポンをお持ちの方",
   'plan.coupon.hint': "割引は今後の請求書に適用されます。すでに発行済みの未払い請求書も含みます。",
   'plan.coupon.nextInvoice': "次回の請求額: {price}",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "ナビゲーション",
+  'siteMap.title': "パネルマップ",
+  'siteMap.description': "このパネルのすべての画面をグループ別に、役割とともに一覧します。表示されるのはあなたの権限で開ける画面だけです。",
+  'siteMap.group.operation': "日々の運用",
+  'siteMap.group.administration': "管理",
+  'siteMap.group.platform': "プラットフォーム",
+  'siteMap.settings.title': "設定のセクション",
+  'siteMap.settings.description': "いずれも設定をそのタブで直接開きます。",
+  'siteMap.inner.title': "他の画面から開く画面",
+  'siteMap.inner.description': "単独のリンクはありません。それぞれ遷移元の項目が必要です。",
+  'siteMap.inner.device': "端末の詳細",
+  'siteMap.inner.deviceReached': "在庫一覧で端末をクリック",
+  'siteMap.inner.contact': "連絡先の詳細",
+  'siteMap.inner.contactReached': "「連絡先」で連絡先をクリック",
+  'siteMap.inner.onboarding': "初回設定",
+  'siteMap.inner.onboardingReached': "ACS 未設定のまま初回ログインすると自動で開きます",
+  'sidebar.siteMap': "パネルマップ",
 }
 
 export default ja
