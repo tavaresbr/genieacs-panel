@@ -34,6 +34,7 @@ import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { couponAppliesToPlan, couponDurationLabel, couponPriceCents } from '@/lib/coupon'
 import { CouponBadge } from '@/components/platform/coupon-control'
 import { CardAutopay } from '@/components/card-autopay'
+import { ReferralCard } from '@/components/referral-card'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -605,6 +606,12 @@ export default function PlanPage() {
             que deve. */}
         <div className="mt-6">
           <TenantCharges refreshKey={chargesKey} />
+        </div>
+
+        {/* A indicação de provedores (0105): o link, o saldo de créditos e os
+            indicados. Depois das cobranças, porque o crédito é abatido nelas. */}
+        <div className="mt-6">
+          <ReferralCard />
         </div>
 
         {/* Abaixo do plano, e não numa aba das configurações: é a mesma

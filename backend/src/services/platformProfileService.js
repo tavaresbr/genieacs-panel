@@ -45,10 +45,14 @@ export const PROFILE_FIELDS = Object.freeze(Object.keys(ENV_FALLBACK));
  *                        pagou é suspenso sozinho. Zero desliga.
  *   autoSuspendWarnDays  quantos dias antes da suspensão sai o aviso. Zero
  *                        desliga só o aviso; menor que `autoSuspendDays`.
+ *   referralRewardCents  o crédito, em centavos, que quem indicou ganha
+ *                        quando o indicado paga o primeiro período (0105).
+ *                        Zero desliga o programa de indicação.
  */
 export const BILLING_POLICY_FIELDS = Object.freeze({
   autoSuspendDays: { default: 15, min: 0, max: 90 },
-  autoSuspendWarnDays: { default: 3, min: 0, max: 30 }
+  autoSuspendWarnDays: { default: 3, min: 0, max: 30 },
+  referralRewardCents: { default: 0, min: 0, max: 1_000_000 }
 });
 
 const MAX = { legalName: 160, tradeName: 80, taxId: 20, address: 240, contactEmail: 160, notifyEmail: 160 };
@@ -141,6 +145,18 @@ export async function autoSuspendConfig() {
   const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
   const politica = politicaDe(stored);
   return { days: politica.autoSuspendDays, warnDays: politica.autoSuspendWarnDays };
+}
+
+/**
+ * O crédito da indicação como o pagamento o lê (0105): centavos, zero quando
+ * desligado. Nunca lança — sem caixa da plataforma, ou com o banco fora, vale
+ * o padrão (desligado). Sem o cache de quinze segundos: é dinheiro, e o
+ * console que acabou de mudar o valor espera que o próximo pagamento o use.
+ */
+export async function referralRewardCents() {
+  invalidatePlatformProfile();
+  const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
+  return politicaDe(stored).referralRewardCents;
 }
 
 /** Um número da política recebido → inteiro a gravar, `null` para o padrão; lança se inválido. */
@@ -253,5 +269,5 @@ export async function saveProfile(patch = {}) {
 }
 
 export default {
-  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS
+  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, referralRewardCents, PROFILE_FIELDS, BILLING_POLICY_FIELDS
 };

@@ -182,7 +182,8 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   // (A troca de plano não passa isto: um plano novo é outra fatura.)
   if (keepOverride && aberta?.amount_overridden_at) return nada;
   if (!aberta) return nada;
-  if (Number(aberta.amount_cents) === preco && String(aberta.currency || '').toUpperCase() === moeda) {
+  // Pelo preço antes do crédito reservado (0105): o abatido não é outro preço.
+  if (BillingCharge.baseAmountOf(aberta) === preco && String(aberta.currency || '').toUpperCase() === moeda) {
     // Mesmo valor, nada a reemitir — mas a linha passa a dizer o plano e o
     // cupom de agora (dois planos no mesmo preço, o cupom no piso), que é o
     // que o pagamento dela vai ler. A de valor mudado à mão fica como está.
@@ -209,7 +210,7 @@ async function reprecificarCobranca(subscription, plano, { keepOverride = false 
   // é o da linha. Se a outra troca já deixou a linha no preço novo (ou a
   // cobrança fechou no meio), não há o que fazer aqui.
   const linha = await BillingCharge.findById(aberta.id);
-  const jaNoPreco = linha && Number(linha.amount_cents) === preco
+  const jaNoPreco = linha && BillingCharge.baseAmountOf(linha) === preco
     && String(linha.currency || '').toUpperCase() === moeda;
   if (!linha || jaNoPreco || !OPEN_CHARGE_STATUSES.includes(linha.status)
     || (keepOverride && linha.amount_overridden_at)) {
@@ -281,7 +282,7 @@ async function descidaTravada(subscription, atual) {
     const cupom = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
     pagaBarato = SubscriptionService.paidScheduledPlan({
       planId: linha.plan_id ?? null,
-      cents: linha.amount_overridden_at ? null : Number(linha.amount_cents),
+      cents: linha.amount_overridden_at ? null : BillingCharge.baseAmountOf(linha),
       subscription,
       current: atual,
       scheduled: agendado,

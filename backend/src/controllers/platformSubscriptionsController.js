@@ -7,6 +7,7 @@ import BillingInvoice from '../models/BillingInvoice.js';
 import BillingInvoiceService, { InvoiceRequestError } from '../services/billing/billingInvoiceService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import BillingEvent from '../models/BillingEvent.js';
+import TenantCredit from '../models/TenantCredit.js';
 import SubscriptionService, { isBillableStatus } from '../services/subscriptionService.js';
 import ChargeIssuingService, { ChargeFollowError } from '../services/chargeIssuingService.js';
 import { providerFor } from '../services/billing/registry.js';
@@ -879,6 +880,10 @@ class PlatformSubscriptionsController {
               if (cobranca.status === 'overdue') patch.status = 'pending';
             }
             await BillingCharge.update(cobranca.id, patch);
+            // O valor digitado pelo console é o final (0105): o crédito que
+            // estava reservado nela volta ao saldo do provedor, para a
+            // próxima fatura.
+            if (mudaValor) await TenantCredit.releaseForCharge(cobranca.id);
             const charge = await BillingCharge.findById(cobranca.id);
             return {
               cobranca,

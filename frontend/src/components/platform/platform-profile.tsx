@@ -13,6 +13,8 @@ import {
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
+import { centsToInput } from '@/lib/subscription-console'
+import { parseRewardToCents } from '@/lib/referrals'
 
 type Rascunho = Record<PlatformProfileField, string>
 
@@ -125,6 +127,8 @@ export function PlatformProfileForm() {
   const [perfil, setPerfil] = useState<PlatformProfile | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho>(VAZIO)
   const [politica, setPolitica] = useState<Record<CampoPolitica, string>>({ autoSuspendDays: '', autoSuspendWarnDays: '' })
+  // O crédito da indicação de provedores (0105), digitado em reais.
+  const [recompensa, setRecompensa] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   // A consulta do CNPJ na Receita: o estado da tela, e qual CNPJ já foi
@@ -143,6 +147,7 @@ export function PlatformProfileForm() {
       autoSuspendDays: String(gravada.autoSuspendDays),
       autoSuspendWarnDays: String(gravada.autoSuspendWarnDays)
     })
+    setRecompensa(centsToInput(dados.billing?.referralRewardCents ?? 0))
   }, [])
 
   useEffect(() => {
@@ -200,7 +205,7 @@ export function PlatformProfileForm() {
     if (!perfil) return
     // Só o que mudou vai, para um campo que vem do `.env` não virar "gravado"
     // só porque o formulário o reenviou.
-    const patch: Partial<Record<PlatformProfileField, string>> & Partial<Record<CampoPolitica, number | null>> = {}
+    const patch: Partial<Record<PlatformProfileField, string>> & Partial<Record<CampoPolitica | 'referralRewardCents', number | null>> = {}
     for (const campo of PLATFORM_PROFILE_FIELDS) {
       if (rascunho[campo].trim() !== paraTela(campo, perfil.values[campo])) patch[campo] = rascunho[campo].trim()
     }
@@ -211,6 +216,13 @@ export function PlatformProfileForm() {
       if (texto === String(atual)) continue
       patch[campo] = texto === '' ? null : Number(texto)
     }
+    // O crédito da indicação: em reais na tela, centavos no servidor.
+    const centavos = parseRewardToCents(recompensa)
+    if (centavos === null) {
+      toast.error(t('platform.profile.referralRewardInvalid'))
+      return
+    }
+    if (centavos !== (perfil.billing?.referralRewardCents ?? 0)) patch.referralRewardCents = centavos
     if (!Object.keys(patch).length) {
       toast.success(t('platform.profile.nothingChanged'))
       return
@@ -333,6 +345,26 @@ export function PlatformProfileForm() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-md border border-border p-4 sm:p-5">
+        <h3 className="font-semibold text-foreground">{t('platform.profile.referral')}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{t('platform.profile.referralHint')}</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="profile-referralRewardCents" className="field-label">{t('platform.profile.referralReward')}</label>
+            <input
+              id="profile-referralRewardCents"
+              inputMode="decimal"
+              className="modern-input w-full min-w-0"
+              value={recompensa}
+              disabled={!perfil.canSave}
+              aria-describedby="profile-referralRewardCents-hint"
+              onChange={(e) => setRecompensa(e.target.value)}
+            />
+            <p id="profile-referralRewardCents-hint" className="field-hint">{t('platform.profile.referralRewardHint')}</p>
+          </div>
         </div>
       </section>
 

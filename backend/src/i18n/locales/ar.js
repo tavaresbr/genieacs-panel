@@ -886,6 +886,8 @@ export default {
   'subscription.retrieveFailed': 'تعذّرت قراءة الاشتراك',
   'plans.retrieved': 'تم جلب الخطط',
   'plans.retrieveFailed': 'تعذّرت قراءة الخطط',
+  'referrals.retrieved': 'تم جلب الإحالات',
+  'referrals.retrieveFailed': 'تعذّرت قراءة الإحالات',
   'subscription.planChanged': 'تم تغيير الخطة',
   'subscription.planUnchanged': 'هذه خطتك بالفعل',
   'subscription.planScheduled': 'تمت جدولة الانتقال إلى خطة أقل في {date}؛ تبقى خطتك الحالية حتى ذلك الحين',

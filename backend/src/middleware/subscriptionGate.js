@@ -91,6 +91,9 @@ const EXEMPT_PATHS = new Set([
   // devolve a fatura de quem está atrasado para Pix/boleto.
   '/api/tenant/subscription/autopay',
   '/api/tenant/subscription/card',
+  // A indicação (0105): o saldo de crédito na mesma tela de Plano que quem
+  // está bloqueado usa para pagar — e o crédito é parte do que ele vai pagar.
+  '/api/tenant/referrals',
   '/api/auth'
 ]);
 // Os caminhos EXATOS das entregas de fora. `/api/sgp/events` sem o

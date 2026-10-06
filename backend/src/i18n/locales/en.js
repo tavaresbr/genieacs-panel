@@ -887,6 +887,8 @@ export default {
   'subscription.retrieveFailed': 'Failed to read the subscription',
   'plans.retrieved': 'Plans retrieved',
   'plans.retrieveFailed': 'Failed to read the plans',
+  'referrals.retrieved': 'Referrals retrieved',
+  'referrals.retrieveFailed': 'Failed to read the referrals',
   'subscription.planChanged': 'Plan changed',
   'subscription.planUnchanged': 'This is already your plan',
   'subscription.planScheduled': 'Plan downgrade scheduled for {date}; your current plan stays until then',

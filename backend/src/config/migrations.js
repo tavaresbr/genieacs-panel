@@ -2483,6 +2483,107 @@ const SUBSCRIPTION_REMINDER_TABLES = [
 ];
 
 /**
+ * A indicação de provedores (0105) — ver `referralService.js`.
+ *
+ * `referral_code` é o código curto e legível do link de indicação de cada
+ * provedor, gerado sob demanda (nulo até alguém abrir a tela de Plano) e único.
+ * `referred_by_tenant_id` é quem indicou este provedor, gravado no cadastro.
+ * Sem `.references`, pelo motivo de `pending_plan_id`: acrescentar chave
+ * estrangeira a uma tabela que já existe é recriá-la no SQLite — e aqui a
+ * tabela é `tenants`, a mãe de todas. Quem lê confere a linha.
+ */
+const TENANT_REFERRAL_COLUMNS = [
+  ['referral_code', (t) => t.string('referral_code', 16).nullable()],
+  ['referred_by_tenant_id', (t) => t.integer('referred_by_tenant_id').unsigned().nullable()]
+];
+
+/**
+ * Quanto de crédito a cobrança tem RESERVADO (0105): o preço do plano menos
+ * isto é o `amount_cents` que foi ao gateway. Nula (ou zero) é a cobrança sem
+ * crédito. O detalhe — de quais créditos saiu — está em `credit_allocations`.
+ */
+const BILLING_CHARGE_CREDIT_COLUMNS = [
+  ['credit_reserved_cents', (t) => t.integer('credit_reserved_cents').nullable()]
+];
+
+/**
+ * A recompensa de uma indicação (0105). Uma linha por provedor INDICADO
+ * (`referred_tenant_id` único): nasce `pending` no cadastro e vira `credited`
+ * no primeiro pagamento que estende o período dele — por atualização
+ * condicional, dentro da transação do pagamento, e é isso que a faz valer uma
+ * vez só. `canceled` é o estorno daquele pagamento (ou o programa desligado
+ * quando ele chegou). Da PLATAFORMA (compartilhada): fala de dois provedores
+ * ao mesmo tempo, e cada lado a lê pelo seu id.
+ */
+const referralRewardsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('referrer_tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('referred_tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('amount_cents').notNullable().defaultTo(0);
+  t.string('status', 16).notNullable().defaultTo('pending'); // pending | credited | canceled
+  t.string('payment_external_id', 160).nullable();
+  t.integer('credit_id').unsigned().nullable();
+  t.timestamp('credited_at').nullable();
+  t.timestamp('canceled_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['referred_tenant_id'], 'referral_rewards_referred_uq');
+  t.index(['referrer_tenant_id'], 'referral_rewards_referrer_idx');
+};
+
+/**
+ * O saldo de créditos de um provedor (0105): uma linha por crédito, e
+ * `remaining_cents` é quanto dele ainda está livre (o reservado numa cobrança
+ * em aberto já saiu daqui; volta se a reserva for solta). `source`:
+ * `referral` (a recompensa de uma indicação) ou `manual` (o ajuste do console
+ * — que pode ser negativo, e então nasce com `remaining_cents` zero e abate dos
+ * outros). `canceled_at` é o crédito cancelado: o estorno do pagamento que o
+ * gerou. Do PROVEDOR (escopada).
+ */
+const tenantCreditsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('amount_cents').notNullable();
+  t.integer('remaining_cents').notNullable().defaultTo(0);
+  t.string('source', 16).notNullable(); // referral | manual
+  t.string('reference', 255).nullable();
+  t.integer('created_by').unsigned().nullable();
+  t.timestamp('canceled_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'created_at'], 'tenant_credits_tenant_idx');
+};
+
+/**
+ * Quanto de cada crédito foi para cada cobrança (0105): `reserved` na emissão,
+ * `consumed` quando ela é paga, `released` quando ela é cancelada, reemitida
+ * ou estornada (o valor volta ao crédito). As transições são atualizações
+ * condicionais sobre `status`, e é isso que as faz idempotentes.
+ */
+const creditAllocationsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('credit_id').unsigned().notNullable()
+    .references('id').inTable('tenant_credits').onDelete('CASCADE');
+  t.integer('charge_id').unsigned().notNullable()
+    .references('id').inTable('billing_charges').onDelete('CASCADE');
+  t.integer('amount_cents').notNullable();
+  t.string('status', 16).notNullable().defaultTo('reserved'); // reserved | consumed | released
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'charge_id'], 'credit_allocations_charge_idx');
+  t.index(['tenant_id', 'credit_id'], 'credit_allocations_credit_idx');
+};
+
+const REFERRAL_TABLES = [
+  ['referral_rewards', referralRewardsTable],
+  ['tenant_credits', tenantCreditsTable],
+  ['credit_allocations', creditAllocationsTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -2518,7 +2619,8 @@ export const SCHEMA_TABLES = [
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
   ...COUPON_TABLES,
-  ...SUBSCRIPTION_REMINDER_TABLES
+  ...SUBSCRIPTION_REMINDER_TABLES,
+  ...REFERRAL_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5671,6 +5773,56 @@ export const migrations = [
       await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /**
+     * A indicação de provedores — ver `TENANT_REFERRAL_COLUMNS`,
+     * `BILLING_CHARGE_CREDIT_COLUMNS` e `REFERRAL_TABLES`. O índice único do
+     * código à parte das colunas, como o do gateway (0047): a base que já tem
+     * a coluna por outro caminho ainda ganha o índice.
+     */
+    id: '0105_referrals_and_credits',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if ((await missingColumns(db, 'tenants', TENANT_REFERRAL_COLUMNS)).length) return false;
+      if (!(await hasIndex(db, 'tenants', 'tenants_referral_code_uq'))) return false;
+      if (await db.schema.hasTable('billing_charges')
+        && (await missingColumns(db, 'billing_charges', BILLING_CHARGE_CREDIT_COLUMNS)).length) return false;
+      for (const [nome] of REFERRAL_TABLES) {
+        if (nome === 'credit_allocations' && !(await db.schema.hasTable('billing_charges'))) continue;
+        if (!(await db.schema.hasTable(nome))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltam = await missingColumns(db, 'tenants', TENANT_REFERRAL_COLUMNS);
+      if (faltam.length) {
+        await db.schema.alterTable('tenants', (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      if (!(await hasIndex(db, 'tenants', 'tenants_referral_code_uq'))) {
+        await db.schema.alterTable('tenants', (t) => {
+          t.unique(['referral_code'], 'tenants_referral_code_uq');
+        });
+      }
+      if (await db.schema.hasTable('billing_charges')) {
+        const semCredito = await missingColumns(db, 'billing_charges', BILLING_CHARGE_CREDIT_COLUMNS);
+        if (semCredito.length) {
+          await db.schema.alterTable('billing_charges', (t) => {
+            for (const add of semCredito) add(t);
+          });
+        }
+      }
+      for (const [nome, construtor] of REFERRAL_TABLES) {
+        // A alocação aponta para `billing_charges`; sem ela, nada a criar.
+        // eslint-disable-next-line no-await-in-loop -- três tabelas só
+        if (nome === 'credit_allocations' && !(await db.schema.hasTable('billing_charges'))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

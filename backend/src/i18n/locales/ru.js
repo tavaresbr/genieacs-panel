@@ -888,6 +888,8 @@ export default {
   'subscription.retrieveFailed': 'Не удалось прочитать подписку',
   'plans.retrieved': 'Тарифы получены',
   'plans.retrieveFailed': 'Не удалось прочитать тарифы',
+  'referrals.retrieved': 'Рекомендации получены',
+  'referrals.retrieveFailed': 'Не удалось прочитать рекомендации',
   'subscription.planChanged': 'Тариф изменён',
   'subscription.planUnchanged': 'Это уже ваш тариф',
   'subscription.planScheduled': 'Переход на более дешёвый тариф запланирован на {date}; до этого действует текущий тариф',

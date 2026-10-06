@@ -40,6 +40,10 @@ router.get('/charges', authenticateToken, requirePermission('settings.read'), Te
 // escolhe o plano, e quem está em `past_due` é quem mais precisa dela.
 router.get('/plans', authenticateToken, requirePermission('settings.read'), TenantController.listPlans);
 
+// A indicação de provedores (0105): o link de indicação, os indicados e o
+// saldo de créditos. Na tela de Plano, com a mesma capacidade dela.
+router.get('/referrals', authenticateToken, requirePermission('settings.read'), TenantController.getReferrals);
+
 // O provedor troca de plano, e "pagar agora". Os dois são a conta do
 // provedor mudando — `settings.write`, que é de `owner` e `admin`, os mesmos
 // que gravam o cadastro fiscal que vai na fatura. Fora da porta da

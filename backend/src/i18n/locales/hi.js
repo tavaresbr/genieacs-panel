@@ -894,6 +894,8 @@ export default {
   'subscription.retrieveFailed': 'सदस्यता पढ़ी नहीं जा सकी',
   'plans.retrieved': 'प्लान प्राप्त हुए',
   'plans.retrieveFailed': 'प्लान पढ़े नहीं जा सके',
+  'referrals.retrieved': 'रेफ़रल प्राप्त हुए',
+  'referrals.retrieveFailed': 'रेफ़रल पढ़े नहीं जा सके',
   'subscription.planChanged': 'प्लान बदल दिया गया',
   'subscription.planUnchanged': 'यह पहले से आपका प्लान है',
   'subscription.planScheduled': 'छोटे प्लान पर बदलाव {date} के लिए निर्धारित; तब तक आपका मौजूदा प्लान जारी रहेगा',

@@ -890,6 +890,8 @@ export default {
   'subscription.retrieveFailed': '구독 정보를 읽지 못했습니다',
   'plans.retrieved': '요금제를 불러왔습니다',
   'plans.retrieveFailed': '요금제를 읽지 못했습니다',
+  'referrals.retrieved': '추천 정보를 가져왔습니다',
+  'referrals.retrieveFailed': '추천 정보를 읽지 못했습니다',
   'subscription.planChanged': '요금제가 변경되었습니다',
   'subscription.planUnchanged': '이미 사용 중인 요금제입니다',
   'subscription.planScheduled': '{date}에 요금제 다운그레이드가 예약되었습니다. 그때까지 현재 요금제가 유지됩니다',
