@@ -594,7 +594,7 @@ export default function PlatformPage() {
                 <article key={tenant.id} className="modern-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h2 className="break-words font-semibold text-foreground">{tenant.name}</h2>
+                      <h2 className="wrap-break-word font-semibold text-foreground">{tenant.name}</h2>
                       <p className="break-all font-mono text-xs text-muted-foreground">{tenant.slug}</p>
                     </div>
                     <div className="text-end">{statusDe(tenant)}</div>

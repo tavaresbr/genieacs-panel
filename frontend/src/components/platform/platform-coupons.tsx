@@ -298,7 +298,7 @@ export function PlatformCoupons({ plans }: { plans: Plan[] }) {
                 {plans.map((plan) => (
                   <label key={plan.id} className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={form.planIds.includes(plan.id)} onChange={() => alternarPlano(plan.id)} />
-                    <span className="break-words">{plan.name}</span>
+                    <span className="wrap-break-word">{plan.name}</span>
                   </label>
                 ))}
               </div>
@@ -355,7 +355,7 @@ export function PlatformCoupons({ plans }: { plans: Plan[] }) {
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-foreground">{t('coupons.plans')}</dt>
-                    <dd className="min-w-0 break-words text-end font-medium">
+                    <dd className="min-w-0 wrap-break-word text-end font-medium">
                       {coupon.planIds ? coupon.planIds.map(nomeDoPlano).join(', ') : t('coupons.allPlans')}
                     </dd>
                   </div>

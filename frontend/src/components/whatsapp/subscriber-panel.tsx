@@ -53,7 +53,7 @@ function Field({ label, children, mono = false }: { label: string; children: Rea
   return (
     <div className="min-w-0">
       <p className="metric-label">{label}</p>
-      <p className={`mt-0.5 break-words text-sm text-foreground ${mono ? 'font-mono' : ''}`}>{children}</p>
+      <p className={`mt-0.5 wrap-break-word text-sm text-foreground ${mono ? 'font-mono' : ''}`}>{children}</p>
     </div>
   )
 }

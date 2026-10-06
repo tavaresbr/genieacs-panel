@@ -138,7 +138,7 @@ export default function Signup() {
           <div className="flex min-w-0 items-center gap-3">
             <BrandMark className="size-10 shrink-0" title={hostName} />
             <div className="min-w-0">
-              <div className="font-bold [overflow-wrap:anywhere]">{hostName}</div>
+              <div className="font-bold wrap-anywhere">{hostName}</div>
               <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
             </div>
           </div>
@@ -236,7 +236,7 @@ export default function Signup() {
                       aria-describedby="slug-hint"
                     />
                     {base && (
-                      <span className="min-w-0 max-w-[55%] text-sm text-muted-foreground [overflow-wrap:anywhere]">.{base}</span>
+                      <span className="min-w-0 max-w-[55%] text-sm text-muted-foreground wrap-anywhere">.{base}</span>
                     )}
                   </div>
                   <p id="slug-hint" className="field-hint" aria-live="polite">

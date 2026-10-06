@@ -50,12 +50,12 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
   })
 
   return createPortal(
-    <div className="fixed inset-0 z-[3000] flex items-end justify-center bg-[#07100c]/75 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
+    <div className="fixed inset-0 z-3000 flex items-end justify-center bg-[#07100c]/75 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
       role="dialog" aria-modal="true" aria-labelledby="release-notes-title">
       <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label={t('release.close')} />
-      <section className="modern-card relative flex max-h-[92vh] w-full supports-[height:100dvh]:max-h-[92dvh] max-w-2xl flex-col overflow-hidden rounded-b-none shadow-2xl sm:rounded-[var(--radius)]">
+      <section className="modern-card relative flex max-h-[92vh] w-full supports-[height:100dvh]:max-h-[92dvh] max-w-2xl flex-col overflow-hidden rounded-b-none shadow-2xl sm:rounded-(--radius)">
         <header className="relative shrink-0 overflow-hidden border-b border-border bg-[#173f35] px-5 py-6 text-[#f4f3ed] sm:px-7">
-          <div className="absolute -end-16 -top-24 size-64 rounded-full border-[42px] border-white/5" aria-hidden="true" />
+          <div className="absolute -inset-e-16 -top-24 size-64 rounded-full border-42 border-white/5" aria-hidden="true" />
           <div className="relative flex items-start justify-between gap-5">
             <div className="flex min-w-0 items-start gap-4">
               <BrandMark className="size-11 shrink-0" />
@@ -95,7 +95,7 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
                         <span className={style.className}>{translateCategory(change.category)}</span>
                         <span className="font-mono text-[0.68rem] text-muted-foreground">{change.shortHash}</span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-foreground [overflow-wrap:anywhere]">{change.title}</p>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-foreground wrap-anywhere">{change.title}</p>
                     </div>
                   </div>
                 </li>

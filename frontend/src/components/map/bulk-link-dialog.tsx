@@ -68,7 +68,7 @@ export function BulkLinkDialog<T extends OccupancyNode>({ nodes, edges, edgeIds,
   }
 
   return (
-    <div className="modal-backdrop z-[2300] bg-black/65" role="dialog" aria-modal="true">
+    <div className="modal-backdrop z-2300 bg-black/65" role="dialog" aria-modal="true">
       <div className="modal-panel modern-card flex max-w-2xl flex-col p-5 sm:p-6">
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="section-heading">{t('map.link.title')}</h2>

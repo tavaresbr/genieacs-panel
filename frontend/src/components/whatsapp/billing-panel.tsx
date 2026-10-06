@@ -52,7 +52,7 @@ const SKIP_REASONS: { key: SkipCountKey; label: TranslationKey }[] = [
 ]
 
 /** A célula da tabela de devedores quando, no celular, ela vira lista. */
-const MOBILE_CELL = 'max-md:block max-md:!border-0 max-md:!px-1 max-md:!py-0.5'
+const MOBILE_CELL = 'max-md:block max-md:border-0! max-md:px-1! max-md:py-0.5!'
 
 /**
  * A body citing `{{dias_para_vencer}}` IS a reminder — the same test the
@@ -472,7 +472,7 @@ export function BillingPanel() {
                       data-contract={row.contract}
                       className="max-md:grid max-md:grid-cols-[2.5rem_minmax(0,1fr)] max-md:border-b max-md:border-border/70 max-md:px-2 max-md:py-2 max-md:last:border-b-0"
                     >
-                      <td className={`${MOBILE_CELL} max-md:row-span-5 max-md:!pt-1`}>
+                      <td className={`${MOBILE_CELL} max-md:row-span-5 max-md:pt-1!`}>
                         <input
                           type="checkbox"
                           className="max-md:size-5"

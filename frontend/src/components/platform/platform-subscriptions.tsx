@@ -251,7 +251,7 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
                 <article key={row.tenant.id} className="modern-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="break-words font-semibold text-foreground">{row.tenant.name}</h3>
+                      <h3 className="wrap-break-word font-semibold text-foreground">{row.tenant.name}</h3>
                       <p className="break-all font-mono text-xs text-muted-foreground">{row.tenant.slug}</p>
                     </div>
                     <StatusBadge row={row} />
@@ -879,7 +879,7 @@ function ChargeItem({
         </span>
       </div>
       {charge.lastError && (
-        <p className="text-xs text-destructive [overflow-wrap:anywhere]">
+        <p className="text-xs text-destructive wrap-anywhere">
           {t('platform.subs.lastError', { error: charge.lastError })}
         </p>
       )}
@@ -1669,7 +1669,7 @@ function RefundDialog({
       )}
       {falhaGateway !== null && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3" role="alert">
-          <p className="text-foreground [overflow-wrap:anywhere]">
+          <p className="text-foreground wrap-anywhere">
             {falhaGateway
               ? t('platform.subs.refundGatewayFailed', { gateway, detail: falhaGateway })
               : t('platform.subs.err.gatewayFailed')}
@@ -1679,7 +1679,7 @@ function RefundDialog({
       )}
       {statusGateway !== null && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3" role="alert">
-          <p className="text-foreground [overflow-wrap:anywhere]">
+          <p className="text-foreground wrap-anywhere">
             {t('platform.subs.refundGatewayStatus', { gateway: gateway || charge.provider, status: statusGateway })}
           </p>
           {viaGateway && <p className="field-hint">{t('platform.subs.refundGatewayStatusHint', { gateway })}</p>}

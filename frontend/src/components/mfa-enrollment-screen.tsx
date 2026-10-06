@@ -26,7 +26,7 @@ export function MfaEnrollmentScreen() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <BrandMark className="size-10 shrink-0" />
-            <span className="min-w-0 font-semibold text-foreground [overflow-wrap:anywhere]">{provedor}</span>
+            <span className="min-w-0 font-semibold text-foreground wrap-anywhere">{provedor}</span>
           </div>
           <button type="button" className="modern-button-secondary shrink-0 whitespace-nowrap" onClick={logout}>
             <Icon name="logout" size={16} /> {t('mfaEnrollment.logout')}

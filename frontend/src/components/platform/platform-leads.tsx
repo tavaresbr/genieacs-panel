@@ -134,11 +134,11 @@ export function PlatformLeads() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground [overflow-wrap:anywhere]">{lead.name}</span>
+                    <span className="font-medium text-foreground wrap-anywhere">{lead.name}</span>
                     {lead.company && <span className="text-sm text-muted-foreground">· {lead.company}</span>}
                     <span className={STATUS_BADGE[lead.status]}>{t(STATUS_KEYS[lead.status])}</span>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                  <p className="mt-1 text-sm text-muted-foreground wrap-anywhere">
                     {[
                       lead.city,
                       lead.devicesEstimate != null ? t('platform.leads.devices', { count: lead.devicesEstimate }) : null,
@@ -147,11 +147,11 @@ export function PlatformLeads() {
                     ].filter(Boolean).join(' · ')}
                   </p>
                   {lead.message && (
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-foreground [overflow-wrap:anywhere]">{lead.message}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-foreground wrap-anywhere">{lead.message}</p>
                   )}
                   <div className="mt-2 flex flex-wrap gap-3 text-sm">
                     {lead.email && (
-                      <a className="underline [overflow-wrap:anywhere]" href={`mailto:${lead.email}`}>{lead.email}</a>
+                      <a className="underline wrap-anywhere" href={`mailto:${lead.email}`}>{lead.email}</a>
                     )}
                     {wa && (
                       <a className="underline" href={wa} target="_blank" rel="noreferrer">WhatsApp {lead.phone}</a>

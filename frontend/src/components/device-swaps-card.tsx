@@ -103,7 +103,7 @@ export function DeviceSwapsCard({ deviceId }: DeviceSwapsCardProps) {
                   {swap.deviceId}
                 </Link>
               </p>
-              <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+              <p className="mt-1 text-xs text-muted-foreground wrap-anywhere">
                 {[
                   swap.customerId,
                   swap.pppoeUsername,

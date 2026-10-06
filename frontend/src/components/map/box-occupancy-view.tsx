@@ -119,7 +119,7 @@ export function BoxOccupancyView<T extends OccupancyNode>({
                   <span className="block font-mono text-xs text-muted-foreground">{row.box.node_id}</span>
                 </td>
                 <td>{row.box.type.toUpperCase()}</td>
-                <td className="min-w-[10rem]">
+                <td className="min-w-40">
                   <span className="text-sm">{row.capacity === null ? row.used : `${row.used}/${row.capacity}`}</span>
                   {row.percent !== null && (
                     <div className="mt-1 h-1.5 overflow-hidden rounded bg-muted">

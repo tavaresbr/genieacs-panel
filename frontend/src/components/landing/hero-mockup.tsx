@@ -21,7 +21,7 @@ export function HeroMockup({ copy }: { copy: LandingCopy }) {
   const m = copy.mockup
   return (
     <div aria-hidden="true" className="relative mx-auto w-full max-w-xl select-none">
-      <div className="absolute -inset-6 rounded-[2rem] bg-emerald-400/10 blur-3xl" />
+      <div className="absolute -inset-6 rounded-4xl bg-emerald-400/10 blur-3xl" />
 
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0f1c18]/95 shadow-2xl shadow-black/50">
         <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
@@ -32,21 +32,21 @@ export function HeroMockup({ copy }: { copy: LandingCopy }) {
         </div>
 
         <div className="grid grid-cols-3 gap-3 p-4">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="rounded-xl border border-white/10 bg-white/3 p-3">
             <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">{m.devices}</div>
             <div className="mt-1 text-xl font-extrabold text-white">1.284</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="rounded-xl border border-white/10 bg-white/3 p-3">
             <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">{m.online}</div>
             <div className="mt-1 text-xl font-extrabold text-emerald-400">98,6%</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="rounded-xl border border-white/10 bg-white/3 p-3">
             <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">{m.alerts}</div>
             <div className="mt-1 text-xl font-extrabold text-amber-300">3</div>
           </div>
         </div>
 
-        <div className="mx-4 mb-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="mx-4 mb-4 rounded-xl border border-white/10 bg-white/3 p-3">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>{m.signal}</span>
             <span className="font-semibold text-white">-19,6 dBm</span>
@@ -78,7 +78,7 @@ export function HeroMockup({ copy }: { copy: LandingCopy }) {
         </ul>
       </div>
 
-      <div className="absolute -bottom-6 -left-4 hidden max-w-[15rem] rounded-2xl border border-white/10 bg-[#12251f] p-3 shadow-xl sm:block">
+      <div className="absolute -bottom-6 -left-4 hidden max-w-60 rounded-2xl border border-white/10 bg-[#12251f] p-3 shadow-xl sm:block">
         <div className="flex items-center gap-2 text-[0.7rem] font-semibold text-emerald-300">
           <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#25d366] text-white">
             <Icon name="chat" size={12} />

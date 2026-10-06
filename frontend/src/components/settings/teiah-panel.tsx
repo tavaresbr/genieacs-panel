@@ -375,7 +375,7 @@ export function TeiahPanel() {
                   <span className="font-semibold">{entry.contract}</span>
                   {entry.clientName ? ` · ${entry.clientName}` : ''}
                   {entry.item ? (
-                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words font-mono text-muted-foreground">
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap wrap-break-word font-mono text-muted-foreground">
                       {JSON.stringify(entry.item, null, 2)}
                     </pre>
                   ) : (

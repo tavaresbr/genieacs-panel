@@ -124,7 +124,7 @@ function MetricCard({
         <p className="metric-label">{label}</p>
         <span className="rounded-md bg-secondary p-2 text-primary"><Icon name={icon} size={18} /></span>
       </div>
-      <p className="break-words text-xl font-bold tracking-tight">{value}</p>
+      <p className="wrap-break-word text-xl font-bold tracking-tight">{value}</p>
       {helper && <p className="mt-1 text-xs text-muted-foreground">{helper}</p>}
     </article>
   )
@@ -537,7 +537,7 @@ export default function CustomerPortal() {
                   />
                   <button
                     type="button"
-                    className="absolute end-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
+                    className="absolute inset-e-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
                     onClick={() => setShowLoginPassword((visible) => !visible)}
                     aria-label={showLoginPassword ? t('portal.login.hidePassword') : t('portal.login.showPassword')}
                     aria-pressed={showLoginPassword}
@@ -572,7 +572,7 @@ export default function CustomerPortal() {
           <div className="flex min-w-0 items-center gap-3">
             <BrandMark className="h-10 w-10 shrink-0" title="TR69 Controle" />
             <div className="min-w-0">
-              <p className="line-clamp-2 break-words font-bold leading-tight">{providerContact?.enabled && providerContact.name ? providerContact.name : t('portal.name')}</p>
+              <p className="line-clamp-2 wrap-break-word font-bold leading-tight">{providerContact?.enabled && providerContact.name ? providerContact.name : t('portal.name')}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{overview?.customerId || customerId}</p>
             </div>
           </div>
@@ -617,7 +617,7 @@ export default function CustomerPortal() {
 
         {!overview && loading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('portal.overview.loadingAria')}>
-            {[0, 1, 2, 3].map((item) => <div key={item} className="h-36 animate-pulse rounded-[var(--radius)] bg-muted" />)}
+            {[0, 1, 2, 3].map((item) => <div key={item} className="h-36 animate-pulse rounded-(--radius) bg-muted" />)}
           </div>
         ) : overview ? (
           <>
@@ -792,7 +792,7 @@ export default function CustomerPortal() {
                                 />
                                 <button
                                   type="button"
-                                  className="absolute end-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
+                                  className="absolute inset-e-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
                                   onClick={() => setShowWifiPassword((visible) => !visible)}
                                   aria-label={showWifiPassword ? t('portal.wifi.hidePassword') : t('portal.wifi.showPassword')}
                                   aria-pressed={showWifiPassword}
@@ -1053,7 +1053,7 @@ export default function CustomerPortal() {
               {providerContact.address && (
                 <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
                   <Icon name="pin" size={16} className="mt-0.5 shrink-0" />
-                  <span className="min-w-0 break-words">{providerContact.address}</span>
+                  <span className="min-w-0 wrap-break-word">{providerContact.address}</span>
                 </p>
               )}
             </section>

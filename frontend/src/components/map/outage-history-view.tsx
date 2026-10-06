@@ -48,7 +48,7 @@ export function OutageHistoryView({ onSelectBox }: { onSelectBox: (nodeId: strin
           <div className="inline-flex rounded-md border border-border bg-muted p-1">
             {PERIODS.map((value) => (
               <button key={value} type="button" onClick={() => setDays(value)}
-                className={`min-h-9 rounded px-3 text-xs font-semibold ${days === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+                className={`min-h-9 rounded px-3 text-xs font-semibold ${days === value ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground'}`}>
                 {t('map.history.period', { days: value })}
               </button>
             ))}

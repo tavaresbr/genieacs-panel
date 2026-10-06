@@ -86,8 +86,8 @@ function PlanCard({
   return (
     <div
       className={`relative flex flex-col rounded-2xl border p-7 transition duration-300 hover:-translate-y-1 ${plan.featured
-        ? 'border-emerald-400/70 bg-emerald-400/[0.06] shadow-[0_0_40px_-12px] shadow-emerald-400/40'
-        : 'border-white/10 bg-white/[0.03]'}`}
+        ? 'border-emerald-400/70 bg-emerald-400/6 shadow-[0_0_40px_-12px] shadow-emerald-400/40'
+        : 'border-white/10 bg-white/3'}`}
     >
       {plan.featured && (
         <span className="absolute -top-3 left-6 rounded-full bg-emerald-400 px-3 py-0.5 text-xs font-bold text-emerald-950">
@@ -184,7 +184,7 @@ function DemoDialog({
     }
   }
 
-  const field = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none'
+  const field = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-hidden'
 
   return (
     <div
@@ -280,7 +280,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-[#0a1411] text-slate-200 antialiased">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0a1411]/90 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0a1411]/90 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-4 sm:px-6">
           <a href="#topo" className="text-xl font-extrabold tracking-tight text-white">
             {marcaA}<span className="text-emerald-400">{marcaB}</span>
@@ -313,7 +313,7 @@ export default function Landing() {
         <section className="relative overflow-hidden">
           {/* Fundo: brilho verde e uma grade sutil que some nas bordas. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-            <div className="absolute left-1/2 top-[-18rem] h-[36rem] w-[60rem] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-3xl" />
+            <div className="absolute left-1/2 -top-72 h-144 w-240 -translate-x-1/2 rounded-full bg-emerald-500/15 blur-3xl" />
             <div
               className="absolute inset-0 opacity-[0.07]"
               style={{
@@ -333,7 +333,7 @@ export default function Landing() {
               </span>
               <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.5rem]">
                 {copy.hero.titleA}{' '}
-                <span className="bg-gradient-to-r from-emerald-300 to-emerald-500 bg-clip-text text-transparent">{copy.hero.titleHighlight}</span>
+                <span className="bg-linear-to-r from-emerald-300 to-emerald-500 bg-clip-text text-transparent">{copy.hero.titleHighlight}</span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-slate-400 sm:text-lg lg:mx-0">{copy.hero.subtitle}</p>
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
@@ -360,7 +360,7 @@ export default function Landing() {
         </section>
 
         {/* A faixa de números e fabricantes. */}
-        <section className="border-y border-white/5 bg-white/[0.02]">
+        <section className="border-y border-white/5 bg-white/2">
           <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
             <dl className="grid grid-cols-2 gap-6 text-center lg:grid-cols-4">
               {copy.stats.map((stat) => (
@@ -391,7 +391,7 @@ export default function Landing() {
             <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {copy.features.items.map((item, i) => (
                 <Reveal key={item.title} delay={(i % 3) * 100}>
-                  <div className="group h-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-7 transition duration-300 hover:-translate-y-1 hover:border-emerald-400/40 hover:shadow-xl hover:shadow-emerald-500/5">
+                  <div className="group h-full rounded-2xl border border-white/10 bg-linear-to-b from-white/5 to-white/1 p-7 transition duration-300 hover:-translate-y-1 hover:border-emerald-400/40 hover:shadow-xl hover:shadow-emerald-500/5">
                     <span className="inline-flex size-12 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-400 ring-1 ring-emerald-400/20 transition group-hover:bg-emerald-400 group-hover:text-emerald-950">
                       <Icon name={item.icon} size={24} />
                     </span>
@@ -404,7 +404,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="como-funciona" className="scroll-mt-20 border-y border-white/5 bg-white/[0.02] py-24">
+        <section id="como-funciona" className="scroll-mt-20 border-y border-white/5 bg-white/2 py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold text-white sm:text-4xl">{copy.how.title}</h2>
@@ -412,7 +412,7 @@ export default function Landing() {
             </div>
             <ol className="relative mt-14 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
               {/* A linha que liga os passos, só onde eles ficam lado a lado. */}
-              <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-6 hidden h-px bg-gradient-to-r from-emerald-400/0 via-emerald-400/50 to-emerald-400/0 lg:block" />
+              <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-6 hidden h-px bg-linear-to-r from-emerald-400/0 via-emerald-400/50 to-emerald-400/0 lg:block" />
               {copy.how.steps.map((step, i) => (
                 <li key={step.title} className="relative text-center">
                   <Reveal delay={i * 120}>
@@ -449,7 +449,7 @@ export default function Landing() {
 
             {plans === null ? (
               <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3" aria-busy="true">
-                {[0, 1, 2].map((i) => <div key={i} className="h-96 animate-pulse rounded-2xl bg-white/[0.04]" />)}
+                {[0, 1, 2].map((i) => <div key={i} className="h-96 animate-pulse rounded-2xl bg-white/4" />)}
               </div>
             ) : plans.length === 0 ? (
               <div className="mx-auto mt-12 max-w-xl rounded-2xl border border-white/10 p-8 text-center">
@@ -475,7 +475,7 @@ export default function Landing() {
               <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
                 {copy.testimonials.items.map((item, i) => (
                   <Reveal key={item.name} delay={i * 100}>
-                    <figure className="h-full rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                    <figure className="h-full rounded-2xl border border-white/10 bg-white/3 p-6">
                       <blockquote className="text-sm leading-6 text-slate-300">“{item.quote}”</blockquote>
                       <figcaption className="mt-4 text-sm">
                         <span className="font-semibold text-white">{item.name}</span>
@@ -510,7 +510,7 @@ export default function Landing() {
         </section>
 
         <section className="px-4 pb-24 sm:px-6">
-          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/20 via-emerald-500/5 to-transparent px-6 py-14 text-center sm:px-12">
+          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-emerald-400/20 bg-linear-to-br from-emerald-500/20 via-emerald-500/5 to-transparent px-6 py-14 text-center sm:px-12">
             <div aria-hidden="true" className="absolute -right-20 -top-20 size-64 rounded-full bg-emerald-400/20 blur-3xl" />
             <h2 className="relative text-3xl font-bold text-white sm:text-4xl">{copy.cta.title}</h2>
             <p className="relative mt-3 text-slate-300">{copy.cta.text}</p>
@@ -572,7 +572,7 @@ export default function Landing() {
               )}
               {info?.contactEmail && (
                 <li>
-                  <a href={`mailto:${info.contactEmail}`} className="text-slate-300 [overflow-wrap:anywhere] hover:text-white">{info.contactEmail}</a>
+                  <a href={`mailto:${info.contactEmail}`} className="text-slate-300 wrap-anywhere hover:text-white">{info.contactEmail}</a>
                 </li>
               )}
               <li>

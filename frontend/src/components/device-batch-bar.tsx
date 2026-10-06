@@ -100,7 +100,7 @@ export function DeviceBatchBar({
       {selection.size > 0 && (
         // No celular a barra fica compacta — contagem e "limpar" numa linha, as
         // duas ações lado a lado na outra — porque ela gruda no topo e come a tela.
-        <div className="sticky top-[4.5rem] z-20 mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-primary/40 bg-card px-3 py-2.5 shadow-sm sm:gap-3 sm:px-4 sm:py-3 lg:top-2" role="region" aria-label={t('devices.batch.aria')}>
+        <div className="sticky top-18 z-20 mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-primary/40 bg-card px-3 py-2.5 shadow-xs sm:gap-3 sm:px-4 sm:py-3 lg:top-2" role="region" aria-label={t('devices.batch.aria')}>
           <span className="text-sm font-semibold text-foreground">
             {t('devices.batch.selected', { count: String(selection.size) })}
           </span>
@@ -108,10 +108,10 @@ export function DeviceBatchBar({
             {t('devices.batch.clear')}
           </button>
           {selection.size >= BATCH_LIMIT && (
-            <span className="order-1 text-xs text-[hsl(var(--status-warning))] sm:order-none">{t('devices.batch.limitReached', { limit: String(BATCH_LIMIT) })}</span>
+            <span className="order-1 text-xs text-[hsl(var(--status-warning))] sm:order-0">{t('devices.batch.limitReached', { limit: String(BATCH_LIMIT) })}</span>
           )}
           {canSelectAll && (
-            <button type="button" className="order-1 min-h-10 text-start text-sm font-semibold text-primary hover:underline disabled:opacity-60 sm:order-none sm:min-h-0" disabled={selectingAll} onClick={onSelectAll}>
+            <button type="button" className="order-1 min-h-10 text-start text-sm font-semibold text-primary hover:underline disabled:opacity-60 sm:order-0 sm:min-h-0" disabled={selectingAll} onClick={onSelectAll}>
               {selectingAll ? t('devices.batch.selectingAll') : t('devices.batch.selectAll', { count: String(filterTotal) })}
             </button>
           )}

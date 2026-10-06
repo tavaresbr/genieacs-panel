@@ -39,7 +39,7 @@ export function InvoiceSummary({ invoice }: { invoice: TenantInvoiceView | Invoi
         </a>
       )}
       {erro && invoice.status !== 'authorized' && (
-        <span className="text-xs text-destructive [overflow-wrap:anywhere]">{t('nfse.error', { error: erro })}</span>
+        <span className="text-xs text-destructive wrap-anywhere">{t('nfse.error', { error: erro })}</span>
       )}
     </span>
   )

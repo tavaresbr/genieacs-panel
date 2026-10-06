@@ -116,7 +116,7 @@ export function SubscriptionNotice() {
 
   if (!wall) {
     return (
-      <div role="status" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 [overflow-wrap:anywhere] dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 sm:text-sm">
+      <div role="status" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 wrap-anywhere dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 sm:text-sm">
         <strong className="mr-2">{t('subscription.readOnlyTitle')}</strong>
         {message}
         {planName && <span className="ml-2 opacity-80">({planName})</span>}
@@ -141,8 +141,8 @@ export function SubscriptionNotice() {
   // No `body`: a casca põe esta peça dentro da faixa grudada, cuja camada fica
   // abaixo da barra do celular — o muro tem que cobrir a barra e o menu também.
   return createPortal(
-    <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-[2150] flex items-center justify-center overflow-y-auto bg-background/95 p-4 sm:p-6">
-      <div className="modern-card my-auto w-full max-w-md p-6 text-center [overflow-wrap:anywhere]">
+    <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-2150 flex items-center justify-center overflow-y-auto bg-background/95 p-4 sm:p-6">
+      <div className="modern-card my-auto w-full max-w-md p-6 text-center wrap-anywhere">
         <BrandMark className="mx-auto mb-4 size-10" />
         <h2 className="mb-2 text-lg font-semibold text-foreground">{t('subscription.blockedTitle')}</h2>
         <p className="mb-4 text-sm text-muted-foreground">{message}</p>

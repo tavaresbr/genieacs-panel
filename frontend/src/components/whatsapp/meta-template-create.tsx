@@ -391,9 +391,9 @@ export function MetaTemplateCreateForm({
         <div className="min-w-0">
           <span className="field-label">{t('whatsapp.metaTemplates.preview')}</span>
           <div className="rounded-md bg-muted/40 p-3">
-            <div className="ml-auto max-w-[95%] rounded-[var(--radius)] border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground">
+            <div className="ml-auto max-w-[95%] rounded-(--radius) border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground">
               {draft.headerText.trim() && <p className="mb-1 font-semibold">{draft.headerText.trim()}</p>}
-              <p className="whitespace-pre-wrap break-words">{preview || '…'}</p>
+              <p className="whitespace-pre-wrap wrap-break-word">{preview || '…'}</p>
               {draft.footerText.trim() && (
                 <p className="mt-1 text-xs text-muted-foreground">{draft.footerText.trim()}</p>
               )}
@@ -403,7 +403,7 @@ export function MetaTemplateCreateForm({
                 {draft.buttons.map((b, i) => (
                   <span
                     key={i}
-                    className="flex items-center justify-center gap-1 rounded-[var(--radius)] border border-border bg-card px-3 py-1.5 text-xs font-semibold text-primary"
+                    className="flex items-center justify-center gap-1 rounded-(--radius) border border-border bg-card px-3 py-1.5 text-xs font-semibold text-primary"
                   >
                     {b.type === 'URL' && <Icon name="external" size={12} />}
                     {b.text.trim() || '…'}
@@ -416,7 +416,7 @@ export function MetaTemplateCreateForm({
       </div>
 
       {refusal && (
-        <p className="mt-3 break-words rounded-md border border-[hsl(var(--status-danger)/0.3)] bg-[hsl(var(--status-danger)/0.08)] p-3 font-mono text-xs leading-5 text-[hsl(var(--status-danger))]">
+        <p className="mt-3 wrap-break-word rounded-md border border-[hsl(var(--status-danger)/0.3)] bg-[hsl(var(--status-danger)/0.08)] p-3 font-mono text-xs leading-5 text-[hsl(var(--status-danger))]">
           {refusal}
         </p>
       )}

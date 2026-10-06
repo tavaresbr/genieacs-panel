@@ -124,7 +124,7 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
             <div className="flex min-w-0 items-center gap-3 lg:hidden">
               <BrandMark className="size-10 shrink-0" title={name} />
               <div className="min-w-0">
-                <div className="font-bold [overflow-wrap:anywhere]">{name}</div>
+                <div className="font-bold wrap-anywhere">{name}</div>
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
               </div>
             </div>
@@ -165,7 +165,7 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
                     onClick={() => void entrar({ tenantId: provedor.id })}
                     className="modern-button w-full justify-between"
                   >
-                    <span className="min-w-0 text-start [overflow-wrap:anywhere]">{provedor.name}</span>
+                    <span className="min-w-0 text-start wrap-anywhere">{provedor.name}</span>
                     {/* Suspenso continua na lista: quem trabalha lá entra e
                         encontra a tela que explica. Esconder o destino trocaria
                         a explicação por um erro de credencial. */}
@@ -301,7 +301,7 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
-                    className="absolute inset-y-0 end-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
+                    className="absolute inset-y-0 inset-e-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
                     aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                   >
                     <Icon name={showPassword ? 'eye-off' : 'eye'} size={19} />

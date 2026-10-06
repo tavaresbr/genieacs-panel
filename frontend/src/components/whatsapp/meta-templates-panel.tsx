@@ -241,7 +241,7 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
                 )}
               </div>
               {m.bodyText && (
-                <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">
+                <p className="mt-2 whitespace-pre-wrap wrap-break-word font-mono text-[0.78rem] leading-6 text-muted-foreground">
                   {m.bodyText}
                 </p>
               )}

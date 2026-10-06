@@ -136,7 +136,7 @@ export function ConversationThread({
         {onBack && (
           <button
             type="button"
-            className="-ms-1 inline-flex min-h-10 items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+            className="-ms-1 inline-flex min-h-10 items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
             data-testid="inbox-back"
             onClick={onBack}
           >
@@ -144,7 +144,7 @@ export function ConversationThread({
             {t('whatsapp.inbox.title')}
           </button>
         )}
-        <div className={compact ? 'min-w-0 flex-1' : 'order-last w-full min-w-0 lg:order-none lg:w-auto'}>
+        <div className={compact ? 'min-w-0 flex-1' : 'order-last w-full min-w-0 lg:order-0 lg:w-auto'}>
           <h2 className="truncate text-base font-semibold text-foreground">{conversationTitle(conversation)}</h2>
           {!compact && address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
 

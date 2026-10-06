@@ -14,7 +14,7 @@ export function ContactLink({ contract, name }: { contract: string | null | unde
   return (
     <Link
       to={`/contacts/${encodeURIComponent(contract)}`}
-      className="break-words hover:text-primary hover:underline"
+      className="wrap-break-word hover:text-primary hover:underline"
     >
       {label}
     </Link>

@@ -529,11 +529,11 @@ export function ProvisioningTab() {
             {runs.map((run) => (
               <li key={run.id} className="space-y-1 py-2.5 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">{run.deviceId}</span>
+                  <span className="min-w-0 font-mono text-xs wrap-anywhere">{run.deviceId}</span>
                   <span className="shrink-0 font-semibold">{run.status}</span>
                 </div>
                 {(run.errorMessage ?? run.error) && (
-                  <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{run.errorMessage ?? run.error}</p>
+                  <p className="text-xs text-muted-foreground wrap-anywhere">{run.errorMessage ?? run.error}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   {run.profileName ?? '—'} · {run.updatedAt ? formatDateTime(run.updatedAt) : '—'}

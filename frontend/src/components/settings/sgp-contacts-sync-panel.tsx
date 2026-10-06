@@ -374,12 +374,12 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
             </p>
           )}
           {test.fields.length > 0 && (
-            <p className="mt-1 break-words font-mono text-xs text-muted-foreground">
+            <p className="mt-1 wrap-break-word font-mono text-xs text-muted-foreground">
               {t('settings.sgp.contacts.testFields')}: {test.fields.join(', ')}
             </p>
           )}
           {Object.entries(test.shape ?? {}).map(([field, description]) => (
-            <p key={field} className="mt-1 break-words font-mono text-xs text-muted-foreground">
+            <p key={field} className="mt-1 wrap-break-word font-mono text-xs text-muted-foreground">
               {field}: {description}
             </p>
           ))}

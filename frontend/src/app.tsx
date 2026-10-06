@@ -165,7 +165,7 @@ function ProtectedShell() {
         {/* Antes de tudo: quem está personificando tem que saber disso em toda
             tela, e a faixa da assinatura fala do provedor, não da sessão. */}
         {/* As duas faixas grudam juntas, logo abaixo da barra do celular. */}
-        <div className="sticky top-16 z-[1100] lg:top-0">
+        <div className="sticky top-16 z-1100 lg:top-0">
           <ImpersonationBanner />
           <SubscriptionNotice />
           {/* Número de WhatsApp caído: em toda tela, porque o atendente só

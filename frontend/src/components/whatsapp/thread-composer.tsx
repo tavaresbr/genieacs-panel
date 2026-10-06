@@ -369,7 +369,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
       )}
 
       {metaWindow?.state === 'closed' && (
-        <div className="mb-2.5 rounded-md border border-[hsl(var(--status-danger))]/40 bg-[hsl(var(--status-danger))]/[0.08] px-3 py-2 text-xs leading-5 text-foreground">
+        <div className="mb-2.5 rounded-md border border-[hsl(var(--status-danger))]/40 bg-[hsl(var(--status-danger))]/8 px-3 py-2 text-xs leading-5 text-foreground">
           <p className="flex items-start gap-2">
             <Icon name="lock" size={14} className="mt-0.5 shrink-0 text-[hsl(var(--status-danger))]" />
             <span>{t('whatsapp.cloud.windowClosed')}</span>
@@ -386,7 +386,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
       )}
 
       {optedOut && (
-        <p className="mb-2.5 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/[0.08] px-3 py-2 text-xs leading-5 text-foreground">
+        <p className="mb-2.5 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/8 px-3 py-2 text-xs leading-5 text-foreground">
           <Icon name="bell" size={14} className="mt-0.5 shrink-0 text-[hsl(var(--status-warning))]" />
           <span>
             <strong className="font-semibold">{t('whatsapp.inbox.optedOut')}.</strong>{' '}
@@ -402,9 +402,9 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
         // `textarea.modern-input` (globals.css) fixa `min-h-24` com
         // especificidade maior que a de uma classe utilitária.
         rows={2}
-        className={`modern-input min-h-20 resize-y max-sm:!min-h-14 ${
+        className={`modern-input min-h-20 resize-y max-sm:min-h-14! ${
           isNote
-            ? 'border-[hsl(var(--status-warning))]/70 bg-[hsl(var(--status-warning))]/[0.06] focus:border-[hsl(var(--status-warning))] focus:ring-[hsl(var(--status-warning))]/20'
+            ? 'border-[hsl(var(--status-warning))]/70 bg-[hsl(var(--status-warning))]/6 focus:border-[hsl(var(--status-warning))] focus:ring-[hsl(var(--status-warning))]/20'
             : ''
         }`}
         placeholder={t('whatsapp.inbox.placeholder')}
@@ -444,7 +444,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
       />
 
       {pickerOpen && (
-        <div className="mt-1.5 rounded-md border border-border bg-card shadow-sm">
+        <div className="mt-1.5 rounded-md border border-border bg-card shadow-xs">
           {matches.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">
               {(quickReplies ?? []).length === 0
@@ -762,7 +762,7 @@ function MetaTemplatePicker({
               onChange={(event) => setButtonParams((c) => ({ ...c, [b.index]: event.target.value }))}
             />
           ))}
-          <p className="whitespace-pre-wrap break-words rounded border border-border bg-background/60 px-2 py-1.5 text-foreground">{preview}</p>
+          <p className="whitespace-pre-wrap wrap-break-word rounded border border-border bg-background/60 px-2 py-1.5 text-foreground">{preview}</p>
           <div className="flex gap-2">
             <button
               type="button"

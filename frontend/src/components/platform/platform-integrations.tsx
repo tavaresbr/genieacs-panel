@@ -365,14 +365,14 @@ function AsaasCard() {
             <li>{t('integrations.asaas.step3')}</li>
             <li>
               {t('integrations.asaas.step4')}{' '}
-              <span className="break-words font-mono text-xs text-foreground">{EVENTOS_ASAAS.join(', ')}</span>
+              <span className="wrap-break-word font-mono text-xs text-foreground">{EVENTOS_ASAAS.join(', ')}</span>
             </li>
             <li>{t('integrations.asaas.step5')}</li>
           </ol>
           {info.nfseEnabled && (
             <p className="mt-2 text-sm text-muted-foreground">
               {t('nfse.webhookEvents')}{' '}
-              <span className="break-words font-mono text-xs text-foreground">{EVENTOS_NFSE.join(', ')}</span>
+              <span className="wrap-break-word font-mono text-xs text-foreground">{EVENTOS_NFSE.join(', ')}</span>
             </p>
           )}
         </Balao>

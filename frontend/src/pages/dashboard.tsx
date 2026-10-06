@@ -392,7 +392,7 @@ function DashboardView({ owner }: { owner: string | null }) {
           <div className="modern-card overflow-hidden">
             <div className="grid min-h-56 sm:grid-cols-[1fr_1.3fr]">
               <div className="flex flex-col justify-between bg-[#173f35] p-6 text-[#f4f3ed] sm:p-7">
-                <div><p className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-[#b7c7be]">{t('dashboard.availability.label')}</p><p className="mt-3 font-mono text-5xl font-semibold tracking-[-0.05em]">{availability}%</p></div>
+                <div><p className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-[#b7c7be]">{t('dashboard.availability.label')}</p><p className="mt-3 font-mono text-5xl font-semibold tracking-tighter">{availability}%</p></div>
                 <p className="mt-8 text-sm leading-6 text-[#c8d4ce]">{t('dashboard.availability.description', { online: data.stats.online, total: data.stats.total })}</p>
               </div>
               <div className="grid grid-cols-2">
@@ -562,7 +562,7 @@ function DashboardView({ owner }: { owner: string | null }) {
                   <span className="text-xs text-muted-foreground">{formatFaultTime(fault.timestamp)}</span>
                 </div>
                 <p className="break-all font-mono text-xs">{fault.deviceId || '—'}</p>
-                <p className="break-words text-sm">{fault.message}</p>
+                <p className="wrap-break-word text-sm">{fault.message}</p>
                 <p className="text-xs text-muted-foreground">{fault.channel}{fault.retries ? ` · ${t('dashboard.faults.retry', { count: fault.retries })}` : ''}</p>
                 {canWrite && (
                   <button type="button" className="modern-button-secondary w-full" disabled={clearingFault === fault.id} onClick={() => void clearFault(fault)}>

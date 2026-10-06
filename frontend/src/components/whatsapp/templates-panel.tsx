@@ -462,7 +462,7 @@ export function TemplatesPanel() {
                   title={t('whatsapp.templates.insertVariable')}
                   aria-label={`${t('whatsapp.templates.insertVariable')} {{${name}}}`}
                   onClick={() => insertVariable(name)}
-                  className="inline-flex items-center gap-1 rounded border border-border bg-[hsl(var(--surface-subtle))] px-2 py-1 font-mono text-xs font-semibold text-foreground transition-colors hover:border-primary hover:bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex items-center gap-1 rounded border border-border bg-[hsl(var(--surface-subtle))] px-2 py-1 font-mono text-xs font-semibold text-foreground transition-colors hover:border-primary hover:bg-secondary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Icon name="copy" size={12} />
                   {`{{${name}}}`}
@@ -498,7 +498,7 @@ export function TemplatesPanel() {
               </select>
               {draftMeta && (
                 <>
-                  <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">
+                  <p className="mt-2 whitespace-pre-wrap wrap-break-word font-mono text-[0.78rem] leading-6 text-muted-foreground">
                     {draftMeta.bodyText}
                   </p>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -610,7 +610,7 @@ export function TemplatesPanel() {
                       <span className="modern-badge-info">{t('whatsapp.metaTemplates.mapBadge', { name: template.metaTemplateName })}</span>
                     )}
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">
+                  <p className="mt-2 whitespace-pre-wrap wrap-break-word font-mono text-[0.78rem] leading-6 text-muted-foreground">
                     {template.body}
                   </p>
                   {template.updatedAt && (
