@@ -45,10 +45,20 @@ export const PROFILE_FIELDS = Object.freeze(Object.keys(ENV_FALLBACK));
  *                        pagou é suspenso sozinho. Zero desliga.
  *   autoSuspendWarnDays  quantos dias antes da suspensão sai o aviso. Zero
  *                        desliga só o aviso; menor que `autoSuspendDays`.
+ *   referralRewardCents  o crédito, em centavos, que quem indicou ganha
+ *                        quando o indicado paga o primeiro período (0106).
+ *                        Zero desliga o programa de indicação.
  */
 export const BILLING_POLICY_FIELDS = Object.freeze({
   autoSuspendDays: { default: 15, min: 0, max: 90 },
-  autoSuspendWarnDays: { default: 3, min: 0, max: 30 }
+  autoSuspendWarnDays: { default: 3, min: 0, max: 30 },
+  referralRewardCents: { default: 0, min: 0, max: 1_000_000 },
+  // A retenção no cancelamento (0107): o desconto oferecido a quem pede para
+  // cancelar (porcentagem e por quantas faturas) e o máximo de meses de
+  // pausa. Zero desliga a oferta correspondente.
+  retentionDiscountPercent: { default: 20, min: 0, max: 90 },
+  retentionDiscountMonths: { default: 3, min: 0, max: 24 },
+  retentionPauseMaxMonths: { default: 2, min: 0, max: 12 }
 });
 
 const MAX = { legalName: 160, tradeName: 80, taxId: 20, address: 240, contactEmail: 160, notifyEmail: 160 };
@@ -141,6 +151,33 @@ export async function autoSuspendConfig() {
   const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
   const politica = politicaDe(stored);
   return { days: politica.autoSuspendDays, warnDays: politica.autoSuspendWarnDays };
+}
+
+/**
+ * O crédito da indicação como o pagamento o lê (0106): centavos, zero quando
+ * desligado. Nunca lança — sem caixa da plataforma, ou com o banco fora, vale
+ * o padrão (desligado). Sem o cache de quinze segundos: é dinheiro, e o
+ * console que acabou de mudar o valor espera que o próximo pagamento o use.
+ */
+export async function referralRewardCents() {
+  invalidatePlatformProfile();
+  const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
+  return politicaDe(stored).referralRewardCents;
+}
+
+/**
+ * As ofertas de retenção como o fluxo de cancelamento as lê:
+ * `{ discountPercent, discountMonths, pauseMaxMonths }`. Nunca lança — sem
+ * caixa da plataforma, ou com o banco fora, vale o padrão.
+ */
+export async function retentionConfig() {
+  const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
+  const politica = politicaDe(stored);
+  return {
+    discountPercent: politica.retentionDiscountPercent,
+    discountMonths: politica.retentionDiscountMonths,
+    pauseMaxMonths: politica.retentionPauseMaxMonths
+  };
 }
 
 /** Um número da política recebido → inteiro a gravar, `null` para o padrão; lança se inválido. */
@@ -253,5 +290,5 @@ export async function saveProfile(patch = {}) {
 }
 
 export default {
-  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS
+  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, referralRewardCents, retentionConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS
 };

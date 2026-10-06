@@ -71,7 +71,8 @@ configuração do provedor (`settings`, `app_state`, `map_settings`), catálogo
 (`vendors`, `wifi_security_config`), equipe (`tenant_invites`, `wa_agents`), modelos e
 campanhas (`wa_templates`, `wa_meta_templates`, `wa_broadcasts` — o destinatário sai na
 tabela de recipients, que está no grupo acima), a conta do provedor conosco (`subscriptions`,
-`billing_*`, `coupon_redemptions`, `subscription_reminder_sends`) e os eventos de rede por
+`billing_*`, `coupon_redemptions`, `subscription_reminder_sends`,
+`cancellation_requests`) e os eventos de rede por
 **nó do mapa**, não por pessoa (`outage_events`, `outage_incidents`, `maintenance_windows`).
 
 ---

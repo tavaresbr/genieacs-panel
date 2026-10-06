@@ -1181,8 +1181,8 @@ const OUTAGE_HISTORY_TABLES = [
  * `public` nasce falso: um plano que existe no catálogo não vira oferta no
  * site só porque alguém o criou. É o console que decide o que se vende ali.
  * `features` é uma lista JSON de frases curtas, a mesma forma de
- * `plan_patterns`. `price_yearly_cents` é só o preço anunciado da opção anual;
- * o que se cobra continua sendo `price_cents` por `period_days`.
+ * `plan_patterns`. `price_yearly_cents` nasceu só como o preço anunciado da
+ * opção anual; desde a 0104 é o que se COBRA no ciclo anual (365 dias).
  */
 const PLAN_MARKETING_COLUMNS = [
   ['public', (t) => t.boolean('public').notNullable().defaultTo(false)],
@@ -1489,6 +1489,32 @@ const SUBSCRIPTION_BILLING_EXEMPT_UNTIL_COLUMNS = [
  */
 const SUBSCRIPTION_SUSPENDED_REASON_COLUMNS = [
   ['suspended_reason', (t) => t.string('suspended_reason', 32).nullable()]
+];
+
+/**
+ * As colunas da 0104 — o ciclo de cobrança (mensal ou anual).
+ *
+ * `billing_cycle` é o ciclo que vale AGORA: `monthly` cobra `price_cents` por
+ * `period_days`; `annual`, `price_yearly_cents` por 365 dias. Toda assinatura
+ * de antes é mensal, que é o que ela sempre pagou — daí o padrão.
+ * `pending_billing_cycle` é o ciclo da troca agendada para a renovação, ao
+ * lado de `pending_plan_id` (nulo é "o mesmo de agora"): a troca de ciclo
+ * reaproveita a descida agendada inteira — a fatura da renovação sai no preço
+ * do ciclo novo, o pagamento trava, a aplicação troca na data.
+ */
+const SUBSCRIPTION_BILLING_CYCLE_COLUMNS = [
+  ['billing_cycle', (t) => t.string('billing_cycle', 16).notNullable().defaultTo('monthly')],
+  ['pending_billing_cycle', (t) => t.string('pending_billing_cycle', 16).nullable()]
+];
+
+/**
+ * O ciclo com que a cobrança saiu (0104), ao lado de `plan_id`/`coupon_id`:
+ * com a troca de ciclo no MESMO plano, o plano sozinho não diz mais se a
+ * fatura paga foi a do mês ou a do ano. Nula nas linhas de antes — que são
+ * todas mensais.
+ */
+const BILLING_CHARGE_BILLING_CYCLE_COLUMNS = [
+  ['billing_cycle', (t) => t.string('billing_cycle', 16).nullable()]
 ];
 
 const BILLING_TABLES = [
@@ -2036,6 +2062,64 @@ const DUNNING_PAUSE_TABLES = [
 ];
 
 /**
+ * A cobrança por excedente (0105): o preço, em centavos, de cada unidade acima
+ * do teto do plano — por operador, por assinante, por ONT. Nulo é "sem preço",
+ * e aí o teto continua bloqueando como sempre (o 402 de operador, a
+ * sincronização que não cria assinante, a troca de plano recusada). Com preço,
+ * o teto deixa de ser parede: quem passa paga as unidades a mais na fatura da
+ * renovação (ver `UsageOverageService`).
+ */
+const PLAN_OVERAGE_COLUMNS = [
+  ['overage_price_cents_operators', (t) => t.integer('overage_price_cents_operators').unsigned().nullable()],
+  ['overage_price_cents_subscribers', (t) => t.integer('overage_price_cents_subscribers').unsigned().nullable()],
+  ['overage_price_cents_devices', (t) => t.integer('overage_price_cents_devices').unsigned().nullable()]
+];
+
+/**
+ * A conta do valor de uma cobrança (0105), em JSON: `{ base, overage: [...] }`
+ * — o preço do plano (já com o cupom) e o excedente do período que fecha —,
+ * e outras parcelas que vierem depois (o crédito de indicação). Nula nas
+ * linhas de antes: o valor delas é o preço do plano, e só.
+ */
+const BILLING_CHARGE_PRICING_DETAIL_COLUMNS = [
+  ['pricing_detail', (t) => t.text('pricing_detail').nullable()]
+];
+
+/**
+ * O maior uso de cada recurso em cada período (0105). `period_end` é a chave
+ * do período no fuso da cobrança (`ChargeIssuingService.periodKey`, o mesmo
+ * texto de `billing_charges.period_end`), e o pico só sobe — o agendador grava
+ * o maior entre o guardado e o de agora. Do provedor (escopada), e some com
+ * ele.
+ */
+const USAGE_PEAK_SNAPSHOT_COLUMNS = [
+  ['limit_value', (t) => t.integer('limit_value').unsigned().nullable()],
+  ['unit_cents', (t) => t.integer('unit_cents').unsigned().nullable()],
+  ['overage_peak', (t) => t.integer('overage_peak').unsigned().nullable()]
+];
+
+const usagePeaksTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('period_end', 10).notNullable();
+  t.string('resource', 16).notNullable(); // operators | subscribers | devices
+  t.integer('peak').unsigned().notNullable().defaultTo(0);
+  // A fotografia do plano que valia quando o excedente MAIOR do período foi
+  // medido: o teto e o preço por unidade dele, e o uso naquele instante. A
+  // cobrança lê daqui, e não do plano de quando sai — subir de plano antes
+  // da fatura não apaga o excedente que já se devia. Nulos nas linhas
+  // gravadas sem a fotografia (aí vale o plano de agora).
+  for (const [, add] of USAGE_PEAK_SNAPSHOT_COLUMNS) add(t);
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'period_end', 'resource'], { indexName: 'usage_peaks_period_resource_uq' });
+};
+
+const USAGE_PEAK_TABLES = [
+  ['usage_peaks', usagePeaksTable]
+];
+
+/**
  * Os cupons de desconto da assinatura (0093). Da PLATAFORMA, como `plans`: um
  * cupom é do catálogo comercial do deploy inteiro, e um provedor o resgata —
  * não tem o seu. Por isso sem `tenant_id`, e só o console escreve aqui.
@@ -2496,6 +2580,185 @@ const SUBSCRIPTION_REMINDER_TABLES = [
 ];
 
 /**
+ * A indicação de provedores (0106) — ver `referralService.js`.
+ *
+ * `referral_code` é o código curto e legível do link de indicação de cada
+ * provedor, gerado sob demanda (nulo até alguém abrir a tela de Plano) e único.
+ * `referred_by_tenant_id` é quem indicou este provedor, gravado no cadastro.
+ * Sem `.references`, pelo motivo de `pending_plan_id`: acrescentar chave
+ * estrangeira a uma tabela que já existe é recriá-la no SQLite — e aqui a
+ * tabela é `tenants`, a mãe de todas. Quem lê confere a linha.
+ */
+const TENANT_REFERRAL_COLUMNS = [
+  ['referral_code', (t) => t.string('referral_code', 16).nullable()],
+  ['referred_by_tenant_id', (t) => t.integer('referred_by_tenant_id').unsigned().nullable()]
+];
+
+/**
+ * Quanto de crédito a cobrança tem RESERVADO (0106): o preço do plano menos
+ * isto é o `amount_cents` que foi ao gateway. Nula (ou zero) é a cobrança sem
+ * crédito. O detalhe — de quais créditos saiu — está em `credit_allocations`.
+ */
+const BILLING_CHARGE_CREDIT_COLUMNS = [
+  ['credit_reserved_cents', (t) => t.integer('credit_reserved_cents').nullable()]
+];
+
+/**
+ * A recompensa de uma indicação (0106). Uma linha por provedor INDICADO
+ * (`referred_tenant_id` único): nasce `pending` no cadastro e vira `credited`
+ * no primeiro pagamento que estende o período dele — por atualização
+ * condicional, dentro da transação do pagamento, e é isso que a faz valer uma
+ * vez só. `canceled` é o estorno daquele pagamento (ou o programa desligado
+ * quando ele chegou). Da PLATAFORMA (compartilhada): fala de dois provedores
+ * ao mesmo tempo, e cada lado a lê pelo seu id.
+ */
+const referralRewardsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('referrer_tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('referred_tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('amount_cents').notNullable().defaultTo(0);
+  t.string('status', 16).notNullable().defaultTo('pending'); // pending | credited | canceled
+  t.string('payment_external_id', 160).nullable();
+  t.integer('credit_id').unsigned().nullable();
+  t.timestamp('credited_at').nullable();
+  t.timestamp('canceled_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['referred_tenant_id'], 'referral_rewards_referred_uq');
+  t.index(['referrer_tenant_id'], 'referral_rewards_referrer_idx');
+};
+
+/**
+ * O saldo de créditos de um provedor (0106): uma linha por crédito, e
+ * `remaining_cents` é quanto dele ainda está livre (o reservado numa cobrança
+ * em aberto já saiu daqui; volta se a reserva for solta). `source`:
+ * `referral` (a recompensa de uma indicação) ou `manual` (o ajuste do console
+ * — que pode ser negativo, e então nasce com `remaining_cents` zero e abate dos
+ * outros). `canceled_at` é o crédito cancelado: o estorno do pagamento que o
+ * gerou. Do PROVEDOR (escopada).
+ */
+const tenantCreditsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('amount_cents').notNullable();
+  t.integer('remaining_cents').notNullable().defaultTo(0);
+  t.string('source', 16).notNullable(); // referral | manual
+  t.string('reference', 255).nullable();
+  t.integer('created_by').unsigned().nullable();
+  t.timestamp('canceled_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'created_at'], 'tenant_credits_tenant_idx');
+};
+
+/**
+ * Quanto de cada crédito foi para cada cobrança (0106): `reserved` na emissão,
+ * `consumed` quando ela é paga, `released` quando ela é cancelada, reemitida
+ * ou estornada (o valor volta ao crédito). As transições são atualizações
+ * condicionais sobre `status`, e é isso que as faz idempotentes.
+ */
+const creditAllocationsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('credit_id').unsigned().notNullable()
+    .references('id').inTable('tenant_credits').onDelete('CASCADE');
+  t.integer('charge_id').unsigned().notNullable()
+    .references('id').inTable('billing_charges').onDelete('CASCADE');
+  t.integer('amount_cents').notNullable();
+  t.string('status', 16).notNullable().defaultTo('reserved'); // reserved | consumed | released
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'charge_id'], 'credit_allocations_charge_idx');
+  t.index(['tenant_id', 'credit_id'], 'credit_allocations_credit_idx');
+};
+
+const REFERRAL_TABLES = [
+  ['referral_rewards', referralRewardsTable],
+  ['tenant_credits', tenantCreditsTable],
+  ['credit_allocations', creditAllocationsTable]
+];
+
+/**
+ * A retenção no cancelamento (0107): cada vez que o dono de um provedor pede
+ * para cancelar, uma linha — o motivo, o comentário, o que lhe foi oferecido
+ * e o que ele decidiu. É a memória que segura o desconto de retenção a uma vez
+ * por doze meses, e é o relatório de cancelamentos do console.
+ *
+ *   reason            o motivo da lista (`CANCELLATION_REASONS`);
+ *   offers_presented  as ofertas que estavam disponíveis, separadas por
+ *                     vírgula (`discount,pause`), para a taxa de aceite;
+ *   offer             o que ele aceitou: `discount`, `pause`, ou `none`
+ *                     (recusou e cancelou); nulo enquanto não decidiu;
+ *   outcome           `retained_discount`, `retained_pause`, `canceled`
+ *                     (cancelamento agendado ou feito) ou `reverted` (o
+ *                     agendado foi desfeito); nulo enquanto não decidiu.
+ *
+ * Do provedor (escopada): diz o que ele nos contou, e some junto com ele.
+ */
+const cancellationRequestsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('reason', 32).notNullable();
+  t.text('comment');
+  t.string('offers_presented', 32);
+  t.string('offer', 16);
+  t.string('outcome', 24);
+  // Os meses da pausa ou do desconto aceito, e a porcentagem do desconto.
+  t.integer('months').unsigned();
+  t.integer('discount_percent').unsigned();
+  // O ciclo da fatura que o desconto aceito cobre (0104): no anual, o
+  // desconto vira UMA fatura anual, e a carência conta doze meses dela.
+  t.string('billing_cycle', 8);
+  // A data do cancelamento agendado (o fim do período pago), quando foi o caso.
+  t.timestamp('cancel_at').nullable();
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('decided_at').nullable();
+  t.timestamp('reverted_at').nullable();
+  // Quem desfez: `provider` ou `console`.
+  t.string('reverted_by', 16);
+  t.index(['tenant_id', 'created_at'], 'cancellation_requests_tenant_idx');
+};
+
+const CANCELLATION_TABLES = [
+  ['cancellation_requests', cancellationRequestsTable]
+];
+
+/** As colunas que a tabela ganhou depois de nascer (a base de desenvolvimento que já a tinha). */
+const CANCELLATION_REQUEST_LATE_COLUMNS = [
+  ['billing_cycle', (t) => t.string('billing_cycle', 8)]
+];
+
+/**
+ * As colunas da 0107 na assinatura:
+ *
+ *   cancel_at         o cancelamento agendado pelo próprio provedor — o fim do
+ *                     período pago. Até lá tudo funciona; nenhuma fatura nova
+ *                     sai; na data o agendador cancela.
+ *   paused_until      a pausa aceita como retenção: de `renews_at` até aqui,
+ *                     sem fatura, sem lembrete, sem suspensão automática, e o
+ *                     painel só lê. Na data a cobrança volta.
+ *   pause_started_at  quando a pausa foi aceita.
+ */
+const SUBSCRIPTION_RETENTION_COLUMNS = [
+  ['cancel_at', (t) => t.timestamp('cancel_at').nullable()],
+  ['paused_until', (t) => t.timestamp('paused_until').nullable()],
+  ['pause_started_at', (t) => t.timestamp('pause_started_at').nullable()]
+];
+
+/**
+ * O cupom do sistema (0107): `retention` é o desconto de retenção, criado
+ * pelo próprio painel. O provedor não o resgata digitando o código — só o
+ * fluxo de cancelamento o aplica.
+ */
+const COUPON_SYSTEM_COLUMNS = [
+  ['system_kind', (t) => t.string('system_kind', 16).nullable()]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -2531,7 +2794,10 @@ export const SCHEMA_TABLES = [
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
   ...COUPON_TABLES,
-  ...SUBSCRIPTION_REMINDER_TABLES
+  ...SUBSCRIPTION_REMINDER_TABLES,
+  ...USAGE_PEAK_TABLES,
+  ...REFERRAL_TABLES,
+  ...CANCELLATION_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5700,6 +5966,175 @@ export const migrations = [
       await db.schema.alterTable('whatsapp_accounts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** O ciclo de cobrança anual — ver `SUBSCRIPTION_BILLING_CYCLE_COLUMNS`. */
+    id: '0104_subscription_billing_cycle',
+    async isApplied(db) {
+      for (const [tabela, colunas] of [
+        ['subscriptions', SUBSCRIPTION_BILLING_CYCLE_COLUMNS],
+        ['billing_charges', BILLING_CHARGE_BILLING_CYCLE_COLUMNS]
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [
+        ['subscriptions', SUBSCRIPTION_BILLING_CYCLE_COLUMNS],
+        ['billing_charges', BILLING_CHARGE_BILLING_CYCLE_COLUMNS]
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+    }
+  },
+  {
+    /**
+     * A cobrança por excedente: o preço por unidade acima do teto em cada
+     * plano, a conta do valor em cada cobrança e o pico de uso por período —
+     * ver `PLAN_OVERAGE_COLUMNS`, `BILLING_CHARGE_PRICING_DETAIL_COLUMNS` e
+     * `usagePeaksTable`.
+     */
+    id: '0105_usage_overage',
+    async isApplied(db) {
+      for (const [tabela, colunas] of [['plans', PLAN_OVERAGE_COLUMNS], ['billing_charges', BILLING_CHARGE_PRICING_DETAIL_COLUMNS]]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasTable('usage_peaks'))) return false;
+      return !(await missingColumns(db, 'usage_peaks', USAGE_PEAK_SNAPSHOT_COLUMNS)).length;
+    },
+    async up(db) {
+      for (const [tabela, colunas] of [['plans', PLAN_OVERAGE_COLUMNS], ['billing_charges', BILLING_CHARGE_PRICING_DETAIL_COLUMNS]]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'usage_peaks', usagePeaksTable(db));
+      // A base que já tinha a tabela antes da fotografia do plano.
+      const semFoto = await missingColumns(db, 'usage_peaks', USAGE_PEAK_SNAPSHOT_COLUMNS);
+      if (semFoto.length) {
+        await db.schema.alterTable('usage_peaks', (t) => {
+          for (const add of semFoto) add(t);
+        });
+      }
+    }
+  },
+  {
+    /**
+     * A indicação de provedores — ver `TENANT_REFERRAL_COLUMNS`,
+     * `BILLING_CHARGE_CREDIT_COLUMNS` e `REFERRAL_TABLES`. O índice único do
+     * código à parte das colunas, como o do gateway (0047): a base que já tem
+     * a coluna por outro caminho ainda ganha o índice.
+     */
+    id: '0106_referrals_and_credits',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if ((await missingColumns(db, 'tenants', TENANT_REFERRAL_COLUMNS)).length) return false;
+      if (!(await hasIndex(db, 'tenants', 'tenants_referral_code_uq'))) return false;
+      if (await db.schema.hasTable('billing_charges')
+        && (await missingColumns(db, 'billing_charges', BILLING_CHARGE_CREDIT_COLUMNS)).length) return false;
+      for (const [nome] of REFERRAL_TABLES) {
+        if (nome === 'credit_allocations' && !(await db.schema.hasTable('billing_charges'))) continue;
+        if (!(await db.schema.hasTable(nome))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltam = await missingColumns(db, 'tenants', TENANT_REFERRAL_COLUMNS);
+      if (faltam.length) {
+        await db.schema.alterTable('tenants', (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      if (!(await hasIndex(db, 'tenants', 'tenants_referral_code_uq'))) {
+        await db.schema.alterTable('tenants', (t) => {
+          t.unique(['referral_code'], 'tenants_referral_code_uq');
+        });
+      }
+      if (await db.schema.hasTable('billing_charges')) {
+        const semCredito = await missingColumns(db, 'billing_charges', BILLING_CHARGE_CREDIT_COLUMNS);
+        if (semCredito.length) {
+          await db.schema.alterTable('billing_charges', (t) => {
+            for (const add of semCredito) add(t);
+          });
+        }
+      }
+      for (const [nome, construtor] of REFERRAL_TABLES) {
+        // A alocação aponta para `billing_charges`; sem ela, nada a criar.
+        // eslint-disable-next-line no-await-in-loop -- três tabelas só
+        if (nome === 'credit_allocations' && !(await db.schema.hasTable('billing_charges'))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * A retenção no cancelamento — ver `cancellationRequestsTable`,
+     * `SUBSCRIPTION_RETENTION_COLUMNS` e `COUPON_SYSTEM_COLUMNS`.
+     */
+    id: '0107_cancellation_retention',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasTable('cancellation_requests'))) return false;
+      for (const [tabela, colunas] of [
+        ['subscriptions', SUBSCRIPTION_RETENTION_COLUMNS], ['coupons', COUPON_SYSTEM_COLUMNS],
+        ['cancellation_requests', CANCELLATION_REQUEST_LATE_COLUMNS]
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if ((await missingColumns(db, tabela, colunas)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [tabela, colunas] of [['subscriptions', SUBSCRIPTION_RETENTION_COLUMNS], ['coupons', COUPON_SYSTEM_COLUMNS]]) {
+        // eslint-disable-next-line no-await-in-loop -- duas tabelas só
+        if (!(await db.schema.hasTable(tabela))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const faltam = await missingColumns(db, tabela, colunas);
+        if (!faltam.length) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable(tabela, (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      for (const [nome, construtor] of CANCELLATION_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+      const tardias = await missingColumns(db, 'cancellation_requests', CANCELLATION_REQUEST_LATE_COLUMNS);
+      if (tardias.length) {
+        await db.schema.alterTable('cancellation_requests', (t) => {
+          for (const add of tardias) add(t);
+        });
+      }
     }
   }
 ];

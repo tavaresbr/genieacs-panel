@@ -106,6 +106,32 @@ describe('plans', () => {
     assert.equal(res.body.data.plan.code, 'pro');
     assert.equal((await platform(`/plans/${proId}`, { method: 'PATCH', body: { code: 'only' } })).status, 400);
   });
+
+  it('the annual price is billed (0104): it cannot be removed while a subscription is on the annual cycle', async () => {
+    const criado = await platform('/plans', {
+      method: 'POST', body: { code: 'anual-teste', name: 'Anual', priceCents: 10000, priceYearlyCents: 100000 }
+    });
+    assert.equal(criado.status, 201);
+    const id = criado.body.data.plan.id;
+    assert.equal(criado.body.data.plan.priceYearlyCents, 100000);
+    const antes = await getDb()('subscriptions').where({ tenant_id: beta }).first();
+    await getDb()('subscriptions').where({ tenant_id: beta }).update({ plan_id: id, billing_cycle: 'annual' });
+    try {
+      const recusa = await platform(`/plans/${id}`, { method: 'PATCH', body: { priceYearlyCents: null } });
+      assert.equal(recusa.status, 409);
+      assert.equal(recusa.body.code, 'plan_has_annual_subscriptions');
+      // Mudar o valor pode.
+      const muda = await platform(`/plans/${id}`, { method: 'PATCH', body: { priceYearlyCents: 90000 } });
+      assert.equal(muda.status, 200);
+      assert.equal(muda.body.data.plan.priceYearlyCents, 90000);
+    } finally {
+      await getDb()('subscriptions').where({ tenant_id: beta })
+        .update({ plan_id: antes.plan_id, billing_cycle: antes.billing_cycle ?? 'monthly' });
+    }
+    const livre = await platform(`/plans/${id}`, { method: 'PATCH', body: { priceYearlyCents: null } });
+    assert.equal(livre.status, 200);
+    assert.equal(livre.body.data.plan.priceYearlyCents, null);
+  });
 });
 
 describe("a provider's subscription", () => {

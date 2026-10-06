@@ -14,6 +14,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { BrandMark } from '@/components/brand-mark'
 import { cobrancaDeProrata, cobrancaEmAberto } from '@/components/tenant-charges'
 import { canGenerateCharge, isBillingExemptRefusal, payInNewTab } from '@/lib/plan-options'
+import { displayDayMonth } from '@/lib/date-format'
 import type { TenantPlanOption } from '@/lib/api'
 
 /**
@@ -38,7 +39,8 @@ const MESSAGE_KEYS: Record<SubscriptionGateCode, TranslationKey> = {
   subscription_trial_expired: 'subscription.trialExpired',
   subscription_suspended: 'subscription.suspended',
   subscription_canceled: 'subscription.canceled',
-  subscription_missing: 'subscription.missing'
+  subscription_missing: 'subscription.missing',
+  subscription_paused: 'subscription.paused'
 }
 
 export function SubscriptionNotice() {
@@ -121,11 +123,15 @@ export function SubscriptionNotice() {
 
   // A pró-rata vencida tem o aviso dela: o período está pago, o que falta é
   // a diferença da troca de plano.
-  const message = t(autoSuspended
-    ? 'subscription.suspendedNonpayment'
-    : blocked.code === 'subscription_past_due' && blocked.subscription?.reason === 'proration_overdue'
-      ? 'subscription.prorationOverdue'
-      : MESSAGE_KEYS[blocked.code]) || blocked.message
+  // A pausa de retenção (0107) diz até quando — e que pagar a encerra antes.
+  const pausadaAte = blocked.code === 'subscription_paused' ? displayDayMonth(blocked.subscription?.pausedUntil) : null
+  const message = (pausadaAte
+    ? t('subscription.pausedUntil', { date: pausadaAte })
+    : t(autoSuspended
+      ? 'subscription.suspendedNonpayment'
+      : blocked.code === 'subscription_past_due' && blocked.subscription?.reason === 'proration_overdue'
+        ? 'subscription.prorationOverdue'
+        : MESSAGE_KEYS[blocked.code])) || blocked.message
   const wall = WALL_CODES.has(blocked.code)
 
   if (!wall) {

@@ -7,6 +7,7 @@ import BillingInvoice from '../models/BillingInvoice.js';
 import BillingInvoiceService, { InvoiceRequestError } from '../services/billing/billingInvoiceService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import BillingEvent from '../models/BillingEvent.js';
+import TenantCredit from '../models/TenantCredit.js';
 import SubscriptionService, { isBillableStatus } from '../services/subscriptionService.js';
 import ChargeIssuingService, { ChargeFollowError } from '../services/chargeIssuingService.js';
 import { providerFor } from '../services/billing/registry.js';
@@ -371,7 +372,11 @@ class PlatformSubscriptionsController {
             planId: sub.plan_id ?? null,
             planCode: sub.plan_code ?? null,
             planName: sub.plan_name ?? null,
-            priceCents: Number(sub.plan_price_cents ?? 0),
+            // O preço de UM ciclo (0104) — o do ano, no anual — e o ciclo.
+            priceCents: planos.get(Number(sub.plan_id))
+              ? SubscriptionService.cyclePriceCents(sub, planos.get(Number(sub.plan_id)))
+              : Number(sub.plan_price_cents ?? 0),
+            billingCycle: SubscriptionService.cycleOf(sub, planos.get(Number(sub.plan_id)) ?? null),
             currency: sub.plan_currency ?? null,
             trialEndsAt: sub.trial_ends_at ?? null,
             renewsAt: sub.renews_at ?? null,
@@ -381,6 +386,8 @@ class PlatformSubscriptionsController {
             ),
             // O cartão recorrente (0100): bandeira e dígitos, nunca o token.
             card: SubscriptionService.presentCard(sub),
+            // A retenção (0107): os selos "Cancela em" e "Pausada até".
+            ...SubscriptionService.presentRetention(sub),
             ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra
@@ -879,6 +886,10 @@ class PlatformSubscriptionsController {
               if (cobranca.status === 'overdue') patch.status = 'pending';
             }
             await BillingCharge.update(cobranca.id, patch);
+            // O valor digitado pelo console é o final (0106): o crédito que
+            // estava reservado nela volta ao saldo do provedor, para a
+            // próxima fatura.
+            if (mudaValor) await TenantCredit.releaseForCharge(cobranca.id);
             const charge = await BillingCharge.findById(cobranca.id);
             return {
               cobranca,

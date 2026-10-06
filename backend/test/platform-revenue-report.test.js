@@ -183,6 +183,24 @@ describe('revenue report: aggregation', () => {
     assert.equal(relatorio.discountApproximate, true);
   });
 
+  it('compares the plan base price recorded in the payment, not the amount with overage or credit', () => {
+    const extra = cenario();
+    const pago = (tenantId, externalId, amount, createdAt, detail) => ({
+      tenant_id: tenantId, type: BILLING_EVENT_TYPES.PAYMENT_RECORDED, external_id: externalId, amount_cents: amount,
+      created_at: createdAt, detail: JSON.stringify(detail)
+    });
+    extra.events.push(
+      // Pro 10000 cheio, pedido 12000 (com R$ 20 de excedente) e base 10000: sem desconto.
+      pago(1, 'pay_excedente', 12000, '2026-09-01 10:00:00', { planId: 1, expectedCents: 12000, baseCents: 10000 }),
+      // Pedido 5000 por causa de R$ 50 de crédito, base 10000: crédito não é desconto.
+      pago(1, 'pay_credito', 5000, '2026-09-02 10:00:00', { planId: 1, expectedCents: 5000, baseCents: 10000 }),
+      // Base 9000 (cupom de 10%), pedido 11000 com excedente: R$ 10 de desconto.
+      pago(1, 'pay_cupom', 11000, '2026-09-03 10:00:00', { planId: 1, expectedCents: 11000, baseCents: 9000 })
+    );
+    const outro = aggregateRevenue({ range: parseRange({}, NOW), now: NOW, ...extra });
+    assert.equal(outro.discountCents, 2000 + 20000 + 1000);
+  });
+
   it('breaks MRR and received down by plan, without the free and exempt ones', () => {
     const pro = relatorio.byPlan.find((linha) => linha.planId === 1);
     const anual = relatorio.byPlan.find((linha) => linha.planId === 2);

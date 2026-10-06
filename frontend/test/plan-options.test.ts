@@ -17,7 +17,12 @@ import {
   payInNewTab,
   pendingBlockedDetail,
   periodLabel,
-  planChangeKind
+  planChangeKind,
+  annualAvailable,
+  couponCountsYears,
+  couponDroppedOnAnnual,
+  cyclePricing,
+  dailyPrice
 } from '@/lib/plan-options'
 
 const plano = (over: Partial<TenantPlanOption> = {}): TenantPlanOption => ({
@@ -118,6 +123,66 @@ describe('plan-options', () => {
       expect(confirmKey('upgrade')).toBe('plan.options.confirm')
       expect(confirmKey('downgrade-now')).toBe('plan.options.confirmDowngradeNow')
       expect(confirmKey('downgrade-scheduled')).toBe('plan.options.confirmScheduled')
+      expect(confirmKey('cycle-scheduled')).toBe('plan.options.confirmCycleScheduled')
+    })
+  })
+
+  describe('o ciclo anual (0104)', () => {
+    const agora = Date.parse('2026-09-27T12:00:00Z')
+    const anualavel = plano({ id: 2, priceCents: 10000, priceYearlyCents: 100000, annualAvailable: true, current: true })
+    const soMensal = plano({ id: 3, priceCents: 12000, priceYearlyCents: null, annualAvailable: false })
+    const emDia = { status: 'active' as const, renewsAt: '2026-10-15T00:00:00Z', billingCycle: 'monthly' as const }
+
+    it('precifica cada ciclo como o backend: o anual por 365 dias, e sem preço anual só o mensal', () => {
+      expect(cyclePricing(anualavel, 'annual')).toEqual({ priceCents: 100000, periodDays: 365 })
+      expect(cyclePricing(anualavel, 'monthly')).toEqual({ priceCents: 10000, periodDays: 30 })
+      expect(cyclePricing(soMensal, 'annual')).toEqual({ priceCents: 12000, periodDays: 30 })
+      expect(annualAvailable(soMensal)).toBe(false)
+      expect(annualAvailable({ id: 9, priceCents: 1, priceYearlyCents: 500 })).toBe(true)
+      expect(dailyPrice(plano({ priceCents: 12000, periodDays: 60 }), 'monthly')).toBe(200)
+    })
+
+    it('trocar de ciclo com o período correndo é na renovação; sem ele, na hora', () => {
+      expect(planChangeKind(anualavel, anualavel, emDia, agora, 'annual')).toBe('cycle-scheduled')
+      expect(planChangeKind(anualavel, anualavel, { ...emDia, status: 'trial' }, agora, 'annual')).toBe('upgrade')
+      expect(planChangeKind(anualavel, anualavel, emDia, agora, 'monthly')).toBe('same')
+      expect(planChangeKind(anualavel, anualavel, { ...emDia, billingCycle: 'annual' }, agora, 'monthly')).toBe('cycle-scheduled')
+    })
+
+    it('subida ou descida pelo preço por dia', () => {
+      // R$ 120 por 60 dias custa menos por dia que R$ 100 por 30: é descida.
+      const bimestral = plano({ id: 5, priceCents: 12000, periodDays: 60 })
+      expect(planChangeKind(anualavel, bimestral, emDia, agora)).toBe('downgrade-scheduled')
+    })
+
+    it('o botão respeita o ciclo do seletor', () => {
+      const ativa = { status: 'active' as const, pendingPlan: null, billingCycle: 'monthly' as const }
+      // O plano atual aparece para trocar de ciclo.
+      expect(canSwitchTo(anualavel, true, ativa, 'annual')).toBe(true)
+      expect(canSwitchTo(anualavel, true, ativa, 'monthly')).toBe(false)
+      // Sem preço anual, não no anual.
+      expect(canSwitchTo(soMensal, true, ativa, 'annual')).toBe(false)
+      expect(canSwitchTo(soMensal, true, ativa, 'monthly')).toBe(true)
+      // O agendado no mesmo ciclo some; em outro ciclo, não.
+      const agendadoAnual = { ...ativa, pendingPlan: { ...agendado(2), billingCycle: 'annual' as const } }
+      expect(canSwitchTo(anualavel, true, agendadoAnual, 'annual')).toBe(false)
+    })
+
+    it('avisa do cupom repeating no anual', () => {
+      expect(couponCountsYears({ duration: 'repeating' }, 'annual')).toBe(true)
+      expect(couponCountsYears({ duration: 'repeating' }, 'monthly')).toBe(false)
+      expect(couponCountsYears({ duration: 'forever' }, 'annual')).toBe(false)
+      expect(couponCountsYears(null, 'annual')).toBe(false)
+    })
+
+    it('avisa que o cupom de N faturas sai na troca do mensal para o anual', () => {
+      expect(couponDroppedOnAnnual({ duration: 'repeating', code: 'X' }, 'monthly', 'annual')).toBe(true)
+      expect(couponDroppedOnAnnual({ duration: 'once', code: 'X' }, 'monthly', 'annual')).toBe(true)
+      expect(couponDroppedOnAnnual({ duration: 'forever', code: 'X' }, 'monthly', 'annual')).toBe(false)
+      expect(couponDroppedOnAnnual({ duration: 'once', code: 'RETENCAO-ANUAL-5' }, 'monthly', 'annual')).toBe(false)
+      expect(couponDroppedOnAnnual({ duration: 'repeating', code: 'X' }, 'annual', 'annual')).toBe(false)
+      expect(couponDroppedOnAnnual({ duration: 'repeating', code: 'X' }, 'monthly', 'monthly')).toBe(false)
+      expect(couponDroppedOnAnnual(null, 'monthly', 'annual')).toBe(false)
     })
   })
 

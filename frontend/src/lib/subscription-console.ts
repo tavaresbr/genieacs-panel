@@ -92,7 +92,7 @@ export function chargeActions(
     // A pró-rata (avulsa da subida) só se reemite quando a criação FALHOU no
     // gateway — é a retentativa dela; cancelada fica cancelada, e o período
     // dela não é a chave de nada.
-    reissue: charge.kind === 'proration'
+    reissue: charge.kind === 'proration' || charge.kind === 'overage'
       ? charge.status === 'failed' && !charge.gatewayChargeId && badge.kind === 'gateway' && !isento
       : (charge.status === 'canceled' || charge.status === 'failed')
         && badge.kind === 'gateway' && !bloqueada && !isento && periodoAtual,

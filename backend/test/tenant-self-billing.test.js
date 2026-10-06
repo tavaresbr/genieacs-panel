@@ -213,7 +213,9 @@ describe('a lista de planos', () => {
 
     const antigo = lista.find((p) => p.code === 'auto-antigo');
     assert.equal(antigo.current, true);
-    const { proration: previa, ...basico } = lista.find((p) => p.code === 'auto-basico');
+    const { proration: previa, overagePriceCents: excedente, ...basico } = lista.find((p) => p.code === 'auto-basico');
+    // Sem preço de excedente (0105): o teto barra, como sempre.
+    assert.deepEqual(excedente, { operators: null, subscribers: null, devices: null });
     // Do Antigo (R$ 50,00) ao Básico com dois dias por correr: a diferença
     // proporcional não chega ao mínimo, e a prévia diz isso (0101).
     assert.equal(previa.skipped, 'below_minimum');
@@ -227,6 +229,10 @@ describe('a lista de planos', () => {
       priceCents: 9990,
       currency: 'BRL',
       periodDays: 30,
+      // Sem preço anual, sem ciclo anual (0104).
+      priceYearlyCents: null,
+      annualAvailable: false,
+      annualSavingsPercent: null,
       limits: { operators: 5, subscribers: null, devices: null },
       current: false
     });
@@ -744,6 +750,7 @@ describe('a descida agendada', () => {
       id: planos.leve.id,
       name: 'Leve',
       priceCents: 6990,
+      billingCycle: 'monthly',
       effectiveAt: renova.toISOString(),
       locked: false,
       blockedBy: null
