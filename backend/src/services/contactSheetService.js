@@ -154,8 +154,8 @@ class ContactSheetService {
   static COLUMNS = COLUMNS;
 
   /** The rows of the export, for the contacts the list shows with this search and state. */
-  static async exportRows({ search = '', state = '', noPhone = false } = {}) {
-    const subscribers = await WaContactService.collect({ search, state, noPhone });
+  static async exportRows({ search = '', state = '', noPhone = false, imported = false } = {}) {
+    const subscribers = await WaContactService.collect({ search, state, noPhone, imported });
     if (subscribers.length === 0) return [];
 
     const contacts = await tdb('sgp_contacts');
@@ -326,7 +326,7 @@ class ContactSheetService {
     }
     for (const step of plan.creates) {
       // eslint-disable-next-line no-await-in-loop -- same
-      await ContactProfileService.create(step.patch, actor);
+      await ContactProfileService.create(step.patch, actor, { importSource: 'sheet' });
       created += 1;
     }
     return { ...this.summary(plan), updated, created };

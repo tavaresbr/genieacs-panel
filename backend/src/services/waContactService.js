@@ -68,10 +68,10 @@ function maskDocument(document) {
  * subscribers an operator looked up in the SGP that have no ONT in the panel.
  */
 class WaContactService {
-  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false } = {}) {
+  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
-    const subscribers = await this.collect({ search, state, noPhone });
+    const subscribers = await this.collect({ search, state, noPhone, imported });
     const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
     return {
       total: subscribers.length,
@@ -86,8 +86,11 @@ class WaContactService {
    * `noPhone` keeps only who has no number the panel could message — the same
    * "Sem telefone" the list shows, after the record's number filled the gap.
    * It combines with `state`: "active with no phone" is the list to fix first.
+   *
+   * `imported` keeps only the clients that came from an import (the connected
+   * WhatsApp's phone book or a spreadsheet), which no SGP row backs.
    */
-  static async collect({ search = '', state = '', noPhone = false } = {}) {
+  static async collect({ search = '', state = '', noPhone = false, imported = false } = {}) {
     const raw = String(search ?? '').trim();
 
     const linkRows = await this.searchTable('sgp_links', raw);
@@ -110,6 +113,7 @@ class WaContactService {
     return [...withDevice, ...withoutDevice]
       .filter((subscriber) => !wanted || subscriber.state === wanted)
       .filter((subscriber) => !noPhone || !subscriber.phone)
+      .filter((subscriber) => !imported || subscriber.importSource)
       .sort((a, b) => (
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
@@ -214,7 +218,8 @@ class WaContactService {
       phone: manual || fromSgp || null,
       phoneSource: manual ? 'manual' : (fromSgp ? 'sgp' : null),
       state: row.contract ? (row.state || 'unknown') : 'none',
-      lastSeenAt: row.last_seen_at || null
+      lastSeenAt: row.last_seen_at || null,
+      importSource: row.import_source || null
     };
   }
 
@@ -341,6 +346,7 @@ class WaContactService {
         hasContract: Boolean(subscriber.contract),
         state: subscriber.state || 'unknown',
         lastSeenAt: subscriber.lastSeenAt || null,
+        importSource: subscriber.importSource || null,
         clientName: subscriber.clientName,
         document: maskDocument(subscriber.document),
         deviceId: subscriber.deviceId,

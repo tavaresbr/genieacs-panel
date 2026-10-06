@@ -333,7 +333,7 @@ class ContactProfileService {
   }
 
   /** A client with no SGP behind it, typed in the panel. */
-  static async create(body, actor) {
+  static async create(body, actor, { importSource = null } = {}) {
     const input = body && typeof body === 'object' ? body : {};
     const name = cleanField('name', input.name ?? null);
     if (!name) throw invalid('name');
@@ -357,6 +357,7 @@ class ContactProfileService {
       client_ref: client.sgp_client_id,
       document: overrides.document?.value ?? null,
       client_name: name,
+      import_source: importSource,
       state: 'none',
       phone_e164: whatsappPhone ?? overrides.phones?.value?.[0] ?? null,
       last_synced_at: now,
