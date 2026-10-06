@@ -89,13 +89,23 @@ Estas não têm `tenant_id` e não pertencem a ISP nenhum. **Aqui o controlador 
 | `user_recovery_codes` | códigos de recuperação | credencial |
 | `auth_tickets`, `impersonation_tickets` | bilhetes de sessão | efêmeros |
 | `account_lockouts` | `subject` do bloqueio por tentativa | identificador de quem errou a senha |
-| **`leads`** | **nome, empresa, e-mail, telefone, cidade, mensagem, notas e `ip`** | **quem pediu contato na vitrine e nunca foi cliente de ninguém** |
+| **`leads`** | **nome, empresa, e-mail, telefone, cidade, mensagem e notas** | **quem pediu contato na vitrine e nunca foi cliente de ninguém** |
 | `tenants` (colunas `billing_*`) | razão social, CNPJ/CPF, endereço, e-mail e telefone de cobrança | cadastro fiscal do ISP |
 | `plans`, `coupons` | — | sem dado pessoal |
 
-`leads` merece destaque por três razões: o titular **não tem relação com ISP nenhum**, a
-tabela guarda **endereço IP** (dado pessoal pela LGPD), e ela **não é podada por nada** — ver
-a seção seguinte.
+`leads` merece destaque porque o titular **não tem relação com ISP nenhum**: não há contrato,
+nem legítimo interesse em exercício, que sustente guardar o dado dele indefinidamente.
+
+Duas das três razões que este documento listava aqui **foram corrigidas** depois de ele ser
+escrito, e vale registrar o que eram:
+
+- A tabela guardava **endereço IP**, e esse campo era **gravado e nunca lido** — `Lead.js` não o
+  mencionava em nenhum método e `presentLead` não o entregava ao console, que portanto nunca o
+  mostrou. Era coleta sem finalidade em exercício (art. 6º). A migração
+  `0103_drop_lead_ip` **derrubou a coluna**, e `publicController.createLead` deixou de gravá-la.
+  O controle de abuso da rota continua sendo o `publicLeadLimiter` e o campo-armadilha
+  `website`, que nunca dependeram do IP.
+- Ela **não era podada por nada**. Agora há prazo — ver a seção seguinte.
 
 ---
 
@@ -113,9 +123,20 @@ O que o painel poda hoje, em `SchedulerService.retentionPass()`
 | Telemetria crua (`device_samples`) | **14 dias** | sim (1–365) |
 | Telemetria por hora (`device_sample_hours`) | **90 dias** | sim (1–3650) |
 
+E, fora daquele laço porque a tabela é global (`SchedulerService.pruneLeads()`):
+
+| Dado | Prazo | Configurável |
+| --- | --- | --- |
+| Pedidos de contato da vitrine (`leads`) | **para sempre por padrão** | sim, por `LEAD_RETENTION_DAYS` (30–3650) |
+
+O padrão aqui é não apagar, e é decisão deliberada: um update que chega numa instalação em
+produção não pode começar a apagar linha que ninguém mandou apagar. Com o prazo ligado, saem os
+pedidos `new`, `contacted` e `lost` mais velhos que ele; **`won` nunca sai** — é o único elo
+entre um provedor que assinou e o pedido que o originou, porque não existe `lead_id` nem
+`converted_at` em lugar nenhum.
+
 **O que não tem prazo nenhum**, e portanto fica para sempre até alguém apagar à mão:
 
-- `leads` — com IP, de gente que nunca virou cliente;
 - `wa_messages` e `wa_conversations` — o conteúdo do atendimento;
 - `sgp_links`, `sgp_contacts`, `sgp_clients` — nome, documento e telefone vindos do ERP;
 - `customer_accounts` e as credenciais cifradas;
@@ -184,8 +205,12 @@ leitura.
    alguém acrescentasse cairia em nenhum dos dois baldes **em silêncio** — e o efeito seria
    um dossiê que entrega menos do que existe e uma exclusão que deixa dado para trás. É a
    lacuna que este trabalho fecha, com `backend/test/lgpd-inventario.test.js`.
-2. **`leads` não tem retenção e guarda IP.** Dado pessoal de quem nunca foi cliente,
-   acumulando sem prazo.
+2. ~~**`leads` não tem retenção e guarda IP.**~~ **Fechado.** O IP era gravado e nunca lido, e
+   a coluna foi derrubada (`0103_drop_lead_ip`); a retenção existe e é configurável por
+   `LEAD_RETENTION_DAYS`, desligada por padrão. **O que esta correção não alcança:**
+   `createLead` manda o conteúdo do lead para a equipe por e-mail
+   (`PlatformNotifyService.notifyTeam`), e apagar a linha não recolhe aquela cópia. Quem lê
+   "temos retenção de leads" precisa saber onde ela termina.
 3. **A retenção não está declarada.** Os prazos existem no código; nenhum documento os diz ao
    titular.
 4. **Não há lista de compartilhamento publicada.** A seção 6 acima é a matéria-prima dela.

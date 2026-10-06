@@ -1211,7 +1211,7 @@ const leadsTable = (db) => (t) => {
   t.string('status', 16).notNullable().defaultTo('new');
   t.text('notes');
   t.string('source', 32).notNullable().defaultTo('landing');
-  t.string('ip', 64);
+  // Sem `ip`: ver `0103_drop_lead_ip`. Era gravado e nunca lido.
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
   t.index(['status', 'created_at'], 'leads_status_created_idx');
@@ -5671,6 +5671,58 @@ export const migrations = [
       await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /**
+     * O IP de quem pediu contato na vitrine, que era gravado e NUNCA lido.
+     *
+     * `publicController.createLead` o escrevia; `models/Lead.js` não o menciona
+     * em nenhum dos cinco métodos, e `presentLead` — lista fechada de campos —
+     * não o entrega ao console, que portanto nunca o mostrou. Dado pessoal
+     * guardado sem finalidade em exercício é o que o art. 6º da LGPD trata como
+     * desnecessário, e o titular aqui é alguém que **não é cliente de ninguém**:
+     * não há contrato, nem legítimo interesse em exercício, que o justifique.
+     *
+     * E ele não era o controle de abuso da rota: isso são o `publicLeadLimiter`
+     * (5/hora por IP) e o campo-armadilha `website`, que devolvem 201 ao robô
+     * sem gravar nada. Nenhum dos dois consulta esta coluna.
+     *
+     * POR QUE DERRUBAR, E NÃO SÓ PARAR DE GRAVAR
+     * ------------------------------------------
+     * Parar de gravar deixaria no disco todos os IPs já coletados — e "não
+     * guardamos o IP de quem pede contato" seria falso sobre o passado. A
+     * coluna é o dado.
+     *
+     * O número descartado vai para o log de propósito: migração que descarta
+     * dado de alguém em silêncio é a que ninguém consegue investigar depois, e
+     * aqui o número NÃO vai ser zero — a coluna vem sendo preenchida desde que
+     * a vitrine existe.
+     *
+     * O índice `leads_status_created_idx` tem que sobreviver: é dele que a poda
+     * por prazo depende, e o SQLite derruba coluna reconstruindo a tabela, que é
+     * onde um índice se perde sem avisar. `backend/test/lead-retention.test.js`
+     * confere isso nos três dialetos.
+     */
+    id: '0103_drop_lead_ip',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('leads'))) return true;
+      return !(await db.schema.hasColumn('leads', 'ip'));
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('leads'))) return;
+      if (!(await db.schema.hasColumn('leads', 'ip'))) return;
+
+      const [linha] = await db('leads').whereNotNull('ip').count({ n: '*' });
+      const total = Number(linha?.n || 0);
+      if (total > 0) {
+        console.warn(
+          `0103_drop_lead_ip: descartando o IP de ${total} lead(s) — dado pessoal que `
+          + 'nenhum código lia. Ver o comentário desta migration.'
+        );
+      }
+
+      await db.schema.alterTable('leads', (t) => t.dropColumn('ip'));
     }
   }
 ];

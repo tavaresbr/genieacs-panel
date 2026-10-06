@@ -156,8 +156,18 @@ class PublicController {
         message: clip(body.message, LEAD_LIMITS.message),
         plan_code: planCode && (await Plan.findPublicByCode(planCode)) ? planCode : null,
         status: 'new',
-        source: 'landing',
-        ip: req.ip ? String(req.ip).slice(0, 64) : null
+        source: 'landing'
+        // O IP não é guardado, e a ausência é deliberada.
+        //
+        // Ele era gravado aqui e NUNCA lido: `models/Lead.js` não o menciona em
+        // nenhum método, e `presentLead` — lista fechada de campos — não o
+        // entrega ao console, que portanto nunca o mostrou. Dado pessoal
+        // guardado sem finalidade em exercício é o que o art. 6º da LGPD chama
+        // de desnecessário, e a migração `0100_drop_lead_ip` derrubou a coluna.
+        //
+        // E ele não era o controle de abuso desta rota: isso são o
+        // `publicLeadLimiter` e o campo-armadilha `website` logo acima, que
+        // devolvem 201 ao robô sem gravar nada.
       });
 
       // Melhor esforço, fora do caminho da resposta.
