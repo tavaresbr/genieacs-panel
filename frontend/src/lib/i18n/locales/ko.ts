@@ -994,6 +994,7 @@ const ko: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai: glm-4.5-flash(무료), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'API 키',
   'settings.chatbot.aiKeySaved': '키 설정됨',
+  'settings.chatbot.aiKeyEnds': '끝자리 …{hint}',
   'settings.chatbot.aiKeyRemove': '키 삭제',
   'settings.chatbot.aiKeyWillRemove': '저장하면 키가 삭제됩니다.',
   'settings.chatbot.aiKeyReplace': '교체하려면 새 키를 붙여넣으세요',

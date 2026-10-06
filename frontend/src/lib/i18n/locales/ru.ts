@@ -997,6 +997,7 @@ const ru: Dictionary = {
   'settings.chatbot.aiModelHint': 'На z.ai: glm-4.5-flash (бесплатно), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Ключ API',
   'settings.chatbot.aiKeySaved': 'Ключ настроен',
+  'settings.chatbot.aiKeyEnds': 'оканчивается на …{hint}',
   'settings.chatbot.aiKeyRemove': 'Удалить ключ',
   'settings.chatbot.aiKeyWillRemove': 'Ключ будет удалён при сохранении.',
   'settings.chatbot.aiKeyReplace': 'Вставьте новый ключ, чтобы заменить его',

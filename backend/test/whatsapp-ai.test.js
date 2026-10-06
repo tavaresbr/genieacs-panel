@@ -208,6 +208,7 @@ describe('a configuração da IA', () => {
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
     const lido = await api('/bot-config');
     assert.equal(lido.body.data.ai.hasApiKey, true);
+    assert.equal(lido.body.data.ai.keyHint, AI_KEY.slice(-4), 'só o fim da chave, para conferir');
     assert.equal(JSON.stringify(lido.body.data).includes(AI_KEY), false, 'a chave não sai do servidor');
     const guardado = await asTenant(() => getDb()('app_state').where({ key: 'wa_bot_config' }).first());
     assert.equal(String(guardado.value).includes(AI_KEY), false, 'guardada cifrada');

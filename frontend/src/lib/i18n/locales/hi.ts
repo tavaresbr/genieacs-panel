@@ -989,6 +989,7 @@ const hi: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai पर: glm-4.5-flash (मुफ़्त), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'API कुंजी',
   'settings.chatbot.aiKeySaved': 'कुंजी कॉन्फ़िगर है',
+  'settings.chatbot.aiKeyEnds': 'अंत में …{hint}',
   'settings.chatbot.aiKeyRemove': 'कुंजी हटाएँ',
   'settings.chatbot.aiKeyWillRemove': 'सहेजने पर कुंजी हटा दी जाएगी।',
   'settings.chatbot.aiKeyReplace': 'बदलने के लिए नई कुंजी पेस्ट करें',

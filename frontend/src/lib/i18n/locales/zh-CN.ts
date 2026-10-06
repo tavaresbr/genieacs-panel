@@ -994,6 +994,7 @@ const zhCN: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai 上：glm-4.5-flash（免费）、glm-4.5-air、glm-4.6。',
   'settings.chatbot.aiKey': 'API 密钥',
   'settings.chatbot.aiKeySaved': '密钥已配置',
+  'settings.chatbot.aiKeyEnds': '结尾为 …{hint}',
   'settings.chatbot.aiKeyRemove': '移除密钥',
   'settings.chatbot.aiKeyWillRemove': '保存后将移除密钥。',
   'settings.chatbot.aiKeyReplace': '粘贴新密钥以替换',

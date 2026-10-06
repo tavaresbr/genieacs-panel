@@ -994,6 +994,7 @@ const ja: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai の場合：glm-4.5-flash（無料）、glm-4.5-air、glm-4.6。',
   'settings.chatbot.aiKey': 'APIキー',
   'settings.chatbot.aiKeySaved': 'キー設定済み',
+  'settings.chatbot.aiKeyEnds': '末尾 …{hint}',
   'settings.chatbot.aiKeyRemove': 'キーを削除',
   'settings.chatbot.aiKeyWillRemove': '保存するとキーが削除されます。',
   'settings.chatbot.aiKeyReplace': '置き換えるには新しいキーを貼り付けてください',

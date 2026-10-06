@@ -4723,6 +4723,8 @@ export interface BotAiConfig {
   model: string
   instructions: string
   hasApiKey: boolean
+  /** Os 4 últimos caracteres da chave salva, para conferir; null se curta demais. */
+  keyHint: string | null
   /** A última falha da IA, para dizer por que o cliente recebeu o menu. */
   lastError: { at: string; code: string; detail?: string | null } | null
 }

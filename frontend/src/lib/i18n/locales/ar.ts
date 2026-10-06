@@ -989,6 +989,7 @@ const ar: Dictionary = {
   'settings.chatbot.aiModelHint': 'على z.ai: ‏glm-4.5-flash (مجاني)، glm-4.5-air، glm-4.6.',
   'settings.chatbot.aiKey': 'مفتاح API',
   'settings.chatbot.aiKeySaved': 'تم إعداد المفتاح',
+  'settings.chatbot.aiKeyEnds': 'ينتهي بـ …{hint}',
   'settings.chatbot.aiKeyRemove': 'إزالة المفتاح',
   'settings.chatbot.aiKeyWillRemove': 'ستتم إزالة المفتاح عند الحفظ.',
   'settings.chatbot.aiKeyReplace': 'الصق مفتاحًا جديدًا لاستبداله',

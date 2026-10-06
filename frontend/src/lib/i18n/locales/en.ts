@@ -996,6 +996,7 @@ const en = {
   'settings.chatbot.aiModelHint': 'On z.ai: glm-4.5-flash (free), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'API key',
   'settings.chatbot.aiKeySaved': 'Key configured',
+  'settings.chatbot.aiKeyEnds': 'ends in …{hint}',
   'settings.chatbot.aiKeyRemove': 'Remove key',
   'settings.chatbot.aiKeyWillRemove': 'The key will be removed when you save.',
   'settings.chatbot.aiKeyReplace': 'Paste a new key to replace it',

@@ -248,9 +248,19 @@ class WaBotConfigService {
       enabled: wa.botEnabled !== false,
       unlockEnabled: wa.botUnlockEnabled === true,
       ...config,
-      ai: { ...ai, hasApiKey: Boolean(apiKey), lastError: ultimoErro },
+      ai: { ...ai, hasApiKey: Boolean(apiKey), keyHint: this.aiKeyHint(apiKey), lastError: ultimoErro },
       defaults: this.defaults(locale)
     };
+  }
+
+  /**
+   * Os 4 últimos caracteres da chave salva, para a tela conferir qual chave
+   * está ali — o navegador já gravou a senha do painel no lugar dela.
+   */
+  static aiKeyHint(stored) {
+    if (!stored) return null;
+    const chave = aiKeyBox.decrypt(stored) ?? '';
+    return chave.length >= 12 ? chave.slice(-4) : null;
   }
 
   /** A configuração da IA com a chave em claro, para quem chama a API. */
