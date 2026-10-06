@@ -628,12 +628,12 @@ export default function DevicesPage() {
                           )}
                           <th>{t('devices.table.status')}</th>
                           <th>{t('devices.table.serial')}</th>
-                          <th>{t('devices.table.vendorModel')}</th>
+                          <th className="hidden lg:table-cell">{t('devices.table.vendorModel')}</th>
                           <th>{t('devices.table.subscriber')}</th>
-                          <th>{t('devices.table.customerId')}</th>
-                          {sgpAvailable && <th>{t('devices.sgp.column')}</th>}
+                          <th className="hidden lg:table-cell">{t('devices.table.customerId')}</th>
+                          {sgpAvailable && <th className="hidden lg:table-cell">{t('devices.sgp.column')}</th>}
                           <th>{t('devices.table.opticalRx')}</th>
-                          <th>{t('devices.table.lastInform')}</th>
+                          <th className="hidden lg:table-cell">{t('devices.table.lastInform')}</th>
                           <th><span className="sr-only">{t('common.actions')}</span></th>
                         </tr>
                       </thead>
@@ -652,27 +652,35 @@ export default function DevicesPage() {
                                   />
                                 </td>
                               )}
-                              <td><DeviceStatus device={device} /></td>
-                              <td className="max-w-[18rem]">
-                                <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="block truncate font-mono text-sm font-semibold text-primary hover:underline">
+                              <td>
+                                <DeviceStatus device={device} />
+                                {/* Entre 768 e 1023 px as colunas escondidas viram segunda linha. */}
+                                <span className="mt-1 block whitespace-nowrap text-[0.68rem] text-muted-foreground lg:hidden">{formatDate(device._lastInform)}</span>
+                              </td>
+                              <td className="max-w-[12rem] lg:max-w-[18rem]">
+                                <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="block break-all font-mono text-sm font-semibold text-primary hover:underline lg:truncate lg:break-normal">
                                   {device.SerialNumber || device._id}
                                 </Link>
-                                {device.SerialNumber && <span className="mt-1 block truncate font-mono text-[0.68rem] text-muted-foreground">{device._id}</span>}
+                                {device.SerialNumber && <span className="mt-1 block break-all font-mono text-[0.68rem] text-muted-foreground lg:truncate lg:break-normal">{device._id}</span>}
+                                <span className="mt-0.5 block truncate text-xs text-muted-foreground lg:hidden">{device.brand} · {device.productclass || t('devices.modelNotReported')}</span>
                               </td>
-                              <td>
+                              <td className="hidden lg:table-cell">
                                 <span className="block font-semibold">{device.brand}</span>
                                 <span className="mt-0.5 block text-xs text-muted-foreground">{device.productclass || t('devices.modelNotReported')}</span>
                               </td>
-                              <td className="font-mono text-xs">{device.pppoe || t('devices.notReported')}</td>
-                              <td className="font-mono text-xs font-semibold">{device.customerId || t('devices.notGenerated')}</td>
-                              {sgpAvailable && <td className="max-w-[14rem]">{renderSgpCell(device)}</td>}
+                              <td className="max-w-[12rem] break-all font-mono text-xs lg:max-w-none lg:break-normal">
+                                {device.pppoe || t('devices.notReported')}
+                                <span className="mt-0.5 block font-semibold text-muted-foreground lg:hidden">{device.customerId || t('devices.notGenerated')}</span>
+                              </td>
+                              <td className="hidden font-mono text-xs font-semibold lg:table-cell">{device.customerId || t('devices.notGenerated')}</td>
+                              {sgpAvailable && <td className="hidden max-w-[14rem] lg:table-cell">{renderSgpCell(device)}</td>}
                               <td>
                                 <span className={`font-mono text-sm font-semibold ${signalInfo.color}`}>
                                   {device.rxpower !== null && device.rxpower !== undefined ? `${device.rxpower} dBm` : t('common.na')}
                                 </span>
                                 <span className="mt-0.5 block text-[0.68rem] text-muted-foreground">{signalInfo.label}</span>
                               </td>
-                              <td className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(device._lastInform)}</td>
+                              <td className="hidden whitespace-nowrap text-xs text-muted-foreground lg:table-cell">{formatDate(device._lastInform)}</td>
                               <td>
                                 <div className="flex justify-end gap-1">
                                   <button onClick={(event) => handleSummon(event, device._id)} className="icon-button" title={t('devices.summon.title')} aria-label={t('devices.summon.aria', { device: device.SerialNumber || device._id })}>
