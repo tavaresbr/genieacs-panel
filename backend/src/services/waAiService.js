@@ -1,6 +1,6 @@
 import SgpService from './sgpService.js';
 import WaBotService from './waBotService.js';
-import WaBotConfigService from './waBotConfigService.js';
+import WaBotConfigService, { chaveParaNovoEndereco, mesmoEnderecoIa } from './waBotConfigService.js';
 import WaConversationService from './waConversationService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import WaAiClient from './waAiClient.js';
@@ -192,12 +192,19 @@ class WaAiService {
     }
   }
 
-  /** Testar a conexão: uma pergunta curta, com a chave salva ou a que veio da tela. */
+  /**
+   * Testar a conexão: uma pergunta curta, com a chave que veio da tela ou a
+   * salva — esta só para o mesmo endereço onde foi salva. Outro endereço sem
+   * chave é recusado antes de qualquer pedido sair: senão a tela mandaria a
+   * chave do provedor para um host qualquer.
+   */
   static async test({ baseUrl, apiKey, model } = {}) {
     const salva = await WaBotConfigService.aiSettings();
+    const chave = String(apiKey ?? '').trim();
+    if (!chave && !mesmoEnderecoIa(baseUrl, salva.baseUrl)) throw chaveParaNovoEndereco();
     const { content } = await WaAiClient.chat({
       baseUrl: baseUrl || salva.baseUrl,
-      apiKey: apiKey || salva.apiKey,
+      apiKey: chave || salva.apiKey,
       model: model || salva.model,
       messages: [{ role: 'user', content: 'Responda apenas: OK' }],
       maxTokens: 20

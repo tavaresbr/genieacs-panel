@@ -262,6 +262,9 @@ export function ChatbotTab() {
             {config.ai.hasApiKey && !aiKeyRemove && (
               <p className="mb-1 flex flex-wrap items-center gap-2 text-sm">
                 <span className="modern-badge-success">{t('settings.chatbot.aiKeySaved')}</span>
+                {config.ai.keyHint && (
+                  <span className="font-mono text-xs text-muted-foreground">{t('settings.chatbot.aiKeyEnds', { hint: config.ai.keyHint })}</span>
+                )}
                 <button type="button" className="text-sm underline" onClick={() => setAiKeyRemove(true)}>
                   {t('settings.chatbot.aiKeyRemove')}
                 </button>
@@ -272,12 +275,19 @@ export function ChatbotTab() {
             )}
             <input
               id="bot-ai-key"
-              type="password"
-              autoComplete="off"
-              className="modern-input w-full"
+              // Texto mascarado e não `password`: num campo de senha o Chrome
+              // ignora o autocomplete e preenche a senha do painel, que aí era
+              // gravada como chave da IA.
+              type="text"
+              name="ai-api-key"
+              autoComplete="new-password"
+              spellCheck={false}
+              data-1p-ignore=""
+              data-lpignore="true"
+              className="modern-input w-full font-mono [-webkit-text-security:disc]"
               value={aiKey}
               placeholder={config.ai.hasApiKey ? t('settings.chatbot.aiKeyReplace') : t('settings.chatbot.aiKeyPlaceholder')}
-              onChange={(event) => { setAiKey(event.target.value); if (event.target.value) setAiKeyRemove(false) }}
+              onChange={(event) => { const v = event.target.value.trim(); setAiKey(v); if (v) setAiKeyRemove(false) }}
             />
           </div>
           <div>

@@ -989,6 +989,7 @@ const hi: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai पर: glm-4.5-flash (मुफ़्त), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'API कुंजी',
   'settings.chatbot.aiKeySaved': 'कुंजी कॉन्फ़िगर है',
+  'settings.chatbot.aiKeyEnds': 'अंत में …{hint}',
   'settings.chatbot.aiKeyRemove': 'कुंजी हटाएँ',
   'settings.chatbot.aiKeyWillRemove': 'सहेजने पर कुंजी हटा दी जाएगी।',
   'settings.chatbot.aiKeyReplace': 'बदलने के लिए नई कुंजी पेस्ट करें',
@@ -2736,6 +2737,7 @@ const hi: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'AI पता अनुमत नहीं है',
   'whatsapp.ai.err.invalidUrl': 'अमान्य API पता',
   'whatsapp.ai.err.keyRequired': 'AI चालू करने के लिए API कुंजी दर्ज करें',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'API पता बदलते समय API कुंजी फिर से दर्ज करें',
   'whatsapp.ai.err.disabled': 'AI सुझाव बंद हैं',
   'whatsapp.ai.err.failed': 'AI विफल रहा',
   'whatsapp.tags.button': 'टैग',
@@ -4329,6 +4331,26 @@ const hi: Dictionary = {
   'plan.proration.pending': "{amount} का आनुपातिक इनवॉइस अभी जारी नहीं हुआ है; जारी होते ही यह शुल्क अनुभाग में दिखेगा।",
   'platform.subscription.prorationOverdueNote': "प्लान बदलाव का आनुपातिक इनवॉइस बकाया है; पैनल केवल पढ़ने के लिए है।",
   'subscription.prorationOverdue': "आपके प्लान बदलाव का आनुपातिक इनवॉइस बकाया है। भुगतान होने तक पैनल केवल पढ़ने के लिए रहेगा।",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "नेविगेशन",
+  'siteMap.title': "पैनल का नक्शा",
+  'siteMap.description': "इस पैनल की सबी स्क्रीनें, समूहों में, और हर किसी का काम — केवल वे जिन्हें आपकी पहुँच खोलती है।",
+  'siteMap.group.operation': "रोज़मर्रा का संचालन",
+  'siteMap.group.administration': "प्रशासन",
+  'siteMap.group.platform': "प्लेटफॉर्म",
+  'siteMap.settings.title': "कॉन्फिगरेशन के खंड",
+  'siteMap.settings.description': "हर लिंक कॉन्फिगरेशन को सीधे उसी टैब पर खोलता है।",
+  'siteMap.inner.title': "अन्य स्क्रीन से पहुँजने वाली स्क्रीनें",
+  'siteMap.inner.description': "इनका अपना लिंक नहीं है: हर किसी को वह वस्तु ज़रूरी है जहाँ से आया जाता है।",
+  'siteMap.inner.device': "डिवाइस का विवरण",
+  'siteMap.inner.deviceReached': "इन्वेंट्री में किसी डिवाइस पर क्लिक करें",
+  'siteMap.inner.contact': "संपर्क का विवरण",
+  'siteMap.inner.contactReached': "“संपर्क” में किसी संपर्क पर क्लिक करें",
+  'siteMap.inner.onboarding': "पहली सेटअप",
+  'siteMap.inner.onboardingReached': "ACS कॉन्फिगर न होने पर पहले लॉगइन पर खुद खुलती है",
+  'sidebar.siteMap': "पैनल का नक्शा",
 }
 
 export default hi

@@ -994,6 +994,7 @@ const ptBR: Dictionary = {
   'settings.chatbot.aiModelHint': 'Na z.ai: glm-4.5-flash (gratuito), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Chave da API',
   'settings.chatbot.aiKeySaved': 'Chave configurada',
+  'settings.chatbot.aiKeyEnds': 'termina em …{hint}',
   'settings.chatbot.aiKeyRemove': 'Remover chave',
   'settings.chatbot.aiKeyWillRemove': 'A chave será removida ao salvar.',
   'settings.chatbot.aiKeyReplace': 'Cole uma nova chave para trocar',
@@ -2755,6 +2756,7 @@ const ptBR: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Endereço da IA não permitido',
   'whatsapp.ai.err.invalidUrl': 'Endereço da API inválido',
   'whatsapp.ai.err.keyRequired': 'Informe a chave da API para ligar a IA',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Ao trocar o endereço da API, informe a chave de novo',
   'whatsapp.ai.err.disabled': 'As sugestões da IA estão desligadas',
   'whatsapp.ai.err.failed': 'A IA falhou',
   'whatsapp.tags.button': 'Etiquetas',
@@ -4321,6 +4323,26 @@ const ptBR: Dictionary = {
   'plan.proration.pending': "A fatura de pró-rata de {amount} ainda não saiu; ela aparece em Cobranças assim que for emitida.",
   'platform.subscription.prorationOverdueNote': "A fatura de pró-rata da troca de plano venceu; o painel está só para leitura.",
   'subscription.prorationOverdue': "A fatura de pró-rata da sua troca de plano venceu. O painel fica só para leitura até o pagamento.",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navegação",
+  'siteMap.title': "Mapa do painel",
+  'siteMap.description': "Todas as telas deste painel, agrupadas, com o que cada uma faz — só as que o seu acesso abre.",
+  'siteMap.group.operation': "Operação do dia",
+  'siteMap.group.administration': "Administração",
+  'siteMap.group.platform': "Plataforma",
+  'siteMap.settings.title': "Seções da Configuração",
+  'siteMap.settings.description': "Cada uma abre a Configuração já naquela aba.",
+  'siteMap.inner.title': "Telas alcançadas de dentro de outra",
+  'siteMap.inner.description': "Não têm link próprio: cada uma depende do item de onde se vem.",
+  'siteMap.inner.device': "Tela do aparelho",
+  'siteMap.inner.deviceReached': "Clique num aparelho do inventário",
+  'siteMap.inner.contact': "Tela do contato",
+  'siteMap.inner.contactReached': "Clique num contato em Contatos",
+  'siteMap.inner.onboarding': "Primeira configuração",
+  'siteMap.inner.onboardingReached': "Abre sozinha no primeiro acesso sem ACS configurado",
+  'sidebar.siteMap': "Mapa do painel",
 }
 
 export default ptBR

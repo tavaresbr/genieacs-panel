@@ -7,6 +7,7 @@ import { offlineMessageKey } from '@/lib/genieacs-agent'
 import { firmwareUploadHeaders, type FirmwareMeta } from '@/lib/firmware'
 import { formatRelativeTime } from '@/lib/utils'
 import { clearSessionScopedStorage } from '@/lib/session-owner'
+import { crossTabTokenAction } from '@/lib/cross-tab-session'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -278,6 +279,37 @@ class ApiClient {
     this.token = guardada.token
     this.refreshToken = guardada.refreshToken
     this.tabScoped = guardada.tabScoped
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('storage', (e) => this.handleStorageEvent(e))
+    }
+  }
+
+  /**
+   * Outra aba mexeu no token do navegador. Esta acompanha — ver
+   * `crossTabTokenAction`. Pública para os testes, que não têm DOM.
+   */
+  handleStorageEvent(e: Pick<StorageEvent, 'key' | 'newValue'>) {
+    const acao = crossTabTokenAction({
+      key: e.key,
+      newValue: e.newValue,
+      current: this.token,
+      tabScoped: this.tabScoped
+    })
+    if (acao === 'logout') {
+      this.clearTokens()
+    } else if (acao === 'adopt' && e.newValue) {
+      // A mesma sessão renovada na outra aba: o token novo e o refresh token
+      // que veio junto. Sem `beginSession` — não é sessão nova, e sem gravar —
+      // a outra aba já gravou.
+      this.token = e.newValue
+      try {
+        this.refreshToken = localStorage.getItem('refreshToken') ?? this.refreshToken
+      } catch {
+        // Sem storage, segue com o refresh token que tinha.
+      }
+    } else if (acao === 'reload') {
+      window.location.reload()
+    }
   }
 
   private async request<T>(
@@ -295,7 +327,9 @@ class ApiClient {
       ...options.headers as Record<string, string>,
     }
 
-    if (this.token) {
+    // Quem já trouxe o próprio token (`postAs`) fala em nome daquela sessão,
+    // não da que estiver na aba quando o pedido sair.
+    if (this.token && !headers['Authorization']) {
       headers['Authorization'] = `Bearer ${this.token}`
     }
 
@@ -553,6 +587,22 @@ class ApiClient {
     }
   }
 
+  /**
+   * Um POST em nome de uma sessão específica, e não da que a aba tiver agora.
+   *
+   * É o que o logout usa: o aviso de saída sai depois de a aba já ter
+   * esquecido os tokens — e, com um login rápido, de já ter os de outra
+   * sessão, que um `/auth/logout` comum revogaria no lugar da certa. Sem
+   * refresh no meio: um token vencido aqui não tem o que renovar.
+   */
+  async postAs<T>(token: string, endpoint: string, data?: unknown): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: data === undefined ? undefined : JSON.stringify(data),
+      headers: { Authorization: `Bearer ${token}` }
+    }, false)
+  }
+
   /** A body that is not JSON — a CSV sheet, sent as the text it is. */
   async postText<T>(endpoint: string, text: string, contentType = 'text/csv'): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
@@ -749,8 +799,9 @@ export const authAPI = {
   getCurrentUser: () =>
     apiClient.get('/auth/user'),
 
-  logout: () =>
-    apiClient.post('/auth/logout'),
+  /** Com `token`, revoga aquela sessão mesmo que a aba já tenha esquecido dela. */
+  logout: (token?: string) =>
+    token ? apiClient.postAs(token, '/auth/logout') : apiClient.post('/auth/logout'),
 
   /** SaaS only; answers 404 on a self-hosted install, where the route is not mounted. */
   signup: (payload: {
@@ -4840,6 +4891,8 @@ export interface BotAiConfig {
   model: string
   instructions: string
   hasApiKey: boolean
+  /** Os 4 últimos caracteres da chave salva, para conferir; null se curta demais. */
+  keyHint: string | null
   /** A última falha da IA, para dizer por que o cliente recebeu o menu. */
   lastError: { at: string; code: string; detail?: string | null } | null
 }

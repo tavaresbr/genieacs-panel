@@ -994,6 +994,7 @@ const fr: Dictionary = {
   'settings.chatbot.aiModelHint': 'Sur z.ai : glm-4.5-flash (gratuit), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Clé API',
   'settings.chatbot.aiKeySaved': 'Clé configurée',
+  'settings.chatbot.aiKeyEnds': 'se termine par …{hint}',
   'settings.chatbot.aiKeyRemove': 'Supprimer la clé',
   'settings.chatbot.aiKeyWillRemove': 'La clé sera supprimée à l’enregistrement.',
   'settings.chatbot.aiKeyReplace': 'Collez une nouvelle clé pour la remplacer',
@@ -2559,6 +2560,7 @@ const fr: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Adresse d’IA non autorisée',
   'whatsapp.ai.err.invalidUrl': 'Adresse d’API invalide',
   'whatsapp.ai.err.keyRequired': 'Saisissez la clé API pour activer l’IA',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'En changeant l’adresse de l’API, saisissez de nouveau la clé',
   'whatsapp.ai.err.disabled': 'Les suggestions de l’IA sont désactivées',
   'whatsapp.ai.err.failed': 'L’IA a échoué',
   'whatsapp.tags.button': 'Étiquettes',
@@ -4321,6 +4323,26 @@ const fr: Dictionary = {
   'plan.proration.pending': "La facture au prorata de {amount} n’a pas encore été émise ; elle apparaîtra dans Factures dès son émission.",
   'platform.subscription.prorationOverdueNote': "La facture au prorata du changement de forfait est en retard ; le panneau est en lecture seule.",
   'subscription.prorationOverdue': "La facture au prorata de votre changement de forfait est en retard. Le panneau reste en lecture seule jusqu’au paiement.",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navigation",
+  'siteMap.title': "Plan du panneau",
+  'siteMap.description': "Tous les écrans de ce panneau, regroupés, avec le rôle de chacun — uniquement ceux que votre accès ouvre.",
+  'siteMap.group.operation': "Exploitation quotidienne",
+  'siteMap.group.administration': "Administration",
+  'siteMap.group.platform': "Plateforme",
+  'siteMap.settings.title': "Sections de la Configuration",
+  'siteMap.settings.description': "Chacune ouvre la Configuration directement sur cet onglet.",
+  'siteMap.inner.title': "Écrans atteints depuis un autre",
+  'siteMap.inner.description': "Ils n'ont pas de lien propre : chacun dépend de l'élément d'où l'on vient.",
+  'siteMap.inner.device': "Détail de l'équipement",
+  'siteMap.inner.deviceReached': "Cliquez sur un équipement dans l'inventaire",
+  'siteMap.inner.contact': "Détail du contact",
+  'siteMap.inner.contactReached': "Cliquez sur un contact dans Contacts",
+  'siteMap.inner.onboarding': "Première configuration",
+  'siteMap.inner.onboardingReached': "S'ouvre d'elle-même à la première connexion sans ACS configuré",
+  'sidebar.siteMap': "Plan du panneau",
 }
 
 export default fr

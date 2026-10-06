@@ -14,32 +14,9 @@ import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal
 /** "1.17.0 (3acef98)": a versão e o commit do build, quando há. */
 const APP_VERSION_LABEL = __APP_COMMIT__ ? `${APP_RELEASE.version} (${__APP_COMMIT__})` : APP_RELEASE.version
 import { normalizeRole, ROLE_LABEL_KEYS } from '@/lib/permissions'
+import { visibleMenuScreens } from '@/lib/screens'
 import { wearingPlatformHat } from '@/lib/shell'
 
-// `permission` é a capacidade que a tela precisa para ABRIR, a mesma que guarda
-// a rota em `app.tsx`: um item que aparece e leva a um redirecionamento é pior
-// do que item nenhum. Era um `adminOnly` booleano, que com quatro papéis passou
-// a mentir nos dois sentidos — escondia do plantão o mapa e a caixa do
-// WhatsApp, que a matriz lhe dá, e teria escondido tudo de um `owner` por ele
-// não se chamar `admin`.
-//
-// `platformOnly` é um portão A MAIS, sobre um fato DIFERENTE, e a diferença é o
-// ponto: o plano de controle fica acima do administrador do provedor, e nenhuma
-// capacidade da matriz responde por ele. Fosse este item guardado só pela
-// capacidade, apareceria para quase todo administrador do painel e levaria a
-// rotas que respondem 404 para eles — e, numa instalação self-hosted, a rotas
-// que não estão montadas.
-const menuItems = [
-  { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', permission: 'devices.list' },
-  { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', permission: 'whatsapp.read' },
-  { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', permission: 'devices.list' },
-  { href: '/contacts', labelKey: 'sidebar.nav.contacts', descriptionKey: 'sidebar.nav.contactsDescription', icon: 'contacts', permission: 'whatsapp.read' },
-  { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', permission: 'map.read' },
-  { href: '/audit', labelKey: 'sidebar.nav.audit', descriptionKey: 'sidebar.nav.auditDescription', icon: 'trail', permission: 'audit.read' },
-  { href: '/plan', labelKey: 'sidebar.nav.plan', descriptionKey: 'sidebar.nav.planDescription', icon: 'invoice', permission: 'settings.read', saasOnly: true },
-  { href: '/platform', labelKey: 'sidebar.nav.platform', descriptionKey: 'sidebar.nav.platformDescription', icon: 'settings', permission: 'settings.read', platformOnly: true },
-  { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', permission: 'settings.read' },
-] as const
 
 /**
  * O que os dois cabeçalhos (o do menu e a barra do celular) dizem sobre de
@@ -167,12 +144,15 @@ function SidebarContent({
   // from `settings.appName` through `localStorage` and a custom event — three
   // places that agreed in none of them for the first second after a change.
   //
-  // Read BEFORE `visibleItems`, which is not a style choice: the filter below
-  // runs synchronously during render and reads `isSaas`. With this line after
-  // it, `isSaas` was in its temporal dead zone at that moment and every
-  // authenticated screen died in `SidebarContent` with "Cannot access 'isSaas'
-  // before initialization" — a black page, for every operator, on every
-  // route. `tsc` does not see it because the read happens inside a callback.
+  // Este `isSaas` já custou uma tela preta para todo operador, em toda rota:
+  // enquanto o filtro do menu era um callback aqui dentro, ele LIA `isSaas` do
+  // escopo, e com esta linha declarada depois a leitura caía na zona morta
+  // temporal — "Cannot access 'isSaas' before initialization" —, que o `tsc`
+  // não vê porque acontece dentro de um callback.
+  //
+  // Agora o filtro é `visibleMenuScreens`, que recebe os três fatos como
+  // argumento. A ordem continua importando, mas pelo motivo banal (não se passa
+  // o que ainda não foi declarado) e com o compilador avisando.
   const { name: appName, isSaas, tenant } = useTenant()
   const isPlatformAdmin = Boolean(user?.isPlatformAdmin)
   /**
@@ -196,11 +176,7 @@ function SidebarContent({
   const naPlataforma = wearingPlatformHat({
     pathname, panelBaseDomain: tenant?.panelBaseDomain, isPlatformAdmin
   })
-  const visibleItems = menuItems.filter((item) => can(item.permission)
-    && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin)
-    // `saasOnly`: a screen about a subscription has nothing to show on an
-    // install that has no subscription to speak of.
-    && (!('saasOnly' in item && item.saasOnly) || isSaas))
+  const visibleItems = visibleMenuScreens({ can, isSaas, isPlatformAdmin })
   const { t } = useTranslation()
   const displayName = user?.username || t('sidebar.defaultOperator')
   const initial = displayName.slice(0, 1).toUpperCase()
@@ -282,7 +258,7 @@ function SidebarContent({
             const label = t(item.labelKey)
             // O console é o único item que pode morar noutro endereço; os
             // demais são sempre desta casca.
-            const foraDaqui = 'platformOnly' in item && item.platformOnly ? consoleForaDaqui : null
+            const foraDaqui = item.platformOnly ? consoleForaDaqui : null
             const classe = `group flex min-h-12 items-center rounded-md transition-colors ${
               isCollapsed ? 'justify-center px-2' : 'gap-3 px-3'
             } ${
@@ -327,6 +303,27 @@ function SidebarContent({
       </nav>
 
       <div className={`border-t border-white/10 ${isCollapsed ? 'p-2.5' : 'p-3'}`}>
+        {/* O mapa das telas mora no pé, ao lado das novidades, e não como um
+            décimo item de menu: o menu é a operação de um ISP, e um índice de
+            telas não é uma delas.
+
+            Fora da plataforma, só: dali o link levaria para dentro do painel de
+            um provedor, que é o que "Voltar ao painel" já faz dizendo o nome
+            dele. */}
+        {!naPlataforma && (
+          <Link
+            to="/sitemap"
+            onClick={closeMobile}
+            className={`mb-2 flex min-h-11 w-full items-center rounded-md text-[#aab8b0] transition-colors hover:bg-white/8 hover:text-white ${
+              isCollapsed ? 'justify-center px-1' : 'gap-2 px-2.5 text-xs font-semibold'
+            }`}
+            aria-current={isActive('/sitemap') ? 'page' : undefined}
+            title={isCollapsed ? t('sidebar.siteMap') : undefined}
+          >
+            <Icon name="document" size={17} />
+            {!isCollapsed && <span>{t('sidebar.siteMap')}</span>}
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => setShowReleaseNotes(true)}

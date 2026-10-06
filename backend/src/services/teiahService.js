@@ -247,6 +247,15 @@ class TeiahService {
     return `${url.origin}${path}`;
   }
 
+  /** Same API address, compared normalized (host case, trailing slash, `/api`). */
+  static sameBaseUrl(a, b) {
+    return this.normalizeBaseUrl(a) === this.normalizeBaseUrl(b);
+  }
+
+  static keyRequiredForNewUrl() {
+    return new TeiahError('teiah.error.apiKeyRequiredForNewUrl', { code: 'api_key_required_for_new_url', status: 400 });
+  }
+
   static async readStoredConfig() {
     const raw = await AppState.get(CONFIG_KEY);
     if (!raw) return { ...DEFAULT_CONFIG, apiKey: null };
@@ -303,9 +312,15 @@ class TeiahService {
   static async saveConfig(patch = {}) {
     const current = await this.getConfig();
     const stored = await this.readStoredConfig();
+    const baseUrl = patch.baseUrl === undefined ? current.baseUrl : this.normalizeBaseUrl(patch.baseUrl);
+    // Moving the base URL without sending the key would hand the stored key
+    // to the new host: the key is only kept for the address it was saved for.
+    if (patch.apiKey === undefined && stored.apiKey && !this.sameBaseUrl(baseUrl, current.baseUrl)) {
+      throw this.keyRequiredForNewUrl();
+    }
     const next = {
       enabled: patch.enabled === undefined ? current.enabled : patch.enabled === true,
-      baseUrl: patch.baseUrl === undefined ? current.baseUrl : this.normalizeBaseUrl(patch.baseUrl),
+      baseUrl,
       exportEnabled: patch.exportEnabled === undefined ? current.exportEnabled : patch.exportEnabled === true,
       exportIntervalHours: patch.exportIntervalHours === undefined
         ? current.exportIntervalHours
@@ -475,8 +490,17 @@ class TeiahService {
    */
   static async testConnection(patch = {}) {
     const current = await this.getConfig();
-    const apiKey = patch.apiKey === undefined || patch.apiKey === '' ? current.apiKey : String(patch.apiKey).trim();
-    const baseUrl = patch.baseUrl === undefined ? current.baseUrl : this.normalizeBaseUrl(patch.baseUrl);
+    const typed = String(patch.apiKey ?? '').trim();
+    // An empty field means "the one already configured", as the screen sends it.
+    const baseUrl = patch.baseUrl === undefined || String(patch.baseUrl ?? '').trim() === ''
+      ? current.baseUrl
+      : this.normalizeBaseUrl(patch.baseUrl);
+    // The stored key only goes to the address it was saved for; anywhere else
+    // needs a key typed on the screen, refused before any request leaves.
+    if (!typed && current.apiKey && !this.sameBaseUrl(baseUrl, current.baseUrl)) {
+      throw this.keyRequiredForNewUrl();
+    }
+    const apiKey = typed || current.apiKey;
     if (!apiKey) {
       throw new TeiahError('teiah.error.apiKeyMissing', { code: 'not_configured', status: 400 });
     }

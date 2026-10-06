@@ -82,9 +82,29 @@ function padroes() {
   };
 }
 
+/**
+ * O endereço pedido é o mesmo onde a chave foi salva? Comparado já
+ * normalizado (host em minúsculas, sem barra final), e vazio é o salvo.
+ */
+export function mesmoEnderecoIa(pedido, salvo) {
+  if (pedido === undefined || pedido === null || String(pedido).trim() === '') return true;
+  return normalizeAiBaseUrl(pedido) === normalizeAiBaseUrl(salvo);
+}
+
+/** A chave salva só vale para o endereço onde foi salva: trocar o endereço pede a chave de novo. */
+export const chaveParaNovoEndereco = () => new WaError('whatsapp.ai.error.keyRequiredForNewUrl', {
+  code: 'ai_key_required_for_new_url', status: 400
+});
+
 function lerIa(raw, atual) {
   if (raw === undefined) return atual;
   if (!raw || typeof raw !== 'object') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai');
+  // Trocar o endereço sem mandar a chave levaria a chave salva para outro host.
+  // Compara com o que vai ser gravado: vazio aqui vira o endereço padrão.
+  const baseUrl = raw.baseUrl === undefined ? atual.baseUrl : normalizeAiBaseUrl(raw.baseUrl);
+  if (raw.apiKey === undefined && atual.apiKey && !mesmoEnderecoIa(baseUrl, atual.baseUrl)) {
+    throw chaveParaNovoEndereco();
+  }
   let apiKey = atual.apiKey;
   if (raw.apiKey !== undefined) {
     const texto = String(raw.apiKey ?? '').trim();
@@ -97,7 +117,7 @@ function lerIa(raw, atual) {
   const proximo = {
     enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true,
     suggest: raw.suggest === undefined ? atual.suggest : raw.suggest === true,
-    baseUrl: raw.baseUrl === undefined ? atual.baseUrl : normalizeAiBaseUrl(raw.baseUrl),
+    baseUrl,
     model,
     apiKey,
     instructions
@@ -248,9 +268,19 @@ class WaBotConfigService {
       enabled: wa.botEnabled !== false,
       unlockEnabled: wa.botUnlockEnabled === true,
       ...config,
-      ai: { ...ai, hasApiKey: Boolean(apiKey), lastError: ultimoErro },
+      ai: { ...ai, hasApiKey: Boolean(apiKey), keyHint: this.aiKeyHint(apiKey), lastError: ultimoErro },
       defaults: this.defaults(locale)
     };
+  }
+
+  /**
+   * Os 4 últimos caracteres da chave salva, para a tela conferir qual chave
+   * está ali — o navegador já gravou a senha do painel no lugar dela.
+   */
+  static aiKeyHint(stored) {
+    if (!stored) return null;
+    const chave = aiKeyBox.decrypt(stored) ?? '';
+    return chave.length >= 12 ? chave.slice(-4) : null;
   }
 
   /** A configuração da IA com a chave em claro, para quem chama a API. */

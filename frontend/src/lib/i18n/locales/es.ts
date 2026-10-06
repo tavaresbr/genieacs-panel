@@ -994,6 +994,7 @@ const es: Dictionary = {
   'settings.chatbot.aiModelHint': 'En z.ai: glm-4.5-flash (gratis), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Clave de API',
   'settings.chatbot.aiKeySaved': 'Clave configurada',
+  'settings.chatbot.aiKeyEnds': 'termina en …{hint}',
   'settings.chatbot.aiKeyRemove': 'Eliminar clave',
   'settings.chatbot.aiKeyWillRemove': 'La clave se eliminará al guardar.',
   'settings.chatbot.aiKeyReplace': 'Pega una nueva clave para reemplazarla',
@@ -2755,6 +2756,7 @@ const es: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Dirección de IA no permitida',
   'whatsapp.ai.err.invalidUrl': 'Dirección de API no válida',
   'whatsapp.ai.err.keyRequired': 'Introduce la clave de API para activar la IA',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'Al cambiar la dirección de la API, ingrese la clave de nuevo',
   'whatsapp.ai.err.disabled': 'Las sugerencias de la IA están desactivadas',
   'whatsapp.ai.err.failed': 'La IA falló',
   'whatsapp.tags.button': 'Etiquetas',
@@ -4321,6 +4323,26 @@ const es: Dictionary = {
   'plan.proration.pending': "La factura de prorrateo de {amount} aún no se ha emitido; aparecerá en Cobros en cuanto se emita.",
   'platform.subscription.prorationOverdueNote': "La factura de prorrateo del cambio de plan está vencida; el panel está en solo lectura.",
   'subscription.prorationOverdue': "La factura de prorrateo de tu cambio de plan está vencida. El panel queda en solo lectura hasta el pago.",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Navegación",
+  'siteMap.title': "Mapa del panel",
+  'siteMap.description': "Todas las pantallas de este panel, agrupadas, con lo que hace cada una: solo las que abre tu acceso.",
+  'siteMap.group.operation': "Operación diaria",
+  'siteMap.group.administration': "Administración",
+  'siteMap.group.platform': "Plataforma",
+  'siteMap.settings.title': "Secciones de Configuración",
+  'siteMap.settings.description': "Cada una abre Configuración directamente en esa pestaña.",
+  'siteMap.inner.title': "Pantallas a las que se llega desde otra",
+  'siteMap.inner.description': "No tienen enlace propio: cada una depende del elemento desde el que se entra.",
+  'siteMap.inner.device': "Detalle del equipo",
+  'siteMap.inner.deviceReached': "Haz clic en un equipo del inventario",
+  'siteMap.inner.contact': "Detalle del contacto",
+  'siteMap.inner.contactReached': "Haz clic en un contacto en Contactos",
+  'siteMap.inner.onboarding': "Primera configuración",
+  'siteMap.inner.onboardingReached': "Se abre sola en el primer acceso sin ACS configurado",
+  'sidebar.siteMap': "Mapa del panel",
 }
 
 export default es

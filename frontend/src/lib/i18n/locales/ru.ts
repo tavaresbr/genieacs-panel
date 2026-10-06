@@ -997,6 +997,7 @@ const ru: Dictionary = {
   'settings.chatbot.aiModelHint': 'На z.ai: glm-4.5-flash (бесплатно), glm-4.5-air, glm-4.6.',
   'settings.chatbot.aiKey': 'Ключ API',
   'settings.chatbot.aiKeySaved': 'Ключ настроен',
+  'settings.chatbot.aiKeyEnds': 'оканчивается на …{hint}',
   'settings.chatbot.aiKeyRemove': 'Удалить ключ',
   'settings.chatbot.aiKeyWillRemove': 'Ключ будет удалён при сохранении.',
   'settings.chatbot.aiKeyReplace': 'Вставьте новый ключ, чтобы заменить его',
@@ -2763,6 +2764,7 @@ const ru: Dictionary = {
   'whatsapp.ai.err.blockedHost': 'Адрес ИИ не разрешён',
   'whatsapp.ai.err.invalidUrl': 'Недопустимый адрес API',
   'whatsapp.ai.err.keyRequired': 'Укажите ключ API, чтобы включить ИИ',
+  'whatsapp.ai.err.keyRequiredForNewUrl': 'При смене адреса API введите ключ заново',
   'whatsapp.ai.err.disabled': 'Подсказки ИИ отключены',
   'whatsapp.ai.err.failed': 'Сбой ИИ',
   'whatsapp.tags.button': 'Метки',
@@ -4329,6 +4331,26 @@ const ru: Dictionary = {
   'plan.proration.pending': "Пропорциональный счёт на {amount} ещё не выставлен; он появится в разделе «Счета», как только будет выставлен.",
   'platform.subscription.prorationOverdueNote': "Пропорциональный счёт за смену тарифа просрочен; панель доступна только для чтения.",
   'subscription.prorationOverdue': "Пропорциональный счёт за смену вашего тарифа просрочен. Панель доступна только для чтения до оплаты.",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "Навигация",
+  'siteMap.title': "Карта панели",
+  'siteMap.description': "Все экраны этой панели по группам и назначение каждого — только те, которые открывает ваш доступ.",
+  'siteMap.group.operation': "Ежедневная работа",
+  'siteMap.group.administration': "Администрирование",
+  'siteMap.group.platform': "Платформа",
+  'siteMap.settings.title': "Разделы настроек",
+  'siteMap.settings.description': "Каждая ссылка открывает настройки сразу на нужной вкладке.",
+  'siteMap.inner.title': "Экраны, куда попадают из другого",
+  'siteMap.inner.description': "У них нет своей ссылки: каждому нужен элемент, с которого пришли.",
+  'siteMap.inner.device': "Карточка устройства",
+  'siteMap.inner.deviceReached': "Нажмите на устройство в инвентаре",
+  'siteMap.inner.contact': "Карточка контакта",
+  'siteMap.inner.contactReached': "Нажмите на контакт в разделе «Контакты»",
+  'siteMap.inner.onboarding': "Первая настройка",
+  'siteMap.inner.onboardingReached': "Открывается сама при первом входе без настроенного ACS",
+  'sidebar.siteMap': "Карта панели",
 }
 
 export default ru

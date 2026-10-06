@@ -994,6 +994,7 @@ const zhCN: Dictionary = {
   'settings.chatbot.aiModelHint': 'z.ai 上：glm-4.5-flash（免费）、glm-4.5-air、glm-4.6。',
   'settings.chatbot.aiKey': 'API 密钥',
   'settings.chatbot.aiKeySaved': '密钥已配置',
+  'settings.chatbot.aiKeyEnds': '结尾为 …{hint}',
   'settings.chatbot.aiKeyRemove': '移除密钥',
   'settings.chatbot.aiKeyWillRemove': '保存后将移除密钥。',
   'settings.chatbot.aiKeyReplace': '粘贴新密钥以替换',
@@ -2755,6 +2756,7 @@ const zhCN: Dictionary = {
   'whatsapp.ai.err.blockedHost': '不允许使用该 AI 地址',
   'whatsapp.ai.err.invalidUrl': 'API 地址无效',
   'whatsapp.ai.err.keyRequired': '请输入 API 密钥以开启 AI',
+  'whatsapp.ai.err.keyRequiredForNewUrl': '更改 API 地址时，请重新输入 API 密钥',
   'whatsapp.ai.err.disabled': 'AI 建议已关闭',
   'whatsapp.ai.err.failed': 'AI 出错',
   'whatsapp.tags.button': '标签',
@@ -4321,6 +4323,26 @@ const zhCN: Dictionary = {
   'plan.proration.pending': "{amount} 的按比例账单尚未开具；开具后将显示在“账单”中。",
   'platform.subscription.prorationOverdueNote': "套餐变更的按比例账单已逾期；面板为只读。",
   'subscription.prorationOverdue': "您套餐变更的按比例账单已逾期。付款前面板保持只读。",
+
+  // O mapa do painel. Os nomes das telas em si reaproveitam `sidebar.nav.*` e
+  // `settings.tab.*`, que já existem nos 13 idiomas.
+  'siteMap.kicker': "导航",
+  'siteMap.title': "面板地图",
+  'siteMap.description': "本面板的所有页面，按组列出并说明用途——仅显示你的权限能打开的页面。",
+  'siteMap.group.operation': "日常运维",
+  'siteMap.group.administration': "管理",
+  'siteMap.group.platform': "平台",
+  'siteMap.settings.title': "设置的各个部分",
+  'siteMap.settings.description': "每个链接都会直接打开设置的对应标签页。",
+  'siteMap.inner.title': "从其他页面进入的页面",
+  'siteMap.inner.description': "它们没有自己的链接：每个都需要从所属条目进入。",
+  'siteMap.inner.device': "设备详情",
+  'siteMap.inner.deviceReached': "在设备清单中点击一台设备",
+  'siteMap.inner.contact': "联系人详情",
+  'siteMap.inner.contactReached': "在“联系人”中点击一位联系人",
+  'siteMap.inner.onboarding': "首次配置",
+  'siteMap.inner.onboardingReached': "在未配置 ACS 的情况下首次登录时自动打开",
+  'sidebar.siteMap': "面板地图",
 }
 
 export default zhCN

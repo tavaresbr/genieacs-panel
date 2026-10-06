@@ -882,6 +882,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     onToggleSgpPanel={canSeeSgp ? toggleSgpPanel : undefined}
                     onLinked={linked}
                     onBack={closeThread}
+                    compact={keyboardHeight !== null}
                   />
                   <ThreadComposer
                     optedOut={conversation.optedOut}
