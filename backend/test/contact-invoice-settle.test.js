@@ -232,6 +232,31 @@ describe('receber um título', () => {
   });
 });
 
+describe('o SGP que responde a baixa sem corpo', () => {
+  // A rota do banco do SGP dá a baixa e responde 200 vazio (ou 204): é baixa
+  // feita, com comprovante e trilha, não "resposta inválida".
+  for (const [caso, responder] of [
+    ['200 sem corpo', (res) => { res.writeHead(200); res.end(); }],
+    ['204', (res) => { res.writeHead(204); res.end(); }],
+    ['200 em HTML', (res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<html><body>ok</body></html>'); }]
+  ]) {
+    it(`${caso} conta como baixa feita`, async () => {
+      sgp.titulos = titulosBase();
+      sgp.baixas = [];
+      sgp.responder = responder;
+      const antes = await asTenant(() => getDb()('audit_log').where({ action: 'contact.invoice_settled' }).count({ n: '*' }).first());
+      const res = await receber('D-608-1', { amount: 49.5, method: 'Dinheiro', receipt: true });
+      sgp.responder = null;
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.body.data.message, null);
+      assert.equal(res.body.data.receipt.sent, true, JSON.stringify(res.body.data.receipt));
+      assert.equal(sgp.baixas.length, 1);
+      const depois = await asTenant(() => getDb()('audit_log').where({ action: 'contact.invoice_settled' }).count({ n: '*' }).first());
+      assert.equal(Number(depois.n), Number(antes.n) + 1);
+    });
+  }
+});
+
 describe('o id que chega à URL', () => {
   it('só um id numérico do SGP vira caminho', async () => {
     await assert.rejects(
