@@ -1,5 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { gzipSync } from 'node:zlib';
 import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 /**
@@ -165,6 +166,25 @@ describe('o CSV do Outlook como o Gmail exporta', () => {
     const ficha = await call(`${panelUrl}/api/contacts/c:${linha.id}`, { headers: authHeaders(token) });
     assert.equal(ficha.body.data.fields.address.value.city, 'Santarém');
     assert.equal(ficha.body.data.fields.address.value.zip, '68005-000');
+  });
+});
+
+describe('o arquivo comprimido pelo navegador', () => {
+  // O painel manda a planilha em gzip: um proxy na frente costuma barrar
+  // corpos acima de 1 MB, e a agenda de um provedor passa disso.
+  it('um CSV em gzip é lido como o original', async () => {
+    const csv = [
+      'First Name,Last Name,Mobile Phone',
+      'Lia,Gzip,(93) 99222-0020'
+    ].join('\r\n');
+    const res = await fetch(`${panelUrl}/api/contacts/import?mode=preview`, {
+      method: 'POST',
+      headers: { ...authHeaders(token), 'Content-Type': 'text/csv', 'Content-Encoding': 'gzip' },
+      body: gzipSync(Buffer.from(csv, 'utf8'))
+    }).then(async (response) => ({ status: response.status, body: await response.json() }));
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.format, 'outlook');
+    assert.deepEqual(res.body.data.rows, [{ name: 'Lia Gzip', phone: '5593992220020' }]);
   });
 });
 
