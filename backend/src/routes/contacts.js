@@ -82,6 +82,9 @@ router.post(
   sgpAdminLimiter,
   ContactController.sendInvoice
 );
+// One client refreshed from the SGP, its ONTs asked to report: it writes, and
+// it asks the SGP and the ACS, so the editor's capability and the SGP limiter.
+router.post('/:key/sync', authenticateToken, requirePermission('contacts.edit'), sgpAdminLimiter, ContactController.sync);
 router.patch('/:key', authenticateToken, requirePermission('contacts.edit'), ContactController.update);
 
 export default router;

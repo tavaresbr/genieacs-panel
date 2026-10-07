@@ -1091,6 +1091,8 @@ export default {
   'contacts.import.whatsappApplied': 'Contatos do WhatsApp importados: {created} criados',
   'contacts.import.googlePreviewed': 'Prévia dos contatos do Google pronta',
   'contacts.import.googleApplied': 'Contatos do Google importados: {created} criados',
+  'contacts.synced': 'Cliente sincronizado',
+  'contacts.syncFailed': 'Não foi possível sincronizar o cliente',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Configuração da TeiaH Valid carregada',

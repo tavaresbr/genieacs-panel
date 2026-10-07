@@ -388,6 +388,15 @@ const CASOS = [
     body: { name: 'Cliente do alcance' },
     aceito: [201]
   },
+  {
+    // Sincronizar grava a ficha: só quem edita. A chave que não existe dá 404.
+    cap: 'contacts.edit',
+    label: 'POST /api/contacts/:key/sync',
+    method: 'POST',
+    path: () => '/api/contacts/CONTRATO-QUE-NAO-EXISTE/sync',
+    aceito: [404],
+    codigoAceito: 'not_found'
+  },
 
   // ── O que só quem administra alcança ──────────────────────────────────
   {
@@ -851,7 +860,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
     // deixaria a promessa valendo sobre menos coisa, calada.
     // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas,
     // e depois as três da TeiaH Valid, e a importação da agenda do WhatsApp.
-    assert.equal(CASOS.length, 61);
+    assert.equal(CASOS.length, 62);
   });
 });
 

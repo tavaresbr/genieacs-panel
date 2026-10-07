@@ -1092,6 +1092,8 @@ export default {
   'contacts.import.whatsappApplied': 'WhatsApp連絡先をインポートしました：{created}件作成',
   'contacts.import.googlePreviewed': 'Google連絡先のプレビューの準備ができました',
   'contacts.import.googleApplied': 'Google連絡先をインポートしました: {created} 件作成',
+  'contacts.synced': '顧客を同期しました',
+  'contacts.syncFailed': '顧客を同期できませんでした',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid の設定を読み込みました',

@@ -113,6 +113,10 @@ class AuditLog {
     // Um título em aberto foi mandado ao cliente pelo WhatsApp, pela ficha. O
     // `detail` diz qual título e qual conversa, nunca o texto (tem o PIX).
     CONTACT_INVOICE_SENT: 'contact.invoice_sent',
+    // "Sincronizar" na ficha: o SGP consultado de novo para um cliente e as
+    // ONTs dos contratos chamadas a reportar. O `detail` guarda contratos e
+    // quantidades, nunca dados do cadastro.
+    CONTACT_SYNCED: 'contact.synced',
     // A base de contatos saiu numa planilha, ou entrou por uma. O `detail`
     // guarda quantidades e filtros, nunca uma linha da planilha.
     CONTACTS_EXPORTED: 'contacts.exported',

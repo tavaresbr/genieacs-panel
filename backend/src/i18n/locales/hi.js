@@ -1092,6 +1092,8 @@ export default {
   'contacts.import.whatsappApplied': 'WhatsApp संपर्क आयात हुए: {created} बनाए गए',
   'contacts.import.googlePreviewed': 'Google संपर्कों का पूर्वावलोकन तैयार',
   'contacts.import.googleApplied': 'Google संपर्क आयात किए गए: {created} बनाए गए',
+  'contacts.synced': 'ग्राहक सिंक हो गया',
+  'contacts.syncFailed': 'ग्राहक सिंक नहीं हो सका',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid कॉन्फ़िगरेशन लोड हुआ',

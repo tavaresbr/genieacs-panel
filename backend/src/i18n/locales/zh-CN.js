@@ -1092,6 +1092,8 @@ export default {
   'contacts.import.whatsappApplied': '已导入 WhatsApp 联系人：创建 {created} 个',
   'contacts.import.googlePreviewed': 'Google 联系人预览已就绪',
   'contacts.import.googleApplied': '已导入 Google 联系人：创建 {created} 个',
+  'contacts.synced': '客户已同步',
+  'contacts.syncFailed': '无法同步客户',
 
   // TeiaH Valid
   'teiah.configLoaded': '已加载 TeiaH Valid 配置',

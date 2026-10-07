@@ -1659,6 +1659,33 @@ class SgpService {
   }
 
   /**
+   * The listing endpoint's answer for one document, as `listCustomersPage`
+   * gives a page: the contract rows and the client profiles. The one-client
+   * refresh of the Contacts screen stores both, the way the full sync does.
+   */
+  static async lookupClientsWithProfiles({ document }) {
+    const digits = String(document ?? '').replace(/\D/g, '');
+    if (!digits) return { rows: [], clients: [] };
+    const config = this.requireReady(await this.getConfig());
+    if (!config.endpoints.customerList) return { rows: [], clients: [] };
+    try {
+      const data = await this.request('customerList', { cpfcnpj: digits }, config, { listing: true });
+      const entries = firstArray(data, ['clientes', 'contratos', 'dados', 'data', 'results', 'items'])
+        // Only the client asked for: an install that ignores the filter must
+        // not refresh a page of strangers.
+        .filter((entry) => normalizeCustomer(entry)
+          .some((row) => String(row.document ?? '').replace(/\D/g, '') === digits));
+      return {
+        rows: entries.flatMap((entry) => normalizeCustomer(entry)),
+        clients: entries.map((entry) => clientProfile(entry)).filter(Boolean)
+      };
+    } catch (error) {
+      if (isNotFound(error)) return { rows: [], clients: [] };
+      throw error;
+    }
+  }
+
+  /**
    * The clients the listing endpoint holds under one document — the lookup
    * that also finds a client with NO contract, which `consultacliente` (a
    * contract lookup) cannot. Rows as `listCustomersPage` gives them.
