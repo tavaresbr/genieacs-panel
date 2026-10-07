@@ -10,23 +10,23 @@ import { DunningRulePanel } from './dunning-rule-panel'
 type View = 'auto' | 'manual' | 'history'
 
 const VIEWS: [View, TranslationKey][] = [
+  ['history', 'whatsapp.dunning.tabHistory'],
   ['auto', 'whatsapp.dunning.tabAuto'],
-  ['manual', 'whatsapp.dunning.tabManual'],
-  ['history', 'whatsapp.dunning.tabHistory']
+  ['manual', 'whatsapp.dunning.tabManual']
 ]
 
 /**
- * The "Régua de cobrança" tab: the automatic cadence, the one-off builder that
- * was here first, and what the automatic one has done.
+ * The "Régua de cobrança" tab: what the automatic cadence has done, the
+ * cadence itself, and the one-off builder that was here first.
  *
- * Automatic first because it is what runs every day; the one-off builder keeps
- * its rule — building never sends — and stays one click away. Only the open
- * view is mounted: the one-off builder calls the ERP once per subscriber the
+ * Results first because it is what an operator opens the tab to check every
+ * day; the cadence is edited rarely, and the one-off builder keeps its rule —
+ * building never sends — one click away. Only the open view is mounted: the one-off builder calls the ERP once per subscriber the
  * moment it appears, and nobody who came to edit the steps asked for that.
  */
 export function DunningSection() {
   const { t } = useTranslation()
-  const [view, setView] = useState<View>('auto')
+  const [view, setView] = useState<View>('history')
 
   return (
     <div className="space-y-5">
