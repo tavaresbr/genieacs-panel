@@ -9,6 +9,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
 import { AccountChip, conversationAddress, conversationTitle } from '@/components/whatsapp/conversation-list'
 import { accountTag } from '@/lib/wa-account-color'
+import { BILLING_BADGE, billingLabel } from '@/lib/wa-billing-status'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
 import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
@@ -153,9 +154,23 @@ export function ConversationThread({
             <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${numero?.className ?? ''}`}>
               {numero?.showName && <AccountChip name={numero.name} />}
               {conversation.contract ? (
-                <span className="modern-badge-info">
+                <span
+                  className={conversation.billing
+                    ? `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${BILLING_BADGE[conversation.billing.status]}`
+                    : 'modern-badge-info'}
+                  title={conversation.billing
+                    ? t(billingLabel(conversation.billing.status, conversation.billing.daysOverdue).key,
+                      billingLabel(conversation.billing.status, conversation.billing.daysOverdue).vars)
+                    : undefined}
+                >
                   <Icon name="invoice" size={12} />
                   {t('whatsapp.inbox.contract')}: <span className="font-mono">{conversation.contract}</span>
+                  {conversation.billing && (
+                    <span className="font-normal">
+                      · {t(billingLabel(conversation.billing.status, conversation.billing.daysOverdue).key,
+                        billingLabel(conversation.billing.status, conversation.billing.daysOverdue).vars)}
+                    </span>
+                  )}
                 </span>
               ) : (
                 <span className="modern-badge">

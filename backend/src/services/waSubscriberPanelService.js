@@ -4,6 +4,7 @@ import WaConversationService from './waConversationService.js';
 import WaTemplateService from './waTemplateService.js';
 import WaBillingService from './waBillingService.js';
 import WaDunningService from './waDunningService.js';
+import BillingStatusService from './billingStatusService.js';
 import { WaError } from './whatsappConfigService.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
@@ -185,6 +186,7 @@ class WaSubscriberPanelService {
     if (!contract) return { items: [], highlight: null, error: null };
     try {
       const { invoices } = await SgpService.listInvoices({ contract, onlyOpen: true });
+      await BillingStatusService.record(contract, invoices);
       // `true`: here a not-yet-due invoice is still the one to point at, the
       // way a reminder would — the operator is answering, not dunning.
       const { fatura } = maisAntigaEmAberto(invoices, new Date(), true);

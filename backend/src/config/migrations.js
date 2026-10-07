@@ -2057,6 +2057,26 @@ const waDunningPausesTable = (db) => (t) => {
   t.unique(['tenant_id', 'contract'], { indexName: 'wa_dunning_pauses_contract_uq' });
 };
 
+/**
+ * A situação financeira de cada contrato, como foi vista na última consulta ao
+ * SGP (0108): a data da fatura em aberto mais antiga. A cor (em dia, vence
+ * hoje, atrasado) é recalculada na leitura a partir dela, então a virada do
+ * dia não precisa de nova consulta.
+ */
+const sgpBillingStatusTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('contract', 64).notNullable();
+  t.string('oldest_due_date', 10);
+  t.timestamp('checked_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'contract'], { indexName: 'sgp_billing_status_contract_uq' });
+};
+
+const BILLING_STATUS_TABLES = [
+  ['sgp_billing_status', sgpBillingStatusTable]
+];
+
 const DUNNING_PAUSE_TABLES = [
   ['wa_dunning_pauses', waDunningPausesTable]
 ];
@@ -2791,6 +2811,7 @@ export const SCHEMA_TABLES = [
   ...WA_AGENT_TABLES,
   ...WA_TAG_TABLES,
   ...DUNNING_PAUSE_TABLES,
+  ...BILLING_STATUS_TABLES,
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
   ...COUPON_TABLES,
@@ -6135,6 +6156,18 @@ export const migrations = [
           for (const add of tardias) add(t);
         });
       }
+    }
+  },
+  {
+    /** A situação financeira por contrato — ver `sgpBillingStatusTable`. */
+    id: '0108_sgp_billing_status',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('sgp_billing_status');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'sgp_billing_status', sgpBillingStatusTable(db));
     }
   }
 ];

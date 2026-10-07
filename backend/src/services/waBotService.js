@@ -7,6 +7,7 @@ import WaBotConfigService from './waBotConfigService.js';
 import OutageIncidentService from './outageIncidentService.js';
 import MaintenanceService from './maintenanceService.js';
 import WaTagService from './waTagService.js';
+import BillingStatusService from './billingStatusService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -299,6 +300,7 @@ async function linkDoPortal() {
 /** The oldest open invoice, spelled out. */
 async function responderFatura(link) {
   const { invoices } = await SgpService.listInvoices({ contract: link.contract, onlyOpen: true });
+  await BillingStatusService.record(link.contract, invoices);
   // `true` for the reminder flag: the dunning rule refuses a not-yet-due
   // invoice because a dunning message has nothing to charge for. Here the
   // customer ASKED, and "you have one due on the 10th" is the answer.

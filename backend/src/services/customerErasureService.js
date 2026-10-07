@@ -154,6 +154,9 @@ class CustomerErasureService {
           if (contratos.length) w.orWhereIn('contract', contratos);
         }))
         : 0,
+      sgp_billing_status: contratos.length
+        ? await contar('sgp_billing_status', (q) => q.whereIn('contract', contratos))
+        : 0,
       wa_dunning_pauses: contratos.length
         ? await contar('wa_dunning_pauses', (q) => q.whereIn('contract', contratos))
         : 0,
@@ -302,6 +305,7 @@ class CustomerErasureService {
 
       if (contratos.length) {
         await tdb('wa_dunning_pauses', trx).whereIn('contract', contratos).del();
+        await tdb('sgp_billing_status', trx).whereIn('contract', contratos).del();
       }
 
       if (noIds.length) {
