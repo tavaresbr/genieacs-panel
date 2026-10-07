@@ -236,6 +236,7 @@ export default function ContactDetailPage() {
                 <Icon name="refresh" size={16} /> {syncing ? t('contacts.profile.syncing') : t('contacts.profile.sync')}
               </button>
             )}
+            <DevicesButton contracts={profile.contracts} />
             {can('whatsapp.send') && (
               <button
                 type="button"
@@ -552,6 +553,49 @@ function InvoicesCard({ contactKey, whatsappPhone, settleMethods }: {
         />
       )}
     </Card>
+  )
+}
+
+/**
+ * The client's managed equipment: one ONT opens its page straight away; more
+ * than one (a client with several contracts) opens a short list to pick from.
+ */
+function DevicesButton({ contracts }: { contracts: ContactProfile['contracts'] }) {
+  const { t } = useTranslation()
+  const devices = contracts.filter((contract) => contract.deviceId)
+  if (devices.length === 0) {
+    return (
+      <button type="button" className="modern-button-secondary" disabled title={t('contacts.profile.noEquipment')}>
+        <Icon name="wifi" size={16} /> {t('contacts.profile.equipment')}
+      </button>
+    )
+  }
+  if (devices.length === 1) {
+    return (
+      <Link className="modern-button-secondary" to={`/devices/detail?id=${encodeURIComponent(devices[0].deviceId!)}`}>
+        <Icon name="wifi" size={16} /> {t('contacts.profile.equipment')}
+      </Link>
+    )
+  }
+  return (
+    <details className="relative">
+      <summary className="modern-button-secondary cursor-pointer list-none">
+        <Icon name="wifi" size={16} /> {t('contacts.profile.equipments', { count: devices.length })}
+      </summary>
+      <ul className="modern-card absolute end-0 z-20 mt-2 min-w-64 p-2 text-sm shadow-lg">
+        {devices.map((contract) => (
+          <li key={contract.key}>
+            <Link
+              className="block rounded px-3 py-2 hover:bg-muted"
+              to={`/devices/detail?id=${encodeURIComponent(contract.deviceId!)}`}
+            >
+              <span className="block font-semibold">{t('contacts.profile.equipmentContract', { contract: contract.contract })}</span>
+              <span className="block break-all font-mono text-xs text-muted-foreground">{contract.deviceId}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 
