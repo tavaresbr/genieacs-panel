@@ -1095,6 +1095,8 @@ export default {
   'contacts.import.whatsappApplied': 'WhatsApp 연락처를 가져왔습니다: {created}건 생성',
   'contacts.import.googlePreviewed': 'Google 연락처 미리보기 준비 완료',
   'contacts.import.googleApplied': 'Google 연락처 가져오기 완료: {created}개 생성',
+  'contacts.synced': '고객 동기화 완료',
+  'contacts.syncFailed': '고객을 동기화할 수 없습니다',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid 설정을 불러왔습니다',

@@ -1084,6 +1084,8 @@ export default {
   'contacts.import.whatsappApplied': 'تم استيراد جهات اتصال واتساب: أُنشئ {created}',
   'contacts.import.googlePreviewed': 'معاينة جهات اتصال Google جاهزة',
   'contacts.import.googleApplied': 'تم استيراد جهات اتصال Google: أُنشئ {created}',
+  'contacts.synced': 'تمت مزامنة العميل',
+  'contacts.syncFailed': 'تعذّرت مزامنة العميل',
 
   // TeiaH Valid
   'teiah.configLoaded': 'تم تحميل إعدادات TeiaH Valid',

@@ -85,6 +85,7 @@ export default function ContactDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [editing, setEditing] = useState(false)
   const [opening, setOpening] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const canEdit = can('contacts.edit')
 
   const load = useCallback(async () => {
@@ -117,6 +118,41 @@ export default function ContactDetailPage() {
       toast.error(t('api.requestFailed'))
     } finally {
       setOpening(false)
+    }
+  }
+
+  // Manual sync: this client from the SGP, and its ONTs asked to report now
+  // (TR-069). The two halves are independent; the toast says how each went.
+  const sync = async () => {
+    setSyncing(true)
+    try {
+      const res = await contactsAPI.sync(key)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('contacts.profile.syncFailed'))
+        return
+      }
+      const { profile: fresh, sgp, devices } = res.data
+      setProfile(fresh)
+      const lines = [
+        sgp.error
+          ? t('contacts.profile.syncSgpError', { error: sgp.error })
+          : sgp.skipped ? t('contacts.profile.syncSgpSkipped') : t('contacts.profile.syncSgpOk', { count: sgp.contracts })
+      ]
+      if (devices) {
+        if (devices.length === 0) lines.push(t('contacts.profile.syncNoDevices'))
+        for (const device of devices) {
+          lines.push(device.error
+            ? t('contacts.profile.syncDeviceError', { device: device.deviceId, error: device.error })
+            : t(device.reached ? 'contacts.profile.syncDeviceReached' : 'contacts.profile.syncDeviceQueued', { device: device.deviceId }))
+        }
+      }
+      const failed = Boolean(sgp.error) || Boolean(devices?.some((device) => device.error))
+      if (failed) toast.error(lines.join(' · '))
+      else toast.success(lines.join(' · '))
+    } catch {
+      toast.error(t('contacts.profile.syncFailed'))
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -186,6 +222,17 @@ export default function ContactDetailPage() {
               <a className="modern-button-secondary" href={profile.sgpUrl} target="_blank" rel="noreferrer">
                 <Icon name="external" size={16} /> {t('contacts.profile.openInSgp')}
               </a>
+            )}
+            {canEdit && (
+              <button
+                type="button"
+                className="modern-button-secondary"
+                disabled={syncing}
+                title={t('contacts.profile.syncHint')}
+                onClick={() => void sync()}
+              >
+                <Icon name="refresh" size={16} /> {syncing ? t('contacts.profile.syncing') : t('contacts.profile.sync')}
+              </button>
             )}
             {can('whatsapp.send') && (
               <button

@@ -1,6 +1,8 @@
 import AuditLog from '../models/AuditLog.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
 import ContactSheetService, { IMPORT_MAX_BYTES } from '../services/contactSheetService.js';
+import ContactSyncService from '../services/contactSyncService.js';
+import { roleHas } from '../config/permissions.js';
 import ContactGoogleImportService from '../services/contactGoogleImportService.js';
 import ContactWhatsappImportService from '../services/contactWhatsappImportService.js';
 import ContactInvoiceService from '../services/contactInvoiceService.js';
@@ -75,6 +77,30 @@ class ContactController {
       return res.status(201).json(createResponse(req.t('contacts.invoiceSent'), result));
     } catch (error) {
       return handleError(req, res, error, 'contacts.invoiceSendFailed');
+    }
+  }
+
+  /** "Sincronizar": this client asked of the SGP again, and its ONTs summoned. */
+  static async sync(req, res) {
+    try {
+      // The ONT half needs the device page's capability; without it the
+      // record still refreshes from the SGP and the answer says the ONTs were
+      // left alone.
+      const canSummon = roleHas(req.user?.role, 'devices.write');
+      const result = await ContactSyncService.syncOne(req.params.key, { t: req.t, canSummon });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_SYNCED,
+        subjectType: 'contact',
+        subjectId: String(req.params.key).slice(0, 64),
+        detail: {
+          contracts: result.profile.contracts.map((entry) => entry.contract),
+          sgp: result.sgp.error ? 'error' : (result.sgp.skipped ? 'skipped' : 'ok'),
+          devices: result.devices ? result.devices.length : null
+        }
+      });
+      return res.json(createResponse(req.t('contacts.synced'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.syncFailed');
     }
   }
 

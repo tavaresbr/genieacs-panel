@@ -3573,6 +3573,13 @@ export interface ContactGoogleImportResult extends ContactWhatsappImportResult {
   defaultDdd: string | null
 }
 
+export interface ContactSyncResult {
+  profile: ContactProfile
+  sgp: { skipped: boolean; contracts: number; error: string | null }
+  /** `null` when the operator may not summon devices. */
+  devices: { deviceId: string; contract: string; reached: boolean; reason: string | null; error: string | null }[] | null
+}
+
 export const contactsAPI = {
   get: (key: string) =>
     apiClient.get<ContactProfile>(`/contacts/${encodeURIComponent(key)}`),
@@ -3582,6 +3589,10 @@ export const contactsAPI = {
 
   create: (data: ContactProfilePatch & { name: string }) =>
     apiClient.post<ContactProfile>('/contacts', data),
+
+  /** This client asked of the SGP again, and its ONTs asked to report now. */
+  sync: (key: string) =>
+    apiClient.post<ContactSyncResult>(`/contacts/${encodeURIComponent(key)}/sync`, {}),
 
   /** Before the form: the SGP by document and, for a new company, the Receita. */
   lookupDocument: (document: string) =>

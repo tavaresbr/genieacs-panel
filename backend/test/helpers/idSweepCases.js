@@ -688,6 +688,14 @@ export const casos = [
     tabela: 'sgp_links',
     coluna: 'contract'
   },
+  {
+    chave: 'sgpContract',
+    label: 'POST /api/contacts/:key/sync',
+    method: 'POST',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/sync`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
   // O contrato do corpo não existe em nenhum dos dois, de propósito: com o id do
   // vizinho a conversa não pode ser achada (404 `conversation_not_found`), e
   // com o próprio a rota passa dela e recusa o contrato — o controle exige só
