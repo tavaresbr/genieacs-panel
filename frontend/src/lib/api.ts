@@ -256,6 +256,22 @@ export function storedSession(): { token: string | null; refreshToken: string | 
   }
 }
 
+/**
+ * A text body gzipped in the browser, or null where the browser cannot. A
+ * contacts spreadsheet is a megabyte or more, and the proxy in front of a
+ * panel often stops request bodies at 1 MB; compressed it is a tenth of that.
+ * The server inflates `Content-Encoding: gzip` on its own (body-parser).
+ */
+async function gzipText(text: string): Promise<Blob | null> {
+  if (typeof CompressionStream === 'undefined' || text.length < 64 * 1024) return null
+  try {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))
+    return await new Response(stream).blob()
+  } catch {
+    return null
+  }
+}
+
 class ApiClient {
   private baseURL: string
   private token: string | null = null
@@ -341,9 +357,14 @@ class ApiClient {
       })
 
       const contentType = response.headers.get('content-type') || ''
+      // A proxy in front of the panel answers its own errors in HTML (nginx's
+      // "413 Request Entity Too Large", a 502 page): the operator gets the
+      // status line, not the markup.
       const data = contentType.includes('application/json')
         ? await response.json()
-        : { message: await response.text() }
+        : await response.text().then((text) => ({
+          message: /^\s*</.test(text) ? `${response.status} ${response.statusText}`.trim() : text
+        }))
 
       if (
         response.status === 403 &&
@@ -606,10 +627,11 @@ class ApiClient {
 
   /** A body that is not JSON — a CSV sheet, sent as the text it is. */
   async postText<T>(endpoint: string, text: string, contentType = 'text/csv'): Promise<ApiResponse<T>> {
+    const gzipped = await gzipText(text)
     return this.request<T>(endpoint, {
       method: 'POST',
-      body: text,
-      headers: { 'Content-Type': contentType }
+      body: gzipped ?? text,
+      headers: gzipped ? { 'Content-Type': contentType, 'Content-Encoding': 'gzip' } : { 'Content-Type': contentType }
     })
   }
 
