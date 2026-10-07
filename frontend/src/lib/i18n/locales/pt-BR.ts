@@ -2278,6 +2278,7 @@ const ptBR: Dictionary = {
   'whatsapp.quickReplies.empty': 'Nenhuma resposta rápida. Crie em WhatsApp > Modelos, na categoria Atendimento.',
   'whatsapp.quickReplies.noMatch': 'Nenhuma resposta com "{query}"',
   'whatsapp.quickReplies.hint': '↑↓ para escolher · Enter para usar · Esc para fechar',
+  'whatsapp.contact.open': "Abrir cadastro do cliente",
   'whatsapp.templatePicker.button': "Modelos",
   'whatsapp.templatePicker.search': "Buscar modelo",
   'whatsapp.templatePicker.empty': "Nenhum modelo ativo. Crie na aba Modelos.",

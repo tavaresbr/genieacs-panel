@@ -5,6 +5,7 @@ import { Link } from 'react-router'
 import { AssigneeControl } from '@/components/whatsapp/assignment'
 import { TagPicker } from '@/components/whatsapp/tags'
 import { Icon } from '@/components/ui/icon'
+import { ContactLink } from '@/components/whatsapp/contact-link'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
 import { AccountChip, conversationAddress, conversationTitle } from '@/components/whatsapp/conversation-list'
@@ -146,7 +147,9 @@ export function ConversationThread({
           </button>
         )}
         <div className={compact ? 'min-w-0 flex-1' : 'order-last w-full min-w-0 lg:order-0 lg:w-auto'}>
-          <h2 className="truncate text-base font-semibold text-foreground">{conversationTitle(conversation)}</h2>
+          <h2 className="truncate text-base font-semibold text-foreground">
+            <ContactLink contract={conversation.contract} name={conversationTitle(conversation)} className="" />
+          </h2>
           {!compact && address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
 
           {/* Com o teclado aberto os selos e as ações saem: a altura vai para as mensagens. */}
@@ -180,7 +183,9 @@ export function ConversationThread({
               )}
               {conversation.clientName && (
                 <span className="modern-badge max-w-full">
-                  <span className="truncate">{t('whatsapp.inbox.subscriber')}: {conversation.clientName}</span>
+                  <span className="truncate">
+                    {t('whatsapp.inbox.subscriber')}: <ContactLink contract={conversation.contract} name={conversation.clientName} className="" />
+                  </span>
                 </span>
               )}
               {conversation.botPausedUntil && (

@@ -2278,6 +2278,7 @@ const zhTW: Dictionary = {
   'whatsapp.quickReplies.empty': '尚無快速回覆。請在 WhatsApp > 範本 的「客服」分類中建立。',
   'whatsapp.quickReplies.noMatch': '沒有符合 "{query}" 的回覆',
   'whatsapp.quickReplies.hint': '↑↓ 選擇 · Enter 使用 · Esc 關閉',
+  'whatsapp.contact.open': "開啟客戶資料",
   'whatsapp.templatePicker.button': "範本",
   'whatsapp.templatePicker.search': "搜尋範本",
   'whatsapp.templatePicker.empty': "沒有啟用的範本。請在「範本」分頁中建立。",

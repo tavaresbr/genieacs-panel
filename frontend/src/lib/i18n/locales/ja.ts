@@ -2277,6 +2277,7 @@ const ja: Dictionary = {
   'whatsapp.quickReplies.empty': 'クイック返信がありません。WhatsApp > テンプレートの「顧客対応」カテゴリで作成してください。',
   'whatsapp.quickReplies.noMatch': '「{query}」に一致する返信はありません',
   'whatsapp.quickReplies.hint': '↑↓ で選択 · Enter で使用 · Esc で閉じる',
+  'whatsapp.contact.open': "顧客情報を開く",
   'whatsapp.templatePicker.button': "テンプレート",
   'whatsapp.templatePicker.search': "テンプレートを検索",
   'whatsapp.templatePicker.empty': "有効なテンプレートがありません。「テンプレート」タブで作成してください。",

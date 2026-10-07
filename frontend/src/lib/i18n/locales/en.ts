@@ -2280,6 +2280,7 @@ const en = {
   'whatsapp.quickReplies.empty': 'No quick replies. Create them under WhatsApp > Templates, in the Support chat category.',
   'whatsapp.quickReplies.noMatch': 'No replies matching "{query}"',
   'whatsapp.quickReplies.hint': '↑↓ to choose · Enter to use · Esc to close',
+  'whatsapp.contact.open': "Open customer record",
   'whatsapp.templatePicker.button': "Templates",
   'whatsapp.templatePicker.search': "Search template",
   'whatsapp.templatePicker.empty': "No active templates. Create one in the Templates tab.",
