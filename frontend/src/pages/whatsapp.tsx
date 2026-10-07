@@ -42,7 +42,8 @@ import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation, useNavigate } from 'react-router'
-import { firstName, type QuickReply } from '@/lib/quick-replies'
+import { fillQuickReply, firstName, type QuickReply } from '@/lib/quick-replies'
+import { needsInvoice, type PickableTemplate } from '@/lib/template-picker'
 import { metaWindowFor } from '@/lib/wa-meta-window'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -170,12 +171,18 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   // Respostas rápidas: os modelos `atendimento`, lidos uma vez. `null` para
   // quem não pode listar modelos — aí nem o "/" nem o botão aparecem.
   const canQuickReply = can('campaigns.read')
-  const [quickReplies, setQuickReplies] = useState<QuickReply[] | null>(null)
+  // Uma leitura só: o botão "Modelos" mostra todos os ativos, e as respostas
+  // rápidas são os da categoria `atendimento` entre eles.
+  const [allTemplates, setAllTemplates] = useState<PickableTemplate[] | null>(null)
+  const quickReplies = useMemo<QuickReply[] | null>(
+    () => (allTemplates === null ? null : allTemplates.filter((row) => row.category === 'atendimento')),
+    [allTemplates]
+  )
   useEffect(() => {
     if (!canQuickReply) return
     let vivo = true
-    void whatsappAPI.listTemplates({ category: 'atendimento' }).then((res) => {
-      if (vivo) setQuickReplies(res.success && Array.isArray(res.data) ? res.data : [])
+    void whatsappAPI.listTemplates().then((res) => {
+      if (vivo) setAllTemplates(res.success && Array.isArray(res.data) ? res.data.filter((row) => row.active) : [])
     })
     return () => {
       vivo = false
@@ -651,6 +658,34 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     }
   }, [submit])
 
+  const quickReplyVars = useMemo(() => ({
+    nome: conversation?.clientName ?? conversation?.pushName ?? null,
+    primeiro_nome: firstName(conversation?.clientName ?? conversation?.pushName),
+    contrato: conversation?.contract ?? null,
+    atendente: user?.username ?? null
+  }), [conversation?.clientName, conversation?.pushName, conversation?.contract, user?.username])
+
+  /**
+   * O botão "Modelos": o texto do modelo preenchido para esta conversa. Com
+   * variável de fatura e contrato vinculado, quem preenche é o servidor, com a
+   * fatura em aberto mais antiga relida no SGP (a mesma conta da 2ª via). Sem
+   * contrato, entra o que a conversa sabe e as variáveis de fatura ficam à
+   * vista, com o aviso de vincular o assinante.
+   */
+  const pickTemplate = useCallback(async (template: PickableTemplate): Promise<string | null> => {
+    if (!conversation) return null
+    if (needsInvoice(template.body)) {
+      if (conversation.contract && can('whatsapp.send')) {
+        const res = await whatsappAPI.subscriberSecondCopy(conversation.id, { contract: conversation.contract, template: String(template.id) })
+        if (res.success && res.data) return res.data.text
+        toast.error(res.message || whatsappErrorMessage(t, res.code))
+        return null
+      }
+      toast.info(t('whatsapp.templatePicker.needsContract'))
+    }
+    return fillQuickReply(template.body, quickReplyVars)
+  }, [conversation, can, toast, t, quickReplyVars])
+
   /**
    * Puts a failed message back in the queue — the SAME row, not a copy.
    *
@@ -904,12 +939,9 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       toast.error(res.message || whatsappErrorMessage(t, res.code))
                       return null
                     } : undefined}
-                    quickReplyVars={{
-                      nome: conversation.clientName ?? conversation.pushName,
-                      primeiro_nome: firstName(conversation.clientName ?? conversation.pushName),
-                      contrato: conversation.contract,
-                      atendente: user?.username ?? null
-                    }}
+                    quickReplyVars={quickReplyVars}
+                    templates={canQuickReply ? allTemplates ?? [] : null}
+                    onPickTemplate={pickTemplate}
                   />
                 </>
               ) : (
