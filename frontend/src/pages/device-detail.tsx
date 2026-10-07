@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
 import { DeviceParametersCard } from '@/components/device-parameters-card'
 import { useLoading } from '@/components/ui/loading'
@@ -810,6 +810,7 @@ export default function DeviceDetailPage() {
   // trabalho dele.
   const canReadSecrets = can('customers.secrets')
   const canWriteDevice = can('devices.write')
+  const canOpenContact = can('contacts.read')
   // O que não tem volta é do admin: o plantão reinicia, mas não apaga a
   // configuração do cliente.
   const canMaintainDevice = can('devices.maintain')
@@ -1633,7 +1634,7 @@ export default function DeviceDetailPage() {
               <div className="min-w-0">
                 <p className="metric-label">{t('detail.sgp.client')}</p>
                 <p className="mt-1 truncate font-semibold" title={sgpLink.clientName || undefined}>
-                  {sgpLink.clientName || '—'}
+                  <ClientName link={sgpLink} canOpen={canOpenContact} />
                 </p>
               </div>
               <div className="min-w-0">
@@ -1966,7 +1967,7 @@ export default function DeviceDetailPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="metric-label">{t('detail.sgp.client')}</p>
-                        <p className="mt-1 font-semibold wrap-anywhere">{sgpLink.clientName || '—'}</p>
+                        <p className="mt-1 font-semibold wrap-anywhere"><ClientName link={sgpLink} canOpen={canOpenContact} /></p>
                       </div>
                       <div className="min-w-0">
                         <p className="metric-label">{t('detail.sgp.plan')}</p>
@@ -2535,5 +2536,16 @@ export default function DeviceDetailPage() {
         />
       </div>
     </div>
+  )
+}
+
+/** The subscriber's name, a link to their client record when the operator may open it. */
+function ClientName({ link, canOpen }: { link: SgpContractLink; canOpen: boolean }) {
+  if (!link.clientName) return <>—</>
+  if (!canOpen || !link.contract) return <>{link.clientName}</>
+  return (
+    <Link className="text-primary hover:underline" to={`/contacts/${encodeURIComponent(link.contract)}`}>
+      {link.clientName}
+    </Link>
   )
 }
