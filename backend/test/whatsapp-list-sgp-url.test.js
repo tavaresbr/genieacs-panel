@@ -53,6 +53,14 @@ describe('o link do SGP na lista de conversas', () => {
     assert.equal(urls['L-SEM'], null);
   });
 
+  it('a conversa aberta traz o mesmo link (cabeçalho)', async () => {
+    const lista = (await call(`${panelUrl}/api/whatsapp/conversations`, { headers: authHeaders(token) })).body.data;
+    const id = lista.find((c) => c.contract === 'L-COM').id;
+    const res = await call(`${panelUrl}/api/whatsapp/conversations/${id}`, { headers: authHeaders(token) });
+    const conversa = res.body.data.conversation ?? res.body.data;
+    assert.equal(conversa.sgpUrl, `${SGP}/admin/cliente/4321/contratos/`);
+  });
+
   it('com o SGP desligado, nenhum link', async () => {
     await asTenant(() => SgpService.saveConfig({ enabled: false, baseUrl: SGP, app: 'painel', token: 'tk', linkMode: 'pppoe' }));
     const urls = await listar();

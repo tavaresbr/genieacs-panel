@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AssigneeControl } from '@/components/whatsapp/assignment'
 import { TagPicker } from '@/components/whatsapp/tags'
@@ -14,6 +14,7 @@ import { BILLING_BADGE, billingLabel } from '@/lib/wa-billing-status'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
 import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
+import { isSafeExternalUrl } from '@/lib/sgp'
 import { showActionLabels } from '@/lib/wa-thread-actions'
 
 /** How close to the foot counts as "the operator is at the bottom". */
@@ -157,7 +158,9 @@ export function ConversationThread({
             <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${numero?.className ?? ''}`}>
               {numero?.showName && <AccountChip name={numero.name} />}
               {conversation.contract ? (
-                <span
+                <ContractBadgeLink
+                  href={can('sgp.read') && isSafeExternalUrl(conversation.sgpUrl ?? null) ? conversation.sgpUrl! : null}
+                  linkTitle={t('whatsapp.sgp.openSgp')}
                   className={conversation.billing
                     ? `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${BILLING_BADGE[conversation.billing.status]}`
                     : 'modern-badge-info'}
@@ -174,7 +177,7 @@ export function ConversationThread({
                         billingLabel(conversation.billing.status, conversation.billing.daysOverdue).vars)}
                     </span>
                   )}
-                </span>
+                </ContractBadgeLink>
               ) : (
                 <span className="modern-badge">
                   <Icon name="info" size={12} />
@@ -333,5 +336,32 @@ export function ConversationThread({
         )}
       </div>
     </>
+  )
+}
+
+/**
+ * O selo do contrato no cabeçalho: com o endereço do cadastro no SGP, é um
+ * link (nova aba) e o `title` diz para onde vai; sem ele, o selo de sempre,
+ * com o `title` da situação financeira.
+ */
+function ContractBadgeLink({
+  href,
+  linkTitle,
+  title,
+  className,
+  children
+}: { href: string | null; linkTitle: string; title?: string; className?: string; children: ReactNode }) {
+  if (!href) return <span className={className} title={title}>{children}</span>
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${className ?? ''} hover:underline`}
+      title={title ? `${linkTitle} · ${title}` : linkTitle}
+    >
+      {children}
+      <Icon name="external" size={10} />
+    </a>
   )
 }
