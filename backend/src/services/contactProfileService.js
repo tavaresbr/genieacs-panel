@@ -231,6 +231,9 @@ class ContactProfileService {
       source: client?.source ?? 'sgp',
       clientId: isSgpId(clientId) ? clientId : null,
       sgpUrl: config && isSgpId(clientId) ? SgpService.clientPageUrl(config, clientId) : null,
+      // Whether "Receber" can work here: the settlement configured, and the
+      // payment methods the operator picks from.
+      settle: config && SgpService.canSettle(config) ? { methods: [...config.settlePaymentMethods] } : null,
       fields,
       notes: client?.notes ?? null,
       registeredAt: client?.registered_at ?? null,

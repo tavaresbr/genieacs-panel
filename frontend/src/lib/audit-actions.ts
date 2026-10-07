@@ -46,6 +46,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'contact.teiah_lookup': 'audit.action.contactTeiahLookup',
   'contact.invoice_sent': 'audit.action.contactInvoiceSent',
   'contact.synced': 'audit.action.contactSynced',
+  'contact.invoice_settled': 'audit.action.contactInvoiceSettled',
   'contacts.exported': 'audit.action.contactsExported',
   'devices.exported': 'audit.action.devicesExported',
   'contacts.imported': 'audit.action.contactsImported',

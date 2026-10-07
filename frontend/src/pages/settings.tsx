@@ -257,6 +257,10 @@ export default function Settings() {
     invoiceLimit: 6,
     ticketEnabled: false,
     ticketOccurrenceType: 5,
+    settleReceivingPoint: 0,
+    settlePaymentMethods: '',
+    settleFees: 0,
+    settlePath: '',
     sample: ''
   })
   const [sgpSaving, setSgpSaving] = useState(false)
@@ -413,7 +417,11 @@ export default function Settings() {
           portalUnlock: config.portalUnlock,
           invoiceLimit: config.invoiceLimit,
           ticketEnabled: config.ticketEnabled,
-          ticketOccurrenceType: config.ticketOccurrenceType
+          ticketOccurrenceType: config.ticketOccurrenceType,
+          settleReceivingPoint: config.settleReceivingPoint ?? 0,
+          settlePaymentMethods: (config.settlePaymentMethods ?? []).join(', '),
+          settleFees: config.settleFees ?? 0,
+          settlePath: config.endpoints?.invoiceSettle ?? ''
         }))
         if (primeiraVez) setSgpTestResult(null)
       }
@@ -513,7 +521,11 @@ export default function Settings() {
         portalUnlock: sgpForm.portalUnlock,
         invoiceLimit: sgpForm.invoiceLimit,
         ticketEnabled: sgpForm.ticketEnabled,
-        ticketOccurrenceType: sgpForm.ticketOccurrenceType
+        ticketOccurrenceType: sgpForm.ticketOccurrenceType,
+        settleReceivingPoint: sgpForm.settleReceivingPoint,
+        settlePaymentMethods: sgpForm.settlePaymentMethods.split(',').map((entry) => entry.trim()).filter(Boolean),
+        settleFees: sgpForm.settleFees,
+        ...(sgpForm.settlePath.trim() ? { endpoints: { invoiceSettle: sgpForm.settlePath.trim() } as SgpConfig['endpoints'] } : {})
       })
       if (res.success && res.data) {
         const salvo = res.data
@@ -2411,6 +2423,56 @@ export default function Settings() {
                   </p>
                 </div>
               )}
+
+              <fieldset className="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2">
+                <legend className="px-1 font-semibold">{t('settings.sgp.settle')}</legend>
+                <p className="text-sm leading-6 text-muted-foreground sm:col-span-2">{t('settings.sgp.settleHint')}</p>
+                <div>
+                  <label htmlFor="sgp-settle-point" className="field-label">{t('settings.sgp.settleReceivingPoint')}</label>
+                  <input
+                    id="sgp-settle-point"
+                    type="number"
+                    min={0}
+                    className="modern-input w-full"
+                    value={sgpForm.settleReceivingPoint || ''}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, settleReceivingPoint: Math.max(Number(event.target.value) || 0, 0) }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="sgp-settle-fees" className="field-label">{t('settings.sgp.settleFees')}</label>
+                  <input
+                    id="sgp-settle-fees"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="modern-input w-full"
+                    value={sgpForm.settleFees}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, settleFees: Math.max(Number(event.target.value) || 0, 0) }))}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="sgp-settle-methods" className="field-label">{t('settings.sgp.settlePaymentMethods')}</label>
+                  <input
+                    id="sgp-settle-methods"
+                    type="text"
+                    className="modern-input w-full"
+                    value={sgpForm.settlePaymentMethods}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, settlePaymentMethods: event.target.value }))}
+                  />
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.settlePaymentMethodsHint')}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="sgp-settle-path" className="field-label">{t('settings.sgp.settlePath')}</label>
+                  <input
+                    id="sgp-settle-path"
+                    type="text"
+                    className="modern-input w-full font-mono"
+                    value={sgpForm.settlePath}
+                    placeholder="/api/banco/titulo/{id}/baixar/"
+                    onChange={(event) => setSgpForm((current) => ({ ...current, settlePath: event.target.value }))}
+                  />
+                </div>
+              </fieldset>
 
               <div>
                 <label htmlFor="sgp-sample" className="field-label">{t('settings.sgp.sample')}</label>

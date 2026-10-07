@@ -450,6 +450,9 @@ export default {
   'sgp.error.blockedHost': 'SGP の URL は、このインストールから到達できないアドレスを指しています',
   'sgp.error.pathsRelative': 'SGP の API のパスは /api/ura/titulos/ のような相対パスで指定してください',
   'sgp.error.pathPlaceholder': 'パスに {{url}} のような Postman の変数は使えません。SGP のアドレスは URL 欄から取得されます。例: /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': '請求書の消込が未設定です: SGP 連携で受付窓口（レジ）を設定してください',
+  'sgp.error.invoiceIdMissing': 'SGP がこの請求書の ID を送信しなかったため、ここでは消込できません',
+  'sgp.error.settlePathId': '消込パスには請求書 ID を含める必要があります（例: /api/banco/titulo/{id}/baixar/）',
   'sgp.error.configIncomplete': '連携を有効にする前に、SGP の URL、アプリ、トークンを入力してください',
   'sgp.error.notConfigured': 'SGP 連携が設定されていません',
   'sgp.error.customerListNotConfigured': 'SGP の顧客一覧のパスが設定されていません。設定 → SGP で入力してください。',
@@ -1094,6 +1097,9 @@ export default {
   'contacts.import.googleApplied': 'Google連絡先をインポートしました: {created} 件作成',
   'contacts.synced': '顧客を同期しました',
   'contacts.syncFailed': '顧客を同期できませんでした',
+  'contacts.invoiceSettled': 'SGP で請求書を消込しました',
+  'contacts.invoiceSettleFailed': '請求書を消込できませんでした',
+  'contacts.settleReceipt.text': '{due} 期限の請求書（契約 {contract}）について、{date} に {method} で {amount} の入金を確認しました。ありがとうございました！',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid の設定を読み込みました',

@@ -451,6 +451,9 @@ export default {
   'sgp.error.blockedHost': 'Адрес SGP указывает на адрес, недоступный для этой установки',
   'sgp.error.pathsRelative': 'Пути API SGP должны быть относительными, например /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'Переменные Postman, такие как {{url}}, в пути не допускаются; адрес SGP берётся из поля URL. Используйте, например, /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': 'Погашение счетов не настроено: укажите пункт приёма (кассу) в интеграции SGP',
+  'sgp.error.invoiceIdMissing': 'SGP не передал id этого счёта, поэтому погасить его здесь нельзя',
+  'sgp.error.settlePathId': 'Путь погашения должен содержать id счёта, например /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'Укажите адрес, приложение и токен SGP, прежде чем включать интеграцию',
   'sgp.error.notConfigured': 'Интеграция с SGP не настроена',
   'sgp.error.customerListNotConfigured': 'Путь списка клиентов SGP не задан. Укажите его в Настройки → SGP.',
@@ -1095,6 +1098,9 @@ export default {
   'contacts.import.googleApplied': 'Контакты Google импортированы: создано {created}',
   'contacts.synced': 'Клиент синхронизирован',
   'contacts.syncFailed': 'Не удалось синхронизировать клиента',
+  'contacts.invoiceSettled': 'Счёт погашен в SGP',
+  'contacts.invoiceSettleFailed': 'Не удалось погасить счёт',
+  'contacts.settleReceipt.text': 'Подтверждаем получение {amount} по счёту со сроком {due} (договор {contract}), оплачено {date} через {method}. Спасибо!',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Настройки TeiaH Valid загружены',

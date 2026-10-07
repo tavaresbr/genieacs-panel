@@ -451,6 +451,9 @@ export default {
   'sgp.error.blockedHost': 'The SGP URL points to an address this deployment is not allowed to reach',
   'sgp.error.pathsRelative': 'The SGP API paths must be relative, such as /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'Postman variables such as {{url}} are not allowed in the path; the SGP address comes from the URL field. Use, for example, /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': 'Invoice settlement is not configured: set the receiving point (cash desk) in the SGP integration',
+  'sgp.error.invoiceIdMissing': 'SGP did not send this invoice\'s id, so it cannot be settled from here',
+  'sgp.error.settlePathId': 'The settlement path must contain the invoice id, as in /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'Enter the SGP URL, app, and token before enabling the integration',
   'sgp.error.notConfigured': 'The SGP integration is not configured',
   'sgp.error.customerListNotConfigured': 'The SGP client listing path is not set. Fill it in under Settings → SGP.',
@@ -1094,6 +1097,9 @@ export default {
   'contacts.import.googleApplied': 'Google contacts imported: {created} created',
   'contacts.synced': 'Client synchronized',
   'contacts.syncFailed': 'Could not synchronize the client',
+  'contacts.invoiceSettled': 'Invoice settled on SGP',
+  'contacts.invoiceSettleFailed': 'Could not settle the invoice',
+  'contacts.settleReceipt.text': 'We confirm receipt of {amount} for the invoice due {due} (contract {contract}), paid on {date} via {method}. Thank you!',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid configuration loaded',

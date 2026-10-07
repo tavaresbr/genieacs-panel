@@ -64,7 +64,11 @@ class SgpController {
         contactsPageSize: body.contactsPageSize,
         contactsPaging: body.contactsPaging,
         contactsOffsetParam: body.contactsOffsetParam,
-        contactsLimitParam: body.contactsLimitParam
+        contactsLimitParam: body.contactsLimitParam,
+        // The "Receber" button on a client record: where the money goes.
+        settleReceivingPoint: body.settleReceivingPoint,
+        settlePaymentMethods: body.settlePaymentMethods,
+        settleFees: body.settleFees
         // `webhookSecret` is deliberately not accepted here: it is only ever
         // set through the rotate action, which shows it once.
       });
