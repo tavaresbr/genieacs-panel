@@ -3544,6 +3544,11 @@ export interface ContactWhatsappImportResult {
   created?: number
 }
 
+/** What importing a Google Contacts export (CSV, Outlook CSV or vCard) did — or would do. */
+export interface ContactGoogleImportResult extends ContactWhatsappImportResult {
+  format: 'google' | 'outlook' | 'vcard'
+}
+
 export const contactsAPI = {
   get: (key: string) =>
     apiClient.get<ContactProfile>(`/contacts/${encodeURIComponent(key)}`),
@@ -3581,7 +3586,7 @@ export const contactsAPI = {
 
   /** `preview` says what the sheet would change; `apply` changes it. */
   importSheet: (csv: string, mode: 'preview' | 'apply') =>
-    apiClient.postText<ContactImportResult>(`/contacts/import?mode=${mode}`, csv),
+    apiClient.postText<ContactImportResult | ContactGoogleImportResult>(`/contacts/import?mode=${mode}`, csv),
 
   /** The phone book of the connected WhatsApp: `preview` lists who is new; `apply` creates them. */
   importWhatsapp: (mode: 'preview' | 'apply') =>
@@ -5015,7 +5020,7 @@ export interface WhatsAppContact {
   phone: string | null
   phoneSource: 'manual' | 'sgp' | null
   /** Where an imported client came from; null for what the SGP brought or the team typed. */
-  importSource?: 'whatsapp' | 'sheet' | null
+  importSource?: 'whatsapp' | 'sheet' | 'google' | null
   /** Blocked for everything. */
   optedOut: boolean
   /** Blocked only for these kinds; `null` when not blocked or blocked for everything. */

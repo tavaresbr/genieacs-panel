@@ -1091,6 +1091,8 @@ export default {
   'contacts.import.rowNoName': 'Новый клиент без имени',
   'contacts.import.whatsappPreviewed': 'Предпросмотр контактов WhatsApp готов',
   'contacts.import.whatsappApplied': 'Контакты WhatsApp импортированы: создано {created}',
+  'contacts.import.googlePreviewed': 'Предпросмотр контактов Google готов',
+  'contacts.import.googleApplied': 'Контакты Google импортированы: создано {created}',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Настройки TeiaH Valid загружены',
