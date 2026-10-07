@@ -7,6 +7,7 @@ import {
   type WhatsAppCampaignFilters,
   type WhatsAppCampaignOption,
   type WhatsAppCampaignPreview,
+  type WhatsAppAccount,
   type WhatsAppTemplate
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
@@ -59,6 +60,8 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
 
   const [options, setOptions] = useState<WhatsAppCampaignAudienceOptions | null>(null)
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
+  const [accounts, setAccounts] = useState<WhatsAppAccount[]>([])
+  const [accountId, setAccountId] = useState('')
   const [perHour, setPerHour] = useState(0)
 
   const [title, setTitle] = useState('')
@@ -80,12 +83,20 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
   useEffect(() => {
     let alive = true
     void (async () => {
-      const [opts, tpls, config] = await Promise.all([
+      const [opts, tpls, config, accs] = await Promise.all([
         whatsappAPI.getCampaignAudienceOptions(),
         whatsappAPI.listTemplates(),
-        whatsappAPI.getConfig()
+        whatsappAPI.getConfig(),
+        whatsappAPI.listAccounts()
       ])
       if (!alive) return
+      if (accs.success && accs.data) {
+        const connected = accs.data.filter((acc) => acc.status === 'connected')
+        setAccounts(connected)
+        // Pré-seleciona o número de cobrança (ou o padrão), o que sai hoje.
+        const preferred = connected.find((acc) => acc.purpose === 'billing') ?? connected.find((acc) => acc.isDefault) ?? connected[0]
+        if (preferred) setAccountId(String(preferred.id))
+      }
       if (opts.success && opts.data) setOptions(opts.data)
       else toast.error(whatsappErrorMessage(t, opts.code))
       if (tpls.success && tpls.data) {
@@ -182,7 +193,8 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
         filters,
         ...message,
         attachment,
-        scheduledAt: scheduledIso
+        scheduledAt: scheduledIso,
+        accountId: accountId ? Number(accountId) : null
       })
       if (!res.success || !res.data) {
         toast.error(errorText(res, t, 'whatsapp.campaign.createFailed'))
@@ -352,6 +364,25 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
             )}
             <p className="field-hint">{t('whatsapp.campaign.attachmentHint')}</p>
           </div>
+
+          {accounts.length > 0 && (
+            <div className="space-y-2">
+              <label className="field-label" htmlFor="campaign-account">{t('whatsapp.campaign.sendFrom')}</label>
+              <select
+                id="campaign-account"
+                className="modern-input w-full"
+                value={accountId}
+                onChange={(event) => setAccountId(event.target.value)}
+              >
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.label || acc.name}{acc.phoneE164 ? ` · +${acc.phoneE164}` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="field-hint">{t('whatsapp.campaign.sendFromHint')}</p>
+            </div>
+          )}
 
           <fieldset className="space-y-2">
             <legend className="field-label mb-2">{t('whatsapp.campaign.when')}</legend>

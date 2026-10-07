@@ -2560,6 +2560,8 @@ const ar: Dictionary = {
   'whatsapp.campaign.addAttachment': 'إرفاق صورة أو PDF',
   'whatsapp.campaign.removeAttachment': 'إزالة',
   'whatsapp.campaign.attachmentHint': 'يُرسل الملف نفسه مع كل رسالة. حتى 16 ميغابايت.',
+  'whatsapp.campaign.sendFrom': 'إرسال من الرقم',
+  'whatsapp.campaign.sendFromHint': 'يُرسل التنبيه من رقم واتساب هذا. تظهر الأرقام المتصلة فقط.',
   'whatsapp.campaign.when': 'متى',
   'whatsapp.campaign.whenDraft': 'حفظ كمسودة (تبدأ عندما يضغط أحدهم «بدء»)',
   'whatsapp.campaign.whenSchedule': 'جدولة في',

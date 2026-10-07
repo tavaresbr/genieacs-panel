@@ -2585,6 +2585,8 @@ const ko: Dictionary = {
   'whatsapp.campaign.addAttachment': '이미지 또는 PDF 첨부',
   'whatsapp.campaign.removeAttachment': '제거',
   'whatsapp.campaign.attachmentHint': '같은 파일이 모든 메시지에 첨부됩니다. 최대 16MB.',
+  'whatsapp.campaign.sendFrom': '발신 번호',
+  'whatsapp.campaign.sendFromHint': '이 WhatsApp 번호로 안내가 발송됩니다. 연결된 번호만 표시됩니다.',
   'whatsapp.campaign.when': '시기',
   'whatsapp.campaign.whenDraft': '초안으로 저장(누군가 시작을 누르면 시작)',
   'whatsapp.campaign.whenSchedule': '예약 일시',

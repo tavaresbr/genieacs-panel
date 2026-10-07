@@ -340,6 +340,25 @@ class WaCampaignService {
     };
   }
 
+  /**
+   * O número que envia a campanha: o escolhido na tela (precisa estar
+   * conectado) ou, sem escolha, o de sempre — o da cobrança.
+   */
+  static async resolveAccount(accountId) {
+    if (accountId === undefined || accountId === null || accountId === '') {
+      return WhatsAppAccount.getForPurpose('billing');
+    }
+    const id = Number(accountId);
+    const account = Number.isInteger(id) ? await WhatsAppAccount.getById(id) : null;
+    if (!account) {
+      throw new WaError('whatsapp.error.noAccount', { code: 'account_not_found', status: 404 });
+    }
+    if (account.status !== 'connected') {
+      throw new WaError('whatsapp.error.noAccount', { code: 'account_not_connected', status: 409 });
+    }
+    return account;
+  }
+
   static lerAgendamento(valor) {
     if (valor === undefined || valor === null || valor === '') return null;
     const quando = new Date(valor);
@@ -357,7 +376,7 @@ class WaCampaignService {
    * agendada (`queued` com `scheduled_at`; o laço de `WaBroadcastService` a
    * inicia na hora).
    */
-  static async create({ title, filters, templateId, body, attachment, scheduledAt, userId = null } = {}) {
+  static async create({ title, filters, templateId, body, attachment, scheduledAt, accountId = null, userId = null } = {}) {
     const agendada = this.lerAgendamento(scheduledAt);
     const anexo = attachment ? normalizeAttachment(attachment) : null;
     const mensagem = await this.resolveMessage({ templateId, body });
@@ -377,7 +396,7 @@ class WaCampaignService {
     }
 
     const config = await WhatsAppConfigService.getConfig();
-    const account = await WhatsAppAccount.getForPurpose('billing');
+    const account = await this.resolveAccount(accountId);
     const broadcast = await WaBroadcast.create({
       title: String(title || `Campanha ${comoDataBr(new Date())}`).trim().slice(0, TITLE_LIMIT),
       template_id: mensagem.templateId,

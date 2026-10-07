@@ -2463,6 +2463,8 @@ const de: Dictionary = {
   'whatsapp.campaign.addAttachment': 'Bild oder PDF anhängen',
   'whatsapp.campaign.removeAttachment': 'Entfernen',
   'whatsapp.campaign.attachmentHint': 'Dieselbe Datei geht mit jeder Nachricht. Bis 16 MB.',
+  'whatsapp.campaign.sendFrom': 'Senden über Nummer',
+  'whatsapp.campaign.sendFromHint': 'Die Mitteilung geht über diese WhatsApp-Nummer raus. Nur verbundene Nummern werden angezeigt.',
   'whatsapp.campaign.when': 'Wann',
   'whatsapp.campaign.whenDraft': 'Als Entwurf speichern (startet, wenn jemand auf Starten klickt)',
   'whatsapp.campaign.whenSchedule': 'Planen für',

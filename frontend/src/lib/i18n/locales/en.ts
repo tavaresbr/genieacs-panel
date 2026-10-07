@@ -2582,6 +2582,8 @@ const en = {
   'whatsapp.campaign.addAttachment': 'Attach image or PDF',
   'whatsapp.campaign.removeAttachment': 'Remove',
   'whatsapp.campaign.attachmentHint': 'The same file goes with every message. Up to 16 MB.',
+  'whatsapp.campaign.sendFrom': 'Send from number',
+  'whatsapp.campaign.sendFromHint': 'The notice goes out from this WhatsApp number. Only connected numbers are listed.',
   'whatsapp.campaign.when': 'When',
   'whatsapp.campaign.whenDraft': 'Save as draft (starts when someone presses Start)',
   'whatsapp.campaign.whenSchedule': 'Schedule for',

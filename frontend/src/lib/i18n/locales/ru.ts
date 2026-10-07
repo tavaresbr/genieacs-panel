@@ -2587,6 +2587,8 @@ const ru: Dictionary = {
   'whatsapp.campaign.addAttachment': 'Прикрепить изображение или PDF',
   'whatsapp.campaign.removeAttachment': 'Удалить',
   'whatsapp.campaign.attachmentHint': 'Один и тот же файл уходит с каждым сообщением. До 16 МБ.',
+  'whatsapp.campaign.sendFrom': 'Отправить с номера',
+  'whatsapp.campaign.sendFromHint': 'Сообщение уйдёт с этого номера WhatsApp. Показаны только подключённые номера.',
   'whatsapp.campaign.when': 'Когда',
   'whatsapp.campaign.whenDraft': 'Сохранить как черновик (запустится, когда кто-то нажмёт «Запустить»)',
   'whatsapp.campaign.whenSchedule': 'Запланировать на',

@@ -2554,6 +2554,8 @@ const ja: Dictionary = {
   'whatsapp.campaign.addAttachment': '画像または PDF を添付',
   'whatsapp.campaign.removeAttachment': '削除',
   'whatsapp.campaign.attachmentHint': '同じファイルが各メッセージに付きます。16 MB まで。',
+  'whatsapp.campaign.sendFrom': '送信元の番号',
+  'whatsapp.campaign.sendFromHint': 'この WhatsApp 番号からお知らせを送信します。接続済みの番号のみ表示されます。',
   'whatsapp.campaign.when': '送信時期',
   'whatsapp.campaign.whenDraft': '下書きとして保存（誰かが「開始」を押すと始まります）',
   'whatsapp.campaign.whenSchedule': '予約日時',

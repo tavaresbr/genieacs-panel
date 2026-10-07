@@ -2560,6 +2560,8 @@ const hi: Dictionary = {
   'whatsapp.campaign.addAttachment': 'छवि या PDF जोड़ें',
   'whatsapp.campaign.removeAttachment': 'हटाएँ',
   'whatsapp.campaign.attachmentHint': 'हर संदेश के साथ वही फ़ाइल जाती है। 16 MB तक।',
+  'whatsapp.campaign.sendFrom': 'इस नंबर से भेजें',
+  'whatsapp.campaign.sendFromHint': 'सूचना इसी WhatsApp नंबर से जाएगी। केवल कनेक्टेड नंबर दिखते हैं।',
   'whatsapp.campaign.when': 'कब',
   'whatsapp.campaign.whenDraft': 'ड्राफ़्ट के रूप में सहेजें (कोई शुरू दबाए तब शुरू होगा)',
   'whatsapp.campaign.whenSchedule': 'इसके लिए शेड्यूल करें',

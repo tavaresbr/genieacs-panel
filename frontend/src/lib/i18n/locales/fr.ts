@@ -2370,6 +2370,8 @@ const fr: Dictionary = {
   'whatsapp.campaign.addAttachment': 'Joindre une image ou un PDF',
   'whatsapp.campaign.removeAttachment': 'Retirer',
   'whatsapp.campaign.attachmentHint': 'Le même fichier accompagne chaque message. Jusqu’à 16 Mo.',
+  'whatsapp.campaign.sendFrom': 'Envoyer depuis le numéro',
+  'whatsapp.campaign.sendFromHint': 'L’avis part de ce numéro WhatsApp. Seuls les numéros connectés sont listés.',
   'whatsapp.campaign.when': 'Quand',
   'whatsapp.campaign.whenDraft': 'Enregistrer comme brouillon (démarre quand quelqu’un clique sur Démarrer)',
   'whatsapp.campaign.whenSchedule': 'Planifier pour',
