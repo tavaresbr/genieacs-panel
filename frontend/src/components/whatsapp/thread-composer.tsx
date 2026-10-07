@@ -26,6 +26,7 @@ import {
   type QuickReply,
   type QuickReplyVars
 } from '@/lib/quick-replies'
+import { groupTemplates, type PickableTemplate } from '@/lib/template-picker'
 import type { MetaWindow } from '@/lib/wa-meta-window'
 import { isAudioType } from '@/lib/wa-audio'
 import { VoiceRecorder, canRecordAudio } from '@/components/whatsapp/voice-recorder'
@@ -69,6 +70,17 @@ interface ThreadComposerProps {
    * atendente lê, corrige e aperta Enviar. Ausente, o botão não aparece.
    */
   onSuggest?: () => Promise<string | null>
+  /**
+   * O botão "Modelos": todos os modelos ativos do painel. `null` quando quem
+   * está logado não pode listá-los — aí o botão não aparece.
+   */
+  templates?: PickableTemplate[] | null
+  /**
+   * O texto do modelo já preenchido para esta conversa (pela conversa ou, com
+   * variável de fatura, pelo servidor). `null` = não deu; quem chama avisa.
+   * Nada é enviado: o texto vai para a caixa.
+   */
+  onPickTemplate?: (template: PickableTemplate) => Promise<string | null>
 }
 
 /**
@@ -120,7 +132,7 @@ const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).
  * modo nota continua ligado, porque o resto do lote ainda é nota e virar
  * resposta no meio do caminho é justamente a direção perigosa.
  */
-export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate, onSuggest }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate, onSuggest, templates = null, onPickTemplate }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
@@ -130,6 +142,8 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
   const [progress, setProgress] = useState<{ n: number; total: number } | null>(null)
   const [dragging, setDragging] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [picking, setPicking] = useState<number | null>(null)
   // Lido uma vez: o navegador não ganha nem perde microfone com a aba aberta.
   const [canRecord] = useState(canRecordAudio)
   const boxRef = useRef<HTMLTextAreaElement>(null)
@@ -183,6 +197,27 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
 
   // Troca o "/texto" (ou o que estiver na caixa, pelo botão) pela resposta já
   // preenchida. Não envia: o atendente revisa e aperta Enviar.
+  // O modelo escolhido entra como a resposta rápida: substitui a caixa vazia
+  // ou vai numa linha nova depois do que já estava escrito. Não envia.
+  const putInBox = (texto: string) => {
+    setBody((atual) => (atual.trim() ? `${atual.trimEnd()}\n${texto}` : texto))
+    setIsNote(false)
+    boxRef.current?.focus()
+  }
+
+  const chooseTemplate = async (item: PickableTemplate) => {
+    if (!onPickTemplate || picking !== null) return
+    setPicking(item.id)
+    try {
+      const texto = await onPickTemplate(item)
+      if (texto === null) return
+      setTemplatesOpen(false)
+      putInBox(texto)
+    } finally {
+      setPicking(null)
+    }
+  }
+
   const chooseQuickReply = (item: QuickReply) => {
     const filled = fillQuickReply(item.body, quickReplyVars)
     setBody(pickerByButton && body.trim() && slashQuery === null ? `${body.trimEnd()}\n${filled}` : filled)
@@ -477,6 +512,18 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
         </div>
       )}
 
+      {templatesOpen && templates !== null && (
+        <TemplatePicker
+          templates={templates}
+          picking={picking}
+          onChoose={(item) => void chooseTemplate(item)}
+          onClose={() => {
+            setTemplatesOpen(false)
+            boxRef.current?.focus()
+          }}
+        />
+      )}
+
       {items.length === 0 ? (
         // Arrastar e Ctrl+V não existem no celular: a dica só aparece onde vale.
         <p className="field-hint hidden sm:block">{t('whatsapp.inbox.attachHint')}</p>
@@ -570,12 +617,32 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
                 else {
                   setPickerByButton(true)
                   setActiveRaw(0)
+                  setTemplatesOpen(false)
                 }
                 boxRef.current?.focus()
               }}
             >
               <Icon name="chat" size={16} />
               <span className="hidden @4xl:inline">{t('whatsapp.quickReplies.button')}</span>
+            </button>
+          )}
+          {templates !== null && onPickTemplate && (
+            <button
+              type="button"
+              className="modern-button-secondary shrink-0 px-3 sm:px-4"
+              aria-label={t('whatsapp.templatePicker.button')}
+              title={t('whatsapp.templatePicker.button')}
+              aria-pressed={templatesOpen}
+              aria-expanded={templatesOpen}
+              aria-controls={templatesOpen ? 'template-picker' : undefined}
+              disabled={busy}
+              onClick={() => {
+                if (!templatesOpen && pickerOpen) closePicker()
+                setTemplatesOpen(!templatesOpen)
+              }}
+            >
+              <Icon name="document" size={16} />
+              <span className="hidden sm:inline">{t('whatsapp.templatePicker.button')}</span>
             </button>
           )}
           {onSuggest && !isNote && (
@@ -630,6 +697,115 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+const CATEGORY_LABEL = {
+  atendimento: 'whatsapp.templates.categoryAtendimento',
+  cobranca: 'whatsapp.templates.categoryCobranca',
+  suporte: 'whatsapp.templates.categorySuporte',
+  alerta: 'whatsapp.templates.categoryAlerta',
+  geral: 'whatsapp.templates.categoryGeral'
+} as const
+
+/**
+ * A lista do botão "Modelos": busca no topo, os modelos em grupos por
+ * categoria. Setas andam, Enter escolhe, Esc fecha. Um modelo que pede a
+ * fatura fica "carregando" enquanto o servidor relê o SGP.
+ */
+function TemplatePicker({
+  templates,
+  picking,
+  onChoose,
+  onClose
+}: {
+  templates: PickableTemplate[]
+  picking: number | null
+  onChoose: (item: PickableTemplate) => void
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const [query, setQuery] = useState('')
+  const [activeRaw, setActiveRaw] = useState(0)
+  const groups = groupTemplates(templates, query)
+  const flat = groups.flatMap((group) => group.items)
+  const active = Math.min(activeRaw, Math.max(0, flat.length - 1))
+  const temAlgum = templates.some((item) => item.active !== false)
+
+  return (
+    <div id="template-picker" className="mt-1.5 rounded-md border border-border bg-card shadow-xs">
+      <div className="border-b border-border p-2">
+        <input
+          type="search"
+          autoFocus
+          className="modern-input h-9 py-1 text-sm"
+          placeholder={t('whatsapp.templatePicker.search')}
+          aria-label={t('whatsapp.templatePicker.search')}
+          aria-controls="template-picker-list"
+          aria-activedescendant={flat[active] ? `template-pick-${flat[active].id}` : undefined}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value)
+            setActiveRaw(0)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              if (flat.length) setActiveRaw((active + (event.key === 'ArrowDown' ? 1 : flat.length - 1)) % flat.length)
+            } else if (event.key === 'Escape') {
+              event.preventDefault()
+              onClose()
+            } else if (event.key === 'Enter') {
+              event.preventDefault()
+              if (flat[active]) onChoose(flat[active])
+            }
+          }}
+        />
+      </div>
+      {flat.length === 0 ? (
+        <p className="px-3 py-2 text-sm text-muted-foreground">
+          {temAlgum ? t('whatsapp.templatePicker.noMatch', { query }) : t('whatsapp.templatePicker.empty')}
+        </p>
+      ) : (
+        <ul id="template-picker-list" role="listbox" aria-label={t('whatsapp.templatePicker.button')} className="max-h-64 overflow-y-auto py-1">
+          {groups.map((group) => (
+            <li key={group.category} role="presentation">
+              <p className="px-3 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t(CATEGORY_LABEL[group.category])}
+              </p>
+              <ul role="presentation">
+                {group.items.map((item) => {
+                  const index = flat.indexOf(item)
+                  return (
+                    <li
+                      key={item.id}
+                      id={`template-pick-${item.id}`}
+                      role="option"
+                      aria-selected={index === active}
+                      aria-busy={picking === item.id}
+                      className={`cursor-pointer px-3 py-1.5 text-sm ${index === active ? 'bg-muted' : ''} ${picking !== null && picking !== item.id ? 'opacity-60' : ''}`}
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        onChoose(item)
+                      }}
+                      onMouseEnter={() => setActiveRaw(index)}
+                    >
+                      <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                        {picking === item.id && <Icon name="refresh" size={12} className="animate-spin" />}
+                        {item.name}
+                        {picking === item.id && <span className="text-xs font-normal text-muted-foreground">{t('whatsapp.templatePicker.loading')}</span>}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">{item.body}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="border-t border-border px-3 py-1 text-xs text-muted-foreground">{t('whatsapp.templatePicker.hint')}</p>
     </div>
   )
 }

@@ -42,7 +42,8 @@ import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation, useNavigate } from 'react-router'
-import { firstName, type QuickReply } from '@/lib/quick-replies'
+import { fillQuickReply, firstName, type QuickReply } from '@/lib/quick-replies'
+import { needsInvoice, type PickableTemplate } from '@/lib/template-picker'
 import { metaWindowFor } from '@/lib/wa-meta-window'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,12 +101,12 @@ const ASSIGNEE_FILTERS = [
 
 /** The piles, in the order an operator reaches for them. */
 const FILTERS = [
-  ['open', 'whatsapp.inbox.filterOpen'],
+  ['open', 'whatsapp.inbox.filterOpen', 'chat'],
   // Conversas que só receberam envio automático (régua, campanha, alerta):
   // ficam fora de "Abertas" até o cliente responder.
-  ['noreply', 'whatsapp.inbox.filterNoReply'],
-  ['closed', 'whatsapp.inbox.filterClosed'],
-  ['all', 'whatsapp.inbox.filterAll']
+  ['noreply', 'whatsapp.inbox.filterNoReply', 'bell'],
+  ['closed', 'whatsapp.inbox.filterClosed', 'check'],
+  ['all', 'whatsapp.inbox.filterAll', 'menu']
 ] as const
 
 /** The API caps the list at 200 and a thread at 500. */
@@ -170,12 +171,18 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   // Respostas rápidas: os modelos `atendimento`, lidos uma vez. `null` para
   // quem não pode listar modelos — aí nem o "/" nem o botão aparecem.
   const canQuickReply = can('campaigns.read')
-  const [quickReplies, setQuickReplies] = useState<QuickReply[] | null>(null)
+  // Uma leitura só: o botão "Modelos" mostra todos os ativos, e as respostas
+  // rápidas são os da categoria `atendimento` entre eles.
+  const [allTemplates, setAllTemplates] = useState<PickableTemplate[] | null>(null)
+  const quickReplies = useMemo<QuickReply[] | null>(
+    () => (allTemplates === null ? null : allTemplates.filter((row) => row.category === 'atendimento')),
+    [allTemplates]
+  )
   useEffect(() => {
     if (!canQuickReply) return
     let vivo = true
-    void whatsappAPI.listTemplates({ category: 'atendimento' }).then((res) => {
-      if (vivo) setQuickReplies(res.success && Array.isArray(res.data) ? res.data : [])
+    void whatsappAPI.listTemplates().then((res) => {
+      if (vivo) setAllTemplates(res.success && Array.isArray(res.data) ? res.data.filter((row) => row.active) : [])
     })
     return () => {
       vivo = false
@@ -651,6 +658,34 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     }
   }, [submit])
 
+  const quickReplyVars = useMemo(() => ({
+    nome: conversation?.clientName ?? conversation?.pushName ?? null,
+    primeiro_nome: firstName(conversation?.clientName ?? conversation?.pushName),
+    contrato: conversation?.contract ?? null,
+    atendente: user?.username ?? null
+  }), [conversation?.clientName, conversation?.pushName, conversation?.contract, user?.username])
+
+  /**
+   * O botão "Modelos": o texto do modelo preenchido para esta conversa. Com
+   * variável de fatura e contrato vinculado, quem preenche é o servidor, com a
+   * fatura em aberto mais antiga relida no SGP (a mesma conta da 2ª via). Sem
+   * contrato, entra o que a conversa sabe e as variáveis de fatura ficam à
+   * vista, com o aviso de vincular o assinante.
+   */
+  const pickTemplate = useCallback(async (template: PickableTemplate): Promise<string | null> => {
+    if (!conversation) return null
+    if (needsInvoice(template.body)) {
+      if (conversation.contract && can('whatsapp.send')) {
+        const res = await whatsappAPI.subscriberSecondCopy(conversation.id, { contract: conversation.contract, template: String(template.id) })
+        if (res.success && res.data) return res.data.text
+        toast.error(res.message || whatsappErrorMessage(t, res.code))
+        return null
+      }
+      toast.info(t('whatsapp.templatePicker.needsContract'))
+    }
+    return fillQuickReply(template.body, quickReplyVars)
+  }, [conversation, can, toast, t, quickReplyVars])
+
   /**
    * Puts a failed message back in the queue — the SAME row, not a copy.
    *
@@ -792,20 +827,24 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="tab-rail min-w-0 flex-1" role="tablist" aria-label={t('whatsapp.inbox.title')}>
-                    {FILTERS.map(([id, labelKey]) => (
+                  {/* Uma linha só, sempre: quatro pilhas numa coluna estreita
+                      quebravam e a última descia sozinha. Cada aba divide a
+                      largura; no celular fica só o ícone, no computador só o nome. */}
+                  <div className="tab-rail min-w-0 flex-1 flex-nowrap!" role="tablist" aria-label={t('whatsapp.inbox.title')}>
+                    {FILTERS.map(([id, labelKey, icon]) => (
                       <button
                         key={id}
                         type="button"
                         onClick={() => setStatus(id)}
-                        // Quatro pilhas numa coluna estreita: com o respiro
-                        // padrão a última ficava cortada na borda.
-                        className="tab-button px-2"
+                        className="tab-button inline-flex min-w-0 flex-auto items-center justify-center whitespace-nowrap px-1.5 text-xs after:inset-x-1.5!"
                         data-active={status === id}
                         role="tab"
                         aria-selected={status === id}
+                        aria-label={t(labelKey)}
+                        title={t(labelKey)}
                       >
-                        {t(labelKey)}
+                        <Icon name={icon} size={18} className="shrink-0 sm:hidden" />
+                        <span className="truncate max-sm:sr-only">{t(labelKey)}</span>
                       </button>
                     ))}
                   </div>
@@ -904,12 +943,9 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       toast.error(res.message || whatsappErrorMessage(t, res.code))
                       return null
                     } : undefined}
-                    quickReplyVars={{
-                      nome: conversation.clientName ?? conversation.pushName,
-                      primeiro_nome: firstName(conversation.clientName ?? conversation.pushName),
-                      contrato: conversation.contract,
-                      atendente: user?.username ?? null
-                    }}
+                    quickReplyVars={quickReplyVars}
+                    templates={canQuickReply ? allTemplates ?? [] : null}
+                    onPickTemplate={pickTemplate}
                   />
                 </>
               ) : (
