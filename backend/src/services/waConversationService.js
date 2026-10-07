@@ -447,7 +447,14 @@ class WaConversationService {
     const atendentes = await WaAssignmentService.names([conversation.assigned_user_id]);
     const etiquetas = await WaTagService.tagsFor([conversation.id]);
     const aguardando = conversation.closed_at ? new Map() : await this.awaitingSince([conversation.id]);
+    // O mesmo atalho para o cadastro no SGP que a lista traz, pelo cliente
+    // que a sincronização de contatos guardou no contrato (`client_ref`).
+    const doContrato = conversation.contract
+      ? (contact?.contract === conversation.contract ? contact : await SgpContact.getByContract(conversation.contract))
+      : null;
+    const sgpConfig = doContrato?.client_ref ? await SgpService.getConfig() : null;
     return this.publicConversation(conversation, {
+      sgpUrl: sgpConfig?.enabled ? SgpService.clientPageUrl(sgpConfig, doContrato.client_ref) : null,
       tags: etiquetas.get(Number(conversation.id)) ?? [],
       awaitingSince: aguardando.get(Number(conversation.id)) ?? null,
       billing: conversation.contract
