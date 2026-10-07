@@ -7,6 +7,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation } from '@/lib/api'
 import { accountTag } from '@/lib/wa-account-color'
 import { formatDayMonth, getActiveDateFormat } from '@/lib/date-format'
+import { isSafeExternalUrl } from '@/lib/sgp'
 
 /**
  * What to call the person on the other end.
@@ -65,6 +66,8 @@ interface ConversationListProps {
   filtered: boolean
   /** Conversa → minutos esperando gente além do limite (o selo vermelho). */
   waiting?: ReadonlyMap<number, number>
+  /** Quem pode ver o SGP: o número do contrato abre o cadastro do cliente lá. */
+  canOpenSgp?: boolean
 }
 
 /**
@@ -79,7 +82,7 @@ export function minutesSince(iso: string, now = Date.now()): number {
   return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 60_000)) : 0
 }
 
-export function ConversationList({ conversations, accounts, selectedId, onSelect, filtered, waiting }: ConversationListProps) {
+export function ConversationList({ conversations, accounts, selectedId, onSelect, filtered, waiting, canOpenSgp = false }: ConversationListProps) {
   const { t, intlLocale } = useTranslation()
 
   if (conversations.length === 0) {
@@ -205,7 +208,24 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                     {t('whatsapp.assign.waiting')}
                   </span>
                 ) : null}
-                {conversation.contract ? (
+                {conversation.contract && canOpenSgp && isSafeExternalUrl(conversation.sgpUrl ?? null) ? (
+                  // A linha inteira é um <button>, e um <a> dentro dele não é
+                  // HTML válido: o selo abre o SGP pelo clique, sem abrir a
+                  // conversa junto. No teclado, o mesmo link está no Módulo SGP.
+                  <span
+                    role="link"
+                    className="modern-badge cursor-pointer hover:border-primary hover:text-primary hover:underline"
+                    title={t('whatsapp.sgp.openSgp')}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      window.open(conversation.sgpUrl!, '_blank', 'noopener,noreferrer')
+                    }}
+                  >
+                    <Icon name="invoice" size={12} />
+                    <span className="font-mono">{conversation.contract}</span>
+                    <Icon name="external" size={10} />
+                  </span>
+                ) : conversation.contract ? (
                   <span className="modern-badge">
                     <Icon name="invoice" size={12} />
                     <span className="font-mono">{conversation.contract}</span>

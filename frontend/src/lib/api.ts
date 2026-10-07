@@ -4941,6 +4941,8 @@ export interface WhatsAppConversation {
   awaitingSince?: string | null
   /** Em dia, vence hoje ou atrasado, pela última consulta ao SGP; null sem foto. */
   billing?: ConversationBilling | null
+  /** O cadastro do cliente no SGP, quando o id dele já foi sincronizado e o SGP está ligado. */
+  sgpUrl?: string | null
   /** As etiquetas da conversa, em ordem de nome. */
   tags?: WhatsAppTag[]
   createdAt: string | null
