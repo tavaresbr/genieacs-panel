@@ -14,6 +14,7 @@ import AuditLog from '../models/AuditLog.js';
 import Setting from '../models/Setting.js';
 import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
+import Lead from '../models/Lead.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
 import SubscriptionNoticeService from './subscriptionNoticeService.js';
 import MaintenanceService from './maintenanceService.js';
@@ -53,6 +54,41 @@ const USAGE_PEAK_INTERVAL_MS = 10 * 60_000;
 const AUDIT_RETENTION_DEFAULT_DAYS = 365;
 const AUDIT_RETENTION_MIN_DAYS = 30;
 const AUDIT_RETENTION_MAX_DAYS = 3650;
+
+/**
+ * O prazo dos pedidos de contato da vitrine, em dias — e ele nasce DESLIGADO.
+ *
+ * Zero ou ausente quer dizer "para sempre", que é a convenção deste sistema
+ * (ver o leitor do prazo da trilha abaixo, e `waMessageSweeper.retentionDays`).
+ * E aqui o desligado é o padrão de propósito: um `skygenpanel update` que chega
+ * numa instalação em produção não pode começar a apagar linhas que ninguém
+ * escolheu apagar. Quem liga o prazo é quem responde por ele.
+ *
+ * Variável de ambiente, e não linha de configuração, por um motivo técnico:
+ * `Setting` e `AppState` passam por `tdb` e têm chave `(tenant_id, key)` —
+ * lançam fora de escopo de provedor. `leads` é da plataforma e não tem
+ * provedor, então guardar o prazo numa linha exigiria eleger um provedor
+ * arbitrário para hospedá-lo, ou depender de a caixa da plataforma existir, e
+ * ela é um passo opcional (`scripts/create-platform-tenant.js`).
+ *
+ * Os limites: abaixo de 30 dias o prazo apagaria o pedido antes de a equipe
+ * comercial tê-lo trabalhado; acima de 10 anos ele não é prazo.
+ */
+const LEAD_RETENTION_MIN_DAYS = 30;
+const LEAD_RETENTION_MAX_DAYS = 3650;
+
+/** Dias de guarda dos leads, ou zero para "para sempre". */
+export function leadRetentionDays(raw = process.env.LEAD_RETENTION_DAYS) {
+  const bruto = String(raw ?? '').trim();
+  // A mesma regra estrita do prazo da trilha, e pelo mesmo motivo:
+  // `Number.parseInt('12abc')` devolve 12, e um prazo de 12 dias nascido de um
+  // campo digitado errado apagaria dado que ninguém mandou apagar. Aqui isso é
+  // pior do que lá, porque o padrão é não apagar nada.
+  if (!/^[0-9]+$/.test(bruto)) return 0;
+  const n = Number.parseInt(bruto, 10);
+  if (n === 0) return 0;
+  return Math.min(Math.max(n, LEAD_RETENTION_MIN_DAYS), LEAD_RETENTION_MAX_DAYS);
+}
 
 /**
  * The panel's only background worker.
@@ -203,6 +239,7 @@ class SchedulerService {
       }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))
+      .then(() => (prune ? this.pruneLeads() : undefined))
       .finally(() => {
         this.tickPromise = null;
       });
@@ -230,6 +267,32 @@ class SchedulerService {
     });
     await ImpersonationTicket.prune().catch((error) => {
       console.warn(`Could not prune impersonation tickets: ${error.message}`);
+    });
+  }
+
+  /**
+   * Os pedidos de contato da vitrine, podados FORA do laço por provedor — e
+   * pelo mesmo argumento de `pruneTickets`: `leads` não é escopada
+   * (`SHARED_TABLES`), então um `forEveryTenant` a varreria inteira uma vez por
+   * provedor, e num deploy com trinta ISPs isso é trinta varreduras idênticas
+   * por dia.
+   *
+   * Não faz nada quando o prazo está desligado, que é o padrão — e nesse caso
+   * nem consulta o banco. Ver `leadRetentionDays`.
+   *
+   * O número apagado vai para o log quando não é zero: é dado pessoal saindo,
+   * e uma poda silenciosa é a que ninguém consegue auditar depois.
+   */
+  static async pruneLeads() {
+    const dias = leadRetentionDays();
+    if (dias === 0) return;
+    const corte = new Date(Date.now() - dias * 24 * 3600_000);
+    await Lead.prune(corte).then((apagados) => {
+      if (apagados > 0) {
+        console.warn(`Pruned ${apagados} lead(s) older than ${dias} days.`);
+      }
+    }).catch((error) => {
+      console.warn(`Could not prune leads: ${error.message}`);
     });
   }
 
