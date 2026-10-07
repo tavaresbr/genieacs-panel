@@ -101,12 +101,12 @@ const ASSIGNEE_FILTERS = [
 
 /** The piles, in the order an operator reaches for them. */
 const FILTERS = [
-  ['open', 'whatsapp.inbox.filterOpen'],
+  ['open', 'whatsapp.inbox.filterOpen', 'chat'],
   // Conversas que só receberam envio automático (régua, campanha, alerta):
   // ficam fora de "Abertas" até o cliente responder.
-  ['noreply', 'whatsapp.inbox.filterNoReply'],
-  ['closed', 'whatsapp.inbox.filterClosed'],
-  ['all', 'whatsapp.inbox.filterAll']
+  ['noreply', 'whatsapp.inbox.filterNoReply', 'bell'],
+  ['closed', 'whatsapp.inbox.filterClosed', 'check'],
+  ['all', 'whatsapp.inbox.filterAll', 'menu']
 ] as const
 
 /** The API caps the list at 200 and a thread at 500. */
@@ -827,20 +827,24 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="tab-rail min-w-0 flex-1" role="tablist" aria-label={t('whatsapp.inbox.title')}>
-                    {FILTERS.map(([id, labelKey]) => (
+                  {/* Uma linha só, sempre: quatro pilhas numa coluna estreita
+                      quebravam e a última descia sozinha. Cada aba divide a
+                      largura; no celular fica só o ícone, no computador só o nome. */}
+                  <div className="tab-rail min-w-0 flex-1 flex-nowrap!" role="tablist" aria-label={t('whatsapp.inbox.title')}>
+                    {FILTERS.map(([id, labelKey, icon]) => (
                       <button
                         key={id}
                         type="button"
                         onClick={() => setStatus(id)}
-                        // Quatro pilhas numa coluna estreita: com o respiro
-                        // padrão a última ficava cortada na borda.
-                        className="tab-button px-2"
+                        className="tab-button inline-flex min-w-0 flex-auto items-center justify-center whitespace-nowrap px-1.5 text-xs after:inset-x-1.5!"
                         data-active={status === id}
                         role="tab"
                         aria-selected={status === id}
+                        aria-label={t(labelKey)}
+                        title={t(labelKey)}
                       >
-                        {t(labelKey)}
+                        <Icon name={icon} size={18} className="shrink-0 sm:hidden" />
+                        <span className="truncate max-sm:sr-only">{t(labelKey)}</span>
                       </button>
                     ))}
                   </div>
