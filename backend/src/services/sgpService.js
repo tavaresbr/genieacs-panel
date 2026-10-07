@@ -1394,9 +1394,14 @@ class SgpService {
         details: asText(pick(data || {}, ['msg', 'mensagem', 'message', 'erro'])) || undefined
       });
     }
-    if (data === null && acceptText && text.trim()) {
-      // Some SGP write routes answer a bare sentence ("... gerado com sucesso").
-      return { message: text.trim().replace(/^['"]|['"]$/g, '').slice(0, 300) };
+    if (data === null && acceptText) {
+      // A 2xx from a write route is the write done, whatever the body: some
+      // SGP routes answer a bare sentence ("... gerado com sucesso"), the
+      // settlement answers nothing at all (or a 204), and a page of HTML is no
+      // message to show anyone.
+      const body = text.trim();
+      if (!body || body.startsWith('<')) return { message: null };
+      return { message: body.replace(/^['"]|['"]$/g, '').slice(0, 300) };
     }
     if (data === null) {
       throw new SgpError('sgp.error.invalidResponse', {
