@@ -717,6 +717,7 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
               duplicated: google.duplicated,
               invalid: google.invalid
             })}</p>
+            {google.defaultDdd && <p className="text-muted-foreground">{t('contacts.sheet.googleDdd', { ddd: google.defaultDdd })}</p>}
             {google.truncated && <p className="text-muted-foreground">{t('contacts.sheet.whatsappTruncated', { max: google.maxCreates })}</p>}
             {google.rows.length === 0 ? (
               <p className="text-muted-foreground">{t('contacts.sheet.googleEmpty')}</p>

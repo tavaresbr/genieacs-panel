@@ -191,6 +191,7 @@ const ar: Dictionary = {
   'contacts.sheet.googleHint': 'يقبل أيضًا جهات اتصال Gmail: من contacts.google.com، تصدير ← Google CSV أو Outlook CSV أو vCard. تُضاف جهات الاتصال الجديدة فقط؛ ويتم تخطي الموجودة في اللوحة.',
   'contacts.sheet.googleSummary': '{file}: {total} جهة اتصال من Google — {creates} جديدة، {existing} موجودة في اللوحة (متخطاة)، {duplicated} مكررة، {invalid} بلا هاتف.',
   'contacts.sheet.googleEmpty': 'لا توجد جهات اتصال جديدة في هذا الملف.',
+  'contacts.sheet.googleDdd': 'الأرقام بلا رمز منطقة تحصل على {ddd}، الأكثر شيوعًا في الملف.',
   'contacts.sheet.whatsappTruncated': 'يُستورد أول {max} جهة اتصال جديدة فقط؛ أعد التشغيل للباقي.',
   'contacts.sheet.whatsappEmpty': 'لا أحد جديد في الدفتر.',
   'contacts.sheet.whatsappFailed': 'تعذّرت قراءة جهات اتصال واتساب',

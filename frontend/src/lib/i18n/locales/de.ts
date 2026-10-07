@@ -191,6 +191,7 @@ const de: Dictionary = {
   'contacts.sheet.googleHint': 'Akzeptiert auch Gmail-Kontakte: unter contacts.google.com Exportieren → Google-CSV, Outlook-CSV oder vCard. Aus dieser Datei kommen nur neue Kontakte; bereits vorhandene werden übersprungen.',
   'contacts.sheet.googleSummary': '{file}: {total} Google-Kontakte — {creates} neu, {existing} bereits im Panel (übersprungen), {duplicated} doppelt, {invalid} ohne Telefon.',
   'contacts.sheet.googleEmpty': 'Keine neuen Kontakte in dieser Datei.',
+  'contacts.sheet.googleDdd': 'Nummern ohne Vorwahl erhalten {ddd}, die häufigste in der Datei.',
   'contacts.sheet.whatsappTruncated': 'Es werden nur die ersten {max} neuen Kontakte importiert; für den Rest erneut ausführen.',
   'contacts.sheet.whatsappEmpty': 'Niemand Neues im Adressbuch.',
   'contacts.sheet.whatsappFailed': 'WhatsApp-Kontakte konnten nicht gelesen werden',

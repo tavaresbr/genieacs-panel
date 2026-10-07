@@ -193,6 +193,7 @@ const en = {
   'contacts.sheet.googleHint': 'Also accepts Gmail contacts: at contacts.google.com, Export → Google CSV, Outlook CSV or vCard. Only new contacts come in from that file; anyone already in the panel is skipped.',
   'contacts.sheet.googleSummary': '{file}: {total} Google contacts — {creates} new, {existing} already in the panel (skipped), {duplicated} repeated, {invalid} without a phone.',
   'contacts.sheet.googleEmpty': 'No new contacts in this file.',
+  'contacts.sheet.googleDdd': 'Numbers without an area code get {ddd}, the most common one in the file.',
   'contacts.sheet.whatsappTruncated': 'Only the first {max} new contacts are imported; run it again for the rest.',
   'contacts.sheet.whatsappEmpty': 'Nobody new in the phone book.',
   'contacts.sheet.whatsappFailed': 'Could not read the WhatsApp contacts',

@@ -134,6 +134,40 @@ describe('outros formatos do Google Contatos', () => {
   });
 });
 
+describe('o CSV do Outlook como o Gmail exporta', () => {
+  // Números como a agenda de um provedor os guarda: com o zero do tronco, com
+  // o código da operadora e sem DDD; o endereço nas colunas Home.
+  const AGENDA = [
+    'First Name,Middle Name,Last Name,Notes,E-mail Address,Primary Phone,Home Phone,Mobile Phone,Home Street,Home City,Home State,Home Postal Code,Business Phone,Other Phone,Car Phone',
+    'Gil,,Tronco,,,,,(093) 99222-0010,Rua B 20,Santarém,PA,68005-000,,,',
+    'Hugo,,Operadora,,,,,(0 41 93) 99222-0011,,,,,,,',
+    'Iris,,Sem DDD,,,,,99222-0012,,,,,,,',
+    'Jair,,Fixo Sem DDD,,,,3522-0013,,,,,,,,',
+    'Kel,,Curto,,,,,*144,,,,,,,'
+  ].join('\r\n');
+
+  it('tira o zero e a operadora, e dá aos números sem DDD o DDD mais comum do arquivo', async () => {
+    const res = await importar(AGENDA, 'preview');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.format, 'outlook');
+    assert.equal(res.body.data.defaultDdd, '93');
+    assert.equal(res.body.data.invalid, 1, 'só o número curto fica de fora');
+    const numeros = Object.fromEntries(res.body.data.rows.map((row) => [row.name, row.phone]));
+    assert.equal(numeros['Gil Tronco'], '5593992220010');
+    assert.equal(numeros['Hugo Operadora'], '5593992220011');
+    assert.equal(numeros['Iris Sem DDD'], '5593992220012');
+    assert.equal(numeros['Jair Fixo Sem DDD'], '559335220013');
+  });
+
+  it('o endereço das colunas Home vai para a ficha', async () => {
+    await importar(AGENDA, 'apply');
+    const linha = (await importados()).find((entry) => entry.client_name === 'Gil Tronco');
+    const ficha = await call(`${panelUrl}/api/contacts/c:${linha.id}`, { headers: authHeaders(token) });
+    assert.equal(ficha.body.data.fields.address.value.city, 'Santarém');
+    assert.equal(ficha.body.data.fields.address.value.zip, '68005-000');
+  });
+});
+
 describe('a planilha do próprio painel', () => {
   it('continua indo para o importador da planilha', async () => {
     const res = await importar('Nome;WhatsApp\r\nCliente da Planilha;(93) 99222-0009', 'preview');

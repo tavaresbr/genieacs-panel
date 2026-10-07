@@ -191,6 +191,7 @@ const hi: Dictionary = {
   'contacts.sheet.googleHint': 'Gmail संपर्क भी स्वीकार करता है: contacts.google.com पर Export → Google CSV, Outlook CSV या vCard। उस फ़ाइल से केवल नए संपर्क आते हैं; पैनल में पहले से मौजूद छोड़ दिए जाते हैं।',
   'contacts.sheet.googleSummary': '{file}: {total} Google संपर्क — {creates} नए, {existing} पहले से पैनल में (छोड़े गए), {duplicated} दोहराए गए, {invalid} बिना फ़ोन।',
   'contacts.sheet.googleEmpty': 'इस फ़ाइल में कोई नया संपर्क नहीं है।',
+  'contacts.sheet.googleDdd': 'बिना क्षेत्र कोड वाले नंबरों को {ddd} मिलता है, जो फ़ाइल में सबसे आम है।',
   'contacts.sheet.whatsappTruncated': 'केवल पहले {max} नए संपर्क आयात होते हैं; बाक़ी के लिए फिर चलाएँ।',
   'contacts.sheet.whatsappEmpty': 'फ़ोनबुक में कोई नया नहीं।',
   'contacts.sheet.whatsappFailed': 'WhatsApp संपर्क नहीं पढ़े जा सके',

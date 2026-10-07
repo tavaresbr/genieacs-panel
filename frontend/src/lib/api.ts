@@ -3547,6 +3547,8 @@ export interface ContactWhatsappImportResult {
 /** What importing a Google Contacts export (CSV, Outlook CSV or vCard) did — or would do. */
 export interface ContactGoogleImportResult extends ContactWhatsappImportResult {
   format: 'google' | 'outlook' | 'vcard'
+  /** The DDD given to numbers written without one: the file's most common. */
+  defaultDdd: string | null
 }
 
 export const contactsAPI = {

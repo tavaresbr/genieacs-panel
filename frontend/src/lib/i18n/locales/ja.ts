@@ -191,6 +191,7 @@ const ja: Dictionary = {
   'contacts.sheet.googleHint': 'Gmailの連絡先にも対応: contacts.google.com でエクスポート → Google CSV、Outlook CSV または vCard。このファイルからは新しい連絡先だけが追加され、既存のものはスキップされます。',
   'contacts.sheet.googleSummary': '{file}: Googleの連絡先 {total} 件 — 新規 {creates}、既存 {existing}（スキップ）、重複 {duplicated}、電話なし {invalid}。',
   'contacts.sheet.googleEmpty': 'このファイルに新しい連絡先はありません。',
+  'contacts.sheet.googleDdd': '市外局番のない番号には、ファイルで最も多い {ddd} を付けます。',
   'contacts.sheet.whatsappTruncated': '新規の連絡先は先頭の{max}件のみ取り込みます。残りは再実行してください。',
   'contacts.sheet.whatsappEmpty': 'アドレス帳に新しい人はいません。',
   'contacts.sheet.whatsappFailed': 'WhatsApp連絡先を読み取れませんでした',
