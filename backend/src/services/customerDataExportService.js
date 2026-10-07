@@ -463,6 +463,9 @@ class CustomerDataExportService {
       : []);
 
     // A régua parada para o contrato (comprovante recebido, ou à mão).
+    guardar('sgp_billing_status', contratos.length
+      ? await tdb('sgp_billing_status').whereIn('contract', contratos).orderBy('id')
+      : []);
     guardar('wa_dunning_pauses', contratos.length
       ? await tdb('wa_dunning_pauses').whereIn('contract', contratos).orderBy('id')
       : []);

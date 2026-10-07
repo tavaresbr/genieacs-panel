@@ -1093,6 +1093,8 @@ export default {
   'contacts.import.rowNoName': '이름 없는 새 고객',
   'contacts.import.whatsappPreviewed': 'WhatsApp 연락처 미리보기가 준비되었습니다',
   'contacts.import.whatsappApplied': 'WhatsApp 연락처를 가져왔습니다: {created}건 생성',
+  'contacts.import.googlePreviewed': 'Google 연락처 미리보기 준비 완료',
+  'contacts.import.googleApplied': 'Google 연락처 가져오기 완료: {created}개 생성',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid 설정을 불러왔습니다',

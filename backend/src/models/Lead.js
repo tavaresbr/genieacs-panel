@@ -44,7 +44,7 @@ class Lead {
    * um cliente pagante chegou — não há `tenant_id`, `lead_id` nem `converted_at`
    * ligando um provedor ao pedido que o originou, então esta linha é o elo, e
    * apagá-la é perda comercial sem ganho de privacidade. Depois da
-   * `0108_drop_lead_ip` ela também já não guarda o campo que não tinha
+   * `0109_drop_lead_ip` ela também já não guarda o campo que não tinha
    * finalidade.
    *
    * A idade é `created_at` e nunca `updated_at`: `Lead.update` mexe em

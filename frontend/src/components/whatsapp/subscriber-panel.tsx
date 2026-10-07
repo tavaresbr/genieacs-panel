@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { BILLING_BADGE, BILLING_BORDER, billingLabel, invoiceStatus } from '@/lib/wa-billing-status'
 import { Link } from 'react-router'
 import { whatsappAPI, type SgpInvoice, type WaSubscriberPanel, type WaSubscriberPartError, type WhatsAppMessage, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
@@ -736,10 +737,12 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                   <ul className="space-y-2" role="list">
                     {panel.invoices.items.map((invoice, index) => {
                       const highlighted = invoice.id !== null && invoice.id === panel.invoices.highlight
+                      // A borda pela data: verde a vencer, amarela vence hoje, vermelha vencida.
+                      const situacao = invoiceStatus(invoice.dueDate)
                       return (
                         <li
                           key={invoice.id ?? `invoice-${index}`}
-                          className={`rounded-md border p-2 ${highlighted ? 'border-[hsl(var(--status-warning))]' : 'border-border'}`}
+                          className={`rounded-md border-2 p-2 ${situacao ? BILLING_BORDER[situacao.status] : 'border-border'}`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold">{formatBrl(invoice.amount, intlLocale)}</span>
@@ -749,8 +752,13 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                               </span>
                             )}
                           </div>
+                          {situacao && (
+                            <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold ${BILLING_BADGE[situacao.status]}`}>
+                              {t(billingLabel(situacao.status, situacao.daysOverdue).key, billingLabel(situacao.status, situacao.daysOverdue).vars)}
+                            </span>
+                          )}
                           {highlighted && (
-                            <p className="mt-0.5 text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.sgp.highlight')}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{t('whatsapp.sgp.highlight')}</p>
                           )}
                           <div className="mt-1.5 flex flex-wrap gap-1.5">
                             {invoice.digitableLine && (

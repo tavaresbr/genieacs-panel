@@ -11,6 +11,7 @@ import WaSatisfactionService from './waSatisfactionService.js';
 import WaAssignmentService from './waAssignmentService.js';
 import WaTagService from './waTagService.js';
 import { tdb } from '../config/database.js';
+import BillingStatusService from './billingStatusService.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
 /** How many messages a thread hands back before the caller has to ask for more. */
@@ -263,6 +264,8 @@ class WaConversationService {
       // desde a primeira mensagem dele sem resposta. Nota interna e envio
       // automático (régua, campanha) não contam como resposta.
       awaitingSince: extra.awaitingSince ?? null,
+      // Em dia, vence hoje ou atrasado, pela última consulta ao SGP; null sem foto.
+      billing: extra.billing ?? null,
       waitingSince: row.waiting_since || null,
       botPausedUntil: row.bot_paused_until && new Date(row.bot_paused_until).getTime() > Date.now()
         ? new Date(row.bot_paused_until).toISOString()
@@ -347,10 +350,15 @@ class WaConversationService {
     const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
     const etiquetas = await WaTagService.tagsFor(rows.map((r) => r.id));
     const aguardando = await this.awaitingSince(rows.filter((r) => !r.closed_at).map((r) => r.id));
+    // A cor da situação financeira: a foto guardada, e as velhas atualizadas
+    // em segundo plano — a lista não espera o SGP.
+    const situacoes = await BillingStatusService.forContracts(contracts);
+    BillingStatusService.refreshStale(contracts, situacoes);
 
     return rows.map((row) => this.publicConversation(row, {
       tags: etiquetas.get(Number(row.id)) ?? [],
       awaitingSince: aguardando.get(Number(row.id)) ?? null,
+      billing: row.contract ? situacoes.get(row.contract) ?? null : null,
       assignedTo: row.assigned_user_id ? atendentes.get(Number(row.assigned_user_id)) ?? null : null,
       clientName: row.contract
         ? names.get(row.contract) ?? null
@@ -427,6 +435,9 @@ class WaConversationService {
     return this.publicConversation(conversation, {
       tags: etiquetas.get(Number(conversation.id)) ?? [],
       awaitingSince: aguardando.get(Number(conversation.id)) ?? null,
+      billing: conversation.contract
+        ? (await BillingStatusService.forContracts([conversation.contract])).get(conversation.contract) ?? null
+        : null,
       assignedTo: conversation.assigned_user_id ? atendentes.get(Number(conversation.assigned_user_id)) ?? null : null,
       clientName: link?.client_name ?? contact?.client_name ?? null,
       ...optOutOf(await this.optOutEntries(conversation))

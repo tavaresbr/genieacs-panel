@@ -1090,6 +1090,8 @@ export default {
   'contacts.import.rowNoName': '新客戶沒有姓名',
   'contacts.import.whatsappPreviewed': 'WhatsApp 聯絡人預覽已就緒',
   'contacts.import.whatsappApplied': '已匯入 WhatsApp 聯絡人：建立 {created} 個',
+  'contacts.import.googlePreviewed': 'Google 聯絡人預覽已就緒',
+  'contacts.import.googleApplied': '已匯入 Google 聯絡人：建立 {created} 個',
 
   // TeiaH Valid
   'teiah.configLoaded': '已載入 TeiaH Valid 設定',

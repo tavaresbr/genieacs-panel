@@ -1211,7 +1211,7 @@ const leadsTable = (db) => (t) => {
   t.string('status', 16).notNullable().defaultTo('new');
   t.text('notes');
   t.string('source', 32).notNullable().defaultTo('landing');
-  // Sem `ip`: ver `0108_drop_lead_ip`. Era gravado e nunca lido.
+  // Sem `ip`: ver `0109_drop_lead_ip`. Era gravado e nunca lido.
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
   t.index(['status', 'created_at'], 'leads_status_created_idx');
@@ -2057,6 +2057,26 @@ const waDunningPausesTable = (db) => (t) => {
   t.unique(['tenant_id', 'contract'], { indexName: 'wa_dunning_pauses_contract_uq' });
 };
 
+/**
+ * A situação financeira de cada contrato, como foi vista na última consulta ao
+ * SGP (0108): a data da fatura em aberto mais antiga. A cor (em dia, vence
+ * hoje, atrasado) é recalculada na leitura a partir dela, então a virada do
+ * dia não precisa de nova consulta.
+ */
+const sgpBillingStatusTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('contract', 64).notNullable();
+  t.string('oldest_due_date', 10);
+  t.timestamp('checked_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'contract'], { indexName: 'sgp_billing_status_contract_uq' });
+};
+
+const BILLING_STATUS_TABLES = [
+  ['sgp_billing_status', sgpBillingStatusTable]
+];
+
 const DUNNING_PAUSE_TABLES = [
   ['wa_dunning_pauses', waDunningPausesTable]
 ];
@@ -2791,6 +2811,7 @@ export const SCHEMA_TABLES = [
   ...WA_AGENT_TABLES,
   ...WA_TAG_TABLES,
   ...DUNNING_PAUSE_TABLES,
+  ...BILLING_STATUS_TABLES,
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
   ...COUPON_TABLES,
@@ -6138,6 +6159,18 @@ export const migrations = [
     }
   },
   {
+    /** A situação financeira por contrato — ver `sgpBillingStatusTable`. */
+    id: '0108_sgp_billing_status',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('sgp_billing_status');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'sgp_billing_status', sgpBillingStatusTable(db));
+    }
+  },
+  {
     /**
      * O IP de quem pediu contato na vitrine, que era gravado e NUNCA lido.
      *
@@ -6168,7 +6201,7 @@ export const migrations = [
      * onde um índice se perde sem avisar. `backend/test/lead-retention.test.js`
      * confere isso nos três dialetos.
      */
-    id: '0108_drop_lead_ip',
+    id: '0109_drop_lead_ip',
     async isApplied(db) {
       if (!(await db.schema.hasTable('leads'))) return true;
       return !(await db.schema.hasColumn('leads', 'ip'));
@@ -6181,7 +6214,7 @@ export const migrations = [
       const total = Number(linha?.n || 0);
       if (total > 0) {
         console.warn(
-          `0108_drop_lead_ip: descartando o IP de ${total} lead(s) — dado pessoal que `
+          `0109_drop_lead_ip: descartando o IP de ${total} lead(s) — dado pessoal que `
           + 'nenhum código lia. Ver o comentário desta migration.'
         );
       }

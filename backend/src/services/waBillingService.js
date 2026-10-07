@@ -1,5 +1,6 @@
 import WaMetaTemplateService from './waMetaTemplateService.js';
 import SgpService, { SgpError } from './sgpService.js';
+import BillingStatusService from './billingStatusService.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
 import { whatsappPhoneOf } from './contactProfileService.js';
@@ -294,6 +295,9 @@ class WaBillingService {
     if (pace) await sleep(SGP_PACE_MS);
     try {
       const { invoices } = await SgpService.listInvoices({ contract, onlyOpen: true });
+      // A foto da situação (em dia, vence hoje, atrasado) sai de graça daqui:
+      // a régua, a conferência na saída e a atualização da lista passam por este caminho.
+      await BillingStatusService.record(contract, invoices);
       return invoices;
     } catch (error) {
       // One refused contract is a fact about that contract — an unknown

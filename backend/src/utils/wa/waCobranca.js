@@ -203,3 +203,39 @@ export function maisAntigaEmAberto(faturas, hoje = new Date(), ehLembrete = fals
 
   return ehLembrete ? { fatura: abertas[0], soFuturas: false } : { fatura: null, soFuturas: true };
 }
+
+/** A data de hoje (`AAAA-MM-DD`) no fuso do provedor. */
+export function hojeNoFuso(now = new Date(), timezone = 'America/Sao_Paulo') {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  } catch {
+    return now.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * A situação pela data de vencimento da fatura em aberto mais antiga:
+ * `ok` (em dia, ou ainda não venceu), `due_today` (vence hoje) ou `overdue`.
+ * Sem fatura em aberto (`null`), em dia. Comparada com o dia de hoje no fuso
+ * do provedor — às 23 h em São Paulo ainda é hoje, mesmo que em UTC não seja.
+ *
+ * @returns {{ status: 'ok'|'due_today'|'overdue', daysOverdue: number }}
+ */
+export function situacaoPorVencimento(oldestDueDate, now = new Date(), timezone = 'America/Sao_Paulo') {
+  const venc = String(oldestDueDate ?? '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(venc)) return { status: 'ok', daysOverdue: 0 };
+  const hoje = hojeNoFuso(now, timezone);
+  const dias = Math.round((Date.parse(`${hoje}T00:00:00Z`) - Date.parse(`${venc}T00:00:00Z`)) / 86_400_000);
+  if (dias > 0) return { status: 'overdue', daysOverdue: dias };
+  if (dias === 0) return { status: 'due_today', daysOverdue: 0 };
+  return { status: 'ok', daysOverdue: 0 };
+}
+
+/** A situação de um contrato a partir das faturas em aberto que o SGP devolveu. */
+export function situacaoFinanceira(faturas, now = new Date(), timezone = 'America/Sao_Paulo') {
+  const abertas = (faturas || [])
+    .filter((f) => f && !f.paid && /^\d{4}-\d{2}-\d{2}/.test(String(f.dueDate ?? '')))
+    .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+  const oldestDueDate = abertas.length ? String(abertas[0].dueDate).slice(0, 10) : null;
+  return { oldestDueDate, ...situacaoPorVencimento(oldestDueDate, now, timezone) };
+}

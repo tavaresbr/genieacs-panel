@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { contactsAPI, type ContactImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContactCounts, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
+import { contactsAPI, type ContactImportResult, type ContactGoogleImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContactCounts, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -241,7 +241,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       )}
       {contact.importSource && (
         <span className="modern-badge-info" title={t('whatsapp.contacts.importedHint')}>
-          {t('whatsapp.contacts.imported')}
+          {t(contact.importSource === 'google' ? 'whatsapp.contacts.importedGoogle' : 'whatsapp.contacts.imported')}
         </span>
       )}
       {!contact.hasDevice && (
@@ -570,12 +570,16 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   const [busy, setBusy] = useState(false)
   const [source, setSource] = useState<'sheet' | 'whatsapp'>('sheet')
   const [book, setBook] = useState<ContactWhatsappImportResult | null>(null)
+  // A Google Contacts export only brings new people in, so its preview is the
+  // phone-book kind, not the sheet's.
+  const [google, setGoogle] = useState<ContactGoogleImportResult | null>(null)
 
   const switchSource = (next: 'sheet' | 'whatsapp') => {
     if (busy) return
     setSource(next)
     setPreview(null)
     setBook(null)
+    setGoogle(null)
     setCsv(null)
   }
 
@@ -593,6 +597,7 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
 
   const readFile = async (file: File | undefined) => {
     setPreview(null)
+    setGoogle(null)
     if (!file) return
     setFileName(file.name)
     const text = await file.text()
@@ -604,7 +609,8 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
       toast.error(res.message || t('contacts.sheet.importFailed'))
       return
     }
-    setPreview(res.data)
+    if ('format' in res.data) setGoogle(res.data)
+    else setPreview(res.data)
   }
 
   const apply = async () => {
@@ -687,18 +693,45 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
           </>
         ) : (
           <>
-        <p className="section-description mb-5">{t('contacts.sheet.importHint')}</p>
+        <p className="section-description mb-2">{t('contacts.sheet.importHint')}</p>
+        <p className="section-description mb-5">{t('contacts.sheet.googleHint')}</p>
 
         <label className="field-label" htmlFor="import-sheet-file">{t('contacts.sheet.file')}</label>
         <input
           id="import-sheet-file"
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.vcf,text/csv,text/vcard,text/x-vcard"
           className="modern-input"
           disabled={busy}
           onChange={(event) => void readFile(event.target.files?.[0])}
         />
         {busy && <p className="mt-3 text-sm text-muted-foreground" role="status">{t('contacts.sheet.reading')}</p>}
+
+        {google && (
+          <div className="mt-5 space-y-3 text-sm" data-testid="import-google-summary">
+            <p className="font-semibold">{t('contacts.sheet.googleSummary', {
+              file: fileName,
+              total: google.total,
+              creates: google.creates,
+              existing: google.existing,
+              duplicated: google.duplicated,
+              invalid: google.invalid
+            })}</p>
+            {google.truncated && <p className="text-muted-foreground">{t('contacts.sheet.whatsappTruncated', { max: google.maxCreates })}</p>}
+            {google.rows.length === 0 ? (
+              <p className="text-muted-foreground">{t('contacts.sheet.googleEmpty')}</p>
+            ) : (
+              <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border p-3">
+                {google.rows.map((row) => (
+                  <li key={row.phone}>
+                    <span className="modern-badge-info">{t('contacts.sheet.create')}</span> {row.name}{' '}
+                    <span className="font-mono text-xs text-muted-foreground">{row.phone}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {preview && (
           <div className="mt-5 space-y-4 text-sm">
@@ -742,7 +775,9 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
           <button
             type="button"
             className="modern-button"
-            disabled={busy || (source === 'whatsapp' ? !book || book.creates === 0 : !preview || preview.updates + preview.creates === 0)}
+            disabled={busy || (source === 'whatsapp'
+              ? !book || book.creates === 0
+              : google ? google.creates === 0 : !preview || preview.updates + preview.creates === 0)}
             onClick={() => void apply()}
           >
             {t('contacts.sheet.apply')}

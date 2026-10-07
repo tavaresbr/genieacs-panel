@@ -1,6 +1,7 @@
 import AuditLog from '../models/AuditLog.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
-import ContactSheetService from '../services/contactSheetService.js';
+import ContactSheetService, { IMPORT_MAX_BYTES } from '../services/contactSheetService.js';
+import ContactGoogleImportService from '../services/contactGoogleImportService.js';
 import ContactWhatsappImportService from '../services/contactWhatsappImportService.js';
 import ContactInvoiceService from '../services/contactInvoiceService.js';
 import ContactOnboardingService from '../services/contactOnboardingService.js';
@@ -196,9 +197,34 @@ ContactController.exportSheet = async function exportSheet(req, res) {
  * does it. The body is the CSV itself, as `text/csv`: a 5 MB sheet does not
  * fit the JSON parser's limit, and does not need to.
  */
+async function importGoogle(req, res, text, format) {
+  if (Buffer.byteLength(text, 'utf8') > IMPORT_MAX_BYTES) {
+    return res.status(413).json({
+      ...createErrorResponse(req.t('contacts.import.tooLarge', { megabytes: IMPORT_MAX_BYTES / 1024 / 1024 }), 'too_large'),
+      code: 'too_large'
+    });
+  }
+  if (req.query.mode !== 'apply') {
+    const plan = await ContactGoogleImportService.plan(text, format);
+    return res.json(createResponse(req.t('contacts.import.googlePreviewed'), ContactGoogleImportService.summary(plan)));
+  }
+  const result = await ContactGoogleImportService.apply(text, format, actorOf(req));
+  await AuditLog.fromRequest(req, {
+    action: AuditLog.ACTIONS.CONTACTS_IMPORTED,
+    subjectType: 'contacts',
+    subjectId: null,
+    detail: { source: 'google', format, total: result.total, created: result.created, existing: result.existing, invalid: result.invalid }
+  });
+  return res.json(createResponse(req.t('contacts.import.googleApplied', { created: result.created }), result));
+}
+
 ContactController.importSheet = async function importSheet(req, res) {
   try {
     const text = typeof req.body === 'string' ? req.body : '';
+    // A file exported from Google Contacts (CSV, Outlook CSV or vCard) only
+    // brings new people in; the panel's own sheet edits and creates.
+    const googleFormat = ContactGoogleImportService.detect(text);
+    if (googleFormat) return importGoogle(req, res, text, googleFormat);
     const translate = (plan) => ({
       ...plan,
       errors: plan.errors.map((error) => ({ line: error.line, message: req.t(error.key, error.vars ?? undefined) }))
