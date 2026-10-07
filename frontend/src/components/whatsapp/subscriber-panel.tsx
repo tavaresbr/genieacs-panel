@@ -435,8 +435,27 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                 <div className="mb-2 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-2">
                   <p className="metric-label">{t('whatsapp.sgp.selectedContract')}</p>
                   <p className="mt-0.5 text-sm font-semibold">
-                    <span className="font-mono">#{panel.contract.contract}</span>
-                    {panel.contract.name ? ` · ${panel.contract.name}` : ''}
+                    {/* O contrato abre o cadastro do cliente no SGP, como o botão "Abrir no SGP". */}
+                    {isSafeExternalUrl(panel.sgpUrl) ? (
+                      <a
+                        href={panel.sgpUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={t('whatsapp.sgp.openSgp')}
+                        className="inline-flex max-w-full items-center gap-1 hover:text-primary hover:underline"
+                      >
+                        <span className="min-w-0 wrap-break-word">
+                          <span className="font-mono">#{panel.contract.contract}</span>
+                          {panel.contract.name ? ` · ${panel.contract.name}` : ''}
+                        </span>
+                        <Icon name="external" size={13} className="shrink-0 text-muted-foreground" />
+                      </a>
+                    ) : (
+                      <>
+                        <span className="font-mono">#{panel.contract.contract}</span>
+                        {panel.contract.name ? ` · ${panel.contract.name}` : ''}
+                      </>
+                    )}
                   </p>
                   {(() => {
                     const selo = sgpBadge(panel.contract)
