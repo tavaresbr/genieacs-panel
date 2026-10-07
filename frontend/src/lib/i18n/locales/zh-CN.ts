@@ -191,6 +191,7 @@ const zhCN: Dictionary = {
   'contacts.sheet.googleHint': '也支持 Gmail 联系人：在 contacts.google.com 选择 导出 → Google CSV、Outlook CSV 或 vCard。该文件只导入新联系人，已在面板中的会被跳过。',
   'contacts.sheet.googleSummary': '{file}：{total} 个 Google 联系人 — {creates} 个新增，{existing} 个已在面板中（跳过），{duplicated} 个重复，{invalid} 个无电话。',
   'contacts.sheet.googleEmpty': '此文件中没有新联系人。',
+  'contacts.sheet.googleDdd': '没有区号的号码会使用文件中最常见的区号 {ddd}。',
   'contacts.sheet.whatsappTruncated': '仅导入前 {max} 个新联系人；其余请再次运行。',
   'contacts.sheet.whatsappEmpty': '通讯录中没有新的联系人。',
   'contacts.sheet.whatsappFailed': '无法读取 WhatsApp 联系人',

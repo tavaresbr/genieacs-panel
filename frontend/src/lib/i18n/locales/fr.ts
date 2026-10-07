@@ -191,6 +191,7 @@ const fr: Dictionary = {
   'contacts.sheet.googleHint': 'Accepte aussi les contacts Gmail : sur contacts.google.com, Exporter → CSV Google, CSV Outlook ou vCard. Seuls les nouveaux contacts sont ajoutés ; ceux déjà dans le panneau sont ignorés.',
   'contacts.sheet.googleSummary': '{file} : {total} contacts Google — {creates} nouveaux, {existing} déjà dans le panneau (ignorés), {duplicated} en double, {invalid} sans téléphone.',
   'contacts.sheet.googleEmpty': 'Aucun nouveau contact dans ce fichier.',
+  'contacts.sheet.googleDdd': 'Les numéros sans indicatif reçoivent le {ddd}, le plus fréquent du fichier.',
   'contacts.sheet.whatsappTruncated': 'Seuls les {max} premiers nouveaux contacts sont importés ; relancez pour le reste.',
   'contacts.sheet.whatsappEmpty': 'Personne de nouveau dans le répertoire.',
   'contacts.sheet.whatsappFailed': 'Impossible de lire les contacts WhatsApp',

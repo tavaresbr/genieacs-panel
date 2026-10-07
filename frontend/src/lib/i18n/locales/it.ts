@@ -191,6 +191,7 @@ const it: Dictionary = {
   'contacts.sheet.googleHint': 'Accetta anche i contatti Gmail: su contacts.google.com, Esporta → CSV Google, CSV Outlook o vCard. Da quel file entrano solo i contatti nuovi; chi è già nel pannello viene saltato.',
   'contacts.sheet.googleSummary': '{file}: {total} contatti Google — {creates} nuovi, {existing} già nel pannello (saltati), {duplicated} ripetuti, {invalid} senza telefono.',
   'contacts.sheet.googleEmpty': 'Nessun contatto nuovo in questo file.',
+  'contacts.sheet.googleDdd': 'I numeri senza prefisso ricevono il {ddd}, il più comune nel file.',
   'contacts.sheet.whatsappTruncated': 'Vengono importati solo i primi {max} contatti nuovi; riesegui per il resto.',
   'contacts.sheet.whatsappEmpty': 'Nessuno di nuovo in rubrica.',
   'contacts.sheet.whatsappFailed': 'Impossibile leggere i contatti WhatsApp',

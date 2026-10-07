@@ -4,7 +4,7 @@ import { parseCsv } from './contactSheetService.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
 /** The most new clients one import creates: a phone book is not an ERP base. */
-const MAX_CREATES = 5000;
+const MAX_CREATES = 10000;
 /** How many new contacts the preview lists one by one; the counts cover all of them. */
 const PREVIEW_ROWS = 200;
 
@@ -71,9 +71,10 @@ function peopleFromCsv(text) {
       }
     }
     // Outlook's columns, one number each.
-    for (const column of ['mobile phone', 'primary phone', 'home phone', 'business phone', 'other phone', 'home phone 2', 'business phone 2']) {
+    for (const column of ['mobile phone', 'car phone', 'primary phone', 'home phone', 'home phone 2', 'business phone',
+      'business phone 2', 'company main phone', 'other phone']) {
       for (const value of values(read(cells, column))) {
-        (column === 'mobile phone' ? mobiles : others).push(value);
+        (column === 'mobile phone' || column === 'car phone' ? mobiles : others).push(value);
       }
     }
 
@@ -82,7 +83,15 @@ function peopleFromCsv(text) {
     for (const column of ['e-mail address', 'e-mail 2 address', 'e-mail 3 address']) emails.push(...values(read(cells, column)));
 
     const slot = addressNumbers[0];
-    const address = slot === undefined ? null : {
+    // Outlook's columns: the home address, or the business one.
+    const outlookPlace = ['home', 'business', 'other'].find((place) => read(cells, `${place} street`) || read(cells, `${place} city`));
+    const address = slot === undefined ? (outlookPlace ? {
+      street: [read(cells, `${outlookPlace} street`), read(cells, `${outlookPlace} street 2`)].filter(Boolean).join(', '),
+      city: read(cells, `${outlookPlace} city`),
+      state: read(cells, `${outlookPlace} state`),
+      zip: read(cells, `${outlookPlace} postal code`),
+      complement: read(cells, `${outlookPlace} street 3`)
+    } : null) : {
       street: read(cells, `address ${slot} - street`) || values(read(cells, `address ${slot} - formatted`))[0] || '',
       city: read(cells, `address ${slot} - city`),
       state: read(cells, `address ${slot} - region`),
@@ -157,6 +166,58 @@ function peopleFromVcard(text) {
   return people;
 }
 
+// ── Phone numbers as phone books write them ────────────────────────────────
+
+/**
+ * The digits of a number as a Brazilian phone book writes it, with the
+ * trunk prefix gone: `(093) 99999-9999` → 93999999999, and the carrier
+ * code too: `(0 41 93) 99999-9999` → 93999999999. A number written with
+ * `+` is international and left as it is.
+ */
+function bookDigits(raw) {
+  const text = String(raw ?? '').trim();
+  let digits = text.replace(/\D/g, '');
+  if (text.startsWith('+') || !digits.startsWith('0')) return { digits, international: text.startsWith('+') };
+  if (digits.length === 11 || digits.length === 12) digits = digits.slice(1); // 0 + DDD + number
+  else if (digits.length === 13 || digits.length === 14) digits = digits.slice(3); // 0 + carrier + DDD + number
+  return { digits, international: false };
+}
+
+/** A number without its DDD: 8 digits (landline) or 9 starting with 9 (mobile). */
+const isLocal = (digits) => digits.length === 8 || (digits.length === 9 && digits.startsWith('9'));
+
+/**
+ * One phone-book number as the panel keeps it, or null. A number without a
+ * DDD gets `defaultDdd` — the DDD most of the file's own numbers carry.
+ */
+function bookPhone(raw, defaultDdd) {
+  const { digits, international } = bookDigits(raw);
+  if (!digits) return null;
+  if (isLocal(digits)) return defaultDdd ? normalizarTelefoneBr(`${defaultDdd}${digits}`) || null : null;
+  const phone = normalizarTelefoneBr(digits);
+  if (!phone) return null;
+  // Brazilian: 55 + DDD + 8 or 9 digits. Anything else only when written as international.
+  if (phone.startsWith('55') && (phone.length === 12 || phone.length === 13)) return phone;
+  return international && phone.length >= 10 && phone.length <= 15 ? phone : null;
+}
+
+/** The DDD most numbers in the file carry, for the numbers that have none. */
+function commonDdd(people) {
+  const counts = new Map();
+  for (const person of people) {
+    for (const raw of person.phones) {
+      const phone = bookPhone(raw, null);
+      if (phone && phone.startsWith('55') && !bookDigits(raw).international) {
+        const ddd = phone.slice(2, 4);
+        counts.set(ddd, (counts.get(ddd) ?? 0) + 1);
+      }
+    }
+  }
+  let best = null;
+  for (const [ddd, count] of counts) if (!best || count > best[1]) best = [ddd, count];
+  return best ? best[0] : null;
+}
+
 // ── The service ─────────────────────────────────────────────────────────────
 
 /**
@@ -185,8 +246,8 @@ export default class ContactGoogleImportService {
   }
 
   /** One contact as the record keeps it: checked fields only, bad emails dropped. */
-  static clean(person) {
-    const phones = [...new Set(person.phones.map((value) => normalizarTelefoneBr(value)).filter(Boolean))];
+  static clean(person, defaultDdd = null) {
+    const phones = [...new Set(person.phones.map((value) => bookPhone(value, defaultDdd)).filter(Boolean))];
     const emails = person.emails.filter((email) => {
       try {
         checkField('emails', [email]);
@@ -213,10 +274,11 @@ export default class ContactGoogleImportService {
     const people = this.people(text, format);
     const known = await ContactWhatsappImportService.knownNumbers();
     const seen = new Set();
-    const plan = { format, total: people.length, creates: [], existing: 0, invalid: 0, duplicated: 0, truncated: false };
+    const defaultDdd = commonDdd(people);
+    const plan = { format, defaultDdd, total: people.length, creates: [], existing: 0, invalid: 0, duplicated: 0, truncated: false };
 
     for (const raw of people) {
-      const person = this.clean(raw);
+      const person = this.clean(raw, defaultDdd);
       if (person.phones.length === 0) {
         plan.invalid += 1;
         continue;
@@ -265,6 +327,7 @@ export default class ContactGoogleImportService {
   static summary(plan) {
     return {
       format: plan.format,
+      defaultDdd: plan.defaultDdd,
       total: plan.total,
       creates: plan.creates.length,
       existing: plan.existing,

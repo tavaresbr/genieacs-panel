@@ -191,6 +191,7 @@ const ru: Dictionary = {
   'contacts.sheet.googleHint': 'Также принимаются контакты Gmail: на contacts.google.com — Экспорт → Google CSV, Outlook CSV или vCard. Из такого файла добавляются только новые контакты; уже существующие пропускаются.',
   'contacts.sheet.googleSummary': '{file}: {total} контактов Google — {creates} новых, {existing} уже в панели (пропущены), {duplicated} повторов, {invalid} без телефона.',
   'contacts.sheet.googleEmpty': 'В этом файле нет новых контактов.',
+  'contacts.sheet.googleDdd': 'Номерам без кода города присваивается {ddd} — самый частый код в файле.',
   'contacts.sheet.whatsappTruncated': 'Импортируются только первые {max} новых контактов; запустите снова для остальных.',
   'contacts.sheet.whatsappEmpty': 'В книге нет новых контактов.',
   'contacts.sheet.whatsappFailed': 'Не удалось прочитать контакты WhatsApp',

@@ -191,6 +191,7 @@ const ko: Dictionary = {
   'contacts.sheet.googleHint': 'Gmail 연락처도 지원합니다: contacts.google.com에서 내보내기 → Google CSV, Outlook CSV 또는 vCard. 이 파일에서는 새 연락처만 추가되고 이미 있는 연락처는 건너뜁니다.',
   'contacts.sheet.googleSummary': '{file}: Google 연락처 {total}개 — 신규 {creates}, 이미 있음 {existing}(건너뜀), 중복 {duplicated}, 전화 없음 {invalid}.',
   'contacts.sheet.googleEmpty': '이 파일에 새 연락처가 없습니다.',
+  'contacts.sheet.googleDdd': '지역번호가 없는 번호에는 파일에서 가장 많은 {ddd}를 붙입니다.',
   'contacts.sheet.whatsappTruncated': '신규 연락처는 처음 {max}건만 가져옵니다. 나머지는 다시 실행하세요.',
   'contacts.sheet.whatsappEmpty': '연락처에 새로운 사람이 없습니다.',
   'contacts.sheet.whatsappFailed': 'WhatsApp 연락처를 읽을 수 없습니다',
