@@ -2278,6 +2278,7 @@ const zhCN: Dictionary = {
   'whatsapp.quickReplies.empty': '暂无快捷回复。请在 WhatsApp > 模板 的“客服”分类中创建。',
   'whatsapp.quickReplies.noMatch': '没有匹配 "{query}" 的回复',
   'whatsapp.quickReplies.hint': '↑↓ 选择 · Enter 使用 · Esc 关闭',
+  'whatsapp.contact.open': "打开客户资料",
   'whatsapp.templatePicker.button': "模板",
   'whatsapp.templatePicker.search': "搜索模板",
   'whatsapp.templatePicker.empty': "没有启用的模板。请在“模板”标签页中创建。",

@@ -5,6 +5,7 @@ import { BILLING_BADGE, BILLING_BORDER, billingLabel, invoiceStatus } from '@/li
 import { Link } from 'react-router'
 import { whatsappAPI, type SgpInvoice, type WaSubscriberPanel, type WaSubscriberPartError, type WhatsAppMessage, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { ContactLink } from '@/components/whatsapp/contact-link'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
@@ -383,7 +384,11 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-foreground">
-                {(panel.ready && panel.attendance.clientName) || attendance.pushName || phone || '—'}
+                <ContactLink
+                  contract={panel.ready ? panel.attendance.contract : null}
+                  name={(panel.ready && panel.attendance.clientName) || attendance.pushName || phone || '—'}
+                  className=""
+                />
               </p>
               {phone && <p className="font-mono text-xs text-muted-foreground">{phone}</p>}
               {panel.ready && panel.attendance.matchedOn && (

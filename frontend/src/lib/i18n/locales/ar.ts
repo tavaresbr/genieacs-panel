@@ -2258,6 +2258,7 @@ const ar: Dictionary = {
   'whatsapp.quickReplies.empty': 'لا توجد ردود سريعة. أنشئها من WhatsApp > القوالب ضمن فئة خدمة العملاء.',
   'whatsapp.quickReplies.noMatch': 'لا توجد ردود تطابق "{query}"',
   'whatsapp.quickReplies.hint': '↑↓ للاختيار · Enter للاستخدام · Esc للإغلاق',
+  'whatsapp.contact.open': "فتح سجل العميل",
   'whatsapp.templatePicker.button': "القوالب",
   'whatsapp.templatePicker.search': "ابحث عن قالب",
   'whatsapp.templatePicker.empty': "لا توجد قوالب نشطة. أنشئ واحدًا في تبويب القوالب.",
