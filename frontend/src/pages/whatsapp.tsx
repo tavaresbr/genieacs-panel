@@ -929,6 +929,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     compact={keyboardHeight !== null}
                   />
                   <ThreadComposer
+                    compact={keyboardHeight !== null}
                     optedOut={conversation.optedOut}
                     sending={sending}
                     onSend={send}

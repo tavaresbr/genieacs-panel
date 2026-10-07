@@ -70,6 +70,8 @@ interface ThreadComposerProps {
    * atendente lê, corrige e aperta Enviar. Ausente, o botão não aparece.
    */
   onSuggest?: () => Promise<string | null>
+  /** Teclado aberto no celular: some o que é só informativo e a nota vira só o cadeado. */
+  compact?: boolean
   /**
    * O botão "Modelos": todos os modelos ativos do painel. `null` quando quem
    * está logado não pode listá-los — aí o botão não aparece.
@@ -132,7 +134,7 @@ const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).
  * modo nota continua ligado, porque o resto do lote ainda é nota e virar
  * resposta no meio do caminho é justamente a direção perigosa.
  */
-export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate, onSuggest, templates = null, onPickTemplate }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate, onSuggest, templates = null, onPickTemplate, compact = false }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
@@ -389,7 +391,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
 
   return (
     <div
-      className="@container relative border-t border-border bg-card p-2.5 sm:p-3"
+      className={`@container relative border-t border-border bg-card ${compact ? 'p-2' : 'p-2.5 sm:p-3'}`}
       data-testid="composer"
       onDragEnter={dragEnter}
       onDragOver={dragOver}
@@ -414,7 +416,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           )}
         </div>
       )}
-      {metaWindow?.state === 'open' && (
+      {!compact && metaWindow?.state === 'open' && (
         <p className="mb-2 text-xs text-muted-foreground">
           {t('whatsapp.cloud.windowOpen', { hours: metaWindow.hoursLeft })}
         </p>
@@ -437,7 +439,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
         // `textarea.modern-input` (globals.css) fixa `min-h-24` com
         // especificidade maior que a de uma classe utilitária.
         rows={2}
-        className={`modern-input min-h-20 resize-y max-sm:min-h-14! ${
+        className={`modern-input min-h-20 resize-y ${compact ? 'max-sm:min-h-11!' : 'max-sm:min-h-14!'} ${
           isNote
             ? 'border-[hsl(var(--status-warning))]/70 bg-[hsl(var(--status-warning))]/6 focus:border-[hsl(var(--status-warning))] focus:ring-[hsl(var(--status-warning))]/20'
             : ''
@@ -571,7 +573,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
         </div>
       )}
 
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3 @4xl:items-start">
+      <div className={`${compact ? 'mt-1.5 gap-2' : 'mt-2.5 gap-3'} flex flex-wrap items-center justify-between @4xl:items-start`}>
         <div className="min-w-0">
           <label
             className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground"
@@ -584,7 +586,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               onChange={(event) => setIsNote(event.target.checked)}
             />
             <Icon name="lock" size={14} className={isNote ? 'text-[hsl(var(--status-warning))]' : 'text-muted-foreground'} />
-            {t('whatsapp.inbox.note')}
+            <span className={compact ? 'sr-only' : undefined}>{t('whatsapp.inbox.note')}</span>
           </label>
           <p className="field-hint hidden max-w-md @6xl:block">{t('whatsapp.inbox.noteHint')}</p>
         </div>
@@ -604,7 +606,9 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               event.target.value = ''
             }}
           />
-          {quickReplies !== null && (
+          {/* Com o teclado aberto ficam só anexar e enviar: o "/" ainda abre as
+              respostas rápidas, e o resto volta quando o teclado fecha. */}
+          {!compact && quickReplies !== null && (
             <button
               type="button"
               className="modern-button-secondary shrink-0 px-3 @4xl:px-4"
@@ -626,7 +630,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               <span className="hidden @4xl:inline">{t('whatsapp.quickReplies.button')}</span>
             </button>
           )}
-          {templates !== null && onPickTemplate && (
+          {!compact && templates !== null && onPickTemplate && (
             <button
               type="button"
               className="modern-button-secondary shrink-0 px-3 sm:px-4"
@@ -645,7 +649,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               <span className="hidden sm:inline">{t('whatsapp.templatePicker.button')}</span>
             </button>
           )}
-          {onSuggest && !isNote && (
+          {!compact && onSuggest && !isNote && (
             <button
               type="button"
               className="modern-button-secondary shrink-0 px-3 @4xl:px-4"
@@ -667,7 +671,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               <span className="hidden @4xl:inline">{suggesting ? t('whatsapp.ai.suggesting') : t('whatsapp.ai.suggest')}</span>
             </button>
           )}
-          {canRecord && !isNote && (
+          {!compact && canRecord && !isNote && (
             <VoiceRecorder
               disabled={busy || items.length >= MAX_ATTACHMENTS_PER_SEND}
               onRecorded={(file) => addFiles([file])}
