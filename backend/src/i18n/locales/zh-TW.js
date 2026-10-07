@@ -450,6 +450,9 @@ export default {
   'sgp.error.blockedHost': 'SGP 位址指向本部署無法存取的位址',
   'sgp.error.pathsRelative': 'SGP 的 API 路徑需為相對路徑，例如 /api/ura/titulos/',
   'sgp.error.pathPlaceholder': '路徑中不能使用 {{url}} 之類的 Postman 變數；SGP 位址來自 URL 欄位。例如使用 /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': '尚未設定帳單銷帳：請在 SGP 整合中設定收款點（收銀台）',
+  'sgp.error.invoiceIdMissing': 'SGP 未提供此帳單的 ID，無法在此銷帳',
+  'sgp.error.settlePathId': '銷帳路徑必須包含帳單 ID，例如 /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': '啟用整合前，請填寫 SGP 位址、應用程式與權杖',
   'sgp.error.notConfigured': 'SGP 整合尚未設定',
   'sgp.error.customerListNotConfigured': '未設定 SGP 客戶清單路徑。請在 設定 → SGP 中填寫。',
@@ -1094,6 +1097,9 @@ export default {
   'contacts.import.googleApplied': '已匯入 Google 聯絡人：建立 {created} 個',
   'contacts.synced': '客戶已同步',
   'contacts.syncFailed': '無法同步客戶',
+  'contacts.invoiceSettled': '已在 SGP 中銷帳',
+  'contacts.invoiceSettleFailed': '無法為該帳單銷帳',
+  'contacts.settleReceipt.text': '我們確認已收到到期日為 {due} 的帳單（合約 {contract}）款項 {amount}，於 {date} 透過 {method} 支付。謝謝！',
 
   // TeiaH Valid
   'teiah.configLoaded': '已載入 TeiaH Valid 設定',

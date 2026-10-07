@@ -106,9 +106,11 @@ export const PERMISSIONS = Object.freeze([
   // A ficha completa do cliente do SGP. `read` é abrir a ficha, com o CPF
   // inteiro, o endereço e todos os contatos; `edit` é corrigir o cadastro no
   // painel. `export` e `import` são a base inteira numa planilha, e por isso
-  // não são do plantão: o mesmo argumento de `tenant.export`.
+  // não são do plantão: o mesmo argumento de `tenant.export`. `settle` é dar
+  // baixa num título no SGP pelo botão Receber — o plantão recebe no balcão.
   'contacts.read',
   'contacts.edit',
+  'contacts.settle',
   'contacts.export',
   'contacts.import',
   'settings.read',
@@ -163,7 +165,8 @@ const TECH = [
   'whatsapp.send',
   'campaigns.read',
   'contacts.read',
-  'contacts.edit'
+  'contacts.edit',
+  'contacts.settle'
 ];
 
 /** Administra a operação do provedor. */

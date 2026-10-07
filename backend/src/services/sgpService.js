@@ -60,8 +60,14 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   customerList: '/api/ura/clientes/',
   // Client creation (the SGP's CRM API): `F` or `J` is appended for a person or
   // a company — `/api/crm/cliente/F`. Answers `{ cliente_id, message }`.
-  crmClient: '/api/crm/cliente/'
+  crmClient: '/api/crm/cliente/',
+  // The settlement of one invoice ("baixa"), from the SGP's banking API: the
+  // invoice's own SGP id goes where `{id}` is.
+  invoiceSettle: '/api/banco/titulo/{id}/baixar/'
 });
+
+/** What `forma_pagamento` carries when the operator has not listed the install's own. */
+export const DEFAULT_SETTLE_PAYMENT_METHODS = Object.freeze(['Dinheiro', 'PIX', 'Cartão de débito', 'Cartão de crédito']);
 
 /** How a listing page is addressed: by row offset, or by page number from 1. */
 export const CONTACTS_PAGING = Object.freeze(['offset', 'page']);
@@ -722,6 +728,12 @@ function normalizeInvoice(entry) {
   const paidAt = asDate(pick(entry, ['dataPagamento', 'datapagamento', 'pagamento']));
   return {
     id: asText(pick(entry, ['numerodocumento', 'numeroDocumento', 'id', 'titulo', 'documento'])),
+    // The SGP's own id of the invoice, which the settlement route is addressed
+    // by — not the document number above. Digits only, or none.
+    sgpId: (() => {
+      const value = asText(pick(entry, ['id', 'titulo_id', 'tituloId', 'idTitulo', 'idtitulo', 'fatura_id', 'faturaId']));
+      return value && /^\d{1,18}$/.test(value) ? value : null;
+    })(),
     description: asText(pick(entry, ['descricaomodelo', 'descricao', 'observacao', 'modelo'])),
     amount: asAmount(pick(entry, ['valor', 'valordocumento', 'valorDocumento', 'valorTotal'])),
     dueDate,
@@ -816,7 +828,10 @@ const DEFAULT_CONFIG = Object.freeze({
   contactsPageSize: 100,
   contactsPaging: 'offset',
   contactsOffsetParam: 'offset',
-  contactsLimitParam: 'limit'
+  contactsLimitParam: 'limit',
+  settleReceivingPoint: 0,
+  settlePaymentMethods: DEFAULT_SETTLE_PAYMENT_METHODS,
+  settleFees: 0
 });
 
 /**
@@ -990,6 +1005,21 @@ class SgpService {
     return text.startsWith('/') ? text : `/${text}`;
   }
 
+  /**
+   * The settlement path names the invoice in the middle — `/titulo/{id}/baixar/`.
+   * Pasted from Postman it reads `{{fatura_id}}`; any one placeholder there is
+   * the invoice id, and a path without exactly one is refused.
+   */
+  static normalizeSettleEndpoint(value) {
+    const raw = stripLeadingPlaceholders(String(value ?? '').trim());
+    if (!raw) return DEFAULT_ENDPOINTS.invoiceSettle;
+    const unified = raw.replace(/\{\{?\s*[A-Za-z_][A-Za-z0-9_]*\s*\}?\}/g, '{id}');
+    if ((unified.match(/\{id\}/g) || []).length !== 1) {
+      throw new SgpError('sgp.error.settlePathId', { code: 'invalid_endpoint', status: 400 });
+    }
+    return this.normalizeEndpoint(unified, DEFAULT_ENDPOINTS.invoiceSettle);
+  }
+
   static async readStoredConfig() {
     const raw = await AppState.get(CONFIG_KEY);
     if (!raw) return { ...DEFAULT_CONFIG, token: null };
@@ -1035,6 +1065,7 @@ class SgpService {
         stored.ticketOccurrenceType, 1, 999999, DEFAULT_TICKET_OCCURRENCE_TYPE
       ),
       ...this.readContactsSync(stored),
+      ...this.readSettle(stored),
       updatedAt: stored.updatedAt || null
     };
     this.configCache.set(config);
@@ -1066,6 +1097,31 @@ class SgpService {
     };
   }
 
+  /** The invoice-settlement settings, bounded. Shared by the reader and the writer. */
+  static readSettle(source, fallback = DEFAULT_CONFIG) {
+    const methods = Array.isArray(source.settlePaymentMethods)
+      ? source.settlePaymentMethods
+      : (typeof source.settlePaymentMethods === 'string' ? source.settlePaymentMethods.split(/[,;\n]/) : null);
+    const cleanMethods = methods
+      ? [...new Set(methods.map((method) => String(method ?? '').trim().slice(0, 40)).filter(Boolean))].slice(0, 12)
+      : null;
+    const fees = Number(source.settleFees ?? fallback.settleFees);
+    return {
+      settleReceivingPoint: clampNumber(source.settleReceivingPoint ?? fallback.settleReceivingPoint, 0, 999999, 0),
+      settlePaymentMethods: cleanMethods && cleanMethods.length > 0
+        ? cleanMethods
+        : (Array.isArray(fallback.settlePaymentMethods) && fallback.settlePaymentMethods.length > 0
+          ? [...fallback.settlePaymentMethods]
+          : [...DEFAULT_SETTLE_PAYMENT_METHODS]),
+      settleFees: Number.isFinite(fees) && fees >= 0 ? Math.min(Math.round(fees * 100) / 100, 99999) : 0
+    };
+  }
+
+  /** Whether the panel may settle invoices: the integration up and a receiving point chosen. */
+  static canSettle(config) {
+    return this.isReady(config) && Number(config.settleReceivingPoint) > 0 && Boolean(config.endpoints?.invoiceSettle);
+  }
+
   static async getPublicConfig() {
     const config = await this.getConfig();
     const { token, webhookSecret, ...rest } = config;
@@ -1074,7 +1130,8 @@ class SgpService {
       tokenConfigured: Boolean(token),
       webhookSecretConfigured: Boolean(webhookSecret),
       webhookPath: WEBHOOK_PATH,
-      ready: this.isReady(config)
+      ready: this.isReady(config),
+      settleReady: this.canSettle(config)
     };
   }
 
@@ -1160,9 +1217,13 @@ class SgpService {
         ),
         crmClient: this.normalizeEndpoint(
           patch.endpoints?.crmClient ?? current.endpoints.crmClient, DEFAULT_ENDPOINTS.crmClient
+        ),
+        invoiceSettle: this.normalizeSettleEndpoint(
+          patch.endpoints?.invoiceSettle ?? current.endpoints.invoiceSettle
         )
       },
       ...this.readContactsSync(patch, current),
+      ...this.readSettle(patch, current),
       updatedAt: new Date().toISOString()
     };
 
@@ -1255,10 +1316,18 @@ class SgpService {
    * @param {object} [limits] - `listing: true` for the client listing: its own
    *   deadline and body ceiling, and errors that say it was the listing.
    */
-  static async request(endpointKey, payload = {}, configOverride = null, { listing = false, pathSuffix = '' } = {}) {
+  static async request(endpointKey, payload = {}, configOverride = null, { listing = false, pathSuffix = '', pathId = null, acceptText = false } = {}) {
     const config = this.requireReady(configOverride || await this.getConfig());
 
-    const endpoint = config.endpoints[endpointKey] || DEFAULT_ENDPOINTS[endpointKey];
+    let endpoint = config.endpoints[endpointKey] || DEFAULT_ENDPOINTS[endpointKey];
+    if (endpoint.includes('{id}')) {
+      // Only an id the SGP itself sent, and only digits: nothing an operator
+      // typed reaches the path.
+      if (!/^\d{1,18}$/.test(String(pathId ?? ''))) {
+        throw new SgpError('sgp.error.invoiceIdMissing', { code: 'invoice_id_missing', status: 409 });
+      }
+      endpoint = endpoint.replace('{id}', String(pathId));
+    }
     // A suffix is a fixed segment the caller names (`F`/`J`), never input.
     const suffix = pathSuffix ? `${endpoint.endsWith('/') ? '' : '/'}${pathSuffix}` : '';
     const url = `${config.baseUrl}${endpoint}${suffix}`;
@@ -1324,6 +1393,10 @@ class SgpService {
         status: 502,
         details: asText(pick(data || {}, ['msg', 'mensagem', 'message', 'erro'])) || undefined
       });
+    }
+    if (data === null && acceptText && text.trim()) {
+      // Some SGP write routes answer a bare sentence ("... gerado com sucesso").
+      return { message: text.trim().replace(/^['"]|['"]$/g, '').slice(0, 300) };
     }
     if (data === null) {
       throw new SgpError('sgp.error.invalidResponse', {
@@ -1471,6 +1544,33 @@ class SgpService {
       invoices,
       message: asText(pick(data, ['msg', 'mensagem', 'message']))
     };
+  }
+
+  /**
+   * One invoice settled ("baixa") on the SGP: paid on `paidAt`, `amount`
+   * received through `method` at the configured receiving point.
+   */
+  static async settleInvoice({ sgpId, paidAt, amount, method }) {
+    const config = await this.getConfig();
+    if (!this.canSettle(config)) {
+      throw new SgpError('sgp.error.settleNotConfigured', { code: 'settle_not_configured', status: 409 });
+    }
+    const data = await this.request('invoiceSettle', {
+      data_pagamento: paidAt,
+      valor_pago: amount,
+      forma_pagamento: method,
+      ponto_recebimento: config.settleReceivingPoint,
+      tarifas: config.settleFees
+    }, config, { pathId: sgpId, acceptText: true });
+    // A refusal without a `status` flag still names itself: `{ erro: "..." }`.
+    const refusal = asText(pick(data || {}, ['erro', 'error', 'errors']));
+    if (refusal) {
+      throw new SgpError(refusal.slice(0, 300), { code: 'sgp_rejected', status: 502, raw: true });
+    }
+    const message = typeof data === 'string'
+      ? data
+      : asText(pick(data || {}, ['msg', 'mensagem', 'message']));
+    return { message: message ? String(message).slice(0, 300) : null };
   }
 
   /**

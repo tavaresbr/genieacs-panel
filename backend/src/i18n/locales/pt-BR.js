@@ -448,6 +448,9 @@ export default {
   'sgp.error.blockedHost': 'A URL do SGP aponta para um endereço que esta instalação não pode acessar',
   'sgp.error.pathsRelative': 'Os caminhos da API do SGP devem ser relativos, como /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'Variáveis do Postman como {{url}} não são aceitas no caminho; o endereço do SGP vem do campo URL. Use, por exemplo, /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': 'A baixa de títulos não está configurada: informe o ponto de recebimento (caixa) na integração SGP',
+  'sgp.error.invoiceIdMissing': 'O SGP não informou o id deste título, então não dá para dar baixa por aqui',
+  'sgp.error.settlePathId': 'O caminho da baixa precisa ter o id do título, como /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'Informe URL, app e token do SGP antes de ativar a integração',
   'sgp.error.notConfigured': 'Integração com o SGP não está configurada',
   'sgp.error.customerListNotConfigured': 'O caminho da listagem de clientes do SGP não está configurado. Preencha em Configurações → SGP.',
@@ -1093,6 +1096,9 @@ export default {
   'contacts.import.googleApplied': 'Contatos do Google importados: {created} criados',
   'contacts.synced': 'Cliente sincronizado',
   'contacts.syncFailed': 'Não foi possível sincronizar o cliente',
+  'contacts.invoiceSettled': 'Título baixado no SGP',
+  'contacts.invoiceSettleFailed': 'Não foi possível dar baixa no título',
+  'contacts.settleReceipt.text': 'Confirmamos o recebimento de {amount} referente ao título com vencimento em {due} (contrato {contract}), pago em {date} via {method}. Obrigado!',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Configuração da TeiaH Valid carregada',

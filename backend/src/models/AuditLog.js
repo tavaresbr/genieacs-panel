@@ -117,6 +117,9 @@ class AuditLog {
     // ONTs dos contratos chamadas a reportar. O `detail` guarda contratos e
     // quantidades, nunca dados do cadastro.
     CONTACT_SYNCED: 'contact.synced',
+    // "Receber" na ficha: um título baixado no SGP. O `detail` diz qual
+    // título, o valor e a forma, e se o comprovante saiu — nunca o nome.
+    CONTACT_INVOICE_SETTLED: 'contact.invoice_settled',
     // A base de contatos saiu numa planilha, ou entrou por uma. O `detail`
     // guarda quantidades e filtros, nunca uma linha da planilha.
     CONTACTS_EXPORTED: 'contacts.exported',

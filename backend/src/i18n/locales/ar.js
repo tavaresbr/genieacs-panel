@@ -450,6 +450,9 @@ export default {
   'sgp.error.blockedHost': 'يشير عنوان SGP إلى عنوان لا يُسمح لهذا التثبيت بالوصول إليه',
   'sgp.error.pathsRelative': 'يجب أن تكون مسارات واجهة SGP نسبية، مثل /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'متغيرات Postman مثل {{url}} غير مقبولة في المسار؛ عنوان SGP يأتي من حقل URL. استخدم مثلًا /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': 'تسوية الفواتير غير مُعدّة: حدّد نقطة الاستلام (الصندوق) في تكامل SGP',
+  'sgp.error.invoiceIdMissing': 'لم يرسل SGP معرّف هذه الفاتورة، لذا لا يمكن تسويتها من هنا',
+  'sgp.error.settlePathId': 'يجب أن يحتوي مسار التسوية على معرّف الفاتورة، مثل /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'أدخل عنوان SGP والتطبيق والرمز قبل تفعيل التكامل',
   'sgp.error.notConfigured': 'التكامل مع SGP غير مُعدّ',
   'sgp.error.customerListNotConfigured': 'مسار قائمة عملاء SGP غير مضبوط. املأه في الإعدادات ← SGP.',
@@ -1086,6 +1089,9 @@ export default {
   'contacts.import.googleApplied': 'تم استيراد جهات اتصال Google: أُنشئ {created}',
   'contacts.synced': 'تمت مزامنة العميل',
   'contacts.syncFailed': 'تعذّرت مزامنة العميل',
+  'contacts.invoiceSettled': 'تمت تسوية الفاتورة في SGP',
+  'contacts.invoiceSettleFailed': 'تعذرت تسوية الفاتورة',
+  'contacts.settleReceipt.text': 'نؤكد استلام {amount} عن الفاتورة المستحقة في {due} (العقد {contract})، المدفوعة في {date} عبر {method}. شكرًا لك!',
 
   // TeiaH Valid
   'teiah.configLoaded': 'تم تحميل إعدادات TeiaH Valid',

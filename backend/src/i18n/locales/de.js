@@ -405,6 +405,9 @@ export default {
   'sgp.error.blockedHost': 'Die SGP-URL verweist auf eine Adresse, die diese Installation nicht erreichen darf',
   'sgp.error.pathsRelative': 'Die SGP-API-Pfade müssen relativ sein, etwa /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'Postman-Variablen wie {{url}} sind im Pfad nicht erlaubt; die SGP-Adresse kommt aus dem URL-Feld. Verwenden Sie z. B. /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': 'Die Ausbuchung ist nicht eingerichtet: Zahlstelle (Kasse) in der SGP-Integration angeben',
+  'sgp.error.invoiceIdMissing': 'Das SGP hat die ID dieser Rechnung nicht gesendet, daher kann sie hier nicht ausgebucht werden',
+  'sgp.error.settlePathId': 'Der Ausbuchungspfad muss die Rechnungs-ID enthalten, z. B. /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'Geben Sie SGP-URL, App und Token an, bevor Sie die Integration aktivieren',
   'sgp.error.notConfigured': 'Die SGP-Integration ist nicht konfiguriert',
   'sgp.error.customerListNotConfigured': 'Der Pfad der SGP-Kundenliste ist nicht gesetzt. Tragen Sie ihn unter Einstellungen → SGP ein.',
@@ -1095,6 +1098,9 @@ export default {
   'contacts.import.googleApplied': 'Google-Kontakte importiert: {created} angelegt',
   'contacts.synced': 'Kunde synchronisiert',
   'contacts.syncFailed': 'Kunde konnte nicht synchronisiert werden',
+  'contacts.invoiceSettled': 'Rechnung im SGP ausgebucht',
+  'contacts.invoiceSettleFailed': 'Rechnung konnte nicht ausgebucht werden',
+  'contacts.settleReceipt.text': 'Wir bestätigen den Eingang von {amount} für die Rechnung fällig am {due} (Vertrag {contract}), bezahlt am {date} per {method}. Vielen Dank!',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH-Valid-Konfiguration geladen',

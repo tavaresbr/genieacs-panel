@@ -59,6 +59,36 @@ class ContactController {
     }
   }
 
+  /** "Receber": the invoice settled on the SGP and, when asked, a receipt over WhatsApp. */
+  static async settleInvoice(req, res) {
+    try {
+      const body = req.body ?? {};
+      const result = await ContactInvoiceService.settle(
+        req.params.key,
+        req.params.invoiceId,
+        { amount: body.amount, paidAt: body.paidAt, method: body.method, receipt: body.receipt === true },
+        { userId: req.user?.userId ?? null, t: req.t, canSendReceipt: roleHas(req.user?.role, 'whatsapp.send') }
+      );
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_INVOICE_SETTLED,
+        subjectType: 'contact',
+        subjectId: String(req.params.key).slice(0, 64),
+        detail: {
+          contract: result.contract,
+          invoiceId: result.invoiceId,
+          sgpId: result.sgpId,
+          amount: result.amount,
+          paidAt: result.paidAt,
+          method: result.method,
+          receipt: result.receipt ? result.receipt.sent : null
+        }
+      });
+      return res.json(createResponse(req.t('contacts.invoiceSettled'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.invoiceSettleFailed');
+    }
+  }
+
   static async sendInvoice(req, res) {
     try {
       const result = await ContactInvoiceService.send(

@@ -679,6 +679,17 @@ export const casos = [
     tabela: 'sgp_links',
     coluna: 'contract'
   },
+  // "Receber": a ficha é procurada antes de tudo, então a chave do vizinho dá
+  // 404; no controle a rota passa da ficha e para na baixa não configurada.
+  {
+    chave: 'sgpContract',
+    label: 'POST /api/contacts/:key/invoices/:invoiceId/settle',
+    method: 'POST',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/invoices/T-1/settle`,
+    body: { amount: 10, method: 'PIX' },
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
   {
     chave: 'sgpContract',
     label: 'PATCH /api/contacts/:key',

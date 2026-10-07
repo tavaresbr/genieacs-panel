@@ -451,6 +451,9 @@ export default {
   'sgp.error.blockedHost': 'L’URL SGP pointe vers une adresse que cette installation n’a pas le droit d’atteindre',
   'sgp.error.pathsRelative': 'Les chemins de l’API SGP doivent être relatifs, par exemple /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'Les variables Postman comme {{url}} ne sont pas acceptées dans le chemin ; l’adresse du SGP vient du champ URL. Utilisez par exemple /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': 'Le solde des factures n\'est pas configuré : indiquez le point d\'encaissement (caisse) dans l\'intégration SGP',
+  'sgp.error.invoiceIdMissing': 'Le SGP n\'a pas envoyé l\'id de cette facture : impossible de la solder ici',
+  'sgp.error.settlePathId': 'Le chemin du solde doit contenir l\'id de la facture, par exemple /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'Saisissez l’URL SGP, l’app et le jeton avant d’activer l’intégration',
   'sgp.error.notConfigured': 'L’intégration SGP n’est pas configurée',
   'sgp.error.customerListNotConfigured': 'Le chemin de la liste des clients du SGP n’est pas configuré. Renseignez-le dans Paramètres → SGP.',
@@ -1090,6 +1093,9 @@ export default {
   'contacts.import.googleApplied': 'Contacts Google importés : {created} créés',
   'contacts.synced': 'Client synchronisé',
   'contacts.syncFailed': 'Impossible de synchroniser le client',
+  'contacts.invoiceSettled': 'Facture soldée dans le SGP',
+  'contacts.invoiceSettleFailed': 'Impossible de solder la facture',
+  'contacts.settleReceipt.text': 'Nous confirmons la réception de {amount} pour la facture échéant le {due} (contrat {contract}), payée le {date} via {method}. Merci !',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Configuration TeiaH Valid chargée',

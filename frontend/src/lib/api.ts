@@ -3216,6 +3216,8 @@ export interface SgpConfig {
     ticket: string
     /** The full client listing behind the contacts sync. Empty until set. */
     customerList: string
+    /** The settlement route; `{id}` is the invoice's SGP id. */
+    invoiceSettle?: string
   }
   tokenConfigured: boolean
   ready: boolean
@@ -3233,6 +3235,11 @@ export interface SgpConfig {
   ticketEnabled: boolean
   /** The install's own Tipo de Ocorrência id; SGP documents 5 as the default. */
   ticketOccurrenceType: number
+  /** The receiving point (cash desk) id settlements go to; 0 = not set. */
+  settleReceivingPoint: number
+  settlePaymentMethods: string[]
+  settleFees: number
+  settleReady: boolean
   contactsSyncEnabled: boolean
   contactsSyncIntervalHours: number
   contactsPageSize: number
@@ -3406,6 +3413,8 @@ export interface SgpFleetOverview {
 
 export interface SgpInvoice {
   id: string | null
+  /** The SGP's own id of the invoice, the one a settlement is addressed by. */
+  sgpId?: string | null
   description: string | null
   amount: number | null
   dueDate: string | null
@@ -3478,6 +3487,8 @@ export interface ContactProfile {
   whatsappPhone: string | null
   whatsappPhoneSource: 'manual' | 'sgp' | null
   contracts: ContactProfileContract[]
+  /** Set when "Receber" can settle on the SGP: the payment methods to pick from. */
+  settle?: { methods: string[] } | null
 }
 
 export type ContactProfileField = keyof ContactProfile['fields']
@@ -3641,7 +3652,25 @@ export const contactsAPI = {
     apiClient.post<ContactInvoiceSent>(
       `/contacts/${encodeURIComponent(key)}/invoices/${encodeURIComponent(invoiceId)}/whatsapp`,
       { text }
+    ),
+
+  /** "Receber": the invoice settled on the SGP, and a receipt over WhatsApp when asked. */
+  settleInvoice: (key: string, invoiceId: string, body: { amount: number; paidAt: string; method: string; receipt: boolean }) =>
+    apiClient.post<ContactInvoiceSettled>(
+      `/contacts/${encodeURIComponent(key)}/invoices/${encodeURIComponent(invoiceId)}/settle`,
+      body
     )
+}
+
+export interface ContactInvoiceSettled {
+  contract: string
+  invoiceId: string
+  sgpId: string
+  amount: number
+  paidAt: string
+  method: string
+  message: string | null
+  receipt: { sent: boolean; conversationId?: number; messageId?: number; error: string | null } | null
 }
 
 export interface ContactInvoiceMessage {

@@ -28,7 +28,7 @@ import assert from 'node:assert/strict';
  * ## O que este arquivo NÃO afirma
  *
  * São **60 rotas**, não as 91. A amostra foi escolhida para que cada uma das
- * 37 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
+ * 38 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
  * o teste do `admin` dá vale **sobre estas 60** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
@@ -88,6 +88,7 @@ const QUEM_TEM = {
   'campaigns.read': ['owner', 'admin', 'tech'],
   'contacts.read': ['owner', 'admin', 'tech'],
   'contacts.edit': ['owner', 'admin', 'tech'],
+  'contacts.settle': ['owner', 'admin', 'tech'],
 
   'catalogue.write': ['owner', 'admin'],
   'sgp.config': ['owner', 'admin'],
@@ -387,6 +388,16 @@ const CASOS = [
     path: () => '/api/contacts',
     body: { name: 'Cliente do alcance' },
     aceito: [201]
+  },
+  {
+    // Receber dá baixa no SGP: quem passa pela guarda chega à busca da ficha.
+    cap: 'contacts.settle',
+    label: 'POST /api/contacts/:key/invoices/:invoiceId/settle',
+    method: 'POST',
+    path: () => '/api/contacts/CONTRATO-QUE-NAO-EXISTE/invoices/T-1/settle',
+    body: { amount: 10, method: 'PIX' },
+    aceito: [404],
+    codigoAceito: 'not_found'
   },
   {
     // Sincronizar grava a ficha: só quem edita. A chave que não existe dá 404.
@@ -830,7 +841,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
     }
   });
 
-  it('cobre as 37 capacidades', () => {
+  it('cobre as 38 capacidades', () => {
     // Uma capacidade fora da amostra é uma rota sem prova de alcance nenhuma.
     const deFora = PERMISSIONS.filter((cap) => !QUEM_TEM[cap]);
     assert.deepEqual(deFora, [], `capacidades sem caso: ${deFora.join(', ')}`);
@@ -840,27 +851,27 @@ describe('a matriz e a expectativa deste arquivo', () => {
 
   it('tem par de recusa para toda capacidade que algum papel não tem', () => {
     /**
-     * A afirmação central do arquivo, conferida sobre a própria amostra: 34 das
-     * 37 capacidades têm alguém do lado de fora, e cada uma delas precisa de
+     * A afirmação central do arquivo, conferida sobre a própria amostra: 35 das
+     * 38 capacidades têm alguém do lado de fora, e cada uma delas precisa de
      * pelo menos uma rota onde essa recusa é exercitada. As 3 restantes são as
      * do `viewer`, que TODO papel tem — para elas não existe par de recusa a
      * escrever, e dizer o número aqui é o que impede que uma capacidade caia
      * silenciosamente para dentro do `viewer` sem ninguém notar.
      */
     const comRecusa = PERMISSIONS.filter((cap) => QUEM_TEM[cap].length < ROLES.length);
-    assert.equal(comRecusa.length, 34);
+    assert.equal(comRecusa.length, 35);
     for (const cap of comRecusa) {
       assert.ok(CASOS.some((caso) => caso.cap === cap), `${cap} sem rota para recusar`);
     }
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 61 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 63 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
     // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas,
     // e depois as três da TeiaH Valid, e a importação da agenda do WhatsApp.
-    assert.equal(CASOS.length, 62);
+    assert.equal(CASOS.length, 63);
   });
 });
 
@@ -927,9 +938,9 @@ describe('o alcance do viewer, sobre a amostra', () => {
 
   it('não alcança nada que mexa em aparelho, em gente ou em configuração', () => {
     // A amostra inteira menos as três acima, numa afirmação só: o que o
-    // `viewer` NÃO alcança é 34 das 37 capacidades.
+    // `viewer` NÃO alcança é 35 das 38 capacidades.
     const fechadas = PERMISSIONS.filter((cap) => !QUEM_TEM[cap].includes('viewer'));
-    assert.equal(fechadas.length, 34, fechadas.join(', '));
+    assert.equal(fechadas.length, 35, fechadas.join(', '));
   });
 });
 

@@ -58,6 +58,7 @@ export const PERMISSIONS = [
   'campaigns.manage',
   'contacts.read',
   'contacts.edit',
+  'contacts.settle',
   'contacts.export',
   'contacts.import',
   'settings.read',
@@ -96,7 +97,8 @@ const TECH: Permission[] = [
   'whatsapp.send',
   'campaigns.read',
   'contacts.read',
-  'contacts.edit'
+  'contacts.edit',
+  'contacts.settle'
 ]
 
 /** Administra a operação do provedor. */

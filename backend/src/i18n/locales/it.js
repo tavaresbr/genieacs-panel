@@ -449,6 +449,9 @@ export default {
   'sgp.error.blockedHost': 'L’URL di SGP punta a un indirizzo che questa installazione non può raggiungere',
   'sgp.error.pathsRelative': 'I percorsi dell’API di SGP devono essere relativi, come /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'Le variabili di Postman come {{url}} non sono accettate nel percorso; l’indirizzo del SGP viene dal campo URL. Usa, ad esempio, /api/ura/clientes/',
+  'sgp.error.settleNotConfigured': 'Il saldo dei titoli non è configurato: indica il punto di incasso (cassa) nell\'integrazione SGP',
+  'sgp.error.invoiceIdMissing': 'Il SGP non ha inviato l\'id di questo titolo, quindi non può essere saldato da qui',
+  'sgp.error.settlePathId': 'Il percorso del saldo deve contenere l\'id del titolo, ad esempio /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'Inserisci URL, app e token di SGP prima di attivare l’integrazione',
   'sgp.error.notConfigured': 'L’integrazione con SGP non è configurata',
   'sgp.error.customerListNotConfigured': 'Il percorso dell’elenco clienti del SGP non è configurato. Compilalo in Impostazioni → SGP.',
@@ -1092,6 +1095,9 @@ export default {
   'contacts.import.googleApplied': 'Contatti Google importati: {created} creati',
   'contacts.synced': 'Cliente sincronizzato',
   'contacts.syncFailed': 'Impossibile sincronizzare il cliente',
+  'contacts.invoiceSettled': 'Titolo saldato nel SGP',
+  'contacts.invoiceSettleFailed': 'Impossibile saldare il titolo',
+  'contacts.settleReceipt.text': 'Confermiamo la ricezione di {amount} per il titolo in scadenza il {due} (contratto {contract}), pagato il {date} tramite {method}. Grazie!',
 
   // TeiaH Valid
   'teiah.configLoaded': 'Configurazione di TeiaH Valid caricata',

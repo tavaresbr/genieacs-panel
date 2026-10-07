@@ -449,6 +449,9 @@ export default {
   'sgp.error.blockedHost': 'SGP पता ऐसे पते की ओर संकेत करता है जिस तक यह इंस्टॉलेशन नहीं पहुँच सकता',
   'sgp.error.pathsRelative': 'SGP API पथ सापेक्ष होने चाहिए, जैसे /api/ura/titulos/',
   'sgp.error.pathPlaceholder': 'पथ में {{url}} जैसे Postman वेरिएबल स्वीकार नहीं हैं; SGP पता URL फ़ील्ड से आता है। उदाहरण के लिए /api/ura/clientes/ इस्तेमाल करें',
+  'sgp.error.settleNotConfigured': 'बिल निपटान कॉन्फ़िगर नहीं है: SGP इंटीग्रेशन में प्राप्ति बिंदु (कैश डेस्क) दर्ज करें',
+  'sgp.error.invoiceIdMissing': 'SGP ने इस बिल की id नहीं भेजी, इसलिए यहाँ से निपटान नहीं हो सकता',
+  'sgp.error.settlePathId': 'निपटान पथ में बिल की id होनी चाहिए, जैसे /api/banco/titulo/{id}/baixar/',
   'sgp.error.configIncomplete': 'एकीकरण सक्षम करने से पहले SGP पता, ऐप और टोकन दर्ज करें',
   'sgp.error.notConfigured': 'SGP एकीकरण कॉन्फ़िगर नहीं है',
   'sgp.error.customerListNotConfigured': 'SGP ग्राहक सूची का पथ सेट नहीं है। सेटिंग्स → SGP में भरें।',
@@ -1094,6 +1097,9 @@ export default {
   'contacts.import.googleApplied': 'Google संपर्क आयात किए गए: {created} बनाए गए',
   'contacts.synced': 'ग्राहक सिंक हो गया',
   'contacts.syncFailed': 'ग्राहक सिंक नहीं हो सका',
+  'contacts.invoiceSettled': 'SGP में बिल का निपटान हुआ',
+  'contacts.invoiceSettleFailed': 'बिल का निपटान नहीं हो सका',
+  'contacts.settleReceipt.text': 'हम {due} को देय बिल (अनुबंध {contract}) के लिए {amount} की प्राप्ति की पुष्टि करते हैं, {date} को {method} से भुगतान किया गया। धन्यवाद!',
 
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid कॉन्फ़िगरेशन लोड हुआ',

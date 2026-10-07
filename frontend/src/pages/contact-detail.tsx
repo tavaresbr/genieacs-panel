@@ -11,6 +11,7 @@ import {
   type ContactProfileField,
   type ContactProfilePatch,
   type ContactInvoiceMessage,
+  type ContactInvoiceSettled,
   type SgpInvoice
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
@@ -20,6 +21,7 @@ import { sessionOwner } from '@/lib/session-owner'
 import { useTranslation } from '@/contexts/language-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl } from '@/lib/sgp'
 import { isoDay } from '@/lib/date-format'
+import { parseAmountToCents } from '@/lib/utils'
 
 const ADDRESS_PARTS = ['street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference'] as const
 
@@ -391,7 +393,7 @@ export default function ContactDetailPage() {
           )}
         </Card>
 
-        {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} whatsappPhone={profile.whatsappPhone} />}
+        {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} whatsappPhone={profile.whatsappPhone} settleMethods={profile.settle?.methods ?? null} />}
 
         {editing && (
           <EditModal
@@ -457,14 +459,21 @@ function FieldRow<T>({ label, field, canEdit, onRestore, children }: {
   )
 }
 
-function InvoicesCard({ contactKey, whatsappPhone }: { contactKey: string; whatsappPhone: string | null }) {
+function InvoicesCard({ contactKey, whatsappPhone, settleMethods }: {
+  contactKey: string
+  whatsappPhone: string | null
+  /** The payment methods "Receber" offers; `null` when settling is not set up. */
+  settleMethods: string[] | null
+}) {
   const { t, intlLocale } = useTranslation()
   const { can } = useAuth()
   const toast = useToast()
   const [groups, setGroups] = useState<{ contract: string; invoices: SgpInvoice[] }[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
+  const [settling, setSettling] = useState<(SgpInvoice & { contract: string }) | null>(null)
   const canSend = can('whatsapp.send')
+  const canSettle = can('contacts.settle') && Boolean(settleMethods?.length)
 
   const load = async () => {
     setLoading(true)
@@ -518,13 +527,148 @@ function InvoicesCard({ contactKey, whatsappPhone }: { contactKey: string; whats
                     <Icon name="chat" size={14} /> {t('contacts.profile.sendInvoice')}
                   </button>
                 )}
+                {canSettle && invoice.id && invoice.sgpId && (
+                  <button type="button" className="modern-button" onClick={() => setSettling(invoice)}>
+                    <Icon name="check" size={14} /> {t('contacts.profile.settle')}
+                  </button>
+                )}
               </span>
             </li>
           ))}
         </ul>
       )}
       {sending && <SendInvoiceModal contactKey={contactKey} invoiceId={sending} onClose={() => setSending(null)} />}
+      {settling && settleMethods && (
+        <SettleInvoiceModal
+          contactKey={contactKey}
+          invoice={settling}
+          methods={settleMethods}
+          canReceipt={canSend && Boolean(whatsappPhone)}
+          onClose={() => setSettling(null)}
+          onSettled={() => {
+            setSettling(null)
+            void load()
+          }}
+        />
+      )}
     </Card>
+  )
+}
+
+/** Today in Brazil, where the SGP keeps its books: the default payment date. */
+function todayInBrazil() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+}
+
+/**
+ * "Receber": the operator took the payment and settles the invoice on the SGP.
+ * The amount starts at the invoice's own and may be changed (interest, a
+ * discount); the server finds the invoice again before settling, so a second
+ * click on one already paid is refused.
+ */
+function SettleInvoiceModal({ contactKey, invoice, methods, canReceipt, onClose, onSettled }: {
+  contactKey: string
+  invoice: SgpInvoice & { contract: string }
+  methods: string[]
+  canReceipt: boolean
+  onClose: () => void
+  onSettled: (result: ContactInvoiceSettled) => void
+}) {
+  const { t, intlLocale } = useTranslation()
+  const toast = useToast()
+  const [amount, setAmount] = useState(invoice.amount !== null ? invoice.amount.toFixed(2).replace('.', ',') : '')
+  const [paidAt, setPaidAt] = useState(todayInBrazil)
+  const [method, setMethod] = useState(methods[0] ?? '')
+  const [receipt, setReceipt] = useState(canReceipt)
+  const [busy, setBusy] = useState(false)
+  const cents = parseAmountToCents(amount)
+  const value = cents === null ? NaN : cents / 100
+  const valid = cents !== null && cents > 0 && Boolean(paidAt) && paidAt <= todayInBrazil() && Boolean(method)
+
+  const confirm = async () => {
+    if (!invoice.id || busy) return
+    setBusy(true)
+    try {
+      const res = await contactsAPI.settleInvoice(contactKey, invoice.id, { amount: value, paidAt, method, receipt: canReceipt && receipt })
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('contacts.profile.settleFailed'))
+        return
+      }
+      const result = res.data
+      if (result.receipt && !result.receipt.sent) {
+        toast.error(t('contacts.profile.settleDoneReceiptFailed', { error: result.receipt.error || '' }))
+      } else {
+        toast.success(result.receipt?.sent ? t('contacts.profile.settleDoneReceipt') : t('contacts.profile.settleDone'))
+      }
+      onSettled(result)
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="settle-invoice-title">
+      <div className="modal-panel modern-card max-w-md p-5 sm:p-6">
+        <h2 id="settle-invoice-title" className="section-heading mb-1">{t('contacts.profile.settleTitle')}</h2>
+        <p className="section-description mb-4">
+          {t('contacts.profile.settleOf', {
+            amount: formatBrl(invoice.amount, intlLocale),
+            date: formatSgpDate(invoice.dueDate, intlLocale),
+            contract: invoice.contract
+          })}
+        </p>
+        <div className="grid gap-4">
+          <div>
+            <label className="field-label" htmlFor="settle-amount">{t('contacts.profile.settleAmount')}</label>
+            <input
+              id="settle-amount"
+              className="modern-input w-full"
+              inputMode="decimal"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value.replace(/[^\d.,]/g, ''))}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="settle-date">{t('contacts.profile.settleDate')}</label>
+            <input
+              id="settle-date"
+              type="date"
+              className="modern-input w-full"
+              value={paidAt}
+              max={todayInBrazil()}
+              onChange={(event) => setPaidAt(event.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="settle-method">{t('contacts.profile.settleMethod')}</label>
+            <select id="settle-method" className="modern-input w-full" value={method} onChange={(event) => setMethod(event.target.value)}>
+              {methods.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+            </select>
+          </div>
+          {canReceipt && (
+            <label className="flex cursor-pointer items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[hsl(var(--primary))]"
+                checked={receipt}
+                onChange={(event) => setReceipt(event.target.checked)}
+              />
+              {t('contacts.profile.settleReceipt')}
+            </label>
+          )}
+        </div>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>
+            {t('common.cancel')}
+          </button>
+          <button type="button" className="modern-button" disabled={busy || !valid} onClick={() => void confirm()}>
+            <Icon name="check" size={16} /> {busy ? t('contacts.profile.settling') : t('contacts.profile.settleConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
