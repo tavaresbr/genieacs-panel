@@ -499,6 +499,37 @@ export function errorHandler(err, req, res, next) {
   });
 }
 
+/**
+ * A página do Embedded Signup da Meta (`frontend/public/whatsapp-signup.html`,
+ * servida pelo `express.static` de `serveFrontend` logo abaixo) carrega o SDK
+ * JS do Facebook, que abre um iframe oculto e fala com a Graph. A CSP do
+ * painel não deixa — `script-src` é só `'self'` — e continua não deixando em
+ * todo o resto: só nesta URL os domínios do Facebook entram, e só eles. O
+ * script da página é um arquivo externo (`whatsapp-signup.js`), então inline
+ * segue bloqueado aqui também, inclusive `onclick=` (`script-src-attr 'none'`).
+ *
+ * O helmet grava o cabeçalho e segue (`setHeader` + `next()`), então um
+ * segundo `contentSecurityPolicy` montado depois dele apenas sobrescreve o
+ * valor nesta rota, com os mesmos padrões dele para o que não é dito aqui.
+ * A janela do `FB.login` é um popup: não passa pela CSP, mas depende de COOP
+ * desligado (`crossOriginOpenerPolicy: false`, acima) para avisar o opener.
+ *
+ * Sem filtro por host: a Meta só aceita o SDK na origem cadastrada no app
+ * (`tr69.com.br`), então em qualquer outro nome a página abre e o botão falha.
+ */
+const CSP_DIRECTIVES = helmetOptions.contentSecurityPolicy.directives;
+app.get('/whatsapp-signup.html', helmet.contentSecurityPolicy({
+  directives: {
+    ...CSP_DIRECTIVES,
+    scriptSrc: ["'self'", 'https://connect.facebook.net'],
+    // O `xd_arbiter` do SDK e o status de login; `web.` é o host que a Meta
+    // usa em parte do Brasil.
+    frameSrc: ['https://www.facebook.com', 'https://web.facebook.com', 'https://staticxx.facebook.com'],
+    connectSrc: ["'self'", 'https://www.facebook.com', 'https://web.facebook.com', 'https://graph.facebook.com'],
+    imgSrc: [...CSP_DIRECTIVES.imgSrc, 'https://www.facebook.com']
+  }
+}));
+
 if (!serveFrontend(app, 'index.html')) {
   console.warn(`Frontend build not found at ${FRONTEND_DIR}; serving API only`);
 }

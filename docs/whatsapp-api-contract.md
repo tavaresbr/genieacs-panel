@@ -292,6 +292,11 @@ verificação são os mesmos para todos (os da plataforma). Um app único da
 plataforma servindo os números dos provedores exige virar *Tech Provider* na
 Meta (verificação da empresa e Embedded Signup) — fica para depois.
 
+Para o número que **já está no app WhatsApp Business** do celular (coexistência,
+via Embedded Signup em `https://tr69.com.br/whatsapp-signup.html`), ver
+`docs/whatsapp-coexistencia.md`: a ordem dos passos importa e a sincronização
+tem prazo de 24 h.
+
 
 **Janela de 24 horas.** Num número oficial, texto livre só é aceito até 24 h
 depois da última mensagem do cliente **naquele número**
