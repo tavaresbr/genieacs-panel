@@ -9,6 +9,19 @@ import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
 import { copyName } from './template-copy'
 import { MetaTemplatesPanel, metaKey } from './meta-templates-panel'
+import {
+  TEMPLATE_CATEGORIES,
+  asCategory,
+  citedVariables,
+  classify,
+  filterTemplates,
+  isFiltering,
+  NO_FILTER,
+  templateCounts,
+  type BillingKind,
+  type TemplateCategory,
+  type TemplateFilter
+} from './template-filter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The variables the dispatcher knows how to fill.
@@ -41,8 +54,7 @@ const VARIABLES = [
  */
 const QUICK_REPLY_VARIABLES = ['nome', 'primeiro_nome', 'contrato', 'atendente'] as const
 
-export const TEMPLATE_CATEGORIES = ['cobranca', 'atendimento', 'suporte', 'alerta', 'geral'] as const
-type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
+export { TEMPLATE_CATEGORIES }
 
 const CATEGORY_LABEL = {
   cobranca: 'whatsapp.templates.categoryCobranca',
@@ -52,22 +64,9 @@ const CATEGORY_LABEL = {
   geral: 'whatsapp.templates.categoryGeral'
 } as const satisfies Record<TemplateCategory, string>
 
-const asCategory = (value: string | null | undefined): TemplateCategory =>
-  (TEMPLATE_CATEGORIES as readonly string[]).includes(String(value)) ? (value as TemplateCategory) : 'geral'
-
 /** As variáveis que a categoria aceita — a mesma regra do servidor. */
 const variablesFor = (category: TemplateCategory): readonly string[] =>
   category === 'atendimento' ? QUICK_REPLY_VARIABLES : VARIABLES
-
-/** The backend's own placeholder pattern, character for character. */
-const PLACEHOLDER = /\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g
-
-/** Every distinct variable a body cites, known or not. */
-function citedVariables(body: string): string[] {
-  const found = new Set<string>()
-  for (const match of body.matchAll(PLACEHOLDER)) found.add(match[1])
-  return [...found]
-}
 
 /** What the server will refuse the body for, computed before asking it. */
 function unknownVariables(body: string, category: TemplateCategory): string[] {
@@ -75,30 +74,10 @@ function unknownVariables(body: string, category: TemplateCategory): string[] {
   return citedVariables(body).filter((name) => !allowed.includes(name))
 }
 
-type Classification = 'reminder' | 'dunning' | 'both' | 'none'
-
-/**
- * What a template IS, read off what it cites — never off a field an operator
- * could set to disagree with the text.
- *
- * `dias_atraso` and `dias_para_vencer` are mirrors: an overdue invoice fills
- * the first and empties the second, and vice versa. Since an empty variable
- * refuses the whole message, a body citing `dias_atraso` can only ever render
- * for someone already overdue — which is the rule that keeps a dunning text
- * away from a subscriber who has not been billed yet. A body citing BOTH is
- * therefore not "more general": it can never render for anybody, and this
- * editor is the only place an operator can be told so before a campaign
- * silently skips every recipient.
- */
-function classify(body: string): Classification {
-  const cited = citedVariables(body)
-  const reminder = cited.includes('dias_para_vencer')
-  const dunning = cited.includes('dias_atraso')
-  if (reminder && dunning) return 'both'
-  if (reminder) return 'reminder'
-  if (dunning) return 'dunning'
-  return 'none'
-}
+const KIND_FILTERS: [BillingKind, TranslationKey][] = [
+  ['reminder', 'whatsapp.templates.filterReminder'],
+  ['dunning', 'whatsapp.templates.filterDunning']
+]
 
 const CLASSIFICATION_LABEL: Record<'reminder' | 'dunning', TranslationKey> = {
   reminder: 'whatsapp.templates.isReminder',
@@ -191,6 +170,7 @@ export function TemplatesPanel() {
   const toast = useToast()
 
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
+  const [filter, setFilter] = useState<TemplateFilter>(NO_FILTER)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -359,6 +339,8 @@ export function TemplatesPanel() {
     && (!draftMeta || draft!.metaParams.length !== draftMeta.paramCount || draft!.metaParams.some((v) => !v)
       || !headerReady(draftMeta, draft!.metaHeader)
       || (draftNeeds.button && !draft!.metaButtonParam))
+  const visible = useMemo(() => filterTemplates(templates, filter), [templates, filter])
+  const counts = useMemo(() => templateCounts(templates, filter), [templates, filter])
   const draftBody = draft?.body ?? ''
   const draftKind = useMemo(() => classify(draftBody), [draftBody])
   const canSave = Boolean(draft && draft.name.trim() && draft.body.trim()) && !metaIncomplete
@@ -585,6 +567,52 @@ export function TemplatesPanel() {
         </p>
       )}
 
+      {templates.length > 0 && (
+        <div className="flex flex-col gap-3" data-testid="templates-filters">
+          <input
+            type="search"
+            className="modern-input"
+            value={filter.search}
+            placeholder={t('whatsapp.templates.searchPlaceholder')}
+            aria-label={t('whatsapp.templates.searchPlaceholder')}
+            onChange={(event) => setFilter((current) => ({ ...current, search: event.target.value }))}
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="tab-rail" role="tablist" aria-label={t('whatsapp.templates.category')}>
+              {(['', ...TEMPLATE_CATEGORIES] as const).map((id) => (
+                <button
+                  key={id || 'all'}
+                  type="button"
+                  className="tab-button"
+                  role="tab"
+                  data-active={filter.category === id}
+                  aria-selected={filter.category === id}
+                  onClick={() => setFilter((current) => ({ ...current, category: id }))}
+                >
+                  {id ? t(CATEGORY_LABEL[id]) : t('whatsapp.templates.filterAll')}
+                  <span className="ml-1.5 text-xs font-normal opacity-70" data-testid="templates-count">{counts.categories[id || 'all']}</span>
+                </button>
+              ))}
+            </div>
+            {KIND_FILTERS.map(([kind, labelKey]) => (
+              <button
+                key={kind}
+                type="button"
+                className={filter.kind === kind ? 'modern-button' : 'modern-button-secondary'}
+                aria-pressed={filter.kind === kind}
+                data-testid={`templates-kind-${kind}`}
+                onClick={() => setFilter((current) => ({ ...current, kind: current.kind === kind ? '' : kind }))}
+              >
+                <Icon name="invoice" size={16} />
+                {t(labelKey)}
+                <span className="text-xs font-normal opacity-70">{counts.kinds[kind]}</span>
+                {filter.kind === kind && <Icon name="x" size={14} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading && templates.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : templates.length === 0 ? (
@@ -596,9 +624,23 @@ export function TemplatesPanel() {
             <p className="empty-state-title">{t('whatsapp.templates.empty')}</p>
           </div>
         </div>
+      ) : visible.length === 0 ? (
+        <div className="modern-card" data-testid="templates-no-match">
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <Icon name="search" size={22} />
+            </div>
+            <p className="empty-state-title">{t('whatsapp.templates.noMatch')}</p>
+            {isFiltering(filter) && (
+              <button type="button" className="modern-button-secondary mt-3" onClick={() => setFilter(NO_FILTER)}>
+                {t('whatsapp.templates.clearFilters')}
+              </button>
+            )}
+          </div>
+        </div>
       ) : (
         <ul className="flex flex-col gap-3" role="list">
-          {templates.map((template) => (
+          {visible.map((template) => (
             <li key={template.id} className="modern-card p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">

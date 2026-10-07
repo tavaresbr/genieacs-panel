@@ -354,7 +354,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
 
   return (
     <div
-      className="relative border-t border-border bg-card p-2.5 sm:p-3"
+      className="@container relative border-t border-border bg-card p-2.5 sm:p-3"
       data-testid="composer"
       onDragEnter={dragEnter}
       onDragOver={dragOver}
@@ -524,7 +524,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
         </div>
       )}
 
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3 sm:items-start">
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3 @4xl:items-start">
         <div className="min-w-0">
           <label
             className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground"
@@ -539,7 +539,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
             <Icon name="lock" size={14} className={isNote ? 'text-[hsl(var(--status-warning))]' : 'text-muted-foreground'} />
             {t('whatsapp.inbox.note')}
           </label>
-          <p className="field-hint hidden max-w-md sm:block">{t('whatsapp.inbox.noteHint')}</p>
+          <p className="field-hint hidden max-w-md @6xl:block">{t('whatsapp.inbox.noteHint')}</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -560,7 +560,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           {quickReplies !== null && (
             <button
               type="button"
-              className="modern-button-secondary shrink-0 px-3 sm:px-4"
+              className="modern-button-secondary shrink-0 px-3 @4xl:px-4"
               aria-label={t('whatsapp.quickReplies.button')}
               title={t('whatsapp.quickReplies.button')}
               aria-pressed={pickerOpen}
@@ -575,13 +575,13 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               }}
             >
               <Icon name="chat" size={16} />
-              <span className="hidden sm:inline">{t('whatsapp.quickReplies.button')}</span>
+              <span className="hidden @4xl:inline">{t('whatsapp.quickReplies.button')}</span>
             </button>
           )}
           {onSuggest && !isNote && (
             <button
               type="button"
-              className="modern-button-secondary shrink-0 px-3 sm:px-4"
+              className="modern-button-secondary shrink-0 px-3 @4xl:px-4"
               aria-label={t('whatsapp.ai.suggest')}
               title={t('whatsapp.ai.suggest')}
               disabled={busy || suggesting}
@@ -597,7 +597,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
               }}
             >
               <Icon name="sparkles" size={16} />
-              <span className="hidden sm:inline">{suggesting ? t('whatsapp.ai.suggesting') : t('whatsapp.ai.suggest')}</span>
+              <span className="hidden @4xl:inline">{suggesting ? t('whatsapp.ai.suggesting') : t('whatsapp.ai.suggest')}</span>
             </button>
           )}
           {canRecord && !isNote && (
@@ -608,14 +608,14 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           )}
           <button
             type="button"
-            className="modern-button-secondary shrink-0 px-3 sm:px-4"
+            className="modern-button-secondary shrink-0 px-3 @4xl:px-4"
             aria-label={t('whatsapp.inbox.attach')}
             title={t('whatsapp.inbox.attachHint')}
             disabled={busy || items.length >= MAX_ATTACHMENTS_PER_SEND}
             onClick={() => fileRef.current?.click()}
           >
             <Icon name="paperclip" size={16} />
-            <span className="hidden sm:inline">{t('whatsapp.inbox.attach')}</span>
+            <span className="hidden @4xl:inline">{t('whatsapp.inbox.attach')}</span>
           </button>
 
           <button

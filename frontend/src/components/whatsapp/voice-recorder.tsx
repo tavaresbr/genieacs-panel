@@ -116,7 +116,7 @@ export function VoiceRecorder({ disabled, onRecorded }: { disabled: boolean; onR
         </span>
         <button type="button" className="modern-button-secondary shrink-0 px-3" onClick={() => stop(true)}>
           <Icon name="x" size={16} />
-          <span className="hidden sm:inline">{t('whatsapp.audio.cancel')}</span>
+          <span className="hidden @4xl:inline">{t('whatsapp.audio.cancel')}</span>
         </button>
         <button type="button" className="modern-button shrink-0 px-3" onClick={() => stop(false)}>
           <Icon name="stop" size={16} />
@@ -129,14 +129,14 @@ export function VoiceRecorder({ disabled, onRecorded }: { disabled: boolean; onR
   return (
     <button
       type="button"
-      className="modern-button-secondary shrink-0 px-3 sm:px-4"
+      className="modern-button-secondary shrink-0 px-3 @4xl:px-4"
       aria-label={t('whatsapp.audio.record')}
       title={t('whatsapp.audio.recordHint')}
       disabled={disabled}
       onClick={() => void start()}
     >
       <Icon name="mic" size={16} />
-      <span className="hidden sm:inline">{t('whatsapp.audio.record')}</span>
+      <span className="hidden @4xl:inline">{t('whatsapp.audio.record')}</span>
     </button>
   )
 }
