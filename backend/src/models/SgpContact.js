@@ -53,6 +53,14 @@ class SgpContact {
     return query;
   }
 
+  /** Clients with no contract (the "Sem contrato" situação), with what the campaign filters need. */
+  static async listWithoutContract() {
+    return tdb('sgp_contacts')
+      .whereNull('contract')
+      .select('id', 'client_name', 'document', 'phone_e164', 'phone_manual', 'address_parts')
+      .orderBy('id');
+  }
+
   /** The contract-less row of one SGP client, if there is one. */
   static async getClientRow(clientId) {
     if (!clientId) return null;

@@ -86,6 +86,9 @@ export function lerFiltros(entrada = {}) {
   };
 }
 
+const SEM_CONTRATO = 'none';
+const ORDEM_SITUACAO = ['active', 'blocked', 'cancelled', 'unknown', SEM_CONTRATO];
+
 function invalido(key, code, vars) {
   return new WaError(key, { code, status: 400, vars });
 }
@@ -127,8 +130,17 @@ class WaCampaignService {
     const ordenar = (mapa) => [...mapa.values()]
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, 'pt-BR'))
       .slice(0, OPTIONS_LIMIT);
+    // Mesma ordem da aba Contatos: Ativos, Suspensos, Cancelados, Sem contrato.
+    const semContrato = (await SgpContact.listWithoutContract()).length;
+    if (semContrato > 0) states.set(SEM_CONTRATO, { value: SEM_CONTRATO, count: semContrato });
+    const ordemSituacao = (valor) => {
+      const i = ORDEM_SITUACAO.indexOf(valor);
+      return i === -1 ? ORDEM_SITUACAO.length : i;
+    };
     return {
-      states: ordenar(states),
+      states: [...states.values()]
+        .sort((a, b) => ordemSituacao(a.value) - ordemSituacao(b.value) || b.count - a.count)
+        .slice(0, OPTIONS_LIMIT),
       plans: ordenar(plans),
       districts: ordenar(districts),
       cities: ordenar(cities),
@@ -152,7 +164,12 @@ class WaCampaignService {
     const filtraCadastro = filtros.states.length > 0 || filtros.plans.length > 0
       || bairros.size > 0 || cidades.size > 0;
 
-    const contatos = (await SgpContact.listForAudience({ states: filtros.states, plans: filtros.plans }))
+    // "Sem contrato" não é um valor de `sgp_contacts.state`: são os clientes sem contrato.
+    const incluiSemContrato = filtros.states.includes(SEM_CONTRATO);
+    const estadosReais = filtros.states.filter((s) => s !== SEM_CONTRATO);
+    const soSemContrato = incluiSemContrato && estadosReais.length === 0;
+
+    const contatos = (soSemContrato ? [] : await SgpContact.listForAudience({ states: estadosReais, plans: filtros.plans }))
       .filter((row) => {
         if (porContrato && !porContrato.has(String(row.contract))) return false;
         if (bairros.size === 0 && cidades.size === 0) return true;
@@ -179,6 +196,23 @@ class WaCampaignService {
       vinculos.filter((link) => contratos.has(String(link.contract))),
       contatos
     );
+
+    // Clientes sem contrato só entram sem filtro de plano nem contrato colado
+    // (não têm nenhum dos dois); bairro e cidade valem como nos demais.
+    if (incluiSemContrato && filtros.plans.length === 0 && !porContrato) {
+      for (const row of await SgpContact.listWithoutContract()) {
+        if (bairros.size > 0 || cidades.size > 0) {
+          const endereco = lerEndereco(row.address_parts);
+          if (bairros.size > 0 && !bairros.has(chaveDeLugar(endereco.district))) continue;
+          if (cidades.size > 0 && !cidades.has(chaveDeLugar(endereco.city))) continue;
+        }
+        assinantes.push({
+          contract: null,
+          clientName: row.client_name || null,
+          phone: row.phone_manual || row.phone_e164 || null
+        });
+      }
+    }
 
     const semTelefone = [];
     const comTelefone = [];
