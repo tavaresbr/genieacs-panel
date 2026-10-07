@@ -12,6 +12,7 @@ import WaAssignmentService from './waAssignmentService.js';
 import WaTagService from './waTagService.js';
 import { tdb } from '../config/database.js';
 import BillingStatusService from './billingStatusService.js';
+import SgpService from './sgpService.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
 /** How many messages a thread hands back before the caller has to ask for more. */
@@ -266,6 +267,7 @@ class WaConversationService {
       awaitingSince: extra.awaitingSince ?? null,
       // Em dia, vence hoje ou atrasado, pela última consulta ao SGP; null sem foto.
       billing: extra.billing ?? null,
+      sgpUrl: extra.sgpUrl ?? null,
       waitingSince: row.waiting_since || null,
       botPausedUntil: row.bot_paused_until && new Date(row.bot_paused_until).getTime() > Date.now()
         ? new Date(row.bot_paused_until).toISOString()
@@ -333,6 +335,10 @@ class WaConversationService {
     // would otherwise open a hundred queries to draw one screen.
     const contracts = [...new Set(rows.map((r) => r.contract).filter(Boolean))];
     const names = new Map();
+    // O id do cliente no SGP, guardado pela sincronização de contatos: com
+    // ele o número do contrato na lista vira atalho para o cadastro no SGP,
+    // sem perguntar nada ao SGP a cada atualização da lista.
+    const clientIds = new Map();
     const contactIds = [...new Set(rows.filter((r) => !r.contract && r.sgp_contact_id).map((r) => r.sgp_contact_id))];
     const contactNames = new Map();
     if (contactIds.length > 0) {
@@ -341,8 +347,12 @@ class WaConversationService {
     }
     if (contracts.length > 0) {
       // The ONT's mirror wins over a lookup's row for the same contract.
-      const contacts = await tdb('sgp_contacts').whereIn('contract', contracts).select('contract', 'client_name');
-      for (const contact of contacts) names.set(contact.contract, contact.client_name);
+      const contacts = await tdb('sgp_contacts').whereIn('contract', contracts).select('contract', 'client_name', 'client_ref');
+      for (const contact of contacts) {
+        names.set(contact.contract, contact.client_name);
+        // Numa linha de contrato o cliente do SGP fica em `client_ref`.
+        if (contact.client_ref) clientIds.set(contact.contract, contact.client_ref);
+      }
       const links = await tdb('sgp_links').whereIn('contract', contracts).select('contract', 'client_name');
       for (const link of links) names.set(link.contract, link.client_name);
     }
@@ -354,11 +364,16 @@ class WaConversationService {
     // em segundo plano — a lista não espera o SGP.
     const situacoes = await BillingStatusService.forContracts(contracts);
     BillingStatusService.refreshStale(contracts, situacoes);
+    const sgpConfig = clientIds.size > 0 ? await SgpService.getConfig() : null;
+    const sgpUrlOf = (contract) => (sgpConfig?.enabled && contract
+      ? SgpService.clientPageUrl(sgpConfig, clientIds.get(contract))
+      : null);
 
     return rows.map((row) => this.publicConversation(row, {
       tags: etiquetas.get(Number(row.id)) ?? [],
       awaitingSince: aguardando.get(Number(row.id)) ?? null,
       billing: row.contract ? situacoes.get(row.contract) ?? null : null,
+      sgpUrl: sgpUrlOf(row.contract),
       assignedTo: row.assigned_user_id ? atendentes.get(Number(row.assigned_user_id)) ?? null : null,
       clientName: row.contract
         ? names.get(row.contract) ?? null

@@ -903,6 +903,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       // clearing the box for.
                       filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null}
                       waiting={waitingMap}
+                      canOpenSgp={canSeeSgp}
                     />
                   )}
               </div>
