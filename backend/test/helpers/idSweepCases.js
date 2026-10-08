@@ -115,6 +115,18 @@ export const casos = [
     tabela: 'wa_templates'
   },
   {
+    // A edição de uma campanha de aviso. O id do vizinho tem que dar 404 antes
+    // de qualquer validação do corpo. No controle, o id do próprio beta dá 409
+    // (a campanha semeada é de cobrança, e só a de aviso se edita): o 409 só
+    // se chega DEPOIS de a campanha ter sido encontrada.
+    chave: 'broadcast',
+    label: 'PUT /api/whatsapp/broadcasts/:id',
+    method: 'PUT',
+    path: (id) => `/api/whatsapp/broadcasts/${id}`,
+    body: { title: 'Aviso', filters: { contracts: ['1'] }, body: 'Oi' },
+    tabela: 'wa_broadcasts'
+  },
+  {
     chave: 'template',
     label: 'DELETE /api/whatsapp/templates/:id',
     method: 'DELETE',
