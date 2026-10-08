@@ -300,6 +300,15 @@ class SubscriptionNoticeService {
 
     const suspensao = await SubscriptionService.autoSuspend({ tenant, now, config, prorationDueAt, warnedAt });
     if (!suspensao.suspended) return { action: 'none', reason: suspensao.reason };
+    // O alerta para quem opera a plataforma (0112): um por prazo vencido —
+    // a mesma chave do aviso. Depois de gravada a suspensão; nunca lança.
+    const { default: PlatformAlertService } = await import('./platformAlertService.js');
+    await PlatformAlertService.enqueue('auto_suspended', {
+      tenantId: tenant.id,
+      dedupeKey: `${tenant.id}:${dueAt}`,
+      payload: { date: dueAt, reason: etapa.reason ?? null },
+      now
+    });
     const depois = await Subscription.forTenant(tenant.id);
     let notice;
     try {

@@ -1169,5 +1169,26 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid 拒絕了 API 金鑰',
   'teiah.error.rateLimited': 'TeiaH Valid 正在限制請求，請稍後重試',
   'teiah.error.status': 'TeiaH Valid 回傳狀態碼 {status}',
-  'teiah.error.exportRunning': '已有傳送到 TeiaH Valid 的工作正在進行'
+  'teiah.error.exportRunning': '已有傳送到 TeiaH Valid 的工作正在進行',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': '已收到付款：{provider}（{amount}）',
+  'platformAlert.payment_received.body': '服務商 {provider}（{slug}）已支付 {amount}。',
+  'platformAlert.card_refused.subject': '信用卡遭拒：{provider}',
+  'platformAlert.card_refused.body': '服務商 {provider}（{slug}）儲存的信用卡遭拒（{reason}）。帳單已改為 Pix/boleto 重新開立。',
+  'platformAlert.cancellation_requested.subject': '取消申請：{provider}',
+  'platformAlert.cancellation_requested.body': '服務商 {provider}（{slug}）申請取消。原因：{reason}。',
+  'platformAlert.cancellation_scheduled.subject': '取消已確認：{provider}',
+  'platformAlert.cancellation_scheduled.body': '服務商 {provider}（{slug}）已確認取消，自 {date} 起生效。原因：{reason}。',
+  'platformAlert.referral_signup.subject': '推薦：{provider} 已註冊',
+  'platformAlert.referral_signup.body': '服務商 {provider}（{slug}）透過 {referrer} 的推薦註冊。',
+  'platformAlert.nfse_error.subject': 'NFS-e 錯誤：{provider}',
+  'platformAlert.nfse_error.body': '服務商 {provider}（{slug}）的 NFS-e 發生錯誤：{error}',
+  'platformAlert.auto_suspended.subject': '自動停用：{provider}',
+  'platformAlert.auto_suspended.body': '服務商 {provider}（{slug}）因欠費遭停用（自 {date} 起逾期）。',
+  'platformAlert.big_overdue.subject': '高額逾期：{provider}（{amount}）',
+  'platformAlert.big_overdue.body': '服務商 {provider}（{slug}）逾期 {amount}，超過 {threshold} 的上限。自 {date} 起逾期。',
+  'platformAlert.test.subject': '測試警示',
+  'platformAlert.test.body': '這是平台的測試警示。如果您收到了，代表警示功能正常。',
+  'platformAlert.digest.subject': '每日摘要：{count} 則警示',
+  'platformAlert.digest.body': '{date} 的平台警示摘要：'
 };

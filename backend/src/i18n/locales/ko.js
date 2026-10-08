@@ -1172,5 +1172,26 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid가 API 키를 거부했습니다',
   'teiah.error.rateLimited': 'TeiaH Valid가 요청을 제한하고 있습니다. 나중에 다시 시도하십시오',
   'teiah.error.status': 'TeiaH Valid가 상태 코드 {status}(으)로 응답했습니다',
-  'teiah.error.exportRunning': 'TeiaH Valid 전송이 이미 진행 중입니다'
+  'teiah.error.exportRunning': 'TeiaH Valid 전송이 이미 진행 중입니다',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': '결제 수신: {provider} ({amount})',
+  'platformAlert.payment_received.body': '공급자 {provider}({slug})이(가) {amount}을(를) 결제했습니다.',
+  'platformAlert.card_refused.subject': '카드 거절: {provider}',
+  'platformAlert.card_refused.body': '공급자 {provider}({slug})의 저장된 카드가 거절되었습니다({reason}). 청구서가 Pix/boleto로 재발행되었습니다.',
+  'platformAlert.cancellation_requested.subject': '해지 요청: {provider}',
+  'platformAlert.cancellation_requested.body': '공급자 {provider}({slug})이(가) 해지를 요청했습니다. 사유: {reason}.',
+  'platformAlert.cancellation_scheduled.subject': '해지 확정: {provider}',
+  'platformAlert.cancellation_scheduled.body': '공급자 {provider}({slug})이(가) 해지를 확정했습니다. {date}부터 적용됩니다. 사유: {reason}.',
+  'platformAlert.referral_signup.subject': '추천: {provider} 가입',
+  'platformAlert.referral_signup.body': '공급자 {provider}({slug})이(가) {referrer}의 추천으로 가입했습니다.',
+  'platformAlert.nfse_error.subject': 'NFS-e 오류: {provider}',
+  'platformAlert.nfse_error.body': '공급자 {provider}({slug})의 NFS-e에 오류가 발생했습니다: {error}',
+  'platformAlert.auto_suspended.subject': '자동 정지: {provider}',
+  'platformAlert.auto_suspended.body': '공급자 {provider}({slug})이(가) 미납으로 정지되었습니다({date}부터 연체).',
+  'platformAlert.big_overdue.subject': '고액 연체: {provider} ({amount})',
+  'platformAlert.big_overdue.body': '공급자 {provider}({slug})의 연체액이 {amount}로 한도 {threshold}를 넘었습니다. {date}부터 연체.',
+  'platformAlert.test.subject': '테스트 알림',
+  'platformAlert.test.body': '플랫폼의 테스트 알림입니다. 받으셨다면 알림이 정상적으로 작동하고 있습니다.',
+  'platformAlert.digest.subject': '일일 요약: 알림 {count}건',
+  'platformAlert.digest.body': '{date} 플랫폼 알림 요약:'
 };

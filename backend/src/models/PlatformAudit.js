@@ -55,6 +55,9 @@ class PlatformAudit {
     // Os dados da empresa que vende o SaaS (Configurações → Dados do SaaS).
     // O detalhe lista os campos que mudaram, não os valores.
     PLATFORM_PROFILE_CHANGED: 'platform.profile_changed',
+    // O "Enviar alerta de teste" dos alertas da plataforma (0112). O detalhe
+    // diz os canais e o resultado de cada um, nunca o destino.
+    PLATFORM_ALERT_TEST: 'platform.alert_test',
     // A conta da plataforma num sistema de fora — hoje o Asaas: ambiente,
     // chave da API, token do webhook. O detalhe diz O QUE mudou (qual
     // integração, o ambiente, se a chave e o token foram trocados), nunca o
