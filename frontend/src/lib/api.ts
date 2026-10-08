@@ -2113,7 +2113,7 @@ export interface BillingEventView {
  * Um lembrete de cobrança que a plataforma mandou ao provedor (0092): a etapa
  * da régua, o prazo a que ela se refere (data ISO) e por onde saiu.
  */
-export type SubscriptionReminderStep = 'before' | 'due' | 'after' | 'suspension_warning' | 'suspended'
+export type SubscriptionReminderStep = 'before' | 'due' | 'after' | 'suspension_warning' | 'suspended' | 'manual'
 
 export interface SubscriptionReminderView {
   dueAt: string
@@ -2659,7 +2659,94 @@ export const platformAPI = {
       }
       charge: 'none' | 'reissued'
       changed: boolean
-    }>('PUT', `/platform/tenants/${tenantId}/subscription/coupon`, { code })
+    }>('PUT', `/platform/tenants/${tenantId}/subscription/coupon`, { code }),
+
+  // ── O painel de inadimplência: quem deve, e as ações em massa ─────────
+  listDelinquency: (filters: DelinquencyFilters = {}) => {
+    const params = new URLSearchParams()
+    for (const [chave, valor] of Object.entries(filters)) {
+      if (valor) params.set(chave, String(valor))
+    }
+    const query = params.toString()
+    return apiClient.get<{ rows: DelinquencyRow[]; summary: DelinquencySummary }>(
+      `/platform/delinquency${query ? `?${query}` : ''}`
+    )
+  },
+
+  /**
+   * Uma ação sobre muitos provedores (até 200). Cada um responde por si em
+   * `results` (`ok` e `code`); o pedido só falha inteiro (400) por ação, lista
+   * ou parâmetro inválidos.
+   */
+  runDelinquencyAction: (payload: {
+    tenantIds: number[]
+    action: DelinquencyAction
+    params?: { reason?: string; until?: string; days?: number }
+  }) =>
+    apiClient.post<{
+      action: DelinquencyAction
+      results: DelinquencyActionResult[]
+      okCount: number
+      failedCount: number
+    }>('/platform/delinquency/actions', payload)
+}
+
+/** As faixas de atraso do painel de inadimplência, em dias. */
+export type DelinquencyBucket = '1-7' | '8-15' | '16-30' | '30+'
+
+export type DelinquencyAction = 'remind' | 'suspend' | 'exempt' | 'extend'
+
+export type DelinquencyStatusFilter = 'past_due' | 'suspended' | 'auto_suspended' | 'manual_suspended'
+
+export interface DelinquencyFilters {
+  bucket?: DelinquencyBucket | ''
+  status?: DelinquencyStatusFilter | ''
+  q?: string
+  sort?: 'amount' | 'days' | ''
+  order?: 'asc' | 'desc' | ''
+}
+
+/** Um provedor que deve: quanto (por tipo de cobrança), desde quando, e o que vem a seguir. */
+export interface DelinquencyRow {
+  tenant: { id: number; name: string; slug: string; status: string }
+  status: SubscriptionStatus
+  storedStatus: SubscriptionStatus
+  suspendedReason: string | null
+  overdueReason: string | null
+  overdueSince: string | null
+  daysOverdue: number
+  bucket: DelinquencyBucket
+  /** A soma das cobranças em aberto JÁ vencidas. */
+  amountCents: number
+  amountByKind: { renewal: number; proration: number; overage: number }
+  /** Todas as em aberto, inclusive as que ainda vão vencer. */
+  openCents: number
+  currency: string
+  overdueCharges: number
+  plan: { id: number | null; code: string | null; name: string | null }
+  renewsAt: string | null
+  trialEndsAt: string | null
+  lastReminder: SubscriptionReminderView | null
+  /** A previsão da suspensão automática; nula quando já está suspenso ou ela está desligada. */
+  autoSuspendAt: string | null
+  autoSuspendWarned: boolean
+  card: SubscriptionCard
+  gateway: { gateway: string | null; linked: boolean }
+}
+
+export interface DelinquencySummary {
+  count: number
+  byBucket: Record<DelinquencyBucket, number>
+  totalOverdueCents: number
+  totalsByCurrency: Array<{ currency: string; cents: number }>
+  autoSuspendDays: number
+}
+
+export interface DelinquencyActionResult {
+  tenantId: number
+  ok: boolean
+  code: string
+  retryAt?: string
 }
 
 /** The provider's own plan, state and usage — the "plan and usage" screen, and what the block screen reads. */
