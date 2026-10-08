@@ -3638,6 +3638,10 @@ export const contactsAPI = {
   importWhatsapp: (mode: 'preview' | 'apply') =>
     apiClient.post<ContactWhatsappImportResult>(`/contacts/import/whatsapp?mode=${mode}`, {}),
 
+  /** The Focus Chat contact book: same preview/apply as the WhatsApp one, plus groups and other channels left out. */
+  importFocusChat: (mode: 'preview' | 'apply') =>
+    apiClient.post<ContactWhatsappImportResult & { ignored: number }>(`/contacts/import/focuschat?mode=${mode}`, {}),
+
   /** Open invoices of each contract, asked of the SGP now. */
   invoices: (key: string) =>
     apiClient.get<{ contract: string; invoices: SgpInvoice[] }[]>(`/contacts/${encodeURIComponent(key)}/invoices`),
@@ -3768,6 +3772,25 @@ export interface TeiahPreviewItem {
   clientName: string | null
   item: TeiahImportItem | null
   reason: TeiahSkipReason | null
+}
+
+export interface FocusChatConfig {
+  enabled: boolean
+  tokenConfigured: boolean
+  ready: boolean
+  updatedAt: string | null
+}
+
+export const focusChatAPI = {
+  getConfig: () =>
+    apiClient.get<FocusChatConfig>('/focuschat/config'),
+
+  /** An absent token keeps the saved one; `""` clears it. */
+  updateConfig: (config: { enabled?: boolean; token?: string }) =>
+    apiClient.put<FocusChatConfig>('/focuschat/config', config),
+
+  test: (payload: { token?: string }) =>
+    apiClient.post<{ ok: boolean; firstPage: number; durationMs: number }>('/focuschat/test', payload)
 }
 
 export const teiahAPI = {
@@ -5121,7 +5144,7 @@ export interface WhatsAppContact {
   phone: string | null
   phoneSource: 'manual' | 'sgp' | null
   /** Where an imported client came from; null for what the SGP brought or the team typed. */
-  importSource?: 'whatsapp' | 'sheet' | 'google' | null
+  importSource?: 'whatsapp' | 'sheet' | 'google' | 'focuschat' | null
   /** Blocked for everything. */
   optedOut: boolean
   /** Blocked only for these kinds; `null` when not blocked or blocked for everything. */

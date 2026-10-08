@@ -139,6 +139,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { tab: 'integrations', labelKey: 'settings.tab.integrations' },
   { tab: 'sgp', labelKey: 'settings.tab.sgp' },
   { tab: 'teiah', labelKey: 'settings.tab.teiah', permission: 'teiah.read' },
+  { tab: 'focuschat', labelKey: 'settings.tab.focuschat', permission: 'settings.write' },
   { tab: 'provisioning', labelKey: 'settings.tab.provisioning' },
   // O rótulo é o do menu, e é o mesmo que o cartão de integrações usa: não
   // existe `settings.tab.whatsapp`, e inventar um daria dois nomes para a

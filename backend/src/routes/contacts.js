@@ -53,6 +53,15 @@ router.post(
   whatsappTestLimiter,
   ContactController.importWhatsapp
 );
+// The Focus Chat contact book: pages through the vendor's API by hand, so the
+// same budget as the other manual imports from an outside service.
+router.post(
+  '/import/focuschat',
+  authenticateToken,
+  requirePermission('contacts.import'),
+  whatsappTestLimiter,
+  ContactController.importFocusChat
+);
 router.get('/:key', authenticateToken, requirePermission('contacts.read'), ContactController.get);
 // Asks the SGP, once per contract: the same limiter as every other SGP read an
 // operator can trigger by hand.

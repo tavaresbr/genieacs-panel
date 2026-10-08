@@ -34,6 +34,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
 import { TeiahPanel } from '@/components/settings/teiah-panel'
+import { FocusChatPanel } from '@/components/settings/focuschat-panel'
 import {
   SGP_CONTACTS_ANCHOR,
   SgpContactsShortcut,
@@ -97,7 +98,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
-  'provider', 'general', 'virtual-params', 'customer-portal', 'integrations', 'sgp', 'teiah', 'provisioning',
+  'provider', 'general', 'virtual-params', 'customer-portal', 'integrations', 'sgp', 'teiah', 'focuschat', 'provisioning',
   'whatsapp', 'chatbot', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
@@ -106,7 +107,7 @@ const SETTINGS_TABS = [
  * Continuam abrindo por `?tab=sgp` etc., e a trilha acende "Integrações"
  * enquanto uma delas está aberta.
  */
-const INTEGRATION_TABS = ['sgp', 'teiah', 'whatsapp', 'chatbot']
+const INTEGRATION_TABS = ['sgp', 'teiah', 'focuschat', 'whatsapp', 'chatbot']
 
 // Botão só de ícone nas listas: 40px de alvo abaixo do desktop, onde o toque
 // precisa; no lg a linha da tabela volta ao tamanho do ícone.
@@ -1833,6 +1834,7 @@ export default function Settings() {
           <IntegrationsHub
             onOpen={setActiveTab}
             canTeiah={can('teiah.read')}
+            canFocusChat={can('settings.write')}
             canChatbot={can('whatsapp.config')}
           />
         )}
@@ -2584,6 +2586,7 @@ export default function Settings() {
         )}
 
         {activeTab === 'teiah' && can('teiah.read') && <TeiahPanel />}
+        {activeTab === 'focuschat' && can('settings.write') && <FocusChatPanel />}
 
         {activeTab === 'provisioning' && <ProvisioningTab />}
 
