@@ -196,6 +196,7 @@ export function DunningHistoryPanel() {
           >
             <option value="">{t('whatsapp.dunning.filterAll')}</option>
             <option value="queued">{t('whatsapp.dunning.statusQueued')}</option>
+            <option value="failed">{t('whatsapp.delivery.failed')}</option>
             <option value="skipped">{t('whatsapp.dunning.statusSkipped')}</option>
             <option value="canceled">{t('whatsapp.dunning.statusCanceled')}</option>
           </select>

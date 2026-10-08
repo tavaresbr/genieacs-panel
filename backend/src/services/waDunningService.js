@@ -1158,6 +1158,10 @@ class WaDunningService {
     const needle = String(contract ?? '').trim();
     if (needle) query.where({ contract: needle });
     if (['queued', 'skipped', 'canceled'].includes(status)) query.where({ status });
+    // "Falhou" não é um estado da linha: é a entrega da mensagem que ela gerou.
+    if (status === 'failed') {
+      query.whereIn('message_id', tdb('wa_messages').where({ delivery_status: 'failed' }).select('id'));
+    }
     if (['step', 'thanks'].includes(kind)) query.where({ kind });
     const rows = (await query).slice(0, cap + 1);
     const pagina = rows.slice(0, cap);
