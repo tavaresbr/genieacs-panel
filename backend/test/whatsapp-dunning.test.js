@@ -477,6 +477,22 @@ describe('histórico e resultado', () => {
     assert.equal(joao.templateName, 'régua cobrança');
   });
 
+  it('filtra os envios que falharam na entrega', async () => {
+    const todos = (await api('/dunning/sends?limit=100')).body.data.items;
+    const joao = todos.find((i) => i.contract === 'R-ATRASO-10' && i.kind === 'step' && i.status === 'queued');
+    const id = (await getDb()('wa_dunning_sends').where({ contract: 'R-ATRASO-10', kind: 'step', status: 'queued' }).first()).message_id;
+    await getDb()('wa_messages').where({ id }).update({ delivery_status: 'failed' });
+    try {
+      const { status, body } = await api('/dunning/sends?status=failed&limit=100');
+      assert.equal(status, 200);
+      assert.ok(body.data.items.length >= 1);
+      assert.ok(body.data.items.every((i) => i.deliveryStatus === 'failed'));
+      assert.ok(body.data.items.some((i) => i.contract === joao.contract));
+    } finally {
+      await getDb()('wa_messages').where({ id }).update({ delivery_status: 'sent' });
+    }
+  });
+
   it('conta o que foi recuperado', async () => {
     const { body } = await api('/dunning/stats?days=30');
     // João (129,90), Maria (89,90) e Carlos (99,90) foram cobrados, e os três
