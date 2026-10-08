@@ -102,17 +102,65 @@ function agoraEmSaoPaulo() {
   }).format(new Date());
 }
 
+/** A linha de contexto de uma mensagem que só tem anexo (um comprovante, um áudio). */
+function textoDoAnexo(mensagem) {
+  const tipo = String(mensagem.attachment_type || '').toLowerCase();
+  let o = 'um arquivo';
+  if (tipo.startsWith('image/')) o = 'uma imagem';
+  else if (tipo.startsWith('audio/')) o = 'um áudio';
+  else if (tipo.startsWith('video/')) o = 'um vídeo';
+  else if (tipo === 'application/pdf') o = 'um PDF';
+  return `[${mensagem.direction === 'in' ? 'o cliente enviou' : 'a equipe enviou'} ${o}]`;
+}
+
+/**
+ * O fio na forma que o modelo aceita: abre e fecha com `user`, e nunca tem dois
+ * turnos seguidos do mesmo papel. A z.ai recusa o resto com 400 · 1214
+ * ("messages parameter is illegal"), e uma conversa em que o cliente só mandou
+ * uma imagem — ou só a equipe falou — saía assim.
+ *
+ * @param {{role: 'user'|'assistant', content: string}[]} turnos
+ * @param {{fecharComUsuario?: string|null}} [opcoes] a instrução que fecha o fio
+ *   quando ele termina em `assistant` (o rascunho para o atendente); sem ela, um
+ *   fio que não termina em `user` volta vazio.
+ */
+export function prepararFio(turnos, { fecharComUsuario = null } = {}) {
+  const juntos = [];
+  for (const turno of turnos) {
+    const conteudo = String(turno?.content ?? '').trim();
+    if (!conteudo) continue;
+    const anterior = juntos.at(-1);
+    if (anterior && anterior.role === turno.role) anterior.content = `${anterior.content}\n${conteudo}`;
+    else juntos.push({ role: turno.role, content: conteudo });
+  }
+  // A conversa tem de abrir com o cliente.
+  while (juntos.length && juntos[0].role !== 'user') juntos.shift();
+  if (fecharComUsuario) {
+    const ultimo = juntos.at(-1);
+    if (!ultimo || ultimo.role !== 'user') juntos.push({ role: 'user', content: fecharComUsuario });
+    else ultimo.content = `${ultimo.content}\n\n${fecharComUsuario}`;
+  }
+  return juntos.length && juntos.at(-1).role === 'user' ? juntos : [];
+}
+
+const INSTRUCAO_DO_RASCUNHO = 'Escreva agora o próximo texto que a equipe deve enviar ao cliente, com base na conversa acima. Devolva só o texto da mensagem.';
+
 /** O fio como o modelo lê: cliente é `user`, bot e atendente são `assistant`. Notas internas ficam de fora. */
 async function historico(conversationId, limite = HISTORICO) {
   const linhas = await tdb('wa_messages')
     .where({ conversation_id: conversationId, is_note: false })
-    .whereNotNull('body')
+    .where((consulta) => consulta.whereNotNull('body').orWhereNotNull('attachment_path'))
     .orderBy('id', 'desc')
     .limit(limite)
-    .select('direction', 'body');
-  return linhas.reverse()
-    .map((m) => ({ role: m.direction === 'in' ? 'user' : 'assistant', content: String(m.body).slice(0, 2000) }))
-    .filter((m) => m.content.trim());
+    .select('direction', 'body', 'attachment_type');
+  return linhas.reverse().map((m) => {
+    const texto = String(m.body ?? '').trim();
+    const legenda = textoDoAnexo(m);
+    const content = m.attachment_type
+      ? (texto ? `${legenda} ${texto}` : legenda)
+      : texto;
+    return { role: m.direction === 'in' ? 'user' : 'assistant', content: content.slice(0, 2000) };
+  });
 }
 
 async function promptDeSistema({ ai, conversation, link, modo }) {
@@ -313,9 +361,13 @@ class WaAiService {
       return lista;
     };
 
+    // Sem mensagem do cliente para responder, não há o que a IA dizer: o bot de
+    // menu segue, ou, no rascunho, a instrução final dá a vez a ela.
+    const fio = prepararFio(await historico(conversation.id), { fecharComUsuario: sugestao ? INSTRUCAO_DO_RASCUNHO : null });
+    if (!fio.length) return { texto: null, anexos: [], intent: null, transferiu: false };
     const mensagens = [
       { role: 'system', content: await promptDeSistema({ ai, conversation, link, modo }) },
-      ...await historico(conversation.id)
+      ...fio
     ];
     const anexos = [];
     let intent = null;

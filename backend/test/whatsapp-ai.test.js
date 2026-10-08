@@ -85,6 +85,14 @@ function startSgpStub() {
   });
 }
 
+/** A lista de mensagens que a z.ai recusa com 1214. */
+function formaIlegal(messages = []) {
+  const conversa = messages.filter((m) => m.role !== 'system');
+  if (!conversa.length || conversa[0].role !== 'user') return true;
+  if (!['user', 'tool'].includes(conversa.at(-1).role)) return true;
+  return conversa.some((m, i) => i > 0 && conversa[i - 1].role === m.role && m.role !== 'tool');
+}
+
 /** Uma API compatível com OpenAI: devolve o próximo item do roteiro. */
 function startAiStub() {
   aiServer = http.createServer((req, res) => {
@@ -94,6 +102,12 @@ function startAiStub() {
       let payload = {};
       try { payload = JSON.parse(raw || '{}'); } catch { payload = {}; }
       pedidosIa.push({ url: req.url, auth: req.headers.authorization, payload });
+      // As regras da z.ai para a lista de mensagens: abre e fecha com `user`, e
+      // não repete o papel em turnos seguidos. O resto é 400 · 1214.
+      if (formaIlegal(payload.messages)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: { code: '1214', message: 'The messages parameter is illegal. Please check the documentation.' } }));
+      }
       if (recusa) {
         res.writeHead(recusa.status, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify(recusa.body));
@@ -399,6 +413,45 @@ describe('sugerir resposta ao atendente', () => {
 
     const status = await api('/ai/status');
     assert.equal(status.body.data.suggest, true);
+  });
+
+  it('conversa em que só a equipe falou (a cobrança da régua): o rascunho sai, com a lista que a z.ai aceita', async () => {
+    await salvarIa({ enabled: true, suggest: true });
+    await asTenant(() => WaBotConfigService.invalidate());
+    await limparFio(ASSINANTE);
+    await receber(ASSINANTE, 'oi');
+    const conversa = await conversaDe(ASSINANTE);
+    await getDb()('wa_messages').where({ conversation_id: conversa.id }).del();
+    await getDb()('wa_messages').insert([
+      { tenant_id: 1, conversation_id: conversa.id, direction: 'out', body: 'Sua fatura vence hoje.', source: 'campaign' },
+      { tenant_id: 1, conversation_id: conversa.id, direction: 'out', body: 'Segue o boleto.', source: 'campaign' }
+    ]);
+    roteiro = [{ content: 'Olá! Conseguiu pagar a fatura?' }];
+    pedidosIa = [];
+    const res = await api(`/conversations/${conversa.id}/suggest-reply`, { method: 'POST', body: {} });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.text, 'Olá! Conseguiu pagar a fatura?');
+    const enviadas = pedidosIa[0].payload.messages.filter((m) => m.role !== 'system');
+    assert.equal(enviadas.length, 1, 'as duas da equipe viram uma só, e a instrução fecha com user');
+    assert.equal(enviadas[0].role, 'user');
+  });
+
+  it('o cliente mandou só uma imagem (o comprovante): ela entra como contexto, e o rascunho sai', async () => {
+    await limparFio(ASSINANTE);
+    await receber(ASSINANTE, 'oi');
+    const conversa = await conversaDe(ASSINANTE);
+    await getDb()('wa_messages').where({ conversation_id: conversa.id }).del();
+    await getDb()('wa_messages').insert([
+      { tenant_id: 1, conversation_id: conversa.id, direction: 'out', body: 'Sua fatura vence hoje.', source: 'campaign' },
+      { tenant_id: 1, conversation_id: conversa.id, direction: 'in', body: null, attachment_path: 'wa/comprovante.jpg', attachment_type: 'image/jpeg', source: 'operator' }
+    ]);
+    roteiro = [{ content: 'Recebi o comprovante, obrigado!' }];
+    pedidosIa = [];
+    const res = await api(`/conversations/${conversa.id}/suggest-reply`, { method: 'POST', body: {} });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const enviadas = pedidosIa[0].payload.messages.filter((m) => m.role !== 'system');
+    assert.match(enviadas[0].content, /o cliente enviou uma imagem/);
+    assert.equal(enviadas.at(-1).role, 'user');
   });
 
   it('desligada: 409', async () => {
