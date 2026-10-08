@@ -2326,6 +2326,8 @@ const es: Dictionary = {
   'whatsapp.quickReplies.empty': 'No hay respuestas rápidas. Créalas en WhatsApp > Plantillas, en la categoría Atención.',
   'whatsapp.quickReplies.noMatch': 'Ninguna respuesta con "{query}"',
   'whatsapp.quickReplies.hint': '↑↓ para elegir · Enter para usar · Esc para cerrar',
+  'whatsapp.inbox.call': "Llamar",
+  'whatsapp.inbox.callHint': "Llamar al cliente desde tu celular o computadora (abre el marcador; la llamada no pasa por el panel)",
   'whatsapp.contact.open': "Abrir ficha del cliente",
   'whatsapp.templatePicker.button': "Plantillas",
   'whatsapp.templatePicker.search': "Buscar plantilla",

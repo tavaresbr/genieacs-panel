@@ -2209,6 +2209,8 @@ const de: Dictionary = {
   'whatsapp.quickReplies.empty': 'Keine Schnellantworten. Legen Sie sie unter WhatsApp > Vorlagen in der Kategorie Kundenservice an.',
   'whatsapp.quickReplies.noMatch': 'Keine Antwort mit "{query}"',
   'whatsapp.quickReplies.hint': '↑↓ zum Auswählen · Enter zum Verwenden · Esc zum Schließen',
+  'whatsapp.inbox.call': "Anrufen",
+  'whatsapp.inbox.callHint': "Kunden von deinem Handy oder Computer anrufen (öffnet die Wähltastatur; der Anruf läuft nicht über das Panel)",
   'whatsapp.contact.open': "Kundendatensatz öffnen",
   'whatsapp.templatePicker.button': "Vorlagen",
   'whatsapp.templatePicker.search': "Vorlage suchen",

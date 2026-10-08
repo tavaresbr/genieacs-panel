@@ -2331,6 +2331,8 @@ const ko: Dictionary = {
   'whatsapp.quickReplies.empty': '빠른 답장이 없습니다. WhatsApp > 템플릿의 고객 응대 카테고리에서 만드세요.',
   'whatsapp.quickReplies.noMatch': '"{query}"에 해당하는 답장이 없습니다',
   'whatsapp.quickReplies.hint': '↑↓ 선택 · Enter 사용 · Esc 닫기',
+  'whatsapp.inbox.call': "전화",
+  'whatsapp.inbox.callHint': "휴대폰이나 컴퓨터로 고객에게 전화합니다(다이얼러가 열리며 통화는 패널을 거치지 않습니다)",
   'whatsapp.contact.open': "고객 정보 열기",
   'whatsapp.templatePicker.button': "템플릿",
   'whatsapp.templatePicker.search': "템플릿 검색",

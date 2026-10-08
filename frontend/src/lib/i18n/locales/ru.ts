@@ -2333,6 +2333,8 @@ const ru: Dictionary = {
   'whatsapp.quickReplies.empty': 'Нет быстрых ответов. Создайте их в WhatsApp > Шаблоны, в категории Обслуживание.',
   'whatsapp.quickReplies.noMatch': 'Нет ответов по запросу "{query}"',
   'whatsapp.quickReplies.hint': '↑↓ — выбрать · Enter — вставить · Esc — закрыть',
+  'whatsapp.inbox.call': "Позвонить",
+  'whatsapp.inbox.callHint': "Позвонить клиенту с телефона или компьютера (откроется номеронабиратель; звонок идёт не через панель)",
   'whatsapp.contact.open': "Открыть карточку клиента",
   'whatsapp.templatePicker.button': "Шаблоны",
   'whatsapp.templatePicker.search': "Поиск шаблона",

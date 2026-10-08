@@ -2306,6 +2306,8 @@ const hi: Dictionary = {
   'whatsapp.quickReplies.empty': 'कोई त्वरित उत्तर नहीं। WhatsApp > टेम्पलेट में ग्राहक सेवा श्रेणी में बनाएँ।',
   'whatsapp.quickReplies.noMatch': '"{query}" से कोई उत्तर नहीं मिला',
   'whatsapp.quickReplies.hint': '↑↓ चुनें · Enter उपयोग करें · Esc बंद करें',
+  'whatsapp.inbox.call': "कॉल करें",
+  'whatsapp.inbox.callHint': "अपने फ़ोन या कंप्यूटर से ग्राहक को कॉल करें (डायलर खुलेगा; कॉल पैनल से नहीं जाती)",
   'whatsapp.contact.open': "ग्राहक का रिकॉर्ड खोलें",
   'whatsapp.templatePicker.button': "टेम्पलेट",
   'whatsapp.templatePicker.search': "टेम्पलेट खोजें",

@@ -16,6 +16,7 @@ import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
 import { isSafeExternalUrl } from '@/lib/sgp'
 import { showActionLabels } from '@/lib/wa-thread-actions'
+import { callHref } from '@/lib/wa-call'
 
 /** How close to the foot counts as "the operator is at the bottom". */
 const STICK_PX = 120
@@ -255,6 +256,19 @@ export function ConversationThread({
               <Icon name={closed ? 'refresh' : 'check'} size={16} className={filing ? 'animate-spin' : ''} />
               <span className={labelClass}>{t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}</span>
             </button>
+
+            {/* Ligar pelo aparelho do atendente: o painel não carrega voz. */}
+            {callHref(conversation.waPhoneE164) && (
+              <a
+                href={callHref(conversation.waPhoneE164)!}
+                className={actionClass}
+                aria-label={t('whatsapp.inbox.call')}
+                title={t('whatsapp.inbox.callHint')}
+              >
+                <Icon name="phone" size={16} />
+                <span className={labelClass}>{t('whatsapp.inbox.call')}</span>
+              </a>
+            )}
 
             {onToggleSgpPanel && (
               <button

@@ -2915,6 +2915,8 @@ const fr: Dictionary = {
   'whatsapp.quickReplies.empty': 'Aucune réponse rapide. Créez-en dans WhatsApp > Modèles, catégorie Service client.',
   'whatsapp.quickReplies.noMatch': 'Aucune réponse pour "{query}"',
   'whatsapp.quickReplies.hint': '↑↓ pour choisir · Entrée pour utiliser · Échap pour fermer',
+  'whatsapp.inbox.call': "Appeler",
+  'whatsapp.inbox.callHint': "Appeler le client depuis votre téléphone ou ordinateur (ouvre le composeur ; l’appel ne passe pas par le panneau)",
   'whatsapp.contact.open': "Ouvrir la fiche client",
   'whatsapp.templatePicker.button': "Modèles",
   'whatsapp.templatePicker.search': "Rechercher un modèle",
