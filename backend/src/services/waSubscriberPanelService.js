@@ -80,7 +80,7 @@ function onlyDigits(value) {
 }
 
 /** The address of a connected WAN first, then any address the ONT reported. */
-function primaryAddress(connections) {
+export function primaryAddress(connections) {
   const usable = connections.filter((c) => c.ipAddress && c.ipAddress !== '0.0.0.0');
   const connected = usable.filter((c) => /connected|up/i.test(String(c.status ?? '')));
   return (connected[0] || usable[0] || null)?.ipAddress ?? null;

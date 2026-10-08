@@ -714,6 +714,14 @@ export const casos = [
   },
   {
     chave: 'sgpContract',
+    label: 'GET /api/contacts/:key/service-status',
+    method: 'GET',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/service-status`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  {
+    chave: 'sgpContract',
     label: 'PATCH /api/contacts/:key',
     method: 'PATCH',
     path: (contract) => `/api/contacts/${encodeURIComponent(contract)}`,
