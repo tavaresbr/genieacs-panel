@@ -62,7 +62,7 @@ export default function Impersonate() {
             <h1 className="mt-6 text-xl font-bold text-foreground">{t('impersonate.failedTitle')}</h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground wrap-anywhere">{error}</p>
             <p className="mt-5 text-sm">
-              <Link to="/login" className="underline">{t('invite.backToLogin')}</Link>
+              <Link to="/login" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('invite.backToLogin')}</Link>
             </p>
           </>
         ) : (

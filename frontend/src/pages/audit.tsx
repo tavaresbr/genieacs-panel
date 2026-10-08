@@ -38,7 +38,7 @@ function Detalhe({ detail }: { detail: Record<string, unknown> | null }) {
       {pares.length > PARES_VISIVEIS && (
         <button
           type="button"
-          className="text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
+          className="inline-flex min-h-10 items-center text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground md:min-h-0"
           onClick={() => setAberto((v) => !v)}
         >
           {aberto ? t('audit.showLess') : t('audit.showAll', { count: String(pares.length) })}
@@ -72,7 +72,7 @@ function Ator({ actor }: { actor: AuditEntry['actor'] }) {
           porque são a informação: "a plataforma entrou no seu painel" é outra
           coisa de "seu administrador entrou". */}
       {actor.kind !== 'operator' && (
-        <span className="modern-badge-warning ms-2 text-[11px]">
+        <span className="modern-badge-warning ms-2 whitespace-nowrap text-[11px]">
           {actor.kind === 'platform' ? t('audit.actorKind.platform') : t('audit.actorKind.system')}
         </span>
       )}
@@ -164,7 +164,7 @@ export default function AuditPage() {
           <p className="text-sm text-muted-foreground">{t('audit.empty')}</p>
         ) : (
           <div className="modern-card p-4 sm:p-5">
-            <div className="desktop-table overflow-x-auto">
+            <div className="hidden overflow-x-auto xl:block">
               <table className="w-full min-w-208 text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -182,15 +182,17 @@ export default function AuditPage() {
                       <td className="whitespace-nowrap py-2 pe-3 text-muted-foreground">
                         {formatDateTime(entry.at)}
                       </td>
-                      <td className="py-2 pe-3"><Acao action={entry.action} /></td>
-                      <td className="py-2 pe-3 wrap-anywhere"><Ator actor={entry.actor} /></td>
-                      <td className="py-2 pe-3 text-xs text-muted-foreground">
+                      <td className="min-w-32 py-2 pe-3 wrap-anywhere"><Acao action={entry.action} /></td>
+                      {/* Largura mínima nas colunas de texto longo: com quebra em qualquer
+                          letra, a tabela as espremia a um caractere por linha. */}
+                      <td className="min-w-36 py-2 pe-3 wrap-anywhere"><Ator actor={entry.actor} /></td>
+                      <td className="min-w-32 py-2 pe-3 text-xs text-muted-foreground wrap-anywhere">
                         {entry.subject.type
                           ? <>{entry.subject.type}{entry.subject.id ? ` #${entry.subject.id}` : ''}</>
                           : '—'}
                       </td>
                       <td className="min-w-56 py-2 pe-3 text-xs"><Detalhe detail={entry.detail} /></td>
-                      <td className="max-w-40 py-2 text-xs text-muted-foreground wrap-anywhere">
+                      <td className="min-w-28 max-w-40 py-2 text-xs text-muted-foreground wrap-anywhere">
                         {entry.ip || '—'}
                       </td>
                     </tr>
@@ -199,9 +201,10 @@ export default function AuditPage() {
               </table>
             </div>
 
-            {/* No celular cada linha vira um bloco: seis colunas não cabem, e
-                rolar de lado esconderia justamente o detalhe. */}
-            <ul className="mobile-card-list divide-y divide-border">
+            {/* Até o xl cada linha vira um bloco: seis colunas não cabem (nem no
+                tablet, nem ao lado do menu), e rolar de lado esconderia
+                justamente o detalhe. */}
+            <ul className="divide-y divide-border xl:hidden">
               {entries.map((entry) => (
                 <li key={entry.id} className="space-y-1.5 py-3 text-sm first:pt-0">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

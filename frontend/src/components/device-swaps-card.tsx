@@ -88,17 +88,19 @@ export function DeviceSwapsCard({ deviceId }: DeviceSwapsCardProps) {
         {swaps.map((swap) => (
           <li key={swap.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
             <div className="min-w-0">
-              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+              {/* No celular os dois ids viram alvos de toque de 40px; o espaço
+                  vertical sai do padding deles, não do gap. */}
+              <p className="flex flex-wrap items-center gap-x-2 text-sm font-semibold sm:gap-y-2">
                 <Link
                   to={`/devices/detail?id=${encodeURIComponent(swap.previousDeviceId)}`}
-                  className="max-w-full truncate font-mono text-xs hover:text-primary"
+                  className="max-w-full truncate py-3 font-mono text-xs hover:text-primary sm:py-0"
                 >
                   {swap.previousDeviceId}
                 </Link>
                 <Icon name="chevron-right" size={14} className="text-muted-foreground" />
                 <Link
                   to={`/devices/detail?id=${encodeURIComponent(swap.deviceId)}`}
-                  className="max-w-full truncate font-mono text-xs hover:text-primary"
+                  className="max-w-full truncate py-3 font-mono text-xs hover:text-primary sm:py-0"
                 >
                   {swap.deviceId}
                 </Link>

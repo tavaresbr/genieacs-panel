@@ -141,17 +141,17 @@ export function SubscriptionNotice() {
         {message}
         {planName && <span className="ml-2 opacity-80">({planName})</span>}
         {paymentUrl && (
-          <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="ml-3 inline-flex min-h-8 items-center font-semibold underline lg:min-h-0">
+          <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="ml-3 inline-flex min-h-10 items-center font-semibold underline lg:min-h-0">
             {t('charges.pay')}
           </a>
         )}
         {canGenerate && (
-          <button type="button" className="ml-3 inline-flex min-h-8 items-center font-semibold underline lg:min-h-0" disabled={paying} onClick={generateAndPay}>
+          <button type="button" className="ml-3 inline-flex min-h-10 items-center font-semibold underline lg:min-h-0" disabled={paying} onClick={generateAndPay}>
             {paying ? t('plan.paying') : t('subscription.generateAndPay')}
           </button>
         )}
         {payError && <span className="ml-3 font-medium">{payError}</span>}
-        <button type="button" className="ml-3 inline-flex min-h-8 items-center underline lg:min-h-0" onClick={() => setBlocked(null)}>
+        <button type="button" className="ml-3 inline-flex min-h-10 min-w-10 items-center justify-center underline lg:min-h-0 lg:min-w-0" onClick={() => setBlocked(null)}>
           {t('common.close')}
         </button>
       </div>

@@ -78,7 +78,7 @@ export default function Sidebar() {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-1200 flex h-16 items-center justify-between border-b border-border bg-card pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:hidden">
-        <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label={t('sidebar.operationsAria')}>
+        <Link to="/dashboard" className="flex min-h-11 min-w-0 items-center gap-2.5" aria-label={t('sidebar.operationsAria')}>
           <BrandMark className="size-8 shrink-0" />
           <div className="min-w-0">
             <div className="truncate text-sm font-bold leading-tight">{mobileHeader.sessionName}</div>
@@ -88,7 +88,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() => setIsMobileOpen(true)}
-          className="icon-button"
+          className="icon-button shrink-0"
           aria-label={t('sidebar.openNavigation')}
           aria-expanded={isMobileOpen}
         >

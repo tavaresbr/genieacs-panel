@@ -779,7 +779,9 @@ function EditWifiModal({
             {t('detail.wifiModal.warning')}
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
+        {/* No celular "Aplicar alterações de WiFi" não cabe ao lado do Cancelar:
+            empilha, com a ação principal em cima. */}
+        <div className="flex flex-col-reverse gap-2 border-t border-border p-5 sm:flex-row sm:flex-wrap sm:justify-end">
           <button type="button" onClick={onClose} className="modern-button-secondary" disabled={saving}>{t('common.cancel')}</button>
           <button type="button" onClick={() => onSave(form)} className="modern-button" disabled={saving || !form.ssid.trim()}>
             {saving ? t('detail.wifiModal.queuing') : t('detail.wifiModal.apply')}
@@ -2333,17 +2335,17 @@ export default function DeviceDetailPage() {
               <>
                 <div className="grid gap-3 p-4 md:hidden">
                   {device.clients.map((client) => (
-                    <article key={`${client.dataModel}-${client.instance}-${client.macAddress || client.ipAddress || ''}`} className="rounded-md border border-border p-4">
+                    <article key={`${client.dataModel}-${client.instance}-${client.macAddress || client.ipAddress || ''}`} className="min-w-0 rounded-md border border-border p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <h3 className="truncate font-semibold">{client.hostName || t('detail.clients.unnamed')}</h3>
                           <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{client.macAddress || t('detail.clients.macNotReported')}</p>
                         </div>
-                        <span className={client.active === true ? 'modern-badge-success' : client.active === false ? 'modern-badge' : 'modern-badge-warning'}>
+                        <span className={`shrink-0 ${client.active === true ? 'modern-badge-success' : client.active === false ? 'modern-badge' : 'modern-badge-warning'}`}>
                           {client.active === true ? t('detail.status.online') : client.active === false ? t('detail.status.offline') : t('common.unknown')}
                         </span>
                       </div>
-                      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <dl className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] gap-3 text-sm">
                         <div><dt className="text-xs text-muted-foreground">{t('detail.clients.ipAddress')}</dt><dd className="mt-1 break-all font-mono">{client.ipAddress || '—'}</dd></div>
                         <div><dt className="text-xs text-muted-foreground">{t('detail.clients.interface')}</dt><dd className="mt-1 break-all">{client.interfaceType || '—'}</dd></div>
                       </dl>
@@ -2544,7 +2546,7 @@ function ClientName({ link, canOpen }: { link: SgpContractLink; canOpen: boolean
   if (!link.clientName) return <>—</>
   if (!canOpen || !link.contract) return <>{link.clientName}</>
   return (
-    <Link className="text-primary hover:underline" to={`/contacts/${encodeURIComponent(link.contract)}`}>
+    <Link className="py-2.5 text-primary hover:underline sm:py-0" to={`/contacts/${encodeURIComponent(link.contract)}`}>
       {link.clientName}
     </Link>
   )

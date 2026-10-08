@@ -565,7 +565,7 @@ export function AlertsPanel() {
                   {stored?.telegram?.configured && (
                     <button
                       type="button"
-                      className="mt-1 text-xs font-semibold text-primary hover:underline"
+                      className="mt-1 text-xs font-semibold text-primary hover:underline max-sm:min-h-10"
                       onClick={() => patchTelegram({ remove: !form.telegram.remove, token: '' })}
                     >
                       {form.telegram.remove ? t('whatsapp.alerts.telegramKeep') : t('whatsapp.alerts.telegramRemove')}

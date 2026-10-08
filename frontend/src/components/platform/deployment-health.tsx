@@ -47,7 +47,7 @@ function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 py-2">
       <dt className="text-sm text-muted-foreground">{rotulo}</dt>
-      <dd className="text-sm font-medium text-foreground">{children}</dd>
+      <dd className="min-w-0 text-sm font-medium break-all text-foreground">{children}</dd>
     </div>
   )
 }

@@ -156,7 +156,7 @@ export function PlatformRevenue() {
         <>
           <section aria-labelledby="revenue-kpi-title">
             <h2 id="revenue-kpi-title" className="section-heading mb-3">{t('platform.revenue.summaryTitle')}</h2>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" aria-busy={loading}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6" aria-busy={loading}>
               <Kpi label={t('platform.revenue.mrr')} value={formatMoney(report.mrrCents, MOEDA)}
                 hint={t('platform.revenue.mrrHint', { count: report.activeCount })} />
               <Kpi label={t('platform.revenue.received')} value={formatMoney(report.receivedCents, MOEDA)}
@@ -182,7 +182,31 @@ export function PlatformRevenue() {
 
           <section aria-labelledby="revenue-plan-title">
             <h2 id="revenue-plan-title" className="section-heading mb-3">{t('platform.revenue.byPlanTitle')}</h2>
-            <div className="modern-card overflow-x-auto">
+            {/* No celular, cartões: a coluna do recebido ficava fora da tela. */}
+            <ul className="mobile-card-list modern-card divide-y divide-border">
+              {report.byPlan.length === 0 ? (
+                <li className="py-6 text-center text-sm text-muted-foreground">{t('platform.revenue.empty')}</li>
+              ) : report.byPlan.map((linha) => (
+                <li key={linha.planId ?? 'none'} className="p-4 text-sm">
+                  <p className="wrap-break-word font-semibold text-foreground">{linha.name ?? t('platform.revenue.noPlan')}</p>
+                  <dl className="mt-2 space-y-1">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">{t('platform.revenue.activeCount')}</dt>
+                      <dd className="font-mono tabular-nums">{linha.activeCount}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">{t('platform.revenue.mrr')}</dt>
+                      <dd className="font-mono tabular-nums">{formatMoney(linha.mrrCents, MOEDA)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">{t('platform.revenue.received')}</dt>
+                      <dd className="font-mono tabular-nums">{formatMoney(linha.receivedCents, MOEDA)}</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+            <div className="desktop-table modern-card overflow-x-auto">
               <table className="modern-table">
                 <thead>
                   <tr>
@@ -335,27 +359,31 @@ function MonthlyChart({ monthly, from, to }: { monthly: RevenueMonth[]; from: st
           })}
         </svg>
       </div>
-      <table className="sr-only">
-        <caption>{t('platform.revenue.monthlyTitle')}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{t('platform.revenue.month')}</th>
-            <th scope="col">{t('platform.revenue.legendReceived')}</th>
-            <th scope="col">{t('platform.revenue.legendRefunded')}</th>
-            <th scope="col">{t('platform.revenue.charges')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {monthly.map((mes) => (
-            <tr key={mes.month}>
-              <th scope="row">{monthLabel(mes.month, locale, 'long')}</th>
-              <td>{formatMoney(mes.receivedCents, MOEDA)}</td>
-              <td>{formatMoney(mes.refundedCents, MOEDA)}</td>
-              <td>{mes.count}</td>
+      {/* O `sr-only` vai num invólucro: uma tabela não encolhe abaixo do
+          conteúdo, e sozinha alargava a página no celular. */}
+      <div className="sr-only">
+        <table>
+          <caption>{t('platform.revenue.monthlyTitle')}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{t('platform.revenue.month')}</th>
+              <th scope="col">{t('platform.revenue.legendReceived')}</th>
+              <th scope="col">{t('platform.revenue.legendRefunded')}</th>
+              <th scope="col">{t('platform.revenue.charges')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {monthly.map((mes) => (
+              <tr key={mes.month}>
+                <th scope="row">{monthLabel(mes.month, locale, 'long')}</th>
+                <td>{formatMoney(mes.receivedCents, MOEDA)}</td>
+                <td>{formatMoney(mes.refundedCents, MOEDA)}</td>
+                <td>{mes.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

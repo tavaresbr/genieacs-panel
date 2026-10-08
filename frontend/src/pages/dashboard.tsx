@@ -434,7 +434,7 @@ function DashboardView({ owner }: { owner: string | null }) {
                 <h2 className="section-heading">{t('dashboard.sgp.title')}</h2>
                 <p className="section-description">{t('dashboard.sgp.description')}</p>
               </div>
-              <p className="text-xs leading-5 text-muted-foreground sm:text-end">
+              <p className="text-xs leading-5 text-muted-foreground xl:text-end">
                 <span className="block">
                   {t('dashboard.sgp.linkedCount', { linked: sgpOverview.totals.linked, total: sgpOverview.totals.devices })}
                 </span>
@@ -529,7 +529,7 @@ function DashboardView({ owner }: { owner: string | null }) {
             <div><h2 className="section-heading">{t('dashboard.faults.title')}</h2><p className="section-description">{t('dashboard.faults.description')}</p></div>
             <div className="flex items-center gap-2">
               <span className={data.faults.length ? 'modern-badge-error' : 'modern-badge-success'}>{faultsLoading ? t('dashboard.refreshing') : t('dashboard.faults.activeCount', { count: data.faults.length })}</span>
-              <button type="button" className="modern-button-secondary min-h-9 px-3 py-1.5" disabled={faultsLoading} onClick={() => void loadFaults()}>
+              <button type="button" className="modern-button-secondary min-h-10 px-3 py-1.5 md:min-h-9" disabled={faultsLoading} onClick={() => void loadFaults()}>
                 <Icon name="refresh" size={16} className={faultsLoading ? 'animate-spin' : ''} /> {t('common.refresh')}
               </button>
             </div>

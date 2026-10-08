@@ -64,11 +64,11 @@ function Incidente({ incident, onChange }: { incident: OutageIncident; onChange:
   }
 
   return (
-    <div className={`rounded-md border p-4 ${aberto ? 'border-[hsl(var(--status-danger))]/50 bg-[hsl(var(--status-danger))]/5' : 'border-border'}`}>
+    <div className={`rounded-md border p-3 sm:p-4 ${aberto ? 'border-[hsl(var(--status-danger))]/50 bg-[hsl(var(--status-danger))]/5' : 'border-border'}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="flex items-center gap-2 font-semibold">
-            <Icon name="warning" size={16} className={aberto ? 'text-[hsl(var(--status-danger))]' : 'text-muted-foreground'} />
+        <div className="min-w-0">
+          <p className="flex items-start gap-2 font-semibold wrap-anywhere">
+            <Icon name="warning" size={16} className={`mt-1 shrink-0 ${aberto ? 'text-[hsl(var(--status-danger))]' : 'text-muted-foreground'}`} />
             {t('outage.cardTitle', { node: incident.nodeName })}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -127,14 +127,14 @@ function Incidente({ incident, onChange }: { incident: OutageIncident; onChange:
         </div>
       )}
 
-      <button type="button" className="mt-3 text-sm underline" onClick={() => void alternarLista()}>
+      <button type="button" className="mt-1 inline-flex min-h-10 items-center text-sm underline md:mt-3 md:min-h-0" onClick={() => void alternarLista()}>
         {t(detail ? 'outage.hideAffected' : 'outage.showAffected')}
       </button>
       {detail && (
-        <ul className="mt-2 grid gap-1 text-sm">
+        <ul className="mt-2 grid gap-2 text-sm md:gap-1">
           {detail.devices.map((d) => (
             <li key={d.deviceId} className="flex flex-wrap gap-x-3">
-              <span className="font-medium">{d.clientName || d.deviceId}</span>
+              <span className="min-w-0 font-medium wrap-anywhere">{d.clientName || d.deviceId}</span>
               {d.contract && <span className="text-muted-foreground">{t('outage.contract', { contract: d.contract })}</span>}
               {!d.hasPhone && <span className="text-muted-foreground">{t('outage.noPhone')}</span>}
               {d.notifiedAt && <span className="text-[hsl(var(--status-success))]">{t('outage.notifiedMark')}</span>}

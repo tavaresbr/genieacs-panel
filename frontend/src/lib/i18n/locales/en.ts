@@ -1565,7 +1565,7 @@ const en = {
   'detail.lgpd.exported': 'Dossier downloaded',
   'detail.lgpd.erase': 'Erase the data',
   'detail.lgpd.eraseHint': 'This cannot be undone. The WiFi password, the portal password, the ERP events, the telemetry and the WhatsApp conversation are destroyed; the contract, the map node and the audit trail stay with the person removed from them. Download the dossier first — a request to erase does not cancel the request to see.',
-  'detail.lgpd.eraseConfirmLabel': 'Type {{id}} to confirm',
+  'detail.lgpd.eraseConfirmLabel': 'Type {id} to confirm',
   'detail.lgpd.eraseConfirm': 'Erase permanently',
   'detail.lgpd.erasing': 'Erasing…',
   'detail.lgpd.eraseFailed': 'Could not erase the subscriber data',

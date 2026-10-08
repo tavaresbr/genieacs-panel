@@ -147,7 +147,7 @@ export default function Signup() {
               <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
             </div>
           </div>
-          <LanguageSwitcher className="ml-auto shrink-0" />
+          <LanguageSwitcher collapseOnMobile className="ml-auto shrink-0" />
         </div>
 
         <div className="auth-panel">
@@ -295,11 +295,11 @@ export default function Signup() {
             panel signs in at that panel's address. */}
         {!isPlatformHost ? (
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-            <Link to="/login" className="underline">{t('signup.backToLogin')}</Link>
+            <Link to="/login" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('signup.backToLogin')}</Link>
           </p>
         ) : (
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-            <Link to="/" className="underline">{t('signup.backToSite')}</Link>
+            <Link to="/" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('signup.backToSite')}</Link>
           </p>
         )}
       </div>

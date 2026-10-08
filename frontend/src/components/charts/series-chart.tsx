@@ -135,7 +135,9 @@ export function SeriesChart({
     <div ref={containerRef} className="w-full">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-[240px] w-full"
+        // Abaixo de 640px não sobra margem no `viewBox` e o "-27.8 dBm" do eixo
+        // perdia o sinal: o rótulo pode passar da borda, para dentro do padding.
+        className="h-[240px] w-full overflow-visible"
         role="img"
         aria-label={ariaLabel}
         onPointerMove={(event) => resolveHover(event.clientX, event.currentTarget)}

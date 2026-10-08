@@ -151,10 +151,10 @@ export function PlatformLeads() {
                   )}
                   <div className="mt-2 flex flex-wrap gap-3 text-sm">
                     {lead.email && (
-                      <a className="underline wrap-anywhere" href={`mailto:${lead.email}`}>{lead.email}</a>
+                      <a className="inline-flex min-h-10 items-center underline wrap-anywhere sm:min-h-0" href={`mailto:${lead.email}`}>{lead.email}</a>
                     )}
                     {wa && (
-                      <a className="underline" href={wa} target="_blank" rel="noreferrer">WhatsApp {lead.phone}</a>
+                      <a className="inline-flex min-h-10 items-center underline sm:min-h-0" href={wa} target="_blank" rel="noreferrer">WhatsApp {lead.phone}</a>
                     )}
                   </div>
                 </div>

@@ -1566,7 +1566,7 @@ const de: Dictionary = {
   'detail.lgpd.exported': 'Dossier heruntergeladen',
   'detail.lgpd.erase': 'Daten löschen',
   'detail.lgpd.eraseHint': 'Das lässt sich nicht rückgängig machen. WLAN-Passwort, Portalpasswort, ERP-Ereignisse, Telemetrie und der WhatsApp-Verlauf werden zerstört; Vertrag, Kartenknoten und Protokoll bleiben, ohne die Person darin. Laden Sie zuerst das Dossier herunter — ein Löschwunsch hebt den Auskunftswunsch nicht auf.',
-  'detail.lgpd.eraseConfirmLabel': 'Geben Sie {{id}} zur Bestätigung ein',
+  'detail.lgpd.eraseConfirmLabel': 'Geben Sie {id} zur Bestätigung ein',
   'detail.lgpd.eraseConfirm': 'Endgültig löschen',
   'detail.lgpd.erasing': 'Wird gelöscht…',
   'detail.lgpd.eraseFailed': 'Die Teilnehmerdaten konnten nicht gelöscht werden',

@@ -418,7 +418,7 @@ export default function PlanPage() {
                 </div>
               )}
               {podeCupom && !cupomAberto && (
-                <button type="button" className="mt-4 text-sm font-medium text-primary underline-offset-2 hover:underline" onClick={() => setCupomAberto(true)}>
+                <button type="button" className="mt-2 inline-flex min-h-10 items-center text-sm font-medium text-primary underline-offset-2 hover:underline md:mt-4 md:min-h-0" onClick={() => setCupomAberto(true)}>
                   {t('plan.coupon.have')}
                 </button>
               )}

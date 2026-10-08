@@ -1564,7 +1564,7 @@ const ko: Dictionary = {
   'detail.lgpd.exported': '조서를 내려받았습니다',
   'detail.lgpd.erase': '데이터 삭제',
   'detail.lgpd.eraseHint': '되돌릴 수 없습니다. WiFi 비밀번호, 포털 비밀번호, ERP 이벤트, 텔레메트리, WhatsApp 대화가 파기됩니다. 계약, 지도 노드, 감사 기록은 남되 그 사람은 지워집니다. 먼저 조서를 내려받으세요 — 삭제 요구가 열람 요구를 취소하지는 않습니다.',
-  'detail.lgpd.eraseConfirmLabel': '확인하려면 {{id}}를 입력하세요',
+  'detail.lgpd.eraseConfirmLabel': '확인하려면 {id}를 입력하세요',
   'detail.lgpd.eraseConfirm': '영구 삭제',
   'detail.lgpd.erasing': '삭제 중…',
   'detail.lgpd.eraseFailed': '가입자 데이터를 삭제하지 못했습니다',

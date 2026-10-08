@@ -67,7 +67,7 @@ export default function VerifyEmail() {
           </>
         )}
         <p className="mt-5 text-sm">
-          <Link to="/login" className="underline">{t('invite.backToLogin')}</Link>
+          <Link to="/login" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('invite.backToLogin')}</Link>
         </p>
       </div>
     </main>

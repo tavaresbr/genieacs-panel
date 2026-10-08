@@ -1563,7 +1563,7 @@ const zhTW: Dictionary = {
   'detail.lgpd.exported': '檔案夾已下載',
   'detail.lgpd.erase': '刪除資料',
   'detail.lgpd.eraseHint': '此操作無法復原。WiFi 密碼、入口網站密碼、ERP 事件、遙測資料與 WhatsApp 對話將被銷毀；合約、地圖節點與稽核軌跡保留，但其中的個人資訊被移除。請先下載檔案夾——要求刪除並不取消查看的要求。',
-  'detail.lgpd.eraseConfirmLabel': '輸入 {{id}} 以確認',
+  'detail.lgpd.eraseConfirmLabel': '輸入 {id} 以確認',
   'detail.lgpd.eraseConfirm': '永久刪除',
   'detail.lgpd.erasing': '正在刪除…',
   'detail.lgpd.eraseFailed': '無法刪除用戶資料',

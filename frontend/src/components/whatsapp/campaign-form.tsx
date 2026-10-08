@@ -318,7 +318,7 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
                   {templates.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
                 </select>
                 {templateBody && (
-                  <pre className="whitespace-pre-wrap rounded-md border border-border surface-subtle p-3 text-xs text-muted-foreground">{templateBody}</pre>
+                  <pre className="whitespace-pre-wrap wrap-break-word rounded-md border border-border surface-subtle p-3 text-xs text-muted-foreground">{templateBody}</pre>
                 )}
               </div>
             ) : (

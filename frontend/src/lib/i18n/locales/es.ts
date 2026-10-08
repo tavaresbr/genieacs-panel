@@ -1563,7 +1563,7 @@ const es: Dictionary = {
   'detail.lgpd.exported': 'Expediente descargado',
   'detail.lgpd.erase': 'Borrar los datos',
   'detail.lgpd.eraseHint': 'Esto no tiene vuelta atrás. La contraseña del WiFi, la del portal, los eventos del ERP, la telemetría y la conversación de WhatsApp se destruyen; el contrato, el nodo del mapa y el historial quedan, con la persona retirada de ellos. Descargue el expediente antes — pedir el borrado no cancela el pedido de ver.',
-  'detail.lgpd.eraseConfirmLabel': 'Escriba {{id}} para confirmar',
+  'detail.lgpd.eraseConfirmLabel': 'Escriba {id} para confirmar',
   'detail.lgpd.eraseConfirm': 'Borrar definitivamente',
   'detail.lgpd.erasing': 'Borrando…',
   'detail.lgpd.eraseFailed': 'No se pudieron borrar los datos del suscriptor',

@@ -446,7 +446,9 @@ export default function DevicesPage() {
   return (
     <div className="page-shell">
       <div className="page-frame">
-        <header className="page-header">
+        {/* Até o xl as ações descem para baixo do título: lado a lado, elas
+            espremiam o título em duas linhas e a descrição em cinco. */}
+        <header className="page-header sm:max-xl:flex-col sm:max-xl:items-stretch">
           <div>
             <p className="page-kicker">{t('devices.kicker')}</p>
             <h1 className="page-title">{t('devices.title')}</h1>

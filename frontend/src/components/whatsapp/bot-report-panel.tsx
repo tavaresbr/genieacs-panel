@@ -102,7 +102,7 @@ function Tile({ label, value, hint }: { label: string; value: string; hint?: str
   return (
     <div className="modern-card min-w-0 p-4 sm:p-5">
       <p className="metric-label">{label}</p>
-      <p className="metric-value mt-3 truncate text-2xl text-foreground sm:text-3xl">{value}</p>
+      <p className="metric-value mt-3 wrap-break-word text-xl text-foreground sm:truncate sm:text-3xl">{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
   )

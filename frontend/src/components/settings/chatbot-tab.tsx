@@ -36,7 +36,7 @@ function Caixa({ checked, onChange, title, hint, disabled = false }: {
   disabled?: boolean
 }) {
   return (
-    <label className={`flex items-start gap-3 ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
+    <label className={`flex min-h-10 items-start gap-3 lg:min-h-0 ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
       <input
         type="checkbox"
         className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
@@ -265,7 +265,7 @@ export function ChatbotTab() {
                 {config.ai.keyHint && (
                   <span className="font-mono text-xs text-muted-foreground">{t('settings.chatbot.aiKeyEnds', { hint: config.ai.keyHint })}</span>
                 )}
-                <button type="button" className="text-sm underline" onClick={() => setAiKeyRemove(true)}>
+                <button type="button" className="min-h-10 text-sm underline sm:min-h-0" onClick={() => setAiKeyRemove(true)}>
                   {t('settings.chatbot.aiKeyRemove')}
                 </button>
               </p>
@@ -316,7 +316,7 @@ export function ChatbotTab() {
               {aiTesting ? t('common.loading') : t('settings.chatbot.aiTest')}
             </button>
             {config.ai.lastError && (
-              <span className="text-sm text-[hsl(var(--status-danger))]">
+              <span className="min-w-0 text-sm text-[hsl(var(--status-danger))] wrap-anywhere">
                 {t('settings.chatbot.aiLastError', {
                   when: formatDateTime(config.ai.lastError.at),
                   reason: config.ai.lastError.detail
@@ -354,7 +354,7 @@ export function ChatbotTab() {
           </div>
           <div>
             <p className="mb-1 text-sm font-medium">{t('settings.chatbot.preview')}</p>
-            <pre className="whitespace-pre-wrap rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm leading-6">
+            <pre className="whitespace-pre-wrap wrap-anywhere rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm leading-6">
               {preview}
             </pre>
           </div>
@@ -456,9 +456,10 @@ export function ChatbotTab() {
               if (!regra) return null
               const inativo = !config.hours.enabled || regra.closed
               return (
-                <div key={day} className="flex flex-wrap items-center gap-3">
-                  <span className="w-32 text-sm capitalize">{dayName(day)}</span>
-                  <label className="flex items-center gap-2 text-sm">
+                // No celular: dia e "Fechado" numa linha, abre — fecha na de baixo.
+                <div key={day} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:flex sm:flex-wrap sm:gap-3">
+                  <span className="col-span-2 text-sm capitalize sm:w-32">{dayName(day)}</span>
+                  <label className="flex min-h-10 items-center gap-2 justify-self-end text-sm sm:min-h-0">
                     <input
                       type="checkbox"
                       checked={regra.closed}
@@ -470,7 +471,7 @@ export function ChatbotTab() {
                   <input
                     type="time"
                     aria-label={`${dayName(day)} — ${t('settings.chatbot.opens')}`}
-                    className="modern-input w-32"
+                    className="modern-input w-full sm:w-32"
                     value={regra.open}
                     disabled={inativo}
                     onChange={(event) => setDay(day, { open: event.target.value })}
@@ -479,7 +480,7 @@ export function ChatbotTab() {
                   <input
                     type="time"
                     aria-label={`${dayName(day)} — ${t('settings.chatbot.closes')}`}
-                    className="modern-input w-32"
+                    className="modern-input w-full sm:w-32"
                     value={regra.close}
                     disabled={inativo}
                     onChange={(event) => setDay(day, { close: event.target.value })}

@@ -110,6 +110,16 @@ export function CampaignDetail({ broadcast, onClose }: { broadcast: WhatsAppBroa
     return key ? t(key) : row.error
   }
 
+  const result = (row: WhatsAppBroadcastRecipient) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className={STATUS[row.status]?.badge ?? 'modern-badge'}>
+        {outcome(row) ?? t(STATUS[row.status]?.label ?? 'whatsapp.campaign.detail.status.pending')}
+      </span>
+      {row.replied && <span className="modern-badge-info">{t('whatsapp.campaign.detail.replied')}</span>}
+      {row.optedOut && <span className="modern-badge-warning">{t('whatsapp.campaign.detail.optedOut')}</span>}
+    </div>
+  )
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="campaign-detail-title">
       <div className="modal-panel modern-card max-h-[92vh] w-full max-w-4xl overflow-y-auto p-5 sm:p-6" data-testid="campaign-detail">
@@ -162,38 +172,48 @@ export function CampaignDetail({ broadcast, onClose }: { broadcast: WhatsAppBroa
             <p className="empty-state-title">{loading ? t('common.loading') : t('whatsapp.campaign.detail.empty')}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-border">
-            <table className="modern-table">
-              <thead>
-                <tr>
-                  <th scope="col">{t('whatsapp.inbox.subscriber')}</th>
-                  <th scope="col">{t('whatsapp.inbox.contract')}</th>
-                  <th scope="col">{t('whatsapp.campaign.detail.sentAt')}</th>
-                  <th scope="col">{t('whatsapp.dunning.result')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((row) => (
-                  <tr key={row.id} data-recipient-status={row.status}>
-                    <td>
-                      <ContactLink contract={row.contract} name={row.clientName || row.phone} />
-                    </td>
-                    <td className="font-mono text-xs">{row.contract || '—'}</td>
-                    <td className="whitespace-nowrap">{row.sentAt ? formatDateTime(row.sentAt) : '—'}</td>
-                    <td>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className={STATUS[row.status]?.badge ?? 'modern-badge'}>
-                          {outcome(row) ?? t(STATUS[row.status]?.label ?? 'whatsapp.campaign.detail.status.pending')}
-                        </span>
-                        {row.replied && <span className="modern-badge-info">{t('whatsapp.campaign.detail.replied')}</span>}
-                        {row.optedOut && <span className="modern-badge-warning">{t('whatsapp.campaign.detail.optedOut')}</span>}
-                      </div>
-                    </td>
+          <>
+            <div className="desktop-table overflow-x-auto rounded-md border border-border">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('whatsapp.inbox.subscriber')}</th>
+                    <th scope="col">{t('whatsapp.inbox.contract')}</th>
+                    <th scope="col">{t('whatsapp.campaign.detail.sentAt')}</th>
+                    <th scope="col">{t('whatsapp.dunning.result')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {items.map((row) => (
+                    <tr key={row.id} data-recipient-status={row.status}>
+                      <td>
+                        <ContactLink contract={row.contract} name={row.clientName || row.phone} />
+                      </td>
+                      <td className="font-mono text-xs">{row.contract || '—'}</td>
+                      <td className="whitespace-nowrap">{row.sentAt ? formatDateTime(row.sentAt) : '—'}</td>
+                      <td>{result(row)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* No celular, um cartão por destinatário: a tabela espremia o nome
+                numa coluna de seis linhas e cortava a hora do envio. */}
+            <ul className="mobile-card-list divide-y divide-border rounded-md border border-border" role="list">
+              {items.map((row) => (
+                <li key={row.id} className="space-y-1.5 p-3 text-sm" data-recipient-status={row.status}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 wrap-break-word font-medium">
+                      <ContactLink contract={row.contract} name={row.clientName || row.phone} />
+                    </div>
+                    <span className="shrink-0 font-mono text-xs">{row.contract || '—'}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{row.sentAt ? formatDateTime(row.sentAt) : '—'}</p>
+                  {result(row)}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
 
         {hasMore && (

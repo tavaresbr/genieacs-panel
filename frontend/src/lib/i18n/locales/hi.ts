@@ -1540,7 +1540,7 @@ const hi: Dictionary = {
   'detail.lgpd.exported': 'दस्तावेज़ डाउनलोड हो गया',
   'detail.lgpd.erase': 'डेटा मिटाएँ',
   'detail.lgpd.eraseHint': 'यह वापस नहीं होता। वाई-फ़ाई पासवर्ड, पोर्टल पासवर्ड, ERP घटनाएँ, टेलीमेट्री और व्हाट्सऐप बातचीत नष्ट हो जाती हैं; अनुबंध, मानचित्र नोड और ऑडिट ट्रेल रहते हैं, पर उनमें से व्यक्ति हटा दिया जाता है। पहले दस्तावेज़ डाउनलोड करें — मिटाने का अनुरोध देखने के अनुरोध को रद्द नहीं करता।',
-  'detail.lgpd.eraseConfirmLabel': 'पुष्टि के लिए {{id}} लिखें',
+  'detail.lgpd.eraseConfirmLabel': 'पुष्टि के लिए {id} लिखें',
   'detail.lgpd.eraseConfirm': 'हमेशा के लिए मिटाएँ',
   'detail.lgpd.erasing': 'मिटाया जा रहा है…',
   'detail.lgpd.eraseFailed': 'ग्राहक डेटा नहीं मिटाया जा सका',

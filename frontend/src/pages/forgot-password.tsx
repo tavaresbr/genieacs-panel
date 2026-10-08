@@ -61,7 +61,7 @@ export default function ForgotPassword() {
               {t('app.genieacsOperations')}
             </div>
           </div>
-          <LanguageSwitcher className="ml-auto shrink-0" />
+          <LanguageSwitcher collapseOnMobile className="ml-auto shrink-0" />
         </div>
 
         <div className="auth-panel">
@@ -103,7 +103,7 @@ export default function ForgotPassword() {
         </div>
 
         <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-          <Link to="/login" className="underline">{t('invite.backToLogin')}</Link>
+          <Link to="/login" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('invite.backToLogin')}</Link>
         </p>
       </div>
     </main>

@@ -280,7 +280,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
         )}
 
         {!lookup && !showForm && (
-          <button type="button" className="mt-3 text-sm text-muted-foreground underline" onClick={() => { setForm(EMPTY_FORM); setShowForm(true) }}>
+          <button type="button" className="mt-3 text-sm text-muted-foreground underline max-sm:min-h-10" onClick={() => { setForm(EMPTY_FORM); setShowForm(true) }}>
             {t('contacts.new.withoutDocument')}
           </button>
         )}

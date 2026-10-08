@@ -1563,7 +1563,7 @@ const ptBR: Dictionary = {
   'detail.lgpd.exported': 'Dossiê baixado',
   'detail.lgpd.erase': 'Apagar os dados',
   'detail.lgpd.eraseHint': 'Isto não tem volta. A senha do WiFi, a senha do portal, os eventos do ERP, a telemetria e a conversa do WhatsApp são destruídos; o contrato, o nó do mapa e a trilha ficam, com a pessoa retirada deles. Baixe o dossiê antes — pedir para apagar não cancela o pedido de ver.',
-  'detail.lgpd.eraseConfirmLabel': 'Digite {{id}} para confirmar',
+  'detail.lgpd.eraseConfirmLabel': 'Digite {id} para confirmar',
   'detail.lgpd.eraseConfirm': 'Apagar definitivamente',
   'detail.lgpd.erasing': 'Apagando…',
   'detail.lgpd.eraseFailed': 'Não foi possível apagar os dados do assinante',

@@ -48,7 +48,7 @@ export function ImpersonationBanner() {
           operator: user.impersonation.platformUsername
         })}
       </span>
-      <button type="button" onClick={logout} className="ml-auto inline-flex min-h-8 shrink-0 items-center font-semibold underline lg:min-h-0">
+      <button type="button" onClick={logout} className="ml-auto inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center font-semibold underline lg:min-h-0 lg:min-w-0">
         {t('impersonate.leave')}
       </button>
     </div>
