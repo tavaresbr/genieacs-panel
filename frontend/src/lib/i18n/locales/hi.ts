@@ -4676,6 +4676,16 @@ const hi: Dictionary = {
   'platform.referrals.adjusted': "बैलेंस समायोजित",
   'platform.referrals.adjustInvalid': "शून्य से अलग राशि और कारण दर्ज करें।",
   'platform.referrals.insufficient': "उपलब्ध बैलेंस {amount} है; इससे अधिक नहीं घटाया जा सकता।",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "सहायता",
+  'help.toc': "विषय-सूची",
+  'help.searchPlaceholder': "मैनुअल में खोजें",
+  'help.noResults': "\"{query}\" के लिए कुछ नहीं मिला।",
+  'help.portugueseOnly': "सामग्री पुर्तगाली में है।",
+  'help.howItWorks': "यह कैसे काम करता है",
+  'help.providerGuideTitle': "बिलिंग कैसे काम करती है",
 }
 
 export default hi

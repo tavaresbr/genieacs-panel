@@ -4668,6 +4668,16 @@ const ja: Dictionary = {
   'platform.referrals.adjusted': "残高を調整しました",
   'platform.referrals.adjustInvalid': "ゼロ以外の金額と理由を入力してください。",
   'platform.referrals.insufficient': "利用可能な残高は {amount} です。それ以上は差し引けません。",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "ヘルプ",
+  'help.toc': "目次",
+  'help.searchPlaceholder': "マニュアル内を検索",
+  'help.noResults': "「{query}」に一致する項目はありません。",
+  'help.portugueseOnly': "内容はポルトガル語です。",
+  'help.howItWorks': "仕組み",
+  'help.providerGuideTitle': "請求の仕組み",
 }
 
 export default ja

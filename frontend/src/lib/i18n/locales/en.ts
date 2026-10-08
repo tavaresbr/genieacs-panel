@@ -4670,6 +4670,16 @@ const en = {
   'platform.referrals.adjusted': "Balance adjusted",
   'platform.referrals.adjustInvalid': "Enter a non-zero amount and the reason.",
   'platform.referrals.insufficient': "The available balance is {amount}; you cannot remove more than that.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "Help",
+  'help.toc': "Contents",
+  'help.searchPlaceholder': "Search the manual",
+  'help.noResults': "Nothing found for \"{query}\".",
+  'help.portugueseOnly': "Content in Portuguese.",
+  'help.howItWorks': "How it works",
+  'help.providerGuideTitle': "How billing works",
 }
 
 export default en

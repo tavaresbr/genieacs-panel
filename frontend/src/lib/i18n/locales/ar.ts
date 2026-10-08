@@ -4677,6 +4677,16 @@ const ar: Dictionary = {
   'platform.referrals.adjusted': "تم تعديل الرصيد",
   'platform.referrals.adjustInvalid': "أدخل مبلغًا غير صفري والسبب.",
   'platform.referrals.insufficient': "الرصيد المتاح {amount}؛ لا يمكن خصم أكثر من ذلك.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "مساعدة",
+  'help.toc': "المحتويات",
+  'help.searchPlaceholder': "ابحث في الدليل",
+  'help.noResults': "لا توجد نتائج لـ \"{query}\".",
+  'help.portugueseOnly': "المحتوى باللغة البرتغالية.",
+  'help.howItWorks': "كيف يعمل",
+  'help.providerGuideTitle': "كيف تعمل الفوترة",
 }
 
 export default ar

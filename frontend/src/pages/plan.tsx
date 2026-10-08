@@ -41,6 +41,7 @@ import { CardAutopay } from '@/components/card-autopay'
 import { blockingOver } from '@/lib/overage'
 import { ReferralCard } from '@/components/referral-card'
 import { CancelSubscription } from '@/components/cancel-subscription'
+import { BillingGuideModal } from '@/components/billing-guide-modal'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -92,6 +93,8 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [plans, setPlans] = useState<TenantPlanOption[] | null>(null)
+  /** O "Como funciona": o guia de cobrança do provedor numa janela. */
+  const [guiaAberto, setGuiaAberto] = useState(false)
   const [plansError, setPlansError] = useState<string | null>(null)
   const [mudando, setMudando] = useState<number | null>(null)
   const [pagando, setPagando] = useState(false)
@@ -110,6 +113,9 @@ export default function PlanPage() {
   // O seletor Mensal/Anual (0104): nulo é "o ciclo de agora da assinatura".
   const [cicloEscolhido, setCicloEscolhido] = useState<BillingCycle | null>(null)
   const cadastroRef = useRef<HTMLDivElement>(null)
+
+  // Estável: a janela usa `onClose` como dependência do efeito que prende o Esc.
+  const fecharGuia = useCallback(() => setGuiaAberto(false), [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -326,11 +332,18 @@ export default function PlanPage() {
             <h1 className="page-title">{t('plan.title')}</h1>
             <p className="page-description">{t('plan.subtitle')}</p>
           </div>
-          <button type="button" className="modern-button-secondary self-start sm:self-auto" disabled={loading} onClick={() => void load()}>
-            <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
-            {t('common.refresh')}
-          </button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <button type="button" className="modern-button-secondary" onClick={() => setGuiaAberto(true)}>
+              <Icon name="info" size={17} />
+              {t('help.howItWorks')}
+            </button>
+            <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void load()}>
+              <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
+              {t('common.refresh')}
+            </button>
+          </div>
         </header>
+        <BillingGuideModal open={guiaAberto} onClose={fecharGuia} />
 
         {loading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>

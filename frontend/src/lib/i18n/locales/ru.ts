@@ -4676,6 +4676,16 @@ const ru: Dictionary = {
   'platform.referrals.adjusted': "Баланс скорректирован",
   'platform.referrals.adjustInvalid': "Укажите ненулевую сумму и причину.",
   'platform.referrals.insufficient': "Свободный баланс — {amount}; списать больше нельзя.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "Справка",
+  'help.toc': "Содержание",
+  'help.searchPlaceholder': "Поиск по руководству",
+  'help.noResults': "По запросу «{query}» ничего не найдено.",
+  'help.portugueseOnly': "Содержимое на португальском языке.",
+  'help.howItWorks': "Как это работает",
+  'help.providerGuideTitle': "Как работает оплата",
 }
 
 export default ru

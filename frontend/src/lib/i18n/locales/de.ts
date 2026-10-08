@@ -4672,6 +4672,16 @@ const de: Dictionary = {
   'platform.referrals.adjusted': "Guthaben angepasst",
   'platform.referrals.adjustInvalid': "Geben Sie einen Betrag ungleich null und den Grund an.",
   'platform.referrals.insufficient': "Das freie Guthaben beträgt {amount}; mehr kann nicht abgezogen werden.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "Hilfe",
+  'help.toc': "Inhalt",
+  'help.searchPlaceholder': "Im Handbuch suchen",
+  'help.noResults': "Nichts gefunden für „{query}“.",
+  'help.portugueseOnly': "Inhalt auf Portugiesisch.",
+  'help.howItWorks': "So funktioniert es",
+  'help.providerGuideTitle': "So funktioniert die Abrechnung",
 }
 
 export default de

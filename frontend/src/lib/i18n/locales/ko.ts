@@ -4675,6 +4675,16 @@ const ko: Dictionary = {
   'platform.referrals.adjusted': "잔액을 조정했습니다",
   'platform.referrals.adjustInvalid': "0이 아닌 금액과 사유를 입력하세요.",
   'platform.referrals.insufficient': "사용 가능한 잔액은 {amount}입니다. 그보다 많이 차감할 수 없습니다.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "도움말",
+  'help.toc': "목차",
+  'help.searchPlaceholder': "매뉴얼 검색",
+  'help.noResults': "\"{query}\"에 대한 결과가 없습니다.",
+  'help.portugueseOnly': "내용은 포르투갈어로 되어 있습니다.",
+  'help.howItWorks': "작동 방식",
+  'help.providerGuideTitle': "청구 방식",
 }
 
 export default ko

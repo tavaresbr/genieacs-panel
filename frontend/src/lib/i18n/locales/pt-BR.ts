@@ -4668,6 +4668,16 @@ const ptBR: Dictionary = {
   'platform.referrals.adjusted': "Saldo ajustado",
   'platform.referrals.adjustInvalid': "Informe um valor diferente de zero e o motivo.",
   'platform.referrals.insufficient': "O saldo livre é {amount}; não dá para tirar mais que isso.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "Ajuda",
+  'help.toc': "Sumário",
+  'help.searchPlaceholder': "Buscar no manual",
+  'help.noResults': "Nada encontrado para \"{query}\".",
+  'help.portugueseOnly': "Conteúdo em português.",
+  'help.howItWorks': "Como funciona",
+  'help.providerGuideTitle': "Como funciona a cobrança",
 }
 
 export default ptBR

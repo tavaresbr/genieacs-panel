@@ -4674,6 +4674,16 @@ const it: Dictionary = {
   'platform.referrals.adjusted': "Saldo rettificato",
   'platform.referrals.adjustInvalid': "Inserisci un importo diverso da zero e il motivo.",
   'platform.referrals.insufficient': "Il saldo disponibile è {amount}; non si può togliere di più.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "Aiuto",
+  'help.toc': "Indice",
+  'help.searchPlaceholder': "Cerca nel manuale",
+  'help.noResults': "Nessun risultato per \"{query}\".",
+  'help.portugueseOnly': "Contenuto in portoghese.",
+  'help.howItWorks': "Come funziona",
+  'help.providerGuideTitle': "Come funziona la fatturazione",
 }
 
 export default it
