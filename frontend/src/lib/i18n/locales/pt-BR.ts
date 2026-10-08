@@ -2799,6 +2799,8 @@ const ptBR: Dictionary = {
   'whatsapp.dunning.skip.paid': "Pagou antes de sair",
   'whatsapp.dunning.skip.paused': "Comprovante recebido: régua pausada",
   'whatsapp.dunning.statusQueued': "Enviada",
+  'whatsapp.dunning.export': "Exportar",
+  'whatsapp.dunning.exportFailed': "Não foi possível exportar o histórico",
   'whatsapp.dunning.statusSkipped': "Pulada",
   'whatsapp.dunning.statusCanceled': "Cancelada — pagou antes do envio",
   'whatsapp.dunning.kindThanks': "Agradecimento",

@@ -2780,6 +2780,8 @@ const hi: Dictionary = {
   'whatsapp.dunning.skip.paid': "भेजने से पहले भुगतान हो गया",
   'whatsapp.dunning.skip.paused': "रसीद मिली: रिमाइंडर रोके गए",
   'whatsapp.dunning.statusQueued': "भेजा गया",
+  'whatsapp.dunning.export': "निर्यात करें",
+  'whatsapp.dunning.exportFailed': "इतिहास निर्यात नहीं हो सका",
   'whatsapp.dunning.statusSkipped': "छोड़ा गया",
   'whatsapp.dunning.statusCanceled': "रद्द — भेजने से पहले भुगतान",
   'whatsapp.dunning.kindThanks': "धन्यवाद",

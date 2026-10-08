@@ -2980,6 +2980,8 @@ const ja: Dictionary = {
   'whatsapp.dunning.skip.paid': "送信前に支払済み",
   'whatsapp.dunning.skip.paused': "受領証あり: 督促を一時停止",
   'whatsapp.dunning.statusQueued': "送信済み",
+  'whatsapp.dunning.export': "エクスポート",
+  'whatsapp.dunning.exportFailed': "履歴をエクスポートできませんでした",
   'whatsapp.dunning.statusSkipped': "スキップ",
   'whatsapp.dunning.statusCanceled': "取消 — 送信前に支払済み",
   'whatsapp.dunning.kindThanks': "お礼",

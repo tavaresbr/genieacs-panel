@@ -2804,6 +2804,8 @@ const ko: Dictionary = {
   'whatsapp.dunning.skip.paid': "발송 전 결제",
   'whatsapp.dunning.skip.paused': "영수증 수신: 독촉 일시 중지",
   'whatsapp.dunning.statusQueued': "발송됨",
+  'whatsapp.dunning.export': "내보내기",
+  'whatsapp.dunning.exportFailed': "기록을 내보낼 수 없습니다",
   'whatsapp.dunning.statusSkipped': "건너뜀",
   'whatsapp.dunning.statusCanceled': "취소됨 — 발송 전 결제",
   'whatsapp.dunning.kindThanks': "감사 메시지",

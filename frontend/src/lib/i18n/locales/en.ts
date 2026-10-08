@@ -2801,6 +2801,8 @@ const en = {
   'whatsapp.dunning.skip.paid': "Paid before it went out",
   'whatsapp.dunning.skip.paused': "Receipt received: cadence paused",
   'whatsapp.dunning.statusQueued': "Sent",
+  'whatsapp.dunning.export': "Export",
+  'whatsapp.dunning.exportFailed': "Could not export the history",
   'whatsapp.dunning.statusSkipped': "Skipped",
   'whatsapp.dunning.statusCanceled': "Canceled — paid before sending",
   'whatsapp.dunning.kindThanks': "Thank-you",

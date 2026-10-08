@@ -2780,6 +2780,8 @@ const ar: Dictionary = {
   'whatsapp.dunning.skip.paid': "دفع قبل الإرسال",
   'whatsapp.dunning.skip.paused': "تم استلام إيصال: تم إيقاف التذكيرات مؤقتًا",
   'whatsapp.dunning.statusQueued': "أُرسل",
+  'whatsapp.dunning.export': "تصدير",
+  'whatsapp.dunning.exportFailed': "تعذّر تصدير السجل",
   'whatsapp.dunning.statusSkipped': "تم التخطي",
   'whatsapp.dunning.statusCanceled': "أُلغي — دفع قبل الإرسال",
   'whatsapp.dunning.kindThanks': "شكر",

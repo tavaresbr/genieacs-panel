@@ -2806,6 +2806,8 @@ const ru: Dictionary = {
   'whatsapp.dunning.skip.paid': "Оплачено до отправки",
   'whatsapp.dunning.skip.paused': "Получена квитанция: напоминания приостановлены",
   'whatsapp.dunning.statusQueued': "Отправлено",
+  'whatsapp.dunning.export': "Экспорт",
+  'whatsapp.dunning.exportFailed': "Не удалось экспортировать историю",
   'whatsapp.dunning.statusSkipped': "Пропущено",
   'whatsapp.dunning.statusCanceled': "Отменено — оплачено до отправки",
   'whatsapp.dunning.kindThanks': "Благодарность",
