@@ -22,7 +22,7 @@
  * e que fazem sentido para um estranho. `/impersonate` também mora lá e NÃO
  * entra: é o resgate de um bilhete, não uma página.
  */
-export const PUBLIC_PATHS = Object.freeze(['/', '/signup', '/login']);
+export const PUBLIC_PATHS = Object.freeze(['/', '/signup', '/login', '/privacidade']);
 
 /**
  * E destas, as que um buscador deve ANUNCIAR. A entrada fica de fora de
@@ -30,7 +30,7 @@ export const PUBLIC_PATHS = Object.freeze(['/', '/signup', '/login']);
  * onde se volta. Liberada no `robots.txt`, para não parecer bloqueio; só não
  * oferecida no mapa.
  */
-export const SITEMAP_PATHS = Object.freeze(['/', '/signup']);
+export const SITEMAP_PATHS = Object.freeze(['/', '/signup', '/privacidade']);
 
 /**
  * O `robots.txt` deste host.
@@ -39,7 +39,7 @@ export const SITEMAP_PATHS = Object.freeze(['/', '/signup']);
  * provedor não anuncia mapa, e apontar para um que responde 404 seria pior do
  * que não apontar.
  *
- * No ápice a forma é de lista de permissão (`Disallow: /` primeiro, e as três
+ * No ápice a forma é de lista de permissão (`Disallow: /` primeiro, e as
  * exceções depois), e não de lista de proibição. A diferença aparece no dia em
  * que alguém acrescentar uma rota pública: com lista de proibição ela nasceria
  * indexável e ninguém saberia; assim ela nasce fechada até alguém decidir o

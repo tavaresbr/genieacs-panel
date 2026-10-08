@@ -1,6 +1,7 @@
 import Plan, { parsePlanFeatures } from '../models/Plan.js';
 import Tenant from '../models/Tenant.js';
 import Lead from '../models/Lead.js';
+import { leadRetentionDays } from '../utils/leadRetention.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import PlatformNotifyService from '../services/platformNotifyService.js';
 import { lookupCnpj } from '../services/cnpjLookupService.js';
@@ -69,6 +70,11 @@ class PublicController {
         legalName: p.legalName,
         taxId: p.taxId,
         address: p.address,
+        // Quanto tempo o pedido de contato fica guardado — `0` quer dizer que
+        // NADA o apaga sozinho. A página de privacidade diz exatamente isto, e
+        // lê da mesma função que a poda (`utils/leadRetention.js`): a política
+        // e o que o código faz não têm como divergir.
+        leadRetentionDays: leadRetentionDays(),
         social: {
           instagram: p.instagram,
           facebook: p.facebook,
@@ -163,7 +169,7 @@ class PublicController {
         // nenhum método, e `presentLead` — lista fechada de campos — não o
         // entrega ao console, que portanto nunca o mostrou. Dado pessoal
         // guardado sem finalidade em exercício é o que o art. 6º da LGPD chama
-        // de desnecessário, e a migração `0100_drop_lead_ip` derrubou a coluna.
+        // de desnecessário, e a migração `0109_drop_lead_ip` derrubou a coluna.
         //
         // E ele não era o controle de abuso desta rota: isso são o
         // `publicLeadLimiter` e o campo-armadilha `website` logo acima, que

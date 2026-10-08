@@ -1679,6 +1679,12 @@ export interface PublicInfo {
   legalName?: string | null
   taxId?: string | null
   address?: string | null
+  /**
+   * Quanto tempo o pedido de contato fica guardado. `0` quer dizer que nada o
+   * apaga sozinho. A página de privacidade diz exatamente isto — vem do servidor,
+   * da mesma função que a poda lê.
+   */
+  leadRetentionDays?: number
 }
 
 export interface CnpjData {

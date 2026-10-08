@@ -323,6 +323,13 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
             {t(doConsole ? 'login.platform.helpText' : 'login.helpText')}
           </p>
+          {/* O operador lê o que guardamos dele ANTES de entrar — é onde o aviso
+              tem que estar para quem vai criar e usar uma conta. */}
+          <p className="mt-1 text-center text-xs">
+            <Link to="/privacidade" className="inline-flex min-h-10 items-center text-muted-foreground underline hover:text-foreground lg:min-h-0">
+              {t('login.privacyLink')}
+            </Link>
+          </p>
           {/* Sign-up lives at the platform's front door, not at this provider's
               address: a new ISP is nobody's customer yet. */}
           {doConsole ? (

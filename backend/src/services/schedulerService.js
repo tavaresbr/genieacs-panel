@@ -15,6 +15,7 @@ import Setting from '../models/Setting.js';
 import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import Lead from '../models/Lead.js';
+import { leadRetentionDays } from '../utils/leadRetention.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
 import SubscriptionNoticeService from './subscriptionNoticeService.js';
 import MaintenanceService from './maintenanceService.js';
@@ -27,6 +28,8 @@ import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js'
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
+
+export { leadRetentionDays };
 
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
@@ -54,41 +57,6 @@ const USAGE_PEAK_INTERVAL_MS = 10 * 60_000;
 const AUDIT_RETENTION_DEFAULT_DAYS = 365;
 const AUDIT_RETENTION_MIN_DAYS = 30;
 const AUDIT_RETENTION_MAX_DAYS = 3650;
-
-/**
- * O prazo dos pedidos de contato da vitrine, em dias — e ele nasce DESLIGADO.
- *
- * Zero ou ausente quer dizer "para sempre", que é a convenção deste sistema
- * (ver o leitor do prazo da trilha abaixo, e `waMessageSweeper.retentionDays`).
- * E aqui o desligado é o padrão de propósito: um `skygenpanel update` que chega
- * numa instalação em produção não pode começar a apagar linhas que ninguém
- * escolheu apagar. Quem liga o prazo é quem responde por ele.
- *
- * Variável de ambiente, e não linha de configuração, por um motivo técnico:
- * `Setting` e `AppState` passam por `tdb` e têm chave `(tenant_id, key)` —
- * lançam fora de escopo de provedor. `leads` é da plataforma e não tem
- * provedor, então guardar o prazo numa linha exigiria eleger um provedor
- * arbitrário para hospedá-lo, ou depender de a caixa da plataforma existir, e
- * ela é um passo opcional (`scripts/create-platform-tenant.js`).
- *
- * Os limites: abaixo de 30 dias o prazo apagaria o pedido antes de a equipe
- * comercial tê-lo trabalhado; acima de 10 anos ele não é prazo.
- */
-const LEAD_RETENTION_MIN_DAYS = 30;
-const LEAD_RETENTION_MAX_DAYS = 3650;
-
-/** Dias de guarda dos leads, ou zero para "para sempre". */
-export function leadRetentionDays(raw = process.env.LEAD_RETENTION_DAYS) {
-  const bruto = String(raw ?? '').trim();
-  // A mesma regra estrita do prazo da trilha, e pelo mesmo motivo:
-  // `Number.parseInt('12abc')` devolve 12, e um prazo de 12 dias nascido de um
-  // campo digitado errado apagaria dado que ninguém mandou apagar. Aqui isso é
-  // pior do que lá, porque o padrão é não apagar nada.
-  if (!/^[0-9]+$/.test(bruto)) return 0;
-  const n = Number.parseInt(bruto, 10);
-  if (n === 0) return 0;
-  return Math.min(Math.max(n, LEAD_RETENTION_MIN_DAYS), LEAD_RETENTION_MAX_DAYS);
-}
 
 /**
  * The panel's only background worker.
