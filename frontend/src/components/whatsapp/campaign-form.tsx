@@ -34,7 +34,7 @@ import { estimatedHours, localInputToIso, parseContracts, toggleValue } from './
  * quem vão receber, e qualquer mudança no público ou no texto a descarta.
  */
 
-const VARIABLES = ['nome', 'primeiro_nome', 'contrato', 'plano'] as const
+const VARIABLES = ['nome', 'primeiro_nome', 'contrato', 'plano', 'link_indicacao'] as const
 
 export const STATE_LABEL: Record<string, TranslationKey> = {
   active: 'whatsapp.campaign.stateActive',

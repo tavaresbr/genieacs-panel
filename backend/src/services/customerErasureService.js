@@ -160,6 +160,12 @@ class CustomerErasureService {
       wa_dunning_pauses: contratos.length
         ? await contar('wa_dunning_pauses', (q) => q.whereIn('contract', contratos))
         : 0,
+      customer_referrals: (telefones.length || contratos.length)
+        ? await contar('customer_referrals', (q) => q.where((w) => {
+          if (telefones.length) w.whereIn('phone_e164', telefones);
+          if (contratos.length) w.orWhereIn('referrer_contract', contratos);
+        }))
+        : 0,
       mapping_nodes: nos.length
     };
 
@@ -300,6 +306,14 @@ class CustomerErasureService {
         await tdb('wa_dunning_sends', trx).where((q) => {
           if (telefones.length) q.whereIn('phone_e164', telefones);
           if (contratos.length) q.orWhereIn('contract', contratos);
+        }).del();
+      }
+
+      // As indicações: as que ele fez e a dele como indicado.
+      if (telefones.length || contratos.length) {
+        await tdb('customer_referrals', trx).where((q) => {
+          if (telefones.length) q.whereIn('phone_e164', telefones);
+          if (contratos.length) q.orWhereIn('referrer_contract', contratos);
         }).del();
       }
 

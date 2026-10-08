@@ -107,6 +107,16 @@ export const casos = [
     codigoDeNaoAchou: 'conversation_not_found'
   },
   {
+    // A indicação de um cliente: o estado mudado por quem atende. O id do
+    // vizinho dá 404 antes de qualquer validação do corpo.
+    chave: 'referral',
+    label: 'PATCH /api/whatsapp/referrals/:id',
+    method: 'PATCH',
+    path: (id) => `/api/whatsapp/referrals/${id}`,
+    body: { status: 'contacted' },
+    tabela: 'customer_referrals'
+  },
+  {
     chave: 'template',
     label: 'PUT /api/whatsapp/templates/:id',
     method: 'PUT',

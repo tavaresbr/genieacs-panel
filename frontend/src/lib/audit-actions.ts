@@ -95,6 +95,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'whatsapp.dunning_saved': 'audit.action.whatsappDunningSaved',
   'whatsapp.campaign_created': 'audit.action.whatsappCampaignCreated',
   'whatsapp.campaign_updated': 'audit.action.whatsappCampaignUpdated',
+  'whatsapp.referral_updated': 'audit.action.whatsappReferralUpdated',
   'whatsapp.opt_out_changed': 'audit.action.whatsappOptOutChanged',
   'whatsapp.template_ai_draft': 'audit.action.whatsappTemplateAiDraft'
 }

@@ -470,6 +470,15 @@ class CustomerDataExportService {
       ? await tdb('wa_dunning_pauses').whereIn('contract', contratos).orderBy('id')
       : []);
 
+    // As indicações: as que este assinante fez (pelo contrato) e a dele próprio
+    // como indicado (pelo telefone).
+    guardar('customer_referrals', (todosTelefones.length || contratos.length)
+      ? await tdb('customer_referrals').where((q) => {
+        if (todosTelefones.length) q.whereIn('phone_e164', todosTelefones);
+        if (contratos.length) q.orWhereIn('referrer_contract', contratos);
+      }).orderBy('id')
+      : []);
+
     guardar('mapping_nodes', nos);
     guardar('mapping_edges', noIds.length
       ? await tdb('mapping_edges').where((q) => {

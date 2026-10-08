@@ -60,6 +60,8 @@ const PUBLICAS = new Map([
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
   ['POST /api/auth/impersonate/redeem', 'o bilhete do console É a credencial: uso único, um minuto de vida, conferido por hash e contra o provedor do host'],
   ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal'],
+  ['GET /api/customer/referral', 'a página de indicação: o token assinado na query É a credencial e nomeia provedor e contrato; prova em customer-referrals.test.js'],
+  ['POST /api/customer/referral', 'o cadastro do indicado: idem, token no corpo; só escreve em `customer_referrals` do provedor do token, e só se o host pode agir por ele'],
   ['POST /api/auth/password-reset', 'quem perdeu a senha não tem sessão; responde a MESMA coisa exista a conta ou não, e a prova está em password-reset.test.js'],
   ['POST /api/auth/password-reset/confirm', 'o bilhete do e-mail É a credencial: uso único, meia hora, conferido por hash, contra o provedor do host e contra o endereço atual da conta'],
   ['POST /api/auth/email/verify/confirm', 'idem, e é aberto do celular, onde não há sessão — pedir login para confirmar um link de e-mail é ensinar a equipe a cair em phishing'],
@@ -269,6 +271,10 @@ describe('toda rota sem sessão', () => {
       // vez só.
       'POST /api/billing-webhook',
       'POST /api/customer/login',
+      // O cadastro de um indicado pelo link de um cliente. Escreve uma linha em
+      // `customer_referrals` do provedor que o token assinado nomeia — o
+      // token é conferido por HMAC e pelo host antes de abrir o escopo.
+      'POST /api/customer/referral',
       'POST /api/invites/token/accept',
       // A prévia do convite NÃO escreve nada: ela é POST só porque o token
       // saiu do caminho e foi para o corpo, para não acabar no log do

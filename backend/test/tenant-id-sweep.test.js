@@ -161,6 +161,10 @@ async function semear(tenantId, slug) {
       title: 'Aviso de manutenção', body: 'Teste', status: 'draft'
     });
 
+    alvo.referral = await semearLinha('customer_referrals', {
+      referrer_contract: '1001', name: 'Indicado Teste', phone_e164: '5511900000009', status: 'new'
+    });
+
     alvo.account = await semearLinha('whatsapp_accounts', {
       name: `skygp_sweep_${slug}`,
       purpose: 'support',

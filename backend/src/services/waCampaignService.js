@@ -6,6 +6,7 @@ import WaOptOut from '../models/WaOptOut.js';
 import WaTemplate from '../models/WaTemplate.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WaBillingService from './waBillingService.js';
+import CustomerReferralService from './customerReferralService.js';
 import { normalizeAttachment } from './waSendService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { VARIAVEIS_DE_COBRANCA, comoDataBr, renderCobranca } from '../utils/wa/waCobranca.js';
@@ -16,7 +17,7 @@ import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
  * contrato. Não há fatura aqui — quem quer citar valor, PIX ou vencimento está
  * fazendo cobrança, e a cobrança tem a sua própria tela, que consulta o SGP.
  */
-export const VARIAVEIS_DE_CAMPANHA = Object.freeze(['nome', 'primeiro_nome', 'contrato', 'plano']);
+export const VARIAVEIS_DE_CAMPANHA = Object.freeze(['nome', 'primeiro_nome', 'contrato', 'plano', 'link_indicacao']);
 
 /** O teto de uma campanha. Com o ritmo padrão (~90/h), 5000 são dois dias e pouco. */
 export const MAX_CAMPAIGN_RECIPIENTS = 5000;
@@ -217,6 +218,7 @@ class WaCampaignService {
       }
     }
 
+    const linkBase = await CustomerReferralService.baseUrl();
     const semTelefone = [];
     const comTelefone = [];
     for (const assinante of assinantes) {
@@ -225,6 +227,7 @@ class WaCampaignService {
         contract: assinante.contract,
         clientName: assinante.clientName,
         plan: cadastro.get(assinante.contract)?.plan ?? null,
+        referralLink: CustomerReferralService.buildLink(linkBase, assinante.contract),
         phone
       };
       if (phone) comTelefone.push(linha);
@@ -301,7 +304,10 @@ class WaCampaignService {
       nome: recipient.clientName || '',
       primeiro_nome: primeiroNome(recipient.clientName),
       contrato: recipient.contract || '',
-      plano: recipient.plan || ''
+      plano: recipient.plan || '',
+      // O link de indicação do próprio cliente; sem endereço configurado ou sem
+      // contrato ele fica vazio, e quem ficaria com a mensagem pela metade é pulado.
+      link_indicacao: recipient.referralLink || ''
     };
   }
 

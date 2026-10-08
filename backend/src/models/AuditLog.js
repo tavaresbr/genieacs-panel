@@ -57,6 +57,7 @@ class AuditLog {
     // guarda os filtros e quantos vão receber, nunca um telefone.
     WHATSAPP_CAMPAIGN_CREATED: 'whatsapp.campaign_created',
     WHATSAPP_CAMPAIGN_UPDATED: 'whatsapp.campaign_updated',
+    WHATSAPP_REFERRAL_UPDATED: 'whatsapp.referral_updated',
     // A equipe pôs um número no "não perturbe" ou mudou os tipos de comunicação
     // que ele bloqueia. O `detail` guarda os tipos, nunca o telefone.
     WHATSAPP_OPT_OUT_CHANGED: 'whatsapp.opt_out_changed',

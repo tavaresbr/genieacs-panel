@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import CustomerPortal from './pages/customer-portal'
+import ReferralPage from './pages/referral'
 import { LanguageProvider } from './contexts/language-context'
 import './styles/globals.css'
 import { detectLocale, loadDictionary } from './lib/i18n'
@@ -15,7 +16,7 @@ document.documentElement.classList.toggle('dark', Boolean(prefersDark))
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <LanguageProvider>
-      <CustomerPortal />
+      {window.location.pathname.replace(/\/+$/, '') === '/indique' ? <ReferralPage /> : <CustomerPortal />}
     </LanguageProvider>
   </React.StrictMode>,
 )

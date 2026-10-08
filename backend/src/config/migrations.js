@@ -2086,6 +2086,35 @@ const BILLING_STATUS_TABLES = [
   ['sgp_billing_status', sgpBillingStatusTable]
 ];
 
+/**
+ * As indicações (0111): quem um cliente indicou pelo link dele. Uma linha por
+ * indicado; `referrer_contract` é o contrato de quem indicou. `status` anda de
+ * `new` até `rewarded` (ou `lost`), à mão, na tela de Indicações. Nome e
+ * telefone do indicado são dado de uma pessoa que ainda não é cliente — o
+ * dossiê da LGPD alcança a linha por qualquer das duas pontas.
+ */
+const customerReferralsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('referrer_contract', 64).notNullable();
+  t.string('referrer_name', 255);
+  t.string('name', 120).notNullable();
+  t.string('phone_e164', 24).notNullable();
+  t.string('neighborhood', 120);
+  t.string('note', 500);
+  t.string('status', 16).notNullable().defaultTo('new');
+  t.timestamp('referrer_notified_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'referrer_contract'], 'customer_referrals_referrer_idx');
+  t.index(['tenant_id', 'created_at'], 'customer_referrals_created_idx');
+};
+
+const CUSTOMER_REFERRAL_TABLES = [
+  ['customer_referrals', customerReferralsTable]
+];
+
 const DUNNING_PAUSE_TABLES = [
   ['wa_dunning_pauses', waDunningPausesTable]
 ];
@@ -2820,6 +2849,7 @@ export const SCHEMA_TABLES = [
   ...WA_AGENT_TABLES,
   ...WA_TAG_TABLES,
   ...DUNNING_PAUSE_TABLES,
+  ...CUSTOMER_REFERRAL_TABLES,
   ...BILLING_STATUS_TABLES,
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
@@ -6245,6 +6275,18 @@ export const migrations = [
       await db.schema.alterTable('wa_broadcasts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** As indicações dos clientes — ver `customerReferralsTable`. */
+    id: '0111_customer_referrals',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('customer_referrals');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'customer_referrals', customerReferralsTable(db));
     }
   }
 ];
