@@ -40,6 +40,16 @@ function meioDia(offsetDays = 0) {
   return d;
 }
 
+/**
+ * Call it WHEN THE SGP ANSWERS, never while building the fixtures below. They
+ * are module constants, evaluated once at import, and the panel counts "overdue
+ * for N days" against the instant of each request: a run that crossed 00:00 UTC
+ * between the two read 11 where the fixture meant 10. The fixtures declare an
+ * offset (`venceEmDias`) and the stub resolves it per response.
+ *
+ * (The payment dates set inside the tests are fine: they are taken at the
+ * moment of the test, not at import.)
+ */
 function dayOffset(days) {
   const date = meioDia();
   date.setUTCDate(date.getUTCDate() + days);
@@ -48,17 +58,17 @@ function dayOffset(days) {
 
 const SUBSCRIBERS = [
   { contract: 'R-ATRASO-10', name: 'João', phone: '5593981120001',
-    invoices: [{ numerodocumento: 'T10', valor: '129,90', vencimento: dayOffset(-10), pix: 'pix-10' }] },
+    invoices: [{ numerodocumento: 'T10', valor: '129,90', venceEmDias: -10, pix: 'pix-10' }] },
   { contract: 'R-ATRASO-2', name: 'Maria', phone: '5593981120002',
-    invoices: [{ numerodocumento: 'T2', valor: '89,90', vencimento: dayOffset(-2), pix: 'pix-2' }] },
+    invoices: [{ numerodocumento: 'T2', valor: '89,90', venceEmDias: -2, pix: 'pix-2' }] },
   { contract: 'R-FUTURA-3', name: 'Carlos', phone: '5593981120003',
-    invoices: [{ numerodocumento: 'T3', valor: '99,90', vencimento: dayOffset(3), pix: 'pix-3' }] },
+    invoices: [{ numerodocumento: 'T3', valor: '99,90', venceEmDias: 3, pix: 'pix-3' }] },
   { contract: 'R-SEM-FONE', name: 'Ana', phone: null,
-    invoices: [{ numerodocumento: 'T4', valor: '50,00', vencimento: dayOffset(-5), pix: 'pix-4' }] },
+    invoices: [{ numerodocumento: 'T4', valor: '50,00', venceEmDias: -5, pix: 'pix-4' }] },
   { contract: 'R-OPTOUT', name: 'Pedro', phone: '5593981120005',
-    invoices: [{ numerodocumento: 'T5', valor: '50,00', vencimento: dayOffset(-5), pix: 'pix-5' }] },
+    invoices: [{ numerodocumento: 'T5', valor: '50,00', venceEmDias: -5, pix: 'pix-5' }] },
   { contract: 'R-SEM-PIX', name: 'Lucia', phone: '5593981120006',
-    invoices: [{ numerodocumento: 'T6', valor: '50,00', vencimento: dayOffset(-5) }] },
+    invoices: [{ numerodocumento: 'T6', valor: '50,00', venceEmDias: -5 }] },
   { contract: 'R-EM-DIA', name: 'Rita', phone: '5593981120007', invoices: [] }
 ];
 const byContract = new Map(SUBSCRIBERS.map((row) => [row.contract, row]));
@@ -83,9 +93,13 @@ function startSgpStub() {
       if (req.url.startsWith('/api/ura/titulos')) {
         const subscriber = byContract.get(String(payload.contrato));
         if (!subscriber) return send({ status: 0, msg: 'Contrato inexistente' });
-        const titulos = payload.apenas_titulos_em_aberto
+        const faturas = payload.apenas_titulos_em_aberto
           ? subscriber.invoices.filter((f) => !f.dataPagamento)
           : subscriber.invoices;
+        // Resolved here, after the filter, so the due date is the one of THIS answer.
+        const titulos = faturas.map(({ venceEmDias, ...titulo }) => (
+          venceEmDias === undefined ? titulo : { ...titulo, vencimento: dayOffset(venceEmDias) }
+        ));
         return send({ status: 1, titulos });
       }
       res.writeHead(404);
