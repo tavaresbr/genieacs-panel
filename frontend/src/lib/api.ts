@@ -4907,6 +4907,8 @@ export interface WaitingReport {
 export interface WhatsAppAlertSettings {
   enabled: boolean
   intervalSeconds: number
+  /** 0 = cada alerta na hora; 5, 10, 15 ou 30 = um resumo a cada tantos minutos. */
+  digestMinutes?: number
   recipients: string[]
   /** E-mails da equipe: o segundo canal, pelo SMTP do servidor. */
   emailRecipients?: string[]

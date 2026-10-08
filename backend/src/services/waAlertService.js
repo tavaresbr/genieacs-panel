@@ -36,6 +36,15 @@ const SETTINGS_KEY = 'whatsapp_alert_settings';
  * in-memory shortcut over it is keyed the same way.
  */
 const LAST_SCAN_KEY = 'whatsapp_alert_last_scan';
+const DIGEST_KEY = 'whatsapp_alert_digest';
+const DIGEST_CHOICES = Object.freeze([0, 5, 10, 15, 30]);
+const DIGEST_MAX_ITEMS = 200;
+const DIGEST_MAX_AGE_MS = 24 * 3600 * 1000;
+const DIGEST_LINES_PER_SECTION = 25;
+const normalizeDigest = (value, fallback = 0) => {
+  const n = Number(value);
+  return DIGEST_CHOICES.includes(n) ? n : fallback;
+};
 
 /** Same 30 s window `whatsappConfigService` uses, and for the same reason. */
 const SETTINGS_CACHE_TTL_MS = 30_000;
@@ -128,6 +137,9 @@ const DEFAULT_SETTINGS = Object.freeze({
   // Five minutes. The rules are all measured in tens of minutes, so scanning
   // faster would only spend GenieACS reads to discover the same answer.
   intervalSeconds: 300,
+  // 0 = cada alerta sai na hora, como sempre. 5, 10, 15 ou 30 juntam os
+  // alertas numa fila e mandam um resumo só a cada tantos minutos.
+  digestMinutes: 0,
   recipients: [],
   // O segundo canal: e-mails da equipe, pelo SMTP do servidor. Mesma regra
   // dos números — quem recebe é a equipe, nunca o assinante.
@@ -383,6 +395,7 @@ class WaAlertService {
     const settings = {
       enabled: stored.enabled === true,
       intervalSeconds: clamp(stored.intervalSeconds, 60, 3600, DEFAULT_SETTINGS.intervalSeconds),
+      digestMinutes: normalizeDigest(stored.digestMinutes),
       // Already validated on the way in; re-normalised on the way out so a blob
       // written by an older version still yields dialable numbers.
       recipients: Array.isArray(stored.recipients)
@@ -456,6 +469,9 @@ class WaAlertService {
       intervalSeconds: patch.intervalSeconds === undefined
         ? current.intervalSeconds
         : clamp(patch.intervalSeconds, 60, 3600, DEFAULT_SETTINGS.intervalSeconds),
+      digestMinutes: patch.digestMinutes === undefined
+        ? current.digestMinutes
+        : normalizeDigest(patch.digestMinutes),
       recipients: patch.recipients === undefined
         ? current.recipients
         : this.normalizeRecipients(patch.recipients),
@@ -546,6 +562,10 @@ class WaAlertService {
   static async tickForTenant() {
     const settings = await this.getSettings().catch(() => null);
     if (!settings || !settings.enabled) return { skipped: 'disabled' };
+    // O resumo tem relógio próprio: sai no horário mesmo entre duas varreduras.
+    await this.flushDigest(settings).catch((error) => {
+      console.warn(`WhatsApp alert digest failed: ${error.message}`);
+    });
     const lastScanAt = await this.readLastScanAt();
     if (Date.now() - lastScanAt < settings.intervalSeconds * 1000) {
       return { skipped: 'not_due' };
@@ -1105,11 +1125,105 @@ class WaAlertService {
   static async notify({ channels, condition, cleared }) {
     const body = this.compose(condition, cleared);
     if (!body) return 0;
+    const { digestMinutes } = await this.getSettings();
+    if (digestMinutes > 0) {
+      // Entra na fila do resumo. Conta como avisada (um por canal pronto) para o
+      // cooldown e a recuperação funcionarem como se tivesse saído.
+      await this.enqueueDigest({ rule: condition.rule, cleared: Boolean(cleared), text: body });
+      return [channels?.whatsapp, channels?.email, channels?.telegram].filter(Boolean).length;
+    }
+    return this.deliver(channels, body);
+  }
+
+  static async deliver(channels, body) {
     let sent = 0;
     if (channels?.whatsapp) sent += await this.notifyWhatsApp(channels.whatsapp, body);
     if (channels?.email) sent += await this.notifyEmail(channels.email, body);
     if (channels?.telegram) sent += await this.notifyTelegram(channels.telegram, body);
     return sent;
+  }
+
+  // ── O resumo ───────────────────────────────────────────────────────
+
+  static digestLocks = new Map();
+
+  /** Uma operação por vez na fila de cada provedor (ler, mudar, gravar). */
+  static async withDigestLock(work) {
+    const tenant = currentTenantId();
+    const previous = this.digestLocks.get(tenant) || Promise.resolve();
+    const run = previous.catch(() => {}).then(work);
+    const tail = run.catch(() => {});
+    this.digestLocks.set(tenant, tail);
+    tail.then(() => {
+      if (this.digestLocks.get(tenant) === tail) this.digestLocks.delete(tenant);
+    });
+    return run;
+  }
+
+  static async readDigest(now = Date.now()) {
+    let stored = null;
+    try {
+      stored = JSON.parse((await AppState.get(DIGEST_KEY)) || 'null');
+    } catch {
+      stored = null;
+    }
+    const items = Array.isArray(stored?.items)
+      ? stored.items.filter((item) => item && typeof item.text === 'string' && now - Number(item.at) < DIGEST_MAX_AGE_MS)
+      : [];
+    return { openedAt: items.length ? Number(items[0].at) : 0, items };
+  }
+
+  static async writeDigest(queue) {
+    await AppState.upsert(DIGEST_KEY, JSON.stringify(queue?.items?.length ? { openedAt: queue.openedAt, items: queue.items } : { openedAt: 0, items: [] }));
+  }
+
+  static async enqueueDigest({ rule, cleared, text }) {
+    return this.withDigestLock(async () => {
+      const now = Date.now();
+      const queue = await this.readDigest(now);
+      const items = [...queue.items, { rule, cleared, text, at: now }].slice(-DIGEST_MAX_ITEMS);
+      await this.writeDigest({ openedAt: Number(items[0].at), items });
+    });
+  }
+
+  /**
+   * Manda a fila como UMA mensagem quando o prazo do resumo venceu (ou a
+   * varredura manual pediu, ou o operador voltou para "na hora"). Só esvazia se
+   * algum canal entregou; sem canal pronto a fila espera.
+   */
+  static async flushDigest(settings, { now = Date.now(), force = false } = {}) {
+    return this.withDigestLock(async () => {
+      const queue = await this.readDigest(now);
+      if (queue.items.length === 0) return 0;
+      const minutes = settings.digestMinutes || 0;
+      const due = force || minutes === 0 || now - queue.openedAt >= minutes * 60000;
+      if (!due) return 0;
+      const channels = await this.readyChannels(settings);
+      if (!channels.whatsapp && !channels.email && !channels.telegram) return 0;
+      const sent = await this.deliver(channels, this.composeDigest(queue, now));
+      if (sent > 0) await this.writeDigest(null);
+      return sent;
+    });
+  }
+
+  static composeDigest(queue, now = Date.now()) {
+    const items = queue.items;
+    if (items.length === 1) return items[0].text;
+    const t = translatorFor(DEFAULT_LOCALE);
+    const fresh = items.filter((item) => !item.cleared);
+    const back = items.filter((item) => item.cleared);
+    const minutes = Math.max(1, Math.round((now - queue.openedAt) / 60000));
+    const section = (heading, list) => {
+      if (list.length === 0) return [];
+      const shown = list.slice(0, DIGEST_LINES_PER_SECTION).map((item) => `• ${item.text}`);
+      if (list.length > shown.length) shown.push(t('whatsapp.alerts.digestMore', { count: list.length - shown.length }));
+      return ['', heading, ...shown];
+    };
+    return [
+      t('whatsapp.alerts.digestTitle', { added: fresh.length, cleared: back.length, minutes }),
+      ...section(t('whatsapp.alerts.digestNew'), fresh),
+      ...section(t('whatsapp.alerts.digestCleared'), back)
+    ].join('\n');
   }
 
   /** Uma cópia por número no outbox do WhatsApp. */

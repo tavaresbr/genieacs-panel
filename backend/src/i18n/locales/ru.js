@@ -807,6 +807,10 @@ export default {
   // WhatsApp — тексты технических оповещений
   'whatsapp.alerts.ontOffline': 'ONT {device} не в сети уже {minutes} мин',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device} снова в сети',
+  'whatsapp.alerts.digestTitle': 'Технические оповещения: новых — {added}, восстановлено — {cleared} за последние {minutes} мин',
+  'whatsapp.alerts.digestNew': 'Новые:',
+  'whatsapp.alerts.digestCleared': 'Восстановлены:',
+  'whatsapp.alerts.digestMore': '… и ещё {count}',
   'whatsapp.alerts.rxPowerLow': 'Оптический сигнал ONT {device}: {value} дБм (предел {threshold})',
   'whatsapp.alerts.rxPowerLowCleared': 'Оптический сигнал ONT {device} вернулся к норме',
   'whatsapp.alerts.temperatureHigh': 'ONT {device}: {value} °C (предел {threshold})',

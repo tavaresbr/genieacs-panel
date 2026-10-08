@@ -138,6 +138,7 @@ interface RuleForm {
 interface AlertsForm {
   enabled: boolean
   intervalSeconds: string
+  digestMinutes: string
   /** The textarea verbatim, one number per line. Parsed only on save. */
   recipients: string
   /** O mesmo, um e-mail por linha. */
@@ -164,6 +165,7 @@ function toForm(settings: WhatsAppAlertSettings): AlertsForm {
   return {
     enabled: settings.enabled,
     intervalSeconds: String(settings.intervalSeconds),
+    digestMinutes: String(settings.digestMinutes ?? 0),
     recipients: (settings.recipients ?? []).join('\n'),
     emailRecipients: (settings.emailRecipients ?? []).join('\n'),
     // O token nunca vem: o campo começa vazio, que quer dizer "manter".
@@ -331,6 +333,7 @@ export function AlertsPanel() {
       const res = await whatsappAPI.updateAlertSettings({
         enabled: form.enabled,
         intervalSeconds: parseInteger(form.intervalSeconds, stored?.intervalSeconds ?? INTERVAL_MIN_S),
+        digestMinutes: Number(form.digestMinutes) || 0,
         recipients,
         emailRecipients,
         telegram: telegramPatch(form.telegram),
@@ -464,6 +467,31 @@ export function AlertsPanel() {
                   return { ...current, intervalSeconds: String(stored?.intervalSeconds ?? INTERVAL_MIN_S) }
                 })}
               />
+            </div>
+
+            <div>
+              <label htmlFor="wa-alerts-digest" className="field-label">
+                {t('whatsapp.alerts.digest')}
+              </label>
+              <select
+                id="wa-alerts-digest"
+                className="modern-input sm:max-w-64"
+                value={form.digestMinutes}
+                aria-describedby="wa-alerts-digest-hint"
+                onChange={(event) => setForm((current) => (current
+                  ? { ...current, digestMinutes: event.target.value }
+                  : current))}
+              >
+                <option value="0">{t('whatsapp.alerts.digestOff')}</option>
+                {[5, 10, 15, 30].map((minutes) => (
+                  <option key={minutes} value={String(minutes)}>
+                    {t('whatsapp.alerts.digestEvery', { minutes })}
+                  </option>
+                ))}
+              </select>
+              <p id="wa-alerts-digest-hint" className="field-hint">
+                {t('whatsapp.alerts.digestHint')}
+              </p>
             </div>
 
             {/* ── Who is woken ────────────────────────────────────────────

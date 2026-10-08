@@ -806,6 +806,10 @@ export default {
   // WhatsApp — 技术告警的消息正文
   'whatsapp.alerts.ontOffline': 'ONT {device} 已离线 {minutes} 分钟',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device} 已恢复在线',
+  'whatsapp.alerts.digestTitle': '技术告警：最近 {minutes} 分钟新增 {added} 条，恢复 {cleared} 条',
+  'whatsapp.alerts.digestNew': '新增：',
+  'whatsapp.alerts.digestCleared': '已恢复：',
+  'whatsapp.alerts.digestMore': '… 另有 {count} 条',
   'whatsapp.alerts.rxPowerLow': 'ONT {device} 的光信号为 {value} dBm（阈值 {threshold}）',
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} 的光信号已恢复正常',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} 温度为 {value} °C（阈值 {threshold}）',

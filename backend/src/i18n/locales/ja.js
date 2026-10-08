@@ -798,6 +798,10 @@ export default {
   // WhatsApp — 技術アラートの本文
   'whatsapp.alerts.ontOffline': 'ONT {device} が {minutes} 分間オフラインです',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device} がオンラインに復帰しました',
+  'whatsapp.alerts.digestTitle': '技術アラート：直近 {minutes} 分で新規 {added} 件、復旧 {cleared} 件',
+  'whatsapp.alerts.digestNew': '新規：',
+  'whatsapp.alerts.digestCleared': '復旧：',
+  'whatsapp.alerts.digestMore': '… ほか {count} 件',
   'whatsapp.alerts.rxPowerLow': 'ONT {device} の光信号が {value} dBm です (しきい値 {threshold})',
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} の光信号が正常に戻りました',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} が {value} °C です (しきい値 {threshold})',
