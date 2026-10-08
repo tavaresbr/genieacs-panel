@@ -1191,5 +1191,6 @@ export default {
   'platformAlert.test.subject': 'Тестовое оповещение',
   'platformAlert.test.body': 'Это тестовое оповещение платформы. Если вы его получили, оповещения работают.',
   'platformAlert.digest.subject': 'Ежедневная сводка: оповещений — {count}',
-  'platformAlert.digest.body': 'Сводка оповещений платформы за {date}:'
+  'platformAlert.digest.body': 'Сводка оповещений платформы за {date}:',
+  'platformAlert.digest.more': '… и ещё {count}'
 };

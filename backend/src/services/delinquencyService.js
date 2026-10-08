@@ -9,7 +9,7 @@ import SubscriptionService, {
 import SubscriptionNoticeService from './subscriptionNoticeService.js';
 import ChargeIssuingService, { ChargeFollowError } from './chargeIssuingService.js';
 import { autoSuspendConfig } from './platformProfileService.js';
-import { getDb } from '../config/database.js';
+import { getDb, isUniqueViolation, tdb } from '../config/database.js';
 import { runInTenant, runUnscoped } from '../config/tenantContext.js';
 
 /**
@@ -365,15 +365,28 @@ class DelinquencyService {
 
     if (action === 'extend') {
       const extendDays = Number(params.days);
+      // A cortesia é a única ação em massa que NÃO é idempotente por si: o
+      // mesmo pedido repetido (o navegador que desistiu de esperar duzentos
+      // provedores e a pessoa que clicou de novo) daria o prazo duas vezes.
+      // Com `requestId`, o pedido deixa a marca no extrato e a repetição vira
+      // "já feito" — a conferência antes poupa o gateway, e o índice único
+      // segura a corrida.
+      const externalId = params.requestId ? `delinq-extend:${params.requestId}` : null;
+      const jaFeito = () => ({ ok: true, code: 'extended', detail: { duplicate: true } });
+      if (externalId) {
+        const marca = await runInTenant(tenant.id, () => tdb('billing_events').where({ external_id: externalId }).first('id'));
+        if (marca) return jaFeito();
+      }
       let depois;
       try {
         depois = await runInTenant(tenant.id, () => SubscriptionService.setDeadlines({
-          extendDays, reason, actorUserId, now
+          extendDays, reason, actorUserId, now, externalId
         }));
       } catch (error) {
         // A cobrança em aberto não acompanhou o prazo (o gateway recusou), e
         // o prazo não se moveu.
         if (error instanceof ChargeFollowError) return { ok: false, code: error.code };
+        if (externalId && isUniqueViolation(error)) return jaFeito();
         throw error;
       }
       return {

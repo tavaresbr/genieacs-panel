@@ -1182,5 +1182,6 @@ export default {
   'platformAlert.test.subject': 'تنبيه تجريبي',
   'platformAlert.test.body': 'هذا تنبيه تجريبي من المنصة. إذا وصلك، فالتنبيهات تعمل.',
   'platformAlert.digest.subject': 'الملخص اليومي: {count} تنبيه',
-  'platformAlert.digest.body': 'ملخص تنبيهات المنصة ليوم {date}:'
+  'platformAlert.digest.body': 'ملخص تنبيهات المنصة ليوم {date}:',
+  'platformAlert.digest.more': '… و{count} أخرى'
 };

@@ -2722,7 +2722,7 @@ export const platformAPI = {
   runDelinquencyAction: (payload: {
     tenantIds: number[]
     action: DelinquencyAction
-    params?: { reason?: string; until?: string; days?: number }
+    params?: { reason?: string; until?: string; days?: number; requestId?: string }
   }) =>
     apiClient.post<{
       action: DelinquencyAction

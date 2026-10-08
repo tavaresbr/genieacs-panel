@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { DelinquencyRow } from '@/lib/api'
 import {
-  MAX_SELECTION, delinquencyCsv, parseBulkDays, pruneSelection, resultCodeKey, toggleAll, toggleSelection
+  MAX_SELECTION, delinquencyCsv, newRequestId, parseBulkDays, pruneSelection, resultCodeKey, toggleAll, toggleSelection
 } from '@/lib/delinquency'
 import en from '@/lib/i18n/locales/en'
 
@@ -86,5 +86,26 @@ describe('a planilha', () => {
     expect(primeira).toBe('1;Provedor 1;p1;past_due;BRL;125.00;100.00;25.00;0.00;2026-09-18;20;16-30;;2026-10-11T12:00:00.000Z;VISA 4242')
     expect(segunda).toContain('"\'=HYPERLINK(""x"")"')
     expect(segunda).toContain('suspended:auto_nonpayment')
+  })
+
+  it('neutraliza toda célula que começa com = + - @ (também depois de espaço ou quebra de linha)', () => {
+    const nomes = ['+SUM(1)', '-2+3', '@cmd', ' =1+1', '\n=1+1', '\tx']
+    const csv = delinquencyCsv(nomes.map((name, i) => linha(i + 1, {
+      tenant: { id: i + 1, name, slug: `p${i + 1}`, status: 'active' }
+    })), ['id'])
+    const celulas = csv.trim().split(/\r\n(?=\d+;)/).slice(1).map((l) => l.split(';')[1])
+    for (const celula of celulas) expect(celula.replace(/^"/, '').startsWith("'")).toBe(true)
+    // Número negativo é número, não fórmula.
+    const negativo = delinquencyCsv([linha(9, { daysOverdue: -3 })], ['id'])
+    expect(negativo).toContain(';-3;')
+  })
+})
+
+describe('a chave do pedido', () => {
+  it('tem o formato que o servidor aceita e muda a cada chamada', () => {
+    const a = newRequestId()
+    const b = newRequestId()
+    expect(a).toMatch(/^[A-Za-z0-9-]{8,64}$/)
+    expect(a).not.toBe(b)
   })
 })

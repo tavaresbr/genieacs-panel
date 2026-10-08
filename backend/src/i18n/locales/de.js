@@ -1191,5 +1191,6 @@ export default {
   'platformAlert.test.subject': 'Testalarm',
   'platformAlert.test.body': 'Dies ist ein Testalarm der Plattform. Wenn Sie ihn erhalten haben, funktionieren die Alarme.',
   'platformAlert.digest.subject': 'Tageszusammenfassung: {count} Alarm(e)',
-  'platformAlert.digest.body': 'Zusammenfassung der Plattformalarme vom {date}:'
+  'platformAlert.digest.body': 'Zusammenfassung der Plattformalarme vom {date}:',
+  'platformAlert.digest.more': '… und {count} weitere'
 };

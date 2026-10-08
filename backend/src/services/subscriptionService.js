@@ -2128,7 +2128,7 @@ class SubscriptionService {
    */
   static async setDeadlines({
     renewsAt = undefined, trialEndsAt = undefined, extendDays = null,
-    reason = null, actorUserId = null, now = new Date()
+    reason = null, actorUserId = null, now = new Date(), externalId = null
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -2186,6 +2186,10 @@ class SubscriptionService {
       await BillingEvent.record({
         subscriptionId: before.id,
         type: BILLING_EVENT_TYPES.DEADLINE_CHANGED,
+        // A chave do pedido, quando há (a cortesia em massa): o índice único
+        // `(tenant_id, external_id)` faz o mesmo pedido repetido desfazer a
+        // transação inteira em vez de dar o prazo duas vezes.
+        externalId,
         createdBy: actorUserId,
         detail: {
           ...(extendDays ? { courtesy: true, extendDays: Number(extendDays) } : {}),

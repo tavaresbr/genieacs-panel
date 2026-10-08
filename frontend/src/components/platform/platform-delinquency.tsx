@@ -23,6 +23,7 @@ import {
   DELINQUENCY_BUCKETS,
   MAX_SELECTION,
   delinquencyCsv,
+  newRequestId,
   parseBulkDays,
   pruneSelection,
   resultCodeKey,
@@ -221,7 +222,33 @@ export function PlatformDelinquency() {
         <ResultsPanel results={results} nomeDe={nomeDe} onClose={() => setResults(null)} />
       )}
 
-      <div className="modern-card overflow-x-auto">
+      {/* No celular, cartões: com oito colunas o valor e o prazo ficavam fora da tela. */}
+      <ul className="mobile-card-list modern-card divide-y divide-border" aria-label={t('platform.delinq.title')}>
+        {rows.length > 0 && vazio === null && (
+          <li className="flex items-center gap-2 p-3 text-sm">
+            <input
+              id="delinq-select-all-mobile"
+              type="checkbox"
+              checked={todosMarcados}
+              onChange={() => setSelected((atual) => toggleAll(atual, visibleIds))}
+            />
+            <label htmlFor="delinq-select-all-mobile">{t('platform.delinq.selectAll')}</label>
+          </li>
+        )}
+        {vazio !== null ? (
+          <li className={`py-6 text-center text-sm ${error !== null && !loading ? 'text-destructive' : 'text-muted-foreground'}`}>{vazio}</li>
+        ) : (
+          rows.map((row) => (
+            <DelinquencyCard
+              key={row.tenant.id}
+              row={row}
+              checked={selected.includes(row.tenant.id)}
+              onToggle={() => setSelected((atual) => toggleSelection(atual, row.tenant.id))}
+            />
+          ))
+        )}
+      </ul>
+      <div className="desktop-table modern-card overflow-x-auto">
         <table className="modern-table">
           <thead>
             <tr>
@@ -334,6 +361,45 @@ function DelinquencyTableRow({ row, checked, onToggle }: { row: DelinquencyRow; 
   )
 }
 
+function DelinquencyCard({ row, checked, onToggle }: { row: DelinquencyRow; checked: boolean; onToggle: () => void }) {
+  const { t, formatDateTime } = useTranslation()
+  return (
+    <li className="flex gap-3 p-4 text-sm">
+      <input
+        type="checkbox"
+        className="mt-1"
+        checked={checked}
+        onChange={onToggle}
+        aria-label={t('platform.delinq.selectRow', { name: row.tenant.name })}
+      />
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <span className="min-w-0 wrap-break-word font-semibold text-foreground">{row.tenant.name}</span>
+          <span className="font-mono font-semibold tabular-nums">{formatMoney(row.amountCents, row.currency)}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={statusBadgeClass(row.status)}>
+            {t(statusLabelKey({ status: row.status, suspendedReason: row.suspendedReason }))}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {formatDay(row.overdueSince)} · {t('platform.delinq.days', { days: row.daysOverdue })}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {t('platform.delinq.col.lastReminder')}: {row.lastReminder?.sentAt ? formatDateTime(row.lastReminder.sentAt) : t('platform.delinq.noReminder')}
+        </p>
+        {row.autoSuspendAt && (
+          <p className="text-xs text-muted-foreground">
+            {t('platform.delinq.col.autoSuspend')}: {formatDay(row.autoSuspendAt)}
+            {row.autoSuspendWarned && ` · ${t('platform.delinq.warned')}`}
+          </p>
+        )}
+        {row.card.saved && <CardBadge card={row.card} />}
+      </div>
+    </li>
+  )
+}
+
 function ResultsPanel({
   results,
   nomeDe,
@@ -390,9 +456,12 @@ function ActionDialog({
   const [until, setUntil] = useState('')
   const [days, setDays] = useState('7')
   const [invalido, setInvalido] = useState<string | null>(null)
+  // Uma chave por diálogo: o mesmo pedido mandado de novo (a resposta que
+  // demorou e o clique repetido) não dá a cortesia duas vezes.
+  const [requestId] = useState(newRequestId)
 
   const enviar = async () => {
-    const params: { reason?: string; until?: string; days?: number } = {}
+    const params: { reason?: string; until?: string; days?: number; requestId?: string } = { requestId }
     if (reason.trim()) params.reason = reason.trim()
     if (action === 'extend') {
       const dias = parseBulkDays(days)

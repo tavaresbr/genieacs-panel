@@ -361,6 +361,105 @@ describe('o resumo diário', () => {
   });
 });
 
+describe('os limites do resumo e da passada', () => {
+  const dia = (iso, horaSp) => new Date(`${iso}T${String(horaSp + 3).padStart(2, '0')}:00:00Z`);
+  const linhaFalsa = (i, extra = {}) => ({
+    id: i, event: 'payment_received', payload: JSON.stringify({ provider: `Provedor ${i}`, amountCents: 100 * i, ...extra })
+  });
+
+  it('o resumo lista no máximo 50, e conta o resto em "+N mais"', () => {
+    const linhas = Array.from({ length: 120 }, (_, i) => linhaFalsa(i + 1));
+    const { subject, text } = PlatformAlertService.renderDigest(linhas, '2030-03-10');
+    assert.match(subject, /120 alerta/);
+    assert.equal((text.match(/^• /gm) || []).length, 50);
+    assert.match(text, /\+70 mais$/);
+    assert.ok(text.length <= 3500);
+  });
+
+  it('o texto do resumo nunca passa de 3500 caracteres', () => {
+    const longo = 'x'.repeat(190);
+    const linhas = Array.from({ length: 50 }, (_, i) => linhaFalsa(i + 1, { provider: `${longo}${i}` }));
+    const { text } = PlatformAlertService.renderDigest(linhas, '2030-03-10');
+    assert.ok(text.length <= 3500, String(text.length));
+    const listados = (text.match(/^• /gm) || []).length;
+    assert.ok(listados < 50);
+    assert.match(text, new RegExp(`\\+${50 - listados} mais$`));
+  });
+
+  it('poucos itens: sem a linha "+N mais"', () => {
+    const { text } = PlatformAlertService.renderDigest([linhaFalsa(1), linhaFalsa(2)], '2030-03-10');
+    assert.equal((text.match(/^• /gm) || []).length, 2);
+    assert.doesNotMatch(text, /mais$/);
+  });
+
+  it('o resumo pendente de um dia que passou é descartado, e os itens vão no de hoje', async () => {
+    await ligar({ payment_received: ['email'] }, { dailyDigest: { enabled: true, hour: 8 } });
+    falhar.email = true;
+    await PlatformAlertService.enqueue('payment_received', { dedupeKey: 'ontem', now: dia('2030-06-01', 5) });
+    await PlatformAlertService.processDue({ now: dia('2030-06-01', 8) });
+    const ontem = await getDb()('platform_alerts').where({ dedupe_key: 'digest:2030-06-01' }).first();
+    assert.equal(ontem.status, 'pending');
+    falhar.email = false;
+    enviados = [];
+    await PlatformAlertService.processDue({ now: dia('2030-06-02', 8) });
+    assert.equal(enviados.length, 1);
+    assert.match(enviados[0].subject, /1 alerta/);
+    const velho = await getDb()('platform_alerts').where({ dedupe_key: 'digest:2030-06-01' }).first();
+    assert.equal(velho.status, 'skipped');
+    assert.equal(velho.last_error, 'superseded');
+    assert.equal((await getDb()('platform_alerts').where({ dedupe_key: 'digest:2030-06-02' }).first()).status, 'sent');
+    // E não volta a tentar o de ontem.
+    enviados = [];
+    await PlatformAlertService.processDue({ now: dia('2030-06-02', 12) });
+    assert.equal(enviados.length, 0);
+  });
+
+  it('a passada para no prazo e deixa o resto para a próxima', async () => {
+    await ligar({ payment_received: ['email'] });
+    for (const k of ['p1', 'p2', 'p3']) {
+      // eslint-disable-next-line no-await-in-loop
+      await PlatformAlertService.enqueue('payment_received', { dedupeKey: k });
+    }
+    let relogio = 0;
+    // Cada envio "leva" 15 s: o segundo já começa fora do prazo de 20 s.
+    PlatformAlertService.senders = {
+      ...PlatformAlertService.senders,
+      email: async (to, msg) => { relogio += 15_000; enviados.push({ canal: 'email', to, ...msg }); return true; }
+    };
+    try {
+      const r = await PlatformAlertService.processDue({ now: new Date(), clock: () => relogio });
+      assert.equal(r.sent, 2);
+      assert.equal(r.deferred, 1);
+      const pendentes = await getDb()('platform_alerts').where({ event: 'payment_received', status: 'pending' });
+      assert.equal(pendentes.length, 1);
+      // Sem garra nem tentativa gasta: a próxima passada manda.
+      assert.equal(pendentes[0].next_attempt_at, null);
+      assert.equal(Number(pendentes[0].attempts), 0);
+    } finally {
+      PlatformAlertService.senders.email = async (to, msg) => { enviados.push({ canal: 'email', to, ...msg }); return !falhar.email; };
+    }
+  });
+
+  it('alertsConfig lê o banco sem derrubar o cache do perfil', async () => {
+    const { readProfile, CONFIG_KEY } = await import('../src/services/platformProfileService.js');
+    const { default: AppState } = await import('../src/models/AppState.js');
+    invalidatePlatformProfile();
+    const antes = await readProfile();
+    assert.equal(antes.alerts.events.card_refused.enabled, false);
+    // Uma gravação por fora do saveProfile: o cache não sabe dela.
+    const caixa = await getDb()('tenants').where({ kind: 'platform' }).first();
+    const bruto = JSON.parse(await runInTenant(caixa.id, () => AppState.get(CONFIG_KEY)));
+    bruto.alerts.events.card_refused = { enabled: true, channels: ['email'] };
+    await runInTenant(caixa.id, () => AppState.upsert(CONFIG_KEY, JSON.stringify(bruto)));
+    // O serviço de alertas vê o novo na hora...
+    assert.equal((await alertsConfig()).events.card_refused.enabled, true);
+    // ...e o cache de quinze segundos do perfil continua de pé.
+    assert.equal((await readProfile()).alerts.events.card_refused.enabled, false);
+    invalidatePlatformProfile();
+    assert.equal((await readProfile()).alerts.events.card_refused.enabled, true);
+  });
+});
+
 describe('o alerta de teste', () => {
   const testar = (body) => call(`${panelUrl}/api/platform/alerts/test`, {
     method: 'POST', body, headers: authHeaders(token)
@@ -515,8 +614,11 @@ describe('os ganchos', () => {
     const db = getDb();
     await db('billing_charges').where({ tenant_id: alfa }).del();
     await db('billing_charges').insert([
-      { tenant_id: alfa, period_end: '2030-01-10', amount_cents: 19990, currency: 'BRL', provider: 'asaas', status: 'pending', due_date: '2030-01-10' },
-      { tenant_id: alfa, period_end: '2030-02-10', amount_cents: 19990, currency: 'BRL', provider: 'asaas', status: 'overdue', due_date: '2030-02-10' }
+      { tenant_id: alfa, period_end: '2030-01-10', amount_cents: 19990, currency: 'BRL', provider: 'asaas', status: 'pending', due_date: '2030-01-10', gateway_charge_id: 'pay_bo_1' },
+      { tenant_id: alfa, period_end: '2030-02-10', amount_cents: 19990, currency: 'BRL', provider: 'asaas', status: 'overdue', due_date: '2030-02-10', gateway_charge_id: 'pay_bo_2' },
+      // Nunca chegaram ao gateway: não são dívida que o provedor pague.
+      { tenant_id: alfa, period_end: '2029-12-10', amount_cents: 90000, currency: 'BRL', provider: 'asaas', status: 'failed', due_date: '2029-12-10', gateway_charge_id: null },
+      { tenant_id: alfa, period_end: '2029-11-10', amount_cents: 90000, currency: 'BRL', provider: 'asaas', status: 'pending', due_date: '2029-11-10', gateway_charge_id: null }
     ]);
     // Abaixo do limite (só a primeira vencida): nada.
     await PlatformAlertService.checkBigOverdue({ now: new Date('2030-01-20T12:00:00Z') });
@@ -534,6 +636,41 @@ describe('os ganchos', () => {
     assert.match(enviados[0].text, /R\$\s?399,80/);
     assert.match(enviados[0].text, /10\/01\/2030/);
     await db('billing_charges').where({ tenant_id: alfa }).del();
+  });
+
+  it('big_overdue: a assinatura cancelada ou isenta não avisa', async () => {
+    await ligar({ big_overdue: ['email'] }, { bigOverdueCents: 10000 });
+    const db = getDb();
+    await db('billing_charges').where({ tenant_id: alfa }).del();
+    await db('billing_charges').insert({
+      tenant_id: alfa, period_end: '2030-05-10', amount_cents: 19990, currency: 'BRL', provider: 'asaas',
+      status: 'overdue', due_date: '2030-05-10', gateway_charge_id: 'pay_bo_3'
+    });
+    const now = new Date('2030-05-20T12:00:00Z');
+    await comAssinatura({ status: 'canceled', canceled_at: aoSegundo(Date.now()) });
+    assert.equal((await PlatformAlertService.checkBigOverdue({ now })).enqueued, 0);
+    await comAssinatura({ billing_exempt_at: aoSegundo(Date.now()) });
+    assert.equal((await PlatformAlertService.checkBigOverdue({ now })).enqueued, 0);
+    // Ainda não vencida (o vencimento é amanhã): também não.
+    await comAssinatura();
+    assert.equal((await PlatformAlertService.checkBigOverdue({ now: new Date('2030-05-09T12:00:00Z') })).enqueued, 0);
+    assert.equal((await PlatformAlertService.checkBigOverdue({ now })).enqueued, 1);
+    await db('billing_charges').where({ tenant_id: alfa }).del();
+  });
+
+  it('nfse_error: o dia da deduplicação é o de Brasília', async () => {
+    await ligar({ nfse_error: ['email'] });
+    const db = getDb();
+    const chargeId = await insertReturningId('billing_charges', {
+      tenant_id: alfa, period_end: '2031-02-01', amount_cents: 19990, currency: 'BRL', provider: 'asaas', status: 'paid'
+    });
+    await db('billing_invoices').insert({ tenant_id: alfa, charge_id: chargeId, status: 'pending' });
+    const nota = await db('billing_invoices').where({ charge_id: chargeId }).first();
+    await runInTenant(alfa, () => BillingInvoice.updateIf(nota.id, { status: 'pending' }, { status: 'error', error: 'x' }));
+    const [linha] = await doEvento('nfse_error');
+    assert.equal(linha.dedupe_key, `nfse_error:${alfa}:${nota.id}:${saoPauloClock().day}`);
+    await db('billing_invoices').where({ charge_id: chargeId }).del();
+    await db('billing_charges').where({ id: chargeId }).del();
   });
 
   it('big_overdue desligado nem consulta', async () => {

@@ -1188,5 +1188,6 @@ export default {
   'platformAlert.test.subject': 'Avviso di prova',
   'platformAlert.test.body': 'Questo è un avviso di prova della piattaforma. Se lo hai ricevuto, gli avvisi funzionano.',
   'platformAlert.digest.subject': 'Riepilogo giornaliero: {count} avviso/i',
-  'platformAlert.digest.body': 'Riepilogo degli avvisi della piattaforma del {date}:'
+  'platformAlert.digest.body': 'Riepilogo degli avvisi della piattaforma del {date}:',
+  'platformAlert.digest.more': '… e altri {count}'
 };

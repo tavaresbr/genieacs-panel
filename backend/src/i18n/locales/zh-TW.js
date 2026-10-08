@@ -1190,5 +1190,6 @@ export default {
   'platformAlert.test.subject': '測試警示',
   'platformAlert.test.body': '這是平台的測試警示。如果您收到了，代表警示功能正常。',
   'platformAlert.digest.subject': '每日摘要：{count} 則警示',
-  'platformAlert.digest.body': '{date} 的平台警示摘要：'
+  'platformAlert.digest.body': '{date} 的平台警示摘要：',
+  'platformAlert.digest.more': '… 另有 {count} 則'
 };

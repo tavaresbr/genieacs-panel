@@ -66,7 +66,8 @@ class PlatformDelinquencyController {
    *   remind   reenvia o lembrete com o link, no máximo um a cada 24 h
    *   suspend  suspende à mão (`reason` opcional)
    *   exempt   isenta de cobrança (`until` opcional, ISO no futuro)
-   *   extend   dá `days` (1–60) dias de prazo
+   *   extend   dá `days` (1–60) dias de prazo; com `requestId` (8–64 letras,
+   *            dígitos ou hífens), o mesmo pedido repetido não dá de novo
    *
    * Responde `{ action, results: [{ tenantId, ok, code, ...detail }], okCount, failedCount }`.
    */
@@ -101,6 +102,13 @@ class PlatformDelinquencyController {
         }
         limpos.days = days;
       }
+      if (params.requestId !== undefined && params.requestId !== null) {
+        // A chave do pedido (a cortesia a usa para não dar o prazo duas vezes).
+        if (typeof params.requestId !== 'string' || !/^[A-Za-z0-9-]{8,64}$/.test(params.requestId)) {
+          return res.status(400).json(createErrorResponse('requestId must be 8 to 64 letters, digits or dashes', null, 'invalid_request_id'));
+        }
+        limpos.requestId = params.requestId;
+      }
       if (action === 'exempt' && params.until !== undefined && params.until !== null && params.until !== '') {
         const ate = typeof params.until === 'string' ? new Date(params.until) : null;
         if (!ate || Number.isNaN(ate.getTime()) || ate.getTime() <= Date.now()) {
@@ -126,8 +134,14 @@ class PlatformDelinquencyController {
             // eslint-disable-next-line no-await-in-loop -- idem
             resultado = await DelinquencyService.runAction({ tenant, action, params: limpos, actorUserId });
             if (resultado.ok && resultado.audit) {
-              // eslint-disable-next-line no-await-in-loop -- idem
-              await recordBoth(req, tenant, resultado.audit);
+              // A ação já foi feita: a trilha que falha não pode virar "erro"
+              // na resposta, ou a pessoa repetiria o que já aconteceu.
+              try {
+                // eslint-disable-next-line no-await-in-loop -- idem
+                await recordBoth(req, tenant, resultado.audit);
+              } catch (error) {
+                console.error(`Delinquency audit failed for provider ${tenantId}:`, error);
+              }
             }
           }
         } catch (error) {

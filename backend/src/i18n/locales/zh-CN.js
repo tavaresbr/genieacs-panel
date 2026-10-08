@@ -1190,5 +1190,6 @@ export default {
   'platformAlert.test.subject': '测试告警',
   'platformAlert.test.body': '这是平台的测试告警。如果您收到了，说明告警功能正常。',
   'platformAlert.digest.subject': '每日摘要：{count} 条告警',
-  'platformAlert.digest.body': '{date} 的平台告警摘要：'
+  'platformAlert.digest.body': '{date} 的平台告警摘要：',
+  'platformAlert.digest.more': '… 另有 {count} 条'
 };

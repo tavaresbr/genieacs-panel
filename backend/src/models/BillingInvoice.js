@@ -135,10 +135,12 @@ class BillingInvoice {
     // nota por dia; melhor esforço, nunca lança.
     if (changed > 0 && patch.status === 'error' && status !== 'error') {
       const tenantId = currentTenantId();
-      const { default: PlatformAlertService } = await import('../services/platformAlertService.js');
+      const { default: PlatformAlertService, saoPauloClock } = await import('../services/platformAlertService.js');
+      // O "dia" da deduplicação é o de Brasília, o mesmo do resumo diário — em
+      // UTC, o erro das 21h e o das 22h do mesmo dia daqui viravam dois.
       await PlatformAlertService.enqueue('nfse_error', {
         tenantId,
-        dedupeKey: `${tenantId}:${id}:${new Date().toISOString().slice(0, 10)}`,
+        dedupeKey: `${tenantId}:${id}:${saoPauloClock().day}`,
         payload: { invoiceId: Number(id), error: patch.error ? String(patch.error) : null }
       });
     }

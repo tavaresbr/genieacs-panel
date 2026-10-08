@@ -1193,5 +1193,6 @@ export default {
   'platformAlert.test.subject': '테스트 알림',
   'platformAlert.test.body': '플랫폼의 테스트 알림입니다. 받으셨다면 알림이 정상적으로 작동하고 있습니다.',
   'platformAlert.digest.subject': '일일 요약: 알림 {count}건',
-  'platformAlert.digest.body': '{date} 플랫폼 알림 요약:'
+  'platformAlert.digest.body': '{date} 플랫폼 알림 요약:',
+  'platformAlert.digest.more': '… 외 {count}건'
 };

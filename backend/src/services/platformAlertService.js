@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getDb, isUniqueViolation } from '../config/database.js';
+import { runUnscoped } from '../config/tenantContext.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import { log } from '../utils/logger.js';
 import { ALERT_CHANNELS, ALERT_EVENTS, alertsConfig, readProfile } from './platformProfileService.js';
@@ -35,10 +36,22 @@ const BACKOFF_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000];
 /** Quanto tempo uma passada segura a linha que está mandando. */
 const CLAIM_MS = 5 * 60_000;
 const BATCH = 50;
+/**
+ * Quanto uma passada pode durar. Cada canal já tem o próprio timeout, mas
+ * um canal lento em 50 linhas seguraria o tique do agendador por minutos:
+ * passado o prazo, o resto fica para a próxima passada.
+ */
+const PASS_BUDGET_MS = 20_000;
+/** Quantos alertas o resumo lista; o resto vira "+N mais". */
+const DIGEST_MAX_ITEMS = 50;
+/** O teto do texto do resumo, com folga para o WhatsApp (4096) e o assunto. */
+const DIGEST_MAX_CHARS = 3500;
 /** O fuso do resumo diário. */
 const FUSO = 'America/Sao_Paulo';
 const DIGEST_EVENT = 'digest';
 const TEST_EVENT = 'test';
+/** As cobranças que contam no `big_overdue`: só as que estão no gateway, à espera. */
+const BIG_OVERDUE_STATUSES = Object.freeze(['pending', 'overdue']);
 
 /** Chave do payload que nunca vai para a fila, venha de onde vier. */
 const CHAVE_SENSIVEL = /token|secret|senha|password|apikey|api_key|card|cvv|authorization|cookie|cipher/i;
@@ -311,8 +324,9 @@ class PlatformAlertService {
    * A passada do agendador. Nunca lança. Com o resumo diário ligado, só o
    * resumo sai (`processDigest`); senão, cada pendente vencido, um a um.
    */
-  static async processDue({ now = new Date() } = {}) {
+  static async processDue({ now = new Date(), budgetMs = PASS_BUDGET_MS, clock = () => Date.now() } = {}) {
     const resumo = { sent: 0, failed: 0, skipped: 0, retry: 0 };
+    const inicio = clock();
     try {
       const config = await alertsConfig();
       if (config.dailyDigest.enabled) return { ...resumo, digest: await this.processDigest({ now, config }) };
@@ -325,7 +339,13 @@ class PlatformAlertService {
         .limit(BATCH);
       if (!linhas.length) return resumo;
       const destinos = await this.destinations();
-      for (const linha of linhas) {
+      for (const [indice, linha] of linhas.entries()) {
+        // O prazo da passada estourou: o que falta espera a próxima, sem
+        // garra nem tentativa gasta.
+        if (clock() - inicio >= budgetMs) {
+          resumo.deferred = linhas.length - indice;
+          break;
+        }
         // eslint-disable-next-line no-await-in-loop -- um envio por vez, em ordem
         if (!(await this.claim(linha, now))) continue;
         try {
@@ -363,6 +383,16 @@ class PlatformAlertService {
     if (hour < config.dailyDigest.hour) return { action: 'waiting' };
     const db = getDb();
     const chave = `${DIGEST_EVENT}:${day}`;
+    // O resumo de um dia que passou e ainda está pendente (falhou e esperava
+    // nova tentativa, ou o processo ficou fora) não sai mais: os alertas dele
+    // continuam pendentes e entram no de hoje. Sem isto, ele tentaria de novo
+    // e mandaria um segundo resumo com os mesmos itens. A linha tomada por
+    // outra passada (`next_attempt_at` no futuro) fica com quem a tomou.
+    await db('platform_alerts')
+      .where({ event: DIGEST_EVENT, status: 'pending' })
+      .where('dedupe_key', '<', chave)
+      .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
+      .update({ status: 'skipped', last_error: 'superseded', next_attempt_at: null });
     let linha = await db('platform_alerts').where({ dedupe_key: chave }).first();
     if (!linha) {
       try {
@@ -439,13 +469,30 @@ class PlatformAlertService {
     return { action: fim === 'failed' ? 'failed' : 'retry', channels: resultado };
   }
 
-  /** O texto do resumo: uma linha por alerta, na ordem em que chegaram. */
+  /**
+   * O texto do resumo: uma linha por alerta, na ordem em que chegaram — no
+   * máximo `DIGEST_MAX_ITEMS` linhas e `DIGEST_MAX_CHARS` caracteres, com o
+   * que sobrou contado num "+N mais". Um dia ruim (cem cartões recusados)
+   * não pode virar uma mensagem que o WhatsApp recusa inteira.
+   */
   static renderDigest(linhas, day) {
-    const itens = linhas.map((linha) => `• ${renderAlert(linha).subject}`);
     const vars = { count: linhas.length, date: dataBr(day) };
+    const cabecalho = translate(DEFAULT_LOCALE, 'platformAlert.digest.body', vars);
+    const mais = (n) => translate(DEFAULT_LOCALE, 'platformAlert.digest.more', { count: n });
+    // A reserva da linha "+N mais" com o maior N possível, para caber sempre.
+    const reserva = 1 + mais(linhas.length).length;
+    let texto = `${cabecalho}\n`;
+    let listados = 0;
+    for (const linha of linhas.slice(0, DIGEST_MAX_ITEMS)) {
+      const item = `\n• ${renderAlert(linha).subject}`;
+      if (texto.length + item.length + reserva > DIGEST_MAX_CHARS) break;
+      texto += item;
+      listados += 1;
+    }
+    if (listados < linhas.length) texto += `\n${mais(linhas.length - listados)}`;
     return {
       subject: translate(DEFAULT_LOCALE, 'platformAlert.digest.subject', vars),
-      text: `${translate(DEFAULT_LOCALE, 'platformAlert.digest.body', vars)}\n\n${itens.join('\n')}`
+      text: texto.slice(0, DIGEST_MAX_CHARS)
     };
   }
 
@@ -488,6 +535,11 @@ class PlatformAlertService {
    * alerta por provedor POR PERÍODO DE ATRASO — a chave leva o vencimento
    * mais antigo em aberto, então o mesmo atraso avisa uma vez, e o próximo
    * atraso (depois de pagar) avisa de novo. Nunca lança.
+   *
+   * Só entra o que é dívida de verdade: cobrança `pending`/`overdue` que
+   * existe no gateway (`gateway_charge_id`) e já venceu. A `failed` nunca
+   * chegou ao gateway — não há o que o provedor pague —, e a assinatura
+   * cancelada ou isenta de cobrança não deve nada, tenha a linha que tiver.
    */
   static async checkBigOverdue({ now = new Date(), config = null } = {}) {
     try {
@@ -497,6 +549,7 @@ class PlatformAlertService {
       const abertas = await BillingCharge.openAcrossTenants();
       const porProvedor = new Map();
       for (const linha of abertas) {
+        if (!BIG_OVERDUE_STATUSES.includes(linha.status) || !linha.gateway_charge_id) continue;
         const vence = prorationOverdueAt(linha.due_date);
         if (!vence || vence.getTime() > now.getTime()) continue;
         const atual = porProvedor.get(Number(linha.tenant_id)) ?? { cents: 0, oldest: null };
@@ -505,13 +558,27 @@ class PlatformAlertService {
         if (!atual.oldest || dia < atual.oldest) atual.oldest = dia;
         porProvedor.set(Number(linha.tenant_id), atual);
       }
+      const candidatos = [...porProvedor].filter(([, { cents }]) => cents >= regras.bigOverdueCents);
+      if (!candidatos.length) return { checked: true, enqueued: 0 };
+      const ids = candidatos.map(([tenantId]) => tenantId);
+      // tenant-scope-exempt: leitura do plano de controle, acima dos provedores.
+      const { tenants, assinaturas } = await runUnscoped('the platform alerts check the overdue providers', async () => {
+        const db = getDb();
+        return {
+          tenants: await db('tenants').whereIn('id', ids).select('id', 'kind'),
+          assinaturas: await db('subscriptions').whereIn('tenant_id', ids)
+            .select('tenant_id', 'status', 'billing_exempt_at')
+        };
+      });
+      const tipoDe = new Map(tenants.map((t) => [Number(t.id), t.kind]));
+      const subDe = new Map(assinaturas.map((a) => [Number(a.tenant_id), a]));
       let enqueued = 0;
-      for (const [tenantId, { cents, oldest }] of porProvedor) {
-        if (cents < regras.bigOverdueCents) continue;
+      for (const [tenantId, { cents, oldest }] of candidatos) {
+        const tipo = tipoDe.get(tenantId);
+        if (!tipo || tipo === 'platform') continue;
+        const sub = subDe.get(tenantId);
+        if (sub && (sub.status === 'canceled' || sub.billing_exempt_at)) continue;
         // eslint-disable-next-line no-await-in-loop -- poucos provedores em atraso
-        const tenant = await getDb()('tenants').where({ id: tenantId }).first('kind');
-        if (!tenant || tenant.kind === 'platform') continue;
-        // eslint-disable-next-line no-await-in-loop
         const r = await this.enqueue('big_overdue', {
           tenantId,
           dedupeKey: `${tenantId}:${oldest}`,

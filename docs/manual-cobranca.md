@@ -276,32 +276,63 @@ Provedores **isentos** ou com assinatura **pausada** não são suspensos.
 
 A aba **Inadimplência** do console reúne, numa tela só, todo provedor que está devendo:
 
-- com fatura vencida;
-- suspenso por falta de pagamento;
-- com fatura de **pró-rata** ou de **excedente** em atraso.
+- com fatura vencida (renovação, **pró-rata** ou **excedente**);
+- **Em atraso**, com o prazo vencido num plano pago;
+- **Suspenso por inadimplência** (a suspensão automática).
+
+Ficam de fora os provedores **isentos de cobrança**, os **cancelados** e os **pausados**: nenhum deles deve nada que se cobre hoje.
+
+### O resumo
+
+No topo:
+
+- **Total em atraso**: a soma das faturas vencidas e ainda não pagas (a que ainda vai vencer não conta).
+- **Provedores devendo**.
+- As faixas **1–7 dias**, **8–15 dias**, **16–30 dias** e **Mais de 30 dias**, com quantos provedores há em cada uma. Clicar numa faixa filtra a lista; clicar de novo tira o filtro.
+
+### Filtros e ordem
+
+- **Buscar provedor**: pelo nome ou pelo endereço (slug).
+- **Faixa**: uma das faixas acima, ou **Todas as faixas**.
+- **Situação**: **Todas**, **Em atraso**, **Suspenso por inadimplência** ou **Suspenso manualmente**.
+- **Ordenar por**: **Dias de atraso** ou **Valor devido** (o maior primeiro).
 
 ### O que a lista mostra
 
-Para cada provedor:
+| Coluna | O que é |
+| --- | --- |
+| **Provedor** | Nome e slug. |
+| **Situação** | Em atraso, suspenso por inadimplência ou suspenso manualmente. |
+| **Devido** | A soma das faturas vencidas; quando há mais de um tipo, aparece a divisão entre **Renovação**, **Pró-rata** e **Excedente**. |
+| **Vencido desde** | A data do vencimento e quantos **dias** de atraso. |
+| **Último lembrete** | Quando saiu o último lembrete de cobrança (automático ou manual), ou **Nenhum**. |
+| **Suspensão automática** | A data prevista da suspensão automática, e **aviso enviado** quando o aviso de suspensão já saiu. |
+| **Cartão** | O cartão salvo para cobrança automática, se houver. |
 
-- **valor devido** (soma das cobranças abertas vencidas);
-- **vencido desde** e **dias de atraso**;
-- **último lembrete** enviado;
-- **previsão da suspensão automática**;
-- **cartão** salvo e **estado** da assinatura.
-
-No topo há um **resumo**: o total em atraso e quantos provedores estão em cada faixa (**1–7**, **8–15**, **16–30** e **mais de 30 dias**). Dá para filtrar e ordenar por valor ou por dias de atraso.
+No celular, a lista vira cartões com as mesmas informações.
 
 ### Ações em massa
 
-Marque um ou mais provedores e escolha a ação na barra que aparece. Toda ação pede confirmação, vale para cada provedor separadamente (um que falhe não atrapalha os outros) e fica na trilha de auditoria:
+Marque os provedores (ou **Selecionar todos**) e escolha a ação na barra **Ações em massa** que aparece. Cada pedido vale para no máximo **200 provedores**; **Limpar seleção** desmarca todos.
 
-- **Reenviar lembrete**: manda de novo o aviso com o link de pagamento.
-- **Suspender**.
-- **Isentar**: com data de fim opcional (como em "Isentar de cobrança").
-- **Dar prazo**: estende o vencimento em **+N dias**.
+| Ação | O que faz |
+| --- | --- |
+| **Reenviar lembrete** | Manda de novo o lembrete de cobrança, por e-mail e WhatsApp, com o link de pagamento da fatura vencida mais antiga. Cada provedor recebe **no máximo um lembrete manual a cada 24 horas**. Só sai para quem está de fato em atraso. |
+| **Suspender** | Suspende à mão (fica como **Suspenso manualmente**). O painel do provedor fica bloqueado até alguém reativar: **o pagamento não desfaz uma suspensão manual**. |
+| **Isentar de cobrança** | Isenta e **cancela as cobranças em aberto** dele, no Asaas e aqui. Em **Isento até (opcional)** você escolhe a data de fim; em branco, vale até alguém desligar a isenção. |
+| **Dar prazo** | Dá **Dias a mais (1 a 60)** de prazo. Para quem já venceu, os dias contam **a partir de hoje**; para quem está em teste, estende o teste. A fatura em aberto acompanha o novo vencimento no Asaas. |
 
-Ao final, a tela mostra o resultado de cada provedor. O botão **Exportar CSV** baixa a lista para planilha.
+Toda ação pede confirmação. Suspender, isentar e dar prazo aceitam um **Motivo (opcional)**, que fica na trilha de auditoria (o motivo da isenção só aparece para a plataforma).
+
+Cada provedor é tratado separadamente: um que falhe não atrapalha os outros, e cada um que deu certo fica na trilha de auditoria. No fim, a tela mostra **"X de Y concluído(s)"** e, em **Não foi possível para:**, quem falhou e por quê — por exemplo **Já recebeu um lembrete manual nas últimas 24 horas**, **Não está em atraso**, **Já está suspenso**, **Já está isento**, **Assinatura cancelada**, **Sem e-mail nem telefone de cobrança** ou **O gateway de pagamento recusou** (o prazo daquele provedor não muda). Os que falharam continuam marcados, para você tentar de novo.
+
+Se a resposta demorar e você confirmar o mesmo **Dar prazo** de novo, os dias **não** são dados duas vezes: a repetição do mesmo pedido é reconhecida. Lembrete, suspensão e isenção já não repetem por natureza.
+
+### Exportar CSV
+
+O botão **Exportar CSV** baixa a lista **como está na tela** (com os filtros aplicados), uma linha por provedor: id, provedor, slug, situação, moeda, devido, renovação, pró-rata, excedente, vencido desde, dias, faixa, último lembrete, suspensão automática e cartão.
+
+A planilha usa **ponto e vírgula** como separador e abre direto no Excel em português. Os valores saem com ponto decimal (por exemplo `199.90`) e as datas no formato `AAAA-MM-DD`. Um nome que comece com `=`, `+`, `-` ou `@` sai com um apóstrofo na frente, para o Excel não o tratar como fórmula.
 
 ## Receita
 
@@ -373,29 +404,40 @@ Os resultados aparecem em **Receita → Cancelamentos**.
 
 ## Alertas
 
-Em **Configurações → Alertas** você escolhe ser avisado, por **WhatsApp**, **e-mail** ou os dois, quando algo importante acontece. Os avisos vão para o **WhatsApp dos avisos** e o **E-mail dos avisos** de **Configurações → Dados do SaaS**.
+Em **Configurações → Alertas** você escolhe ser avisado, por **WhatsApp**, **E-mail** ou os dois, quando algo importante acontece na cobrança. Os avisos vão para o **WhatsApp dos avisos** e o **E-mail dos avisos** de **Configurações → Dados do SaaS** — sem nenhum dos dois, nada é enviado.
+
+**Todos os alertas vêm desligados.** Ligue só os que quiser receber e clique em **Salvar**.
 
 ### Eventos
 
-Cada evento pode ser ligado ou desligado e ter o seu canal:
+Cada evento tem a sua chave de ligar e os seus **Canais** (marque ao menos um):
 
-- **Pagamento recebido** (com o valor).
-- **Cartão recusado**.
-- **Cancelamento pedido** e **cancelamento agendado**.
-- **Novo cadastro por indicação**.
-- **Erro na nota fiscal (NFS-e)**.
-- **Provedor suspenso automaticamente**.
-- **Atraso alto**: quando um provedor passa de um valor em atraso que você define.
+| Evento | Quando avisa |
+| --- | --- |
+| **Pagamento recebido (com valor)** | Um provedor pagou uma fatura. Uma vez por pagamento. |
+| **Cartão recusado** | A cobrança automática no cartão foi recusada (a fatura volta para Pix/boleto). |
+| **Pedido de cancelamento** | Um provedor pediu para cancelar. |
+| **Cancelamento confirmado** | O cancelamento ficou agendado (ou foi feito). |
+| **Cadastro por indicação** | Um provedor novo se cadastrou pelo link de indicação de outro. |
+| **Erro na NFS-e** | A nota fiscal de um pagamento deu erro. No máximo uma vez por nota por dia. |
+| **Suspensão automática** | Um provedor foi suspenso por inadimplência. |
+| **Atraso alto (acima do limite)** | O total em atraso de um provedor passou do limite. |
+
+### Atraso alto
+
+Em **Limite do atraso alto (R$)** você define o valor; o padrão é **R$ 500,00**. Entram na conta só as faturas **emitidas no Asaas**, ainda **não pagas** e **já vencidas**; provedores **isentos de cobrança** ou com assinatura **cancelada** não são avisados. O aviso sai **uma vez por período de atraso**: depois que o provedor paga e atrasa de novo, você é avisado de novo. A conferência roda a cada 15 minutos.
 
 ### Resumo diário
 
-Em vez de um aviso por evento, você pode ligar o **resumo diário**: uma mensagem só, todo dia às **8h (horário de Brasília)**, com tudo o que aconteceu.
+Ligue **Resumo diário em vez de um alerta por evento** e escolha em **Enviar às** a hora (horário de Brasília; o padrão é **08:00**). Nada sai um a um: tudo o que chegou até a hora vai numa mensagem só por canal, e o que chegar depois espera o resumo do dia seguinte. Um resumo muito grande lista os **50 primeiros** alertas e termina com **"+N mais"**.
 
 ### Testar
 
-Use o botão **Enviar alerta de teste** para conferir se o WhatsApp e o e-mail estão chegando.
+O botão **Enviar alerta de teste** manda uma mensagem **na hora** pelo WhatsApp e pelo e-mail dos avisos, mesmo com todos os eventos desligados ou com o resumo diário ligado. Ele usa os destinos que estão **salvos** em Dados do SaaS: sem nenhum, a tela pede para cadastrar o WhatsApp ou o e-mail de avisos.
 
-Os alertas são enviados pelo agendador da plataforma, com novas tentativas se o envio falhar. O mesmo evento nunca gera dois alertas.
+### Como os alertas saem
+
+Os alertas são enviados pelo agendador da plataforma, a cada passada. Se o envio falhar, há novas tentativas (depois de 1 min, 5 min, 15 min e 1 h, até 5 tentativas). Se um dos canais saiu, o alerta não é repetido pelo outro. O mesmo evento nunca gera dois alertas.
 
 ## Teste no sandbox
 
@@ -415,7 +457,7 @@ cd backend
 ASAAS_SANDBOX_API_KEY=sua_chave_do_sandbox npm run e2e:asaas-sandbox
 ```
 
-Para só ver o que seria feito, sem chamar o Asaas, acrescente `--dry-run`:
+Para conferir o script sem chamar o Asaas de verdade (não precisa de chave), acrescente `--dry-run`: ele roda os mesmos fluxos contra um Asaas simulado.
 
 ```
 cd backend
@@ -437,7 +479,7 @@ O script **se recusa a rodar contra a produção**: ele confere o ambiente e o e
 
 ### O relatório
 
-No fim, cada fluxo aparece como **passou**, **falhou** ou **pulado**, na tela e num arquivo `reports/asaas-sandbox-<data>.json`. Se algo falhar, mande esse arquivo para o suporte técnico.
+No fim, cada fluxo aparece como **passou**, **falhou** ou **pulado**, na tela e num arquivo `backend/reports/asaas-sandbox-<data>.json`. Se algo falhar, mande esse arquivo para o suporte técnico.
 
 ## Perguntas frequentes
 
@@ -475,7 +517,11 @@ Não. A plataforma reemite a fatura como Pix/boleto e avisa o provedor. Se você
 
 ### Onde vejo quem está devendo e quanto?
 
-Na aba **Inadimplência**, ordenando por valor ou por dias de atraso.
+Na aba **Inadimplência**, em **Ordenar por**: **Valor devido** ou **Dias de atraso**. Para levar para uma planilha, use **Exportar CSV**.
+
+### Posso reenviar o lembrete de cobrança para um provedor?
+
+Sim: na aba **Inadimplência**, marque o provedor e use **Reenviar lembrete**. Cada provedor recebe no máximo um lembrete manual a cada 24 horas.
 
 ### Como desligo a suspensão automática?
 

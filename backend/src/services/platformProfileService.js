@@ -172,8 +172,10 @@ function normalizarAlertas(bruto, atual) {
  * Nunca lança — com o banco fora, vale o padrão (tudo desligado).
  */
 export async function alertsConfig() {
-  invalidatePlatformProfile();
-  const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
+  // Lê direto do banco sem derrubar o cache compartilhado: o agendador chama
+  // isto a cada passada, e invalidar aqui obrigaria todo `readProfile` do
+  // painel a ir ao banco de novo.
+  const { stored } = await lerGuardado({ fresh: true }).catch(() => ({ stored: {} }));
   return alertasDe(stored);
 }
 
@@ -197,8 +199,8 @@ export class PlatformProfileError extends Error {
   }
 }
 
-async function lerGuardado() {
-  if (cache && cache.expiresAt > Date.now()) return cache.value;
+async function lerGuardado({ fresh = false } = {}) {
+  if (!fresh && cache && cache.expiresAt > Date.now()) return cache.value;
   const caixa = await Tenant.platform();
   let stored = {};
   if (caixa) {
@@ -213,7 +215,8 @@ async function lerGuardado() {
     }
   }
   const value = { platformId: caixa?.id ?? null, stored };
-  cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+  // A leitura fresca não mexe no cache: nem o derruba, nem o substitui.
+  if (!fresh) cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
   return value;
 }
 

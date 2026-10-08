@@ -16,6 +16,8 @@ Este guia explica como você paga o painel, como funcionam os planos e o que faz
 3. Depois de alguns dias de atraso, o painel é **suspenso**. Você recebe um aviso antes.
 4. **Pagou, voltou**: assim que o pagamento é confirmado, o painel volta a funcionar sozinho.
 
+A equipe da plataforma também pode reenviar o lembrete, com o link de pagamento, a qualquer momento (no máximo um por dia), ou combinar com você **mais alguns dias de prazo**. Se o painel foi **suspenso pela equipe** (e não pelo atraso), o pagamento sozinho não o libera: fale com a plataforma.
+
 ## Cobrança automática no cartão
 
 1. Ligue **Cobrar automaticamente no cartão**.

@@ -423,6 +423,42 @@ describe('as ações em massa', () => {
     assert.equal(JSON.parse(trilha[0].detail).extendDays, 30);
   });
 
+  it('extend: o mesmo pedido repetido (mesmo requestId) não dá o prazo duas vezes', async () => {
+    const requestId = 'pedido-1234-abcd';
+    const primeiro = await agir({ tenantIds: [beta], action: 'extend', params: { days: 10, requestId } });
+    assert.equal(primeiro.status, 200, JSON.stringify(primeiro.body));
+    assert.equal(primeiro.body.data.results[0].code, 'extended');
+    const depois1 = new Date((await Subscription.forTenant(beta)).renews_at).getTime();
+    const repetido = await agir({ tenantIds: [beta], action: 'extend', params: { days: 10, requestId } });
+    assert.equal(repetido.status, 200);
+    assert.equal(repetido.body.data.results[0].ok, true);
+    assert.equal(repetido.body.data.results[0].duplicate, true);
+    assert.equal(new Date((await Subscription.forTenant(beta)).renews_at).getTime(), depois1, 'o prazo não andou de novo');
+    const trilha = await getDb()('platform_audit').where({ action: 'subscription.deadline_changed', tenant_id: beta });
+    assert.equal(trilha.length, 1, 'uma trilha só');
+    // Outro pedido é outra cortesia.
+    await agir({ tenantIds: [beta], action: 'extend', params: { days: 10, requestId: 'pedido-5678-efgh' } });
+    assert.ok(new Date((await Subscription.forTenant(beta)).renews_at).getTime() > depois1);
+    // A chave malformada é recusada antes de tocar em alguém.
+    const ruim = await agir({ tenantIds: [beta], action: 'extend', params: { days: 10, requestId: 'x' } });
+    assert.equal(ruim.status, 400);
+    assert.equal(ruim.body.code, 'invalid_request_id');
+  });
+
+  it('a trilha que falha não transforma em erro a ação que já foi feita', async () => {
+    const { default: PlatformAudit } = await import('../src/models/PlatformAudit.js');
+    const original = PlatformAudit.fromRequest;
+    PlatformAudit.fromRequest = async () => { throw new Error('banco da trilha fora'); };
+    try {
+      const res = await agir({ tenantIds: [beta], action: 'suspend' });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.deepEqual(res.body.data.results.map((r) => [r.ok, r.code]), [[true, 'suspended']]);
+    } finally {
+      PlatformAudit.fromRequest = original;
+    }
+    assert.equal((await Subscription.forTenant(beta)).status, 'suspended');
+  });
+
   it('remind: manda o lembrete com o link a quem deve, e uma vez só a cada 24 h', async () => {
     const res = await agir({ tenantIds: [beta, gama, alfa], action: 'remind' });
     assert.equal(res.status, 200, JSON.stringify(res.body));

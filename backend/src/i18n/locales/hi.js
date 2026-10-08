@@ -1190,5 +1190,6 @@ export default {
   'platformAlert.test.subject': 'परीक्षण अलर्ट',
   'platformAlert.test.body': 'यह प्लेटफ़ॉर्म का परीक्षण अलर्ट है। अगर आपको मिला, तो अलर्ट काम कर रहे हैं।',
   'platformAlert.digest.subject': 'दैनिक सारांश: {count} अलर्ट',
-  'platformAlert.digest.body': '{date} के प्लेटफ़ॉर्म अलर्ट का सारांश:'
+  'platformAlert.digest.body': '{date} के प्लेटफ़ॉर्म अलर्ट का सारांश:',
+  'platformAlert.digest.more': '… और {count} अन्य'
 };

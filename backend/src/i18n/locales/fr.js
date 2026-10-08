@@ -1186,5 +1186,6 @@ export default {
   'platformAlert.test.subject': 'Alerte de test',
   'platformAlert.test.body': 'Ceci est une alerte de test de la plateforme. Si vous l’avez reçue, les alertes fonctionnent.',
   'platformAlert.digest.subject': 'Résumé quotidien : {count} alerte(s)',
-  'platformAlert.digest.body': 'Résumé des alertes de la plateforme du {date} :'
+  'platformAlert.digest.body': 'Résumé des alertes de la plateforme du {date} :',
+  'platformAlert.digest.more': '… et {count} de plus'
 };

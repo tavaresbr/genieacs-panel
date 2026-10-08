@@ -1190,5 +1190,6 @@ export default {
   'platformAlert.test.subject': 'テストアラート',
   'platformAlert.test.body': 'これはプラットフォームからのテストアラートです。受信できていれば、アラートは正常に動作しています。',
   'platformAlert.digest.subject': '日次サマリー: {count} 件のアラート',
-  'platformAlert.digest.body': '{date} のプラットフォームアラートのまとめ:'
+  'platformAlert.digest.body': '{date} のプラットフォームアラートのまとめ:',
+  'platformAlert.digest.more': '… ほか {count} 件'
 };

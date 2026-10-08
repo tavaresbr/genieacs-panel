@@ -82,11 +82,24 @@ export function parseBulkDays(value: string): number | null {
   return dias >= 1 && dias <= MAX_EXTEND_DAYS ? dias : null
 }
 
+/**
+ * A chave de um pedido de ação em massa (8–64 letras, dígitos ou hífens).
+ * `crypto.randomUUID` só existe em contexto seguro, e o painel também roda
+ * em HTTP na rede local — aí vai o relógio com sorteio.
+ */
+export function newRequestId(): string {
+  const c = globalThis.crypto
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID()
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
 const csvCell = (value: unknown) => {
   const text = String(value ?? '')
-  // Célula que o Excel leria como fórmula sai neutralizada, como nas outras planilhas.
-  const safe = /^[=+\-@\t\r]/.test(text) && !/^-?\d+([.,]\d+)?$/.test(text) ? `'${text}` : text
-  return /[";\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+  // Célula que o Excel leria como fórmula sai neutralizada, como nas outras
+  // planilhas — também com espaço ou quebra de linha antes do sinal, que
+  // alguns leitores descartam antes de decidir se é fórmula.
+  const safe = /^[\s]*[=+\-@]|^[\t\r\n]/.test(text) && !/^-?\d+([.,]\d+)?$/.test(text) ? `'${text}` : text
+  return /[";\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
 const reais = (cents: number) => (cents / 100).toFixed(2)
