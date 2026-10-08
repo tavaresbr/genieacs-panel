@@ -169,6 +169,32 @@ describe('POST /broadcasts', () => {
     assert.ok(rows.some((r) => r.rendered_body === 'Oi Raquel, amanhã há manutenção no seu bairro.'));
   });
 
+  it('edita um rascunho: refaz público e texto, e uma campanha em andamento não se edita', async () => {
+    const criada = await criar({ title: 'Antes', filters: { districts: ['Centro'] }, body: 'Oi {{nome}}' });
+    assert.equal(criada.status, 201, JSON.stringify(criada.body));
+    const id = criada.body.data.broadcast.id;
+    assert.equal(criada.body.data.broadcast.audience.contractList.length, 0);
+
+    const editada = await api(`/broadcasts/${id}`, {
+      method: 'PUT',
+      body: { title: 'Depois', filters: { contracts: ['101', '103'] }, body: 'Olá {{primeiro_nome}}', pace: 'slow' }
+    });
+    assert.equal(editada.status, 200, JSON.stringify(editada.body));
+    assert.equal(editada.body.data.recipients, 2);
+    assert.equal(editada.body.data.broadcast.title, 'Depois');
+    assert.equal(editada.body.data.broadcast.pacePerHour, 30);
+    assert.deepEqual(editada.body.data.broadcast.audience.contractList, ['101', '103']);
+    const rows = await getDb()('wa_broadcast_recipients').where({ broadcast_id: id });
+    assert.equal(rows.length, 2, 'a lista antiga foi trocada, não somada');
+    assert.ok(rows.every((r) => r.rendered_body.startsWith('Olá ')));
+
+    await getDb()('wa_broadcasts').where({ id }).update({ status: 'running' });
+    const recusada = await api(`/broadcasts/${id}`, { method: 'PUT', body: { title: 'X', filters: { contracts: ['101'] }, body: 'Oi' } });
+    assert.equal(recusada.status, 409);
+    assert.equal((await getDb()('wa_broadcast_recipients').where({ broadcast_id: id })).length, 2);
+    await asTenant(() => WaBroadcastService.setStatus(id, 'canceled'));
+  });
+
   it('recusa agendamento no passado', async () => {
     const { status } = await criar({
       title: 'Atrasada', filters: { contracts: ['101'] }, body: 'Oi', scheduledAt: new Date(Date.now() - 3600_000).toISOString()

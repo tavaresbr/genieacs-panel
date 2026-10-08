@@ -666,6 +666,8 @@ export default {
   'whatsapp.campaign.previewReady': '{count} Empfänger würden sie erhalten',
   'whatsapp.campaign.previewFailed': 'Vorschau konnte nicht erstellt werden',
   'whatsapp.campaign.created': 'Kampagne mit {count} Empfänger(n) erstellt',
+  'whatsapp.campaign.updated': 'Kampagne mit {count} Empfänger(n) aktualisiert',
+  'whatsapp.campaign.updateFailed': 'Kampagne konnte nicht aktualisiert werden',
   'whatsapp.campaign.createFailed': 'Kampagne konnte nicht erstellt werden',
   'whatsapp.campaign.invalidPace': 'Ungültiges Sendetempo',
   'whatsapp.campaign.billingVariables': 'Die Nachricht nennt Rechnungsvariablen ({names}); für Rechnungen die Einzelmahnung verwenden',

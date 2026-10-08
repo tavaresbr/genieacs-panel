@@ -664,6 +664,8 @@ export default {
   'whatsapp.campaign.previewReady': 'سيستلمها {count} مستلم',
   'whatsapp.campaign.previewFailed': 'تعذّر إنشاء المعاينة',
   'whatsapp.campaign.created': 'تم إنشاء الحملة مع {count} مستلم',
+  'whatsapp.campaign.updated': 'تم تحديث الحملة بعدد {count} من المستلمين',
+  'whatsapp.campaign.updateFailed': 'تعذر تحديث الحملة',
   'whatsapp.campaign.createFailed': 'تعذّر إنشاء الحملة',
   'whatsapp.campaign.invalidPace': 'وتيرة إرسال غير صالحة',
   'whatsapp.campaign.billingVariables': 'تذكر الرسالة متغيرات فوترة ({names})؛ لتحصيل الفواتير استخدم التحصيل الفردي',

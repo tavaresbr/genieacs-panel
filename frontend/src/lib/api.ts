@@ -4764,7 +4764,11 @@ export interface WhatsAppBroadcast {
   /** Quando a campanha agendada ('queued') começa sozinha. */
   scheduledAt?: string | null
   attachment?: { name: string | null; type: string | null } | null
-  audience?: (Omit<WhatsAppCampaignFilters, 'contracts'> & { contracts: number }) | null
+  audience?: (Omit<WhatsAppCampaignFilters, 'contracts'> & { contracts: number; contractList?: string[] }) | null
+  /** O número que envia, o modelo escolhido e o ritmo próprio (mensagens por hora; nulo é o do WhatsApp). */
+  accountId?: number | null
+  templateId?: number | null
+  pacePerHour?: number | null
   startAt: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -4802,7 +4806,7 @@ export interface WhatsAppCampaignPreview {
     reachable: number
   }
   max: number
-  sample: { contract: string; clientName: string | null; phone: string; body: string }[]
+  sample: { contract: string | null; clientName: string | null; phone: string; body: string }[]
 }
 
 export interface WhatsAppCampaignInput {
@@ -4810,6 +4814,7 @@ export interface WhatsAppCampaignInput {
   filters: WhatsAppCampaignFilters
   templateId?: number
   body?: string
+  /** Na edição: ausente mantém o anexo, nulo tira, um objeto troca. */
   attachment?: { path: string; name: string } | null
   scheduledAt?: string | null
   /** O número que envia; sem ele, o da cobrança. */
@@ -5574,6 +5579,9 @@ export const whatsappAPI = {
 
   previewCampaign: (input: Omit<WhatsAppCampaignInput, 'title' | 'attachment' | 'scheduledAt'>) =>
     apiClient.post<WhatsAppCampaignPreview>('/whatsapp/broadcasts/preview', input),
+
+  updateCampaign: (id: number, input: WhatsAppCampaignInput) =>
+    apiClient.put<{ broadcast: WhatsAppBroadcast; recipients: number }>(`/whatsapp/broadcasts/${id}`, input),
 
   createCampaign: (input: WhatsAppCampaignInput) =>
     apiClient.post<{ broadcast: WhatsAppBroadcast; recipients: number }>('/whatsapp/broadcasts', input),

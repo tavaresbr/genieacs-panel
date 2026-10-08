@@ -663,6 +663,8 @@ export default {
   'whatsapp.campaign.previewReady': '{count} destinatario/i lo riceverebbero',
   'whatsapp.campaign.previewFailed': 'Impossibile generare l’anteprima',
   'whatsapp.campaign.created': 'Campagna creata con {count} destinatario/i',
+  'whatsapp.campaign.updated': 'Campagna aggiornata con {count} destinatario/i',
+  'whatsapp.campaign.updateFailed': 'Impossibile aggiornare la campagna',
   'whatsapp.campaign.createFailed': 'Impossibile creare la campagna',
   'whatsapp.campaign.invalidPace': 'Ritmo di invio non valido',
   'whatsapp.campaign.billingVariables': 'Il messaggio cita variabili di fatturazione ({names}); per sollecitare fatture usa il sollecito singolo',

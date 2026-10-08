@@ -602,6 +602,8 @@ class WaBroadcastService {
       failedCount: Number(row.failed_count || 0),
       rateLimitPerMin: row.rate_limit_per_min ?? null,
       pacePerHour: row.pace_per_hour ?? null,
+      accountId: row.account_id ?? null,
+      templateId: row.template_id ?? null,
       kind: row.kind === 'general' ? 'general' : 'billing',
       scheduledAt: this.asIso(row.scheduled_at),
       attachment: row.attachment_path

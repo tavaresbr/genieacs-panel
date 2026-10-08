@@ -665,6 +665,8 @@ export default {
   'whatsapp.campaign.previewReady': '{count} recipient(s) would receive it',
   'whatsapp.campaign.previewFailed': 'Could not build the preview',
   'whatsapp.campaign.created': 'Campaign created with {count} recipient(s)',
+  'whatsapp.campaign.updated': 'Campaign updated with {count} recipient(s)',
+  'whatsapp.campaign.updateFailed': 'Could not update the campaign',
   'whatsapp.campaign.createFailed': 'Could not create the campaign',
   'whatsapp.campaign.invalidPace': 'Invalid sending pace',
   'whatsapp.campaign.billingVariables': 'This message cites billing variables ({names}); use One-off billing to charge invoices',

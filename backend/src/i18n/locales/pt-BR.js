@@ -662,6 +662,8 @@ export default {
   'whatsapp.campaign.previewReady': '{count} destinatário(s) receberiam',
   'whatsapp.campaign.previewFailed': 'Não foi possível montar a prévia',
   'whatsapp.campaign.created': 'Campanha criada com {count} destinatário(s)',
+  'whatsapp.campaign.updated': 'Campanha atualizada com {count} destinatário(s)',
+  'whatsapp.campaign.updateFailed': 'Não foi possível atualizar a campanha',
   'whatsapp.campaign.createFailed': 'Não foi possível criar a campanha',
   'whatsapp.campaign.invalidPace': 'Ritmo de envio inválido',
   'whatsapp.campaign.billingVariables': 'A mensagem cita variáveis de cobrança ({names}); para cobrar faturas use a Cobrança avulsa',

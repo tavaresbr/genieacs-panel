@@ -665,6 +665,8 @@ export default {
   'whatsapp.campaign.previewReady': '{count} प्राप्तकर्ता इसे पाएंगे',
   'whatsapp.campaign.previewFailed': 'पूर्वावलोकन नहीं बन सका',
   'whatsapp.campaign.created': '{count} प्राप्तकर्ताओं के साथ अभियान बनाया गया',
+  'whatsapp.campaign.updated': 'अभियान {count} प्राप्तकर्ताओं के साथ अपडेट हुआ',
+  'whatsapp.campaign.updateFailed': 'अभियान अपडेट नहीं हो सका',
   'whatsapp.campaign.createFailed': 'अभियान नहीं बनाया जा सका',
   'whatsapp.campaign.invalidPace': 'अमान्य भेजने की गति',
   'whatsapp.campaign.billingVariables': 'संदेश में बिलिंग चर ({names}) हैं; चालान वसूली के लिए एकल वसूली का उपयोग करें',

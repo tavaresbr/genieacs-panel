@@ -99,6 +99,21 @@ class WaBroadcast {
     return this.getById(id);
   }
 
+  /** Update only while the campaign is still in one of `statuses`; false when it moved on. */
+  static async updateIfStatus(id, statuses, patch) {
+    const changed = await tdb('wa_broadcasts')
+      .where({ id })
+      .whereIn('status', statuses)
+      .update({ ...patch, updated_at: new Date() });
+    return Number(changed) > 0;
+  }
+
+  /** Swaps the whole recipient list; only for a campaign that has not started. */
+  static async replaceRecipients(broadcastId, recipients) {
+    await tdb('wa_broadcast_recipients').where({ broadcast_id: broadcastId }).del();
+    return this.addRecipients(broadcastId, recipients);
+  }
+
   /**
    * Writes the recipient list.
    *

@@ -664,6 +664,8 @@ export default {
   'whatsapp.campaign.previewReady': '將有 {count} 位收件人收到',
   'whatsapp.campaign.previewFailed': '無法產生預覽',
   'whatsapp.campaign.created': '已建立群發，收件人 {count} 位',
+  'whatsapp.campaign.updated': '已更新群發，收件人 {count} 位',
+  'whatsapp.campaign.updateFailed': '無法更新群發',
   'whatsapp.campaign.createFailed': '無法建立群發',
   'whatsapp.campaign.invalidPace': '發送速度無效',
   'whatsapp.campaign.billingVariables': '訊息引用了帳單變數（{names}）；催繳帳單請使用單次催繳',

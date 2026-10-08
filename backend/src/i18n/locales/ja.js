@@ -660,6 +660,8 @@ export default {
   'whatsapp.campaign.previewReady': '{count} 件に送信されます',
   'whatsapp.campaign.previewFailed': 'プレビューを作成できませんでした',
   'whatsapp.campaign.created': '{count} 件の宛先でキャンペーンを作成しました',
+  'whatsapp.campaign.updated': 'キャンペーンを更新しました（宛先 {count} 件）',
+  'whatsapp.campaign.updateFailed': 'キャンペーンを更新できませんでした',
   'whatsapp.campaign.createFailed': 'キャンペーンを作成できませんでした',
   'whatsapp.campaign.invalidPace': '送信ペースが無効です',
   'whatsapp.campaign.billingVariables': 'メッセージに請求用の変数（{names}）が含まれています。請求には個別督促を使用してください',
