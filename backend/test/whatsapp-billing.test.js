@@ -37,7 +37,17 @@ let token;
 let sgpServer;
 let sgpUrl;
 
-/** `YYYY-MM-DD`, N days from today. Negative is in the past. */
+/**
+ * `YYYY-MM-DD`, N days from today. Negative is in the past.
+ *
+ * Call it WHEN THE SGP ANSWERS, never while building the fixtures. The fixtures
+ * below are module constants, evaluated once at import; the panel counts
+ * "overdue for N days" against the instant of each request. With the due dates
+ * frozen at import, a run that crossed 00:00 UTC between the two counted one
+ * day more than the fixture meant, and four assertions read 11 where they
+ * expected 10. The fixtures declare an offset (`venceEmDias`) and the stub
+ * resolves it per response, so seeding and measuring share the same instant.
+ */
 function dayOffset(days) {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + days);
@@ -58,7 +68,7 @@ const SUBSCRIBERS = [
     invoices: [{
       numerodocumento: '1',
       valor: '129,90',
-      vencimento: dayOffset(-10),
+      venceEmDias: -10,
       pix: 'pix-copia-e-cola-1',
       linhadigitavel: '34191790010104351004791020150008699999999999'
     }]
@@ -68,7 +78,7 @@ const SUBSCRIBERS = [
     name: 'Maria Souza',
     phone: '5593981110002',
     invoices: [{
-      numerodocumento: '2', valor: '89,90', vencimento: dayOffset(-3), pix: 'pix-copia-e-cola-2'
+      numerodocumento: '2', valor: '89,90', venceEmDias: -3, pix: 'pix-copia-e-cola-2'
     }]
   },
   {
@@ -76,7 +86,7 @@ const SUBSCRIBERS = [
     name: 'Carlos Lima',
     phone: '5593981110003',
     invoices: [{
-      numerodocumento: '3', valor: '99,90', vencimento: dayOffset(3), pix: 'pix-copia-e-cola-3'
+      numerodocumento: '3', valor: '99,90', venceEmDias: 3, pix: 'pix-copia-e-cola-3'
     }]
   },
   {
@@ -84,13 +94,13 @@ const SUBSCRIBERS = [
     contract: 'C-SEM-FONE',
     name: 'Ana Prado',
     phone: null,
-    invoices: [{ numerodocumento: '4', valor: '129,90', vencimento: dayOffset(-8), pix: 'pix-4' }]
+    invoices: [{ numerodocumento: '4', valor: '129,90', venceEmDias: -8, pix: 'pix-4' }]
   },
   {
     contract: 'C-OPTOUT',
     name: 'Pedro Alves',
     phone: '5593981110005',
-    invoices: [{ numerodocumento: '5', valor: '129,90', vencimento: dayOffset(-6), pix: 'pix-5' }]
+    invoices: [{ numerodocumento: '5', valor: '129,90', venceEmDias: -6, pix: 'pix-5' }]
   },
   {
     contract: 'C-EM-DIA',
@@ -110,7 +120,7 @@ const SUBSCRIBERS = [
     contract: 'C-SEM-PIX',
     name: 'Lucia Melo',
     phone: '5593981110008',
-    invoices: [{ numerodocumento: '8', valor: '129,90', vencimento: dayOffset(-4) }]
+    invoices: [{ numerodocumento: '8', valor: '129,90', venceEmDias: -4 }]
   }
 ];
 
@@ -136,7 +146,11 @@ function startSgpStub() {
         if (!subscriber || subscriber.invoices === null) {
           return send({ status: 0, msg: 'Contrato inexistente' });
         }
-        return send({ status: 1, titulos: subscriber.invoices });
+        const titulos = subscriber.invoices.map(({ venceEmDias, ...titulo }) => ({
+          ...titulo,
+          vencimento: dayOffset(venceEmDias)
+        }));
+        return send({ status: 1, titulos });
       }
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 0, msg: 'Endpoint inexistente' }));
