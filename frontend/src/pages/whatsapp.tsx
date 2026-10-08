@@ -158,13 +158,19 @@ function readPanelPreference(): boolean {
 
 interface InboxTabProps {
   /**
+   * Muda a cada pedido de "voltar para a lista" (a aba Conversas clicada de
+   * novo, ou WhatsApp no menu lateral): a conversa aberta fecha. Num notebook
+   * com o Módulo SGP aberto a lista some, e não havia outro jeito de voltar.
+   */
+  backToList?: number
+  /**
    * A thread to open on arrival — the one the Contacts tab just opened or
    * started. Drawn from this row while its history loads, like a click.
    */
   initialConversation?: WhatsAppConversation | null
 }
 
-function InboxTab({ initialConversation = null }: InboxTabProps) {
+function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const { can, user } = useAuth()
@@ -513,6 +519,13 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     setHasOlder(false)
     setSelectedId(null)
   }, [])
+
+  const backSeen = useRef(backToList)
+  useEffect(() => {
+    if (backSeen.current === backToList) return
+    backSeen.current = backToList
+    closeThread()
+  }, [backToList, closeThread])
 
   // Arriving from Contacts with a thread in hand. Opened once, on mount — the
   // page remounts this tab for every thread it hands over.
@@ -1233,6 +1246,19 @@ export default function WhatsAppPage() {
   // conversa na caixa de entrada e limpa a URL, para recarregar não reabrir.
   const navigate = useNavigate()
   const mounted = useRef(true)
+  const [backToList, setBackToList] = useState(0)
+  // "WhatsApp" no menu lateral com a página já aberta: o mesmo endereço de
+  // novo, só um `location.key` novo. Volta para a lista de conversas. O
+  // primeiro endereço (a chegada) e os que trazem conversa (notificação,
+  // Contatos) ficam de fora.
+  const lastKey = useRef(location.key)
+  useEffect(() => {
+    if (lastKey.current === location.key) return
+    lastKey.current = location.key
+    if (location.search.includes('conversation=') || routedState?.conversation) return
+    setTab('inbox')
+    setBackToList((n) => n + 1)
+  }, [location.key, location.search, routedState])
   useEffect(() => {
     mounted.current = true
     return () => { mounted.current = false }
@@ -1281,6 +1307,8 @@ export default function WhatsAppPage() {
                 key={id}
                 type="button"
                 onClick={() => {
+                  // "Conversas" de novo, já nela: volta para a lista.
+                  if (id === 'inbox' && tab === 'inbox') setBackToList((n) => n + 1)
                   setTab(id)
                   setHandOver(null)
                 }}
@@ -1308,7 +1336,7 @@ export default function WhatsAppPage() {
         </div>
 
         {tab === 'inbox' && (
-          <InboxTab key={handOver?.seq ?? 0} initialConversation={handOver?.conversation ?? null} />
+          <InboxTab key={handOver?.seq ?? 0} initialConversation={handOver?.conversation ?? null} backToList={backToList} />
         )}
         {tab === 'contacts' && (
           <ContactsPanel
