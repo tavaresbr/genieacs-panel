@@ -448,6 +448,16 @@ const CASOS = [
     codigoAceito: 'not_configured'
   },
   {
+    // Sem o token do Focus Chat, quem passa pela guarda ouve 409 `not_configured`.
+    cap: 'contacts.import',
+    label: 'POST /api/contacts/import/focuschat',
+    method: 'POST',
+    path: () => '/api/contacts/import/focuschat?mode=preview',
+    body: {},
+    aceito: [409],
+    codigoAceito: 'not_configured'
+  },
+  {
     cap: 'catalogue.write',
     label: 'PUT /api/vendor-management/:id',
     method: 'PUT',
@@ -866,12 +876,12 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 63 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 64 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
     // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas,
     // e depois as três da TeiaH Valid, e a importação da agenda do WhatsApp.
-    assert.equal(CASOS.length, 63);
+    assert.equal(CASOS.length, 64);
   });
 });
 

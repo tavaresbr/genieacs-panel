@@ -89,6 +89,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'maintenance.notified': 'audit.action.maintenanceNotified',
   'maintenance.cancelled': 'audit.action.maintenanceCancelled',
   'whatsapp.config_tested': 'audit.action.whatsappConfigTested',
+  'focuschat.config_updated': 'audit.action.focusChatConfigUpdated',
   'alerts.telegram_changed': 'audit.action.alertsTelegramChanged',
   'whatsapp.dunning_enabled': 'audit.action.whatsappDunningEnabled',
   'whatsapp.dunning_disabled': 'audit.action.whatsappDunningDisabled',

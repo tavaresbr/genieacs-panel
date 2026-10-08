@@ -241,7 +241,9 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       )}
       {contact.importSource && (
         <span className="modern-badge-info" title={t('whatsapp.contacts.importedHint')}>
-          {t(contact.importSource === 'google' ? 'whatsapp.contacts.importedGoogle' : 'whatsapp.contacts.imported')}
+          {t(contact.importSource === 'google'
+            ? 'whatsapp.contacts.importedGoogle'
+            : contact.importSource === 'focuschat' ? 'whatsapp.contacts.importedFocusChat' : 'whatsapp.contacts.imported')}
         </span>
       )}
       {!contact.hasDevice && (
@@ -561,6 +563,20 @@ const FIELD_LABELS: Record<string, TranslationKey> = {
  * The import, in two steps: the preview says what the sheet would change and
  * which lines are wrong; nothing is written until Apply.
  */
+type ImportSource = 'sheet' | 'whatsapp' | 'focuschat'
+
+const SOURCE_LABEL: Record<ImportSource, TranslationKey> = {
+  sheet: 'contacts.sheet.sourceSheet',
+  whatsapp: 'contacts.sheet.sourceWhatsapp',
+  focuschat: 'contacts.sheet.sourceFocusChat'
+}
+
+const SOURCE_TITLE: Record<ImportSource, TranslationKey> = {
+  sheet: 'contacts.sheet.importTitle',
+  whatsapp: 'contacts.sheet.whatsappTitle',
+  focuschat: 'contacts.sheet.focusChatTitle'
+}
+
 function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
   const { t } = useTranslation()
   const toast = useToast()
@@ -568,13 +584,20 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   const [fileName, setFileName] = useState('')
   const [preview, setPreview] = useState<ContactImportResult | null>(null)
   const [busy, setBusy] = useState(false)
-  const [source, setSource] = useState<'sheet' | 'whatsapp'>('sheet')
-  const [book, setBook] = useState<ContactWhatsappImportResult | null>(null)
+  const [source, setSource] = useState<ImportSource>('sheet')
+  // The WhatsApp phone book and the Focus Chat contact book share a preview:
+  // only new people come in. Focus Chat also counts groups and other channels.
+  const [book, setBook] = useState<(ContactWhatsappImportResult & { ignored?: number }) | null>(null)
+  const fromBook = source !== 'sheet'
+  const bookFailedKey = source === 'focuschat' ? 'contacts.sheet.focusChatFailed' : 'contacts.sheet.whatsappFailed'
+  const importBook = (mode: 'preview' | 'apply') => (source === 'focuschat'
+    ? contactsAPI.importFocusChat(mode)
+    : contactsAPI.importWhatsapp(mode))
   // A Google Contacts export only brings new people in, so its preview is the
   // phone-book kind, not the sheet's.
   const [google, setGoogle] = useState<ContactGoogleImportResult | null>(null)
 
-  const switchSource = (next: 'sheet' | 'whatsapp') => {
+  const switchSource = (next: ImportSource) => {
     if (busy) return
     setSource(next)
     setPreview(null)
@@ -586,10 +609,10 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   const readBook = async () => {
     setBook(null)
     setBusy(true)
-    const res = await contactsAPI.importWhatsapp('preview')
+    const res = await importBook('preview')
     setBusy(false)
     if (!res.success || !res.data) {
-      toast.error(res.message || t('contacts.sheet.whatsappFailed'))
+      toast.error(res.message || t(bookFailedKey))
       return
     }
     setBook(res.data)
@@ -614,12 +637,12 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   }
 
   const apply = async () => {
-    if (source === 'whatsapp') {
+    if (fromBook) {
       setBusy(true)
-      const done = await contactsAPI.importWhatsapp('apply')
+      const done = await importBook('apply')
       setBusy(false)
       if (!done.success || !done.data) {
-        toast.error(done.message || t('contacts.sheet.whatsappFailed'))
+        toast.error(done.message || t(bookFailedKey))
         return
       }
       toast.success(done.message || t('contacts.sheet.applied'))
@@ -641,9 +664,9 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="import-sheet-title">
       <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6" data-testid="import-sheet">
-        <h2 id="import-sheet-title" className="section-heading mb-1">{t(source === 'whatsapp' ? 'contacts.sheet.whatsappTitle' : 'contacts.sheet.importTitle')}</h2>
+        <h2 id="import-sheet-title" className="section-heading mb-1">{t(SOURCE_TITLE[source])}</h2>
         <div className="tab-rail mb-4" role="tablist">
-          {(['sheet', 'whatsapp'] as const).map((id) => (
+          {(['sheet', 'whatsapp', 'focuschat'] as const).map((id) => (
             <button
               key={id}
               type="button"
@@ -654,14 +677,14 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
               data-testid={`import-source-${id}`}
               onClick={() => switchSource(id)}
             >
-              {t(id === 'sheet' ? 'contacts.sheet.sourceSheet' : 'contacts.sheet.sourceWhatsapp')}
+              {t(SOURCE_LABEL[id])}
             </button>
           ))}
         </div>
 
-        {source === 'whatsapp' ? (
+        {fromBook ? (
           <>
-            <p className="section-description mb-4">{t('contacts.sheet.whatsappHint')}</p>
+            <p className="section-description mb-4">{t(source === 'focuschat' ? 'contacts.sheet.focusChatHint' : 'contacts.sheet.whatsappHint')}</p>
             <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void readBook()} data-testid="import-whatsapp-load">
               {t('contacts.sheet.whatsappLoad')}
             </button>
@@ -675,6 +698,7 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
                   duplicated: book.duplicated,
                   invalid: book.invalid
                 })}</p>
+                {book.ignored ? <p className="text-muted-foreground">{t('contacts.sheet.focusChatIgnored', { count: book.ignored })}</p> : null}
                 {book.truncated && <p className="text-muted-foreground">{t('contacts.sheet.whatsappTruncated', { max: book.maxCreates })}</p>}
                 {book.rows.length === 0 ? (
                   <p className="text-muted-foreground">{t('contacts.sheet.whatsappEmpty')}</p>
@@ -776,7 +800,7 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
           <button
             type="button"
             className="modern-button"
-            disabled={busy || (source === 'whatsapp'
+            disabled={busy || (fromBook
               ? !book || book.creates === 0
               : google ? google.creates === 0 : !preview || preview.updates + preview.creates === 0)}
             onClick={() => void apply()}

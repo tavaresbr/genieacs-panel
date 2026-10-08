@@ -5,6 +5,8 @@ import ContactSyncService from '../services/contactSyncService.js';
 import { roleHas } from '../config/permissions.js';
 import ContactGoogleImportService from '../services/contactGoogleImportService.js';
 import ContactWhatsappImportService from '../services/contactWhatsappImportService.js';
+import ContactFocusChatImportService from '../services/contactFocusChatImportService.js';
+import { FocusChatError } from '../services/focusChatService.js';
 import ContactInvoiceService from '../services/contactInvoiceService.js';
 import ContactOnboardingService from '../services/contactOnboardingService.js';
 import { WaError } from '../services/whatsappConfigService.js';
@@ -13,7 +15,7 @@ import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 function handleError(req, res, error, fallbackKey) {
-  if (error instanceof ContactProfileError || error instanceof SgpError || error instanceof WaError) {
+  if (error instanceof ContactProfileError || error instanceof SgpError || error instanceof WaError || error instanceof FocusChatError) {
     return res.status(error.status).json({
       ...createErrorResponse(translateError(req.t, error), error.code),
       code: error.code
@@ -323,6 +325,30 @@ ContactController.importWhatsapp = async function importWhatsapp(req, res) {
       detail: { source: 'whatsapp', total: result.total, created: result.created, existing: result.existing }
     });
     return res.json(createResponse(req.t('contacts.import.whatsappApplied', { created: result.created }), result));
+  } catch (error) {
+    return handleError(req, res, error, 'contacts.importFailed');
+  }
+};
+
+/**
+ * The Focus Chat contact book, same rule as the WhatsApp one: `preview` lists
+ * who would become a client; `apply` creates them. Existing contacts are
+ * never touched.
+ */
+ContactController.importFocusChat = async function importFocusChat(req, res) {
+  try {
+    if (req.query.mode !== 'apply') {
+      const plan = await ContactFocusChatImportService.plan();
+      return res.json(createResponse(req.t('contacts.import.focusChatPreviewed'), ContactFocusChatImportService.summary(plan)));
+    }
+    const result = await ContactFocusChatImportService.apply(actorOf(req));
+    await AuditLog.fromRequest(req, {
+      action: AuditLog.ACTIONS.CONTACTS_IMPORTED,
+      subjectType: 'contacts',
+      subjectId: null,
+      detail: { source: 'focuschat', total: result.total, created: result.created, existing: result.existing }
+    });
+    return res.json(createResponse(req.t('contacts.import.focusChatApplied', { created: result.created }), result));
   } catch (error) {
     return handleError(req, res, error, 'contacts.importFailed');
   }
