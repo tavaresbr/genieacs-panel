@@ -206,7 +206,7 @@ export default function ContactDetailPage() {
       <div className="page-frame" data-testid="contact-detail">
         <header className="page-header">
           <div className="min-w-0">
-            <Link to="/contacts" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <Link to="/contacts" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground max-sm:-my-2 max-sm:min-h-10">
               <Icon name="back" size={14} /> {t('contacts.profile.back')}
             </Link>
             <h1 className="page-title wrap-break-word">{fields.name.value || '—'}</h1>
@@ -305,7 +305,7 @@ export default function ContactDetailPage() {
                         {can('whatsapp.send') && (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
                             disabled={opening}
                             title={t('contacts.profile.chatThisNumber')}
                             aria-label={`${t('contacts.profile.chatThisNumber')} ${phoneText(phone)}`}

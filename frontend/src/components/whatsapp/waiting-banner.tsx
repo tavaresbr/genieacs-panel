@@ -66,7 +66,7 @@ export function WaitingBanner({ report, onShow }: {
       {minhas + semDono > 0 && (
         <button
           type="button"
-          className="ml-auto font-semibold text-primary underline"
+          className="ml-auto font-semibold text-primary underline max-sm:-my-2 max-sm:-mr-2 max-sm:px-2 max-sm:py-2"
           onClick={() => onShow(minhas > 0 ? 'me' : 'unassigned')}
         >
           {t('whatsapp.waiting.show')}

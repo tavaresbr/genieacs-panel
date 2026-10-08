@@ -573,8 +573,11 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
         </div>
       )}
 
-      <div className={`${compact ? 'mt-1.5 gap-2' : 'mt-2.5 gap-3'} flex flex-wrap items-center justify-between @4xl:items-start`}>
-        <div className="min-w-0">
+      {/* No celular, "Enviar" sobe para a linha da nota e os outros botões
+          descem juntos para a de baixo: eram três linhas tirando altura da
+          conversa. Com o teclado aberto (`compact`) já cabe tudo numa linha. */}
+      <div className={`${compact ? 'mt-1.5 gap-2' : 'mt-2.5 gap-3 max-sm:justify-end max-sm:gap-x-2 max-sm:gap-y-0'} flex flex-wrap items-center justify-between @4xl:items-start`}>
+        <div className={`min-w-0 ${compact ? '' : 'max-sm:order-first max-sm:mr-auto'}`}>
           <label
             className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground"
             title={t('whatsapp.inbox.noteHint')}
@@ -591,7 +594,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           <p className="field-hint hidden max-w-md @6xl:block">{t('whatsapp.inbox.noteHint')}</p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className={`flex flex-wrap items-center justify-end gap-2 ${compact ? '' : 'max-sm:contents'}`}>
           <input
             ref={fileRef}
             type="file"
@@ -691,7 +694,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
 
           <button
             type="button"
-            className={isNote ? 'modern-button-secondary shrink-0 border-[hsl(var(--status-warning))]/70' : 'modern-button shrink-0'}
+            className={`${isNote ? 'modern-button-secondary shrink-0 border-[hsl(var(--status-warning))]/70' : 'modern-button shrink-0'} ${compact ? '' : 'max-sm:-order-1'}`}
             disabled={empty || busy || windowBlocked}
             aria-live="polite"
             onClick={() => void submit()}
@@ -699,6 +702,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
             <Icon name={busy ? 'refresh' : isNote ? 'lock' : 'chat'} size={16} className={busy ? 'animate-spin' : ''} />
             {sendLabel}
           </button>
+          {!compact && <span aria-hidden="true" className="hidden max-sm:-order-1 max-sm:block max-sm:h-2 max-sm:basis-full" />}
         </div>
       </div>
     </div>

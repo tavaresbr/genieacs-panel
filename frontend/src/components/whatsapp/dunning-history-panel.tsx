@@ -207,39 +207,68 @@ export function DunningHistoryPanel() {
             <p className="empty-state-title">{loading ? t('common.loading') : t('whatsapp.dunning.historyEmpty')}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="modern-table">
-              <thead>
-                <tr>
-                  <th scope="col">{t('whatsapp.dunning.when')}</th>
-                  <th scope="col">{t('whatsapp.inbox.contract')}</th>
-                  <th scope="col">{t('whatsapp.inbox.subscriber')}</th>
-                  <th scope="col">{t('whatsapp.dunning.step')}</th>
-                  <th scope="col">{t('whatsapp.billing.amount')}</th>
-                  <th scope="col">{t('whatsapp.billing.dueDate')}</th>
-                  <th scope="col">{t('whatsapp.dunning.result')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((row) => (
-                  <tr key={row.id}>
-                    <td className="whitespace-nowrap">{row.createdAt ? formatDateTime(row.createdAt) : '—'}</td>
-                    <td className="font-mono text-xs">{row.contract}</td>
-                    <td><ContactLink contract={row.contract} name={row.clientName} /></td>
-                    <td className="whitespace-nowrap">{stepLabel(row)}</td>
-                    <td>{money(row.amount)}</td>
-                    <td className="whitespace-nowrap">
-                      {row.dueDate ? formatDate(`${row.dueDate}T12:00:00`) : '—'}
-                      {row.paidAt && row.kind === 'step' && (
-                        <span className="modern-badge-success ml-2">{t('whatsapp.dunning.paid')}</span>
-                      )}
-                    </td>
-                    <td>{result(row)}</td>
+          <>
+            <div className="desktop-table overflow-x-auto">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('whatsapp.dunning.when')}</th>
+                    <th scope="col">{t('whatsapp.inbox.contract')}</th>
+                    <th scope="col">{t('whatsapp.inbox.subscriber')}</th>
+                    <th scope="col">{t('whatsapp.dunning.step')}</th>
+                    <th scope="col">{t('whatsapp.billing.amount')}</th>
+                    <th scope="col">{t('whatsapp.billing.dueDate')}</th>
+                    <th scope="col">{t('whatsapp.dunning.result')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {items.map((row) => (
+                    <tr key={row.id}>
+                      <td className="whitespace-nowrap">{row.createdAt ? formatDateTime(row.createdAt) : '—'}</td>
+                      <td className="font-mono text-xs">{row.contract}</td>
+                      <td><ContactLink contract={row.contract} name={row.clientName} /></td>
+                      <td className="whitespace-nowrap">{stepLabel(row)}</td>
+                      <td>{money(row.amount)}</td>
+                      <td className="whitespace-nowrap">
+                        {row.dueDate ? formatDate(`${row.dueDate}T12:00:00`) : '—'}
+                        {row.paidAt && row.kind === 'step' && (
+                          <span className="modern-badge-success ml-2">{t('whatsapp.dunning.paid')}</span>
+                        )}
+                      </td>
+                      <td>{result(row)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* No celular, um cartão por envio: a tabela de sete colunas rolava
+                de lado e o nome do assinante virava uma coluna de seis linhas. */}
+            <ul className="mobile-card-list divide-y divide-border" role="list">
+              {items.map((row) => (
+                <li key={row.id} className="space-y-1.5 p-4 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 wrap-break-word font-medium">
+                      <ContactLink contract={row.contract} name={row.clientName} />
+                    </div>
+                    <span className="shrink-0 font-mono text-xs">{row.contract}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {row.createdAt ? formatDateTime(row.createdAt) : '—'} · {stepLabel(row)}
+                  </p>
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>{money(row.amount)}</span>
+                    <span className="text-muted-foreground">
+                      {t('whatsapp.billing.dueDate')}: {row.dueDate ? formatDate(`${row.dueDate}T12:00:00`) : '—'}
+                    </span>
+                    {row.paidAt && row.kind === 'step' && (
+                      <span className="modern-badge-success">{t('whatsapp.dunning.paid')}</span>
+                    )}
+                  </p>
+                  <div>{result(row)}</div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
 
         {hasMore && (

@@ -14,7 +14,7 @@ function Tile({ label, value, hint }: { label: string; value: string; hint?: str
   return (
     <div className="modern-card min-w-0 p-4 sm:p-5">
       <p className="metric-label">{label}</p>
-      <p className="metric-value mt-3 truncate text-2xl text-foreground sm:text-3xl">{value}</p>
+      <p className="metric-value mt-3 wrap-break-word text-xl text-foreground sm:truncate sm:text-3xl">{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
@@ -136,16 +136,16 @@ export function ResponseTimePanel() {
                 <thead>
                   <tr className="text-muted-foreground">
                     <th className="py-1 font-medium">{t('whatsapp.satisfaction.agent')}</th>
-                    <th className="py-1 text-right font-medium">{t('whatsapp.responseTime.answeredShort')}</th>
-                    <th className="py-1 text-right font-medium">{t('whatsapp.responseTime.medianShort')}</th>
+                    <th className="py-1 pl-3 text-right font-medium">{t('whatsapp.responseTime.answeredShort')}</th>
+                    <th className="py-1 pl-3 text-right font-medium">{t('whatsapp.responseTime.medianShort')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {report.byAgent.map((a) => (
                     <tr key={a.userId ?? 'phone'} className="border-t border-border">
                       <td className="py-1.5">{a.name ?? t('whatsapp.responseTime.fromPhone')}</td>
-                      <td className="py-1.5 text-right tabular-nums">{a.answered}</td>
-                      <td className="py-1.5 text-right tabular-nums font-medium">{dur(a.medianSeconds)}</td>
+                      <td className="py-1.5 pl-3 text-right tabular-nums">{a.answered}</td>
+                      <td className="py-1.5 pl-3 text-right tabular-nums font-medium">{dur(a.medianSeconds)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -321,7 +321,7 @@ export function CampaignsPanel() {
                   <p className="field-label">{t('whatsapp.broadcast.body')}</p>
                   {/* The rendered text, readable before the start rather than
                       after: this is the thing hundreds of people will get. */}
-                  <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded-md border border-border surface-subtle p-3 text-xs leading-5 text-muted-foreground">
+                  <pre className="max-h-32 overflow-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border surface-subtle p-3 text-xs leading-5 text-muted-foreground">
                     {broadcast.body}
                   </pre>
                 </div>

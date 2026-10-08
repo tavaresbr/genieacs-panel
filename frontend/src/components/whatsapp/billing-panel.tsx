@@ -406,7 +406,7 @@ export function BillingPanel() {
         </div>
 
         {template && (
-          <pre className="mt-4 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border surface-subtle p-3 text-xs leading-5 text-muted-foreground">
+          <pre className="mt-4 max-h-40 overflow-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border surface-subtle p-3 text-xs leading-5 text-muted-foreground">
             {template.body}
           </pre>
         )}
