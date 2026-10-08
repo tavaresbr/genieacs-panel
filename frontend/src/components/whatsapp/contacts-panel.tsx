@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { contactsAPI, type ContactImportResult, type ContactGoogleImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContactCounts, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
+import { contactsAPI, type ContactImportResult, type ContactGoogleImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContactCounts, type ContactDeviceFilter, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -68,6 +68,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const [noPhone, setNoPhone] = useState(false)
   // Só os cadastros que vieram de uma importação (agenda do WhatsApp ou planilha).
   const [imported, setImported] = useState(false)
+  // Só quem tem (ou não tem) equipamento gerenciado vinculado ao contrato.
+  const [device, setDevice] = useState<ContactDeviceFilter>('')
   // Quantos contatos cada filtro mostraria; vazio até a primeira leitura.
   const [counts, setCounts] = useState<WhatsAppContactCounts | null>(null)
 
@@ -113,7 +115,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     }
   }, [search, t, toast])
 
-  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean, onlyImported: boolean) => {
+  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean, onlyImported: boolean, deviceFilter: ContactDeviceFilter) => {
     const seq = ++requestSeq.current
     setLoading(true)
     const res = await whatsappAPI.listContacts({
@@ -121,7 +123,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       limit: PAGE,
       state: (state || undefined) as WhatsAppContactState | undefined,
       noPhone: onlyNoPhone,
-      imported: onlyImported
+      imported: onlyImported,
+      device: deviceFilter
     })
     if (!alive.current || seq !== requestSeq.current) return
     if (res.success && res.data) {
@@ -135,7 +138,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     setLoading(false)
   }, [t])
 
-  useEffect(() => { void load(debounced, stateFilter, noPhone, imported) }, [debounced, stateFilter, noPhone, imported, load])
+  useEffect(() => { void load(debounced, stateFilter, noPhone, imported, device) }, [debounced, stateFilter, noPhone, imported, device, load])
 
   const loadMore = useCallback(async () => {
     const seq = requestSeq.current
@@ -146,7 +149,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       offset: contacts.length,
       state: (stateFilter || undefined) as WhatsAppContactState | undefined,
       noPhone,
-      imported
+      imported,
+      device
     })
     if (!alive.current) return
     setLoadingMore(false)
@@ -161,7 +165,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       ...page.filter((row) => !current.some((held) => held.key === row.key))
     ])
     setTotal(res.data.total)
-  }, [contacts.length, debounced, stateFilter, noPhone, imported, t, toast])
+  }, [contacts.length, debounced, stateFilter, noPhone, imported, device, t, toast])
 
   const open = useCallback(async (contact: WhatsAppContact) => {
     setOpeningContract(contact.key)
@@ -197,7 +201,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const exportSheet = async () => {
     setExporting(true)
     try {
-      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone, imported })
+      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone, imported, device })
       if (!res.success || !res.blob) {
         toast.error(res.message || t('contacts.sheet.exportFailed'))
         return
@@ -246,11 +250,6 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
             : contact.importSource === 'focuschat' ? 'whatsapp.contacts.importedFocusChat' : 'whatsapp.contacts.imported')}
         </span>
       )}
-      {!contact.hasDevice && (
-        <span className="modern-badge" title={t('whatsapp.contacts.noDeviceHint')}>
-          {t('whatsapp.contacts.noDevice')}
-        </span>
-      )}
       {contact.state === 'blocked' && (
         <span className="modern-badge-warning">{t('whatsapp.contacts.stateBlocked')}</span>
       )}
@@ -259,6 +258,23 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       )}
     </span>
   )
+
+  // The managed ONT linked to the contract, opening its page; or the plain
+  // "no equipment" for a subscriber the panel has no ONT of.
+  const deviceOf = (contact: WhatsAppContact) => (contact.deviceId ? (
+    <Link
+      className="inline-flex max-w-56 items-center gap-1 truncate text-sm text-primary hover:underline"
+      to={`/devices/detail?id=${encodeURIComponent(contact.deviceId)}`}
+      title={contact.deviceId}
+    >
+      <Icon name="wifi" size={14} />
+      <span className="truncate font-mono text-xs">{contact.deviceId}</span>
+    </Link>
+  ) : (
+    <span className="text-sm text-muted-foreground" title={t('whatsapp.contacts.noDeviceHint')}>
+      {t('whatsapp.contacts.withoutDevice')}
+    </span>
+  ))
 
   const phoneOf = (contact: WhatsAppContact) => (contact.phone ? (
     <span className="flex flex-wrap items-center gap-1.5">
@@ -328,7 +344,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           <button
             type="button"
             className="modern-button-secondary"
-            onClick={() => void load(debounced, stateFilter, noPhone, imported)}
+            onClick={() => void load(debounced, stateFilter, noPhone, imported, device)}
             disabled={loading}
           >
             <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
@@ -342,7 +358,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           onClose={() => setImporting(false)}
           onApplied={() => {
             setImporting(false)
-            void load(debounced, stateFilter, noPhone, imported)
+            void load(debounced, stateFilter, noPhone, imported, device)
           }}
         />
       )}
@@ -420,6 +436,21 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
             {countBadge(counts?.imported)}
             {imported && <Icon name="x" size={14} />}
           </button>
+          {(['with', 'without'] as const).map((which) => (
+            <button
+              key={which}
+              type="button"
+              className={device === which ? 'modern-button' : 'modern-button-secondary'}
+              aria-pressed={device === which}
+              data-testid={`wa-contacts-device-${which}`}
+              onClick={() => setDevice((current) => (current === which ? '' : which))}
+            >
+              <Icon name="wifi" size={16} />
+              {t(which === 'with' ? 'whatsapp.contacts.filterWithDevice' : 'whatsapp.contacts.filterWithoutDevice')}
+              {countBadge(which === 'with' ? counts?.withDevice : counts?.withoutDevice)}
+              {device === which && <Icon name="x" size={14} />}
+            </button>
+          ))}
         </div>
       )}
 
@@ -472,6 +503,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
                     <th scope="col">{t('whatsapp.inbox.subscriber')}</th>
                     <th scope="col">{t('whatsapp.inbox.contract')}</th>
                     <th scope="col">{t('whatsapp.optOut.phone')}</th>
+                    <th scope="col">{t('whatsapp.contacts.device')}</th>
                     <th scope="col">{t('whatsapp.contacts.lastMessage')}</th>
                     <th scope="col"><span className="sr-only">{t('whatsapp.contacts.actions')}</span></th>
                   </tr>
@@ -487,6 +519,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
                         {contact.contract ?? <span className="font-sans text-muted-foreground">{t('whatsapp.contacts.noContract')}</span>}
                       </td>
                       <td>{phoneOf(contact)}</td>
+                      <td>{deviceOf(contact)}</td>
                       <td className="text-sm text-muted-foreground">
                         {contact.conversationId ? stamp(contact.lastMessageAt) || '—' : '—'}
                       </td>
@@ -513,6 +546,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
                     )}
                   </div>
                   <div className="text-sm">{phoneOf(contact)}</div>
+                  <div>{deviceOf(contact)}</div>
                   {contact.conversationId && contact.lastMessageAt && (
                     <p className="text-xs text-muted-foreground">
                       {t('whatsapp.contacts.lastMessage')}: {stamp(contact.lastMessageAt)}

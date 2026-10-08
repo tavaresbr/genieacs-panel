@@ -67,16 +67,19 @@ function maskDocument(document) {
  * `sgp_links`, the mirror of the ERP per ONT, and `sgp_contacts`, the
  * subscribers an operator looked up in the SGP that have no ONT in the panel.
  */
+/** "With" or "without" a managed ONT linked to the contract. */
+const DEVICE_FILTERS = ['with', 'without'];
+
 class WaContactService {
-  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false } = {}) {
+  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false, device = '' } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
     const everyone = await this.gather({ search });
-    const subscribers = this.narrow(everyone, { state, noPhone, imported });
+    const subscribers = this.narrow(everyone, { state, noPhone, imported, device });
     const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
     return {
       total: subscribers.length,
-      counts: this.counts(everyone, { state, noPhone, imported }),
+      counts: this.counts(everyone, { state, noPhone, imported, device }),
       contacts: await this.decorate(page)
     };
   }
@@ -91,9 +94,11 @@ class WaContactService {
    *
    * `imported` keeps only the clients that came from an import (the connected
    * WhatsApp's phone book or a spreadsheet), which no SGP row backs.
+   *
+   * `device` is `with` or `without` a managed ONT linked to the contract.
    */
-  static async collect({ search = '', state = '', noPhone = false, imported = false } = {}) {
-    return this.narrow(await this.gather({ search }), { state, noPhone, imported });
+  static async collect({ search = '', state = '', noPhone = false, imported = false, device = '' } = {}) {
+    return this.narrow(await this.gather({ search }), { state, noPhone, imported, device });
   }
 
   /**
@@ -128,12 +133,14 @@ class WaContactService {
   }
 
   /** The state, phone and origin filters, applied to what `gather` returned. */
-  static narrow(everyone, { state = '', noPhone = false, imported = false } = {}) {
+  static narrow(everyone, { state = '', noPhone = false, imported = false, device = '' } = {}) {
     const wanted = CONTACT_STATES.includes(state) ? state : null;
+    const linked = DEVICE_FILTERS.includes(device) ? device : null;
     return everyone
       .filter((subscriber) => !wanted || subscriber.state === wanted)
       .filter((subscriber) => !noPhone || !subscriber.phone)
-      .filter((subscriber) => !imported || subscriber.importSource);
+      .filter((subscriber) => !imported || subscriber.importSource)
+      .filter((subscriber) => !linked || (linked === 'with') === Boolean(subscriber.deviceId));
   }
 
   /**
@@ -142,19 +149,21 @@ class WaContactService {
    * toggles, each toggle counts under the current tab — so the number on the
    * active filter is always the list's own total.
    */
-  static counts(everyone, { state = '', noPhone = false, imported = false } = {}) {
+  static counts(everyone, { state = '', noPhone = false, imported = false, device = '' } = {}) {
     const size = (filters) => this.narrow(everyone, filters).length;
     const tab = CONTACT_STATES.includes(state) ? state : '';
     return {
       states: {
-        all: size({ noPhone, imported }),
-        active: size({ state: 'active', noPhone, imported }),
-        blocked: size({ state: 'blocked', noPhone, imported }),
-        cancelled: size({ state: 'cancelled', noPhone, imported }),
-        none: size({ state: 'none', noPhone, imported })
+        all: size({ noPhone, imported, device }),
+        active: size({ state: 'active', noPhone, imported, device }),
+        blocked: size({ state: 'blocked', noPhone, imported, device }),
+        cancelled: size({ state: 'cancelled', noPhone, imported, device }),
+        none: size({ state: 'none', noPhone, imported, device })
       },
-      noPhone: size({ state: tab, noPhone: true, imported }),
-      imported: size({ state: tab, noPhone, imported: true })
+      noPhone: size({ state: tab, noPhone: true, imported, device }),
+      imported: size({ state: tab, noPhone, imported: true, device }),
+      withDevice: size({ state: tab, noPhone, imported, device: 'with' }),
+      withoutDevice: size({ state: tab, noPhone, imported, device: 'without' })
     };
   }
 

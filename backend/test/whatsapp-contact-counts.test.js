@@ -41,7 +41,9 @@ describe('os números dos filtros de Contatos', () => {
     assert.deepEqual(body.data.counts, {
       states: { all: 7, active: 3, blocked: 1, cancelled: 1, none: 2 },
       noPhone: 4,
-      imported: 2
+      imported: 2,
+      withDevice: 0,
+      withoutDevice: 7
     });
     assert.equal(body.data.total, 7);
   });
@@ -84,5 +86,27 @@ describe('os números dos filtros de Contatos', () => {
     const segunda = await call(`${panelUrl}/api/whatsapp/contacts?limit=2&offset=2`, { headers: authHeaders(token) });
     assert.equal(segunda.body.data.contacts.length, 2);
     assert.deepEqual(segunda.body.data.counts, primeira.body.data.counts);
+  });
+
+  // Por último: a ONT ligada ao contrato 401 muda quem tem equipamento.
+  it('com e sem equipamento: contam, filtram e combinam com a aba', async () => {
+    await getDb()('sgp_links').insert({
+      tenant_id: 1, device_id: 'ONT-401', contract: '401', client_name: 'ATIVO COM FONE', state: 'active', link_mode: 'manual'
+    });
+    const { body } = await lista();
+    assert.equal(body.data.counts.withDevice, 1);
+    assert.equal(body.data.counts.withoutDevice, 6);
+
+    const com = await lista('&device=with');
+    assert.equal(com.body.data.total, 1);
+    assert.equal(com.body.data.contacts[0].deviceId, 'ONT-401');
+    assert.equal(com.body.data.counts.states.all, 1);
+
+    const semAtivos = await lista('&device=without&state=active');
+    assert.equal(semAtivos.body.data.total, 2);
+    assert.ok(semAtivos.body.data.contacts.every((contact) => !contact.hasDevice));
+
+    const ignorado = await lista('&device=qualquer');
+    assert.equal(ignorado.body.data.total, 7, 'um valor desconhecido não filtra');
   });
 });
