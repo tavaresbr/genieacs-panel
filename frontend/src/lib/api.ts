@@ -4775,6 +4775,30 @@ export interface WhatsAppBroadcast {
 }
 
 /** O público de uma campanha de aviso. Grupos diferentes combinam com E; valores do mesmo grupo, com OU. */
+export type WhatsAppReferralStatus = 'new' | 'contacted' | 'won' | 'rewarded' | 'lost'
+
+/** Quem um cliente indicou pelo link dele ("Indique e ganhe"). */
+export interface WhatsAppReferral {
+  id: number
+  referrerContract: string
+  referrerName: string | null
+  name: string
+  phone: string
+  neighborhood: string | null
+  note: string | null
+  status: WhatsAppReferralStatus
+  createdAt: string | null
+}
+
+export interface WhatsAppReferralList {
+  referrals: WhatsAppReferral[]
+  counts: Record<WhatsAppReferralStatus, number>
+  /** De onde o link abre; nulo enquanto ninguém informou e não há como derivar. */
+  baseUrl: string | null
+  /** Falso quando o servidor não tem segredo para assinar links. */
+  linksReady: boolean
+}
+
 export interface WhatsAppCampaignFilters {
   states: string[]
   plans: string[]
@@ -5581,6 +5605,15 @@ export const whatsappAPI = {
 
   previewCampaign: (input: Omit<WhatsAppCampaignInput, 'title' | 'attachment' | 'scheduledAt'>) =>
     apiClient.post<WhatsAppCampaignPreview>('/whatsapp/broadcasts/preview', input),
+
+  listReferrals: (status?: WhatsAppReferralStatus | '') =>
+    apiClient.get<WhatsAppReferralList>(`/whatsapp/referrals${status ? `?status=${status}` : ''}`),
+
+  updateReferral: (id: number, patch: { status?: WhatsAppReferralStatus; note?: string }) =>
+    apiClient.patch<WhatsAppReferral>(`/whatsapp/referrals/${id}`, patch),
+
+  setReferralBaseUrl: (baseUrl: string) =>
+    apiClient.put<{ baseUrl: string | null }>('/whatsapp/referrals/base-url', { baseUrl }),
 
   updateCampaign: (id: number, input: WhatsAppCampaignInput) =>
     apiClient.put<{ broadcast: WhatsAppBroadcast; recipients: number }>(`/whatsapp/broadcasts/${id}`, input),

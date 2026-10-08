@@ -134,6 +134,18 @@ export const publicLeadLimiter = limiter({
   message: limitMessage('rateLimit.attempts', 'rate_limited')
 });
 
+/**
+ * A página de indicação, aberta sem sessão por quem recebeu o link. Por IP: o
+ * limite protege a lista de lixo (cadastros em massa), e uma casa que indica
+ * três amigos de uma vez não chega perto dele.
+ */
+export const referralSubmitLimiter = limiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.attempts', 'rate_limited')
+});
+
 export const portalLoginLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 10,

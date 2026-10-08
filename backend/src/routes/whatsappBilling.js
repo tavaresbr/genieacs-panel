@@ -1,4 +1,5 @@
 import express from 'express';
+import ReferralController from '../controllers/referralController.js';
 import WhatsAppBillingController from '../controllers/whatsappBillingController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { whatsappSendLimiter } from '../middleware/rateLimit.js';
@@ -76,5 +77,12 @@ router.post('/broadcasts', ...gestao, WhatsAppBillingController.createCampaign);
 router.put('/broadcasts/:id', ...gestao, WhatsAppBillingController.updateCampaign);
 router.get('/broadcasts/:id/recipients', ...leitura, WhatsAppBillingController.broadcastRecipients);
 router.post('/broadcasts/:id/status', ...gestao, WhatsAppBillingController.setBroadcastStatus);
+
+// ── Indique e ganhe ────────────────────────────────────────────────────
+// A lista de quem os clientes indicaram, o estado de cada um e o endereço de
+// onde o link abre. A página pública do link mora no portal do assinante.
+router.get('/referrals', ...leitura, ReferralController.list);
+router.put('/referrals/base-url', ...gestao, ReferralController.setBaseUrl);
+router.patch('/referrals/:id', ...gestao, ReferralController.update);
 
 export default router;

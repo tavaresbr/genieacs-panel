@@ -21,6 +21,7 @@ import { SubscriberPanel } from '@/components/whatsapp/subscriber-panel'
 import { ThreadComposer, type ComposerAttachment } from '@/components/whatsapp/thread-composer'
 import { DunningSection } from '@/components/whatsapp/dunning-section'
 import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
+import { ReferralsPanel } from '@/components/whatsapp/referrals-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
@@ -1200,6 +1201,7 @@ const TABS = [
   ['contacts', 'whatsapp.contacts.title', 'whatsapp.read'],
   ['billing', 'whatsapp.billing.title', 'campaigns.read'],
   ['campaigns', 'whatsapp.broadcast.title', 'campaigns.read'],
+  ['referrals', 'whatsapp.referral.tab', 'campaigns.read'],
   ['templates', 'whatsapp.templates.title', 'campaigns.read'],
   ['optOut', 'whatsapp.optOut.title', 'campaigns.read'],
   ['botReport', 'whatsapp.botReport.tab', 'whatsapp.read'],
@@ -1348,6 +1350,7 @@ export default function WhatsAppPage() {
         )}
         {tab === 'billing' && <DunningSection />}
         {tab === 'campaigns' && <CampaignsPanel />}
+        {tab === 'referrals' && <ReferralsPanel />}
         {tab === 'templates' && <TemplatesPanel />}
         {tab === 'optOut' && <OptOutPanel />}
         {tab === 'botReport' && (

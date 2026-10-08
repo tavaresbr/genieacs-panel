@@ -69,6 +69,9 @@ export const SCOPED_TABLES = new Set([
   // assinante cobrado, e quando pagou. Dado de assinante, de um provedor só.
   'wa_dunning_sends',
   'wa_dunning_pauses',
+  // As indicações dos clientes: nome e telefone de quem foi indicado, e o
+  // contrato de quem indicou. Dado de pessoa, de um provedor só.
+  'customer_referrals',
   'sgp_billing_status',
   // The ERP event log, and the heaviest concentration of personal data here:
   // contract, document, PPPoE login, device id and a redacted payload, per
