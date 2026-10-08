@@ -4,6 +4,7 @@ import PlatformSubscriptionsController from '../controllers/platformSubscription
 import PlatformCouponsController from '../controllers/platformCouponsController.js';
 import PlatformReferralsController from '../controllers/platformReferralsController.js';
 import CancellationController from '../controllers/cancellationController.js';
+import PlatformDelinquencyController from '../controllers/platformDelinquencyController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -54,5 +55,10 @@ router.delete('/tenants/:id/subscription/cancellation', ...guard, CancellationCo
 // do saldo — auditado nas duas trilhas.
 router.get('/tenants/:id/referrals', ...guard, PlatformReferralsController.get);
 router.post('/tenants/:id/credits', ...guard, PlatformReferralsController.adjust);
+
+// O painel de inadimplência: quem deve, e as ações em massa — os provedores
+// vão no corpo, e cada um é tratado no escopo dele (ver o controlador).
+router.get('/delinquency', ...guard, PlatformDelinquencyController.list);
+router.post('/delinquency/actions', ...guard, PlatformDelinquencyController.run);
 
 export default router;

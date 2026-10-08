@@ -114,6 +114,9 @@ class PlatformAudit {
     // aceitou o desconto ou a pausa, agendou o cancelamento, ou o desfez — ou
     // o console o desfez. O detalhe diz qual (`action`).
     SUBSCRIPTION_CANCELLATION_CHANGED: 'subscription.cancellation_changed',
+    // O lembrete de cobrança mandado à mão pelo painel de inadimplência —
+    // fora da régua, no máximo um por provedor a cada vinte e quatro horas.
+    SUBSCRIPTION_REMINDER_SENT: 'subscription.reminder_sent',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem
