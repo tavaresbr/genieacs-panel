@@ -200,7 +200,7 @@ class WhatsAppMessageController {
   static async aiStatus(req, res) {
     try {
       const ai = await WaBotConfigService.aiSettings();
-      return res.json(createResponse(req.t('whatsapp.configLoaded'), { suggest: Boolean(ai.suggest && ai.apiKey) }));
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), { suggest: Boolean(ai.suggest && ai.apiKey), templates: Boolean(ai.apiKey) }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');
     }

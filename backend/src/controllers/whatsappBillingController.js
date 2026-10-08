@@ -6,6 +6,7 @@ import WaTemplateService from '../services/waTemplateService.js';
 import WaDunningService from '../services/waDunningService.js';
 import WaCampaignService from '../services/waCampaignService.js';
 import AuditLog from '../models/AuditLog.js';
+import WaAiService from '../services/waAiService.js';
 import WaOptOut from '../models/WaOptOut.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { SgpError } from '../services/sgpService.js';
@@ -130,6 +131,32 @@ class WhatsAppBillingController {
       return res.status(201).json(createResponse(req.t('whatsapp.templates.created'), template));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.saveFailed');
+    }
+  }
+
+  /**
+   * `POST /templates/ai-draft` — a IA escreve (ou melhora) o texto de um
+   * modelo. Nada é gravado: o texto volta para a caixa do editor.
+   */
+  static async draftTemplate(req, res) {
+    try {
+      const body = req.body ?? {};
+      const result = await WaAiService.draftTemplate({
+        category: body.category,
+        goal: body.goal,
+        tone: body.tone,
+        current: body.current
+      });
+      // Que a IA foi usada e para qual categoria; o texto nunca vai para a Trilha.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_TEMPLATE_AI_DRAFT,
+        subjectType: 'whatsapp_template',
+        subjectId: null,
+        detail: { category: String(body.category ?? '').slice(0, 32), improved: Boolean(String(body.current ?? '').trim()) }
+      });
+      return res.json(createResponse(req.t('whatsapp.templates.aiDrafted'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.templates.aiDraftFailed');
     }
   }
 

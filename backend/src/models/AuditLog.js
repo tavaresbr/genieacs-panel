@@ -59,6 +59,7 @@ class AuditLog {
     // A equipe pôs um número no "não perturbe" ou mudou os tipos de comunicação
     // que ele bloqueia. O `detail` guarda os tipos, nunca o telefone.
     WHATSAPP_OPT_OUT_CHANGED: 'whatsapp.opt_out_changed',
+    WHATSAPP_TEMPLATE_AI_DRAFT: 'whatsapp.template_ai_draft',
     // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
     // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
     // ID muda, a senha do portal é recunhada e o vínculo com o ERP é apagado —
