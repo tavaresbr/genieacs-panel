@@ -9,6 +9,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { errorText } from './dunning-rule-panel'
 import { ContactLink } from './contact-link'
 import { missingText } from './wa-variables'
+import { sheetCsv } from './dunning-export'
 
 /**
  * What the automatic cadence did, and what it was worth.
@@ -19,6 +20,8 @@ import { missingText } from './wa-variables'
  */
 
 const PAGE = 50
+const EXPORT_PAGE = 200
+const EXPORT_MAX = 5000
 const PERIODS = [7, 30, 90] as const
 
 /** The reason a row was skipped, as `wa_dunning_sends.reason` stores it. */
@@ -112,6 +115,61 @@ export function DunningHistoryPanel() {
     )
   }
 
+  const [exporting, setExporting] = useState(false)
+
+  const resultText = (row: WhatsAppDunningSend) => {
+    if (row.status === 'skipped') {
+      const key = row.reason ? REASON_LABELS[row.reason] : undefined
+      return missingText(t, row.missing) ?? (key ? t(key) : (row.reason || t('whatsapp.dunning.statusSkipped')))
+    }
+    if (row.status === 'canceled') return t('whatsapp.dunning.statusCanceled')
+    const delivery = row.deliveryStatus ? DELIVERY_LABELS[row.deliveryStatus] : undefined
+    return delivery ? t(delivery) : t('whatsapp.dunning.statusQueued')
+  }
+
+  /** Todas as linhas do filtro atual — não só as páginas já carregadas. */
+  const exportSheet = async () => {
+    setExporting(true)
+    try {
+      const all: WhatsAppDunningSend[] = []
+      for (let offset = 0; offset < EXPORT_MAX; offset += EXPORT_PAGE) {
+        const res = await whatsappAPI.listDunningSends({ contract: contract.trim(), status, limit: EXPORT_PAGE, offset })
+        if (!res.success || !res.data) {
+          toast.error(errorText(res, t, 'whatsapp.dunning.exportFailed'))
+          return
+        }
+        all.push(...res.data.items)
+        if (!res.data.hasMore) break
+      }
+      const csv = sheetCsv(
+        [
+          t('whatsapp.dunning.when'), t('whatsapp.inbox.contract'), t('whatsapp.inbox.subscriber'),
+          t('whatsapp.dunning.step'), t('whatsapp.billing.amount'), t('whatsapp.billing.dueDate'),
+          t('whatsapp.dunning.result')
+        ],
+        all.map((row) => [
+          row.createdAt ? formatDateTime(row.createdAt) : '',
+          row.contract,
+          row.clientName,
+          stepLabel(row),
+          row.amount === null || row.amount === undefined ? '' : row.amount.toFixed(2).replace('.', ','),
+          row.dueDate ? formatDate(`${row.dueDate}T12:00:00`) : '',
+          resultText(row)
+        ])
+      )
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `historico-regua-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      if (alive.current) setExporting(false)
+    }
+  }
+
   return (
     <section className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -179,7 +237,7 @@ export function DunningHistoryPanel() {
 
       {/* ── Every decision ─────────────────────────────────────────────── */}
       <div className="modern-card overflow-hidden">
-        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
+        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[minmax(0,1fr)_14rem_auto]">
           <input
             type="search"
             className="modern-input"
@@ -200,6 +258,10 @@ export function DunningHistoryPanel() {
             <option value="skipped">{t('whatsapp.dunning.statusSkipped')}</option>
             <option value="canceled">{t('whatsapp.dunning.statusCanceled')}</option>
           </select>
+          <button type="button" className="modern-button-secondary" disabled={exporting} onClick={() => void exportSheet()}>
+            <Icon name="external" size={16} />
+            {t('whatsapp.dunning.export')}
+          </button>
         </div>
 
         {items.length === 0 ? (

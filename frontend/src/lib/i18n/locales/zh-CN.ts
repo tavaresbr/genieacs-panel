@@ -2799,6 +2799,8 @@ const zhCN: Dictionary = {
   'whatsapp.dunning.skip.paid': "发送前已付款",
   'whatsapp.dunning.skip.paused': "已收到付款凭证:催缴已暂停",
   'whatsapp.dunning.statusQueued': "已发送",
+  'whatsapp.dunning.export': "导出",
+  'whatsapp.dunning.exportFailed': "无法导出历史记录",
   'whatsapp.dunning.statusSkipped': "已跳过",
   'whatsapp.dunning.statusCanceled': "已取消 — 发送前已付款",
   'whatsapp.dunning.kindThanks': "感谢",

@@ -2805,6 +2805,8 @@ const it: Dictionary = {
   'whatsapp.dunning.skip.paid': "Ha pagato prima dell'invio",
   'whatsapp.dunning.skip.paused': "Ricevuta di pagamento arrivata: solleciti in pausa",
   'whatsapp.dunning.statusQueued': "Inviato",
+  'whatsapp.dunning.export': "Esporta",
+  'whatsapp.dunning.exportFailed': "Impossibile esportare la cronologia",
   'whatsapp.dunning.statusSkipped': "Saltato",
   'whatsapp.dunning.statusCanceled': "Annullato — pagato prima dell'invio",
   'whatsapp.dunning.kindThanks': "Ringraziamento",

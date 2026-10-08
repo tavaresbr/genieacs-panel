@@ -2682,6 +2682,8 @@ const de: Dictionary = {
   'whatsapp.dunning.skip.paid': "Vor dem Versand bezahlt",
   'whatsapp.dunning.skip.paused': "Zahlungsbeleg erhalten: Mahnlauf pausiert",
   'whatsapp.dunning.statusQueued': "Gesendet",
+  'whatsapp.dunning.export': "Exportieren",
+  'whatsapp.dunning.exportFailed': "Der Verlauf konnte nicht exportiert werden",
   'whatsapp.dunning.statusSkipped': "Übersprungen",
   'whatsapp.dunning.statusCanceled': "Storniert — vor dem Versand bezahlt",
   'whatsapp.dunning.kindThanks': "Dankesnachricht",

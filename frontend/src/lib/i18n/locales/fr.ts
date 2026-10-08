@@ -2588,6 +2588,8 @@ const fr: Dictionary = {
   'whatsapp.dunning.skip.paid': "A payé avant l'envoi",
   'whatsapp.dunning.skip.paused': "Justificatif reçu : relances en pause",
   'whatsapp.dunning.statusQueued': "Envoyé",
+  'whatsapp.dunning.export': "Exporter",
+  'whatsapp.dunning.exportFailed': "Impossible d'exporter l'historique",
   'whatsapp.dunning.statusSkipped': "Ignoré",
   'whatsapp.dunning.statusCanceled': "Annulé — payé avant l'envoi",
   'whatsapp.dunning.kindThanks': "Remerciement",
