@@ -4812,6 +4812,8 @@ export interface WhatsAppCampaignInput {
   body?: string
   attachment?: { path: string; name: string } | null
   scheduledAt?: string | null
+  /** O número que envia; sem ele, o da cobrança. */
+  accountId?: number | null
 }
 
 /**

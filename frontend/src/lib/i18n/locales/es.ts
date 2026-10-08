@@ -2580,6 +2580,8 @@ const es: Dictionary = {
   'whatsapp.campaign.addAttachment': 'Adjuntar imagen o PDF',
   'whatsapp.campaign.removeAttachment': 'Quitar',
   'whatsapp.campaign.attachmentHint': 'El mismo archivo va con cada mensaje. Hasta 16 MB.',
+  'whatsapp.campaign.sendFrom': 'Enviar desde el número',
+  'whatsapp.campaign.sendFromHint': 'El aviso sale por este número de WhatsApp. Solo aparecen los conectados.',
   'whatsapp.campaign.when': 'Cuándo',
   'whatsapp.campaign.whenDraft': 'Guardar como borrador (empieza cuando alguien pulse Iniciar)',
   'whatsapp.campaign.whenSchedule': 'Programar para',

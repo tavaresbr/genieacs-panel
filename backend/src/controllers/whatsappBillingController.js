@@ -564,6 +564,7 @@ class WhatsAppBillingController {
         body: body.body,
         attachment: body.attachment,
         scheduledAt: body.scheduledAt,
+        accountId: body.accountId,
         userId: req.user?.userId ?? null
       });
       const publico = WaBroadcastService.publicBroadcast(broadcast);

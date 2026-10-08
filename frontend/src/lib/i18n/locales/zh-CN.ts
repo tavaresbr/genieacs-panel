@@ -2580,6 +2580,8 @@ const zhCN: Dictionary = {
   'whatsapp.campaign.addAttachment': '附加图片或 PDF',
   'whatsapp.campaign.removeAttachment': '移除',
   'whatsapp.campaign.attachmentHint': '每条消息都附带同一个文件。最大 16 MB。',
+  'whatsapp.campaign.sendFrom': '发送号码',
+  'whatsapp.campaign.sendFromHint': '通知将通过此 WhatsApp 号码发出。仅显示已连接的号码。',
   'whatsapp.campaign.when': '何时',
   'whatsapp.campaign.whenDraft': '保存为草稿（有人点击“开始”时开始）',
   'whatsapp.campaign.whenSchedule': '预约于',

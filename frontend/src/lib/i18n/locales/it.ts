@@ -2586,6 +2586,8 @@ const it: Dictionary = {
   'whatsapp.campaign.addAttachment': 'Allega immagine o PDF',
   'whatsapp.campaign.removeAttachment': 'Rimuovi',
   'whatsapp.campaign.attachmentHint': 'Lo stesso file accompagna ogni messaggio. Fino a 16 MB.',
+  'whatsapp.campaign.sendFrom': 'Invia dal numero',
+  'whatsapp.campaign.sendFromHint': 'L’avviso parte da questo numero WhatsApp. Sono elencati solo i numeri connessi.',
   'whatsapp.campaign.when': 'Quando',
   'whatsapp.campaign.whenDraft': 'Salva come bozza (parte quando qualcuno preme Avvia)',
   'whatsapp.campaign.whenSchedule': 'Programma per',

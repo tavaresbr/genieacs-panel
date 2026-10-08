@@ -351,7 +351,14 @@ class WaBroadcastService {
   /** One campaign's share of this minute. Never throws. */
   static async flushOne(broadcast, config, summary) {
     try {
-      const account = await WhatsAppAccount.getForPurpose('billing');
+      // Uma campanha de aviso sai pelo número escolhido ao criá-la; se ele
+      // não está conectado agora, espera como qualquer outra sem número.
+      const chosen = broadcast.kind === 'general' && broadcast.account_id
+        ? await WhatsAppAccount.getById(broadcast.account_id)
+        : null;
+      const account = chosen
+        ? (chosen.status === 'connected' ? chosen : null)
+        : await WhatsAppAccount.getForPurpose('billing');
       // No connected number: leave the campaign in `running` and try again next
       // minute. Failing the recipients instead would burn a campaign's three
       // attempts over a number that was merely re-pairing.
