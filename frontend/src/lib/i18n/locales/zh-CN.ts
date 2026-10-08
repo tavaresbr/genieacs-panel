@@ -1563,7 +1563,7 @@ const zhCN: Dictionary = {
   'detail.lgpd.exported': '档案已下载',
   'detail.lgpd.erase': '删除数据',
   'detail.lgpd.eraseHint': '此操作不可撤销。WiFi 密码、门户密码、ERP 事件、遥测数据和 WhatsApp 会话将被销毁；合同、地图节点和审计轨迹保留，但其中的个人信息被移除。请先下载档案——要求删除并不取消查看的要求。',
-  'detail.lgpd.eraseConfirmLabel': '输入 {{id}} 以确认',
+  'detail.lgpd.eraseConfirmLabel': '输入 {id} 以确认',
   'detail.lgpd.eraseConfirm': '永久删除',
   'detail.lgpd.erasing': '正在删除…',
   'detail.lgpd.eraseFailed': '无法删除用户数据',

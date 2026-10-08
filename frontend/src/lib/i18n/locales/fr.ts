@@ -1563,7 +1563,7 @@ const fr: Dictionary = {
   'detail.lgpd.exported': 'Dossier téléchargé',
   'detail.lgpd.erase': 'Effacer les données',
   'detail.lgpd.eraseHint': 'C\'est irréversible. Le mot de passe WiFi, celui du portail, les événements de l\'ERP, la télémétrie et la conversation WhatsApp sont détruits ; le contrat, le nœud de la carte et le journal restent, la personne en étant retirée. Téléchargez d\'abord le dossier — demander l\'effacement n\'annule pas la demande de consultation.',
-  'detail.lgpd.eraseConfirmLabel': 'Saisissez {{id}} pour confirmer',
+  'detail.lgpd.eraseConfirmLabel': 'Saisissez {id} pour confirmer',
   'detail.lgpd.eraseConfirm': 'Effacer définitivement',
   'detail.lgpd.erasing': 'Effacement…',
   'detail.lgpd.eraseFailed': 'Impossible d\'effacer les données de l\'abonné',

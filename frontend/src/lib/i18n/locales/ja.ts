@@ -1563,7 +1563,7 @@ const ja: Dictionary = {
   'detail.lgpd.exported': '一件書類をダウンロードしました',
   'detail.lgpd.erase': 'データを削除',
   'detail.lgpd.eraseHint': 'この操作は取り消せません。WiFi のパスワード、ポータルのパスワード、ERP のイベント、テレメトリ、WhatsApp の会話は破棄されます。契約、地図ノード、監査証跡は残りますが、その人物は取り除かれます。先に一件書類をダウンロードしてください — 削除の請求は開示の請求を取り消しません。',
-  'detail.lgpd.eraseConfirmLabel': '確認のため {{id}} を入力してください',
+  'detail.lgpd.eraseConfirmLabel': '確認のため {id} を入力してください',
   'detail.lgpd.eraseConfirm': '完全に削除',
   'detail.lgpd.erasing': '削除中…',
   'detail.lgpd.eraseFailed': '加入者データを削除できませんでした',

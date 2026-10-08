@@ -1567,7 +1567,7 @@ const ru: Dictionary = {
   'detail.lgpd.exported': 'Досье скачано',
   'detail.lgpd.erase': 'Удалить данные',
   'detail.lgpd.eraseHint': 'Это необратимо. Пароль Wi-Fi, пароль портала, события ERP, телеметрия и переписка в WhatsApp уничтожаются; договор, узел карты и журнал остаются, но человек из них убран. Сначала скачайте досье — просьба об удалении не отменяет просьбу об ознакомлении.',
-  'detail.lgpd.eraseConfirmLabel': 'Введите {{id}} для подтверждения',
+  'detail.lgpd.eraseConfirmLabel': 'Введите {id} для подтверждения',
   'detail.lgpd.eraseConfirm': 'Удалить безвозвратно',
   'detail.lgpd.erasing': 'Удаление…',
   'detail.lgpd.eraseFailed': 'Не удалось удалить данные абонента',

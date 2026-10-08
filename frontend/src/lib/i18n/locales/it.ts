@@ -1566,7 +1566,7 @@ const it: Dictionary = {
   'detail.lgpd.exported': 'Dossier scaricato',
   'detail.lgpd.erase': 'Cancella i dati',
   'detail.lgpd.eraseHint': 'Non si torna indietro. La password del WiFi, quella del portale, gli eventi dell\'ERP, la telemetria e la conversazione WhatsApp vengono distrutte; il contratto, il nodo della mappa e il registro restano, con la persona tolta da essi. Scarica prima il dossier — chiedere la cancellazione non annulla la richiesta di accesso.',
-  'detail.lgpd.eraseConfirmLabel': 'Digita {{id}} per confermare',
+  'detail.lgpd.eraseConfirmLabel': 'Digita {id} per confermare',
   'detail.lgpd.eraseConfirm': 'Cancella definitivamente',
   'detail.lgpd.erasing': 'Cancellazione…',
   'detail.lgpd.eraseFailed': 'Impossibile cancellare i dati dell\'abbonato',

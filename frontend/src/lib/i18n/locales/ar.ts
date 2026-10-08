@@ -1540,7 +1540,7 @@ const ar: Dictionary = {
   'detail.lgpd.exported': 'تم تنزيل الملف',
   'detail.lgpd.erase': 'حذف البيانات',
   'detail.lgpd.eraseHint': 'لا رجعة في هذا. تُدمَّر كلمة مرور الواي فاي وكلمة مرور البوابة وأحداث نظام ERP وبيانات القياس ومحادثة واتساب؛ ويبقى العقد وعقدة الخريطة وسجل التدقيق بعد إزالة الشخص منها. نزِّل الملف أولًا — فطلب الحذف لا يلغي طلب الاطلاع.',
-  'detail.lgpd.eraseConfirmLabel': 'اكتب {{id}} للتأكيد',
+  'detail.lgpd.eraseConfirmLabel': 'اكتب {id} للتأكيد',
   'detail.lgpd.eraseConfirm': 'حذف نهائي',
   'detail.lgpd.erasing': 'جارٍ الحذف…',
   'detail.lgpd.eraseFailed': 'تعذّر حذف بيانات المشترك',
