@@ -1170,5 +1170,27 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid отклонила ключ API',
   'teiah.error.rateLimited': 'TeiaH Valid ограничивает запросы; повторите позже',
   'teiah.error.status': 'TeiaH Valid ответила кодом состояния {status}',
-  'teiah.error.exportRunning': 'Выгрузка в TeiaH Valid уже выполняется'
+  'teiah.error.exportRunning': 'Выгрузка в TeiaH Valid уже выполняется',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'Платёж получен: {provider} ({amount})',
+  'platformAlert.payment_received.body': 'Провайдер {provider} ({slug}) оплатил {amount}.',
+  'platformAlert.card_refused.subject': 'Карта отклонена: {provider}',
+  'platformAlert.card_refused.body': 'Сохранённая карта провайдера {provider} ({slug}) была отклонена ({reason}). Счёт перевыставлен через Pix/boleto.',
+  'platformAlert.cancellation_requested.subject': 'Запрос на отмену: {provider}',
+  'platformAlert.cancellation_requested.body': 'Провайдер {provider} ({slug}) запросил отмену. Причина: {reason}.',
+  'platformAlert.cancellation_scheduled.subject': 'Отмена подтверждена: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'Провайдер {provider} ({slug}) подтвердил отмену, вступает в силу {date}. Причина: {reason}.',
+  'platformAlert.referral_signup.subject': 'Рекомендация: {provider} зарегистрировался',
+  'platformAlert.referral_signup.body': 'Провайдер {provider} ({slug}) зарегистрировался по рекомендации {referrer}.',
+  'platformAlert.nfse_error.subject': 'Ошибка NFS-e: {provider}',
+  'platformAlert.nfse_error.body': 'NFS-e провайдера {provider} ({slug}) завершилась ошибкой: {error}',
+  'platformAlert.auto_suspended.subject': 'Автоматическая блокировка: {provider}',
+  'platformAlert.auto_suspended.body': 'Провайдер {provider} ({slug}) заблокирован за неуплату (просрочка с {date}).',
+  'platformAlert.big_overdue.subject': 'Большая просрочка: {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'У провайдера {provider} ({slug}) просрочено {amount}, выше порога {threshold}. Просрочка с {date}.',
+  'platformAlert.test.subject': 'Тестовое оповещение',
+  'platformAlert.test.body': 'Это тестовое оповещение платформы. Если вы его получили, оповещения работают.',
+  'platformAlert.digest.subject': 'Ежедневная сводка: оповещений — {count}',
+  'platformAlert.digest.body': 'Сводка оповещений платформы за {date}:',
+  'platformAlert.digest.more': '… и ещё {count}'
 };

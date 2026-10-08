@@ -19,7 +19,9 @@ import { tdb, tinsertReturningId, isUniqueViolation } from '../config/database.j
  * de novo; se o processo morre no meio, `claimed_until` vence e outra passada a
  * retoma (`claim`).
  */
-export const REMINDER_STEPS = Object.freeze(['before', 'due', 'after', 'suspension_warning', 'suspended']);
+// `manual`: o lembrete pedido pelo console (painel de inadimplência), com a
+// chave no dia do envio em vez do prazo — ver `SubscriptionNoticeService.remindNow`.
+export const REMINDER_STEPS = Object.freeze(['before', 'due', 'after', 'suspension_warning', 'suspended', 'manual']);
 
 /**
  * As etapas da suspensão automática (0102) como a coluna as guarda: `step`

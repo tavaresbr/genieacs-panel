@@ -1169,5 +1169,27 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid が API キーを拒否しました',
   'teiah.error.rateLimited': 'TeiaH Valid がリクエストを制限しています。後で再試行してください',
   'teiah.error.status': 'TeiaH Valid がステータス {status} を返しました',
-  'teiah.error.exportRunning': 'TeiaH Valid への送信はすでに実行中です'
+  'teiah.error.exportRunning': 'TeiaH Valid への送信はすでに実行中です',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': '入金を受領: {provider}（{amount}）',
+  'platformAlert.payment_received.body': 'プロバイダー {provider}（{slug}）が {amount} を支払いました。',
+  'platformAlert.card_refused.subject': 'カード拒否: {provider}',
+  'platformAlert.card_refused.body': 'プロバイダー {provider}（{slug}）の保存済みカードが拒否されました（{reason}）。請求書は Pix/ボレートで再発行されました。',
+  'platformAlert.cancellation_requested.subject': '解約リクエスト: {provider}',
+  'platformAlert.cancellation_requested.body': 'プロバイダー {provider}（{slug}）が解約を申請しました。理由: {reason}。',
+  'platformAlert.cancellation_scheduled.subject': '解約確定: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'プロバイダー {provider}（{slug}）が解約を確定しました。{date} から有効です。理由: {reason}。',
+  'platformAlert.referral_signup.subject': '紹介: {provider} が登録',
+  'platformAlert.referral_signup.body': 'プロバイダー {provider}（{slug}）が {referrer} の紹介で登録しました。',
+  'platformAlert.nfse_error.subject': 'NFS-e エラー: {provider}',
+  'platformAlert.nfse_error.body': 'プロバイダー {provider}（{slug}）の NFS-e でエラーが発生しました: {error}',
+  'platformAlert.auto_suspended.subject': '自動停止: {provider}',
+  'platformAlert.auto_suspended.body': 'プロバイダー {provider}（{slug}）は未払いのため停止されました（{date} から延滞）。',
+  'platformAlert.big_overdue.subject': '高額延滞: {provider}（{amount}）',
+  'platformAlert.big_overdue.body': 'プロバイダー {provider}（{slug}）の延滞額は {amount} で、上限 {threshold} を超えています。{date} から延滞。',
+  'platformAlert.test.subject': 'テストアラート',
+  'platformAlert.test.body': 'これはプラットフォームからのテストアラートです。受信できていれば、アラートは正常に動作しています。',
+  'platformAlert.digest.subject': '日次サマリー: {count} 件のアラート',
+  'platformAlert.digest.body': '{date} のプラットフォームアラートのまとめ:',
+  'platformAlert.digest.more': '… ほか {count} 件'
 };

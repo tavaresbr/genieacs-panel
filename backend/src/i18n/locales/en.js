@@ -1169,5 +1169,27 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid rejected the API key',
   'teiah.error.rateLimited': 'TeiaH Valid is rate limiting requests; try again later',
   'teiah.error.status': 'TeiaH Valid responded with status {status}',
-  'teiah.error.exportRunning': 'A TeiaH Valid export is already running'
+  'teiah.error.exportRunning': 'A TeiaH Valid export is already running',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'Payment received: {provider} ({amount})',
+  'platformAlert.payment_received.body': 'Provider {provider} ({slug}) paid {amount}.',
+  'platformAlert.card_refused.subject': 'Card refused: {provider}',
+  'platformAlert.card_refused.body': 'Provider {provider} ({slug})\'s saved card was refused ({reason}). The invoice was reissued as Pix/boleto.',
+  'platformAlert.cancellation_requested.subject': 'Cancellation request: {provider}',
+  'platformAlert.cancellation_requested.body': 'Provider {provider} ({slug}) asked to cancel. Reason: {reason}.',
+  'platformAlert.cancellation_scheduled.subject': 'Cancellation confirmed: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'Provider {provider} ({slug}) confirmed the cancellation, effective {date}. Reason: {reason}.',
+  'platformAlert.referral_signup.subject': 'Referral: {provider} signed up',
+  'platformAlert.referral_signup.body': 'Provider {provider} ({slug}) signed up through a referral from {referrer}.',
+  'platformAlert.nfse_error.subject': 'NFS-e error: {provider}',
+  'platformAlert.nfse_error.body': 'Provider {provider} ({slug})\'s NFS-e failed: {error}',
+  'platformAlert.auto_suspended.subject': 'Automatic suspension: {provider}',
+  'platformAlert.auto_suspended.body': 'Provider {provider} ({slug}) was suspended for non-payment (overdue since {date}).',
+  'platformAlert.big_overdue.subject': 'High overdue: {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'Provider {provider} ({slug}) owes {amount} overdue, above the {threshold} limit. Overdue since {date}.',
+  'platformAlert.test.subject': 'Test alert',
+  'platformAlert.test.body': 'This is a test alert from the platform. If you received it, alerts are working.',
+  'platformAlert.digest.subject': 'Daily summary: {count} alert(s)',
+  'platformAlert.digest.body': 'Summary of platform alerts for {date}:',
+  'platformAlert.digest.more': '… and {count} more'
 };

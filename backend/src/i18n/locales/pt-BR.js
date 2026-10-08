@@ -1168,5 +1168,27 @@ export default {
   'teiah.error.credentialsRejected': 'A TeiaH Valid recusou a chave de API',
   'teiah.error.rateLimited': 'A TeiaH Valid limitou as requisições; tente mais tarde',
   'teiah.error.status': 'A TeiaH Valid respondeu com status {status}',
-  'teiah.error.exportRunning': 'Já existe um envio à TeiaH Valid em andamento'
+  'teiah.error.exportRunning': 'Já existe um envio à TeiaH Valid em andamento',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'Pagamento recebido: {provider} ({amount})',
+  'platformAlert.payment_received.body': 'O provedor {provider} ({slug}) pagou {amount}.',
+  'platformAlert.card_refused.subject': 'Cartão recusado: {provider}',
+  'platformAlert.card_refused.body': 'O cartão salvo do provedor {provider} ({slug}) foi recusado ({reason}). A fatura foi reemitida como Pix/boleto.',
+  'platformAlert.cancellation_requested.subject': 'Pedido de cancelamento: {provider}',
+  'platformAlert.cancellation_requested.body': 'O provedor {provider} ({slug}) pediu para cancelar. Motivo: {reason}.',
+  'platformAlert.cancellation_scheduled.subject': 'Cancelamento confirmado: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'O provedor {provider} ({slug}) confirmou o cancelamento, que vale a partir de {date}. Motivo: {reason}.',
+  'platformAlert.referral_signup.subject': 'Indicação: {provider} se cadastrou',
+  'platformAlert.referral_signup.body': 'O provedor {provider} ({slug}) se cadastrou pela indicação de {referrer}.',
+  'platformAlert.nfse_error.subject': 'Erro na NFS-e: {provider}',
+  'platformAlert.nfse_error.body': 'A NFS-e do provedor {provider} ({slug}) ficou com erro: {error}',
+  'platformAlert.auto_suspended.subject': 'Suspensão automática: {provider}',
+  'platformAlert.auto_suspended.body': 'O provedor {provider} ({slug}) foi suspenso por inadimplência (vencido desde {date}).',
+  'platformAlert.big_overdue.subject': 'Atraso alto: {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'O provedor {provider} ({slug}) tem {amount} em atraso, acima do limite de {threshold}. Vencido desde {date}.',
+  'platformAlert.test.subject': 'Alerta de teste',
+  'platformAlert.test.body': 'Este é um alerta de teste da plataforma. Se você recebeu, os alertas estão funcionando.',
+  'platformAlert.digest.subject': 'Resumo diário: {count} alerta(s)',
+  'platformAlert.digest.body': 'Resumo dos alertas da plataforma de {date}:',
+  'platformAlert.digest.more': '+{count} mais'
 };

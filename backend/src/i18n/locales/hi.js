@@ -1169,5 +1169,27 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid ने API कुंजी अस्वीकार की',
   'teiah.error.rateLimited': 'TeiaH Valid अनुरोध सीमित कर रहा है; बाद में प्रयास करें',
   'teiah.error.status': 'TeiaH Valid ने स्थिति {status} के साथ उत्तर दिया',
-  'teiah.error.exportRunning': 'TeiaH Valid निर्यात पहले से चल रहा है'
+  'teiah.error.exportRunning': 'TeiaH Valid निर्यात पहले से चल रहा है',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'भुगतान प्राप्त: {provider} ({amount})',
+  'platformAlert.payment_received.body': 'प्रदाता {provider} ({slug}) ने {amount} का भुगतान किया।',
+  'platformAlert.card_refused.subject': 'कार्ड अस्वीकृत: {provider}',
+  'platformAlert.card_refused.body': 'प्रदाता {provider} ({slug}) का सहेजा गया कार्ड अस्वीकृत हुआ ({reason})। बिल Pix/boleto के रूप में दोबारा जारी किया गया।',
+  'platformAlert.cancellation_requested.subject': 'रद्द करने का अनुरोध: {provider}',
+  'platformAlert.cancellation_requested.body': 'प्रदाता {provider} ({slug}) ने रद्द करने का अनुरोध किया। कारण: {reason}।',
+  'platformAlert.cancellation_scheduled.subject': 'रद्दीकरण पुष्ट: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'प्रदाता {provider} ({slug}) ने रद्दीकरण की पुष्टि की, {date} से प्रभावी। कारण: {reason}।',
+  'platformAlert.referral_signup.subject': 'रेफ़रल: {provider} ने साइन अप किया',
+  'platformAlert.referral_signup.body': 'प्रदाता {provider} ({slug}) ने {referrer} के रेफ़रल से साइन अप किया।',
+  'platformAlert.nfse_error.subject': 'NFS-e त्रुटि: {provider}',
+  'platformAlert.nfse_error.body': 'प्रदाता {provider} ({slug}) की NFS-e में त्रुटि: {error}',
+  'platformAlert.auto_suspended.subject': 'स्वचालित निलंबन: {provider}',
+  'platformAlert.auto_suspended.body': 'प्रदाता {provider} ({slug}) को भुगतान न करने पर निलंबित किया गया ({date} से बकाया)।',
+  'platformAlert.big_overdue.subject': 'अधिक बकाया: {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'प्रदाता {provider} ({slug}) पर {amount} बकाया है, जो {threshold} की सीमा से अधिक है। {date} से बकाया।',
+  'platformAlert.test.subject': 'परीक्षण अलर्ट',
+  'platformAlert.test.body': 'यह प्लेटफ़ॉर्म का परीक्षण अलर्ट है। अगर आपको मिला, तो अलर्ट काम कर रहे हैं।',
+  'platformAlert.digest.subject': 'दैनिक सारांश: {count} अलर्ट',
+  'platformAlert.digest.body': '{date} के प्लेटफ़ॉर्म अलर्ट का सारांश:',
+  'platformAlert.digest.more': '… और {count} अन्य'
 };

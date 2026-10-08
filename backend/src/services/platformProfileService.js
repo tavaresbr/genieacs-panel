@@ -61,6 +61,124 @@ export const BILLING_POLICY_FIELDS = Object.freeze({
   retentionPauseMaxMonths: { default: 2, min: 0, max: 12 }
 });
 
+/**
+ * Os alertas para quem opera a plataforma (0112): por evento, ligado ou não e
+ * por quais canais; o valor em atraso que dispara `big_overdue`; e o resumo
+ * diário, que junta tudo numa mensagem só à hora escolhida (horário de
+ * Brasília) em vez de um aviso por evento. Ver `platformAlertService`.
+ *
+ * Tudo desligado por padrão: quem opera liga o que quer receber.
+ */
+export const ALERT_EVENTS = Object.freeze([
+  'payment_received',
+  'card_refused',
+  'cancellation_requested',
+  'cancellation_scheduled',
+  'referral_signup',
+  'nfse_error',
+  'auto_suspended',
+  'big_overdue'
+]);
+export const ALERT_CHANNELS = Object.freeze(['whatsapp', 'email']);
+export const ALERT_DEFAULTS = Object.freeze({
+  bigOverdueCents: 50_000,
+  digestHour: 8
+});
+const BIG_OVERDUE_MAX_CENTS = 100_000_000;
+
+/** A configuração dos alertas como vale: a gravada, completada pelo padrão. */
+function alertasDe(stored) {
+  const gravado = stored?.alerts && typeof stored.alerts === 'object' ? stored.alerts : {};
+  const eventos = gravado.events && typeof gravado.events === 'object' ? gravado.events : {};
+  const events = {};
+  for (const evento of ALERT_EVENTS) {
+    const e = eventos[evento] && typeof eventos[evento] === 'object' ? eventos[evento] : {};
+    const canais = Array.isArray(e.channels) ? ALERT_CHANNELS.filter((c) => e.channels.includes(c)) : [...ALERT_CHANNELS];
+    events[evento] = { enabled: e.enabled === true, channels: canais };
+  }
+  const limite = gravado.bigOverdueCents;
+  const digest = gravado.dailyDigest && typeof gravado.dailyDigest === 'object' ? gravado.dailyDigest : {};
+  const hora = digest.hour;
+  return {
+    events,
+    bigOverdueCents: Number.isInteger(limite) && limite > 0 && limite <= BIG_OVERDUE_MAX_CENTS
+      ? limite : ALERT_DEFAULTS.bigOverdueCents,
+    dailyDigest: {
+      enabled: digest.enabled === true,
+      hour: Number.isInteger(hora) && hora >= 0 && hora <= 23 ? hora : ALERT_DEFAULTS.digestHour
+    }
+  };
+}
+
+/**
+ * Um `alerts` recebido, mesclado ao gravado. Ausente mantém; lança no inválido.
+ * Devolve o objeto novo a gravar.
+ */
+function normalizarAlertas(bruto, atual) {
+  if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) {
+    throw new PlatformProfileError('alerts must be an object', { field: 'alerts' });
+  }
+  const novo = alertasDe({ alerts: atual });
+  if (bruto.events !== undefined) {
+    if (!bruto.events || typeof bruto.events !== 'object' || Array.isArray(bruto.events)) {
+      throw new PlatformProfileError('alerts.events must be an object', { field: 'alerts' });
+    }
+    for (const [evento, regra] of Object.entries(bruto.events)) {
+      if (!ALERT_EVENTS.includes(evento)) {
+        throw new PlatformProfileError(`Unknown alert event: ${evento}`, { field: 'alerts' });
+      }
+      if (!regra || typeof regra !== 'object') {
+        throw new PlatformProfileError(`Invalid rule for ${evento}`, { field: 'alerts' });
+      }
+      if (regra.enabled !== undefined) {
+        if (typeof regra.enabled !== 'boolean') throw new PlatformProfileError(`Invalid rule for ${evento}`, { field: 'alerts' });
+        novo.events[evento].enabled = regra.enabled;
+      }
+      if (regra.channels !== undefined) {
+        if (!Array.isArray(regra.channels) || regra.channels.some((c) => !ALERT_CHANNELS.includes(c))) {
+          throw new PlatformProfileError(`Invalid channels for ${evento}`, { field: 'alerts' });
+        }
+        novo.events[evento].channels = ALERT_CHANNELS.filter((c) => regra.channels.includes(c));
+      }
+    }
+  }
+  if (bruto.bigOverdueCents !== undefined) {
+    const valor = bruto.bigOverdueCents;
+    if (valor === null) novo.bigOverdueCents = ALERT_DEFAULTS.bigOverdueCents;
+    else if (!Number.isInteger(valor) || valor <= 0 || valor > BIG_OVERDUE_MAX_CENTS) {
+      throw new PlatformProfileError('bigOverdueCents must be a positive integer of cents', { field: 'bigOverdueCents' });
+    } else novo.bigOverdueCents = valor;
+  }
+  if (bruto.dailyDigest !== undefined) {
+    const d = bruto.dailyDigest;
+    if (!d || typeof d !== 'object') throw new PlatformProfileError('Invalid dailyDigest', { field: 'dailyDigest' });
+    if (d.enabled !== undefined) {
+      if (typeof d.enabled !== 'boolean') throw new PlatformProfileError('Invalid dailyDigest', { field: 'dailyDigest' });
+      novo.dailyDigest.enabled = d.enabled;
+    }
+    if (d.hour !== undefined) {
+      if (!Number.isInteger(d.hour) || d.hour < 0 || d.hour > 23) {
+        throw new PlatformProfileError('dailyDigest.hour must be an integer from 0 to 23', { field: 'dailyDigest' });
+      }
+      novo.dailyDigest.hour = d.hour;
+    }
+  }
+  return novo;
+}
+
+/**
+ * Os alertas como o serviço de alertas os lê, sem o cache de quinze segundos:
+ * o "enviar alerta de teste" logo depois de salvar espera a configuração nova.
+ * Nunca lança — com o banco fora, vale o padrão (tudo desligado).
+ */
+export async function alertsConfig() {
+  // Lê direto do banco sem derrubar o cache compartilhado: o agendador chama
+  // isto a cada passada, e invalidar aqui obrigaria todo `readProfile` do
+  // painel a ir ao banco de novo.
+  const { stored } = await lerGuardado({ fresh: true }).catch(() => ({ stored: {} }));
+  return alertasDe(stored);
+}
+
 const MAX = { legalName: 160, tradeName: 80, taxId: 20, address: 240, contactEmail: 160, notifyEmail: 160 };
 const URL_MAX = 300;
 const SOCIAL = { instagram: 'instagram.com', facebook: 'facebook.com', youtube: 'youtube.com', linkedin: 'linkedin.com' };
@@ -81,8 +199,8 @@ export class PlatformProfileError extends Error {
   }
 }
 
-async function lerGuardado() {
-  if (cache && cache.expiresAt > Date.now()) return cache.value;
+async function lerGuardado({ fresh = false } = {}) {
+  if (!fresh && cache && cache.expiresAt > Date.now()) return cache.value;
   const caixa = await Tenant.platform();
   let stored = {};
   if (caixa) {
@@ -97,7 +215,8 @@ async function lerGuardado() {
     }
   }
   const value = { platformId: caixa?.id ?? null, stored };
-  cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+  // A leitura fresca não mexe no cache: nem o derruba, nem o substitui.
+  if (!fresh) cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
   return value;
 }
 
@@ -126,6 +245,7 @@ export async function readProfile() {
     sources,
     billing: politicaDe(stored),
     billingDefaults: Object.fromEntries(Object.entries(BILLING_POLICY_FIELDS).map(([c, r]) => [c, r.default])),
+    alerts: alertasDe(stored),
     canSave: Boolean(platformId),
     updatedAt: stored.updatedAt ?? null
   };
@@ -275,6 +395,14 @@ export async function saveProfile(patch = {}) {
     else novo[campo] = valor;
     mudou.push(campo);
   }
+  // Os alertas (0112): um bloco só, mesclado ao gravado.
+  if ('alerts' in patch && patch.alerts !== undefined) {
+    const valor = normalizarAlertas(patch.alerts, stored.alerts);
+    if (JSON.stringify(valor) !== JSON.stringify(alertasDe(stored))) {
+      novo.alerts = valor;
+      mudou.push('alerts');
+    }
+  }
   // O aviso tem de cair ANTES da suspensão: com ele igual ou maior, sairia no
   // vencimento (ou antes dele) dizendo "vai ser suspenso" a quem nem atrasou.
   const politica = politicaDe(novo);
@@ -290,5 +418,6 @@ export async function saveProfile(patch = {}) {
 }
 
 export default {
-  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, referralRewardCents, retentionConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS
+  readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, referralRewardCents, retentionConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS,
+  alertsConfig, ALERT_EVENTS, ALERT_CHANNELS
 };

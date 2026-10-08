@@ -11,8 +11,10 @@ import { PlatformAudit } from '@/components/platform/platform-audit'
 import { PlatformSettings } from '@/components/platform/platform-settings'
 import { PlatformLeads } from '@/components/platform/platform-leads'
 import { PlatformSubscriptions } from '@/components/platform/platform-subscriptions'
+import { PlatformDelinquency } from '@/components/platform/platform-delinquency'
 import { PlatformRevenue } from '@/components/platform/platform-revenue'
 import { PlatformCoupons } from '@/components/platform/platform-coupons'
+import { PlatformHelp } from '@/components/platform/platform-help'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantGenieAcs } from '@/components/platform/tenant-genieacs'
@@ -72,7 +74,7 @@ export default function PlatformPage() {
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
   const estreito = useEstreito()
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'revenue' | 'coupons' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'delinquency' | 'revenue' | 'coupons' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue' | 'help'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -496,6 +498,8 @@ export default function PlatformPage() {
             // Ao lado de Planos: é o catálogo visto do lado de quem paga — quem
             // está em dia, quem deve, e a mão para dar baixa ou renegociar.
             ['subscriptions', 'platform.tabs.subscriptions'],
+            // Logo depois: o recorte de quem deve, com as ações em massa.
+            ['delinquency', 'platform.tabs.delinquency'],
             // Depois de Assinaturas: a mesma carteira, somada — quanto entra por
             // mês, quanto entrou e voltou, e de que plano vem.
             ['revenue', 'platform.tabs.revenue'],
@@ -515,7 +519,10 @@ export default function PlatformPage() {
             // fabricante, abre-se quando alguma coisa não chegou ou um
             // provedor não está reconhecendo os aparelhos dele.
             ['deployment', 'platform.tabs.deployment'],
-            ['catalogue', 'platform.tabs.catalogue']
+            ['catalogue', 'platform.tabs.catalogue'],
+            // O manual de cobrança, por último: é o que se abre quando não se
+            // sabe em qual das outras abas está a resposta.
+            ['help', 'platform.tabs.help']
           ] as const).map(([chave, rotulo]) => (
             <button
               key={chave}
@@ -531,6 +538,7 @@ export default function PlatformPage() {
 
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
         {aba === 'subscriptions' && <PlatformSubscriptions plans={plans} estreito={estreito} />}
+        {aba === 'delinquency' && <PlatformDelinquency />}
         {aba === 'revenue' && <PlatformRevenue />}
         {aba === 'coupons' && <PlatformCoupons plans={plans} />}
         {aba === 'leads' && <PlatformLeads />}
@@ -539,6 +547,7 @@ export default function PlatformPage() {
         {aba === 'settings' && <PlatformSettings />}
         {aba === 'deployment' && <DeploymentHealth />}
         {aba === 'catalogue' && <DefaultCatalogueTab />}
+        {aba === 'help' && <PlatformHelp />}
 
         {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
 

@@ -12,6 +12,8 @@ yarn.lock
 
 # Logs
 logs/
+# Relatórios do `npm run e2e:asaas-sandbox` (ids de cobrança do sandbox, horários).
+backend/reports/
 *.log
 npm-debug.log*
 yarn-debug.log*

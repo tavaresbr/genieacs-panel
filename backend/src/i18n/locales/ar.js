@@ -1161,5 +1161,27 @@ export default {
   'teiah.error.credentialsRejected': 'رفضت TeiaH Valid مفتاح API',
   'teiah.error.rateLimited': 'تحد TeiaH Valid من الطلبات؛ أعد المحاولة لاحقًا',
   'teiah.error.status': 'استجابت TeiaH Valid بالرمز {status}',
-  'teiah.error.exportRunning': 'يوجد إرسال إلى TeiaH Valid قيد التنفيذ بالفعل'
+  'teiah.error.exportRunning': 'يوجد إرسال إلى TeiaH Valid قيد التنفيذ بالفعل',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'تم استلام دفعة: {provider} ({amount})',
+  'platformAlert.payment_received.body': 'دفع المزوّد {provider} ({slug}) مبلغ {amount}.',
+  'platformAlert.card_refused.subject': 'رُفضت البطاقة: {provider}',
+  'platformAlert.card_refused.body': 'رُفضت البطاقة المحفوظة للمزوّد {provider} ({slug}) ({reason}). أُعيد إصدار الفاتورة عبر Pix/boleto.',
+  'platformAlert.cancellation_requested.subject': 'طلب إلغاء: {provider}',
+  'platformAlert.cancellation_requested.body': 'طلب المزوّد {provider} ({slug}) الإلغاء. السبب: {reason}.',
+  'platformAlert.cancellation_scheduled.subject': 'تأكيد الإلغاء: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'أكّد المزوّد {provider} ({slug}) الإلغاء، ويسري اعتبارًا من {date}. السبب: {reason}.',
+  'platformAlert.referral_signup.subject': 'إحالة: سجّل {provider}',
+  'platformAlert.referral_signup.body': 'سجّل المزوّد {provider} ({slug}) عبر إحالة من {referrer}.',
+  'platformAlert.nfse_error.subject': 'خطأ في NFS-e: {provider}',
+  'platformAlert.nfse_error.body': 'حدث خطأ في NFS-e الخاصة بالمزوّد {provider} ({slug}): {error}',
+  'platformAlert.auto_suspended.subject': 'إيقاف تلقائي: {provider}',
+  'platformAlert.auto_suspended.body': 'أُوقف المزوّد {provider} ({slug}) لعدم الدفع (متأخر منذ {date}).',
+  'platformAlert.big_overdue.subject': 'متأخرات كبيرة: {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'على المزوّد {provider} ({slug}) متأخرات بقيمة {amount}، تتجاوز الحد {threshold}. متأخر منذ {date}.',
+  'platformAlert.test.subject': 'تنبيه تجريبي',
+  'platformAlert.test.body': 'هذا تنبيه تجريبي من المنصة. إذا وصلك، فالتنبيهات تعمل.',
+  'platformAlert.digest.subject': 'الملخص اليومي: {count} تنبيه',
+  'platformAlert.digest.body': 'ملخص تنبيهات المنصة ليوم {date}:',
+  'platformAlert.digest.more': '… و{count} أخرى'
 };

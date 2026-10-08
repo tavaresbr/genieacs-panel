@@ -4,7 +4,7 @@ import { DEFAULT_LOCALE } from '../i18n/config.js';
 import Tenant from '../models/Tenant.js';
 import TenantUser from '../models/TenantUser.js';
 import { mailTransport, panelUrlFor } from './mail/index.js';
-import SubscriptionService from './subscriptionService.js';
+import SubscriptionService, { isAutoSuspended, overdueSince } from './subscriptionService.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import PlatformNotifyService from './platformNotifyService.js';
@@ -300,6 +300,15 @@ class SubscriptionNoticeService {
 
     const suspensao = await SubscriptionService.autoSuspend({ tenant, now, config, prorationDueAt, warnedAt });
     if (!suspensao.suspended) return { action: 'none', reason: suspensao.reason };
+    // O alerta para quem opera a plataforma (0112): um por prazo vencido —
+    // a mesma chave do aviso. Depois de gravada a suspensão; nunca lança.
+    const { default: PlatformAlertService } = await import('./platformAlertService.js');
+    await PlatformAlertService.enqueue('auto_suspended', {
+      tenantId: tenant.id,
+      dedupeKey: `${tenant.id}:${dueAt}`,
+      payload: { date: dueAt, reason: etapa.reason ?? null },
+      now
+    });
     const depois = await Subscription.forTenant(tenant.id);
     let notice;
     try {
@@ -324,6 +333,107 @@ class SubscriptionNoticeService {
       notice = { sent: false, reason: 'error' };
     }
     return { action: 'suspended', ...suspensao, notice };
+  }
+
+  /** A janela do lembrete manual: um por provedor a cada vinte e quatro horas. */
+  static MANUAL_REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  /**
+   * O lembrete MANUAL, pedido pelo console (painel de inadimplência): manda
+   * agora a cobrança do provedor em escopo, com o link de pagar.
+   *
+   * Fora da régua de propósito: a régua tem uma etapa por prazo, e quem pede
+   * o lembrete à mão quer justamente mandar de novo o que ela já mandou. A
+   * memória é a mesma tabela (`subscription_reminder_sends`), com a etapa
+   * própria `manual` e a chave no DIA de hoje (São Paulo) em vez do prazo —
+   * o índice único faz dois cliques no mesmo dia mandarem uma vez só, e a
+   * leitura do último envio fecha a janela de vinte e quatro horas que
+   * atravessa a meia-noite.
+   *
+   * Só para quem deve: o atraso que vale (`overdueSince`), a suspensão
+   * automática por inadimplência, ou uma cobrança em aberto já vencida. A
+   * mensagem é a da etapa `after` (ou a do teste, ou a da suspensão), com a
+   * data de desde quando se deve.
+   *
+   * @returns {Promise<{ sent: boolean, reason?: string, retryAt?: string,
+   *   recipients?: number, whatsapp?: boolean }>}
+   */
+  static async remindNow({ now = new Date(), tenant: doLaco = null } = {}) {
+    const tenant = doLaco ?? await Tenant.findById(currentTenantId());
+    if (!tenant) return { sent: false, reason: 'tenant_gone' };
+    if (tenant.kind === 'platform') return { sent: false, reason: 'platform_tenant' };
+    const subscription = await Subscription.forTenant(tenant.id);
+    if (!subscription) return { sent: false, reason: 'no_subscription' };
+    if (subscription.billing_exempt_at) return { sent: false, reason: 'billing_exempt' };
+    if (subscription.status === 'canceled') return { sent: false, reason: 'canceled' };
+    const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
+
+    // A janela de vinte e quatro horas, pelo último manual que SAIU.
+    const ultimo = await tdb('subscription_reminder_sends')
+      .where({ step: 'manual' })
+      .whereNotNull('sent_at')
+      .orderBy('sent_at', 'desc')
+      .first();
+    if (ultimo?.sent_at) {
+      const liberado = new Date(new Date(ultimo.sent_at).getTime() + this.MANUAL_REMINDER_WINDOW_MS);
+      if (liberado.getTime() > now.getTime()) {
+        return { sent: false, reason: 'rate_limited', retryAt: liberado.toISOString() };
+      }
+    }
+
+    // Desde quando se deve. O suspenso automático não deve mais para
+    // `overdueSince` (já parou); a conta é refeita com o estado de antes.
+    const suspensoAuto = isAutoSuspended(subscription);
+    const comoAntes = suspensoAuto
+      ? { ...subscription, status: subscription.renews_at ? 'active' : 'trial', suspended_reason: null }
+      : subscription;
+    const prorationDueAt = this.prorationOverdueSince(subscription);
+    // A cobrança em aberto vencida mais antiga, de qualquer tipo: é dela o
+    // valor e o link da mensagem — a mais recente em aberto (a que a régua
+    // linka) pode ser a do período seguinte, que ainda nem venceu.
+    const hoje = ChargeIssuingService.isoDate(now);
+    const vencida = (await BillingCharge.openAll())
+      .filter((linha) => linha.status === 'overdue' || (isoDateOf(linha.due_date) && isoDateOf(linha.due_date) < hoje))
+      .sort((a, b) => String(isoDateOf(a.due_date) ?? '').localeCompare(String(isoDateOf(b.due_date) ?? '')))[0] ?? null;
+    let devendo = overdueSince(comoAntes, now, { prorationDueAt });
+    if (!devendo && vencida) {
+      // Sem prazo vencido na assinatura, a cobrança vencida também é dívida.
+      devendo = {
+        since: new Date(`${isoDateOf(vencida.due_date) ?? hoje}T12:00:00Z`),
+        reason: vencida.kind === 'proration' || vencida.kind === 'overage' ? 'proration_overdue' : 'renewal_expired'
+      };
+    }
+    if (!devendo && !suspensoAuto) return { sent: false, reason: 'not_overdue' };
+    const desde = devendo?.since ?? now;
+
+    const cobranca = devendo?.reason === 'proration_overdue'
+      ? (await this.overdueProration()) ?? vencida
+      : vencida;
+    let messageKey = 'subscription.reminder.after';
+    if (suspensoAuto) messageKey = 'subscription.reminder.suspended';
+    else if (devendo?.reason === 'trial_expired') messageKey = 'subscription.reminder.trialAfter';
+
+    const resultado = await this.sendStep({
+      tenant,
+      // A chave é o dia do envio, e não o prazo: ver o comentário acima.
+      dueAt: ChargeIssuingService.periodKey(now),
+      now,
+      plan,
+      subscription,
+      charge: cobranca,
+      pendente: {
+        step: 'manual',
+        deadline: desde,
+        messageKey,
+        vars: { date: ChargeIssuingService.periodKey(desde) }
+      }
+    });
+    if (!resultado.sent) {
+      // Tomado por outro clique no mesmo dia: é a mesma janela.
+      if (resultado.reason === 'already_sent') return { sent: false, reason: 'rate_limited' };
+      return resultado;
+    }
+    return { sent: true, recipients: resultado.recipients, whatsapp: resultado.whatsapp };
   }
 
   /**

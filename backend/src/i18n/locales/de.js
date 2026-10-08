@@ -1170,5 +1170,27 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid hat den API-Schlüssel abgelehnt',
   'teiah.error.rateLimited': 'TeiaH Valid begrenzt die Anfragen; später erneut versuchen',
   'teiah.error.status': 'TeiaH Valid hat mit dem Status {status} geantwortet',
-  'teiah.error.exportRunning': 'Ein TeiaH-Valid-Export läuft bereits'
+  'teiah.error.exportRunning': 'Ein TeiaH-Valid-Export läuft bereits',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'Zahlung erhalten: {provider} ({amount})',
+  'platformAlert.payment_received.body': 'Anbieter {provider} ({slug}) hat {amount} bezahlt.',
+  'platformAlert.card_refused.subject': 'Karte abgelehnt: {provider}',
+  'platformAlert.card_refused.body': 'Die gespeicherte Karte von Anbieter {provider} ({slug}) wurde abgelehnt ({reason}). Die Rechnung wurde als Pix/Boleto neu ausgestellt.',
+  'platformAlert.cancellation_requested.subject': 'Kündigungsanfrage: {provider}',
+  'platformAlert.cancellation_requested.body': 'Anbieter {provider} ({slug}) möchte kündigen. Grund: {reason}.',
+  'platformAlert.cancellation_scheduled.subject': 'Kündigung bestätigt: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'Anbieter {provider} ({slug}) hat die Kündigung bestätigt, wirksam ab {date}. Grund: {reason}.',
+  'platformAlert.referral_signup.subject': 'Empfehlung: {provider} hat sich registriert',
+  'platformAlert.referral_signup.body': 'Anbieter {provider} ({slug}) hat sich auf Empfehlung von {referrer} registriert.',
+  'platformAlert.nfse_error.subject': 'NFS-e-Fehler: {provider}',
+  'platformAlert.nfse_error.body': 'Die NFS-e von Anbieter {provider} ({slug}) ist fehlgeschlagen: {error}',
+  'platformAlert.auto_suspended.subject': 'Automatische Sperre: {provider}',
+  'platformAlert.auto_suspended.body': 'Anbieter {provider} ({slug}) wurde wegen Zahlungsverzug gesperrt (überfällig seit {date}).',
+  'platformAlert.big_overdue.subject': 'Hoher Rückstand: {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'Anbieter {provider} ({slug}) ist mit {amount} im Rückstand, über dem Limit von {threshold}. Überfällig seit {date}.',
+  'platformAlert.test.subject': 'Testalarm',
+  'platformAlert.test.body': 'Dies ist ein Testalarm der Plattform. Wenn Sie ihn erhalten haben, funktionieren die Alarme.',
+  'platformAlert.digest.subject': 'Tageszusammenfassung: {count} Alarm(e)',
+  'platformAlert.digest.body': 'Zusammenfassung der Plattformalarme vom {date}:',
+  'platformAlert.digest.more': '… und {count} weitere'
 };

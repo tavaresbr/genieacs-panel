@@ -3,6 +3,7 @@ import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
 import BillingCharge, { isoDateOf, prorationOverdueAt } from '../models/BillingCharge.js';
 import AuditLog from '../models/AuditLog.js';
+import PlatformAlertService from './platformAlertService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import Coupon, { parseCouponPlanIds } from '../models/Coupon.js';
 import UsagePeak, { USAGE_RESOURCES } from '../models/UsagePeak.js';
@@ -2127,7 +2128,7 @@ class SubscriptionService {
    */
   static async setDeadlines({
     renewsAt = undefined, trialEndsAt = undefined, extendDays = null,
-    reason = null, actorUserId = null, now = new Date()
+    reason = null, actorUserId = null, now = new Date(), externalId = null
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -2185,6 +2186,10 @@ class SubscriptionService {
       await BillingEvent.record({
         subscriptionId: before.id,
         type: BILLING_EVENT_TYPES.DEADLINE_CHANGED,
+        // A chave do pedido, quando há (a cortesia em massa): o índice único
+        // `(tenant_id, external_id)` faz o mesmo pedido repetido desfazer a
+        // transação inteira em vez de dar o prazo duas vezes.
+        externalId,
         createdBy: actorUserId,
         detail: {
           ...(extendDays ? { courtesy: true, extendDays: Number(extendDays) } : {}),
@@ -2974,6 +2979,18 @@ class SubscriptionService {
           ? Subscription.upsertForTenant(tenantId, patch, trx)
           : Subscription.forTenant(tenantId, trx);
       });
+      // O alerta para quem opera a plataforma (0112): DEPOIS da transação, e
+      // sem poder derrubar nada — o dinheiro já está creditado. A referência
+      // do gateway é a idempotência; o aceite da diferença (valor zero) não é
+      // dinheiro novo e não avisa.
+      if (amount > 0) {
+        await PlatformAlertService.enqueue('payment_received', {
+          tenantId,
+          dedupeKey: externalId ? `${tenantId}:${externalId}` : `${tenantId}:manual:${now.getTime()}:${before.id}`,
+          payload: { amountCents: amount, underpaid: Boolean(underpaid), proration: isProration },
+          now
+        });
+      }
       return {
         subscription,
         duplicate: false,

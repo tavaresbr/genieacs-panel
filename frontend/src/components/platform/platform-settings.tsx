@@ -3,21 +3,24 @@
 import { useState } from 'react'
 import { PlatformIntegrations } from '@/components/platform/platform-integrations'
 import { PlatformProfileForm } from '@/components/platform/platform-profile'
+import { PlatformAlertsSettings } from '@/components/platform/platform-alerts'
 import { useTranslation } from '@/contexts/language-context'
 
 /**
  * Configurações do console, com submenu: os dados da empresa que vende o SaaS
- * e as integrações com sistemas de fora (a conta Asaas).
+ * e as integrações com sistemas de fora (a conta Asaas). E os alertas para
+ * quem opera a plataforma (0112).
  */
 export function PlatformSettings() {
   const { t } = useTranslation()
-  const [sub, setSub] = useState<'profile' | 'integrations'>('profile')
+  const [sub, setSub] = useState<'profile' | 'alerts' | 'integrations'>('profile')
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
       <nav aria-label={t('platform.tabs.settings')} className="flex gap-2 overflow-x-auto lg:flex-col">
         {([
           ['profile', 'platform.settings.profile'],
+          ['alerts', 'platform.settings.alerts'],
           ['integrations', 'platform.tabs.integrations']
         ] as const).map(([chave, rotulo]) => (
           <button
@@ -35,6 +38,7 @@ export function PlatformSettings() {
       </nav>
       <div className="min-w-0">
         {sub === 'profile' && <PlatformProfileForm />}
+        {sub === 'alerts' && <PlatformAlertsSettings />}
         {sub === 'integrations' && <PlatformIntegrations />}
       </div>
     </div>

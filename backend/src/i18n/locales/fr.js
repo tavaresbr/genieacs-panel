@@ -1165,5 +1165,27 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid a refusé la clé d’API',
   'teiah.error.rateLimited': 'TeiaH Valid limite les requêtes ; réessayez plus tard',
   'teiah.error.status': 'TeiaH Valid a répondu avec le statut {status}',
-  'teiah.error.exportRunning': 'Un envoi vers TeiaH Valid est déjà en cours'
+  'teiah.error.exportRunning': 'Un envoi vers TeiaH Valid est déjà en cours',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'Paiement reçu : {provider} ({amount})',
+  'platformAlert.payment_received.body': 'Le fournisseur {provider} ({slug}) a payé {amount}.',
+  'platformAlert.card_refused.subject': 'Carte refusée : {provider}',
+  'platformAlert.card_refused.body': 'La carte enregistrée du fournisseur {provider} ({slug}) a été refusée ({reason}). La facture a été réémise en Pix/boleto.',
+  'platformAlert.cancellation_requested.subject': 'Demande de résiliation : {provider}',
+  'platformAlert.cancellation_requested.body': 'Le fournisseur {provider} ({slug}) a demandé à résilier. Motif : {reason}.',
+  'platformAlert.cancellation_scheduled.subject': 'Résiliation confirmée : {provider}',
+  'platformAlert.cancellation_scheduled.body': 'Le fournisseur {provider} ({slug}) a confirmé la résiliation, effective le {date}. Motif : {reason}.',
+  'platformAlert.referral_signup.subject': 'Parrainage : {provider} s’est inscrit',
+  'platformAlert.referral_signup.body': 'Le fournisseur {provider} ({slug}) s’est inscrit sur recommandation de {referrer}.',
+  'platformAlert.nfse_error.subject': 'Erreur NFS-e : {provider}',
+  'platformAlert.nfse_error.body': 'La NFS-e du fournisseur {provider} ({slug}) est en erreur : {error}',
+  'platformAlert.auto_suspended.subject': 'Suspension automatique : {provider}',
+  'platformAlert.auto_suspended.body': 'Le fournisseur {provider} ({slug}) a été suspendu pour impayé (en retard depuis le {date}).',
+  'platformAlert.big_overdue.subject': 'Retard élevé : {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'Le fournisseur {provider} ({slug}) a {amount} en retard, au-dessus du seuil de {threshold}. En retard depuis le {date}.',
+  'platformAlert.test.subject': 'Alerte de test',
+  'platformAlert.test.body': 'Ceci est une alerte de test de la plateforme. Si vous l’avez reçue, les alertes fonctionnent.',
+  'platformAlert.digest.subject': 'Résumé quotidien : {count} alerte(s)',
+  'platformAlert.digest.body': 'Résumé des alertes de la plateforme du {date} :',
+  'platformAlert.digest.more': '… et {count} de plus'
 };

@@ -815,7 +815,9 @@ const REMINDER_STEP_KEYS = {
   after: 'platform.subs.reminders.step.after',
   // A suspensão automática (0102): o aviso antes, e o aviso dela.
   suspension_warning: 'platform.subs.reminders.step.suspensionWarning',
-  suspended: 'platform.subs.reminders.step.suspended'
+  suspended: 'platform.subs.reminders.step.suspended',
+  // O lembrete mandado à mão pelo painel de inadimplência.
+  manual: 'platform.subs.reminders.step.manual'
 } as const
 
 const REMINDER_CHANNEL_KEYS: Record<string, 'platform.subs.reminders.channel.email' | 'platform.subs.reminders.channel.whatsapp'> = {

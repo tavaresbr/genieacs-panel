@@ -1,5 +1,5 @@
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
-import { runUnscoped } from '../config/tenantContext.js';
+import { currentTenantId, runUnscoped } from '../config/tenantContext.js';
 
 /**
  * A NFS-e de uma cobrança paga — uma por cobrança, pelo índice único em
@@ -128,6 +128,22 @@ class BillingInvoice {
     if (externalId === null) consulta.whereNull('external_id');
     else if (externalId !== undefined) consulta.where({ external_id: externalId });
     const changed = await consulta.update({ ...patch, updated_at: new Date() });
+    // A nota que acabou de virar `error` avisa quem opera a plataforma (0112).
+    // É aqui, e não em cada um dos caminhos que a levam a isso (a emissão, a
+    // consulta, o webhook, o cancelamento que desistiu): a transição é esta
+    // gravação condicional, e quem ganhou a corrida é quem avisa. Uma vez por
+    // nota por dia; melhor esforço, nunca lança.
+    if (changed > 0 && patch.status === 'error' && status !== 'error') {
+      const tenantId = currentTenantId();
+      const { default: PlatformAlertService, saoPauloClock } = await import('../services/platformAlertService.js');
+      // O "dia" da deduplicação é o de Brasília, o mesmo do resumo diário — em
+      // UTC, o erro das 21h e o das 22h do mesmo dia daqui viravam dois.
+      await PlatformAlertService.enqueue('nfse_error', {
+        tenantId,
+        dedupeKey: `${tenantId}:${id}:${saoPauloClock().day}`,
+        payload: { invoiceId: Number(id), error: patch.error ? String(patch.error) : null }
+      });
+    }
     return changed > 0;
   }
 
