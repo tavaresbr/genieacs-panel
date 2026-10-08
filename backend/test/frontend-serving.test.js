@@ -22,6 +22,7 @@ const dottedDir = path.join(buildDir, '.hidden', 'dist');
 fs.mkdirSync(dottedDir, { recursive: true });
 fs.writeFileSync(path.join(dottedDir, 'index.html'), '<html><body>painel</body></html>');
 fs.writeFileSync(path.join(dottedDir, 'portal.html'), '<html><body>portal</body></html>');
+fs.writeFileSync(path.join(dottedDir, 'whatsapp-signup.html'), '<html><body>signup</body></html>');
 fs.writeFileSync(path.join(dottedDir, '.env'), 'SECRET=nao-deve-sair-daqui');
 process.env.FRONTEND_DIR = dottedDir;
 
@@ -76,5 +77,33 @@ describe('serving the build from a path that contains a dot segment', () => {
     const { status, body } = await call(`${panelUrl}/api/health`);
     assert.equal(status, 200);
     assert.equal(body.status, 'ok');
+  });
+});
+
+describe('a página do Embedded Signup da Meta', () => {
+  it('libera o SDK do Facebook só nela', async () => {
+    const { response, status, body } = await call(`${panelUrl}/whatsapp-signup.html`);
+    assert.equal(status, 200);
+    assert.match(String(body), /signup/);
+    const csp = response.headers.get('content-security-policy');
+    assert.match(csp, /script-src 'self' https:\/\/connect\.facebook\.net/);
+    assert.match(csp, /frame-src [^;]*https:\/\/www\.facebook\.com/);
+    assert.match(csp, /connect-src [^;]*https:\/\/graph\.facebook\.com/);
+    // O que não é do SDK fica como no resto do painel.
+    assert.match(csp, /frame-ancestors 'none'/);
+    assert.match(csp, /script-src-attr 'none'/);
+    assert.equal(response.headers.get('cache-control'), 'no-cache');
+  });
+
+  it('o resto do painel continua sem o Facebook', async () => {
+    const { response } = await call(`${panelUrl}/login`);
+    const csp = response.headers.get('content-security-policy');
+    assert.match(csp, /script-src 'self';/);
+    assert.doesNotMatch(csp, /facebook/);
+  });
+
+  it('o portal do assinante também', async () => {
+    const { response } = await call(`${portalUrl}/whatsapp-signup.html`);
+    assert.doesNotMatch(response.headers.get('content-security-policy'), /facebook/);
   });
 });
