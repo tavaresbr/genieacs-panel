@@ -805,6 +805,10 @@ export default {
   // WhatsApp — 技術警示的訊息內文
   'whatsapp.alerts.ontOffline': 'ONT {device} 已離線 {minutes} 分鐘',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device} 已恢復連線',
+  'whatsapp.alerts.digestTitle': '技術告警：最近 {minutes} 分鐘新增 {added} 則，恢復 {cleared} 則',
+  'whatsapp.alerts.digestNew': '新增：',
+  'whatsapp.alerts.digestCleared': '已恢復：',
+  'whatsapp.alerts.digestMore': '… 另有 {count} 則',
   'whatsapp.alerts.rxPowerLow': 'ONT {device} 的光訊號為 {value} dBm（臨界值 {threshold}）',
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} 的光訊號已恢復正常',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} 溫度為 {value} °C（臨界值 {threshold}）',

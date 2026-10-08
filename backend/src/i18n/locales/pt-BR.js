@@ -803,6 +803,10 @@ export default {
   // WhatsApp — corpo das mensagens de alerta técnico
   'whatsapp.alerts.ontOffline': 'ONT {device} offline há {minutes} min',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device} voltou a responder',
+  'whatsapp.alerts.digestTitle': 'Alertas técnicos: {added} novo(s), {cleared} normalizado(s) nos últimos {minutes} min',
+  'whatsapp.alerts.digestNew': 'Novos:',
+  'whatsapp.alerts.digestCleared': 'Normalizados:',
+  'whatsapp.alerts.digestMore': '… e mais {count}',
   'whatsapp.alerts.rxPowerLow': 'ONT {device} com sinal óptico em {value} dBm (limite {threshold})',
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} com sinal óptico normalizado',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} a {value} °C (limite {threshold})',

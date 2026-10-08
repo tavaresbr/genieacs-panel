@@ -804,6 +804,10 @@ export default {
   // WhatsApp — corpo das mensagens de alerta técnico
   'whatsapp.alerts.ontOffline': 'ONT {device} offline da {minutes} min',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device} risponde di nuovo',
+  'whatsapp.alerts.digestTitle': 'Avvisi tecnici: {added} nuovi, {cleared} rientrati negli ultimi {minutes} min',
+  'whatsapp.alerts.digestNew': 'Nuovi:',
+  'whatsapp.alerts.digestCleared': 'Rientrati:',
+  'whatsapp.alerts.digestMore': '… e altri {count}',
   'whatsapp.alerts.rxPowerLow': 'ONT {device} con segnale ottico a {value} dBm (limite {threshold})',
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} segnale ottico rientrato',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} a {value} °C (limite {threshold})',

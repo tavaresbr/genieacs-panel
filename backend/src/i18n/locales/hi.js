@@ -807,6 +807,10 @@ export default {
   // WhatsApp — तकनीकी अलर्ट संदेशों का मुख्य पाठ
   'whatsapp.alerts.ontOffline': 'ONT {device} {minutes} मिनट से ऑफ़लाइन है',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device} फिर से ऑनलाइन है',
+  'whatsapp.alerts.digestTitle': 'तकनीकी अलर्ट: पिछले {minutes} मिनट में {added} नए, {cleared} सामान्य हुए',
+  'whatsapp.alerts.digestNew': 'नए:',
+  'whatsapp.alerts.digestCleared': 'सामान्य हुए:',
+  'whatsapp.alerts.digestMore': '… और {count} अन्य',
   'whatsapp.alerts.rxPowerLow': 'ONT {device} का ऑप्टिकल सिग्नल {value} dBm पर है (सीमा {threshold})',
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} का ऑप्टिकल सिग्नल सामान्य पर लौट आया',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} {value} °C पर है (सीमा {threshold})',

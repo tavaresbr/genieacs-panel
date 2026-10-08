@@ -804,6 +804,10 @@ export default {
   // WhatsApp — 기술 알림 메시지 본문
   'whatsapp.alerts.ontOffline': 'ONT {device}이(가) {minutes}분째 오프라인입니다',
   'whatsapp.alerts.ontOfflineCleared': 'ONT {device}이(가) 다시 온라인 상태입니다',
+  'whatsapp.alerts.digestTitle': '기술 알림: 최근 {minutes}분간 신규 {added}건, 정상화 {cleared}건',
+  'whatsapp.alerts.digestNew': '신규:',
+  'whatsapp.alerts.digestCleared': '정상화:',
+  'whatsapp.alerts.digestMore': '… 외 {count}건',
   'whatsapp.alerts.rxPowerLow': 'ONT {device}의 광 신호가 {value} dBm입니다 (기준 {threshold})',
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device}의 광 신호가 정상으로 돌아왔습니다',
   'whatsapp.alerts.temperatureHigh': 'ONT {device}의 온도가 {value} °C입니다 (기준 {threshold})',

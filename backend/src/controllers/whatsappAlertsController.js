@@ -77,6 +77,9 @@ class WhatsAppAlertsController {
   static async scan(req, res) {
     try {
       const summary = await WaAlertService.scan();
+      // A varredura manual também descarrega a fila do resumo: quem apertou o
+      // botão não quer esperar o relógio.
+      await WaAlertService.flushDigest(await WaAlertService.getSettings(), { force: true }).catch(() => {});
       // Every reason a pass did nothing is a refusal, never a cheerful
       // `{fired: 0}`. "Nothing is wrong" and "nothing was checked" look
       // identical in that number, and the admin pressed the button precisely
