@@ -1167,5 +1167,26 @@ export default {
   'teiah.error.credentialsRejected': 'TeiaH Valid ha rifiutato la chiave API',
   'teiah.error.rateLimited': 'TeiaH Valid sta limitando le richieste; riprova più tardi',
   'teiah.error.status': 'TeiaH Valid ha risposto con stato {status}',
-  'teiah.error.exportRunning': 'Un invio a TeiaH Valid è già in corso'
+  'teiah.error.exportRunning': 'Un invio a TeiaH Valid è già in corso',
+  // Os alertas para quem opera a plataforma (0112)
+  'platformAlert.payment_received.subject': 'Pagamento ricevuto: {provider} ({amount})',
+  'platformAlert.payment_received.body': 'Il provider {provider} ({slug}) ha pagato {amount}.',
+  'platformAlert.card_refused.subject': 'Carta rifiutata: {provider}',
+  'platformAlert.card_refused.body': 'La carta salvata del provider {provider} ({slug}) è stata rifiutata ({reason}). La fattura è stata riemessa come Pix/boleto.',
+  'platformAlert.cancellation_requested.subject': 'Richiesta di disdetta: {provider}',
+  'platformAlert.cancellation_requested.body': 'Il provider {provider} ({slug}) ha chiesto di disdire. Motivo: {reason}.',
+  'platformAlert.cancellation_scheduled.subject': 'Disdetta confermata: {provider}',
+  'platformAlert.cancellation_scheduled.body': 'Il provider {provider} ({slug}) ha confermato la disdetta, valida dal {date}. Motivo: {reason}.',
+  'platformAlert.referral_signup.subject': 'Segnalazione: {provider} si è registrato',
+  'platformAlert.referral_signup.body': 'Il provider {provider} ({slug}) si è registrato su segnalazione di {referrer}.',
+  'platformAlert.nfse_error.subject': 'Errore NFS-e: {provider}',
+  'platformAlert.nfse_error.body': 'La NFS-e del provider {provider} ({slug}) è andata in errore: {error}',
+  'platformAlert.auto_suspended.subject': 'Sospensione automatica: {provider}',
+  'platformAlert.auto_suspended.body': 'Il provider {provider} ({slug}) è stato sospeso per mancato pagamento (scaduto dal {date}).',
+  'platformAlert.big_overdue.subject': 'Arretrato elevato: {provider} ({amount})',
+  'platformAlert.big_overdue.body': 'Il provider {provider} ({slug}) ha {amount} di arretrato, oltre il limite di {threshold}. Scaduto dal {date}.',
+  'platformAlert.test.subject': 'Avviso di prova',
+  'platformAlert.test.body': 'Questo è un avviso di prova della piattaforma. Se lo hai ricevuto, gli avvisi funzionano.',
+  'platformAlert.digest.subject': 'Riepilogo giornaliero: {count} avviso/i',
+  'platformAlert.digest.body': 'Riepilogo degli avvisi della piattaforma del {date}:'
 };

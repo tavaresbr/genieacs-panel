@@ -15,6 +15,7 @@ import ChargeIssuingService, { ChargeFollowError } from './chargeIssuingService.
 import CouponService from './couponService.js';
 import { SelfBillingError } from './selfBillingService.js';
 import { retentionConfig } from './platformProfileService.js';
+import PlatformAlertService from './platformAlertService.js';
 import { getDb, isUniqueViolation } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
 
@@ -455,6 +456,14 @@ class CancellationService {
         created_at: aoSegundo(now)
       });
     }
+    // O alerta para quem opera a plataforma (0112): um por pedido — o motivo
+    // trocado na mesma tela é o mesmo pedido, e não avisa de novo.
+    await PlatformAlertService.enqueue('cancellation_requested', {
+      tenantId: currentTenantId(),
+      dedupeKey: `${currentTenantId()}:${linha.id}`,
+      payload: { reason: motivo },
+      now
+    });
     return { request: presentRequest(linha), offers };
   }
 
@@ -620,6 +629,7 @@ class CancellationService {
       // O excedente do período que fecha (0105), numa fatura final de só
       // excedente — as de renovação acabaram de ser canceladas.
       await ChargeIssuingService.issueFinalOverage({ subscription, now });
+      await this.alertarAgendado(tenantId, aberto, aoSegundo(now), true, now);
       return {
         immediate: true,
         cancelAt: aoSegundo(now).toISOString(),
@@ -655,12 +665,23 @@ class CancellationService {
     if (!gravou) throw new SelfBillingError('billing.busy', { code: 'busy', status: 409 });
     // Como na pausa: a emissão que escapou da varredura de antes.
     await this.varrerDeNovo(fim, now);
+    await this.alertarAgendado(tenantId, aberto, quando, false, now);
     return {
       immediate: false,
       cancelAt: quando.toISOString(),
       canceledCharges: canceladas.canceled.length,
       request: presentRequest(await CancellationRequest.findById(aberto.id))
     };
+  }
+
+  /** O alerta do cancelamento confirmado (0112), um por pedido. Nunca lança. */
+  static async alertarAgendado(tenantId, pedido, quando, imediato, now) {
+    await PlatformAlertService.enqueue('cancellation_scheduled', {
+      tenantId,
+      dedupeKey: `${tenantId}:${pedido.id}`,
+      payload: { reason: pedido.reason ?? null, date: quando.toISOString(), immediate: imediato },
+      now
+    });
   }
 
   /** A segunda varredura das faturas da renovação de `prazo`, depois de gravar — melhor esforço. */

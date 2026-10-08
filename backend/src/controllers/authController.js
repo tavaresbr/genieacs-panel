@@ -23,6 +23,7 @@ import AccountLockout from '../models/AccountLockout.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import Plan from '../models/Plan.js';
 import PlatformNotifyService from '../services/platformNotifyService.js';
+import PlatformAlertService from '../services/platformAlertService.js';
 import { normalizeTaxId, isValidCnpj } from '../utils/taxId.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { translate } from '../i18n/index.js';
@@ -364,6 +365,16 @@ class AuthController {
         detail: { via: 'signup', ownerUserId: userId, ...(referredBy ? { referredBy } : {}) },
         ip: req.ip ?? null
       });
+      // O alerta da indicação para quem opera a plataforma (0112): um por
+      // provedor indicado. Depois da transação do cadastro, e nunca lança.
+      if (referredBy) {
+        const quem = await Tenant.findById(referredBy).catch(() => null);
+        await PlatformAlertService.enqueue('referral_signup', {
+          tenantId,
+          dedupeKey: String(tenantId),
+          payload: { referrer: quem?.name ?? null, referrerSlug: quem?.slug ?? null }
+        });
+      }
 
       // A prova do endereço, mandada agora e não um dia depois.
       //

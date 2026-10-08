@@ -396,6 +396,16 @@ class CardAutopayService {
       .update({ card_failure_notified_at: aoSegundo(now), updated_at: new Date() });
     if (!garra) return { sent: false, reason: 'already_sent' };
 
+    // O alerta para quem opera a plataforma (0112): uma vez por recusa — a
+    // data dela é a chave. Melhor esforço, nunca lança.
+    const { default: PlatformAlertService } = await import('../platformAlertService.js');
+    await PlatformAlertService.enqueue('card_refused', {
+      tenantId,
+      dedupeKey: `${tenantId}:${new Date(subscription.card_failed_at).getTime() || String(subscription.card_failed_at)}`,
+      payload: { reason: subscription.card_failure ?? null },
+      now
+    });
+
     const { default: SubscriptionNoticeService } = await import('../subscriptionNoticeService.js');
     let resultado;
     try {

@@ -23,6 +23,7 @@ import ChargeIssuingService from './chargeIssuingService.js';
 import BillingInvoiceService from './billing/billingInvoiceService.js';
 import CardAutopayService from './billing/cardAutopayService.js';
 import CancellationService from './cancellationService.js';
+import PlatformAlertService from './platformAlertService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -236,6 +237,12 @@ class SchedulerService {
         onError: (error, tenant) => {
           console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
         }
+      }))
+      // Os alertas para quem opera a plataforma (0112): FORA do laço por
+      // provedor — a fila é uma só, acima de todos, e o laço a mandaria uma
+      // vez por provedor. Nunca lança.
+      .then(() => PlatformAlertService.schedulerPass().catch((error) => {
+        console.warn(`Could not send the platform alerts: ${error.message}`);
       }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))

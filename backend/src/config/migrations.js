@@ -2785,6 +2785,46 @@ const CANCELLATION_TABLES = [
   ['cancellation_requests', cancellationRequestsTable]
 ];
 
+/**
+ * Os alertas para quem opera a plataforma (0112): a fila do que avisar por
+ * WhatsApp e e-mail — um pagamento que entrou, um cartão recusado, um pedido
+ * de cancelamento. Ver `platformAlertService`.
+ *
+ *   event            o evento (`payment_received`, `card_refused`, ...);
+ *   tenant_id        o provedor de quem se fala, quando há um. Inteiro simples
+ *                    e SEM chave estrangeira, como em `platform_audit`: o
+ *                    alerta de um provedor que depois foi apagado continua
+ *                    sendo o que aconteceu;
+ *   payload          JSON com o que a mensagem mostra — nunca segredo;
+ *   dedupe_key       a idempotência: o mesmo fato (o mesmo pagamento, a
+ *                    mesma recusa) entra uma vez só, pelo índice único;
+ *   status           pending | sent | failed | skipped;
+ *   attempts         quantas vezes o envio falhou;
+ *   next_attempt_at  quando tentar de novo (nulo: já);
+ *   last_error       o motivo curto da última falha, para o console.
+ *
+ * Da PLATAFORMA (compartilhada): está acima dos provedores, e só o console lê.
+ */
+const platformAlertsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('event', 32).notNullable();
+  t.integer('tenant_id').unsigned().nullable();
+  t.text('payload');
+  t.string('dedupe_key', 191).notNullable();
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.timestamp('next_attempt_at').nullable();
+  t.string('last_error', 255).nullable();
+  t.timestamp('sent_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['dedupe_key'], 'platform_alerts_dedupe_uq');
+  t.index(['status', 'next_attempt_at'], 'platform_alerts_due_idx');
+};
+
+const PLATFORM_ALERT_TABLES = [
+  ['platform_alerts', platformAlertsTable]
+];
+
 /** As colunas que a tabela ganhou depois de nascer (a base de desenvolvimento que já a tinha). */
 const CANCELLATION_REQUEST_LATE_COLUMNS = [
   ['billing_cycle', (t) => t.string('billing_cycle', 8)]
@@ -2857,7 +2897,8 @@ export const SCHEMA_TABLES = [
   ...SUBSCRIPTION_REMINDER_TABLES,
   ...USAGE_PEAK_TABLES,
   ...REFERRAL_TABLES,
-  ...CANCELLATION_TABLES
+  ...CANCELLATION_TABLES,
+  ...PLATFORM_ALERT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6287,6 +6328,18 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'customer_referrals', customerReferralsTable(db));
+    }
+  },
+  {
+    /** Os alertas para quem opera a plataforma — ver `platformAlertsTable`. */
+    id: '0112_platform_alerts',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('platform_alerts');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'platform_alerts', platformAlertsTable(db));
     }
   }
 ];

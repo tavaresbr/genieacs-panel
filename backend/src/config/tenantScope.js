@@ -234,7 +234,11 @@ export const SHARED_TABLES = new Set([
   // quem foi indicado —, e cada lado a lê pelo próprio id, sempre nomeado
   // (`ReferralReward`). O crédito que ela gera mora em `tenant_credits`, essa
   // sim escopada.
-  'referral_rewards'
+  'referral_rewards',
+  // Os alertas para quem opera a plataforma (0112): a fila do que o console
+  // avisa por WhatsApp e e-mail. Acima dos provedores — fala de vários, e o
+  // envio é um passo só do agendador, fora do laço por provedor.
+  'platform_alerts'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

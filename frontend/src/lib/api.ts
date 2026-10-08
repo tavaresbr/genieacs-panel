@@ -1644,9 +1644,40 @@ export interface PlatformProfile {
   /** A política de suspensão automática (0102), já com o padrão aplicado. */
   billing?: PlatformBillingPolicy & PlatformReferralPolicy
   billingDefaults?: PlatformBillingPolicy & PlatformReferralPolicy
+  /** Os alertas para quem opera a plataforma (0112). */
+  alerts?: PlatformAlertsConfig
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
+}
+
+/** Os eventos que avisam quem opera a plataforma (0112). */
+export const PLATFORM_ALERT_EVENTS = [
+  'payment_received',
+  'card_refused',
+  'cancellation_requested',
+  'cancellation_scheduled',
+  'referral_signup',
+  'nfse_error',
+  'auto_suspended',
+  'big_overdue'
+] as const
+export type PlatformAlertEvent = typeof PLATFORM_ALERT_EVENTS[number]
+export type PlatformAlertChannel = 'whatsapp' | 'email'
+
+/** Por evento, ligado ou não e por quais canais; o limite do atraso alto; o resumo diário. */
+export interface PlatformAlertsConfig {
+  events: Record<PlatformAlertEvent, { enabled: boolean; channels: PlatformAlertChannel[] }>
+  bigOverdueCents: number
+  /** `hour` no horário de Brasília. */
+  dailyDigest: { enabled: boolean; hour: number }
+}
+
+/** O patch dos alertas: ausente mantém. */
+export interface PlatformAlertsUpdate {
+  events?: Partial<Record<PlatformAlertEvent, { enabled?: boolean; channels?: PlatformAlertChannel[] }>>
+  bigOverdueCents?: number | null
+  dailyDigest?: { enabled?: boolean; hour?: number }
 }
 
 /** O crédito da indicação de provedores, em centavos (0106); 0 desliga o programa. */
@@ -2296,8 +2327,18 @@ export const platformAPI = {
   updatePlatformProfile: (
     payload: Partial<Record<PlatformProfileField, string>>
       & Partial<Record<keyof PlatformBillingPolicy | keyof PlatformReferralPolicy, number | null>>
+      & { alerts?: PlatformAlertsUpdate }
   ) =>
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
+
+  /**
+   * Manda um alerta de teste agora (0112). 409 `no_destination` sem WhatsApp
+   * nem e-mail de avisos; 502 `send_failed` quando nenhum canal saiu.
+   */
+  testPlatformAlert: (channels?: PlatformAlertChannel[]) =>
+    apiClient.post<{ channels: Partial<Record<PlatformAlertChannel, boolean | null>> }>(
+      '/platform/alerts/test', channels ? { channels } : {}
+    ),
 
   testAsaasIntegration: () =>
     apiClient.post<AsaasConnectionTest>('/platform/integrations/asaas/test'),

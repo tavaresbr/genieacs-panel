@@ -3,6 +3,7 @@ import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
 import BillingCharge, { isoDateOf, prorationOverdueAt } from '../models/BillingCharge.js';
 import AuditLog from '../models/AuditLog.js';
+import PlatformAlertService from './platformAlertService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import Coupon, { parseCouponPlanIds } from '../models/Coupon.js';
 import UsagePeak, { USAGE_RESOURCES } from '../models/UsagePeak.js';
@@ -2974,6 +2975,18 @@ class SubscriptionService {
           ? Subscription.upsertForTenant(tenantId, patch, trx)
           : Subscription.forTenant(tenantId, trx);
       });
+      // O alerta para quem opera a plataforma (0112): DEPOIS da transação, e
+      // sem poder derrubar nada — o dinheiro já está creditado. A referência
+      // do gateway é a idempotência; o aceite da diferença (valor zero) não é
+      // dinheiro novo e não avisa.
+      if (amount > 0) {
+        await PlatformAlertService.enqueue('payment_received', {
+          tenantId,
+          dedupeKey: externalId ? `${tenantId}:${externalId}` : `${tenantId}:manual:${now.getTime()}:${before.id}`,
+          payload: { amountCents: amount, underpaid: Boolean(underpaid), proration: isProration },
+          now
+        });
+      }
       return {
         subscription,
         duplicate: false,
