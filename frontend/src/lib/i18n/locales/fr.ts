@@ -4668,6 +4668,16 @@ const fr: Dictionary = {
   'platform.referrals.adjusted': "Solde ajusté",
   'platform.referrals.adjustInvalid': "Saisissez un montant non nul et le motif.",
   'platform.referrals.insufficient': "Le solde disponible est de {amount} ; impossible de retirer davantage.",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "Aide",
+  'help.toc': "Sommaire",
+  'help.searchPlaceholder': "Rechercher dans le manuel",
+  'help.noResults': "Aucun résultat pour « {query} ».",
+  'help.portugueseOnly': "Contenu en portugais.",
+  'help.howItWorks': "Comment ça marche",
+  'help.providerGuideTitle': "Comment fonctionne la facturation",
 }
 
 export default fr

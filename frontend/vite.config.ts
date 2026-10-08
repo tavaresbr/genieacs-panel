@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
@@ -35,6 +35,12 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Os manuais de cobrança moram em `../docs` e entram por `?raw`
+    // (src/lib/help-docs.ts). O build lê de qualquer lugar; o servidor de
+    // desenvolvimento só serve o que está liberado aqui.
+    fs: {
+      allow: [searchForWorkspaceRoot(process.cwd()), fileURLToPath(new URL('../docs', import.meta.url))],
+    },
     proxy: {
       '/api': {
         target: process.env.API_URL || 'http://127.0.0.1:5890',

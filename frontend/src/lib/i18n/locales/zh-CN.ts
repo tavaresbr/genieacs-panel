@@ -4668,6 +4668,16 @@ const zhCN: Dictionary = {
   'platform.referrals.adjusted': "余额已调整",
   'platform.referrals.adjustInvalid': "请输入非零金额和原因。",
   'platform.referrals.insufficient': "可用余额为 {amount},不能扣减超过此数。",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "帮助",
+  'help.toc': "目录",
+  'help.searchPlaceholder': "搜索手册",
+  'help.noResults': "未找到与“{query}”相关的内容。",
+  'help.portugueseOnly': "内容为葡萄牙语。",
+  'help.howItWorks': "使用说明",
+  'help.providerGuideTitle': "计费说明",
 }
 
 export default zhCN

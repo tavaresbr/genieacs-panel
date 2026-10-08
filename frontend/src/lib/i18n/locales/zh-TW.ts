@@ -4669,6 +4669,16 @@ const zhTW: Dictionary = {
   'platform.referrals.adjusted': "餘額已調整",
   'platform.referrals.adjustInvalid': "請輸入非零金額和原因。",
   'platform.referrals.insufficient': "可用餘額為 {amount},不能扣減超過此數。",
+
+  // A ajuda embutida: a aba do console e o "Como funciona" do Plano. O texto
+  // dos manuais fica em português; só estes rótulos são traduzidos.
+  'platform.tabs.help': "說明",
+  'help.toc': "目錄",
+  'help.searchPlaceholder': "搜尋手冊",
+  'help.noResults': "找不到與「{query}」相關的內容。",
+  'help.portugueseOnly': "內容為葡萄牙文。",
+  'help.howItWorks': "運作方式",
+  'help.providerGuideTitle': "計費說明",
 }
 
 export default zhTW

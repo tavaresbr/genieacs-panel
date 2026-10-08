@@ -8,6 +8,9 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci --include=dev
 COPY frontend/ ./
+# Os manuais de cobrança entram no bundle (`?raw` em src/lib/help-docs.ts),
+# lidos de `../docs` — por isso os dois, e só eles, vêm para `/app/docs`.
+COPY docs/manual-cobranca.md docs/guia-provedor-cobranca.md /app/docs/
 RUN npm run build
 
 # The backend's dependencies are installed in a stage of their own because

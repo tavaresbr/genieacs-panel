@@ -13,6 +13,7 @@ import { PlatformLeads } from '@/components/platform/platform-leads'
 import { PlatformSubscriptions } from '@/components/platform/platform-subscriptions'
 import { PlatformRevenue } from '@/components/platform/platform-revenue'
 import { PlatformCoupons } from '@/components/platform/platform-coupons'
+import { PlatformHelp } from '@/components/platform/platform-help'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantGenieAcs } from '@/components/platform/tenant-genieacs'
@@ -72,7 +73,7 @@ export default function PlatformPage() {
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
   const estreito = useEstreito()
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'revenue' | 'coupons' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'revenue' | 'coupons' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue' | 'help'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -515,7 +516,10 @@ export default function PlatformPage() {
             // fabricante, abre-se quando alguma coisa não chegou ou um
             // provedor não está reconhecendo os aparelhos dele.
             ['deployment', 'platform.tabs.deployment'],
-            ['catalogue', 'platform.tabs.catalogue']
+            ['catalogue', 'platform.tabs.catalogue'],
+            // O manual de cobrança, por último: é o que se abre quando não se
+            // sabe em qual das outras abas está a resposta.
+            ['help', 'platform.tabs.help']
           ] as const).map(([chave, rotulo]) => (
             <button
               key={chave}
@@ -539,6 +543,7 @@ export default function PlatformPage() {
         {aba === 'settings' && <PlatformSettings />}
         {aba === 'deployment' && <DeploymentHealth />}
         {aba === 'catalogue' && <DefaultCatalogueTab />}
+        {aba === 'help' && <PlatformHelp />}
 
         {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
 

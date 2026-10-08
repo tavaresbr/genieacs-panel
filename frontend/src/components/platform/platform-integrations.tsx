@@ -42,7 +42,10 @@ const EVENTOS_ASAAS = [
   'PAYMENT_RECEIVED',
   'PAYMENT_OVERDUE',
   'PAYMENT_DELETED',
-  'PAYMENT_REFUNDED'
+  'PAYMENT_REFUNDED',
+  // A recusa do cartão salvo (0100): sem ele, a fatura de cartão recusada não
+  // volta sozinha para Pix/boleto.
+  'PAYMENT_CREDIT_CARD_CAPTURE_REFUSED'
 ]
 
 /** Os eventos da nota fiscal, para quem ligou a NFS-e. Nomes da Asaas. */
