@@ -73,7 +73,7 @@ export function DeviceHistoryCard({ deviceId }: { deviceId: string }) {
           <h2 className="section-heading">{t('detail.history.title')}</h2>
           <p className="section-description">{t('detail.history.description')}</p>
         </div>
-        <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
+        <div className="grid grid-cols-1 gap-2 min-[26.25rem]:grid-cols-2 sm:flex sm:flex-wrap">
           <select
             className="modern-input"
             value={metric}
