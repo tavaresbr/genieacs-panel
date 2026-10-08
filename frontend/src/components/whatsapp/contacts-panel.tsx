@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
 import { useAuth } from '@/contexts/auth-context'
+import { formatBrPhone } from '@/lib/phone'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
 import { NewContactModal } from '@/components/whatsapp/new-contact-modal'
@@ -278,7 +279,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
 
   const phoneOf = (contact: WhatsAppContact) => (contact.phone ? (
     <span className="flex flex-wrap items-center gap-1.5">
-      <span className="font-mono">{contact.phone}</span>
+      <span className="font-mono" title={contact.phone}>{formatBrPhone(contact.phone)}</span>
       {contact.phoneSource === 'manual' && (
         <span className="modern-badge" title={t('whatsapp.contacts.phoneManualHint')}>
           {t('whatsapp.contacts.phoneManual')}
