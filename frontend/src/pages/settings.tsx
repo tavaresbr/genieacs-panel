@@ -1840,7 +1840,7 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => setActiveTab('integrations')}
-            className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
+            className="mb-4 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground lg:min-h-0"
           >
             <Icon name="chevron-left" size={16} />
             {t('settings.integrations.back')}
@@ -2134,13 +2134,13 @@ export default function Settings() {
               <fieldset>
                 <legend className="field-label">{t('settings.portal.prefixLegend')}</legend>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex min-h-10 items-center gap-2 text-sm lg:min-h-0">
                     <input type="radio" name="customer-prefix" value="default"
                       checked={settings.customerIdPrefixMode === 'default'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdPrefixMode: 'default' }))} />
                     {t('settings.portal.prefixDefault')} <span className="font-mono font-semibold">CSG</span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex min-h-10 items-center gap-2 text-sm lg:min-h-0">
                     <input type="radio" name="customer-prefix" value="company"
                       checked={settings.customerIdPrefixMode === 'company'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdPrefixMode: 'company' }))} />
@@ -2168,13 +2168,13 @@ export default function Settings() {
               <fieldset>
                 <legend className="field-label">{t('settings.portal.suffixLegend')}</legend>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex min-h-10 items-center gap-2 text-sm lg:min-h-0">
                     <input type="radio" name="customer-suffix" value="random"
                       checked={settings.customerIdSuffixMode === 'random'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdSuffixMode: 'random' }))} />
                     {t('settings.portal.suffixRandom')}
                   </label>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex min-h-10 items-center gap-2 text-sm lg:min-h-0">
                     <input type="radio" name="customer-suffix" value="installation_date"
                       checked={settings.customerIdSuffixMode === 'installation_date'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdSuffixMode: 'installation_date' }))} />

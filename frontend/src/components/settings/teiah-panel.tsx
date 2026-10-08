@@ -456,36 +456,56 @@ export function TeiahPanel() {
         {items.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">{t('settings.teiah.export.listEmpty')}</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-start text-xs text-muted-foreground">
-                  <th className="py-2 pe-3 text-start font-medium">{t('settings.teiah.export.contract')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('settings.teiah.export.amount')}</th>
-                  <th className="py-2 text-start font-medium">
-                    {filter === 'sent' ? t('settings.teiah.export.sentAt') : t('settings.teiah.export.reason')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.contract} className="border-t border-border align-top">
-                    <td className="py-2 pe-3">
-                      <span className="font-mono">{item.contract}</span>
-                      {item.clientName && <span className="block text-xs text-muted-foreground">{item.clientName}</span>}
-                      {item.address && <span className="block text-xs text-muted-foreground">{item.address}</span>}
-                    </td>
-                    <td className="py-2 pe-3 whitespace-nowrap">{money(item.amount)}</td>
-                    <td className="py-2 text-xs">
-                      {filter === 'sent'
-                        ? (item.sentAt ? formatDateTime(item.sentAt) : '—')
-                        : (item.reason ? t(REASON_KEYS[item.reason]) : '—')}
-                    </td>
+          <>
+            {/* No celular, uma linha por contrato: na tabela o endereço virava uma coluna estreita. */}
+            <ul className="mobile-card-list mt-3 divide-y divide-border border-y border-border">
+              {items.map((item) => (
+                <li key={item.contract} className="space-y-1 py-2.5 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0 font-mono wrap-anywhere">{item.contract}</span>
+                    <span className="shrink-0 whitespace-nowrap">{money(item.amount)}</span>
+                  </div>
+                  {item.clientName && <p className="text-xs text-muted-foreground">{item.clientName}</p>}
+                  {item.address && <p className="text-xs text-muted-foreground">{item.address}</p>}
+                  <p className="text-xs">
+                    {filter === 'sent'
+                      ? (item.sentAt ? formatDateTime(item.sentAt) : '—')
+                      : (item.reason ? t(REASON_KEYS[item.reason]) : '—')}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="desktop-table mt-3 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-start text-xs text-muted-foreground">
+                    <th className="py-2 pe-3 text-start font-medium">{t('settings.teiah.export.contract')}</th>
+                    <th className="py-2 pe-3 text-start font-medium">{t('settings.teiah.export.amount')}</th>
+                    <th className="py-2 text-start font-medium">
+                      {filter === 'sent' ? t('settings.teiah.export.sentAt') : t('settings.teiah.export.reason')}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.contract} className="border-t border-border align-top">
+                      <td className="py-2 pe-3">
+                        <span className="font-mono">{item.contract}</span>
+                        {item.clientName && <span className="block text-xs text-muted-foreground">{item.clientName}</span>}
+                        {item.address && <span className="block text-xs text-muted-foreground">{item.address}</span>}
+                      </td>
+                      <td className="py-2 pe-3 whitespace-nowrap">{money(item.amount)}</td>
+                      <td className="py-2 text-xs">
+                        {filter === 'sent'
+                          ? (item.sentAt ? formatDateTime(item.sentAt) : '—')
+                          : (item.reason ? t(REASON_KEYS[item.reason]) : '—')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

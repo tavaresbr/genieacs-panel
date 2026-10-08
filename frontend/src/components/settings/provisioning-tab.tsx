@@ -361,7 +361,7 @@ export function ProvisioningTab() {
         </div>
 
         <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2">
+          <label className="flex min-h-10 items-center gap-2 lg:min-h-0">
             <input
               type="checkbox"
               checked={draft.enabled ?? true}
@@ -369,7 +369,7 @@ export function ProvisioningTab() {
             />
             <span className="field-label">{t('settings.provisioning.profileEnabled')}</span>
           </label>
-          <label className="flex items-center gap-2">
+          <label className="flex min-h-10 items-center gap-2 lg:min-h-0">
             <input
               type="checkbox"
               checked={draft.isDefault ?? false}
@@ -406,7 +406,7 @@ export function ProvisioningTab() {
           </div>
         </div>
 
-        <label className="flex items-center gap-2">
+        <label className="flex min-h-10 items-center gap-2 lg:min-h-0">
           <input
             type="checkbox"
             checked={draft.applyWifi ?? true}
@@ -473,7 +473,7 @@ export function ProvisioningTab() {
           )}
         </div>
 
-        <label className="flex items-center gap-2">
+        <label className="flex min-h-10 items-center gap-2 lg:min-h-0">
           <input
             type="checkbox"
             checked={draft.applyCredentials ?? false}

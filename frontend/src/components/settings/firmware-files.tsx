@@ -153,13 +153,14 @@ export function FirmwareFilesCard() {
                 file.uploadedAt ? t('detail.firmware.uploadedAt', { when: formatDateTime(file.uploadedAt) }) : null
               ].filter(Boolean)
               return (
-                <li key={file.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                  <span className="min-w-0 flex-1">
+                // No celular o Excluir desce: ao lado, o nome do arquivo ficava espremido.
+                <li key={file.id} className="flex flex-col items-start gap-3 rounded-lg border border-border p-3 sm:flex-row">
+                  <span className="min-w-0 self-stretch sm:flex-1 sm:self-auto">
                     <span className="block font-medium text-foreground">
                       {file.version || t('detail.firmware.noVersion')}
                     </span>
                     <span className="block break-all font-mono text-xs text-muted-foreground">{file.id}</span>
-                    <span className="block text-xs text-muted-foreground">{detalhes.join(' · ')}</span>
+                    <span className="block text-xs text-muted-foreground wrap-anywhere">{detalhes.join(' · ')}</span>
                   </span>
                   <button
                     type="button"
