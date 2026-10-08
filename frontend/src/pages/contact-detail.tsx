@@ -21,6 +21,7 @@ import { sessionOwner } from '@/lib/session-owner'
 import { useTranslation } from '@/contexts/language-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl } from '@/lib/sgp'
 import { isoDay } from '@/lib/date-format'
+import { formatBrPhone } from '@/lib/phone'
 import { parseAmountToCents } from '@/lib/utils'
 
 const ADDRESS_PARTS = ['street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference'] as const
@@ -34,13 +35,7 @@ export function addressText(address: ContactAddress | null | undefined) {
   return [street, address.complement, place, address.zip].filter(Boolean).join(' · ')
 }
 
-/** A phone as a person reads it: 5593991261076 → (93) 99126-1076. */
-function phoneText(phone: string) {
-  const local = phone.startsWith('55') ? phone.slice(2) : phone
-  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`
-  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`
-  return phone
-}
+const phoneText = formatBrPhone
 
 /**
  * A phone as it is typed: digits only, masked as it grows — (93) 9885-1993
