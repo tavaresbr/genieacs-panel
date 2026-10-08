@@ -8,6 +8,7 @@ import {
   type WhatsAppCampaignOption,
   type WhatsAppCampaignPreview,
   type WhatsAppAccount,
+  type WhatsAppBroadcast,
   type WhatsAppTemplate
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
@@ -54,7 +55,34 @@ const GROUPS: [Group, TranslationKey][] = [
 
 const EMPTY_SELECTION: Record<Group, string[]> = { states: [], plans: [], districts: [], cities: [] }
 
-export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+/** Uma campanha editável: ainda não saiu, é de aviso e, se tinha lista de contratos, a lista foi guardada. */
+export function canEditCampaign(broadcast: WhatsAppBroadcast): boolean {
+  if (broadcast.kind !== 'general' || !['draft', 'queued'].includes(broadcast.status)) return false
+  const audience = broadcast.audience
+  return !audience || audience.contracts === 0 || Boolean(audience.contractList)
+}
+
+function paceOf(perHour: number | null | undefined): 'default' | 'slow' | 'very_slow' {
+  if (perHour === 30) return 'slow'
+  if (perHour === 12) return 'very_slow'
+  return 'default'
+}
+
+/** ISO → valor de um `datetime-local` (hora local do navegador). */
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function CampaignForm({ onClose, onCreated, editing }: {
+  onClose: () => void
+  onCreated: () => void
+  /** Presente: edita esta campanha em vez de criar uma. */
+  editing?: WhatsAppBroadcast
+}) {
   const { t } = useTranslation()
   const toast = useToast()
 
@@ -62,24 +90,33 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [accounts, setAccounts] = useState<WhatsAppAccount[]>([])
   const [accountId, setAccountId] = useState('')
-  const [pace, setPace] = useState<'default' | 'slow' | 'very_slow'>('default')
+  const [pace, setPace] = useState<'default' | 'slow' | 'very_slow'>(paceOf(editing?.pacePerHour))
   const [perHour, setPerHour] = useState(0)
 
-  const [title, setTitle] = useState('')
-  const [selection, setSelection] = useState<Record<Group, string[]>>(EMPTY_SELECTION)
-  const [contractsText, setContractsText] = useState('')
-  const [mode, setMode] = useState<'template' | 'text'>('text')
-  const [templateId, setTemplateId] = useState('')
-  const [body, setBody] = useState('')
+  const [title, setTitle] = useState(editing?.title ?? '')
+  const [selection, setSelection] = useState<Record<Group, string[]>>(() => ({
+    states: editing?.audience?.states ?? [],
+    plans: editing?.audience?.plans ?? [],
+    districts: editing?.audience?.districts ?? [],
+    cities: editing?.audience?.cities ?? []
+  }))
+  const [contractsText, setContractsText] = useState((editing?.audience?.contractList ?? []).join('\n'))
+  const [mode, setMode] = useState<'template' | 'text'>(editing?.templateId ? 'template' : 'text')
+  const [templateId, setTemplateId] = useState(editing?.templateId ? String(editing.templateId) : '')
+  const [body, setBody] = useState(editing && !editing.templateId ? editing.body : '')
   const [attachment, setAttachment] = useState<{ path: string; name: string } | null>(null)
+  // Na edição, o anexo que já está na campanha fica até alguém trocar ou tirar.
+  const [keepOldAttachment, setKeepOldAttachment] = useState(Boolean(editing?.attachment))
   const [uploading, setUploading] = useState(false)
-  const [when, setWhen] = useState<'draft' | 'schedule'>('draft')
-  const [scheduleLocal, setScheduleLocal] = useState('')
+  const [when, setWhen] = useState<'draft' | 'schedule'>(editing?.status === 'queued' ? 'schedule' : 'draft')
+  const [scheduleLocal, setScheduleLocal] = useState(isoToLocalInput(editing?.scheduledAt))
 
   const [preview, setPreview] = useState<WhatsAppCampaignPreview | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [saving, setSaving] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
+
+  const editingAccountId = editing?.accountId ?? null
 
   useEffect(() => {
     let alive = true
@@ -95,7 +132,8 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
         const connected = accs.data.filter((acc) => acc.status === 'connected')
         setAccounts(connected)
         // Pré-seleciona o número de cobrança (ou o padrão), o que sai hoje.
-        const preferred = connected.find((acc) => acc.purpose === 'billing') ?? connected.find((acc) => acc.isDefault) ?? connected[0]
+        const saved = editingAccountId ? connected.find((acc) => acc.id === editingAccountId) : undefined
+        const preferred = saved ?? connected.find((acc) => acc.purpose === 'billing') ?? connected.find((acc) => acc.isDefault) ?? connected[0]
         if (preferred) setAccountId(String(preferred.id))
       }
       if (opts.success && opts.data) setOptions(opts.data)
@@ -113,7 +151,7 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
       }
     })()
     return () => { alive = false }
-  }, [t, toast])
+  }, [t, toast, editingAccountId])
 
   const filters: WhatsAppCampaignFilters = useMemo(() => ({
     ...selection,
@@ -191,20 +229,26 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
     if (!canCreate || !message) return
     setSaving(true)
     try {
-      const res = await whatsappAPI.createCampaign({
+      const input = {
         title: title.trim(),
         filters,
         ...message,
-        attachment,
         scheduledAt: scheduledIso,
         accountId: accountId ? Number(accountId) : null,
         pace
-      })
+      }
+      const res = editing
+        ? await whatsappAPI.updateCampaign(editing.id, {
+          ...input,
+          // Ausente mantém o anexo da campanha; nulo tira; um objeto troca.
+          ...(attachment ? { attachment } : keepOldAttachment ? {} : { attachment: null })
+        })
+        : await whatsappAPI.createCampaign({ ...input, attachment })
       if (!res.success || !res.data) {
         toast.error(errorText(res, t, 'whatsapp.campaign.createFailed'))
         return
       }
-      toast.success(t(when === 'schedule' ? 'whatsapp.campaign.scheduled' : 'whatsapp.campaign.createdDraft', {
+      toast.success(t(editing ? 'whatsapp.campaign.updatedToast' : when === 'schedule' ? 'whatsapp.campaign.scheduled' : 'whatsapp.campaign.createdDraft', {
         count: res.data.recipients
       }))
       onCreated()
@@ -220,8 +264,8 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
       <div className="modal-panel modern-card max-h-[92vh] w-full max-w-3xl overflow-y-auto p-5 sm:p-6" data-testid="campaign-form">
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <h2 id="campaign-form-title" className="section-heading mb-1">{t('whatsapp.campaign.new')}</h2>
-            <p className="section-description">{t('whatsapp.campaign.newHint')}</p>
+            <h2 id="campaign-form-title" className="section-heading mb-1">{t(editing ? 'whatsapp.campaign.edit' : 'whatsapp.campaign.new')}</h2>
+            <p className="section-description">{t(editing ? 'whatsapp.campaign.editHint' : 'whatsapp.campaign.newHint')}</p>
           </div>
           <button type="button" className="modern-button-secondary" aria-label={t('common.close')} onClick={onClose}>
             <Icon name="x" size={18} />
@@ -345,11 +389,11 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
 
           <div>
             <p className="field-label">{t('whatsapp.campaign.attachment')}</p>
-            {attachment ? (
+            {attachment || (keepOldAttachment && editing?.attachment) ? (
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <Icon name="document" size={16} />
-                <span className="break-all">{attachment.name}</span>
-                <button type="button" className="modern-button-secondary text-xs" onClick={() => setAttachment(null)}>
+                <span className="break-all">{attachment ? attachment.name : editing?.attachment?.name}</span>
+                <button type="button" className="modern-button-secondary text-xs" onClick={() => { setAttachment(null); setKeepOldAttachment(false) }}>
                   {t('whatsapp.campaign.removeAttachment')}
                 </button>
               </div>
@@ -464,8 +508,8 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
                         </tr>
                       </thead>
                       <tbody>
-                        {preview.sample.map((row) => (
-                          <tr key={row.contract}>
+                        {preview.sample.map((row, index) => (
+                          <tr key={`${row.contract ?? 'sem'}-${index}`}>
                             <td className="font-mono text-xs">{row.contract}</td>
                             <td><ContactLink contract={row.contract} name={row.clientName} /></td>
                             <td className="whitespace-pre-wrap text-xs text-muted-foreground">{row.body}</td>
@@ -486,7 +530,7 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
           <button type="button" className="modern-button-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="button" className="modern-button" disabled={!canCreate || saving} onClick={() => void create()}>
             <Icon name={when === 'schedule' ? 'bell' : 'check'} size={16} />
-            {t(when === 'schedule' ? 'whatsapp.campaign.createScheduled' : 'whatsapp.campaign.createDraft')}
+            {t(editing ? 'whatsapp.campaign.saveChanges' : when === 'schedule' ? 'whatsapp.campaign.createScheduled' : 'whatsapp.campaign.createDraft')}
           </button>
         </div>
       </div>

@@ -73,6 +73,7 @@ router.get('/broadcasts', ...leitura, WhatsAppBillingController.listBroadcasts);
 router.get('/broadcasts/audience-options', ...leitura, WhatsAppBillingController.campaignAudienceOptions);
 router.post('/broadcasts/preview', ...gestao, WhatsAppBillingController.previewCampaign);
 router.post('/broadcasts', ...gestao, WhatsAppBillingController.createCampaign);
+router.put('/broadcasts/:id', ...gestao, WhatsAppBillingController.updateCampaign);
 router.get('/broadcasts/:id/recipients', ...leitura, WhatsAppBillingController.broadcastRecipients);
 router.post('/broadcasts/:id/status', ...gestao, WhatsAppBillingController.setBroadcastStatus);
 

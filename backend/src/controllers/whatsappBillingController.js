@@ -617,6 +617,40 @@ class WhatsAppBillingController {
     }
   }
 
+  static async updateCampaign(req, res) {
+    try {
+      const body = req.body ?? {};
+      const { broadcast, recipients, skipped } = await WaCampaignService.update(req.params.id, {
+        title: body.title,
+        filters: body.filters,
+        templateId: body.templateId,
+        body: body.body,
+        attachment: body.attachment,
+        scheduledAt: body.scheduledAt,
+        accountId: body.accountId,
+        pace: body.pace
+      });
+      const publico = WaBroadcastService.publicBroadcast(broadcast);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CAMPAIGN_UPDATED,
+        subjectType: 'broadcast',
+        subjectId: String(broadcast.id),
+        detail: {
+          title: publico.title,
+          recipients,
+          scheduledAt: publico.scheduledAt,
+          attachment: Boolean(publico.attachment)
+        }
+      });
+      return res.json(createResponse(
+        req.t('whatsapp.campaign.updated', { count: recipients }),
+        { broadcast: publico, recipients, skipped }
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.campaign.updateFailed');
+    }
+  }
+
   static async broadcastRecipients(req, res) {
     try {
       const detail = await WaBroadcastService.recipients(req.params.id, {

@@ -8,7 +8,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
 import { useAuth } from '@/contexts/auth-context'
-import { CampaignForm, STATE_LABEL } from './campaign-form'
+import { CampaignForm, STATE_LABEL, canEditCampaign } from './campaign-form'
 import { CampaignDetail } from './campaign-detail'
 
 /**
@@ -106,6 +106,7 @@ export function CampaignsPanel() {
   const [busyId, setBusyId] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
   const [viewing, setViewing] = useState<WhatsAppBroadcast | null>(null)
+  const [editingBroadcast, setEditingBroadcast] = useState<WhatsAppBroadcast | null>(null)
   const { can } = useAuth()
   const canManage = can('campaigns.manage')
 
@@ -230,6 +231,14 @@ export function CampaignsPanel() {
         />
       )}
 
+      {editingBroadcast && (
+        <CampaignForm
+          editing={editingBroadcast}
+          onClose={() => setEditingBroadcast(null)}
+          onCreated={() => { setEditingBroadcast(null); void load(true) }}
+        />
+      )}
+
       {viewing && <CampaignDetail broadcast={viewing} onClose={() => setViewing(null)} />}
 
       {broadcasts.length === 0 ? (
@@ -336,6 +345,18 @@ export function CampaignsPanel() {
                       <Icon name="contacts" size={16} />
                       {t('whatsapp.campaign.detail.open')}
                     </button>
+                    {canManage && canEditCampaign(broadcast) && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        data-testid="wa-broadcast-edit"
+                        disabled={busy}
+                        onClick={() => setEditingBroadcast(broadcast)}
+                      >
+                        <Icon name="edit" size={16} />
+                        {t('whatsapp.campaign.editAction')}
+                      </button>
+                    )}
                     {allowed.includes('running') && (
                       <button
                         type="button"

@@ -666,6 +666,8 @@ export default {
   'whatsapp.campaign.previewReady': 'Получат: {count}',
   'whatsapp.campaign.previewFailed': 'Не удалось построить предпросмотр',
   'whatsapp.campaign.created': 'Рассылка создана, получателей: {count}',
+  'whatsapp.campaign.updated': 'Рассылка обновлена, получателей: {count}',
+  'whatsapp.campaign.updateFailed': 'Не удалось обновить рассылку',
   'whatsapp.campaign.createFailed': 'Не удалось создать рассылку',
   'whatsapp.campaign.invalidPace': 'Недопустимый темп отправки',
   'whatsapp.campaign.billingVariables': 'Сообщение использует переменные счетов ({names}); для напоминаний о счетах используйте разовое напоминание',

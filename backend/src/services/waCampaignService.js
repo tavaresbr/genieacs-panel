@@ -375,11 +375,13 @@ class WaCampaignService {
   }
 
   /**
-   * Grava a campanha: rascunho (começa quando alguém clicar em Iniciar) ou
-   * agendada (`queued` com `scheduled_at`; o laço de `WaBroadcastService` a
-   * inicia na hora).
+   * Tudo que a campanha precisa para ser gravada, sem gravar nada: o texto, o
+   * público já resolvido e renderizado, o número e o ritmo. `create` e `update`
+   * usam o mesmo caminho, para que editar nunca valide menos que criar.
+   * `attachment`: `undefined` mantém o anexo de quem edita, `null` tira, um
+   * objeto troca.
    */
-  static async create({ title, filters, templateId, body, attachment, scheduledAt, accountId = null, pace = 'default', userId = null } = {}) {
+  static async prepare({ filters, templateId, body, attachment, scheduledAt, accountId = null, pace = 'default' }) {
     if (!Object.hasOwn(RITMOS, pace ?? 'default')) {
       throw invalido('whatsapp.campaign.invalidPace', 'invalid_pace');
     }
@@ -403,30 +405,85 @@ class WaCampaignService {
 
     const config = await WhatsAppConfigService.getConfig();
     const account = await this.resolveAccount(accountId);
+    return {
+      prontos,
+      counts: { ...counts, templateIncomplete },
+      anexo,
+      anexoMantido: attachment === undefined,
+      fields: {
+        template_id: mensagem.templateId,
+        body: mensagem.body,
+        account_id: account?.id ?? null,
+        pace_per_hour: RITMOS[pace ?? 'default'],
+        status: agendada ? 'queued' : 'draft',
+        scheduled_at: agendada,
+        // A lista colada pode ter milhares de contratos; o cartão só precisa
+        // saber quantos, e a edição precisa da lista (`contractList`).
+        audience_json: JSON.stringify({
+          ...filtros,
+          contracts: filtros.contracts.length,
+          contractList: filtros.contracts
+        }),
+        rate_limit_per_min: config.rateLimitPerMin,
+        total_count: prontos.length
+      }
+    };
+  }
+
+  /**
+   * Grava a campanha: rascunho (começa quando alguém clicar em Iniciar) ou
+   * agendada (`queued` com `scheduled_at`; o laço de `WaBroadcastService` a
+   * inicia na hora).
+   */
+  static async create({ title, userId = null, ...entrada } = {}) {
+    const preparo = await this.prepare(entrada);
+    const { anexo } = preparo;
     const broadcast = await WaBroadcast.create({
       title: String(title || `Campanha ${comoDataBr(new Date())}`).trim().slice(0, TITLE_LIMIT),
-      template_id: mensagem.templateId,
-      body: mensagem.body,
-      account_id: account?.id ?? null,
-      pace_per_hour: RITMOS[pace ?? 'default'],
+      ...preparo.fields,
       kind: 'general',
-      status: agendada ? 'queued' : 'draft',
-      scheduled_at: agendada,
       attachment_path: anexo?.path ?? null,
       attachment_type: anexo?.type ?? null,
       attachment_name: anexo?.name ?? null,
-      // A lista colada pode ter milhares de contratos; o cartão só precisa
-      // saber quantos.
-      audience_json: JSON.stringify({ ...filtros, contracts: filtros.contracts.length }),
-      rate_limit_per_min: config.rateLimitPerMin,
-      total_count: prontos.length,
       created_by: userId
     });
-    await WaBroadcast.addRecipients(broadcast.id, prontos);
+    await WaBroadcast.addRecipients(broadcast.id, preparo.prontos);
+    return { broadcast, recipients: preparo.prontos.length, skipped: preparo.counts };
+  }
+
+  /**
+   * Edita uma campanha que ainda não saiu (rascunho ou agendada): refaz o
+   * público, o texto e o resto pelo mesmo caminho da criação e troca a lista
+   * de destinatários. Uma campanha que já começou não se edita — parte dela já
+   * foi entregue.
+   */
+  static async update(id, { title, ...entrada } = {}) {
+    const numeric = Number(id);
+    const atual = Number.isInteger(numeric) ? await WaBroadcast.getById(numeric) : null;
+    if (!atual) throw new WaError('whatsapp.broadcast.notFound', { code: 'broadcast_not_found', status: 404 });
+    if (atual.kind !== 'general' || !['draft', 'queued'].includes(atual.status)) {
+      throw new WaError('whatsapp.error.invalidStatus', { code: 'invalid_status', status: 409 });
+    }
+    const preparo = await this.prepare(entrada);
+    const { anexo, anexoMantido } = preparo;
+    const campos = {
+      ...preparo.fields,
+      ...(title ? { title: String(title).trim().slice(0, TITLE_LIMIT) } : {}),
+      ...(anexoMantido ? {} : {
+        attachment_path: anexo?.path ?? null,
+        attachment_type: anexo?.type ?? null,
+        attachment_name: anexo?.name ?? null
+      })
+    };
+    // Condicionado ao estado: se a campanha começou entre a leitura e aqui, a
+    // edição não passa e nenhum destinatário é tocado.
+    const trocou = await WaBroadcast.updateIfStatus(numeric, ['draft', 'queued'], campos);
+    if (!trocou) throw new WaError('whatsapp.error.invalidStatus', { code: 'invalid_status', status: 409 });
+    await WaBroadcast.replaceRecipients(numeric, preparo.prontos);
     return {
-      broadcast,
-      recipients: prontos.length,
-      skipped: { ...counts, templateIncomplete }
+      broadcast: await WaBroadcast.getById(numeric),
+      recipients: preparo.prontos.length,
+      skipped: preparo.counts
     };
   }
 }

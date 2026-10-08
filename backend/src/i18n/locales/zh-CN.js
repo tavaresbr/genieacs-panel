@@ -665,6 +665,8 @@ export default {
   'whatsapp.campaign.previewReady': '将有 {count} 位收件人收到',
   'whatsapp.campaign.previewFailed': '无法生成预览',
   'whatsapp.campaign.created': '已创建群发，收件人 {count} 位',
+  'whatsapp.campaign.updated': '已更新群发，收件人 {count} 位',
+  'whatsapp.campaign.updateFailed': '无法更新群发',
   'whatsapp.campaign.createFailed': '无法创建群发',
   'whatsapp.campaign.invalidPace': '发送速度无效',
   'whatsapp.campaign.billingVariables': '消息引用了账单变量（{names}）；催缴账单请使用单次催缴',

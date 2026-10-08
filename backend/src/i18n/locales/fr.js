@@ -682,6 +682,8 @@ export default {
   'whatsapp.campaign.previewReady': '{count} destinataire(s) le recevraient',
   'whatsapp.campaign.previewFailed': 'Impossible de générer l\'aperçu',
   'whatsapp.campaign.created': 'Campagne créée avec {count} destinataire(s)',
+  'whatsapp.campaign.updated': 'Campagne mise à jour avec {count} destinataire(s)',
+  'whatsapp.campaign.updateFailed': 'Impossible de mettre à jour la campagne',
   'whatsapp.campaign.createFailed': 'Impossible de créer la campagne',
   'whatsapp.campaign.invalidPace': 'Rythme d’envoi non valide',
   'whatsapp.campaign.billingVariables': 'Le message cite des variables de facturation ({names}) ; pour relancer des factures, utilisez la relance ponctuelle',
