@@ -128,7 +128,7 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
               </div>
             </div>
-            <LanguageSwitcher className="ms-auto shrink-0" />
+            <LanguageSwitcher collapseOnMobile className="ms-auto shrink-0" />
           </div>
 
           <div className="auth-panel">
@@ -279,7 +279,7 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
                       ali não há um. Para uma conta de plataforma o caminho é
                       `scripts/reset-password.js`, que roda sem escopo. */}
                   {!doConsole && (
-                    <Link to="/forgot-password" className="text-xs text-muted-foreground underline hover:text-foreground">
+                    <Link to="/forgot-password" className="-my-3 inline-flex min-h-10 items-center text-xs text-muted-foreground underline hover:text-foreground lg:my-0 lg:min-h-0">
                       {t('login.forgotPassword')}
                     </Link>
                   )}
@@ -330,11 +330,11 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
             // de entrada das duas pessoas sem conta — o ISP que ainda não
             // existe e quem opera a plataforma.
             <p className="mt-3 text-center text-sm">
-              <Link to="/signup" className="underline">{t('login.signupLink')}</Link>
+              <Link to="/signup" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('login.signupLink')}</Link>
             </p>
           ) : tenant?.edition === 'saas' && tenant.panelBaseDomain && (
             <p className="mt-3 text-center text-sm">
-              <a href={`https://${tenant.panelBaseDomain}/signup`} className="underline">{t('login.signupLink')}</a>
+              <a href={`https://${tenant.panelBaseDomain}/signup`} className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('login.signupLink')}</a>
             </p>
           )}
         </div>

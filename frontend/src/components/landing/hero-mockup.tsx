@@ -31,17 +31,17 @@ export function HeroMockup({ copy }: { copy: LandingCopy }) {
           <span className="ml-3 text-xs font-semibold text-slate-400">{m.title}</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 p-4">
-          <div className="rounded-xl border border-white/10 bg-white/3 p-3">
-            <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">{m.devices}</div>
+        <div className="grid grid-cols-3 gap-2 px-3 py-4 sm:gap-3 sm:px-4">
+          <div className="min-w-0 rounded-xl border border-white/10 bg-white/3 p-2 sm:p-3">
+            <div className="truncate text-[0.6rem] uppercase text-slate-500 sm:text-[0.65rem] sm:tracking-wide">{m.devices}</div>
             <div className="mt-1 text-xl font-extrabold text-white">1.284</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/3 p-3">
-            <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">{m.online}</div>
+          <div className="min-w-0 rounded-xl border border-white/10 bg-white/3 p-2 sm:p-3">
+            <div className="truncate text-[0.6rem] uppercase text-slate-500 sm:text-[0.65rem] sm:tracking-wide">{m.online}</div>
             <div className="mt-1 text-xl font-extrabold text-emerald-400">98,6%</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/3 p-3">
-            <div className="text-[0.65rem] uppercase tracking-wide text-slate-500">{m.alerts}</div>
+          <div className="min-w-0 rounded-xl border border-white/10 bg-white/3 p-2 sm:p-3">
+            <div className="truncate text-[0.6rem] uppercase text-slate-500 sm:text-[0.65rem] sm:tracking-wide">{m.alerts}</div>
             <div className="mt-1 text-xl font-extrabold text-amber-300">3</div>
           </div>
         </div>

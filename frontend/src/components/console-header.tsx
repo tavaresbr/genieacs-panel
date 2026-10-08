@@ -30,13 +30,13 @@ export function ConsoleHeader() {
             "Provedor · slug": esta sessão não é de provedor nenhum. */}
         <div className="mt-0.5 flex items-center gap-1 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
           <Icon name="lock" size={11} className="shrink-0" />
-          {t('sidebar.platformAdmin')}
+          <span className="truncate">{t('sidebar.platformAdmin')}</span>
         </div>
       </div>
       <div className="ms-auto flex shrink-0 items-center gap-2 sm:gap-3">
-        <LanguageSwitcher />
+        <LanguageSwitcher collapseOnMobile />
         {user?.username && (
-          <span className="hidden text-sm text-muted-foreground sm:inline">{user.username}</span>
+          <span className="hidden max-w-64 truncate text-sm text-muted-foreground lg:inline">{user.username}</span>
         )}
         <button
           type="button"

@@ -85,7 +85,7 @@ function PlanCard({
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border p-7 transition duration-300 hover:-translate-y-1 ${plan.featured
+      className={`relative flex min-w-0 flex-col rounded-2xl border p-5 transition sm:p-7 duration-300 hover:-translate-y-1 ${plan.featured
         ? 'border-emerald-400/70 bg-emerald-400/6 shadow-[0_0_40px_-12px] shadow-emerald-400/40'
         : 'border-white/10 bg-white/3'}`}
     >
@@ -94,10 +94,12 @@ function PlanCard({
           {copy.plans.featured}
         </span>
       )}
-      <h3 className="text-lg font-bold text-white">{plan.name}</h3>
+      <h3 className="text-lg font-bold text-white wrap-anywhere">{plan.name}</h3>
       {plan.description && <p className="mt-1 text-sm text-slate-400">{plan.description}</p>}
-      <div className="mt-5 flex items-baseline gap-1">
-        <span className="text-4xl font-extrabold tracking-tight text-white">
+      {/* Quebra: um preço de cinco dígitos com "/ano" não cabe em 360px; e
+          no tablet são três cards lado a lado, cada um com ~170px de miolo. */}
+      <div className="mt-5 flex flex-wrap items-baseline gap-x-1">
+        <span className="text-4xl font-extrabold tracking-tight text-white md:text-3xl lg:text-4xl">
           {price === 0 ? copy.plans.free : money(price, plan.currency, locale)}
         </span>
         {price > 0 && <span className="text-sm text-slate-400">{suffix}</span>}
@@ -118,7 +120,7 @@ function PlanCard({
         ].map((item) => (
           <li key={item} className="flex gap-2">
             <Icon name="check" size={18} className="mt-0.5 shrink-0 text-emerald-400" />
-            <span>{item}</span>
+            <span className="min-w-0 wrap-anywhere">{item}</span>
           </li>
         ))}
       </ul>
@@ -133,7 +135,7 @@ function PlanCard({
       </Link>
       <button
         type="button" onClick={() => onDemo(plan.code)}
-        className="mt-3 text-center text-xs text-slate-400 underline-offset-4 hover:text-white hover:underline"
+        className="mt-1 min-h-10 text-center text-xs text-slate-400 underline-offset-4 hover:text-white hover:underline sm:mt-3 sm:min-h-0"
       >
         {copy.plans.talk}
       </button>
@@ -188,17 +190,17 @@ function DemoDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center overscroll-contain bg-black/70 p-0 sm:items-center sm:p-4"
       role="dialog" aria-modal="true" aria-labelledby="demo-title"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0f1c18] p-6 sm:rounded-2xl">
+      <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 bg-[#0f1c18] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-2xl sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <h2 id="demo-title" className="text-xl font-bold text-white">{copy.demo.title}</h2>
             <p className="mt-1 text-sm text-slate-400">{copy.demo.text}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label={copy.demo.close} className="rounded p-1 text-slate-400 hover:text-white">
+          <button type="button" onClick={onClose} aria-label={copy.demo.close} className="-m-2 inline-flex size-10 shrink-0 items-center justify-center rounded text-slate-400 hover:text-white sm:m-0 sm:size-auto sm:p-1">
             <Icon name="x" size={20} />
           </button>
         </div>
@@ -292,17 +294,17 @@ export default function Landing() {
             <a href="#duvidas" className="hover:text-white">{copy.nav.faq}</a>
           </nav>
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
-            <LanguageSwitcher variant="dark" compact className="hidden w-12 sm:flex" />
+            <LanguageSwitcher variant="dark" compact className="w-11 sm:w-12" />
             {painelExterno ? (
-              <a href={painelExterno} className="rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/5 sm:px-5 sm:py-2.5">
+              <a href={painelExterno} className="inline-flex min-h-10 items-center whitespace-nowrap rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/5 sm:px-5 sm:py-2.5">
                 {copy.nav.signIn}
               </a>
             ) : (
-              <Link to={entrar} className="rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/5 sm:px-5 sm:py-2.5">
+              <Link to={entrar} className="inline-flex min-h-10 items-center whitespace-nowrap rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/5 sm:px-5 sm:py-2.5">
                 {copy.nav.signIn}
               </Link>
             )}
-            <a href="#planos" className="rounded-lg bg-emerald-400 px-3 py-2 text-sm font-bold text-emerald-950 hover:bg-emerald-300 sm:px-5 sm:py-2.5">
+            <a href="#planos" className="inline-flex min-h-10 items-center whitespace-nowrap rounded-lg bg-emerald-400 px-3 py-2 text-sm font-bold text-emerald-950 hover:bg-emerald-300 sm:px-5 sm:py-2.5">
               {copy.nav.signUp}
             </a>
           </div>
@@ -438,7 +440,7 @@ export default function Landing() {
                   {([false, true] as const).map((anual) => (
                     <button
                       key={String(anual)} type="button" onClick={() => setYearly(anual)} aria-pressed={yearly === anual}
-                      className={`rounded-md px-4 py-1.5 text-sm font-semibold ${yearly === anual ? 'bg-emerald-400 text-emerald-950' : 'text-slate-300'}`}
+                      className={`rounded-md px-4 py-2.5 text-sm font-semibold sm:py-1.5 ${yearly === anual ? 'bg-emerald-400 text-emerald-950' : 'text-slate-300'}`}
                     >
                       {anual ? copy.plans.yearly : copy.plans.monthly}
                     </button>
@@ -497,12 +499,12 @@ export default function Landing() {
                 <div key={item.q}>
                   <button
                     type="button" onClick={() => setAberta(aberta === i ? null : i)} aria-expanded={aberta === i}
-                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-white"
+                    className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left font-semibold text-white sm:px-5"
                   >
                     {item.q}
                     <Icon name="chevron-down" size={18} className={`shrink-0 transition ${aberta === i ? 'rotate-180' : ''}`} />
                   </button>
-                  {aberta === i && <p className="px-5 pb-5 text-sm leading-6 text-slate-400">{item.a}</p>}
+                  {aberta === i && <p className="px-4 pb-5 text-sm sm:px-5 leading-6 text-slate-400">{item.a}</p>}
                 </div>
               ))}
             </div>
@@ -539,7 +541,7 @@ export default function Landing() {
                   <li key={rede}>
                     <a
                       href={url} target="_blank" rel="noreferrer" aria-label={SOCIAL_ICONS[rede].label}
-                      className="inline-flex size-9 items-center justify-center rounded-full border border-white/10 text-slate-400 transition hover:border-emerald-400/50 hover:text-emerald-300"
+                      className="inline-flex size-10 items-center justify-center rounded-full border sm:size-9 border-white/10 text-slate-400 transition hover:border-emerald-400/50 hover:text-emerald-300"
                     >
                       <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">
                         <path d={SOCIAL_ICONS[rede].path} fillRule="evenodd" />
@@ -552,19 +554,19 @@ export default function Landing() {
           </div>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.footer.product}</h3>
-            <ul className="mt-4 space-y-2.5 text-sm">
-              <li><a href="#recursos" className="text-slate-300 hover:text-white">{copy.nav.features}</a></li>
-              <li><a href="#como-funciona" className="text-slate-300 hover:text-white">{copy.nav.how}</a></li>
-              <li><a href="#planos" className="text-slate-300 hover:text-white">{copy.nav.plans}</a></li>
-              <li><a href="#duvidas" className="text-slate-300 hover:text-white">{copy.nav.faq}</a></li>
+            <ul className="mt-3 text-sm sm:mt-4 sm:space-y-2.5">
+              <li><a href="#recursos" className="inline-flex min-h-10 items-center text-slate-300 hover:text-white sm:min-h-0">{copy.nav.features}</a></li>
+              <li><a href="#como-funciona" className="inline-flex min-h-10 items-center text-slate-300 hover:text-white sm:min-h-0">{copy.nav.how}</a></li>
+              <li><a href="#planos" className="inline-flex min-h-10 items-center text-slate-300 hover:text-white sm:min-h-0">{copy.nav.plans}</a></li>
+              <li><a href="#duvidas" className="inline-flex min-h-10 items-center text-slate-300 hover:text-white sm:min-h-0">{copy.nav.faq}</a></li>
             </ul>
           </div>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.footer.contact}</h3>
-            <ul className="mt-4 space-y-2.5 text-sm">
+            <ul className="mt-3 text-sm sm:mt-4 sm:space-y-2.5">
               {whatsapp && info?.contactWhatsapp && (
                 <li>
-                  <a href={whatsapp} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-300 hover:text-white">
+                  <a href={whatsapp} target="_blank" rel="noreferrer" className="flex min-h-10 items-center gap-2 text-slate-300 hover:text-white sm:min-h-0">
                     <Icon name="chat" size={16} className="text-emerald-400" />
                     {formatPhone(info.contactWhatsapp)}
                   </a>
@@ -572,32 +574,33 @@ export default function Landing() {
               )}
               {info?.contactEmail && (
                 <li>
-                  <a href={`mailto:${info.contactEmail}`} className="text-slate-300 wrap-anywhere hover:text-white">{info.contactEmail}</a>
+                  <a href={`mailto:${info.contactEmail}`} className="inline-flex min-h-10 items-center text-slate-300 wrap-anywhere hover:text-white sm:inline sm:min-h-0">{info.contactEmail}</a>
                 </li>
               )}
               <li>
-                <button type="button" onClick={() => setDemo('')} className="text-slate-300 hover:text-white">{copy.hero.ctaDemo}</button>
+                <button type="button" onClick={() => setDemo('')} className="inline-flex min-h-10 items-center text-slate-300 hover:text-white sm:min-h-0">{copy.hero.ctaDemo}</button>
               </li>
             </ul>
           </div>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.footer.company}</h3>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-400">
-              {info?.legalName && <li className="text-slate-300">{info.legalName}</li>}
-              {info?.taxId && <li>{copy.footer.taxId} {info.taxId}</li>}
-              {info?.address && <li className="leading-6">{info.address}</li>}
+            <ul className="mt-3 text-sm sm:mt-4 sm:space-y-2.5 text-slate-400">
+              {info?.legalName && <li className="py-1 text-slate-300 sm:py-0">{info.legalName}</li>}
+              {info?.taxId && <li className="py-1 sm:py-0">{copy.footer.taxId} {info.taxId}</li>}
+              {info?.address && <li className="py-1 leading-6 sm:py-0">{info.address}</li>}
               <li>
                 {painelExterno
-                  ? <a href={painelExterno} className="text-slate-300 hover:text-white">{copy.nav.signIn}</a>
-                  : <Link to={entrar} className="text-slate-300 hover:text-white">{copy.nav.signIn}</Link>}
+                  ? <a href={painelExterno} className="inline-flex min-h-10 items-center text-slate-300 hover:text-white sm:min-h-0">{copy.nav.signIn}</a>
+                  : <Link to={entrar} className="inline-flex min-h-10 items-center text-slate-300 hover:text-white sm:min-h-0">{copy.nav.signIn}</Link>}
               </li>
             </ul>
           </div>
         </div>
         <div className="border-t border-white/5">
-          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-xs text-slate-500 sm:flex-row sm:px-6">
+          {/* No celular o botão fixo do WhatsApp cobre o canto: sobra embaixo. */}
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 pb-24 pt-6 text-center text-xs text-slate-500 sm:flex-row sm:px-6 sm:pb-6 sm:text-left">
             <span>© {new Date().getFullYear()} {info?.legalName || produto}. {copy.footer.rights}</span>
-            <Link to="/login" className="hover:text-slate-300">{copy.footer.console}</Link>
+            <Link to="/login" className="inline-flex min-h-10 items-center hover:text-slate-300 sm:min-h-0">{copy.footer.console}</Link>
           </div>
         </div>
       </footer>
@@ -605,7 +608,7 @@ export default function Landing() {
       {whatsapp && (
         <a
           href={whatsapp} target="_blank" rel="noreferrer" aria-label="WhatsApp"
-          className="fixed bottom-5 right-5 z-40 inline-flex size-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-lg hover:brightness-110"
+          className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] z-40 inline-flex size-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-lg hover:brightness-110"
         >
           <Icon name="chat" size={28} />
         </a>

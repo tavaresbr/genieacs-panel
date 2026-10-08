@@ -9,10 +9,12 @@ type LanguageSwitcherProps = {
   variant?: 'dark' | 'light'
   /** Renders the two-letter badge only, for the collapsed sidebar. */
   compact?: boolean
+  /** Below `sm`, collapses to the badge too: the auth headers share the row with the brand name. */
+  collapseOnMobile?: boolean
   className?: string
 }
 
-export function LanguageSwitcher({ variant = 'light', compact = false, className = '' }: LanguageSwitcherProps) {
+export function LanguageSwitcher({ variant = 'light', compact = false, collapseOnMobile = false, className = '' }: LanguageSwitcherProps) {
   const { locale, locales, setLocale, t } = useLanguage()
   const isDark = variant === 'dark'
 
@@ -23,17 +25,22 @@ export function LanguageSwitcher({ variant = 'light', compact = false, className
   return (
     <div
       className={`relative flex min-h-11 items-center rounded-md border transition-colors ${shellClass} ${
-        compact ? 'justify-center gap-1 px-1' : 'gap-2 px-2.5'
+        compact ? 'justify-center gap-1 px-1' : collapseOnMobile ? 'min-w-11 justify-center gap-1 px-1.5 sm:justify-start sm:gap-2 sm:px-2.5' : 'gap-2 px-2.5'
       } ${className}`}
       title={t('language.current', { language: LOCALE_METADATA[locale].label })}
     >
       <Icon name="globe" size={17} className="shrink-0" aria-hidden="true" />
       {compact ? (
         <span className="text-[0.62rem] font-bold">{LOCALE_METADATA[locale].shortLabel}</span>
+      ) : collapseOnMobile ? (
+        <>
+          <span className="text-[0.62rem] font-bold sm:hidden">{LOCALE_METADATA[locale].shortLabel}</span>
+          <span className="hidden truncate text-xs font-semibold sm:inline">{LOCALE_METADATA[locale].label}</span>
+        </>
       ) : (
         <span className="truncate text-xs font-semibold">{LOCALE_METADATA[locale].label}</span>
       )}
-      {!compact && <Icon name="chevron-down" size={14} className="ms-auto shrink-0 opacity-70" aria-hidden="true" />}
+      {!compact && <Icon name="chevron-down" size={14} className={`ms-auto shrink-0 opacity-70 ${collapseOnMobile ? 'hidden sm:block' : ''}`} aria-hidden="true" />}
       <select
         value={locale}
         onChange={(event) => setLocale(event.target.value as Locale)}
