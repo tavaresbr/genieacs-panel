@@ -9,6 +9,7 @@ import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
 import { copyName } from './template-copy'
 import { MetaTemplatesPanel, metaKey } from './meta-templates-panel'
+import { TemplateAiAssist } from './template-ai-assist'
 import {
   TEMPLATE_CATEGORIES,
   asCategory,
@@ -417,6 +418,15 @@ export function TemplatesPanel() {
               <p className="field-hint">{t('whatsapp.templates.quickReplyHint')}</p>
             )}
           </div>
+
+          <TemplateAiAssist
+            category={draft.category}
+            body={draft.body}
+            onApply={(text) => {
+              setDraft((current) => (current ? { ...current, body: text } : current))
+              setRefusal('')
+            }}
+          />
 
           <div>
             <label className="field-label" htmlFor="wa-template-body">

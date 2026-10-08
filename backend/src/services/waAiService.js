@@ -4,6 +4,16 @@ import WaBotConfigService, { chaveParaNovoEndereco, mesmoEnderecoIa } from './wa
 import WaConversationService from './waConversationService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import WaAiClient from './waAiClient.js';
+import { CATEGORIES, variaveisDaCategoria } from './waTemplateService.js';
+import {
+  OBJETIVO_MAX,
+  TEXTO_MAX,
+  limparTextoDoModelo,
+  pedidoDeModelo,
+  promptDeModelo,
+  tomValido,
+  variaveisForaDaLista
+} from '../utils/wa/waModeloIa.js';
 import { getDb, tdb } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { isValidCnpj, isValidCpf, normalizeTaxId } from '../utils/taxId.js';
@@ -186,6 +196,58 @@ class WaAiService {
       const texto = [resultado.texto, ...resultado.anexos.filter(Boolean)].filter(Boolean).join('\n\n').trim();
       if (!texto) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
       return { text: texto };
+    } catch (error) {
+      if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code, error.details);
+      throw error;
+    }
+  }
+
+  /**
+   * O texto de um modelo de mensagem, escrito (ou melhorado) pela IA.
+   *
+   * Só rascunho: nada é gravado, e o texto volta para a caixa do editor, onde o
+   * atendente revisa antes de salvar. A IA só conhece as variáveis da
+   * categoria; se citar outra, ela é chamada uma segunda vez com a correção, e
+   * o que ainda sobrar é tirado do texto e avisado.
+   *
+   * @returns {Promise<{text: string, warnings: {removed: string[], mirrors: boolean}}>}
+   */
+  static async draftTemplate({ category, goal, tone, current } = {}) {
+    const ai = await WaBotConfigService.aiSettings();
+    if (!ai.apiKey) throw new WaError('whatsapp.ai.error.keyRequired', { code: 'ai_key_required', status: 409 });
+    const objetivo = String(goal ?? '').trim().slice(0, OBJETIVO_MAX);
+    const atual = String(current ?? '').trim().slice(0, TEXTO_MAX);
+    if (!objetivo && !atual) throw new WaError('whatsapp.ai.error.draftGoal', { code: 'ai_draft_goal', status: 400 });
+
+    const categoria = CATEGORIES.includes(String(category)) ? String(category) : 'geral';
+    const variaveis = [...variaveisDaCategoria(categoria)];
+    const mensagens = [
+      { role: 'system', content: promptDeModelo({ empresa: await nomeDaEmpresa(), categoria, variaveis, tom: tomValido(tone) }) },
+      { role: 'user', content: pedidoDeModelo({ objetivo, atual }) }
+    ];
+    const chamar = async () => {
+      const { content } = await WaAiClient.chat({
+        baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model, messages: mensagens, maxTokens: 700
+      });
+      if (!content) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
+      return content;
+    };
+
+    try {
+      let resposta = await chamar();
+      const fora = variaveisForaDaLista(resposta, variaveis);
+      if (fora.length) {
+        mensagens.push({ role: 'assistant', content: resposta });
+        mensagens.push({
+          role: 'user',
+          content: `Você usou variáveis que não existem: ${fora.map((n) => `{{${n}}}`).join(', ')}. Reescreva usando só: ${variaveis.map((n) => `{{${n}}}`).join(', ')}. Devolva só o texto.`
+        });
+        resposta = await chamar();
+      }
+      const { texto, removidas, espelhos } = limparTextoDoModelo(resposta, variaveis);
+      if (!texto) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
+      await WaBotConfigService.recordAiError(null);
+      return { text: texto, warnings: { removed: removidas, mirrors: espelhos } };
     } catch (error) {
       if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code, error.details);
       throw error;

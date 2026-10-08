@@ -1,6 +1,7 @@
 import express from 'express';
 import WhatsAppBillingController from '../controllers/whatsappBillingController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
+import { whatsappSendLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -13,6 +14,8 @@ const gestao = [authenticateToken, requirePermission('campaigns.manage')];
 
 // ── Templates ──────────────────────────────────────────────────────────
 router.get('/templates', ...leitura, WhatsAppBillingController.listTemplates);
+// A IA escreve o texto do modelo; só rascunho, e a IA é paga por uso.
+router.post('/templates/ai-draft', ...gestao, whatsappSendLimiter, WhatsAppBillingController.draftTemplate);
 router.post('/templates', ...gestao, WhatsAppBillingController.createTemplate);
 router.put('/templates/:id', ...gestao, WhatsAppBillingController.updateTemplate);
 router.delete('/templates/:id', ...gestao, WhatsAppBillingController.deleteTemplate);

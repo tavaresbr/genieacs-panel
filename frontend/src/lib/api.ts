@@ -5287,7 +5287,11 @@ export const whatsappAPI = {
 
   /** Se o botão "Sugerir (IA)" aparece para quem atende. */
   getAiStatus: () =>
-    apiClient.get<{ suggest: boolean }>('/whatsapp/ai/status'),
+    apiClient.get<{ suggest: boolean; templates?: boolean }>('/whatsapp/ai/status'),
+
+  /** A IA escreve (ou melhora) o texto de um modelo; só rascunho, nada é gravado. */
+  draftTemplate: (payload: { category: string; goal: string; tone: string; current: string }) =>
+    apiClient.post<{ text: string; warnings: { removed: string[]; mirrors: boolean } }>('/whatsapp/templates/ai-draft', payload),
 
   /** Um rascunho da IA para a caixa de resposta; nada é enviado. */
   suggestReply: (conversationId: number) =>
