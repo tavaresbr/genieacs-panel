@@ -148,14 +148,14 @@ export function BulkPlaceDialog({ existingIds, onClose, onDone }: {
                 <li className="flex flex-wrap items-center gap-2">
                   <Icon name="pin" size={15} className="text-amber-600" />{t('map.bulk.needsAddress', { count: data.needsAddress.length })}
                   {!located && !locating && (
-                    <button type="button" className="modern-button-secondary min-h-8 px-3 text-xs" onClick={() => void locate()} disabled={saving !== null}>
+                    <button type="button" className="modern-button-secondary min-h-10 px-3 text-xs sm:min-h-8" onClick={() => void locate()} disabled={saving !== null}>
                       {t('map.bulk.locate')}
                     </button>
                   )}
                   {locating && (
                     <>
                       <span className="text-xs text-muted-foreground" aria-live="polite">{t('map.bulk.locating', { done: locating.done, total: locating.total })}</span>
-                      <button type="button" className="modern-button-secondary min-h-8 px-3 text-xs" onClick={() => { cancelRef.current = true }}>{t('common.cancel')}</button>
+                      <button type="button" className="modern-button-secondary min-h-10 px-3 text-xs sm:min-h-8" onClick={() => { cancelRef.current = true }}>{t('common.cancel')}</button>
                     </>
                   )}
                   {located && notFound > 0 && <span className="text-xs text-muted-foreground">{t('map.bulk.notFound', { count: notFound })}</span>}

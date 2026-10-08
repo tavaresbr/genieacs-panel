@@ -111,7 +111,33 @@ export function PlatformCancellations({ from }: { from?: string }) {
             </div>
           </div>
 
-          <div className="modern-card overflow-x-auto">
+          {/* No celular, cartões: com quatro colunas o motivo virava uma
+              palavra por linha e o desfecho ficava fora da tela. */}
+          <ul className="mobile-card-list modern-card divide-y divide-border" aria-label={t('platform.cancellations.list')}>
+            {report.requests.length === 0 ? (
+              <li className="py-6 text-center text-sm text-muted-foreground">{t('platform.cancellations.empty')}</li>
+            ) : report.requests.map((pedido) => (
+              <li key={pedido.id} className="p-4 text-sm">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <span className="min-w-0 wrap-break-word font-semibold text-foreground">
+                    {pedido.tenant.name ?? pedido.tenant.slug ?? `#${pedido.tenant.id}`}
+                  </span>
+                  <span className="text-xs whitespace-nowrap text-muted-foreground">{displayDate(pedido.createdAt) ?? '—'}</span>
+                </div>
+                <p className="mt-1 wrap-break-word">{t(CANCELLATION_REASON_KEYS[pedido.reason] ?? 'plan.cancel.reason.other')}</p>
+                {pedido.comment && <p className="mt-0.5 text-xs wrap-break-word text-muted-foreground">{pedido.comment}</p>}
+                <p className="mt-1 font-medium">
+                  {t(CANCELLATION_OUTCOME_KEYS[desfechoDe(pedido)])}
+                  {pedido.cancelAt && pedido.outcome === 'canceled' && (
+                    <span className="ms-2 text-xs font-normal text-muted-foreground">
+                      {t('platform.subs.cancelsOn', { date: displayDate(pedido.cancelAt) ?? '—' })}
+                    </span>
+                  )}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <div className="desktop-table modern-card overflow-x-auto">
             <table className="modern-table">
               <caption className="sr-only">{t('platform.cancellations.list')}</caption>
               <thead>

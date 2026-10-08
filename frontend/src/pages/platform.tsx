@@ -487,7 +487,9 @@ export default function PlatformPage() {
           )}
         </header>
 
-        <nav className="mb-6 flex flex-wrap gap-2" aria-label={t('platform.title')}>
+        {/* No celular, uma faixa que rola de lado: as onze abas quebradas em
+            linhas ocupavam a primeira tela inteira antes do conteúdo. */}
+        <nav className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" aria-label={t('platform.title')}>
           {([
             ['tenants', 'platform.tabs.tenants'],
             ['plans', 'platform.tabs.plans'],
@@ -520,7 +522,7 @@ export default function PlatformPage() {
               type="button"
               onClick={() => setAba(chave)}
               aria-current={aba === chave ? 'page' : undefined}
-              className={aba === chave ? 'modern-button' : 'modern-button-secondary'}
+              className={`shrink-0 whitespace-nowrap ${aba === chave ? 'modern-button' : 'modern-button-secondary'}`}
             >
               {t(rotulo)}
             </button>
@@ -597,7 +599,7 @@ export default function PlatformPage() {
                       <h2 className="wrap-break-word font-semibold text-foreground">{tenant.name}</h2>
                       <p className="break-all font-mono text-xs text-muted-foreground">{tenant.slug}</p>
                     </div>
-                    <div className="text-end">{statusDe(tenant)}</div>
+                    <div className="sm:text-end">{statusDe(tenant)}</div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                     {planoDe(tenant)}

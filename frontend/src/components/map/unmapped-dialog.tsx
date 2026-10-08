@@ -48,7 +48,7 @@ export function UnmappedDialog({ canWrite, onClose, onPlace, onPlaceAll }: {
         {canWrite && onPlaceAll && data && data.total > 0 && (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm">
             <span className="min-w-0 flex-1 text-muted-foreground">{t('map.bulk.offer')}</span>
-            <button type="button" className="modern-button min-h-9 shrink-0 px-3 text-sm" onClick={onPlaceAll}>
+            <button type="button" className="modern-button min-h-10 shrink-0 px-3 text-sm sm:min-h-9" onClick={onPlaceAll}>
               <Icon name="pin" size={15} />{t('map.bulk.button')}
             </button>
           </div>
@@ -67,7 +67,7 @@ export function UnmappedDialog({ canWrite, onClose, onPlace, onPlaceAll }: {
                 <span className="block truncate text-xs text-muted-foreground">{item.deviceId}{item.rxPower !== null ? ` · RX ${item.rxPower} dBm` : ''}</span>
               </span>
               {canWrite && (
-                <button type="button" className="modern-button-secondary min-h-9 shrink-0 px-3 text-sm" onClick={() => onPlace(item)}>
+                <button type="button" className="modern-button-secondary min-h-10 shrink-0 px-3 text-sm sm:min-h-9" onClick={() => onPlace(item)}>
                   <Icon name="pin" size={15} />{t('map.unmapped.place')}
                 </button>
               )}

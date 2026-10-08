@@ -775,7 +775,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
             ] as const).map(([key, label]) => (
               <div key={key} className="flex items-center justify-between gap-2 rounded border border-border px-3 py-2">
                 <dt className="text-muted-foreground">{label}</dt>
-                <dd className={usage.over[key] ? 'font-semibold text-destructive' : 'font-medium'}>
+                <dd className={`whitespace-nowrap ${usage.over[key] ? 'font-semibold text-destructive' : 'font-medium'}`}>
                   {limitText(usage.usage[key], usage.limits[key])}
                 </dd>
               </div>
@@ -799,7 +799,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
                   {/* O pagamento (ou a troca) da pró-rata de uma subida. */}
                   {event.detail?.proration ? <span className="modern-badge-info mr-2">{t('charges.proration')}</span> : null}
                   {event.amountCents !== null && <span>{formatMoney(event.amountCents, event.currency)}</span>}
-                  {event.externalId && <span className="ml-2 font-mono text-xs text-muted-foreground">{event.externalId}</span>}
+                  {event.externalId && <span className="ml-2 font-mono text-xs break-all text-muted-foreground">{event.externalId}</span>}
                 </span>
                 <span className="text-muted-foreground">{formatDate(event.at)}</span>
                 {/* A nota fiscal do pagamento que quitou uma cobrança do painel. */}

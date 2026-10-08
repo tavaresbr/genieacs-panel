@@ -158,7 +158,9 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
             <p className="metric-label">{t('platform.subs.filterExempt')}</p>
             <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground">{isentos}</p>
           </div>
-          <div className="modern-card p-3">
+          {/* No celular, linha inteira e por último: um total de sete dígitos
+              em mono não cabe na metade da tela. */}
+          <div className="modern-card order-last col-span-2 p-3 sm:order-none sm:col-span-1">
             <p className="metric-label">{t('platform.subs.openTotal')}</p>
             {variasMoedas ? (
               <>
@@ -452,7 +454,7 @@ function OpenChargeCell({ row }: { row: SubscriptionRow }) {
           href={charge.invoiceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+          className="inline-flex min-h-10 items-center gap-1 text-primary underline-offset-2 hover:underline sm:min-h-0"
         >
           <Icon name="external" size={14} />
           {t('platform.subs.invoice')}
@@ -760,7 +762,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
                 <span>
                   <span className="modern-badge mr-2">{event.type}</span>
                   {event.amountCents !== null && <span>{formatMoney(event.amountCents, event.currency)}</span>}
-                  {event.externalId && <span className="ml-2 font-mono text-xs text-muted-foreground">{event.externalId}</span>}
+                  {event.externalId && <span className="ml-2 font-mono text-xs break-all text-muted-foreground">{event.externalId}</span>}
                 </span>
                 <span className="text-muted-foreground">{formatDay(event.at)}</span>
               </li>

@@ -116,8 +116,8 @@ export function PlaceClientDialog<T extends OccupancyNode>({
     <div className="modal-backdrop z-2300 bg-black/65" role="dialog" aria-modal="true">
       <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 className="section-heading">{t('map.place.title', { pppoe: target.pppoe })}</h2>
-          <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')} disabled={saving}><Icon name="x" size={20} /></button>
+          <h2 className="section-heading min-w-0 wrap-break-word">{t('map.place.title', { pppoe: target.pppoe })}</h2>
+          <button type="button" onClick={onClose} className="icon-button shrink-0" aria-label={t('common.close')} disabled={saving}><Icon name="x" size={20} /></button>
         </div>
         <label className="field-label" htmlFor="place-name">{t('map.table.name')}</label>
         <input id="place-name" className="modern-input w-full" maxLength={255} value={name} onChange={(event) => setName(event.target.value)} />

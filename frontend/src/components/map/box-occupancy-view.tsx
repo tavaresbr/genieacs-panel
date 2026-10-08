@@ -81,14 +81,14 @@ export function BoxOccupancyView<T extends OccupancyNode>({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <input type="search" className="modern-input min-h-9 w-48 text-sm" placeholder={t('map.boxes.search')} aria-label={t('map.boxes.search')}
+          <input type="search" className="modern-input min-h-10 w-full text-sm sm:min-h-9 sm:w-48" placeholder={t('map.boxes.search')} aria-label={t('map.boxes.search')}
             value={query} onChange={(event) => setQuery(event.target.value)} />
           {onBulkLink && (
-            <button type="button" className="modern-button min-h-9" onClick={onBulkLink} title={t('map.link.hint')}>
+            <button type="button" className="modern-button min-h-10 sm:min-h-9" onClick={onBulkLink} title={t('map.link.hint')}>
               <Icon name="signal" size={16} />{t('map.link.button')}
             </button>
           )}
-          <button type="button" className="modern-button-secondary min-h-9" disabled={!visible.length} onClick={download}>
+          <button type="button" className="modern-button-secondary min-h-10 sm:min-h-9" disabled={!visible.length} onClick={download}>
             <Icon name="document" size={16} />{t('map.boxes.export')}
           </button>
         </div>
@@ -96,14 +96,50 @@ export function BoxOccupancyView<T extends OccupancyNode>({
       <div className="flex flex-wrap gap-2 border-b border-border px-5 py-3">
         {FILTERS.map((value) => (
           <button key={value} type="button" onClick={() => setFilter(value)}
-            className={`modern-badge ${filter === value ? 'ring-2 ring-primary' : ''}`}>
+            className={`modern-badge min-h-9 sm:min-h-0 ${filter === value ? 'ring-2 ring-primary' : ''}`}>
             {value === 'weak' && <span style={{ color: WEAK_COLOR }}><Icon name="signal" size={13} /></span>}
             {value !== 'all' && value !== 'weak' && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLORS[value] }} />}
             {value === 'all' ? t('map.boxes.all') : value === 'weak' ? t('map.weak.filter') : levelLabel(value)} {counts[value]}
           </button>
         ))}
       </div>
-      <div className="overflow-x-auto">
+      {/* No celular, cartões: seis colunas não cabem e a ação ficava fora da tela. */}
+      <ul className="mobile-card-list divide-y divide-border">
+        {visible.map((row) => (
+          <li key={row.box.node_id}>
+            <button type="button" className="block w-full px-4 py-3 text-start hover:bg-[hsl(var(--surface-subtle))]" onClick={() => onSelect(row.box)}>
+              <span className="block wrap-break-word font-semibold">{row.box.name}</span>
+              <span className="mt-0.5 block break-all font-mono text-xs text-muted-foreground">{row.box.node_id} · {row.box.type.toUpperCase()}</span>
+              <span className="mt-2 flex items-center gap-3 text-sm">
+                <span className="shrink-0">{row.capacity === null ? row.used : `${row.used}/${row.capacity}`}</span>
+                {row.percent !== null && (
+                  <span className="h-1.5 flex-1 overflow-hidden rounded bg-muted">
+                    <span className="block h-full rounded" style={{ width: `${Math.min(100, row.percent)}%`, background: LEVEL_COLORS[row.level] }} />
+                  </span>
+                )}
+              </span>
+              <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLORS[row.level] }} />
+                  {levelLabel(row.level)}
+                </span>
+                {outageIds.has(row.box.node_id) && (
+                  <span className="inline-flex items-center gap-1 font-semibold" style={{ color: LEVEL_COLORS.over }}>
+                    <Icon name="warning" size={13} />{t('map.boxes.outageNow')}
+                  </span>
+                )}
+                {weakIds.has(row.box.node_id) && (
+                  <span className="inline-flex items-center gap-1 font-semibold" style={{ color: WEAK_COLOR }}>
+                    <Icon name="signal" size={13} />{t('map.weak.filter')}
+                  </span>
+                )}
+              </span>
+            </button>
+          </li>
+        ))}
+        {!visible.length && <li className="py-10 text-center text-muted-foreground">{t('map.boxes.empty')}</li>}
+      </ul>
+      <div className="desktop-table overflow-x-auto">
         <table className="modern-table">
           <thead>
             <tr>

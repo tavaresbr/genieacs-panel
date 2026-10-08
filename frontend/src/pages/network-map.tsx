@@ -1027,10 +1027,12 @@ export default function NetworkMap() {
             ))}
             {liveError && <span className="modern-badge text-[hsl(var(--status-danger))]" title={liveError}><Icon name="warning" size={14} />{t('map.live.unavailable')}</span>}
           </div>
-          <div className="flex rounded-md border border-border bg-card p-1">
+          {/* No celular as quatro vistas ocupam a linha inteira e dividem a
+              largura; o rolar de lado só entra numa língua de rótulos longos. */}
+          <div className="flex w-full overflow-x-auto rounded-md border border-border bg-card p-1 sm:w-auto">
             {(['map', 'list', 'boxes', 'outages'] as const).map((view) => (
               <button key={view} type="button" onClick={() => setMapView(view)}
-                className={`min-h-10 rounded px-3 text-sm font-semibold sm:min-h-9 ${mapView === view ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                className={`min-h-10 flex-auto rounded px-2 text-sm font-semibold sm:min-h-9 sm:flex-none sm:px-3 ${mapView === view ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
                 {t(`map.view.${view}` as const)}
               </button>
             ))}
@@ -1047,7 +1049,7 @@ export default function NetworkMap() {
                 <li key={outage.node_id} className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-semibold">{outage.name}</span>
                   <span className="text-muted-foreground">{outageLine(outage)}</span>
-                  <button type="button" className="font-semibold text-primary hover:underline" onClick={() => focusBox(outage.node_id)}>
+                  <button type="button" className="min-h-10 font-semibold text-primary hover:underline sm:min-h-0" onClick={() => focusBox(outage.node_id)}>
                     {t('map.outage.show')}
                   </button>
                 </li>
@@ -1072,7 +1074,7 @@ export default function NetworkMap() {
                       {t('map.weak.line', { weak: entry.weak, measured: entry.measured })}
                       {entry.averageRx !== null ? ` · ${t('map.weak.average', { rx: entry.averageRx.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}` : ''}
                     </span>
-                    <button type="button" className="font-semibold text-primary hover:underline" onClick={() => focusBox(entry.box.node_id)}>
+                    <button type="button" className="min-h-10 font-semibold text-primary hover:underline sm:min-h-0" onClick={() => focusBox(entry.box.node_id)}>
                       {t('map.outage.show')}
                     </button>
                   </li>

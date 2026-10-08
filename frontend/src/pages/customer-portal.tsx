@@ -497,7 +497,7 @@ export default function CustomerPortal() {
               <p className="text-lg font-bold">TR69 Controle</p>
               <p className="text-sm text-muted-foreground">{t('portal.name')}</p>
             </div>
-            <LanguageSwitcher className="ms-auto shrink-0" />
+            <LanguageSwitcher collapseOnMobile className="ms-auto shrink-0" />
           </header>
           <section className="modern-card p-5 sm:p-7">
             <p className="page-kicker">{t('portal.login.kicker')}</p>
