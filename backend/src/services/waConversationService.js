@@ -244,13 +244,16 @@ class WaConversationService {
   static async retireStaleBindings(contract, { oldPhones = [] } = {}) {
     const key = String(contract ?? '').trim();
     if (!key) return [];
-    const { all: atuais } = await this.contractPhones(key);
-    // Sem número no cadastro não há com o que comparar.
-    if (atuais.size === 0) return [];
+    // A consulta barata primeiro: quase todo contrato não tem conversa, e a
+    // sincronização de contatos passa por aqui a cada número que muda.
     const rows = await tdb('wa_conversations')
       .where({ contract: key })
       .whereNotNull('wa_phone_e164')
       .select('id', 'wa_phone_e164');
+    if (rows.length === 0) return [];
+    const { all: atuais } = await this.contractPhones(key);
+    // Sem número no cadastro não há com o que comparar.
+    if (atuais.size === 0) return [];
     const grafias = (numero) => variantesTelefoneBr(numero);
     const candidatas = rows.filter((row) => {
       const vs = grafias(row.wa_phone_e164);

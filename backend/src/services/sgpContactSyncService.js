@@ -258,7 +258,8 @@ class SgpContactSyncService {
     if (record.contract && row.clientId && stored) await this.retireClientRow(row.clientId, stored);
     // O número do contrato mudou no SGP: a conversa no número antigo deixa de
     // ser a do contrato. Uma falha aqui não derruba a sincronização.
-    if (record.contract && existing?.phone_e164 && existing.phone_e164 !== stored?.phone_e164) {
+    if (record.contract && existing?.phone_e164 && existing.phone_e164 !== stored?.phone_e164
+      && await tdb('wa_conversations').where({ contract: record.contract }).first('id')) {
       try {
         const { default: WaConversationService } = await import('./waConversationService.js');
         await WaConversationService.retireStaleBindings(record.contract, { oldPhones: [existing.phone_e164] });
