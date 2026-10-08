@@ -31,6 +31,11 @@ de baixo são nossas e de mais ninguém — e é por isso que a política de pri
 **site** e o contrato de operador com o **ISP** são documentos diferentes, com obrigações
 diferentes.
 
+A política do **site** já está publicada em `/privacidade` (texto em `frontend/src/pages/privacy.tsx`,
+afirmações em `frontend/src/lib/privacy.ts`, guardadas por `frontend/test/privacy.test.ts`). O
+prazo que ela declara para `leads` é lido de `/api/public/info`, da mesma função que a poda usa.
+O contrato de operador e o modelo de aviso ao assinante ainda não existem.
+
 A fronteira técnica dessa divisão é `tenant_id`: toda tabela escopada
 (`backend/src/config/tenantScope.js`) carrega um provedor em cada linha, e `tdb()` **lança**
 se for lida fora de escopo. Não existe linha de assinante sem dono.

@@ -55,7 +55,7 @@ describe('o robots.txt', () => {
     assert.doesNotMatch(texto, /Sitemap:/);
   });
 
-  it('abre as três páginas públicas no ápice, e só elas', () => {
+  it('abre as páginas públicas no ápice, e só elas', () => {
     const texto = robotsFor({ platformHost: true, host: 'tr69.com.br' });
 
     // A forma é de lista de permissão: `Disallow: /` primeiro, exceções depois.
@@ -64,6 +64,9 @@ describe('o robots.txt', () => {
     assert.match(texto, /^Allow: \/\$$/m);
     assert.match(texto, /^Allow: \/signup$/m);
     assert.match(texto, /^Allow: \/login$/m);
+    // A política é onde o titular lê o que fazemos com o dado: bloqueá-la do
+    // buscador esconderia justamente o aviso que a LGPD (art. 9º) manda dar.
+    assert.match(texto, /^Allow: \/privacidade$/m);
 
     const liberadas = [...texto.matchAll(/^Allow: (.+)$/gm)].map((m) => m[1]);
     assert.equal(liberadas.length, PUBLIC_PATHS.length);
@@ -100,6 +103,7 @@ describe('o sitemap.xml', () => {
     assert.match(xml, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
     assert.match(xml, /<loc>https:\/\/tr69\.com\.br\/<\/loc>/);
     assert.match(xml, /<loc>https:\/\/tr69\.com\.br\/signup<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/tr69\.com\.br\/privacidade<\/loc>/);
   });
 
   /**

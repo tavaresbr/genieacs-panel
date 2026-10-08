@@ -307,6 +307,7 @@ const ptBR: Dictionary = {
   'login.mfa.invalid': 'Código inválido. Confira o horário do celular e tente o código atual.',
   'login.submitting': 'Verificando conta…',
   'login.helpText': 'Se o acesso for negado, fale com o administrador do painel para redefinir as credenciais.',
+  'login.privacyLink': "Política de privacidade",
   'login.platform.helpText': 'A senha de uma conta de plataforma se redefine pelo servidor, com scripts/reset-password.js.',
   'console.header': 'Plataforma',
   'login.error.invalidCredentials': 'Usuário ou e-mail e senha não conferem. Verifique as credenciais.',

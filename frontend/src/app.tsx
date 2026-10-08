@@ -36,6 +36,7 @@ const LoginPage = lazy(() => import('@/pages/login'))
 const SetupPage = lazy(() => import('@/pages/setup'))
 const SignupPage = lazy(() => import('@/pages/signup'))
 const LandingPage = lazy(() => import('@/pages/landing'))
+const PrivacyPage = lazy(() => import('@/pages/privacy'))
 const PlanPage = lazy(() => import('@/pages/plan'))
 const OnboardingPage = lazy(() => import('@/pages/onboarding'))
 const InvitePage = lazy(() => import('@/pages/invite'))
@@ -323,6 +324,10 @@ function ConsoleRoutes() {
       <Route path="/" element={<Suspense fallback={<AuthFallback />}><LandingRoute /></Suspense>} />
       <Route path="/login" element={<Suspense fallback={<AuthFallback />}><ConsoleLoginRoute /></Suspense>} />
       <Route path="/signup" element={<Suspense fallback={<AuthFallback />}><SignupRoute /></Suspense>} />
+      {/* A política de privacidade é pública e tem que estar onde está o
+          formulário que coleta o dado: a vitrine mora aqui, e o aviso da LGPD
+          (art. 9º) é na coleta. Antes do `*` abaixo, que a mandaria ao console. */}
+      <Route path="/privacidade" element={<Suspense fallback={<AuthFallback />}><PrivacyPage /></Suspense>} />
       {/* O resgate da personificação também mora aqui. Num deploy de host
           único o "Abrir o painel" abre `/impersonate` no MESMO endereço, e a
           aba nova herda do `localStorage` a sessão do console — então é esta
@@ -365,6 +370,10 @@ function ProviderRoutes() {
                     da URL, e não com usuário e senha: o convite e o bilhete de
                     personificação. Fora da casca protegida de propósito — quem
                     chega nelas ainda não tem sessão neste provedor. */}
+                {/* Pública, como as outras deste bloco: o operador lê o que
+                    guardamos dele antes de entrar, e um deploy de endereço único
+                    — sem vitrine — não tem outro lugar para a política morar. */}
+                <Route path="/privacidade" element={<Suspense fallback={<AuthFallback />}><PrivacyPage /></Suspense>} />
                 <Route path="/invite" element={<Suspense fallback={<AuthFallback />}><InvitePage /></Suspense>} />
                 <Route path="/impersonate" element={<Suspense fallback={<AuthFallback />}><ImpersonatePage /></Suspense>} />
                 {/* As três que chegam de fora com um token no fragmento. Sem

@@ -237,6 +237,14 @@ function DemoDialog({
             {/* O campo que só robô preenche. */}
             <input className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true"
               value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} />
+            {/* O aviso na COLETA (LGPD art. 9º): o que se faz com o dado, ao lado
+                do botão que o envia — e não só numa página que ninguém abre. */}
+            <p className="text-xs leading-5 text-slate-400 sm:col-span-2">
+              {copy.demo.privacyNotice}{' '}
+              <Link to="/privacidade" className="font-semibold text-emerald-400 underline hover:text-emerald-300">
+                {copy.demo.privacyLink}
+              </Link>.
+            </p>
             <button type="submit" disabled={state === 'sending'}
               className="rounded-lg bg-emerald-400 px-4 py-3 text-sm font-bold text-emerald-950 hover:bg-emerald-300 disabled:opacity-60 sm:col-span-2">
               {state === 'sending' ? copy.demo.sending : copy.demo.submit}
@@ -600,7 +608,10 @@ export default function Landing() {
           {/* No celular o botão fixo do WhatsApp cobre o canto: sobra embaixo. */}
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 pb-24 pt-6 text-center text-xs text-slate-500 sm:flex-row sm:px-6 sm:pb-6 sm:text-left">
             <span>© {new Date().getFullYear()} {info?.legalName || produto}. {copy.footer.rights}</span>
-            <Link to="/login" className="inline-flex min-h-10 items-center hover:text-slate-300 sm:min-h-0">{copy.footer.console}</Link>
+            <span className="flex items-center gap-4">
+              <Link to="/privacidade" className="inline-flex min-h-10 items-center hover:text-slate-300 sm:min-h-0">{copy.footer.privacy}</Link>
+              <Link to="/login" className="inline-flex min-h-10 items-center hover:text-slate-300 sm:min-h-0">{copy.footer.console}</Link>
+            </span>
           </div>
         </div>
       </footer>

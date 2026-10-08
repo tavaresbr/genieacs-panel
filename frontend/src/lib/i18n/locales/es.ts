@@ -307,6 +307,7 @@ const es: Dictionary = {
   'login.mfa.invalid': 'Código no válido. Revise la hora del celular y pruebe el código actual.',
   'login.submitting': 'Verificando cuenta…',
   'login.helpText': 'Si el acceso es denegado, contacta al administrador del panel para restablecer las credenciales.',
+  'login.privacyLink': "Política de privacidad",
   'login.platform.helpText': 'La contraseña de una cuenta de plataforma se restablece en el servidor, con scripts/reset-password.js.',
   'console.header': 'Plataforma',
   'login.error.invalidCredentials': 'El usuario o correo y la contraseña no coinciden. Revisa las credenciales.',

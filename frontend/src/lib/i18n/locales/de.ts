@@ -307,6 +307,7 @@ const de: Dictionary = {
   'login.mfa.invalid': 'Ungültiger Code. Prüfen Sie die Uhrzeit des Telefons und versuchen Sie den aktuellen Code.',
   'login.submitting': 'Konto wird geprüft…',
   'login.helpText': 'Wenn der Zugriff verweigert wird, wenden Sie sich an den Panel-Administrator, um die Zugangsdaten zurückzusetzen.',
+  'login.privacyLink': "Datenschutzerklärung",
   'login.platform.helpText': 'Das Passwort eines Plattformkontos wird auf dem Server zurückgesetzt, mit scripts/reset-password.js.',
   'console.header': 'Plattform',
   'login.error.invalidCredentials': 'Benutzername oder E-Mail und Passwort stimmen nicht. Prüfen Sie die Zugangsdaten.',

@@ -24,6 +24,7 @@ responder "onde fica X" sem abrir o código.
 | `/` | **Vitrine** | só existe no ápice da plataforma; em host único a raiz leva ao console |
 | `/signup` | Cadastro de provedor | aceita `?plano=` vindo da vitrine |
 | `/login` | Entrada | a do console e a do provedor são rotas distintas no mesmo caminho |
+| `/privacidade` | Política de privacidade | texto em `frontend/src/pages/privacy.tsx`, dados em `frontend/src/lib/privacy.ts`; nas duas árvores públicas |
 | `/setup` | Primeira instalação | só enquanto não há nenhum usuário |
 | `/invite` | Aceitar convite de equipe | por token |
 | `/forgot-password`, `/reset-password` | Recuperação de senha | exige e-mail verificado |
@@ -35,7 +36,7 @@ transacionais e dependem de token.
 
 **E o que um buscador alcança de verdade é decidido por host.** `GET /robots.txt` e
 `GET /sitemap.xml` (`backend/src/services/seoFiles.js`) respondem conforme o endereço seja o
-ápice da plataforma ou não: no ápice, `Disallow: /` com exceção de `/`, `/signup` e `/login`,
+ápice da plataforma ou não: no ápice, `Disallow: /` com exceção de `/`, `/signup`, `/login` e `/privacidade`,
 mais o `Sitemap:`; em qualquer outro host — painel de provedor, deploy de endereço único,
 portal do assinante — `Disallow: /` e nada de mapa. Num deploy sem ápice, portanto, o efeito é
 só um: **manter o painel fora dos buscadores**.

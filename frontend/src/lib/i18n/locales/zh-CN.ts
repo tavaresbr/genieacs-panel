@@ -307,6 +307,7 @@ const zhCN: Dictionary = {
   'login.mfa.invalid': '代码无效。请检查手机时间并尝试当前代码。',
   'login.submitting': '正在验证账号…',
   'login.helpText': '如果访问被拒绝，请联系面板管理员重置您的凭据。',
+  'login.privacyLink': "隐私政策",
   'login.platform.helpText': '平台账户的密码在服务器上用 scripts/reset-password.js 重置。',
   'console.header': '平台',
   'login.error.invalidCredentials': '用户名或邮箱与密码不匹配。请检查凭据。',

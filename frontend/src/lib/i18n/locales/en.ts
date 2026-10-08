@@ -309,6 +309,7 @@ const en = {
   'login.mfa.invalid': 'Invalid code. Check your phone\'s clock and try the current code.',
   'login.submitting': 'Verifying account…',
   'login.helpText': 'If access is denied, contact the panel administrator to reset your credentials.',
+  'login.privacyLink': "Privacy policy",
   'login.platform.helpText': 'A platform account\'s password is reset on the server, with scripts/reset-password.js.',
   'console.header': 'Platform',
   'login.error.invalidCredentials': 'The username or email and the password do not match. Check the credentials.',

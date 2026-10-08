@@ -304,6 +304,7 @@ const ar: Dictionary = {
   'login.mfa.invalid': 'رمز غير صالح. تحقق من ساعة الهاتف وجرّب الرمز الحالي.',
   'login.submitting': 'جارٍ التحقق من الحساب…',
   'login.helpText': 'إذا رُفض الدخول، تواصل مع مدير اللوحة لإعادة تعيين بيانات الاعتماد.',
+  'login.privacyLink': "سياسة الخصوصية",
   'login.platform.helpText': 'تُعاد تعيين كلمة مرور حساب المنصة على الخادم، عبر scripts/reset-password.js.',
   'console.header': 'المنصة',
   'login.error.invalidCredentials': 'اسم المستخدم أو كلمة المرور غير مطابقة. تحقّق من بيانات اعتماد المدير.',

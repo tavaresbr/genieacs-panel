@@ -307,6 +307,7 @@ const zhTW: Dictionary = {
   'login.mfa.invalid': '代碼無效。請檢查手機時間並嘗試目前的代碼。',
   'login.submitting': '正在驗證帳號…',
   'login.helpText': '若存取遭到拒絕，請聯絡面板管理員重設您的憑證。',
+  'login.privacyLink': "隱私權政策",
   'login.platform.helpText': '平台帳戶的密碼在伺服器上用 scripts/reset-password.js 重設。',
   'console.header': '平台',
   'login.error.invalidCredentials': '使用者名稱或電子郵件與密碼不符。請確認憑證。',

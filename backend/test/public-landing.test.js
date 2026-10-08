@@ -228,3 +228,42 @@ describe('o pedido de demonstração', () => {
     assert.ok([401, 404].includes(res.status));
   });
 });
+
+/**
+ * O que a política de privacidade diz sobre quanto tempo o pedido de contato
+ * fica guardado vem DESTA rota — e a rota lê a mesma função que a poda
+ * (`utils/leadRetention.js`). Sem isto a página poderia prometer um prazo e o
+ * código cumprir outro, que é o defeito que uma política escrita à mão tem.
+ */
+describe('o prazo que a política publica', () => {
+  const anterior = process.env.LEAD_RETENTION_DAYS;
+  after(() => {
+    if (anterior === undefined) delete process.env.LEAD_RETENTION_DAYS;
+    else process.env.LEAD_RETENTION_DAYS = anterior;
+  });
+
+  it('é zero — "nada o apaga sozinho" — enquanto ninguém configurou', async () => {
+    delete process.env.LEAD_RETENTION_DAYS;
+    const info = await noApex('/api/public/info');
+    assert.equal(info.status, 200);
+    assert.equal(info.body.data.leadRetentionDays, 0);
+  });
+
+  it('acompanha a variável de ambiente, sem precisar de outro deploy da página', async () => {
+    process.env.LEAD_RETENTION_DAYS = '365';
+    const info = await noApex('/api/public/info');
+    assert.equal(info.body.data.leadRetentionDays, 365);
+  });
+
+  /**
+   * O caso que importa: um valor mal digitado NÃO pode virar uma promessa
+   * pública. A poda lê `'12abc'` como zero (não apaga nada), e a política tem que
+   * dizer o mesmo — publicar "12 dias" sobre um prazo que o código nunca cumpre
+   * seria afirmar em público o que não é verdade.
+   */
+  it('lê um valor inválido como zero, igual à poda, em vez de publicar um prazo inventado', async () => {
+    process.env.LEAD_RETENTION_DAYS = '12abc';
+    const info = await noApex('/api/public/info');
+    assert.equal(info.body.data.leadRetentionDays, 0);
+  });
+});

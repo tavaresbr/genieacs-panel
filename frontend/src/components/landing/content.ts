@@ -40,9 +40,11 @@ export interface LandingCopy {
     title: string; text: string; name: string; company: string; email: string; phone: string; city: string
     devices: string; message: string; submit: string; sending: string; done: string; error: string; close: string
     plan: string; anyPlan: string
+    /** O aviso na coleta (LGPD art. 9º): o que se faz com o dado, ao lado do botão de enviar. */
+    privacyNotice: string; privacyLink: string
   }
   footer: {
-    rights: string; console: string; tagline: string; product: string; contact: string; company: string
+    rights: string; console: string; tagline: string; product: string; contact: string; company: string; privacy: string
     taxId: string; whatsapp: string; email: string
   }
 }
@@ -156,10 +158,13 @@ const ptBR: LandingCopy = {
     error: 'Não foi possível enviar agora. Tente de novo ou chame no WhatsApp.',
     close: 'Fechar',
     plan: 'Plano de interesse',
-    anyPlan: 'Ainda não sei'
+    anyPlan: 'Ainda não sei',
+    privacyNotice: 'Usamos estes dados para responder ao seu pedido e dar andamento ao contato comercial.',
+    privacyLink: 'Política de privacidade'
   },
   footer: {
     rights: 'Todos os direitos reservados.',
+    privacy: 'Política de privacidade',
     console: 'Console da plataforma',
     tagline: 'Gestão TR-069 para provedores de internet: ACS, painel, portal do assinante e WhatsApp.',
     product: 'Produto',
@@ -280,10 +285,13 @@ const en: LandingCopy = {
     error: 'Could not send right now. Try again or reach us on WhatsApp.',
     close: 'Close',
     plan: 'Plan of interest',
-    anyPlan: 'Not sure yet'
+    anyPlan: 'Not sure yet',
+    privacyNotice: 'We use these details to answer your request and follow up on it.',
+    privacyLink: 'Privacy policy'
   },
   footer: {
     rights: 'All rights reserved.',
+    privacy: 'Privacy policy',
     console: 'Platform console',
     tagline: 'TR-069 management for internet providers: ACS, panel, subscriber portal and WhatsApp.',
     product: 'Product',
