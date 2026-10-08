@@ -664,6 +664,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'Impossibile generare l’anteprima',
   'whatsapp.campaign.created': 'Campagna creata con {count} destinatario/i',
   'whatsapp.campaign.createFailed': 'Impossibile creare la campagna',
+  'whatsapp.campaign.invalidPace': 'Ritmo di invio non valido',
   'whatsapp.campaign.billingVariables': 'Il messaggio cita variabili di fatturazione ({names}); per sollecitare fatture usa il sollecito singolo',
   'whatsapp.campaign.invalidSchedule': 'Scegli data e ora con almeno 1 minuto e al massimo 60 giorni di anticipo',
   'whatsapp.campaign.noRecipients': 'Nessuno di questo pubblico può ricevere il messaggio (senza cellulare, non disturbare o dati mancanti)',

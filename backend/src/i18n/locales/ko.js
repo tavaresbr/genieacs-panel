@@ -664,6 +664,7 @@ export default {
   'whatsapp.campaign.previewFailed': '미리보기를 만들 수 없습니다',
   'whatsapp.campaign.created': '수신자 {count}명으로 캠페인을 만들었습니다',
   'whatsapp.campaign.createFailed': '캠페인을 만들 수 없습니다',
+  'whatsapp.campaign.invalidPace': '잘못된 발송 속도',
   'whatsapp.campaign.billingVariables': '메시지에 청구 변수({names})가 있습니다. 청구에는 개별 독촉을 사용하세요',
   'whatsapp.campaign.invalidSchedule': '최소 1분 후, 최대 60일 이내의 날짜와 시간을 선택하세요',
   'whatsapp.campaign.noRecipients': '이 대상 중 메시지를 받을 수 있는 사람이 없습니다(휴대폰 없음, 수신 거부 또는 데이터 누락)',

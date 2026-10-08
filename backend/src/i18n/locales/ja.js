@@ -661,6 +661,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'プレビューを作成できませんでした',
   'whatsapp.campaign.created': '{count} 件の宛先でキャンペーンを作成しました',
   'whatsapp.campaign.createFailed': 'キャンペーンを作成できませんでした',
+  'whatsapp.campaign.invalidPace': '送信ペースが無効です',
   'whatsapp.campaign.billingVariables': 'メッセージに請求用の変数（{names}）が含まれています。請求には個別督促を使用してください',
   'whatsapp.campaign.invalidSchedule': '1 分後から 60 日後までの日時を選択してください',
   'whatsapp.campaign.noRecipients': 'この対象には受信できる人がいません（携帯番号なし・配信停止・データ不足）',

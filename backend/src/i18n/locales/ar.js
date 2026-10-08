@@ -665,6 +665,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'تعذّر إنشاء المعاينة',
   'whatsapp.campaign.created': 'تم إنشاء الحملة مع {count} مستلم',
   'whatsapp.campaign.createFailed': 'تعذّر إنشاء الحملة',
+  'whatsapp.campaign.invalidPace': 'وتيرة إرسال غير صالحة',
   'whatsapp.campaign.billingVariables': 'تذكر الرسالة متغيرات فوترة ({names})؛ لتحصيل الفواتير استخدم التحصيل الفردي',
   'whatsapp.campaign.invalidSchedule': 'اختر تاريخًا ووقتًا بعد دقيقة واحدة على الأقل و60 يومًا على الأكثر',
   'whatsapp.campaign.noRecipients': 'لا أحد في هذا الجمهور يمكنه استلام الرسالة (لا هاتف، عدم الإزعاج أو بيانات ناقصة)',

@@ -667,6 +667,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'Vorschau konnte nicht erstellt werden',
   'whatsapp.campaign.created': 'Kampagne mit {count} Empfänger(n) erstellt',
   'whatsapp.campaign.createFailed': 'Kampagne konnte nicht erstellt werden',
+  'whatsapp.campaign.invalidPace': 'Ungültiges Sendetempo',
   'whatsapp.campaign.billingVariables': 'Die Nachricht nennt Rechnungsvariablen ({names}); für Rechnungen die Einzelmahnung verwenden',
   'whatsapp.campaign.invalidSchedule': 'Wählen Sie Datum und Uhrzeit mindestens 1 Minute und höchstens 60 Tage im Voraus',
   'whatsapp.campaign.noRecipients': 'Niemand in dieser Zielgruppe kann die Nachricht erhalten (keine Handynummer, nicht stören oder fehlende Daten)',

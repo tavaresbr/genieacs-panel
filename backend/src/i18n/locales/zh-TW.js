@@ -665,6 +665,7 @@ export default {
   'whatsapp.campaign.previewFailed': '無法產生預覽',
   'whatsapp.campaign.created': '已建立群發，收件人 {count} 位',
   'whatsapp.campaign.createFailed': '無法建立群發',
+  'whatsapp.campaign.invalidPace': '發送速度無效',
   'whatsapp.campaign.billingVariables': '訊息引用了帳單變數（{names}）；催繳帳單請使用單次催繳',
   'whatsapp.campaign.invalidSchedule': '請選擇 1 分鐘後至 60 天內的日期和時間',
   'whatsapp.campaign.noRecipients': '此受眾中沒有人能收到訊息（無手機、勿擾或資料缺漏）',

@@ -667,6 +667,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'Не удалось построить предпросмотр',
   'whatsapp.campaign.created': 'Рассылка создана, получателей: {count}',
   'whatsapp.campaign.createFailed': 'Не удалось создать рассылку',
+  'whatsapp.campaign.invalidPace': 'Недопустимый темп отправки',
   'whatsapp.campaign.billingVariables': 'Сообщение использует переменные счетов ({names}); для напоминаний о счетах используйте разовое напоминание',
   'whatsapp.campaign.invalidSchedule': 'Выберите дату и время не раньше чем через 1 минуту и не позже чем через 60 дней',
   'whatsapp.campaign.noRecipients': 'Никто из этой аудитории не может получить сообщение (нет мобильного, «не беспокоить» или нет данных)',
