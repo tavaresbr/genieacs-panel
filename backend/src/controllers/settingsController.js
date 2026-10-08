@@ -15,6 +15,7 @@ import {
 import { forgetSharedAcs } from '../services/genieacs/direct.js';
 import GenieAcsConnection from '../models/GenieAcsConnection.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import { AUDIT_RETENTION } from '../config/retention.js';
 import {
   PLATFORM_MANAGED_SETTING_KEYS,
   genieAcsOriginTakenByAnotherTenant,
@@ -159,7 +160,7 @@ function validateSetting(key, value) {
     // nisso?", que chega meses depois), e acima de 10 anos ela vira o arquivo
     // de dado pessoal que o prazo existe para evitar.
     const dias = Number.parseInt(normalized, 10);
-    if (!Number.isInteger(dias) || String(dias) !== normalized.trim() || dias < 30 || dias > 3650) {
+    if (!Number.isInteger(dias) || String(dias) !== normalized.trim() || dias < AUDIT_RETENTION.minDays || dias > AUDIT_RETENTION.maxDays) {
       return { errorKey: 'settings.validation.auditRetentionDays' };
     }
   }

@@ -10,6 +10,7 @@ import TeiahExportService from './teiahExportService.js';
 import WaDunningService from './waDunningService.js';
 import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import { AUDIT_RETENTION, BOT_EVENTS_RETENTION_DAYS } from '../config/retention.js';
 import AuditLog from '../models/AuditLog.js';
 import Setting from '../models/Setting.js';
 import AuthTicket from '../models/AuthTicket.js';
@@ -55,9 +56,9 @@ const USAGE_PEAK_INTERVAL_MS = 10 * 60_000;
  * responder à pergunta que a justifica; acima de 10 anos ela vira o arquivo
  * pessoal que o prazo existe para evitar.
  */
-const AUDIT_RETENTION_DEFAULT_DAYS = 365;
-const AUDIT_RETENTION_MIN_DAYS = 30;
-const AUDIT_RETENTION_MAX_DAYS = 3650;
+const AUDIT_RETENTION_DEFAULT_DAYS = AUDIT_RETENTION.defaultDays;
+const AUDIT_RETENTION_MIN_DAYS = AUDIT_RETENTION.minDays;
+const AUDIT_RETENTION_MAX_DAYS = AUDIT_RETENTION.maxDays;
 
 /**
  * The panel's only background worker.
@@ -564,7 +565,7 @@ class SchedulerService {
       });
       // O que o bot respondeu: 180 dias bastam para o relatório, que olha no
       // máximo 90 para trás.
-      await tdb('wa_bot_events').where('created_at', '<', new Date(Date.now() - 180 * 24 * 3600_000)).del()
+      await tdb('wa_bot_events').where('created_at', '<', new Date(Date.now() - BOT_EVENTS_RETENTION_DAYS * 24 * 3600_000)).del()
         .catch((error) => {
           console.warn(`Could not prune bot events: ${error.message}`);
         });

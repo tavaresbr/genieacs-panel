@@ -3,6 +3,7 @@ import { IS_SAAS } from './edition.js';
 import { WA_SERVER_FIELDS } from './platformManaged.js';
 import { LEGACY_PRODUCT_NAMES, PRODUCT_NAME } from './brand.js';
 import { log } from '../utils/logger.js';
+import { AUDIT_RETENTION } from './retention.js';
 
 export const DEFAULT_SETTINGS = {
   appName: PRODUCT_NAME,
@@ -33,7 +34,7 @@ export const DEFAULT_SETTINGS = {
   // O leitor em `schedulerService` continua com o mesmo padrão e os mesmos
   // limites, e continua sendo a última linha: ele alcança valor escrito direto
   // no banco, e um deploy que nunca rodou o seed.
-  auditRetentionDays: '365',
+  auditRetentionDays: String(AUDIT_RETENTION.defaultDays),
   // O contato do provedor no portal do assinante. Desligado até o provedor
   // ligar: mostrar telefone e endereço a quem entra no portal é decisão dele.
   // Os três campos são opcionais; vazios, o portal usa o do cadastro.

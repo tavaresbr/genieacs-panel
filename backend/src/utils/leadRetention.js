@@ -1,3 +1,5 @@
+import { LEAD_RETENTION } from '../config/retention.js';
+
 /**
  * Por quanto tempo o painel guarda os pedidos de contato da vitrine.
  *
@@ -28,8 +30,8 @@
  * Os limites: abaixo de 30 dias o prazo apagaria o pedido antes de a equipe
  * comercial tê-lo trabalhado; acima de 10 anos ele não é prazo.
  */
-const LEAD_RETENTION_MIN_DAYS = 30;
-const LEAD_RETENTION_MAX_DAYS = 3650;
+const LEAD_RETENTION_MIN_DAYS = LEAD_RETENTION.minDays;
+const LEAD_RETENTION_MAX_DAYS = LEAD_RETENTION.maxDays;
 
 /** Dias de guarda dos leads, ou zero para "para sempre". */
 export function leadRetentionDays(raw = process.env.LEAD_RETENTION_DAYS) {
