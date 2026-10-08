@@ -465,6 +465,9 @@ class WaContactService {
         throw new WaError('whatsapp.error.invalidPhone', { code: 'invalid_phone', status: 400 });
       }
     } else {
+      // A conversa presa ao contrato num número que o cadastro não tem mais
+      // é solta antes: "Conversar" abre a do número atual.
+      if (subscriber.contract) await WaConversationService.retireStaleBindings(subscriber.contract);
       const [contact] = await this.decorate([subscriber]);
       if (contact.conversationId) {
         let existing = await WaConversation.getById(contact.conversationId);

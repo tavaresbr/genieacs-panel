@@ -11,6 +11,7 @@ import WaMetaTemplateService from './waMetaTemplateService.js';
 import WaTemplateService from './waTemplateService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import WaTagService from './waTagService.js';
+import WaConversationService from './waConversationService.js';
 import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
 import { isUniqueViolation, tdb, tinsertReturningId, withDeadlockRetry } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -786,6 +787,9 @@ class WaDunningService {
   static async enqueue({ account, subscriber, body, metaTemplate = null }) {
     const number = normalizarTelefoneBr(subscriber.phone);
     if (!number) throw new WaError('whatsapp.error.noDestination', { code: 'no_destination', status: 409 });
+    // O cadastro trocou de número: a conversa antiga sai do contrato e a
+    // cobrança abre (ou reusa) a do número novo, que ganha o contrato abaixo.
+    if (subscriber.contract) await WaConversationService.retireStaleBindings(subscriber.contract);
     const conversation = await WaConversation.ensure({
       accountId: account.id,
       externalThreadId: `${number}@s.whatsapp.net`,
@@ -1100,6 +1104,13 @@ class WaDunningService {
     });
     if (alvo.length === 0) return 0;
 
+    // O número de hoje, não o da cobrança: se o cadastro mudou entre a
+    // cobrança e o pagamento, o obrigado vai para o número novo.
+    for (const row of alvo) {
+      // eslint-disable-next-line no-await-in-loop -- poucos pagamentos por passada
+      const { current } = await WaConversationService.contractPhones(row.contract);
+      if (current) row.phone_e164 = current;
+    }
     const blocked = await WaOptOut.activePhones(alvo.map((r) => r.phone_e164).filter(Boolean), 'billing');
     let sent = 0;
     for (const row of alvo) {
