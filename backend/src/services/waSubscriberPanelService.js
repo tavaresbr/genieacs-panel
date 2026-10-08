@@ -205,6 +205,12 @@ class WaSubscriberPanelService {
    */
   static async build(conversationId, { contract: wanted = null, document = null } = {}) {
     let conversation = await WaConversationService.get(conversationId);
+    // Aberta a conversa antiga de um cliente que trocou de número: ela sai do
+    // contrato aqui, e o módulo passa a tratá-la como número não vinculado.
+    if (conversation.contract
+      && (await WaConversationService.retireStaleBindings(conversation.contract)).includes(conversation.id)) {
+      conversation = await WaConversationService.get(conversationId);
+    }
     conversation = await WaConversationService.bindSubscriber(conversation);
 
     const config = await SgpService.getConfig();

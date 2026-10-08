@@ -205,6 +205,76 @@ class WaConversationService {
    * billing screen's number correction, and the controller holds it to the
    * same permission.
    */
+  /**
+   * Os números que o cadastro dá hoje para um contrato — o corrigido à mão e
+   * o do SGP, da ficha (`sgp_contacts`) e da ONU (`sgp_links`) — em todas as
+   * grafias do nono dígito. O primeiro é o que o painel usa para escrever
+   * (a mesma ordem de `whatsappPhoneOf`).
+   */
+  static async contractPhones(contract) {
+    const key = String(contract ?? '').trim();
+    if (!key) return { current: null, all: new Set() };
+    const [links, contact] = await Promise.all([SgpLink.getByContract(key), SgpContact.getByContract(key)]);
+    const ordem = [contact?.phone_manual, ...links.map((l) => l.phone_manual), contact?.phone_e164, ...links.map((l) => l.phone_e164)];
+    const all = new Set();
+    let current = null;
+    for (const bruto of ordem) {
+      const numero = normalizarTelefoneBr(bruto);
+      if (!numero) continue;
+      current ??= numero;
+      for (const v of variantesTelefoneBr(numero)) all.add(v);
+    }
+    return { current, all };
+  }
+
+  /**
+   * O cadastro do cliente mudou de número e a conversa antiga continuava presa
+   * ao contrato: o painel abria e cobrava nela, num número que não é mais o
+   * dele. Aqui ela é solta do contrato (fica no histórico, sem assinante) e a
+   * próxima conversa sai no número novo.
+   *
+   * Só solta quando há prova de que aquele número JÁ FOI o do contrato: o
+   * número anterior que a sincronização acabou de trocar (`oldPhones`) ou a
+   * régua ter cobrado nele. Uma conversa de outro número ligada a mão pelo
+   * atendente ("Trocar assinante") ou pelo CPF que o cliente digitou nunca foi
+   * número do contrato, e fica como está.
+   *
+   * @returns {Promise<number[]>} as conversas soltas
+   */
+  static async retireStaleBindings(contract, { oldPhones = [] } = {}) {
+    const key = String(contract ?? '').trim();
+    if (!key) return [];
+    const { all: atuais } = await this.contractPhones(key);
+    // Sem número no cadastro não há com o que comparar.
+    if (atuais.size === 0) return [];
+    const rows = await tdb('wa_conversations')
+      .where({ contract: key })
+      .whereNotNull('wa_phone_e164')
+      .select('id', 'wa_phone_e164');
+    const grafias = (numero) => variantesTelefoneBr(numero);
+    const candidatas = rows.filter((row) => {
+      const vs = grafias(row.wa_phone_e164);
+      return vs.length > 0 && !vs.some((v) => atuais.has(v));
+    });
+    if (candidatas.length === 0) return [];
+
+    const antigos = new Set(oldPhones.flatMap((p) => grafias(p)));
+    const procurar = [...new Set(candidatas.flatMap((row) => grafias(row.wa_phone_e164)))];
+    const cobrados = await tdb('wa_dunning_sends')
+      .where({ contract: key })
+      .whereIn('phone_e164', procurar)
+      .distinct('phone_e164');
+    for (const row of cobrados) for (const v of grafias(row.phone_e164)) antigos.add(v);
+
+    const velhas = candidatas.filter((row) => grafias(row.wa_phone_e164).some((v) => antigos.has(v)));
+    if (velhas.length === 0) return [];
+    const ids = velhas.map((row) => row.id);
+    await tdb('wa_conversations')
+      .whereIn('id', ids)
+      .update({ contract: null, device_id: null, customer_account_id: null, updated_at: new Date() });
+    return ids;
+  }
+
   static async linkSubscriber(id, { contract, savePhone = false } = {}) {
     const conversation = await this.get(id);
     const key = String(contract ?? '').trim();
