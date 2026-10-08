@@ -12,6 +12,7 @@
     "reset-password": "node scripts/reset-password.js",
     "reset-mfa": "node scripts/reset-mfa.js",
     "check": "node scripts/check-syntax.js",
+    "e2e:asaas-sandbox": "node scripts/asaas-sandbox-e2e.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
