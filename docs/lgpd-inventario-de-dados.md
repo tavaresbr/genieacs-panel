@@ -85,7 +85,7 @@ conosco (`subscriptions`, `billing_events`, `billing_charges`, `billing_invoices
 
 ---
 
-## 3. Dado fora do escopo do provedor — as 13 tabelas globais
+## 3. Dado fora do escopo do provedor — as 14 tabelas globais
 
 Estas não têm `tenant_id` e não pertencem a ISP nenhum. **Aqui o controlador somos nós.**
 
