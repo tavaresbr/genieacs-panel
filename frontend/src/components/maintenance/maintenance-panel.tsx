@@ -228,11 +228,11 @@ function Janela({ item, agora, onChange }: { item: MaintenanceWindow; agora: num
   }
 
   return (
-    <div className={`rounded-md border p-4 ${item.status === 'active' ? 'border-[hsl(var(--status-warning))]/60 bg-[hsl(var(--status-warning))]/5' : 'border-border'}`}>
+    <div className={`rounded-md border p-3 sm:p-4 ${item.status === 'active' ? 'border-[hsl(var(--status-warning))]/60 bg-[hsl(var(--status-warning))]/5' : 'border-border'}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 font-semibold">
-            <Icon name="settings" size={16} className="shrink-0 text-muted-foreground" />
+          <p className="flex items-start gap-2 font-semibold wrap-anywhere">
+            <Icon name="settings" size={16} className="mt-1 shrink-0 text-muted-foreground" />
             {t('maintenance.cardTitle', { node: item.nodeName })}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -298,14 +298,14 @@ function Janela({ item, agora, onChange }: { item: MaintenanceWindow; agora: num
         </div>
       )}
 
-      <button type="button" className="mt-3 text-sm underline" onClick={() => void alternarLista()}>
+      <button type="button" className="mt-1 inline-flex min-h-10 items-center text-sm underline md:mt-3 md:min-h-0" onClick={() => void alternarLista()}>
         {t(detail ? 'outage.hideAffected' : 'outage.showAffected')}
       </button>
       {detail && (
-        <ul className="mt-2 grid gap-1 text-sm">
+        <ul className="mt-2 grid gap-2 text-sm md:gap-1">
           {detail.devices.map((d) => (
             <li key={d.deviceId} className="flex flex-wrap gap-x-3">
-              <span className="font-medium">{d.clientName || d.deviceId}</span>
+              <span className="min-w-0 font-medium wrap-anywhere">{d.clientName || d.deviceId}</span>
               {d.contract && <span className="text-muted-foreground">{t('outage.contract', { contract: d.contract })}</span>}
               {!d.hasPhone && <span className="text-muted-foreground">{t('outage.noPhone')}</span>}
               {d.notifiedAt && <span className="text-[hsl(var(--status-success))]">{t('outage.notifiedMark')}</span>}
@@ -362,7 +362,7 @@ export function MaintenancePanel({ compact = false }: { compact?: boolean }) {
         )}
       </div>
       {agendando && (
-        <div className="mt-4 rounded-md border border-border p-4">
+        <div className="mt-4 rounded-md border border-border p-3 sm:p-4">
           <h3 className="mb-3 font-semibold">{t('maintenance.formTitle')}</h3>
           <MaintenanceForm
             onCancel={() => setAgendando(false)}
