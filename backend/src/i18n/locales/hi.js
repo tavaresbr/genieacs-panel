@@ -666,6 +666,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'पूर्वावलोकन नहीं बन सका',
   'whatsapp.campaign.created': '{count} प्राप्तकर्ताओं के साथ अभियान बनाया गया',
   'whatsapp.campaign.createFailed': 'अभियान नहीं बनाया जा सका',
+  'whatsapp.campaign.invalidPace': 'अमान्य भेजने की गति',
   'whatsapp.campaign.billingVariables': 'संदेश में बिलिंग चर ({names}) हैं; चालान वसूली के लिए एकल वसूली का उपयोग करें',
   'whatsapp.campaign.invalidSchedule': 'कम से कम 1 मिनट और अधिकतम 60 दिन आगे की तारीख और समय चुनें',
   'whatsapp.campaign.noRecipients': 'इस दर्शक समूह में कोई भी संदेश प्राप्त नहीं कर सकता (फ़ोन नहीं, परेशान न करें या डेटा अधूरा)',

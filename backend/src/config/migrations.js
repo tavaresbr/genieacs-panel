@@ -1673,6 +1673,15 @@ const WA_OPT_OUT_CATEGORY_COLUMNS = [
   ['categories', (t) => t.string('categories', 100).nullable()]
 ];
 
+/**
+ * O ritmo próprio de uma campanha de aviso, em mensagens por hora. Nulo é o
+ * ritmo do provedor; o número só pode ser MENOR que ele (o ritmo geral continua
+ * valendo na fila de saída).
+ */
+const WA_BROADCAST_PACE_COLUMNS = [
+  ['pace_per_hour', (t) => t.integer('pace_per_hour').nullable()]
+];
+
 const SKIP_DETAIL_TABLES = [
   ['wa_dunning_sends', WA_DUNNING_DETAIL_COLUMNS],
   ['wa_broadcast_recipients', WA_BROADCAST_INVOICE_COLUMNS]
@@ -6220,6 +6229,22 @@ export const migrations = [
       }
 
       await db.schema.alterTable('leads', (t) => t.dropColumn('ip'));
+    }
+  },
+  {
+    /** O ritmo escolhido na Nova campanha. Ver `WA_BROADCAST_PACE_COLUMNS`. */
+    id: '0110_wa_broadcast_pace',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_broadcasts'))) return true;
+      return (await missingColumns(db, 'wa_broadcasts', WA_BROADCAST_PACE_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_broadcasts'))) return;
+      const missing = await missingColumns(db, 'wa_broadcasts', WA_BROADCAST_PACE_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_broadcasts', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

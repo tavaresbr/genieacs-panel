@@ -4814,6 +4814,8 @@ export interface WhatsAppCampaignInput {
   scheduledAt?: string | null
   /** O número que envia; sem ele, o da cobrança. */
   accountId?: number | null
+  /** Só desacelera o ritmo geral: `default` (o do WhatsApp), `slow` (30/h) ou `very_slow` (12/h). */
+  pace?: 'default' | 'slow' | 'very_slow'
 }
 
 /**

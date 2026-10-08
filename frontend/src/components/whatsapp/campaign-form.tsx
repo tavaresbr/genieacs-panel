@@ -62,6 +62,7 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [accounts, setAccounts] = useState<WhatsAppAccount[]>([])
   const [accountId, setAccountId] = useState('')
+  const [pace, setPace] = useState<'default' | 'slow' | 'very_slow'>('default')
   const [perHour, setPerHour] = useState(0)
 
   const [title, setTitle] = useState('')
@@ -180,6 +181,8 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
     }
   }
 
+  const paceCap = pace === 'slow' ? 30 : pace === 'very_slow' ? 12 : 0
+  const effectivePerHour = paceCap > 0 && perHour > 0 ? Math.min(perHour, paceCap) : perHour
   const scheduledIso = when === 'schedule' ? localInputToIso(scheduleLocal) : null
   const canCreate = Boolean(preview && preview.counts.reachable > 0 && message && title.trim()
     && (when === 'draft' || scheduledIso))
@@ -194,7 +197,8 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
         ...message,
         attachment,
         scheduledAt: scheduledIso,
-        accountId: accountId ? Number(accountId) : null
+        accountId: accountId ? Number(accountId) : null,
+        pace
       })
       if (!res.success || !res.data) {
         toast.error(errorText(res, t, 'whatsapp.campaign.createFailed'))
@@ -384,6 +388,21 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
             </div>
           )}
 
+          <div className="space-y-2">
+            <label className="field-label" htmlFor="campaign-pace">{t('whatsapp.campaign.pace')}</label>
+            <select
+              id="campaign-pace"
+              className="modern-input w-full"
+              value={pace}
+              onChange={(event) => setPace(event.target.value as typeof pace)}
+            >
+              <option value="default">{t('whatsapp.campaign.paceDefault')}</option>
+              <option value="slow">{t('whatsapp.campaign.paceSlow')}</option>
+              <option value="very_slow">{t('whatsapp.campaign.paceVerySlow')}</option>
+            </select>
+            <p className="field-hint">{t('whatsapp.campaign.paceHint')}</p>
+          </div>
+
           <fieldset className="space-y-2">
             <legend className="field-label mb-2">{t('whatsapp.campaign.when')}</legend>
             <label className="flex items-center gap-2 text-sm">
@@ -423,11 +442,11 @@ export function CampaignForm({ onClose, onCreated }: { onClose: () => void; onCr
                     incomplete: preview.counts.templateIncomplete
                   })}
                 </p>
-                {preview.counts.reachable > 0 && perHour > 0 && (
+                {preview.counts.reachable > 0 && effectivePerHour > 0 && (
                   <p className="field-hint">
                     {t('whatsapp.campaign.previewDuration', {
-                      hours: estimatedHours(preview.counts.reachable, perHour),
-                      perHour
+                      hours: estimatedHours(preview.counts.reachable, effectivePerHour),
+                      perHour: effectivePerHour
                     })}
                   </p>
                 )}

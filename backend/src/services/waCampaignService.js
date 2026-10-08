@@ -87,6 +87,9 @@ export function lerFiltros(entrada = {}) {
 }
 
 const SEM_CONTRATO = 'none';
+// O ritmo escolhido na tela, em mensagens por hora. Só desacelera: o ritmo do
+// provedor continua sendo o teto na fila de saída.
+const RITMOS = Object.freeze({ default: null, slow: 30, very_slow: 12 });
 const ORDEM_SITUACAO = ['active', 'blocked', 'cancelled', 'unknown', SEM_CONTRATO];
 
 function invalido(key, code, vars) {
@@ -376,7 +379,10 @@ class WaCampaignService {
    * agendada (`queued` com `scheduled_at`; o laço de `WaBroadcastService` a
    * inicia na hora).
    */
-  static async create({ title, filters, templateId, body, attachment, scheduledAt, accountId = null, userId = null } = {}) {
+  static async create({ title, filters, templateId, body, attachment, scheduledAt, accountId = null, pace = 'default', userId = null } = {}) {
+    if (!Object.hasOwn(RITMOS, pace ?? 'default')) {
+      throw invalido('whatsapp.campaign.invalidPace', 'invalid_pace');
+    }
     const agendada = this.lerAgendamento(scheduledAt);
     const anexo = attachment ? normalizeAttachment(attachment) : null;
     const mensagem = await this.resolveMessage({ templateId, body });
@@ -402,6 +408,7 @@ class WaCampaignService {
       template_id: mensagem.templateId,
       body: mensagem.body,
       account_id: account?.id ?? null,
+      pace_per_hour: RITMOS[pace ?? 'default'],
       kind: 'general',
       status: agendada ? 'queued' : 'draft',
       scheduled_at: agendada,

@@ -663,6 +663,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'Não foi possível montar a prévia',
   'whatsapp.campaign.created': 'Campanha criada com {count} destinatário(s)',
   'whatsapp.campaign.createFailed': 'Não foi possível criar a campanha',
+  'whatsapp.campaign.invalidPace': 'Ritmo de envio inválido',
   'whatsapp.campaign.billingVariables': 'A mensagem cita variáveis de cobrança ({names}); para cobrar faturas use a Cobrança avulsa',
   'whatsapp.campaign.invalidSchedule': 'Escolha uma data e hora com pelo menos 1 minuto e no máximo 60 dias de antecedência',
   'whatsapp.campaign.noRecipients': 'Ninguém deste público pode receber a mensagem (sem celular, não perturbe ou dado faltando)',

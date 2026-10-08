@@ -666,6 +666,7 @@ export default {
   'whatsapp.campaign.previewFailed': 'Could not build the preview',
   'whatsapp.campaign.created': 'Campaign created with {count} recipient(s)',
   'whatsapp.campaign.createFailed': 'Could not create the campaign',
+  'whatsapp.campaign.invalidPace': 'Invalid sending pace',
   'whatsapp.campaign.billingVariables': 'This message cites billing variables ({names}); use One-off billing to charge invoices',
   'whatsapp.campaign.invalidSchedule': 'Pick a date and time at least 1 minute ahead and at most 60 days ahead',
   'whatsapp.campaign.noRecipients': 'Nobody in this audience can receive the message (no phone, opted out or missing data)',

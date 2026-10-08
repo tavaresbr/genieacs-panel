@@ -368,7 +368,19 @@ class WaBroadcastService {
         Math.max(Number(broadcast.rate_limit_per_min) || Number(config.rateLimitPerMin) || 1, 1),
         broadcast.kind === 'general' ? 120 : BILLING_CHECKS_PER_FLUSH
       );
-      const ids = await WaBroadcast.listPendingIds(broadcast.id, budget);
+      let vez = budget;
+      // Ritmo próprio da campanha (só desacelera): quantas já deveriam ter saído
+      // desde o início, menos as que saíram. Sem catch-up em rajada: no máximo
+      // o que cabe num minuto naquele ritmo, e ao menos uma.
+      const porHora = Number(broadcast.pace_per_hour) || 0;
+      if (broadcast.kind === 'general' && porHora > 0) {
+        const inicio = broadcast.start_at ? new Date(broadcast.start_at).getTime() : Date.now();
+        const horas = Math.max(0, Date.now() - inicio) / 3_600_000;
+        const { sent, failed } = await WaBroadcast.tally(broadcast.id);
+        const devidas = Math.floor(porHora * horas) + 1 - (sent + failed);
+        vez = Math.min(budget, Math.max(0, devidas), Math.max(1, Math.ceil(porHora / 60)));
+      }
+      const ids = vez > 0 ? await WaBroadcast.listPendingIds(broadcast.id, vez) : [];
       // Shared across this flush so only the SECOND SGP call onwards waits.
       const ritmo = { sgpCalls: 0 };
       for (const id of ids) {
@@ -589,6 +601,7 @@ class WaBroadcastService {
       sentCount: Number(row.sent_count || 0),
       failedCount: Number(row.failed_count || 0),
       rateLimitPerMin: row.rate_limit_per_min ?? null,
+      pacePerHour: row.pace_per_hour ?? null,
       kind: row.kind === 'general' ? 'general' : 'billing',
       scheduledAt: this.asIso(row.scheduled_at),
       attachment: row.attachment_path
