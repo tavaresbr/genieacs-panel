@@ -3620,12 +3620,13 @@ export const contactsAPI = {
     apiClient.post<ContactProfile>('/contacts/sgp', data),
 
   /** The contacts as a CSV, with the list's search and state filter. */
-  exportSheet: (filters: { search?: string; state?: string; noPhone?: boolean; imported?: boolean } = {}) => {
+  exportSheet: (filters: { search?: string; state?: string; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter } = {}) => {
     const query = new URLSearchParams()
     if (filters.search) query.set('search', filters.search)
     if (filters.state) query.set('state', filters.state)
     if (filters.noPhone) query.set('noPhone', 'true')
     if (filters.imported) query.set('imported', 'true')
+    if (filters.device) query.set('device', filters.device)
     const suffix = query.toString()
     return apiClient.getBlob(`/contacts/export${suffix ? `?${suffix}` : ''}`)
   },
@@ -5159,7 +5160,13 @@ export interface WhatsAppContactCounts {
   states: { all: number; active: number; blocked: number; cancelled: number; none: number }
   noPhone: number
   imported: number
+  /** With and without a managed ONT linked, under the current tab. */
+  withDevice?: number
+  withoutDevice?: number
 }
+
+/** Only who has, or has not, a managed ONT linked to the contract. */
+export type ContactDeviceFilter = '' | 'with' | 'without'
 
 export interface WhatsAppContactPage {
   total: number
@@ -5758,13 +5765,14 @@ export const whatsappAPI = {
     ),
 
   // ── SGP contacts ─────────────────────────────────────────────────────
-  listContacts: (params: { search?: string; limit?: number; offset?: number; state?: WhatsAppContactState; noPhone?: boolean; imported?: boolean } = {}) => {
+  listContacts: (params: { search?: string; limit?: number; offset?: number; state?: WhatsAppContactState; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter } = {}) => {
     const query = new URLSearchParams()
     if (params.search) query.set('search', params.search)
     if (params.state) query.set('state', params.state)
     // Só quem não tem número para mensagem; combina com a situação.
     if (params.noPhone) query.set('noPhone', 'true')
     if (params.imported) query.set('imported', 'true')
+    if (params.device) query.set('device', params.device)
     if (params.limit) query.set('limit', String(params.limit))
     if (params.offset) query.set('offset', String(params.offset))
     const suffix = query.toString()
