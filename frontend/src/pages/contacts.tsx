@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router'
 import type { WhatsAppConversation } from '@/lib/api'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
+import { CONTACTS_FILTERS_KEY } from '@/lib/contact-filters'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 
 /**
@@ -22,7 +23,7 @@ export default function ContactsPage() {
   return (
     <div className="page-shell">
       <div className="page-frame">
-        <ContactsPanel onOpenConversation={openConversation} defaultState="active" />
+        <ContactsPanel onOpenConversation={openConversation} defaultState="active" persistKey={CONTACTS_FILTERS_KEY} />
       </div>
     </div>
   )
