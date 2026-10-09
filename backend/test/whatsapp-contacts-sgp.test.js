@@ -151,6 +151,7 @@ describe('buscar no SGP', () => {
     assert.deepEqual(res.body.data.contacts.map((c) => c.contract), ['S-100']);
     const rosa = res.body.data.contacts[0];
     assert.equal(rosa.hasDevice, false);
+    assert.equal(rosa.sgpUrl, null);
     assert.equal(rosa.clientName, 'Rosa Sem ONT');
     assert.equal(rosa.phone, '5593991112222');
     assert.equal(rosa.document, '•••2100');
@@ -196,6 +197,8 @@ describe('buscar no SGP um cliente sem contrato', () => {
     const diego = res.body.data.contacts[0];
     assert.equal(diego.hasContract, false);
     assert.equal(diego.state, 'none');
+    // O id do cliente no SGP leva à página dele; sem id guardado, não há link.
+    assert.match(diego.sgpUrl, /\/admin\/cliente\/701\/contratos\/$/);
     assert.match(diego.key, /^c:\d+$/);
     assert.equal(diego.phone, '5593994444444');
 
