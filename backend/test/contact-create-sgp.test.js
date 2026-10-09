@@ -404,6 +404,18 @@ describe('preencher pela TeiaH', () => {
     assert.equal(JSON.parse(trilha.detail).found, true);
   });
 
+  it('o endereço fora das seções esperadas é achado, e o que falta vem do CEP', async () => {
+    // Uma empresa: a TeiaH guarda o endereço numa seção que o código não conhece
+    // e traz só o CEP; rua, bairro, cidade e UF vêm do serviço de CEP.
+    const original = JSON.stringify(RESPOSTA);
+    const outra = JSON.parse(original);
+    delete outra.resultado.mix.enderecos;
+    outra.resultado.mix.localizacao = { data: { sede: { cep: '68180-000', numero: '77' } } };
+    const { normalizeConsult } = await import('../src/services/teiahService.js');
+    const result = normalizeConsult(outra);
+    assert.deepEqual(result.address, { number: '77', zip: '68180000' });
+  });
+
   it('quem já está no SGP não é consultado na TeiaH', async () => {
     const res = await lookup(CPF_EXISTENTE);
     assert.equal(res.status, 200);
