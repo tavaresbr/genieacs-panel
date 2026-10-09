@@ -34,7 +34,7 @@ diferentes.
 A política do **site** já está publicada em `/privacidade` (texto em `frontend/src/pages/privacy.tsx`,
 afirmações em `frontend/src/lib/privacy.ts`, guardadas por `frontend/test/privacy.test.ts`). O
 prazo que ela declara para `leads` é lido de `/api/public/info`, da mesma função que a poda usa.
-O contrato de operador e o modelo de aviso ao assinante ainda não existem.
+O contrato de operador (`docs/anexo-de-operador.md`) e o modelo de aviso ao assinante (`docs/modelo-de-aviso-ao-assinante.md`) são minutas para revisão jurídica.
 
 A fronteira técnica dessa divisão é `tenant_id`: toda tabela escopada
 (`backend/src/config/tenantScope.js`) carrega um provedor em cada linha, e `tdb()` **lança**
@@ -229,19 +229,23 @@ que o painel escondeu algo.
 
 ## 6. Terceiros que recebem dado pessoal
 
-Levantado dos serviços que fazem chamada externa:
+A lista completa, com o que sai para cada destino, quem o escolhe e em que condição, é
+**`docs/lista-de-compartilhamento.md`**. Ela substitui a tabela que esta seção trazia, que tinha
+seis destinos quando o código alcança bem mais, e que errava a divisão de quem opera o quê:
 
-| Destino | O que sai | Quando |
-| --- | --- | --- |
-| **GenieACS** do provedor | identificadores de ONT, parâmetros TR-069 | toda operação sobre aparelho |
-| **SGP** (ERP do provedor) | contrato, documento, telefone | sincronização e abertura de chamado |
-| **Evolution API** (WhatsApp) | telefone, conteúdo das mensagens, anexos | todo atendimento |
-| **Asaas** (gateway) | cadastro fiscal do **provedor** | cobrança da assinatura — não envolve assinante |
-| **Provedor de IA** (API compatível com OpenAI) | conteúdo da conversa | só com o atendimento por IA ligado |
-| **SMTP** configurado | e-mail de operador | convite, recuperação de senha, avisos |
+- Dizia que GenieACS, SGP e WhatsApp eram "sistemas do próprio ISP, não subcontratação nossa".
+  **Na SaaS isso é falso para dois deles:** a plataforma hospeda o GenieACS de cada provedor
+  (salvo o que o console marca como servidor próprio) e opera o servidor Evolution único que
+  atende todos os números. Nesses dois nós somos **operador** do dado de assinante, e o anexo
+  de operador precisa dizê-lo. O SGP é de fato o ERP do provedor.
+- Dizia que "os três últimos são escolha do deployment". O provedor de IA, o TeiaH e o Focus
+  Chat são configuração **por provedor**; só o SMTP é do deploy inteiro.
+- Omitia: TeiaH (que recebe endereço e dívida, e o CPF na consulta), Nominatim (que recebe o
+  **endereço do assinante** e que o provedor não pode desligar), BrasilAPI/CNPJ.ws/ReceitaWS/
+  ViaCEP, Telegram, Meta, Focus Chat e os servidores de mapa.
 
-Os três primeiros são sistemas **do próprio ISP** — não são subcontratação nossa. Os três
-últimos são escolha do deployment, e são os que um contrato de operador precisa nomear.
+`backend/test/sharing-list.test.js` varre a fonte atrás de endereços `https://…` e falha quando
+o código passa a alcançar um host que a lista não cita.
 
 ---
 
@@ -271,7 +275,7 @@ leitura.
    não tomada. Duas correções minhas ao texto anterior: a tabela já omitiu os bilhetes de
    sessão, o bloqueio de login e o **teto do plano**, que encurta em silêncio a janela da
    trilha e do WhatsApp.
-4. **Não há lista de compartilhamento publicada.** A seção 6 acima é a matéria-prima dela.
+4. ~~**Não há lista de compartilhamento publicada.**~~ **Existe**: `docs/lista-de-compartilhamento.md`, mantida pelo teste que varre a fonte. O que falta é publicá-la ao titular: a política do site cobre os dados da plataforma, e o aviso ao assinante é do provedor (modelo em `docs/modelo-de-aviso-ao-assinante.md`).
 
 ---
 
