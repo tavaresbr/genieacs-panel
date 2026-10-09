@@ -2318,6 +2318,7 @@ const en = {
   'whatsapp.inbox.noteHint': 'Stays in the panel. The customer never receives it.',
   'whatsapp.inbox.sendFailed': 'The message could not be queued.',
   'whatsapp.inbox.attachment': 'Attachment',
+  'whatsapp.inbox.unsupported': "A message the panel cannot display. Check it on the phone.",
   'whatsapp.inbox.attach': 'Attach a file',
   'whatsapp.inbox.attachRemove': 'Remove {name}',
   'whatsapp.inbox.attachDrop': 'Drop the files to attach them',

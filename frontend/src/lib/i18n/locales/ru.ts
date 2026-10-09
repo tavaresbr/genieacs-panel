@@ -2323,6 +2323,7 @@ const ru: Dictionary = {
   'whatsapp.inbox.noteHint': 'Остаётся в панели. Абонент этого не увидит.',
   'whatsapp.inbox.sendFailed': 'Не удалось поставить сообщение в очередь.',
   'whatsapp.inbox.attachment': 'Вложение',
+  'whatsapp.inbox.unsupported': "Сообщение, которое панель не может показать. Посмотрите на телефоне.",
   'whatsapp.inbox.attach': 'Прикрепить файл',
   'whatsapp.inbox.attachRemove': 'Убрать {name}',
   'whatsapp.inbox.attachDrop': 'Отпустите файлы, чтобы прикрепить их',

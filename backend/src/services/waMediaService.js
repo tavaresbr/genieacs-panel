@@ -97,6 +97,8 @@ const NOS_DE_MIDIA = [
   ['videoMessage', 'video'],
   ['audioMessage', 'audio'],
   ['pttMessage', 'audio'],
+  // A "bolinha" de vídeo (recado em vídeo) é um vídeo como outro qualquer.
+  ['ptvMessage', 'video'],
   ['documentMessage', 'document'],
   ['stickerMessage', 'sticker']
 ];

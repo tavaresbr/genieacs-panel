@@ -2316,6 +2316,7 @@ const zhCN: Dictionary = {
   'whatsapp.inbox.noteHint': '仅保留在面板中，客户不会收到。',
   'whatsapp.inbox.sendFailed': '无法将消息加入队列。',
   'whatsapp.inbox.attachment': '附件',
+  'whatsapp.inbox.unsupported': "面板无法显示的消息，请在手机上查看。",
   'whatsapp.inbox.attach': '添加附件',
   'whatsapp.inbox.attachRemove': '移除 {name}',
   'whatsapp.inbox.attachDrop': '松开即可附加文件',

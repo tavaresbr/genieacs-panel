@@ -2199,6 +2199,7 @@ const de: Dictionary = {
   'whatsapp.inbox.noteHint': 'Bleibt im Panel. Der Kunde erhält sie nie.',
   'whatsapp.inbox.sendFailed': 'Die Nachricht konnte nicht eingereiht werden.',
   'whatsapp.inbox.attachment': 'Anhang',
+  'whatsapp.inbox.unsupported': "Nachricht, die das Panel nicht anzeigen kann. Am Handy ansehen.",
   'whatsapp.inbox.attach': 'Datei anhängen',
   'whatsapp.inbox.attachRemove': '{name} entfernen',
   'whatsapp.inbox.attachDrop': 'Dateien zum Anhängen hier ablegen',

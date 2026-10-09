@@ -2296,6 +2296,7 @@ const ar: Dictionary = {
   'whatsapp.inbox.noteHint': 'تبقى داخل اللوحة. ولا يستلمها المشترك أبدًا.',
   'whatsapp.inbox.sendFailed': 'تعذّرت إضافة الرسالة إلى الطابور.',
   'whatsapp.inbox.attachment': 'مرفق',
+  'whatsapp.inbox.unsupported': "رسالة لا تستطيع اللوحة عرضها. اطلع عليها في الهاتف.",
   'whatsapp.inbox.attach': 'إرفاق ملف',
   'whatsapp.inbox.attachRemove': 'إزالة {name}',
   'whatsapp.inbox.attachDrop': 'أفلت الملفات لإرفاقها',

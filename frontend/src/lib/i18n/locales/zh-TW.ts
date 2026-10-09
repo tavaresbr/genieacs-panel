@@ -2316,6 +2316,7 @@ const zhTW: Dictionary = {
   'whatsapp.inbox.noteHint': '僅保留在面板中，客戶不會收到。',
   'whatsapp.inbox.sendFailed': '無法將訊息排入佇列。',
   'whatsapp.inbox.attachment': '附件',
+  'whatsapp.inbox.unsupported': "面板無法顯示的訊息，請在手機上查看。",
   'whatsapp.inbox.attach': '新增附件',
   'whatsapp.inbox.attachRemove': '移除 {name}',
   'whatsapp.inbox.attachDrop': '放開即可附加檔案',

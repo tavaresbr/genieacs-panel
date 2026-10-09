@@ -2296,6 +2296,7 @@ const hi: Dictionary = {
   'whatsapp.inbox.noteHint': 'यह पैनल में ही रहता है। ग्राहक को कभी नहीं मिलता।',
   'whatsapp.inbox.sendFailed': 'संदेश कतार में नहीं डाला जा सका।',
   'whatsapp.inbox.attachment': 'अनुलग्नक',
+  'whatsapp.inbox.unsupported': "ऐसा संदेश जिसे पैनल नहीं दिखा सकता। फ़ोन पर देखें।",
   'whatsapp.inbox.attach': 'फ़ाइल जोड़ें',
   'whatsapp.inbox.attachRemove': '{name} हटाएँ',
   'whatsapp.inbox.attachDrop': 'अटैच करने के लिए फ़ाइलें यहाँ छोड़ें',

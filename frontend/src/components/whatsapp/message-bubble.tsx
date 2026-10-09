@@ -307,7 +307,9 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
   const body = message.body
     ? <p className="whitespace-pre-wrap text-sm leading-6 wrap-anywhere">{message.body}</p>
     : !message.attachment
-      ? <p className="text-sm italic text-muted-foreground">{t('whatsapp.inbox.attachment')}</p>
+      // Um tipo que o painel não sabe mostrar (o servidor já descreve reação,
+      // localização, contato, enquete e mídia que não baixou).
+      ? <p className="text-sm italic text-muted-foreground">{t('whatsapp.inbox.unsupported')}</p>
       : null
 
   // ── An internal note ──────────────────────────────────────────────────────

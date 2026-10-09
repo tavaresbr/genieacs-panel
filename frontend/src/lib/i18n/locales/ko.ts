@@ -2321,6 +2321,7 @@ const ko: Dictionary = {
   'whatsapp.inbox.noteHint': '패널에만 남으며 고객에게는 전달되지 않습니다.',
   'whatsapp.inbox.sendFailed': '메시지를 대기열에 추가하지 못했습니다.',
   'whatsapp.inbox.attachment': '첨부 파일',
+  'whatsapp.inbox.unsupported': "패널에서 표시할 수 없는 메시지입니다. 휴대폰에서 확인하세요.",
   'whatsapp.inbox.attach': '파일 첨부',
   'whatsapp.inbox.attachRemove': '{name} 제거',
   'whatsapp.inbox.attachDrop': '파일을 놓아 첨부하세요',

@@ -2315,6 +2315,7 @@ const ja: Dictionary = {
   'whatsapp.inbox.noteHint': 'パネル内にのみ残ります。顧客には届きません。',
   'whatsapp.inbox.sendFailed': 'メッセージをキューに追加できませんでした。',
   'whatsapp.inbox.attachment': '添付ファイル',
+  'whatsapp.inbox.unsupported': "パネルで表示できないメッセージです。スマートフォンで確認してください。",
   'whatsapp.inbox.attach': 'ファイルを添付',
   'whatsapp.inbox.attachRemove': '{name} を外す',
   'whatsapp.inbox.attachDrop': 'ドロップして添付',

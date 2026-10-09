@@ -2316,6 +2316,7 @@ const es: Dictionary = {
   'whatsapp.inbox.noteHint': 'Se queda en el panel. El cliente nunca la recibe.',
   'whatsapp.inbox.sendFailed': 'No se pudo poner el mensaje en la cola.',
   'whatsapp.inbox.attachment': 'Adjunto',
+  'whatsapp.inbox.unsupported': "Mensaje que el panel no puede mostrar. Míralo en el celular.",
   'whatsapp.inbox.attach': 'Adjuntar archivo',
   'whatsapp.inbox.attachRemove': 'Quitar {name}',
   'whatsapp.inbox.attachDrop': 'Suelta los archivos para adjuntarlos',

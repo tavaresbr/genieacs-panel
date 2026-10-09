@@ -2322,6 +2322,7 @@ const it: Dictionary = {
   'whatsapp.inbox.noteHint': 'Resta nel pannello. Il cliente non la riceve mai.',
   'whatsapp.inbox.sendFailed': 'Non è stato possibile accodare il messaggio.',
   'whatsapp.inbox.attachment': 'Allegato',
+  'whatsapp.inbox.unsupported': "Messaggio che il pannello non può mostrare. Controllalo sul telefono.",
   'whatsapp.inbox.attach': 'Allega un file',
   'whatsapp.inbox.attachRemove': 'Rimuovi {name}',
   'whatsapp.inbox.attachDrop': 'Rilascia i file per allegarli',

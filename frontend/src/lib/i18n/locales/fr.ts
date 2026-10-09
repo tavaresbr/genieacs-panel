@@ -2905,6 +2905,7 @@ const fr: Dictionary = {
   'whatsapp.inbox.noteHint': 'Reste dans le panneau. Le client ne la reçoit jamais.',
   'whatsapp.inbox.sendFailed': 'Le message n’a pas pu être mis en file d’attente.',
   'whatsapp.inbox.attachment': 'Pièce jointe',
+  'whatsapp.inbox.unsupported': "Message que le panneau ne peut pas afficher. Consultez-le sur le téléphone.",
   'whatsapp.inbox.attach': 'Joindre un fichier',
   'whatsapp.inbox.attachRemove': 'Retirer {name}',
   'whatsapp.inbox.attachDrop': 'Déposez les fichiers pour les joindre',

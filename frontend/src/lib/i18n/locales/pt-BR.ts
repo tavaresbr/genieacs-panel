@@ -2316,6 +2316,7 @@ const ptBR: Dictionary = {
   'whatsapp.inbox.noteHint': 'Fica no painel. O cliente nunca recebe.',
   'whatsapp.inbox.sendFailed': 'Não foi possível enfileirar a mensagem.',
   'whatsapp.inbox.attachment': 'Anexo',
+  'whatsapp.inbox.unsupported': "Mensagem que o painel não consegue exibir. Veja no celular.",
   'whatsapp.inbox.attach': 'Anexar arquivo',
   'whatsapp.inbox.attachRemove': 'Remover {name}',
   'whatsapp.inbox.attachDrop': 'Solte os arquivos para anexar',
