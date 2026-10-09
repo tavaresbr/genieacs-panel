@@ -72,6 +72,15 @@ router.get(
   sgpAdminLimiter,
   ContactController.invoices
 );
+// The line's status as the ONTs report it: the ACS is asked, so the same
+// capability as looking at an ONT.
+router.get(
+  '/:key/service-status',
+  authenticateToken,
+  requirePermission('contacts.read'),
+  requirePermission('devices.inspect'),
+  ContactController.serviceStatus
+);
 // One open invoice to the client over WhatsApp: the preview asks the SGP, the
 // send asks it again and goes out through the ordinary reply queue.
 router.get(

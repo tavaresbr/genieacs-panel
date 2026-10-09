@@ -3777,6 +3777,10 @@ export const contactsAPI = {
   importFocusChat: (mode: 'preview' | 'apply') =>
     apiClient.post<ContactWhatsappImportResult & { ignored: number }>(`/contacts/import/focuschat?mode=${mode}`, {}),
 
+  /** What each contract's ONT says about the line now, asked of the ACS. */
+  serviceStatus: (key: string) =>
+    apiClient.get<ContactServiceStatus>(`/contacts/${encodeURIComponent(key)}/service-status`),
+
   /** Open invoices of each contract, asked of the SGP now. */
   invoices: (key: string) =>
     apiClient.get<{ contract: string; invoices: SgpInvoice[] }[]>(`/contacts/${encodeURIComponent(key)}/invoices`),
@@ -3810,6 +3814,24 @@ export interface ContactInvoiceSettled {
   method: string
   message: string | null
   receipt: { sent: boolean; conversationId?: number; messageId?: number; error: string | null } | null
+}
+
+export interface ContactServiceStatus {
+  contracts: {
+    contract: string
+    deviceId: string | null
+    available: boolean
+    reason?: 'unlinked' | 'unreachable' | 'not_found'
+    status?: 'online' | 'offline' | null
+    lastInform?: string | null
+    uptimeSeconds?: number | null
+    model?: string | null
+    rxPower?: number | null
+    connectedDevices?: number | null
+    ipAddress?: string | null
+    wanStatus?: string | null
+  }[]
+  generatedAt: string
 }
 
 export interface ContactInvoiceMessage {

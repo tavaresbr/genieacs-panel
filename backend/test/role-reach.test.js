@@ -400,6 +400,15 @@ const CASOS = [
     codigoAceito: 'not_found'
   },
   {
+    // O status do serviço pergunta ao ACS: quem passa pela guarda chega à busca da ficha.
+    cap: 'devices.inspect',
+    label: 'GET /api/contacts/:key/service-status',
+    method: 'GET',
+    path: () => '/api/contacts/CONTRATO-QUE-NAO-EXISTE/service-status',
+    aceito: [404],
+    codigoAceito: 'not_found'
+  },
+  {
     // Sincronizar grava a ficha: só quem edita. A chave que não existe dá 404.
     cap: 'contacts.edit',
     label: 'POST /api/contacts/:key/sync',
@@ -876,12 +885,12 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 64 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 65 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
     // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas,
     // e depois as três da TeiaH Valid, e a importação da agenda do WhatsApp.
-    assert.equal(CASOS.length, 64);
+    assert.equal(CASOS.length, 65);
   });
 });
 

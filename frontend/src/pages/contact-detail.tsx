@@ -22,6 +22,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl } from '@/lib/sgp'
 import { isoDay } from '@/lib/date-format'
 import { formatBrPhone } from '@/lib/phone'
+import { ServiceStatusCard } from '@/components/contacts/service-status-card'
 import { parseAmountToCents } from '@/lib/utils'
 
 const ADDRESS_PARTS = ['street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference'] as const
@@ -326,6 +327,8 @@ export default function ContactDetailPage() {
             <p className="whitespace-pre-wrap text-sm wrap-anywhere">{profile.notes || <span className="text-muted-foreground">—</span>}</p>
           </Card>
         </div>
+
+        {can('devices.inspect') && <ServiceStatusCard contactKey={profile.key} hasContracts={profile.contracts.length > 0} />}
 
         <Card title={t('contacts.profile.contracts')} className="mt-5">
           {profile.contracts.length === 0 ? (

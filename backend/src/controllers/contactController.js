@@ -2,6 +2,7 @@ import AuditLog from '../models/AuditLog.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
 import ContactSheetService, { IMPORT_MAX_BYTES } from '../services/contactSheetService.js';
 import ContactSyncService from '../services/contactSyncService.js';
+import ContactServiceStatusService from '../services/contactServiceStatusService.js';
 import { roleHas } from '../config/permissions.js';
 import ContactGoogleImportService from '../services/contactGoogleImportService.js';
 import ContactWhatsappImportService from '../services/contactWhatsappImportService.js';
@@ -46,6 +47,15 @@ class ContactController {
   static async invoices(req, res) {
     try {
       return res.json(createResponse(req.t('contacts.loaded'), await ContactProfileService.invoices(req.params.key)));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.loadFailed');
+    }
+  }
+
+  /** What each contract's ONT says about the line now: asked of the ACS, stored nowhere. */
+  static async serviceStatus(req, res) {
+    try {
+      return res.json(createResponse(req.t('contacts.loaded'), await ContactServiceStatusService.forClient(req.params.key)));
     } catch (error) {
       return handleError(req, res, error, 'contacts.loadFailed');
     }
