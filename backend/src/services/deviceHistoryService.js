@@ -4,6 +4,7 @@ import DeviceSampleHour from '../models/DeviceSampleHour.js';
 import DeviceService from './deviceService.js';
 import { forEveryTenant } from '../config/tenantJobs.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { RAW_SAMPLE_RETENTION, HOURLY_SAMPLE_RETENTION } from '../config/retention.js';
 import { timestampMs } from '../utils/helpers.js';
 
 const CONFIG_KEY = 'device_history_config';
@@ -25,8 +26,8 @@ export const DEFAULT_HISTORY_CONFIG = Object.freeze({
   // minutes; a degradation curve does not need finer, and 90 days at this grain
   // is already more points than a chart can draw.
   intervalSeconds: 900,
-  rawRetentionDays: 14,
-  rollupRetentionDays: 90
+  rawRetentionDays: RAW_SAMPLE_RETENTION.defaultDays,
+  rollupRetentionDays: HOURLY_SAMPLE_RETENTION.defaultDays
 });
 
 function clampNumber(value, min, max, fallback) {
@@ -75,8 +76,8 @@ class DeviceHistoryService {
       // here, and a 60-second interval would multiply the table by fifteen for
       // a curve nobody can read at that resolution.
       intervalSeconds: clampNumber(stored.intervalSeconds, 300, 86_400, 900),
-      rawRetentionDays: clampNumber(stored.rawRetentionDays, 1, 365, 14),
-      rollupRetentionDays: clampNumber(stored.rollupRetentionDays, 1, 3650, 90),
+      rawRetentionDays: clampNumber(stored.rawRetentionDays, RAW_SAMPLE_RETENTION.minDays, RAW_SAMPLE_RETENTION.maxDays, RAW_SAMPLE_RETENTION.defaultDays),
+      rollupRetentionDays: clampNumber(stored.rollupRetentionDays, HOURLY_SAMPLE_RETENTION.minDays, HOURLY_SAMPLE_RETENTION.maxDays, HOURLY_SAMPLE_RETENTION.defaultDays),
       updatedAt: stored.updatedAt || null
     });
   }
@@ -90,10 +91,10 @@ class DeviceHistoryService {
         : clampNumber(patch.intervalSeconds, 300, 86_400, 900),
       rawRetentionDays: patch.rawRetentionDays === undefined
         ? current.rawRetentionDays
-        : clampNumber(patch.rawRetentionDays, 1, 365, 14),
+        : clampNumber(patch.rawRetentionDays, RAW_SAMPLE_RETENTION.minDays, RAW_SAMPLE_RETENTION.maxDays, RAW_SAMPLE_RETENTION.defaultDays),
       rollupRetentionDays: patch.rollupRetentionDays === undefined
         ? current.rollupRetentionDays
-        : clampNumber(patch.rollupRetentionDays, 1, 3650, 90),
+        : clampNumber(patch.rollupRetentionDays, HOURLY_SAMPLE_RETENTION.minDays, HOURLY_SAMPLE_RETENTION.maxDays, HOURLY_SAMPLE_RETENTION.defaultDays),
       updatedAt: new Date().toISOString()
     };
     await AppState.upsert(CONFIG_KEY, JSON.stringify(next));

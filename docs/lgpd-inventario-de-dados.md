@@ -21,7 +21,7 @@ e a divisória está no schema, não numa opinião:
 
 | Dado | Controlador | Operador | Onde está |
 | --- | --- | --- | --- |
-| Assinante de um ISP (quem tem a ONT) | **o ISP** | **nós** | as 50 tabelas escopadas por `tenant_id` |
+| Assinante de um ISP (quem tem a ONT) | **o ISP** | **nós** | as 56 tabelas escopadas por `tenant_id` |
 | Operador do painel (quem faz login) | **nós** | — | `users`, `tenant_users` |
 | Interessado que pediu contato na vitrine | **nós** | — | `leads` |
 | Cadastro fiscal do ISP | **nós** | — | colunas `billing_*` de `tenants` |
@@ -42,11 +42,11 @@ se for lida fora de escopo. Não existe linha de assinante sem dono.
 
 ---
 
-## 2. Dado de assinante — as 50 tabelas escopadas
+## 2. Dado de assinante — as 56 tabelas escopadas
 
-As 50 se dividem em exatamente dois grupos, sem sobra (é o que o teste fixa):
+As 56 se dividem em exatamente dois grupos, sem sobra (é o que o teste fixa):
 
-### 2.1 As 27 que alcançam um titular
+### 2.1 As 29 que alcançam um titular
 
 São as que o dossiê percorre quando um assinante exerce o direito de acesso
 (`backend/src/services/customerDataExportService.js`). Agrupadas pelo que guardam:
@@ -59,6 +59,7 @@ São as que o dossiê percorre quando um assinante exerce o direito de acesso
 | **Rede** | `mapping_nodes`, `mapping_edges` | posição do assinante na planta de fibra |
 | **Atendimento (WhatsApp)** | `wa_conversations`, `wa_messages`, `wa_opt_outs`, `wa_satisfaction`, `wa_bot_events`, `wa_conversation_tags`, `wa_alert_state`, `wa_broadcast_recipients`, `wa_dunning_sends`, `wa_dunning_pauses` | telefone, conteúdo das mensagens, anexos, avaliação |
 | **Operação** | `provisioning_runs`, `outage_incident_devices`, `maintenance_window_devices` | que aparelho foi ativado, atingido por queda ou avisado |
+| **Indicações e situação financeira** | `customer_referrals`, `sgp_billing_status` | nome e telefone de quem foi indicado (ainda não é cliente), contrato e fatura em aberto mais antiga |
 | **Trilha** | `audit_log` | quem fez o quê sobre aquele assinante |
 | **Exportação** | `teiah_exports` | o que já saiu do painel sobre ele |
 
@@ -69,20 +70,22 @@ PPPoE no mapa. Quem trocou de ONT tem telemetria sob o **id antigo**, recuperáv
 `device_swaps` — exportar pelo id atual perderia justamente o histórico de quem tem mais
 história.
 
-### 2.2 As 23 que não alcançam titular nenhum
+### 2.2 As 27 que não alcançam titular nenhum
 
 Declaradas uma a uma em `SEM_DADO_DE_ASSINANTE`, cada qual com o motivo escrito ao lado:
-configuração do provedor (`settings`, `app_state`, `map_settings`), catálogo
-(`vendors`, `wifi_security_config`), equipe (`tenant_invites`, `wa_agents`), modelos e
-campanhas (`wa_templates`, `wa_meta_templates`, `wa_broadcasts` — o destinatário sai na
-tabela de recipients, que está no grupo acima), a conta do provedor conosco (`subscriptions`,
-`billing_*`, `coupon_redemptions`, `subscription_reminder_sends`,
-`cancellation_requests`) e os eventos de rede por
-**nó do mapa**, não por pessoa (`outage_events`, `outage_incidents`, `maintenance_windows`).
+configuração do provedor (`settings`, `app_state`, `map_settings`,
+`tenant_genieacs_connections`, `provisioning_profiles`, `whatsapp_accounts`), catálogo
+(`vendors`, `wifi_security_config`), equipe (`tenant_invites`, `wa_agents`), modelos,
+etiquetas e campanhas (`wa_tags`, `wa_templates`, `wa_meta_templates`, `wa_broadcasts` — o
+destinatário sai na tabela de recipients, que está no grupo acima), a conta do provedor
+conosco (`subscriptions`, `billing_events`, `billing_charges`, `billing_invoices`,
+`coupon_redemptions`, `subscription_reminder_sends`, `cancellation_requests`, `usage_peaks`,
+`tenant_credits`, `credit_allocations`) e os eventos de rede por **nó do mapa**, não por pessoa
+(`outage_events`, `outage_incidents`, `maintenance_windows`).
 
 ---
 
-## 3. Dado fora do escopo do provedor — as 12 tabelas globais
+## 3. Dado fora do escopo do provedor — as 14 tabelas globais
 
 Estas não têm `tenant_id` e não pertencem a ISP nenhum. **Aqui o controlador somos nós.**
 
@@ -97,7 +100,8 @@ Estas não têm `tenant_id` e não pertencem a ISP nenhum. **Aqui o controlador 
 | `account_lockouts` | `subject` do bloqueio por tentativa | identificador de quem errou a senha |
 | **`leads`** | **nome, empresa, e-mail, telefone, cidade, mensagem e notas** | **quem pediu contato na vitrine e nunca foi cliente de ninguém** |
 | `tenants` (colunas `billing_*`) | razão social, CNPJ/CPF, endereço, e-mail e telefone de cobrança | cadastro fiscal do ISP |
-| `plans`, `coupons` | — | sem dado pessoal |
+| `plans`, `coupons`, `referral_rewards` | — | sem dado pessoal (planos, cupons e o crédito entre dois provedores) |
+| `platform_alerts` | `payload`, texto sobre fatos de provedores | fila dos avisos do console por WhatsApp e e-mail. **Não auditei o conteúdo do `payload` campo a campo**; nenhuma rotina a poda |
 
 `leads` merece destaque porque o titular **não tem relação com ISP nenhum**: não há contrato,
 nem legítimo interesse em exercício, que sustente guardar o dado dele indefinidamente.
@@ -117,40 +121,82 @@ escrito, e vale registrar o que eram:
 
 ## 4. Retenção: o que some sozinho, e o que não some
 
-O que o painel poda hoje, em `SchedulerService.retentionPass()`
-(`backend/src/services/schedulerService.js:457`), provedor a provedor:
+Esta seção é **gerada** de `backend/src/config/retention.js`, o registro de onde o código lê
+cada prazo. Não se edita à mão: `backend/test/retention-registry.test.js` falha se o bloco
+abaixo divergir do registro, e `node backend/scripts/render-retention-doc.js` o reescreve.
+Uma tabela com dado de assinante que não esteja nem numa janela nem declarada "sem prazo"
+também quebra aquele teste — a retenção deixa de poder ficar sem decisão em silêncio.
 
-| Dado | Prazo | Configurável |
-| --- | --- | --- |
-| Trilha de auditoria (`audit_log`) | **365 dias** | sim, por provedor (mín. 30, máx. 3650) |
-| Eventos do bot (`wa_bot_events`) | **180 dias** | não, fixo no código |
-| Execuções de ativação (`provisioning_runs`) | pela configuração do provedor | sim |
-| Eventos do SGP (`sgp_events`) | pela configuração do provedor | sim |
-| Telemetria crua (`device_samples`) | **14 dias** | sim (1–365) |
-| Telemetria por hora (`device_sample_hours`) | **90 dias** | sim (1–3650) |
+O padrão do sistema é **não apagar**: um update que chega numa instalação em produção não pode
+começar a apagar linha que ninguém mandou apagar. Por isso `wa_messages`, os anexos e `leads`
+nascem desligados e só apagam depois de alguém escolher o prazo.
 
-E, fora daquele laço porque a tabela é global (`SchedulerService.pruneLeads()`):
+**Declarar não é decidir.** As tabelas da 4.2 estão sem prazo por idade hoje, e este documento
+diz isso; escolher um número para elas é decisão de negócio que ainda não foi tomada.
 
-| Dado | Prazo | Configurável |
-| --- | --- | --- |
-| Pedidos de contato da vitrine (`leads`) | **para sempre por padrão** | sim, por `LEAD_RETENTION_DAYS` (30–3650) |
+<!-- retention:begin — gerado de backend/src/config/retention.js; não edite à mão, rode `node backend/scripts/render-retention-doc.js` -->
 
-O padrão aqui é não apagar, e é decisão deliberada: um update que chega numa instalação em
-produção não pode começar a apagar linha que ninguém mandou apagar. Com o prazo ligado, saem os
-pedidos `new`, `contacted` e `lost` mais velhos que ele; **`won` nunca sai** — é o único elo
-entre um provedor que assinou e o pedido que o originou, porque não existe `lead_id` nem
-`converted_at` em lugar nenhum.
+### 4.1 O que o código apaga por idade
 
-**O que não tem prazo nenhum**, e portanto fica para sempre até alguém apagar à mão:
+| Dado | Tabela | Prazo padrão | Limites | Quem muda | Relógio | O que a poda poupa |
+| --- | --- | --- | --- | --- | --- | --- |
+| Trilha de auditoria | `audit_log` | **365 dias** | 30–3650 dias | o provedor, numa tela — e o teto do plano pode encurtar o que ele escolheu | created_at | — |
+| Eventos do bot | `wa_bot_events` | **180 dias** | — | ninguém: fixo no código | created_at | — |
+| Execuções de ativação | `provisioning_runs` | **90 dias** | 1–365 dias | o provedor, numa tela | updated_at | execuções ainda em andamento ou pendentes — só as terminadas saem |
+| Eventos do SGP | `sgp_events` | **90 dias** | 1–365 dias | o provedor, numa tela | updated_at | eventos ainda não processados — só os processados ou ignorados saem |
+| Telemetria crua | `device_samples` | **14 dias** | 1–365 dias | o provedor, numa tela | inform_at | — |
+| Telemetria por hora | `device_sample_hours` | **90 dias** | 1–3650 dias | o provedor, numa tela | bucket_at | — |
+| Mensagens do WhatsApp | `wa_messages` | **nenhum** — nada apaga sozinho até alguém configurar | 1–3650 dias | o provedor, numa tela — e o teto do plano pode encurtar o que ele escolheu | created_at | mensagens ainda na fila de envio; e a própria conversa (`wa_conversations`), que o varredor se recusa a tocar |
+| Anexos do WhatsApp | (arquivos em disco) | **nenhum** — nada apaga sozinho até alguém configurar | 1–3650 dias | o provedor, numa tela — e o teto do plano pode encurtar o que ele escolheu | data de modificação do arquivo | arquivos ainda ligados a uma mensagem na fila de envio |
+| Pedidos de contato da vitrine | `leads` | **nenhum** — nada apaga sozinho até alguém configurar | 30–3650 dias | quem tem o servidor, por variável de ambiente | created_at | pedidos que viraram contratação (`won`) — em qualquer prazo |
+| Bilhetes de redefinição e verificação | `auth_tickets` | **1 dia** | — | ninguém: fixo no código | expires_at | — |
+| Bilhetes de entrada do console | `impersonation_tickets` | **1 dia** | — | ninguém: fixo no código | expires_at | — |
+| Bloqueio por tentativa de senha | `account_lockouts` | **1 dia** | — | ninguém: fixo no código | updated_at | bloqueios ainda em vigor |
 
-- `wa_messages` e `wa_conversations` — o conteúdo do atendimento;
-- `sgp_links`, `sgp_contacts`, `sgp_clients` — nome, documento e telefone vindos do ERP;
-- `customer_accounts` e as credenciais cifradas;
-- `platform_audit`.
+Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **vale** é o menor dos dois, e "para sempre" vira o próprio teto (`SubscriptionService.effectiveRetention`). É a única janela que o provedor não escolheu: a tela mostra o número dele, não o que vale.
 
-Isso não é defeito por si só — retenção é decisão de negócio, e a LGPD pede que ela seja
-**declarada**, não que seja curta. Mas hoje ela não está declarada em lugar nenhum, e é a
-primeira lacuna que uma política de retenção precisa fechar.
+### 4.2 O que nenhuma rotina apaga por idade — 22 tabelas com dado de assinante
+
+"Sem prazo" não é "nunca sai": várias têm saída pelo ciclo de vida, e todas as do assinante saem pela exclusão do art. 18. O que não existe é uma rotina que as apague porque ficaram velhas.
+
+| Tabela | O que guarda, e o que a tira de lá |
+| --- | --- |
+| `customer_accounts` | o cadastro do assinante no portal; nunca é apagada — a exclusão do art. 18 a anonimiza no lugar |
+| `customer_wifi_credentials` | a senha de WiFi do assinante (cifrada); sai só pela exclusão do art. 18 |
+| `sgp_links` | o vínculo ONT↔contrato, com nome, documento e telefone vindos do ERP; sai ao desvincular o aparelho ou trocar a ONT |
+| `sgp_contacts` | o contato do contrato importado do ERP; é substituído na sincronização quando o contrato muda de linha |
+| `sgp_clients` | o cadastro do cliente importado do ERP (nome, documento, telefone); sai só pela exclusão do art. 18 |
+| `device_profiles` | o perfil do aparelho do assinante; nenhuma rotina o apaga |
+| `device_swaps` | o histórico de troca de ONT, que liga a telemetria do id antigo ao novo; nenhuma rotina o apaga |
+| `mapping_nodes` | a posição do assinante na planta de fibra; sai quando o operador remove o nó ou limpa o mapa |
+| `mapping_edges` | a ligação entre dois nós da planta; sai quando o operador remove a ligação ou limpa o mapa |
+| `wa_conversations` | a conversa e o telefone do assinante; o varredor de mensagens se recusa a tocá-la, por desenho — sai pela exclusão do art. 18 |
+| `wa_opt_outs` | quem pediu para não receber mensagens; nenhuma rotina o apaga |
+| `wa_satisfaction` | a avaliação do atendimento dada pelo assinante; sai só pela exclusão do art. 18 |
+| `wa_conversation_tags` | as etiquetas postas na conversa; saem ao tirar a etiqueta, ao apagá-la ou pela exclusão do art. 18 |
+| `wa_alert_state` | o estado dos avisos já enviados; sai quando a condição que o gerou se recupera |
+| `wa_broadcast_recipients` | quem recebeu cada campanha; a lista é trocada enquanto a campanha não começou, e a exclusão do art. 18 anonimiza a linha |
+| `wa_dunning_sends` | as cobranças já enviadas ao assinante, que também evitam reenvio; saem só pela exclusão do art. 18 |
+| `wa_dunning_pauses` | as pausas de cobrança pedidas para um contrato; saem quando a pausa é desfeita ou pela exclusão do art. 18 |
+| `customer_referrals` | nome e telefone de quem foi indicado (que ainda não é cliente) e o nome de quem indicou; sai só pela exclusão do art. 18 |
+| `sgp_billing_status` | a data da fatura em aberto mais antiga de cada contrato, sobrescrita a cada consulta ao SGP; sai só pela exclusão do art. 18 |
+| `outage_incident_devices` | que aparelhos foram atingidos por uma queda; nenhuma rotina o apaga |
+| `maintenance_window_devices` | que aparelhos foram avisados de uma manutenção; nenhuma rotina o apaga |
+| `teiah_exports` | o registro do que já saiu do painel sobre o assinante; sai só pela exclusão do art. 18 |
+
+### 4.3 O mesmo, nas 7 tabelas globais com dado pessoal e sem janela (somos o controlador)
+
+| Tabela | O que guarda |
+| --- | --- |
+| `users` | quem opera o painel, de qualquer provedor; nenhuma rotina apaga a conta |
+| `tenant_users` | o vínculo pessoa↔provedor; nenhuma rotina o apaga |
+| `platform_admins` | quem tem a chave do plano de controle; nenhuma rotina o apaga |
+| `user_recovery_codes` | os códigos de recuperação do segundo fator (credencial); nenhuma rotina os apaga |
+| `platform_audit` | a trilha do console sobre os provedores; nenhuma rotina a poda |
+| `platform_alerts` | a fila dos avisos do console; o `payload` é texto sobre fatos de provedores e seu conteúdo não foi auditado campo a campo; nenhuma rotina a poda |
+| `tenants` | nas colunas `billing_*`, o cadastro fiscal do provedor (razão social, CNPJ/CPF, endereço, e-mail, telefone); fica enquanto o provedor existir |
+
+<!-- retention:end -->
 
 ---
 
@@ -201,8 +247,8 @@ Os três primeiros são sistemas **do próprio ISP** — não são subcontrataç
 
 ## 7. O que este levantamento achou
 
-**Confirmado e correto:** as 50 tabelas escopadas se dividem exatamente em 23 sem titular +
-27 alcançadas pelo dossiê. Nenhuma órfã. Conferido por script contra o código, não por
+**Confirmado e correto:** as 56 tabelas escopadas se dividem exatamente em 27 sem titular +
+29 alcançadas pelo dossiê. Nenhuma órfã. Conferido por script contra o código, não por
 leitura.
 
 **As lacunas, em ordem de risco:**
@@ -217,8 +263,14 @@ leitura.
    `createLead` manda o conteúdo do lead para a equipe por e-mail
    (`PlatformNotifyService.notifyTeam`), e apagar a linha não recolhe aquela cópia. Quem lê
    "temos retenção de leads" precisa saber onde ela termina.
-3. **A retenção não está declarada.** Os prazos existem no código; nenhum documento os diz ao
-   titular.
+3. ~~**A retenção não está declarada.**~~ **Declarada, no estado em que está.** A seção 4 é
+   gerada do registro `backend/src/config/retention.js`, e um teste a mantém igual a ele. O
+   que ela revelou: **20 das 27 tabelas com dado de assinante não têm poda por idade**
+   (4.2), e `wa_messages`/anexos têm janela por provedor, mas nascem desligadas (padrão 0).
+   **Declarar não resolveu:** se essas tabelas devem ter prazo é decisão de negócio ainda
+   não tomada. Duas correções minhas ao texto anterior: a tabela já omitiu os bilhetes de
+   sessão, o bloqueio de login e o **teto do plano**, que encurta em silêncio a janela da
+   trilha e do WhatsApp.
 4. **Não há lista de compartilhamento publicada.** A seção 6 acima é a matéria-prima dela.
 
 ---
@@ -231,11 +283,15 @@ exatamente um dos dois lugares — declarada em `SEM_DADO_DE_ASSINANTE`, ou alca
 dossiê. Acrescentar uma tabela escopada sem classificá-la quebra a suíte, com a mensagem
 dizendo qual é e o que fazer.
 
-O teste fixa a **divisão**, não os números: ele não afirma "são 50", porque travar a contagem
+O teste fixa a **divisão**, não os números: ele não afirma "são 56", porque travar a contagem
 faria toda tabela nova quebrar a suíte por motivo errado. O que ele não deixa passar é uma
 tabela em nenhum dos dois lados — e a mensagem de falha manda atualizar este documento.
 
-As contagens aqui (50 / 23 / 27) são, portanto, uma fotografia de hoje. Para refazê-la:
+A retenção tem a guarda equivalente, `backend/test/retention-registry.test.js`: toda tabela
+com dado de assinante precisa estar numa janela ou declarada sem prazo, e o bloco da seção 4
+precisa ser igual ao gerado do registro.
+
+As contagens aqui (56 / 27 / 29) são, portanto, uma fotografia de hoje. Para refazê-la:
 
 ```
 cd backend && node --input-type=module -e "

@@ -1,5 +1,6 @@
 import { tdb } from '../config/database.js';
 import { forEveryTenant } from '../config/tenantJobs.js';
+import { MAX_RETENTION_DAYS } from '../config/retention.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 
 /**
@@ -52,7 +53,6 @@ const TICK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Ten years, the same ceiling `whatsappConfigService` clamps the setting to. */
-const MAX_RETENTION_DAYS = 3650;
 
 /** A row with one of these still has a send in front of it. */
 const PENDING_STATUSES = ['queued', 'sending'];

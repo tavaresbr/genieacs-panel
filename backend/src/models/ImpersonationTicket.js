@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getDb, insertReturningId } from '../config/database.js';
+import { TICKET_GRACE_DAYS } from '../config/retention.js';
 
 /**
  * O bilhete de uso único que leva uma personificação do console ao painel.
@@ -84,7 +85,7 @@ class ImpersonationTicket {
    * provedor é o registro, e a linha aqui é lixo.
    */
   static async prune(now = new Date()) {
-    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const cutoff = new Date(now.getTime() - TICKET_GRACE_DAYS * 24 * 60 * 60 * 1000);
     return getDb()('impersonation_tickets')
       .where('expires_at', '<', now)
       .andWhere((q) => q.whereNull('redeemed_at').orWhere('redeemed_at', '<', cutoff))

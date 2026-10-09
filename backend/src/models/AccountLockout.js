@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { getDb } from '../config/database.js';
 import { createErrorResponse } from '../utils/helpers.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { LOCKOUT_STALE_DAYS } from '../config/retention.js';
 import AuditLog from './AuditLog.js';
 import TenantUser from './TenantUser.js';
 
@@ -64,7 +65,7 @@ export const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 export const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 
 /** Linha parada há mais que isto, e sem trava valendo, é lixo. */
-const STALE_MS = 24 * 60 * 60 * 1000;
+const STALE_MS = LOCKOUT_STALE_DAYS * 24 * 60 * 60 * 1000;
 /** De quanto em quanto tempo, no máximo, um processo faz a poda. */
 const PRUNE_EVERY_MS = 10 * 60 * 1000;
 let ultimaPoda = 0;

@@ -13,6 +13,7 @@ import Setting from '../models/Setting.js';
 import { TranslatableError } from '../i18n/index.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { RUN_RETENTION } from '../config/retention.js';
 
 const CONFIG_KEY = 'provisioning_config';
 const CONFIG_CACHE_TTL_MS = 30_000;
@@ -38,7 +39,7 @@ export const DEFAULT_PROVISIONING_CONFIG = Object.freeze({
   verifyEnabled: true,
   verifyDelaySeconds: 90,
   requirePppoePassword: false,
-  runRetentionDays: 90
+  runRetentionDays: RUN_RETENTION.defaultDays
 });
 
 const profileBox = createSecretBox('skygenpanel-provisioning-profile-v1');
@@ -125,7 +126,7 @@ class ProvisioningService {
       verifyEnabled: stored.verifyEnabled !== false,
       verifyDelaySeconds: clampNumber(stored.verifyDelaySeconds, 30, 3600, 90),
       requirePppoePassword: stored.requirePppoePassword === true,
-      runRetentionDays: clampNumber(stored.runRetentionDays, 1, 365, 90),
+      runRetentionDays: clampNumber(stored.runRetentionDays, RUN_RETENTION.minDays, RUN_RETENTION.maxDays, RUN_RETENTION.defaultDays),
       updatedAt: stored.updatedAt || null
     };
     this.configCache.set(config);
@@ -176,7 +177,7 @@ class ProvisioningService {
         : patch.requirePppoePassword === true,
       runRetentionDays: patch.runRetentionDays === undefined
         ? current.runRetentionDays
-        : clampNumber(patch.runRetentionDays, 1, 365, 90),
+        : clampNumber(patch.runRetentionDays, RUN_RETENTION.minDays, RUN_RETENTION.maxDays, RUN_RETENTION.defaultDays),
       updatedAt: new Date().toISOString()
     };
 

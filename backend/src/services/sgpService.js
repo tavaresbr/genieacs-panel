@@ -11,6 +11,7 @@ import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js
 import { deploymentIsShared } from './genieacsEgress.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { SGP_EVENT_RETENTION } from '../config/retention.js';
 
 const CONFIG_KEY = 'sgp_integration_config';
 const SYNC_STATE_KEY = 'sgp_sync_last_run';
@@ -821,7 +822,7 @@ const DEFAULT_CONFIG = Object.freeze({
   reconcileEnabled: false,
   reconcileIntervalMinutes: 15,
   reconcileBatchSize: 25,
-  eventRetentionDays: 90,
+  eventRetentionDays: SGP_EVENT_RETENTION.defaultDays,
   eventTypeMap: {},
   contactsSyncEnabled: false,
   contactsSyncIntervalHours: 24,
@@ -1058,7 +1059,7 @@ class SgpService {
         stored.reconcileIntervalMinutes, MIN_RECONCILE_INTERVAL_MINUTES, 1440, 15
       ),
       reconcileBatchSize: clampNumber(stored.reconcileBatchSize, 1, 200, 25),
-      eventRetentionDays: clampNumber(stored.eventRetentionDays, 1, 365, 90),
+      eventRetentionDays: clampNumber(stored.eventRetentionDays, SGP_EVENT_RETENTION.minDays, SGP_EVENT_RETENTION.maxDays, SGP_EVENT_RETENTION.defaultDays),
       eventTypeMap: normalizeEventTypeMap(stored.eventTypeMap),
       ticketEnabled: stored.ticketEnabled === true,
       ticketOccurrenceType: clampNumber(
@@ -1187,7 +1188,7 @@ class SgpService {
         : clampNumber(patch.reconcileBatchSize, 1, 200, 25),
       eventRetentionDays: patch.eventRetentionDays === undefined
         ? current.eventRetentionDays
-        : clampNumber(patch.eventRetentionDays, 1, 365, 90),
+        : clampNumber(patch.eventRetentionDays, SGP_EVENT_RETENTION.minDays, SGP_EVENT_RETENTION.maxDays, SGP_EVENT_RETENTION.defaultDays),
       eventTypeMap: patch.eventTypeMap === undefined
         ? current.eventTypeMap
         : normalizeEventTypeMap(patch.eventTypeMap),

@@ -4,6 +4,7 @@ import { WA_WEBHOOK_PATH, withWebhookPath } from '../config/waWebhookPath.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { normalizeEvoUrl, parseAllowedHosts } from '../utils/wa/evolutionPolicy.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { MAX_RETENTION_DAYS } from '../config/retention.js';
 import { IS_SAAS } from '../config/edition.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { WA_SERVER_FIELDS, platformManagesCurrentTenant } from '../config/platformManaged.js';
@@ -127,7 +128,7 @@ function normalizeRetentionDays(value) {
   const days = Math.trunc(Number(value));
   if (!Number.isFinite(days) || days <= 0) return 0;
   // Ten years. Past that the number is a mistake, not a policy.
-  return Math.min(days, 3650);
+  return Math.min(days, MAX_RETENTION_DAYS);
 }
 
 function encryptSecret(box, value) {

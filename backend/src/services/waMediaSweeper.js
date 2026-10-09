@@ -2,6 +2,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { getDb, tdb } from '../config/database.js';
 import { DATA_DIR } from '../config/paths.js';
+import { MAX_RETENTION_DAYS } from '../config/retention.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { MEDIA_DIR, tenantIdFromDir, tenantMediaDir } from './waMediaService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
@@ -60,7 +61,6 @@ const TICK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Ten years, the same ceiling `whatsappConfigService` clamps the setting to. */
-const MAX_RETENTION_DAYS = 3650;
 
 /** A row with one of these still has a send in front of it. */
 const PENDING_STATUSES = ['queued', 'sending'];
