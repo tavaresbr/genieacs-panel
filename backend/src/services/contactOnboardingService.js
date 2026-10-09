@@ -139,6 +139,10 @@ class ContactOnboardingService {
       }
     }
 
+    // A source that gave a name and no (or half an) address leaves the form
+    // with the part the operator least wants to type: complete it.
+    if (prefill) prefill.address = await this.completeAddress(prefill.address, { digits, personType, fromReceita: prefill.source === 'receita' });
+
     return {
       document: digits,
       personType,
@@ -151,6 +155,57 @@ class ContactOnboardingService {
       teiahScore,
       deceased
     };
+  }
+
+  /**
+   * Fills what the first source left empty, never what it wrote: the CEP gives
+   * street, district, city and state; for a company still without an address,
+   * the Receita's record does. Best effort — a lookup that fails leaves the
+   * address as it was.
+   */
+  static async completeAddress(address, { digits, personType, fromReceita }) {
+    const result = { ...(address || {}) };
+    const fill = (extra) => {
+      for (const [field, value] of Object.entries(extra)) {
+        if (value && !result[field]) result[field] = value;
+      }
+    };
+    const incomplete = () => !result.street || !result.district || !result.city || !result.state;
+
+    const zip = String(result.zip ?? '').replace(/\D/g, '');
+    if (incomplete() && zip.length === 8) {
+      try {
+        const found = await lookupCep(zip);
+        if (found.found) {
+          fill({
+            street: found.data.addressLine, district: found.data.district, city: found.data.city, state: found.data.state
+          });
+        }
+      } catch {
+        // The CEP services down: the form keeps what it has.
+      }
+    }
+
+    if (incomplete() && personType === 'PJ' && !fromReceita) {
+      try {
+        const receita = await lookupCnpj(digits);
+        if (receita.found) {
+          const data = receita.data;
+          fill({
+            street: data.addressLine,
+            number: data.addressNumber,
+            complement: data.addressExtra,
+            district: data.district,
+            city: data.city,
+            state: data.state,
+            zip: data.postalCode
+          });
+        }
+      } catch {
+        // Same: a hand-typed address, not a failed lookup.
+      }
+    }
+    return result;
   }
 
   static async lookupCep(cep) {

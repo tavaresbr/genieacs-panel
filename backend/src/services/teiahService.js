@@ -147,6 +147,36 @@ function addressFrom(entry) {
     : null;
 }
 
+const ADDRESS_KEYS = ['cep', 'zip', 'logradouro', 'bairro', 'cidade', 'municipio', 'uf'];
+
+/**
+ * An address the named sections did not carry: any object in the answer that
+ * has address-looking fields (CEP, logradouro, bairro…), found by walking it.
+ * The sections' names were guessed from a partial sample, and a company's
+ * record keeps its address elsewhere than a person's, so this is the net under
+ * the lookups by name. Bounded in depth and width: the answer is 25 KB at most.
+ */
+function findAddress(node, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > 5) return null;
+  if (Array.isArray(node)) {
+    for (const item of node.slice(0, 20)) {
+      const found = findAddress(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  const keys = new Set(Object.keys(node).map(normalizeKey));
+  if (keys.has('cep') || keys.has('logradouro') || ADDRESS_KEYS.filter((key) => keys.has(key)).length >= 2) {
+    const address = addressFrom(node);
+    if (address) return address;
+  }
+  for (const value of Object.values(node).slice(0, 40)) {
+    const found = findAddress(value, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
 function phoneFrom(entry) {
   if (entry === null || entry === undefined) return null;
   if (typeof entry !== 'object') return normalizarTelefoneBr(entry);
@@ -189,6 +219,10 @@ export function normalizeConsult(payload) {
   const addresses = asList(section(mix, ['enderecos', 'endereco', 'addresses']))
     .map(addressFrom)
     .filter(Boolean);
+  if (addresses.length === 0) {
+    const found = findAddress(mix);
+    if (found) addresses.push(found);
+  }
 
   const scoreValue = Number(pick(scoreData, ['score', 'pontuacao']));
   const score = Number.isFinite(scoreValue) || text(pick(scoreData, ['risco', 'descricaoPagamento']))
@@ -479,7 +513,14 @@ class TeiahService {
     const { status, data } = await this.request(CONSULT_DOCUMENT_PATH, { cpf: digits }, configOverride);
     if (status === 404) return { found: false };
     if (status < 200 || status >= 300) throw this.failure(status, data);
-    return normalizeConsult(data);
+    const result = normalizeConsult(data);
+    if (result.found && !result.address) {
+      // Only the names of the sections, never their content: enough to see where
+      // an address hides without logging a person's record.
+      const mix = pick(pick(data, ['resultado', 'result', 'data']) ?? data, ['mix']) ?? {};
+      console.warn(`TeiaH answer without an address; sections: ${Object.keys(mix).join(', ') || '-'}`);
+    }
+    return result;
   }
 
   /**
