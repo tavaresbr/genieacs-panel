@@ -8,7 +8,8 @@ import { readMetaError, readQr, readStatus } from '../utils/wa/evolutionApi.js';
 import { classificarJid, telefoneDoJid } from '../utils/wa/waJid.js';
 import { lerFalhaDeEnvio, lerRecibo } from '../utils/wa/waRecibo.js';
 import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
-import WaMediaService from './waMediaService.js';
+import WaMediaService, { desembrulhar } from './waMediaService.js';
+import { resumoSemTexto } from '../utils/wa/waSemTexto.js';
 import WaBotService from './waBotService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
 import WaAssignmentService from './waAssignmentService.js';
@@ -309,7 +310,10 @@ async function gravarMensagem(account, item) {
     conversation_id: conversation.id,
     direction: fromMe ? 'out' : 'in',
     external_id: externalId,
-    body: texto || null,
+    // Sem texto e sem anexo: reação, localização, contato, enquete ou uma
+    // mídia que não deu para baixar. O balão diz o que foi, em vez de "Anexo".
+    // Só o balão: bot, opt-out e pesquisa continuam lendo `texto`.
+    body: texto || (anexo ? null : resumoSemTexto(desembrulhar(mensagem)) || null),
     is_note: false,
     // Uma mensagem que já saiu do celular do provedor está, no mínimo, enviada.
     // `applyReceipt` nunca anda para trás, então o ✓✓ que vier depois manda.

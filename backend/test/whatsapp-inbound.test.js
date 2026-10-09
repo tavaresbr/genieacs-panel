@@ -300,6 +300,32 @@ describe('inbound messages', () => {
     }));
     assert.equal((await mensagemPorId('V2-EXTENDED')).body, 'segue o link do boleto');
   });
+
+  it('describes a reaction or a location instead of leaving an empty bubble', async () => {
+    await hook(eventoV2({
+      id: 'V2-REACAO',
+      remoteJid: '5593911113333@s.whatsapp.net',
+      message: { reactionMessage: { text: '👍', key: { id: 'OUTRA' } } }
+    }));
+    assert.equal((await mensagemPorId('V2-REACAO')).body, 'Reagiu com 👍 a uma mensagem');
+    await hook(eventoV2({
+      id: 'V2-LOCAL',
+      remoteJid: '5593911113333@s.whatsapp.net',
+      message: { locationMessage: { degreesLatitude: -2.4, degreesLongitude: -54.7 } }
+    }));
+    assert.match((await mensagemPorId('V2-LOCAL')).body, /📍 Localização\nhttps:\/\/www\.google\.com\/maps\?q=-2\.4,-54\.7/);
+  });
+
+  it('says which media did not come through', async () => {
+    await hook(eventoV2({
+      id: 'V2-MIDIA-SEM-BYTES',
+      remoteJid: '5593911114444@s.whatsapp.net',
+      message: { imageMessage: { mimetype: 'image/jpeg', url: 'https://mmg.whatsapp.net/x.enc' } }
+    }));
+    const msg = await mensagemPorId('V2-MIDIA-SEM-BYTES');
+    assert.equal(msg.attachment_path, null);
+    assert.match(msg.body, /^📷 Foto — não foi possível baixar/);
+  });
 });
 
 describe('inbound media', () => {
