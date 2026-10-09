@@ -377,6 +377,7 @@ class WaContactService {
       .orderBy('last_message_at', 'desc')
       .select('id', 'contract', 'sgp_contact_id', 'wa_phone_e164', 'last_message_at', 'closed_at');
     const blocked = await WaOptOut.activeBlocks(phones);
+    const sgpUrls = await this.sgpPageUrls(contracts, contactIds);
 
     return subscribers.map((subscriber) => {
       const spellings = variantesTelefoneBr(subscriber.phone);
@@ -404,9 +405,39 @@ class WaContactService {
         phoneSource: subscriber.phoneSource,
         ...optOutOf(spellings.map((phone) => blocked.get(phone)).filter((tipos) => tipos !== undefined)),
         conversationId: thread?.id ?? null,
-        lastMessageAt: thread?.last_message_at ?? null
+        lastMessageAt: thread?.last_message_at ?? null,
+        sgpUrl: (subscriber.contract
+          ? sgpUrls.byContract.get(String(subscriber.contract))
+          : sgpUrls.byId.get(Number(subscriber.contactId))) ?? null
       };
     });
+  }
+
+  /**
+   * The SGP page of each client on a page of the list, from the client ids the
+   * contacts sync stored — two batched reads, never one per row. A subscriber
+   * the sync has not stored, or an install with the SGP off, has no link.
+   */
+  static async sgpPageUrls(contracts, contactIds) {
+    const byContract = new Map();
+    const byId = new Map();
+    if (contracts.length === 0 && contactIds.length === 0) return { byContract, byId };
+    const config = await SgpService.getConfig().catch(() => null);
+    if (!config?.enabled) return { byContract, byId };
+    const rows = await tdb('sgp_contacts')
+      .where((match) => {
+        match.whereRaw('1 = 0');
+        if (contracts.length > 0) match.orWhereIn('contract', contracts.map(String));
+        if (contactIds.length > 0) match.orWhereIn('id', contactIds);
+      })
+      .select('id', 'contract', 'client_ref', 'sgp_client_id');
+    for (const row of rows) {
+      const url = SgpService.clientPageUrl(config, row.client_ref || row.sgp_client_id);
+      if (!url) continue;
+      if (row.contract) byContract.set(String(row.contract), url);
+      byId.set(Number(row.id), url);
+    }
+    return { byContract, byId };
   }
 
   /**

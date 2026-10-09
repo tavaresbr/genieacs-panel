@@ -5309,6 +5309,8 @@ export interface WhatsAppContact {
   /** The thread already open with this subscriber, if any. */
   conversationId: number | null
   lastMessageAt: string | null
+  /** The client's page in the SGP; null when the SGP is off or has not synced this client. */
+  sgpUrl?: string | null
 }
 
 /** How many contacts each filter button would show if clicked now (see `WaContactService.counts`). */

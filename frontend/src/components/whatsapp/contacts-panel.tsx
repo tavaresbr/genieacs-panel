@@ -9,6 +9,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
 import { useAuth } from '@/contexts/auth-context'
 import { formatBrPhone } from '@/lib/phone'
+import { isSafeExternalUrl } from '@/lib/sgp'
 import { loadContactFilters, saveContactFilters } from '@/lib/contact-filters'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
@@ -307,6 +308,21 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     <span className="text-muted-foreground">{t('whatsapp.contacts.noPhone')}</span>
   ))
 
+  const sgpOf = (contact: WhatsAppContact, extra = '') => (
+    contact.sgpUrl && isSafeExternalUrl(contact.sgpUrl) ? (
+      <a
+        className={`modern-button-secondary${extra ? ` ${extra}` : ''}`}
+        href={contact.sgpUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={t('contacts.profile.openInSgp')}
+      >
+        <Icon name="external" size={16} />
+        <span className="max-xl:sr-only">{t('contacts.profile.openInSgp')}</span>
+      </a>
+    ) : null
+  )
+
   const actionOf = (contact: WhatsAppContact, extra = '') => (
     canSend && (contact.conversationId || contact.phone) ? (
       <button
@@ -535,7 +551,12 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
                       <td className="text-sm text-muted-foreground">
                         {contact.conversationId ? stamp(contact.lastMessageAt) || '—' : '—'}
                       </td>
-                      <td className="text-end">{actionOf(contact)}</td>
+                      <td className="text-end">
+                        <div className="flex items-center justify-end gap-2">
+                          {sgpOf(contact)}
+                          {actionOf(contact)}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -564,7 +585,10 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
                       {t('whatsapp.contacts.lastMessage')}: {stamp(contact.lastMessageAt)}
                     </p>
                   )}
-                  {actionOf(contact, 'w-full')}
+                  <div className="flex flex-col gap-2">
+                    {sgpOf(contact, 'w-full')}
+                    {actionOf(contact, 'w-full')}
+                  </div>
                 </li>
               ))}
             </ul>
