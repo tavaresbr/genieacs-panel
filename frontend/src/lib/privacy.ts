@@ -15,7 +15,7 @@
  */
 
 /** Data da última revisão do CONTEÚDO. Muda à mão, a cada alteração do texto. */
-export const POLICY_UPDATED_AT = '2026-10-08'
+export const POLICY_UPDATED_AT = '2026-10-09'
 
 export type LeadField = {
   /** A chave que `publicAPI.createLead` envia, exatamente como em `landing.tsx`. */
@@ -94,6 +94,16 @@ export const RECIPIENTS: readonly Recipient[] = [
     who: 'BrasilAPI e ViaCEP',
     what: 'o CEP digitado no cadastro',
     why: 'preencher o endereço'
+  },
+  {
+    who: 'OpenStreetMap ou Google (imagens do mapa)',
+    what: 'o endereço IP do navegador de quem usa o painel e a área do mapa que está sendo vista',
+    why: 'mostrar o mapa da rede; é o navegador que pede as imagens, quando o mapa é aberto'
+  },
+  {
+    who: 'Meta (Facebook)',
+    what: 'no navegador de quem conecta o WhatsApp oficial, o script da Meta e a identidade do operador no cadastro integrado; no servidor, o identificador da conta WhatsApp Business',
+    why: 'conectar o WhatsApp oficial do provedor, apenas quando essa conexão é feita'
   },
   {
     who: 'Provedor de infraestrutura em nuvem onde o serviço é hospedado',
