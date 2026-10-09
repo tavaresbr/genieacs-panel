@@ -9,6 +9,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
 import { useAuth } from '@/contexts/auth-context'
 import { formatBrPhone } from '@/lib/phone'
+import { loadContactFilters, saveContactFilters } from '@/lib/contact-filters'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
 import { NewContactModal } from '@/components/whatsapp/new-contact-modal'
@@ -36,6 +37,8 @@ interface ContactsPanelProps {
   onOpenConversation: (conversation: WhatsAppConversation) => void
   /** The tab the list opens on. The Contacts menu entry opens on the active subscribers. */
   defaultState?: StateFilter
+  /** When set, the filters survive leaving the page (kept per tab under this key). */
+  persistKey?: string
 }
 
 /**
@@ -46,15 +49,20 @@ interface ContactsPanelProps {
  * whether a thread with them already exists, and open it — or start one.
  * Starting sends nothing; the operator lands in an empty thread and writes.
  */
-export function ContactsPanel({ onOpenConversation, defaultState = '' }: ContactsPanelProps) {
+export function ContactsPanel({ onOpenConversation, defaultState = '', persistKey }: ContactsPanelProps) {
   const { t, intlLocale, formatDateTime, formatNumber } = useTranslation()
   const { can } = useAuth()
   const toast = useToast()
 
   const [contacts, setContacts] = useState<WhatsAppContact[]>([])
   const [total, setTotal] = useState(0)
-  const [search, setSearch] = useState('')
-  const [debounced, setDebounced] = useState('')
+  // Where the filters were left, when this panel keeps them between visits.
+  const [saved] = useState(() => {
+    const base = { search: '', state: defaultState, noPhone: false, imported: false, device: '' as ContactDeviceFilter }
+    return persistKey ? loadContactFilters(persistKey, base) : base
+  })
+  const [search, setSearch] = useState(saved.search)
+  const [debounced, setDebounced] = useState(saved.search.trim())
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -63,14 +71,17 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   // table shows — the panel's own directory comes back when the search changes.
   const [sgpResult, setSgpResult] = useState<{ term: string; contacts: WhatsAppContact[] } | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
-  const [stateFilter, setStateFilter] = useState<StateFilter>(defaultState)
+  const [stateFilter, setStateFilter] = useState<StateFilter>(saved.state)
   // Só quem está sem telefone — combina com a aba: "Ativos sem telefone" é a
   // lista para corrigir primeiro, porque quem está nela fica fora da cobrança.
-  const [noPhone, setNoPhone] = useState(false)
+  const [noPhone, setNoPhone] = useState(saved.noPhone)
   // Só os cadastros que vieram de uma importação (agenda do WhatsApp ou planilha).
-  const [imported, setImported] = useState(false)
+  const [imported, setImported] = useState(saved.imported)
   // Só quem tem (ou não tem) equipamento gerenciado vinculado ao contrato.
-  const [device, setDevice] = useState<ContactDeviceFilter>('')
+  const [device, setDevice] = useState<ContactDeviceFilter>(saved.device)
+  useEffect(() => {
+    if (persistKey) saveContactFilters(persistKey, { search, state: stateFilter, noPhone, imported, device })
+  }, [persistKey, search, stateFilter, noPhone, imported, device])
   // Quantos contatos cada filtro mostraria; vazio até a primeira leitura.
   const [counts, setCounts] = useState<WhatsAppContactCounts | null>(null)
 

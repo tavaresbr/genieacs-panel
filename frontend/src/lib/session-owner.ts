@@ -1,5 +1,6 @@
 import type { User } from '@/types'
 import { clearDashboardSnapshot } from '@/lib/dashboard-snapshot'
+import { CONTACTS_FILTERS_KEY } from '@/lib/contact-filters'
 
 /**
  * Quem é o dono da sessão desta aba: o provedor e o usuário.
@@ -34,6 +35,7 @@ export function clearSessionScopedStorage() {
   clearDashboardSnapshot()
   try {
     sessionStorage.removeItem(WA_DOWN_DISMISSED_KEY)
+    sessionStorage.removeItem(CONTACTS_FILTERS_KEY)
   } catch {
     // Storage can be disabled by browser privacy settings.
   }
