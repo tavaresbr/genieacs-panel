@@ -14,6 +14,8 @@ import { BILLING_BADGE, billingLabel } from '@/lib/wa-billing-status'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
 import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
+import { useToast } from '@/components/ui/toast'
+import { copyToClipboard } from '@/lib/utils'
 import { isSafeExternalUrl } from '@/lib/sgp'
 import { showActionLabels } from '@/lib/wa-thread-actions'
 import { callHref } from '@/lib/wa-call'
@@ -85,6 +87,13 @@ export function ConversationThread({
   const stick = useRef(true)
 
   const address = conversationAddress(conversation)
+  const toast = useToast()
+  // Copies the number as stored (country code and digits only), the form every
+  // other system accepts; the screen shows it masked.
+  const copyNumber = async () => {
+    const number = conversation.waPhoneE164
+    if (number && await copyToClipboard(number)) toast.success(t('common.copied'))
+  }
   const numero = accountTag(accounts, conversation)
   // The API hands the history back newest first; a conversation reads the other
   // way round.
@@ -152,7 +161,22 @@ export function ConversationThread({
           <h2 className="truncate text-base font-semibold text-foreground">
             <ContactLink contract={conversation.contract} name={conversationTitle(conversation)} className="" />
           </h2>
-          {!compact && address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
+          {!compact && address && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="truncate font-mono">{address}</span>
+              {conversation.waPhoneE164 && (
+                <button
+                  type="button"
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
+                  aria-label={t('common.copy')}
+                  title={t('common.copy')}
+                  onClick={() => void copyNumber()}
+                >
+                  <Icon name="copy" size={14} />
+                </button>
+              )}
+            </p>
+          )}
 
           {/* Com o teclado aberto os selos e as ações saem: a altura vai para as mensagens. */}
           {!compact && (

@@ -8,6 +8,12 @@ import type { WhatsAppAccount, WhatsAppConversation } from '@/lib/api'
 import { accountTag } from '@/lib/wa-account-color'
 import { formatDayMonth, getActiveDateFormat } from '@/lib/date-format'
 import { isSafeExternalUrl } from '@/lib/sgp'
+import { formatBrPhone } from '@/lib/phone'
+
+/** A Brazilian number (55 + DDD + number) as people read it; any other number as it came. */
+function maskNumber(number: string): string {
+  return /^55\d{10,11}$/.test(number.replace(/\D/g, '')) ? formatBrPhone(number) : number
+}
 
 /**
  * What to call the person on the other end.
@@ -22,7 +28,7 @@ export function conversationTitle(conversation: WhatsAppConversation): string {
   return (
     conversation.clientName
     || conversation.pushName
-    || conversation.waPhoneE164
+    || (conversation.waPhoneE164 ? maskNumber(conversation.waPhoneE164) : null)
     || conversation.waLid
     || `#${conversation.id}`
   )
@@ -33,7 +39,7 @@ export function conversationTitle(conversation: WhatsAppConversation): string {
  * "+5511999999999 · +5511999999999" on an unnamed thread is noise.
  */
 export function conversationAddress(conversation: WhatsAppConversation): string | null {
-  const address = conversation.waPhoneE164 || conversation.waLid
+  const address = conversation.waPhoneE164 ? maskNumber(conversation.waPhoneE164) : conversation.waLid
   if (!address) return null
   return address === conversationTitle(conversation) ? null : address
 }
