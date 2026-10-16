@@ -99,4 +99,16 @@ describe('troca de número no cadastro', () => {
     await asTenant(() => ContactProfileService.update('N-6', { whatsappPhone: '(93) 98122-2221' }, null));
     assert.equal(await contratoDe(outra), 'N-6');
   });
+  it('"Abrir conversa" com a conversa antiga ainda presa abre uma nova no número atual', async () => {
+    await asTenant(() => SgpContact.upsertFromSgp({ contract: 'N-7', client_name: 'Cliente', phone_e164: '5593988887777' }));
+    const velha = await conversa('5593988887777', 'N-7');
+    await asTenant(() => SgpContact.setManualPhone('N-7', '5593981233334'));
+    const waContacts = (await import('../src/services/waContactService.js')).default;
+    const { conversation, created } = await asTenant(() => waContacts.openConversation('N-7'));
+    assert.equal(created, true);
+    assert.notEqual(conversation.id, velha);
+    assert.equal(conversation.waPhoneE164, '5593981233334');
+    const again = await asTenant(() => waContacts.openConversation('N-7'));
+    assert.equal(again.conversation.id, conversation.id, 'da próxima vez abre a nova');
+  });
 });
