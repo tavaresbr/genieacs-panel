@@ -1998,8 +1998,16 @@ class SgpService {
     return contracts.find((entry) => entry.contract === String(wanted)) || null;
   }
 
-  static pickContract(contracts, preferredContract = null) {
+  static pickContract(contracts, preferredContract = null, login = null) {
     if (contracts.length === 0) return null;
+    // O ERP responde com o cliente inteiro; quando o cliente tem vários
+    // contratos, o login da ONT é o que diz de qual deles ela é — vale mais que
+    // o contrato já salvo, para corrigir vínculos que caíram no contrato errado.
+    const wantedLogin = normalizeLogin(login);
+    if (wantedLogin) {
+      const byLogin = contracts.find((entry) => normalizeLogin(entry.login) === wantedLogin);
+      if (byLogin) return byLogin;
+    }
     if (preferredContract) {
       const exact = contracts.find((entry) => entry.contract === String(preferredContract));
       if (exact) return exact;
@@ -2127,7 +2135,7 @@ class SgpService {
     // `syncAccount` se recusa a fazer três métodos abaixo.
     const contract = manual
       ? this.exactContract(contracts, preferredContract)
-      : this.pickContract(contracts, preferredContract);
+      : this.pickContract(contracts, preferredContract, filters.login);
     if (!contract) {
       // A stale cache is better than no answer, but only while it still
       // belongs to the subscriber holding the device.
@@ -2240,7 +2248,7 @@ class SgpService {
     const { contracts } = await this.lookupCustomer(filters, config);
     const contract = manual
       ? contracts.find((entry) => entry.contract === stored.contract) || null
-      : this.pickContract(contracts, stored?.contract || null);
+      : this.pickContract(contracts, stored?.contract || null, filters.login);
     if (!contract) return 'skipped';
 
     await SgpLink.upsert(this.contractToLinkRow(contract, {
