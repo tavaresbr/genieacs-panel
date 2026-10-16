@@ -383,10 +383,15 @@ class WaContactService {
       const spellings = variantesTelefoneBr(subscriber.phone);
       // The thread bound to the contract first: it is the one an operator
       // already confirmed. A thread matched only by number comes second.
-      const thread = (subscriber.contract
-        ? threads.find((row) => row.contract === subscriber.contract)
-        : threads.find((row) => Number(row.sgp_contact_id) === Number(subscriber.contactId)))
+      const bound = (row) => (subscriber.contract
+        ? row.contract === subscriber.contract
+        : Number(row.sgp_contact_id) === Number(subscriber.contactId));
+      // A thread on the number the record has today wins: after the number
+      // changed, the old thread is still bound, but it is not where the
+      // subscriber is reached.
+      const thread = threads.find((row) => bound(row) && spellings.includes(row.wa_phone_e164))
         || threads.find((row) => spellings.includes(row.wa_phone_e164))
+        || threads.find(bound)
         || null;
       return {
         key: contactKey(subscriber),
@@ -509,8 +514,16 @@ class WaContactService {
       // é solta antes: "Conversar" abre a do número atual.
       if (subscriber.contract) await WaConversationService.retireStaleBindings(subscriber.contract);
       const [contact] = await this.decorate([subscriber]);
-      if (contact.conversationId) {
-        let existing = await WaConversation.getById(contact.conversationId);
+      // Only a thread on the subscriber's number is reused: one left on an
+      // old number (the record changed) would send to the wrong phone, so a
+      // new thread opens on the current one.
+      const reusable = contact.conversationId
+        ? await WaConversation.getById(contact.conversationId)
+        : null;
+      const onNumber = reusable
+        && variantesTelefoneBr(subscriber.phone).includes(reusable.wa_phone_e164);
+      if (reusable && (onNumber || !normalizarTelefoneBr(subscriber.phone))) {
+        let existing = reusable;
         // A conversa que só tinha cobrança automática: o atendente abriu, ela
         // passa a "Abertas".
         if (existing && !existing.engaged_at) {
