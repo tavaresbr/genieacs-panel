@@ -49,6 +49,44 @@ class SmtpMailTransport extends MailTransport {
       return false;
     }
   }
+
+  async probe({ to, subject, text }) {
+    let timer;
+    const limite = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Object.assign(new Error('probe timeout'), { code: 'PROBE_TIMEOUT' })), PROBE_TIMEOUT_MS);
+    });
+    try {
+      // `verify` conecta e autentica sem mandar nada; o envio vem depois, porque
+      // um SMTP pode autenticar e ainda assim recusar o remetente.
+      await Promise.race([this.transporter.verify(), limite]);
+      await Promise.race([this.transporter.sendMail({ from: this.from, to, subject, text }), limite]);
+      log.info('mail_test_sent', { to: maskAddress(to) });
+      return { ok: true };
+    } catch (error) {
+      const reason = classifyMailError(error);
+      log.error('mail_test_failed', { to: maskAddress(to), reason, err: error });
+      return { ok: false, reason };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+const PROBE_TIMEOUT_MS = 20000;
+
+/**
+ * Traduz o erro do nodemailer num código que o painel sabe explicar. O texto do
+ * erro não sai daqui: ele traz o servidor e, às vezes, o usuário do SMTP.
+ */
+export function classifyMailError(error) {
+  const code = String(error?.code ?? '');
+  const resposta = Number(error?.responseCode ?? 0);
+  if (code === 'EAUTH' || resposta === 535 || resposta === 534) return 'auth';
+  if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT' || code === 'PROBE_TIMEOUT') return 'timeout';
+  if (code === 'ETLS' || (code === 'ESOCKET' && /tls|ssl|certificate/i.test(String(error?.message)))) return 'tls';
+  if (['ECONNECTION', 'ECONNREFUSED', 'ECONNRESET', 'EDNS', 'ENOTFOUND', 'ESOCKET'].includes(code)) return 'connection';
+  if (code === 'EENVELOPE' || (resposta >= 500 && resposta < 600)) return 'rejected';
+  return 'unknown';
 }
 
 /**
