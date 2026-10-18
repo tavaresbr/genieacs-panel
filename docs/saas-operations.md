@@ -581,6 +581,13 @@ painel não inventa o próprio endereço a partir do que a requisição disser.
 Um SMTP fora do ar não quebra nada: o convite existe, a resposta diz `emailed: false` e o
 link está ali.
 
+**Para provar o SMTP**, use Console → Configurações → **E-mail** → "Enviar e-mail de teste"
+(`POST /api/platform/mail/test`). Ele manda uma mensagem de verdade — para o endereço digitado
+ou, em branco, para o e-mail de avisos de Dados do SaaS — e, se falhar, diz o motivo: usuário
+ou chave recusados, servidor inalcançável, tempo esgotado, falha de TLS (troque 465 por 587 ou
+o contrário) ou remetente rejeitado (`MAIL_FROM` fora de um domínio autenticado). A trilha
+registra o resultado, nunca o destino nem o texto do erro.
+
 ### O que mais sai por e-mail
 
 **A redefinição de senha** (`/forgot-password` no painel de cada provedor). Quem pede

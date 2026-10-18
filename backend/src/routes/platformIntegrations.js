@@ -22,6 +22,8 @@ router.get('/settings/profile', ...guard, PlatformSettingsController.getProfile)
 router.put('/settings/profile', ...guard, PlatformSettingsController.updateProfile);
 // Configurações → Alertas (0112): a configuração vai no perfil; o teste, aqui.
 router.post('/alerts/test', ...guard, PlatformSettingsController.testAlert);
+// Configurações → E-mail: prova o SMTP do deploy mandando uma mensagem de verdade.
+router.post('/mail/test', ...guard, PlatformSettingsController.testMail);
 
 // O provedor como cliente na conta Asaas da plataforma: cria lá e liga aqui.
 router.post('/tenants/:id/gateway/asaas-customer', ...guard, PlatformIntegrationsController.createAsaasCustomer);

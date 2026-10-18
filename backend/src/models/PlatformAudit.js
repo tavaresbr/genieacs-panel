@@ -58,6 +58,9 @@ class PlatformAudit {
     // O "Enviar alerta de teste" dos alertas da plataforma (0112). O detalhe
     // diz os canais e o resultado de cada um, nunca o destino.
     PLATFORM_ALERT_TEST: 'platform.alert_test',
+    // O "Enviar e-mail de teste" do SMTP do deploy. O detalhe diz se saiu e,
+    // se não, o código do motivo — nunca o destino nem o texto do erro.
+    PLATFORM_MAIL_TEST: 'platform.mail_test',
     // A conta da plataforma num sistema de fora — hoje o Asaas: ambiente,
     // chave da API, token do webhook. O detalhe diz O QUE mudou (qual
     // integração, o ambiente, se a chave e o token foram trocados), nunca o

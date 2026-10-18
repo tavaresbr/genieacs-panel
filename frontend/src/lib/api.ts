@@ -132,6 +132,8 @@ export interface ApiResponse<T = any> {
   message?: string
   error?: string
   code?: string
+  /** Only on a refusal that says why in a short code (the SMTP test: `auth`, `connection`...). */
+  reason?: string
   /**
    * Only on a refusal, and only where the route has a breakdown to offer: the
    * billing build attaches it to its 409 so "every one of them is on the
@@ -420,6 +422,7 @@ class ApiClient {
           ),
           error: data.error || translate(getActiveLocale(), 'api.unknownError'),
           code: data.code,
+          ...(typeof data.reason === 'string' ? { reason: data.reason } : {}),
           // Forwarded, not rebuilt away: see `skipped` above.
           ...(data.skipped ? { skipped: data.skipped } : {}),
           ...(data.subscription !== undefined ? { subscription: data.subscription } : {}),
@@ -2345,6 +2348,15 @@ export const platformAPI = {
     apiClient.post<{ channels: Partial<Record<PlatformAlertChannel, boolean | null>> }>(
       '/platform/alerts/test', channels ? { channels } : {}
     ),
+
+  /**
+   * Sends a test e-mail through the deployment's SMTP now. `to` falls back to
+   * the notification e-mail of SaaS details. 409 `not_configured` without SMTP;
+   * 502 `send_failed` with `reason` (`auth`, `connection`, `timeout`, `tls`,
+   * `rejected`, `unknown`).
+   */
+  testPlatformMail: (to?: string) =>
+    apiClient.post<{ sent: boolean }>('/platform/mail/test', to ? { to } : {}),
 
   testAsaasIntegration: () =>
     apiClient.post<AsaasConnectionTest>('/platform/integrations/asaas/test'),

@@ -22,6 +22,20 @@ export class MailTransport {
     throw new Error('MailTransport.send is not implemented');
   }
 
+  /**
+   * Manda uma mensagem E diz por que não saiu. É o que o botão "Enviar e-mail
+   * de teste" do console usa: `send` esconde a causa de propósito (quem convida
+   * não tem o que fazer com ela), mas quem opera o deploy só consegue corrigir
+   * o SMTP sabendo se foi a senha, o endereço ou o remetente.
+   * @param {{to: string, subject: string, text: string}} _message
+   * @returns {Promise<{ok: boolean, reason?: string}>} `reason` é um código curto
+   *   (`not_configured`, `auth`, `connection`, `timeout`, `tls`, `rejected`,
+   *   `unknown`) — nunca o texto do erro, que pode trazer o servidor e o usuário.
+   */
+  async probe(_message) {
+    throw new Error('MailTransport.probe is not implemented');
+  }
+
   /** Um nome curto para a linha de log. */
   get name() {
     return 'none';
@@ -37,6 +51,10 @@ export class MailTransport {
 export class NullMailTransport extends MailTransport {
   async send() {
     return false;
+  }
+
+  async probe() {
+    return { ok: false, reason: 'not_configured' };
   }
 }
 

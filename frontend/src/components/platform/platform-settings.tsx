@@ -4,16 +4,17 @@ import { useState } from 'react'
 import { PlatformIntegrations } from '@/components/platform/platform-integrations'
 import { PlatformProfileForm } from '@/components/platform/platform-profile'
 import { PlatformAlertsSettings } from '@/components/platform/platform-alerts'
+import { PlatformMailSettings } from '@/components/platform/platform-mail'
 import { useTranslation } from '@/contexts/language-context'
 
 /**
  * Configurações do console, com submenu: os dados da empresa que vende o SaaS
  * e as integrações com sistemas de fora (a conta Asaas). E os alertas para
- * quem opera a plataforma (0112).
+ * quem opera a plataforma (0112), e o e-mail de teste do SMTP do deploy.
  */
 export function PlatformSettings() {
   const { t } = useTranslation()
-  const [sub, setSub] = useState<'profile' | 'alerts' | 'integrations'>('profile')
+  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations'>('profile')
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
@@ -21,6 +22,7 @@ export function PlatformSettings() {
         {([
           ['profile', 'platform.settings.profile'],
           ['alerts', 'platform.settings.alerts'],
+          ['mail', 'platform.settings.mail'],
           ['integrations', 'platform.tabs.integrations']
         ] as const).map(([chave, rotulo]) => (
           <button
@@ -39,6 +41,7 @@ export function PlatformSettings() {
       <div className="min-w-0">
         {sub === 'profile' && <PlatformProfileForm />}
         {sub === 'alerts' && <PlatformAlertsSettings />}
+        {sub === 'mail' && <PlatformMailSettings />}
         {sub === 'integrations' && <PlatformIntegrations />}
       </div>
     </div>
