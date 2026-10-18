@@ -8,6 +8,7 @@ import {
   type ContactAddress,
   type ContactField,
   type ContactProfile,
+  type ContactProfileContract,
   type ContactProfileField,
   type ContactProfilePatch,
   type ContactInvoiceMessage,
@@ -24,6 +25,7 @@ import { isoDay } from '@/lib/date-format'
 import { formatBrPhone } from '@/lib/phone'
 import { ServiceStatusCard } from '@/components/contacts/service-status-card'
 import { TeiahCard } from '@/components/contacts/teiah-card'
+import { LinkDeviceModal } from '@/components/contacts/link-device-modal'
 import { parseAmountToCents } from '@/lib/utils'
 
 const ADDRESS_PARTS = ['street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference'] as const
@@ -83,9 +85,11 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [linking, setLinking] = useState<ContactProfileContract | null>(null)
   const [opening, setOpening] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const canEdit = can('contacts.edit')
+  const canLink = can('sgp.act')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -365,7 +369,16 @@ export default function ContactDetailPage() {
                         <td>
                           {contract.deviceId
                             ? <Link className="text-primary hover:underline wrap-anywhere" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
-                            : <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>}
+                            : (
+                              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>
+                                {canLink && (
+                                  <button type="button" className="text-primary hover:underline" onClick={() => setLinking(contract)}>
+                                    {t('contacts.profile.linkButton')}
+                                  </button>
+                                )}
+                              </span>
+                            )}
                         </td>
                       </tr>
                     ))}
@@ -388,7 +401,16 @@ export default function ContactDetailPage() {
                     </p>
                     {contract.deviceId
                       ? <Link className="block break-all text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
-                      : <p className="text-muted-foreground">{t('contacts.profile.noDevice')}</p>}
+                      : (
+                        <p className="flex flex-wrap items-center gap-x-3 text-muted-foreground">
+                          {t('contacts.profile.noDevice')}
+                          {canLink && (
+                            <button type="button" className="text-primary hover:underline" onClick={() => setLinking(contract)}>
+                              {t('contacts.profile.linkButton')}
+                            </button>
+                          )}
+                        </p>
+                      )}
                   </li>
                 ))}
               </ul>
@@ -397,6 +419,17 @@ export default function ContactDetailPage() {
         </Card>
 
         {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} whatsappPhone={profile.whatsappPhone} settleMethods={profile.settle?.methods ?? null} />}
+
+        {linking && (
+          <LinkDeviceModal
+            contract={linking}
+            onClose={() => setLinking(null)}
+            onLinked={() => {
+              setLinking(null)
+              void load()
+            }}
+          />
+        )}
 
         {editing && (
           <EditModal
