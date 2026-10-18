@@ -3,6 +3,11 @@ import { PlatformProfileError, readProfile, saveProfile } from '../services/plat
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import PlatformAlertService from '../services/platformAlertService.js';
 import { ALERT_CHANNELS } from '../services/platformProfileService.js';
+import {
+  PlatformBrandingError,
+  removeBrandingImage,
+  saveBrandingImage
+} from '../services/platformBrandingService.js';
 
 /**
  * Configurações do console: os dados da empresa que vende o SaaS, que a
@@ -35,6 +40,42 @@ class PlatformSettingsController {
       console.error('Save platform profile error:', error);
       return res.status(500).json(createErrorResponse('Failed to save the profile', error.message));
     }
+  }
+
+  /** `PUT /api/platform/settings/branding/:kind` — o corpo é a imagem crua. */
+  static saveBranding = (kind) => async (req, res) => {
+    try {
+      await saveBrandingImage(kind, req.body);
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.PLATFORM_BRANDING_CHANGED,
+        detail: { kind, removed: false }
+      });
+      return res.json(createResponse('Branding saved', { kind }));
+    } catch (error) {
+      return PlatformSettingsController.brandingError(res, error, 'Save platform branding error:');
+    }
+  };
+
+  /** `DELETE /api/platform/settings/branding/:kind` — volta ao padrão. */
+  static removeBranding = (kind) => async (req, res) => {
+    try {
+      await removeBrandingImage(kind);
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.PLATFORM_BRANDING_CHANGED,
+        detail: { kind, removed: true }
+      });
+      return res.json(createResponse('Branding removed', { kind }));
+    } catch (error) {
+      return PlatformSettingsController.brandingError(res, error, 'Remove platform branding error:');
+    }
+  };
+
+  static brandingError(res, error, label) {
+    if (error instanceof PlatformBrandingError) {
+      return res.status(error.status).json({ ...createErrorResponse(error.message), code: error.code });
+    }
+    console.error(label, error);
+    return res.status(500).json(createErrorResponse('Failed to save the branding', error.message));
   }
 
   /**

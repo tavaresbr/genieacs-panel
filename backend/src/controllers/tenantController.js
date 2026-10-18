@@ -20,6 +20,7 @@ import { normalizeTaxId, isValidTaxId, isValidCnpj } from '../utils/taxId.js';
 import { lookupCnpj } from '../services/cnpjLookupService.js';
 import { lookupCep, geocodeAddress } from '../services/addressLookupService.js';
 import ReferralService from '../services/referralService.js';
+import { readBranding, readBrandingImage } from '../services/platformBrandingService.js';
 
 /**
  * O cadastro fiscal vindo do corpo, normalizado — ou o motivo de recusa.
@@ -837,6 +838,38 @@ class TenantController {
       );
     }
   }
+
+  /** `GET /api/tenant/brand` — quais imagens existem e a URL (versionada) de cada uma. */
+  static async getBrand(req, res) {
+    try {
+      const brand = await readBranding();
+      const url = (kind) => (brand[kind]
+        ? `/api/tenant/brand/${kind}?v=${encodeURIComponent(brand[kind].updatedAt ?? '')}`
+        : null);
+      return res.json(createResponse('ok', { logoUrl: url('logo'), faviconUrl: url('favicon') }));
+    } catch (error) {
+      console.error('Get brand error:', error);
+      return res.status(500).json(createErrorResponse(req.t('tenant.publicFailed'), error.message));
+    }
+  }
+
+  /** `GET /api/tenant/brand/logo|favicon` — os bytes; 404 quando o console nunca enviou. */
+  static getBrandImage = (kind) => async (req, res) => {
+    try {
+      const image = await readBrandingImage(kind);
+      if (!image) return res.status(404).json(createErrorResponse(req.t('common.notFound')));
+      res.set({
+        'Content-Type': image.mime,
+        'X-Content-Type-Options': 'nosniff',
+        // A URL leva `?v=updatedAt`, então o navegador pode guardar.
+        'Cache-Control': 'public, max-age=86400'
+      });
+      return res.send(image.buffer);
+    } catch (error) {
+      console.error('Get brand image error:', error);
+      return res.status(500).json(createErrorResponse(req.t('tenant.publicFailed'), error.message));
+    }
+  };
 }
 
 export default TenantController;
