@@ -11,6 +11,7 @@ import {
   type PlatformProfileField
 } from '@/lib/api'
 import { refreshBrand, useBrand } from '@/lib/brand'
+import { BrandingImageError, prepareBrandingImage } from '@/lib/branding-image'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
@@ -141,11 +142,13 @@ function telefoneDoCnpj(bruto: string | undefined) {
 }
 
 
-const BRANDING_ACCEPT = 'image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon,.ico'
+// Qualquer imagem: `prepareBrandingImage` reduz e converte o que o servidor não aceita como está.
+const BRANDING_ACCEPT = 'image/*,.ico'
 
 /**
  * A logo e o favicon do sistema. Sobem na hora, sem passar pelo "Salvar" do
- * formulário: são arquivos, e o servidor confere os bytes (nada de SVG).
+ * formulário. A imagem é reduzida e convertida aqui (`prepareBrandingImage`);
+ * o servidor ainda confere os bytes e recusa SVG.
  */
 function BrandingSection({ canSave }: { canSave: boolean }) {
   const { t } = useTranslation()
@@ -157,7 +160,8 @@ function BrandingSection({ canSave }: { canSave: boolean }) {
     if (!file) return
     setOcupado(kind)
     try {
-      const res = await platformAPI.uploadBranding(kind, file)
+      const pronto = await prepareBrandingImage(file, kind)
+      const res = await platformAPI.uploadBranding(kind, pronto)
       if (res.success) {
         await refreshBrand()
         toast.success(t('platform.profile.brandingSaved'))
@@ -168,8 +172,12 @@ function BrandingSection({ canSave }: { canSave: boolean }) {
       } else {
         toast.error(t('platform.profile.brandingFailed'))
       }
-    } catch {
-      toast.error(t('platform.profile.brandingFailed'))
+    } catch (error) {
+      if (error instanceof BrandingImageError) {
+        toast.error(t(error.code === 'too_large' ? 'platform.profile.brandingTooLarge' : 'platform.profile.brandingTypeInvalid'))
+      } else {
+        toast.error(t('platform.profile.brandingFailed'))
+      }
     } finally {
       setOcupado(null)
     }
