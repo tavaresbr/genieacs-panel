@@ -27,6 +27,7 @@ router.get('/config', authenticateToken, requirePermission('sgp.config'), SgpCon
 router.put('/config', authenticateToken, requirePermission('sgp.config'), SgpController.updateConfig);
 router.post('/test', authenticateToken, requirePermission('sgp.config'), sgpAdminLimiter, SgpController.testConnection);
 router.get('/customers', authenticateToken, requirePermission('sgp.read'), sgpAdminLimiter, SgpController.lookup);
+router.get('/contracts/search', authenticateToken, requirePermission('sgp.read'), sgpAdminLimiter, SgpController.searchContracts);
 router.get('/links', authenticateToken, requirePermission('sgp.read'), SgpController.listLinks);
 router.get('/overview', authenticateToken, requirePermission('sgp.read'), SgpController.getOverview);
 // A fleet sync calls the provider once per ONT, so it gets its own budget.

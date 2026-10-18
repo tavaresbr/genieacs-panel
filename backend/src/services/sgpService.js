@@ -2165,17 +2165,90 @@ class SgpService {
     const selected = contract
       ? this.exactContract(contracts, contract)
       : this.pickContract(contracts);
-    if (!selected) {
+    // A consulta do SGP nem sempre devolve o contrato que a listagem de
+    // clientes já trouxe (a que alimenta Contatos). O operador está olhando
+    // esse contrato na tela; recusar o vínculo por isso o deixa sem saída.
+    const known = !selected && contract
+      ? await SgpContact.getByContract(String(contract).trim())
+      : null;
+    if (!selected && !known) {
       throw new SgpError('sgp.error.contractNotFound', { code: 'not_found', status: 404 });
     }
     const account = await CustomerAccount.getByDeviceId(deviceId);
-    const link = await SgpLink.upsert(this.contractToLinkRow(selected, {
-      deviceId,
-      accountId: account?.id ?? null,
-      linkMode: 'manual'
-    }));
+    const row = selected
+      ? this.contractToLinkRow(selected, {
+        deviceId,
+        accountId: account?.id ?? null,
+        linkMode: 'manual'
+      })
+      : this.contactToLinkRow(known, { deviceId, accountId: account?.id ?? null });
+    const link = await SgpLink.upsert(row);
     await DeviceTagService.safeReconcile(deviceId);
     return link;
+  }
+
+  /**
+   * O vínculo manual montado a partir do cadastro sincronizado (`sgp_contacts`),
+   * para quando a consulta do SGP não devolve o contrato. Leva o estado e os
+   * campos que a listagem já guardou; o próximo refresh que o SGP responder
+   * confirma ou corrige, e um que não responder deixa o vínculo como está.
+   */
+  static contactToLinkRow(contact, { deviceId, accountId }) {
+    const state = CONTRACT_STATES.includes(contact.state) ? contact.state : 'unknown';
+    return {
+      device_id: deviceId,
+      account_id: accountId ?? null,
+      contract: String(contact.contract),
+      document: contact.document ? String(contact.document).replace(/\D/g, '').slice(0, 32) : null,
+      client_name: contact.client_name ? String(contact.client_name).slice(0, 255) : null,
+      plan: contact.plan ? String(contact.plan).slice(0, 255) : null,
+      status: contact.status ? String(contact.status).slice(0, 64) : null,
+      status_label: contact.status_label ? String(contact.status_label).slice(0, 128) : null,
+      state,
+      login: contact.login ? String(contact.login).slice(0, 255) : null,
+      phone_e164: contact.phone_e164 || null,
+      link_mode: 'manual',
+      last_synced_at: new Date()
+    };
+  }
+
+  /**
+   * Contratos para o operador escolher, a partir do cadastro sincronizado.
+   *
+   * `suggestions` é o que há de mais forte para uma ONT: os contratos cujo
+   * login no SGP é o que ela reporta. Cada resultado diz se já tem ONT, porque
+   * vincular uma segunda ao mesmo contrato é legítimo mas raramente é o que a
+   * pessoa quer.
+   */
+  static async searchContracts(q, { deviceId = null } = {}) {
+    const [results, reported] = await Promise.all([
+      SgpContact.search(q),
+      deviceId ? this.reportedPppoeLogin(deviceId) : null
+    ]);
+    const suggested = reported?.login ? await SgpContact.getByLogin(reported.login) : [];
+    const contracts = [...new Set([...results, ...suggested].map((row) => String(row.contract)))];
+    const links = contracts.length
+      ? await Promise.all(contracts.map((contract) => SgpLink.getByContract(contract)))
+      : [];
+    const owners = new Map(contracts.map((contract, index) => [
+      contract,
+      links[index].map((link) => link.device_id).filter((id) => id !== deviceId)
+    ]));
+    const shape = (row) => ({
+      contract: String(row.contract),
+      clientName: row.client_name || null,
+      document: row.document || null,
+      plan: row.plan || null,
+      state: row.state || 'unknown',
+      statusLabel: row.status_label || null,
+      login: row.login || null,
+      linkedDevices: owners.get(String(row.contract)) || []
+    });
+    return {
+      results: results.map(shape),
+      suggestions: suggested.map(shape),
+      reportedLogin: reported?.login || null
+    };
   }
 
   static async unlinkDevice(deviceId) {

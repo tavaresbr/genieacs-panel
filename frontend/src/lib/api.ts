@@ -4067,6 +4067,24 @@ export const teiahAPI = {
     apiClient.post<{ running: boolean }>('/teiah/export/run')
 }
 
+export interface SgpContractChoice {
+  contract: string
+  clientName: string | null
+  document: string | null
+  plan: string | null
+  state: string
+  statusLabel: string | null
+  login: string | null
+  /** Outras ONTs que já usam este contrato. */
+  linkedDevices: string[]
+}
+
+export interface SgpContractSearch {
+  results: SgpContractChoice[]
+  suggestions: SgpContractChoice[]
+  reportedLogin: string | null
+}
+
 export const sgpAPI = {
   getConfig: () =>
     apiClient.get<SgpConfig>('/sgp/config'),
@@ -4096,6 +4114,13 @@ export const sgpAPI = {
     }>(
       `/sgp/devices/${encodeURIComponent(deviceId)}${options.refresh ? '?refresh=1' : ''}`
     ),
+
+  /** Contratos do cadastro sincronizado; `suggestions` são os que têm o login desta ONT. */
+  searchContracts: (q: string, deviceId?: string) => {
+    const params = new URLSearchParams({ q })
+    if (deviceId) params.set('deviceId', deviceId)
+    return apiClient.get<SgpContractSearch>(`/sgp/contracts/search?${params.toString()}`)
+  },
 
   linkDevice: (deviceId: string, payload: { contract: string; document?: string }) =>
     apiClient.post<{ link: SgpContractLink }>(`/sgp/devices/${encodeURIComponent(deviceId)}/link`, payload),

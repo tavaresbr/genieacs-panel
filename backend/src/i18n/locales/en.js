@@ -479,7 +479,7 @@ export default {
   'sgp.error.loginRequested': 'The ONT has not reported its PPPoE login to GenieACS yet. A read was requested and arrives with the next Inform; try again in a few minutes or link it manually by CPF/contract.',
   'sgp.error.loginNotReported': 'The ONT does not report its PPPoE login over TR-069 (common when the OLT configures the WAN over OMCI). Link it manually by CPF/contract.',
   'sgp.error.noContractForDevice': 'No SGP contract was found for this ONT',
-  'sgp.error.contractNotFound': 'Contract not found in SGP',
+  'sgp.error.contractNotFound': 'Contract not found in SGP or in the synced contacts',
   'sgp.error.webhookSecretRequired': 'Generate a webhook secret before enabling SGP event delivery',
   'sgp.error.testCredentialsRequired': 'Enter the SGP URL, app, and token to test the connection',
   'sgp.error.tokenForNewUrl': 'The SGP address changed: enter the token again to save',
