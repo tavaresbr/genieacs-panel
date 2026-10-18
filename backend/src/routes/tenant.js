@@ -19,6 +19,13 @@ const router = express.Router();
  */
 router.get('/public', TenantController.getPublicProfile);
 
+// A logo e o favicon do sistema, abertos pelo mesmo motivo do `/public`: a tela
+// de login os mostra antes de haver sessão. São da PLATAFORMA e iguais para
+// todo host; o que vale é a imagem, nunca o provedor que perguntou.
+router.get('/brand', TenantController.getBrand);
+router.get('/brand/logo', TenantController.getBrandImage('logo'));
+router.get('/brand/favicon', TenantController.getBrandImage('favicon'));
+
 // E do outro lado da linha que o parágrafo acima descreve: tudo que este
 // provedor cadastrou, num arquivo. Autenticada e com capacidade própria.
 router.get('/export', authenticateToken, requirePermission('tenant.export'), TenantController.exportTenant);

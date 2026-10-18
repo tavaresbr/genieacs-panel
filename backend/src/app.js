@@ -60,6 +60,7 @@ import { BILLING_WEBHOOK_PATH } from './config/billingWebhookPath.js';
 import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
+import { BRANDING_UPLOAD_PATHS, brandingRawBody } from './services/platformBrandingService.js';
 import { FIRMWARE_REASSIGN_PATH, FIRMWARE_UPLOAD_PATH, firmwareRawBody } from './services/firmwareStore.js';
 import provisioningRoutes from './routes/provisioning.js';
 import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
@@ -243,6 +244,15 @@ app.post(
   authenticateToken,
   requirePlatformAdmin,
   firmwareRawBody
+);
+// A logo e o favicon do sistema: o corpo é a imagem (até 512 KB). Só o `PUT`,
+// pelo mesmo motivo do firmware: o `DELETE` do mesmo caminho não tem corpo.
+app.put(
+  BRANDING_UPLOAD_PATHS,
+  firmwareUploadLimiter,
+  authenticateToken,
+  requirePlatformAdmin,
+  brandingRawBody
 );
 app.use(express.json({ limit: '1mb' }));
 

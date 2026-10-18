@@ -47,6 +47,9 @@ const GUARDAS_DE_SESSAO = new Set([
  */
 const PUBLICAS = new Map([
   ['GET /api/tenant/public', 'o nome do provedor para a tela de login, atrás do resolvedor — quem responde é o host'],
+  ['GET /api/tenant/brand', 'a logo e o favicon do sistema, que a tela de login mostra antes de haver sessão; da plataforma, iguais em todo host'],
+  ['GET /api/tenant/brand/logo', 'os bytes da logo; não lê dado de provedor'],
+  ['GET /api/tenant/brand/favicon', 'os bytes do favicon; não lê dado de provedor'],
   ['GET /api/auth/setup-status', 'a instalação já tem alguém? é a pergunta que a tela de instalação faz antes de existir sessão'],
   ['POST /api/auth/setup', 'cria a primeira conta do provedor; recusa se já houver uma'],
   ['POST /api/auth/signup', 'um ISP se cadastra; só na edição SaaS e só onde há domínio-base'],
@@ -611,11 +614,14 @@ describe('a allowlist do endereço da plataforma', () => {
   // lá. Não leem dado de provedor nenhum — são dois arquivos do disco —, e a
   // origem que o instalador leva no ápice é o domínio-base configurado, nunca o
   // Host (prova em genieacs-agent-files-subdomain.test.js).
-  it('serve por caminho exato só o perfil público, o cadastro e os arquivos do agente', () => {
+  it('serve por caminho exato só o perfil público, a marca, o cadastro e os arquivos do agente', () => {
     assert.deepEqual(listaDe('PLATFORM_HOST_PATHS').sort(), [
       '/api/auth/signup',
       '/api/genieacs-agent/agent.mjs',
       '/api/genieacs-agent/install.sh',
+      '/api/tenant/brand',
+      '/api/tenant/brand/favicon',
+      '/api/tenant/brand/logo',
       '/api/tenant/public'
     ]);
   });

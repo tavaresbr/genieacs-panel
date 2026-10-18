@@ -20,6 +20,12 @@ router.post('/integrations/asaas/webhook-token', ...guard, PlatformIntegrationsC
 // Configurações → Dados do SaaS: a empresa que vende, como o site a mostra.
 router.get('/settings/profile', ...guard, PlatformSettingsController.getProfile);
 router.put('/settings/profile', ...guard, PlatformSettingsController.updateProfile);
+// A logo e o favicon. O corpo cru do PUT é lido em `app.js` (`BRANDING_UPLOAD_PATH`),
+// antes do parser JSON; aqui só a rota e a guarda.
+for (const kind of ['logo', 'favicon']) {
+  router.put(`/settings/branding/${kind}`, ...guard, PlatformSettingsController.saveBranding(kind));
+  router.delete(`/settings/branding/${kind}`, ...guard, PlatformSettingsController.removeBranding(kind));
+}
 // Configurações → Alertas (0112): a configuração vai no perfil; o teste, aqui.
 router.post('/alerts/test', ...guard, PlatformSettingsController.testAlert);
 

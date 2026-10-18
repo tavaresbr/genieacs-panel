@@ -1,9 +1,24 @@
+import { useBrand } from '@/lib/brand'
+
 type BrandMarkProps = {
   className?: string
   title?: string
 }
 
 export function BrandMark({ className = 'h-9 w-9', title }: BrandMarkProps) {
+  const { logoUrl } = useBrand()
+  // A logo enviada pelo console vale para todo uso da marca; sem ela, o SVG.
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        className={`${className} object-contain`}
+        alt={title ?? ''}
+        aria-hidden={title ? undefined : true}
+        decoding="async"
+      />
+    )
+  }
   return (
     <svg
       className={className}
