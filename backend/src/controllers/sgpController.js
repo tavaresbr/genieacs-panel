@@ -114,6 +114,19 @@ class SgpController {
     }
   }
 
+  static async searchContracts(req, res) {
+    try {
+      const deviceId = String(req.query?.deviceId ?? '').trim() || null;
+      const data = await SgpService.searchContracts(req.query?.q, { deviceId });
+      return res.json(createResponse(
+        req.t('sgp.contractsFound', { count: data.results.length }),
+        data
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.lookupFailed');
+    }
+  }
+
   static async listLinks(req, res) {
     try {
       const links = await SgpService.listLinks();

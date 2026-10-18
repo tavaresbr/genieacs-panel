@@ -10,6 +10,7 @@ import { formatDate } from '@/lib/utils'
 import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
+import { SgpContractPicker } from '@/components/sgp-contract-picker'
 import { informedRecently, serialMatches, summonDeferredMessage } from '@/lib/device-actions'
 import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
@@ -2094,16 +2095,14 @@ export default function DeviceDetailPage() {
                       {sgpMessage || t('detail.sgp.notLinked')}
                     </p>
                     <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                      <input
-                        type="text"
-                        className="modern-input sm:max-w-xs"
-                        placeholder={t('detail.sgp.contractPlaceholder')}
+                      <SgpContractPicker
+                        deviceId={deviceId}
                         value={sgpContractInput}
-                        onChange={(event) => setSgpContractInput(event.target.value)}
+                        onChange={setSgpContractInput}
                       />
                       <button
                         type="button"
-                        className="modern-button shrink-0"
+                        className="modern-button shrink-0 self-start"
                         disabled={sgpLoading}
                         onClick={() => void handleSgpLink()}
                       >
