@@ -927,6 +927,32 @@ async function sgpFetch(url, { headers, body, signal, maxBytes = MAX_RESPONSE_BY
 
 const MIN_RECONCILE_INTERVAL_MINUTES = 5;
 
+/**
+ * What the SGP said when it refused a request. It answers a refusal in more
+ * than one shape — `{msg}`, `{erro}`, a field map (`{"cep": ["inválido"]}`),
+ * `{"errors": [...]}` or a bare sentence — and the operator needs the words,
+ * not "status 400". Only the SGP's own text goes through, cut short.
+ */
+function refusalText(data, text) {
+  const direct = asText(pick(data || {}, ['msg', 'mensagem', 'message', 'erro', 'error', 'detail', 'detalhe']));
+  if (direct) return direct.slice(0, 400);
+  const parts = [];
+  const walk = (value, label) => {
+    if (parts.length >= 8 || value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, label);
+    } else if (typeof value === 'object') {
+      for (const [key, inner] of Object.entries(value)) walk(inner, key);
+    } else {
+      const line = String(value).trim();
+      if (line) parts.push(label && !/^\d+$/.test(label) ? `${label}: ${line}` : line);
+    }
+  };
+  if (data && typeof data === 'object') walk(data, '');
+  else if (typeof text === 'string' && text.trim() && !text.trim().startsWith('<')) parts.push(text.trim());
+  return parts.join('; ').slice(0, 400);
+}
+
 class SgpService {
   static configCache = new TenantCache(CONFIG_CACHE_TTL_MS);
 
@@ -1392,7 +1418,7 @@ class SgpService {
         vars: { status: response.status },
         code: 'http_error',
         status: 502,
-        details: asText(pick(data || {}, ['msg', 'mensagem', 'message', 'erro'])) || undefined
+        details: refusalText(data, text) || undefined
       });
     }
     if (data === null && acceptText) {

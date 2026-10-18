@@ -51,6 +51,8 @@ function startSgpStub() {
         criados.push({ path: req.url, body: payload });
         if (modoCriacao === 'sem-id') return send({ message: 'Campo obrigatório: bairro' });
         if (modoCriacao === 'recusa') return send({ message: 'CPF já cadastrado' }, 400);
+        if (modoCriacao === 'recusa-campos') return send({ logradouro: ['Informe o nome completo da rua.'], cep: ['CEP não encontrado'] }, 400);
+        if (modoCriacao === 'recusa-vazia') return send({}, 400);
         proximoId += 1;
         return send({ cliente_id: proximoId, message: `Cliente ${payload.nome} cadastrado via API.` });
       }
@@ -291,6 +293,14 @@ describe('cadastrar no SGP', () => {
     assert.match(res.body.message, /já cadastrado/);
   });
 
+  it('a recusa do SGP em campos ("logradouro", "cep") também chega com as palavras dele', async () => {
+    modoCriacao = 'recusa-campos';
+    const res = await criarNoSgp({ ...PESSOA, document: '39053344705' });
+    assert.equal(res.status, 502);
+    assert.match(res.body.message, /logradouro: Informe o nome completo da rua\./);
+    assert.match(res.body.message, /cep: CEP não encontrado/);
+  });
+
   it('quem não tem sgp.act não cria no SGP', async () => {
     await call(`${panelUrl}/api/users`, {
       method: 'POST', ...auth(),
@@ -414,6 +424,20 @@ describe('preencher pela TeiaH', () => {
     const { normalizeConsult } = await import('../src/services/teiahService.js');
     const result = normalizeConsult(outra);
     assert.deepEqual(result.address, { number: '77', zip: '68180000' });
+  });
+
+  it('um logradouro que é só o tipo ("RUA") não vai para o formulário', async () => {
+    const { default: ContactOnboardingService } = await import('../src/services/contactOnboardingService.js');
+    const feito = await ContactOnboardingService.completeAddress(
+      { street: 'RUA', number: '1050', district: 'CENTRO', city: 'OBIDOS', state: 'AM', zip: '' },
+      { digits: '39053344705', personType: 'PF', fromReceita: false }
+    );
+    assert.equal(feito.street, '');
+    assert.equal(feito.number, '1050');
+    const real = await ContactOnboardingService.completeAddress(
+      { street: 'RUA DAS FLORES', zip: '' }, { digits: '39053344705', personType: 'PF', fromReceita: false }
+    );
+    assert.equal(real.street, 'RUA DAS FLORES');
   });
 
   it('quem já está no SGP não é consultado na TeiaH', async () => {
