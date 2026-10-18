@@ -678,6 +678,9 @@ export function TemplatesPanel() {
                     onClick={() => {
                       setRefusal('')
                       setDraft({ id: template.id, name: template.name, body: template.body, category: asCategory(template.category), ...draftFrom(template) })
+                      // The editor sits above the list; without this, editing a
+                      // template far down the list opens the form off screen.
+                      requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
                     }}
                   >
                     <Icon name="edit" size={16} />
