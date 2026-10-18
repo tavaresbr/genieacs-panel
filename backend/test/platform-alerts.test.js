@@ -23,6 +23,7 @@ const { default: PlatformAlertService, MAX_ATTEMPTS, sanitizePayload, saoPauloCl
 const { saveProfile, invalidatePlatformProfile, alertsConfig } = await import('../src/services/platformProfileService.js');
 const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
 const { default: SubscriptionNoticeService } = await import('../src/services/subscriptionNoticeService.js');
+const { default: ChargeIssuingService } = await import('../src/services/chargeIssuingService.js');
 const { default: CancellationService } = await import('../src/services/cancellationService.js');
 const { default: CardAutopayService } = await import('../src/services/billing/cardAutopayService.js');
 const { default: BillingInvoice } = await import('../src/models/BillingInvoice.js');
@@ -605,7 +606,8 @@ describe('os ganchos', () => {
     await passada(em(16));
     const linhas = await doEvento('auto_suspended');
     assert.equal(linhas.length, 1);
-    assert.equal(JSON.parse(linhas[0].payload).date, vencimento.toISOString().slice(0, 10));
+    // A data do prazo é a de Brasília, como no serviço; em UTC ela difere entre 0h e 3h.
+    assert.equal(JSON.parse(linhas[0].payload).date, ChargeIssuingService.isoDate(vencimento));
     await comAssinatura();
   });
 

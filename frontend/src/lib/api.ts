@@ -533,9 +533,10 @@ class ApiClient {
   async sendBlob<T>(
     endpoint: string,
     body: Blob,
-    headers: Record<string, string>
+    headers: Record<string, string>,
+    method: 'POST' | 'PUT' = 'POST'
   ): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'POST', body, headers })
+    return this.request<T>(endpoint, { method, body, headers })
   }
 
   /**
@@ -988,7 +989,16 @@ export interface SignupResult {
  * exactly as it does today.
  */
 export const publicTenantAPI = {
-  current: () => apiClient.get<PublicTenant>('/tenant/public')
+  current: () => apiClient.get<PublicTenant>('/tenant/public'),
+
+  /** A logo e o favicon do sistema, abertos como o resto: o login os mostra antes da sessão. */
+  brand: () => apiClient.get<PublicBrand>('/tenant/brand')
+}
+
+/** URLs já versionadas (`?v=`); `null` onde o console nunca enviou a imagem. */
+export interface PublicBrand {
+  logoUrl: string | null
+  faviconUrl: string | null
 }
 
 /**
@@ -2339,6 +2349,19 @@ export const platformAPI = {
       & { alerts?: PlatformAlertsUpdate }
   ) =>
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
+
+  /** A logo ou o favicon do sistema. O corpo é a imagem crua; o servidor confere os bytes. */
+  uploadBranding: (kind: 'logo' | 'favicon', file: File) =>
+    apiClient.sendBlob<{ kind: string }>(
+      `/platform/settings/branding/${kind}`,
+      file,
+      { 'Content-Type': 'application/octet-stream' },
+      'PUT'
+    ),
+
+  /** Volta ao padrão do sistema. */
+  removeBranding: (kind: 'logo' | 'favicon') =>
+    apiClient.delete<{ kind: string }>(`/platform/settings/branding/${kind}`),
 
   /**
    * Manda um alerta de teste agora (0112). 409 `no_destination` sem WhatsApp

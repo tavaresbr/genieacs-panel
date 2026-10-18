@@ -55,6 +55,8 @@ class PlatformAudit {
     // Os dados da empresa que vende o SaaS (Configurações → Dados do SaaS).
     // O detalhe lista os campos que mudaram, não os valores.
     PLATFORM_PROFILE_CHANGED: 'platform.profile_changed',
+    // A logo ou o favicon do sistema. O detalhe diz qual e se foi enviada ou removida.
+    PLATFORM_BRANDING_CHANGED: 'platform.branding_changed',
     // O "Enviar alerta de teste" dos alertas da plataforma (0112). O detalhe
     // diz os canais e o resultado de cada um, nunca o destino.
     PLATFORM_ALERT_TEST: 'platform.alert_test',

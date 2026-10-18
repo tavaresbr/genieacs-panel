@@ -5,10 +5,13 @@ import ReferralPage from './pages/referral'
 import { LanguageProvider } from './contexts/language-context'
 import './styles/globals.css'
 import { detectLocale, loadDictionary } from './lib/i18n'
+import { loadBrand } from './lib/brand'
 
 // Start fetching the visitor's dictionary during module evaluation rather than
 // from an effect, so the first paint is already in the right language.
 void loadDictionary(detectLocale())
+// O favicon enviado pelo console troca o da aba assim que a resposta chega.
+void loadBrand()
 
 const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
 document.documentElement.classList.toggle('dark', Boolean(prefersDark))

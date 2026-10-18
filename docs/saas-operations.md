@@ -1026,6 +1026,12 @@ que não conhece. Três caminhos:
   YouTube, LinkedIn). Vale na hora, sem reiniciar. O `.env` fica como valor inicial: cada
   campo que nunca foi salvo no console usa a variável correspondente, e salvar o campo vazio
   devolve o valor ao `.env`. Guardado no `app_state` da caixa da plataforma.
+- **Logo e favicon:** na mesma tela, em **Identidade visual**, o console envia a logo (até
+  512 KB) e o favicon (até 128 KB), em PNG, JPG, WebP ou ICO — SVG é recusado, e o tipo é
+  conferido pelos bytes. Valem na hora em todos os painéis, no login, no portal do cliente e
+  no site; "Restaurar padrão" volta à marca original. Ficam no `app_state` da caixa da
+  plataforma (`platform_branding`) e saem de `GET /api/tenant/brand`, aberto como o
+  `/api/tenant/public`.
 - O rodapé do site mostra, se configurados, `PLATFORM_CONTACT_EMAIL`, `PLATFORM_LEGAL_NAME`
   (razão social), `PLATFORM_TAX_ID` (CNPJ) e `PLATFORM_ADDRESS`. O que não estiver no `.env`
   simplesmente não aparece.

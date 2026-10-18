@@ -10,6 +10,7 @@ import {
   type PlatformProfile,
   type PlatformProfileField
 } from '@/lib/api'
+import { refreshBrand, useBrand } from '@/lib/brand'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
@@ -137,6 +138,115 @@ function telefoneDoCnpj(bruto: string | undefined) {
   const d = String(bruto ?? '').replace(/\D/g, '')
   if (d.length !== 10 && d.length !== 11) return ''
   return paraTela('contactWhatsapp', d)
+}
+
+
+const BRANDING_ACCEPT = 'image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon,.ico'
+
+/**
+ * A logo e o favicon do sistema. Sobem na hora, sem passar pelo "Salvar" do
+ * formulário: são arquivos, e o servidor confere os bytes (nada de SVG).
+ */
+function BrandingSection({ canSave }: { canSave: boolean }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const brand = useBrand()
+  const [ocupado, setOcupado] = useState<'logo' | 'favicon' | null>(null)
+
+  const enviar = async (kind: 'logo' | 'favicon', file: File | undefined) => {
+    if (!file) return
+    setOcupado(kind)
+    try {
+      const res = await platformAPI.uploadBranding(kind, file)
+      if (res.success) {
+        await refreshBrand()
+        toast.success(t('platform.profile.brandingSaved'))
+      } else if (res.code === 'branding_too_large') {
+        toast.error(t('platform.profile.brandingTooLarge'))
+      } else if (res.code === 'branding_type_invalid') {
+        toast.error(t('platform.profile.brandingTypeInvalid'))
+      } else {
+        toast.error(t('platform.profile.brandingFailed'))
+      }
+    } catch {
+      toast.error(t('platform.profile.brandingFailed'))
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  const remover = async (kind: 'logo' | 'favicon') => {
+    setOcupado(kind)
+    try {
+      const res = await platformAPI.removeBranding(kind)
+      if (res.success) {
+        await refreshBrand()
+        toast.success(t('platform.profile.brandingRemoved'))
+      } else {
+        toast.error(t('platform.profile.brandingFailed'))
+      }
+    } catch {
+      toast.error(t('platform.profile.brandingFailed'))
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  const itens = [
+    { kind: 'logo' as const, rotulo: t('platform.profile.brandingLogo'), url: brand.logoUrl, caixa: 'h-16 w-16' },
+    { kind: 'favicon' as const, rotulo: t('platform.profile.brandingFavicon'), url: brand.faviconUrl, caixa: 'h-10 w-10' }
+  ]
+
+  return (
+    <section className="rounded-md border border-border p-4 sm:p-5">
+      <h3 className="font-semibold text-foreground">{t('platform.profile.branding')}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{t('platform.profile.brandingHint')}</p>
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {itens.map(({ kind, rotulo, url, caixa }) => (
+          <div key={kind} className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40">
+              {url ? (
+                <img src={url} alt="" className={`${caixa} object-contain`} />
+              ) : (
+                <span className="px-1 text-center text-[10px] leading-tight text-muted-foreground">
+                  {t('platform.profile.brandingDefault')}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="field-label">{rotulo}</p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <label className={`modern-button cursor-pointer ${!canSave || ocupado ? 'pointer-events-none opacity-60' : ''}`}>
+                  {t('platform.profile.brandingUpload')}
+                  <input
+                    type="file"
+                    accept={BRANDING_ACCEPT}
+                    className="sr-only"
+                    disabled={!canSave || ocupado !== null}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      void enviar(kind, file)
+                    }}
+                  />
+                </label>
+                {url && (
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    disabled={!canSave || ocupado !== null}
+                    onClick={() => void remover(kind)}
+                  >
+                    {t('platform.profile.brandingRemove')}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 /**
@@ -374,6 +484,8 @@ export function PlatformProfileForm() {
           </div>
         </section>
       ))}
+
+      <BrandingSection canSave={perfil.canSave} />
 
       <section className="rounded-md border border-border p-4 sm:p-5">
         <h3 className="font-semibold text-foreground">{t('platform.profile.referral')}</h3>
