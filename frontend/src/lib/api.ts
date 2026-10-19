@@ -3512,6 +3512,10 @@ export type SgpContractState = 'active' | 'blocked' | 'cancelled' | 'unknown'
 export interface SgpLinkRow {
   deviceId: string
   contract: string
+  /** O login do contrato no SGP. */
+  login?: string | null
+  /** Quantas ONTs dividem este contrato. */
+  deviceCount?: number
   clientName: string | null
   plan: string | null
   status: string | null
@@ -3538,6 +3542,14 @@ export interface SgpStaleActiveRow extends SgpDivergenceRow {
     lastInform: string | null
     matchedBy: 'pppoe' | 'contract'
   } | null
+}
+
+export interface SgpLoginMismatchRow {
+  deviceId: string
+  contract: string
+  clientName: string | null
+  reportedLogin: string | null
+  contractLogin: string | null
 }
 
 export interface SgpUnlinkedRow {
@@ -3570,12 +3582,15 @@ export interface SgpFleetOverview {
     onlineBlocked: number
     offlineActive: number
     staleActive: number
+    loginMismatch?: number
   }
   byState: Record<SgpContractState, number>
   divergences: {
     onlineBlocked: SgpDivergenceRow[]
     offlineActive: SgpDivergenceRow[]
     staleActive: SgpStaleActiveRow[]
+    /** Vínculos automáticos cujo login do contrato não é o que a ONT reporta. */
+    loginMismatch?: SgpLoginMismatchRow[]
     unlinked: SgpUnlinkedRow[]
   }
   lastSync: SgpSyncSummary | null
@@ -3633,6 +3648,8 @@ export interface ContactProfileContract {
   createdAt: string | null
   deviceId: string | null
   hasDevice: boolean
+  /** Todas as ONTs do contrato; `deviceId` é a primeira. */
+  devices?: { deviceId: string; linkMode: 'auto' | 'manual'; login: string | null }[]
 }
 
 /** The full client record behind the Contacts screen. */

@@ -14,10 +14,13 @@ import type { Device } from '@/types'
  */
 export function LinkDeviceModal({
   contract,
+  replaceDeviceId,
   onClose,
   onLinked
 }: {
   contract: ContactProfileContract
+  /** A ONT a trocar: depois de vincular a nova, esta sai do contrato. */
+  replaceDeviceId?: string
   onClose: () => void
   onLinked: () => void
 }) {
@@ -66,6 +69,14 @@ export function LinkDeviceModal({
         toast.error(res.message || t('contacts.profile.linkFailed'))
         return
       }
+      // A nova entra primeiro: se a troca falhar no meio, o contrato fica com
+      // as duas, e nunca com nenhuma.
+      if (replaceDeviceId && replaceDeviceId !== deviceId) {
+        const removed = await sgpAPI.unlinkDevice(replaceDeviceId)
+        if (!removed.success) {
+          toast.error(removed.message || t('contacts.profile.unlinkFailed'))
+        }
+      }
       toast.success(res.message || t('contacts.profile.linked'))
       onLinked()
     } finally {
@@ -77,7 +88,7 @@ export function LinkDeviceModal({
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="link-device-title">
       <div className="modal-panel modern-card max-w-xl p-5 sm:p-6">
         <h2 id="link-device-title" className="section-heading mb-1">
-          {t('contacts.profile.linkTitle', { contract: contract.contract })}
+          {t(replaceDeviceId ? 'contacts.profile.swapTitle' : 'contacts.profile.linkTitle', { contract: contract.contract })}
         </h2>
         <p className="section-description mb-4">{t('contacts.profile.linkHint')}</p>
         <input
@@ -89,7 +100,7 @@ export function LinkDeviceModal({
           autoFocus
         />
         <ul className="mt-3 max-h-72 divide-y divide-border overflow-y-auto" role="list">
-          {devices.map((device) => {
+          {devices.filter((device) => device._id !== replaceDeviceId).map((device) => {
             const matches = wantedLogin !== '' && (device.pppoe ?? '').trim().toLowerCase() === wantedLogin
             return (
               <li key={device._id} className="flex items-center justify-between gap-3 py-2 text-sm">

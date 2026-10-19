@@ -22,6 +22,7 @@ import {
 import { useLoading } from '@/components/ui/loading'
 import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
+import { loginsDiffer } from '@/lib/sgp'
 import { useTranslation } from '@/contexts/language-context'
 import { formatDate } from '@/lib/utils'
 import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
@@ -391,6 +392,16 @@ export default function DevicesPage() {
         <span className="mt-1 block truncate font-mono text-[0.68rem] text-muted-foreground" title={link.clientName || undefined}>
           {link.contract}{link.clientName ? ` · ${link.clientName}` : ''}
         </span>
+        {(link.deviceCount ?? 1) > 1 && (
+          <span className="mt-1 block text-[0.68rem] text-amber-600 dark:text-amber-400">
+            {t('devices.sgp.sharedContract', { count: link.deviceCount ?? 2 })}
+          </span>
+        )}
+        {link.linkMode !== 'manual' && loginsDiffer(link.login, device.pppoe) && (
+          <span className="mt-1 block text-[0.68rem] text-amber-600 dark:text-amber-400" title={`${device.pppoe} ≠ ${link.login}`}>
+            {t('devices.sgp.loginMismatch')}
+          </span>
+        )}
       </>
     )
   }
