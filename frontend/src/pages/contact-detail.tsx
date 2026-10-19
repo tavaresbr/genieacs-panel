@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
   contactsAPI,
+  sgpAPI,
   whatsappAPI,
   type ContactAddress,
   type ContactField,
@@ -85,7 +86,7 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [linking, setLinking] = useState<ContactProfileContract | null>(null)
+  const [linking, setLinking] = useState<{ contract: ContactProfileContract; replaceDeviceId?: string } | null>(null)
   const [opening, setOpening] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const canEdit = can('contacts.edit')
@@ -102,6 +103,66 @@ export default function ContactDetailPage() {
     setNotFound(false)
     setProfile(res.data)
   }, [key])
+
+  const unlinkDevice = async (contract: ContactProfileContract, deviceId: string) => {
+    if (!confirm(t('contacts.profile.unlinkConfirm', { device: deviceId, contract: contract.contract }))) return
+    const res = await sgpAPI.unlinkDevice(deviceId)
+    if (!res.success) {
+      toast.error(res.message || t('contacts.profile.unlinkFailed'))
+      return
+    }
+    toast.success(res.message || t('contacts.profile.unlinked'))
+    void load()
+  }
+
+  /* Todas as ONTs do contrato, cada uma com Trocar e Desvincular; sem nenhuma,
+     o Vincular que já existia. Um contrato com mais de uma é legítimo, e por
+     isso a lista mostra todas em vez de escolher uma. */
+  const renderDevices = (contract: ContactProfileContract) => {
+    const linked = contract.devices && contract.devices.length > 0
+      ? contract.devices
+      : contract.deviceId ? [{ deviceId: contract.deviceId, linkMode: 'auto' as const, login: null }] : []
+    if (linked.length === 0) {
+      return (
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>
+          {canLink && (
+            <button type="button" className="text-primary hover:underline" onClick={() => setLinking({ contract })}>
+              {t('contacts.profile.linkButton')}
+            </button>
+          )}
+        </span>
+      )
+    }
+    return (
+      <ul className="space-y-1" role="list">
+        {linked.map((device) => (
+          <li key={device.deviceId} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+            <Link className="text-primary hover:underline wrap-anywhere" to={`/devices/detail?id=${encodeURIComponent(device.deviceId)}`}>{device.deviceId}</Link>
+            {device.linkMode === 'manual' && <span className="text-xs text-muted-foreground">{t('contacts.profile.manualBadge')}</span>}
+            {canLink && (
+              <>
+                <button type="button" className="text-xs text-primary hover:underline" onClick={() => setLinking({ contract, replaceDeviceId: device.deviceId })}>
+                  {t('contacts.profile.swap')}
+                </button>
+                <button type="button" className="text-xs text-[hsl(var(--status-danger))] hover:underline" onClick={() => void unlinkDevice(contract, device.deviceId)}>
+                  {t('contacts.profile.unlink')}
+                </button>
+              </>
+            )}
+          </li>
+        ))}
+        {canLink && (
+          <li>
+            <button type="button" className="text-xs text-muted-foreground hover:text-primary hover:underline" onClick={() => setLinking({ contract })}>
+              {t('contacts.profile.addDevice')}
+            </button>
+          </li>
+        )}
+      </ul>
+    )
+  }
+
 
   useEffect(() => { void load() }, [load])
 
@@ -367,18 +428,7 @@ export default function ContactDetailPage() {
                         <td>{contract.dueDay || '—'}</td>
                         <td>{day(contract.createdAt)}</td>
                         <td>
-                          {contract.deviceId
-                            ? <Link className="text-primary hover:underline wrap-anywhere" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
-                            : (
-                              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>
-                                {canLink && (
-                                  <button type="button" className="text-primary hover:underline" onClick={() => setLinking(contract)}>
-                                    {t('contacts.profile.linkButton')}
-                                  </button>
-                                )}
-                              </span>
-                            )}
+                          {renderDevices(contract)}
                         </td>
                       </tr>
                     ))}
@@ -399,18 +449,7 @@ export default function ContactDetailPage() {
                     <p className="text-xs text-muted-foreground">
                       {t('contacts.profile.dueDay')}: {contract.dueDay || '—'} · {t('contacts.profile.since')}: {day(contract.createdAt)}
                     </p>
-                    {contract.deviceId
-                      ? <Link className="block break-all text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
-                      : (
-                        <p className="flex flex-wrap items-center gap-x-3 text-muted-foreground">
-                          {t('contacts.profile.noDevice')}
-                          {canLink && (
-                            <button type="button" className="text-primary hover:underline" onClick={() => setLinking(contract)}>
-                              {t('contacts.profile.linkButton')}
-                            </button>
-                          )}
-                        </p>
-                      )}
+                    {renderDevices(contract)}
                   </li>
                 ))}
               </ul>
@@ -422,7 +461,8 @@ export default function ContactDetailPage() {
 
         {linking && (
           <LinkDeviceModal
-            contract={linking}
+            contract={linking.contract}
+            replaceDeviceId={linking.replaceDeviceId}
             onClose={() => setLinking(null)}
             onLinked={() => {
               setLinking(null)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatSgpDate, routerUrl, sgpBadge } from '@/lib/sgp'
+import { formatSgpDate, loginsDiffer, routerUrl, sgpBadge } from '@/lib/sgp'
 
 /**
  * A cor do selo de um contrato do ERP.
@@ -111,5 +111,26 @@ describe('formatSgpDate', () => {
     expect(formatSgpDate(null, 'pt-BR')).toBe('—')
     expect(formatSgpDate('', 'pt-BR')).toBe('—')
     expect(formatSgpDate('sem data', 'pt-BR')).toBe('sem data')
+  })
+})
+
+/**
+ * O login da ONT contra o do contrato: só é alarme quando os dois existem e são
+ * logins diferentes. Caixa e espaços não contam (a ONT e o RADIUS discordam dos
+ * dois), e um lado vazio não prova nada.
+ */
+describe('loginsDiffer', () => {
+  it('é verdadeiro para dois logins diferentes', () => {
+    expect(loginsDiffer('TA100.310', 'TA100.310.1')).toBe(true)
+  })
+
+  it('ignora caixa e espaços nas pontas', () => {
+    expect(loginsDiffer('TA100.310', ' ta100.310 ')).toBe(false)
+  })
+
+  it('não acusa quando falta um dos lados', () => {
+    expect(loginsDiffer(null, 'TA100.310')).toBe(false)
+    expect(loginsDiffer('TA100.310', undefined)).toBe(false)
+    expect(loginsDiffer('', '')).toBe(false)
   })
 })

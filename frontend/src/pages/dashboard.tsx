@@ -232,6 +232,7 @@ function DashboardView({ owner }: { owner: string | null }) {
     const { onlineBlocked, offlineActive, unlinked } = sgpOverview.divergences
     // `?? []`/`?? 0`: an older backend does not send the stale block yet.
     const staleActive = sgpOverview.divergences.staleActive ?? []
+    const loginMismatch = sgpOverview.divergences.loginMismatch ?? []
     // The lists are samples; the counts to show come from `totals`.
     const { totals } = sgpOverview
     return [
@@ -259,6 +260,25 @@ function DashboardView({ owner }: { owner: string | null }) {
           detail: [row.clientName, row.contract, row.lastInform ? t('dashboard.sgp.lastInform', { time: formatDateTime(row.lastInform) }) : null]
             .filter(Boolean)
             .join(' · '),
+        })),
+      },
+      {
+        key: 'loginMismatch',
+        titleKey: 'dashboard.sgp.loginMismatch.title',
+        hintKey: 'dashboard.sgp.loginMismatch.hint',
+        emptyKey: 'dashboard.sgp.loginMismatch.empty',
+        tone: 'text-[hsl(var(--status-warning))]',
+        total: totals.loginMismatch ?? 0,
+        rows: loginMismatch.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
+          deviceId: row.deviceId,
+          detail: [
+            row.clientName,
+            t('dashboard.sgp.loginMismatch.detail', {
+              reported: row.reportedLogin ?? '—',
+              contract: row.contract,
+              contractLogin: row.contractLogin ?? '—',
+            }),
+          ].filter(Boolean).join(' · '),
         })),
       },
       {

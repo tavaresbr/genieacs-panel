@@ -222,7 +222,7 @@ class ContactProfileService {
     const contractRows = rows.filter((entry) => entry.contract);
     if (row.contract && !contractRows.some((entry) => entry.contract === row.contract)) contractRows.unshift(row);
     const devices = contractRows.length
-      ? await tdb('sgp_links').whereIn('contract', contractRows.map((entry) => String(entry.contract))).select('contract', 'device_id')
+      ? await tdb('sgp_links').whereIn('contract', contractRows.map((entry) => String(entry.contract))).select('contract', 'device_id', 'link_mode', 'login').orderBy('id', 'asc')
       : [];
 
     const link = row.fromLink ? row : (row.contract ? await tdb('sgp_links').where({ contract: String(row.contract) }).first() : null);
@@ -248,7 +248,10 @@ class ContactProfileService {
       whatsappPhone: whatsapp.phone,
       whatsappPhoneSource: whatsapp.phoneSource,
       contracts: contractRows.map((entry) => {
-        const device = devices.find((link) => String(link.contract) === String(entry.contract));
+        // Todas as ONTs do contrato, não só a primeira: um contrato pode ter
+        // mais de uma, e foi uma segunda escondida que atrasou achar o erro.
+        const linked = devices.filter((link) => String(link.contract) === String(entry.contract));
+        const device = linked[0];
         return {
           key: String(entry.contract),
           contract: String(entry.contract),
@@ -261,7 +264,12 @@ class ContactProfileService {
           address: entry.address ?? null,
           createdAt: entry.contract_created_at ?? null,
           deviceId: device?.device_id ?? null,
-          hasDevice: Boolean(device)
+          hasDevice: Boolean(device),
+          devices: linked.map((link) => ({
+            deviceId: link.device_id,
+            linkMode: link.link_mode === 'manual' ? 'manual' : 'auto',
+            login: link.login ?? null
+          }))
         };
       })
     };

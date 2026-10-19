@@ -442,6 +442,28 @@ describe('fleet reconciliation overview', () => {
     assert.equal(orphan.pppoe, 'orfao@provedor');
   });
 
+  it('flags an automatic link whose contract login is not the ONT\'s', async () => {
+    assert.equal(overview.totals.loginMismatch, 0, 'a fleet that links by login has no mismatch');
+    const before = await getDb()('sgp_links').where({ device_id: 'fleet-active' }).first();
+    await getDb()('sgp_links').where({ device_id: 'fleet-active' }).update({ login: 'outro.login@provedor' });
+    try {
+      const { body } = await call(`${panelUrl}/api/sgp/overview`, { headers: authHeaders(token) });
+      assert.equal(body.data.totals.loginMismatch, 1);
+      const [entry] = body.data.divergences.loginMismatch;
+      assert.equal(entry.deviceId, 'fleet-active');
+      assert.equal(entry.contractLogin, 'outro.login@provedor');
+      assert.ok(entry.reportedLogin);
+
+      // O vínculo manual é uma escolha de alguém: não é alarme.
+      await getDb()('sgp_links').where({ device_id: 'fleet-active' }).update({ link_mode: 'manual' });
+      const manual = await call(`${panelUrl}/api/sgp/overview`, { headers: authHeaders(token) });
+      assert.equal(manual.body.data.totals.loginMismatch, 0);
+    } finally {
+      await getDb()('sgp_links').where({ device_id: 'fleet-active' })
+        .update({ login: before.login, link_mode: before.link_mode });
+    }
+  });
+
   it('carries the last sync summary so the UI survives a reload', () => {
     assert.equal(overview.lastSync.total, FLEET.length + 1);
     assert.equal(overview.lastSync.linked, 5);
@@ -460,6 +482,8 @@ describe('stored link listing', () => {
     assert.deepEqual(Object.keys(manual), [
       'deviceId',
       'contract',
+      'login',
+      'deviceCount',
       'clientName',
       'plan',
       'status',
@@ -469,6 +493,7 @@ describe('stored link listing', () => {
       'lastSyncedAt'
     ]);
     assert.equal(manual.contract, '1005');
+    assert.equal(manual.deviceCount, 1);
     assert.equal(manual.state, 'active');
     assert.equal(manual.linkMode, 'manual');
     assert.ok(Date.parse(manual.lastSyncedAt));

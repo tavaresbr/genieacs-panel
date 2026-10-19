@@ -2326,9 +2326,18 @@ class SgpService {
   static async listLinks() {
     this.requireReady(await this.getConfig());
     const links = await SgpLink.getAll();
+    // Quantas ONTs dividem cada contrato: mais de uma é legítimo, mas é também
+    // como um vínculo no contrato errado de um cliente com vários se disfarça.
+    const perContract = new Map();
+    for (const link of links) {
+      const key = String(link.contract);
+      perContract.set(key, (perContract.get(key) || 0) + 1);
+    }
     return links.map((link) => ({
       deviceId: link.device_id,
       contract: link.contract,
+      login: link.login || null,
+      deviceCount: perContract.get(String(link.contract)) || 1,
       clientName: link.client_name,
       plan: link.plan,
       status: link.status,
@@ -2628,6 +2637,7 @@ class SgpService {
     const onlineBlocked = [];
     const offlineActive = [];
     const staleActive = [];
+    const loginMismatch = [];
     const unlinked = [];
     let linked = 0;
 
@@ -2658,6 +2668,20 @@ class SgpService {
         state,
         lastInform
       };
+      // A ONT cujo login não é o do contrato a que está ligada: o vínculo
+      // automático caiu no contrato errado de um cliente com vários. Um vínculo
+      // manual fica de fora — alguém o escolheu, e é isso que o painel respeita.
+      const reportedLogin = normalizeLogin(device.pppoe);
+      const contractLogin = normalizeLogin(link.login);
+      if (link.link_mode !== 'manual' && reportedLogin && contractLogin && reportedLogin !== contractLogin) {
+        loginMismatch.push({
+          deviceId,
+          contract: link.contract,
+          clientName: link.client_name,
+          reportedLogin: device.pppoe,
+          contractLogin: link.login
+        });
+      }
       if (online && (state === 'blocked' || state === 'cancelled')) {
         onlineBlocked.push(entry);
       } else if (!online && state === 'active') {
@@ -2687,7 +2711,8 @@ class SgpService {
         unlinked: unlinked.length,
         onlineBlocked: onlineBlocked.length,
         offlineActive: offlineActive.length,
-        staleActive: staleActive.length
+        staleActive: staleActive.length,
+        loginMismatch: loginMismatch.length
       },
       byState,
       // The lists are samples capped at DIVERGENCE_LIMIT; `totals` always
@@ -2696,6 +2721,7 @@ class SgpService {
         onlineBlocked: onlineBlocked.slice(0, DIVERGENCE_LIMIT),
         offlineActive: offlineActive.slice(0, DIVERGENCE_LIMIT),
         staleActive: staleActive.slice(0, DIVERGENCE_LIMIT),
+        loginMismatch: loginMismatch.slice(0, DIVERGENCE_LIMIT),
         unlinked: unlinked.slice(0, DIVERGENCE_LIMIT)
       },
       lastSync: await this.getLastSync(),

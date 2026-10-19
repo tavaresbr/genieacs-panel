@@ -118,4 +118,15 @@ export function routerUrl(ip: string | null | undefined): string | null {
   return `http://${value}/`
 }
 
+/**
+ * Whether the login the ONT reports and the one on its contract are two
+ * different logins. Case and stray spaces mean nothing here — the ONT and the
+ * RADIUS disagree about both — and a missing side proves nothing either way.
+ */
+export function loginsDiffer(contractLogin: string | null | undefined, reportedLogin: string | null | undefined): boolean {
+  const left = (contractLogin ?? '').trim().toLowerCase()
+  const right = (reportedLogin ?? '').trim().toLowerCase()
+  return left !== '' && right !== '' && left !== right
+}
+
 export default sgpBadge
