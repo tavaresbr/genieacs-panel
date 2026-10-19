@@ -400,7 +400,9 @@ describe('a IA atendendo', () => {
         const b = await liberar();
         assert.match(b.paraModelo, /ainda não respondeu/i);
         assert.equal(chamadas, 0, 'o SGP não foi tocado');
-        assert.equal((await conversaDe(ASSINANTE)).bot_step, 'ia_confirmar_liberacao', 'o pedido segue valendo');
+        const guardada = await conversaDe(ASSINANTE);
+        assert.equal(guardada.bot_step, 'ia_confirmar_liberacao', 'o pedido segue valendo');
+        assert.ok(Number(JSON.parse(guardada.bot_step_data).depoisDe) > 0, 'guarda o id da última mensagem do cliente');
       } finally { restaurar(); }
     });
 

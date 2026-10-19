@@ -568,22 +568,29 @@ class WaAiService {
    * mensagem do cliente) não pode liberar sozinho.
    */
   static async liberar({ conversation, link }) {
+    // "Depois do pedido" é por id de mensagem, não por horário: o horário tem
+    // precisão de segundo no MySQL, e um "sim" logo em seguida empataria.
+    const ultimaDoCliente = () => tdb('wa_messages')
+      .where({ conversation_id: conversation.id, direction: 'in', is_note: false })
+      .orderBy('id', 'desc')
+      .first('id', 'body');
     const pendente = WaBotService.passoAtivo(conversation) === WaBotService.PASSO_LIBERACAO;
     if (!pendente) {
+      const base = await ultimaDoCliente();
       await WaBotService.gravarPasso(conversation, {
-        bot_step: WaBotService.PASSO_LIBERACAO, bot_step_data: null, bot_step_at: new Date()
+        bot_step: WaBotService.PASSO_LIBERACAO,
+        bot_step_data: JSON.stringify({ depoisDe: base?.id ?? 0 }),
+        bot_step_at: new Date()
       });
       return {
         paraModelo: 'Antes de liberar, pergunte ao cliente se ele confirma o desbloqueio em confiança (temporário, a fatura continua a pagar). NÃO chame liberar_em_confianca de novo até ele responder.',
         intent: 'liberarPedido'
       };
     }
-    const desde = new Date(conversation.bot_step_at);
-    const ultima = await tdb('wa_messages')
-      .where({ conversation_id: conversation.id, direction: 'in', is_note: false })
-      .orderBy('id', 'desc')
-      .first('body', 'created_at');
-    if (!ultima || new Date(ultima.created_at) <= desde) {
+    let depoisDe = 0;
+    try { depoisDe = Number(JSON.parse(conversation.bot_step_data || '{}').depoisDe) || 0; } catch { depoisDe = 0; }
+    const ultima = await ultimaDoCliente();
+    if (!ultima || Number(ultima.id) <= depoisDe) {
       return { paraModelo: 'O cliente ainda não respondeu à confirmação. Pergunte e aguarde; não libere.' };
     }
     await WaBotService.gravarPasso(conversation, { bot_step: null, bot_step_data: null, bot_step_at: null });
