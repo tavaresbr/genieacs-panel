@@ -246,6 +246,28 @@ seis destinos quando o código alcança bem mais, e que errava a divisão de que
   **endereço do assinante** e que o provedor não pode desligar), BrasilAPI/CNPJ.ws/ReceitaWS/
   ViaCEP, Telegram, Meta, Focus Chat e os servidores de mapa.
 
+### 6.1 O provedor de IA do atendimento
+
+É escolhido **por provedor de internet** (Claude da Anthropic, ou uma API compatível com OpenAI:
+z.ai, bigmodel.cn, OpenAI). A chave é do provedor (traz a própria), fica cifrada no painel e nunca
+volta à tela. Quando o atendimento por IA, a sugestão de resposta ou o "Melhorar com IA" estão
+ligados, o painel envia ao serviço escolhido:
+
+| Sai | Quando |
+|---|---|
+| As últimas 20 mensagens da conversa (até 2.000 caracteres cada), **inclusive o CPF/CNPJ se o assinante o digitar** | atendimento e sugestão |
+| Número do contrato, nome do perfil do WhatsApp e nome da empresa | atendimento e sugestão |
+| O resultado das ferramentas: valor e vencimento da fatura **e os códigos de pagamento (PIX, linha digitável, link)**, estado da ONT e sinal óptico, avisos de queda e manutenção, resultado do desbloqueio | atendimento e sugestão |
+| O texto das "Instruções da empresa" e dos textos do bot que o provedor pede para melhorar | sempre que a IA é chamada |
+
+**Não sai:** senhas (nenhuma ferramenta as lê), o conteúdo de imagens, áudios e documentos (só um
+rótulo como "o cliente enviou uma imagem"), e dado de outros assinantes.
+
+O serviço de IA é **controlador ou operador do próprio contrato do provedor** (a chave e a cobrança
+são dele); a plataforma não vê a chave nem o que o serviço devolve além da resposta exibida. O
+provedor que ligar a IA deve citar o serviço escolhido na própria política de privacidade. O
+destino consta de `docs/lista-de-compartilhamento.md` (linha "Provedor de IA").
+
 `backend/test/sharing-list.test.js` varre a fonte atrás de endereços `https://…` e falha quando
 o código passa a alcançar um host que a lista não cita.
 

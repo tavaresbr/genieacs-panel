@@ -5579,6 +5579,8 @@ export function aiCreditsUrl(provider: BotAiProvider, baseUrl: string): string |
 export interface BotAiConfig {
   enabled: boolean
   suggest: boolean
+  /** A IA entrega quem quer contratar à equipe comercial. */
+  sales: boolean
   provider: BotAiProvider
   baseUrl: string
   model: string
@@ -5596,6 +5598,7 @@ export interface BotAiConfig {
 export interface BotAiInput {
   enabled?: boolean
   suggest?: boolean
+  sales?: boolean
   provider?: BotAiProvider
   baseUrl?: string
   model?: string
@@ -5663,6 +5666,7 @@ export interface BotReport {
   outagesInformed: number
   unlocks: number
   identified: number
+  leads: number
   documentFailures: number
   humanRequests: number
   /** 24 posições, hora 0 a 23 no fuso do horário de atendimento. */

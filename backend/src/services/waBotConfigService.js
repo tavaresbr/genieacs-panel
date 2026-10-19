@@ -77,6 +77,8 @@ function padroes() {
     ai: {
       enabled: false,
       suggest: false,
+      // A IA entrega quem quer contratar à equipe comercial (nota + etiqueta Venda).
+      sales: true,
       provider: AI_PROVIDER_OPENAI,
       baseUrl: AI_DEFAULT_BASE_URL,
       model: AI_DEFAULT_MODEL,
@@ -138,6 +140,7 @@ function lerIa(raw, atual) {
   const proximo = {
     enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true,
     suggest: raw.suggest === undefined ? atual.suggest : raw.suggest === true,
+    sales: raw.sales === undefined ? atual.sales !== false : raw.sales === true,
     provider,
     baseUrl,
     model,

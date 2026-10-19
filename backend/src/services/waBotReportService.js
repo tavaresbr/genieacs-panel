@@ -121,6 +121,7 @@ class WaBotReportService {
       outagesInformed: intents.outage || 0,
       unlocks: liberacoes.length,
       identified: intents.identified || 0,
+      leads: intents.lead || 0,
       documentFailures: soma([...FALHAS_DE_DOCUMENTO]),
       humanRequests: soma([...PEDIDOS_DE_ATENDENTE]),
       humanRequestsByHour: porHora,
