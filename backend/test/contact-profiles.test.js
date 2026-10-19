@@ -209,6 +209,35 @@ describe('editar no painel', () => {
     assert.equal(res.body.data.whatsappPhoneSource, 'manual');
   });
 
+  it('guarda outros endereços, limpa os vazios e restaura', async () => {
+    const res = await editar('373', {
+      extraAddresses: [
+        { street: 'Rua do Trabalho', number: '10', city: 'Santarém', state: 'PA', zip: '68181190' },
+        { street: '', number: '' },
+        { street: 'Rua da Casa', district: 'Centro' }
+      ]
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const campo = res.body.data.fields.extraAddresses;
+    assert.equal(campo.edited, true);
+    assert.equal(campo.value.length, 2, 'o bloco vazio não vira endereço');
+    assert.equal(campo.value[0].zip, '68181190');
+    assert.deepEqual(campo.sgpValue, []);
+    // A sincronização não desfaz.
+    await sincronizar();
+    assert.equal((await ficha('373')).body.data.fields.extraAddresses.value.length, 2);
+    const volta = await editar('373', { extraAddresses: null });
+    assert.equal(volta.body.data.fields.extraAddresses.edited, false);
+    assert.deepEqual(volta.body.data.fields.extraAddresses.value, []);
+  });
+
+  it('recusa mais de 5 outros endereços e item que não é endereço', async () => {
+    const seis = Array.from({ length: 6 }, (_, i) => ({ street: `Rua ${i}` }));
+    assert.equal((await editar('373', { extraAddresses: seis })).status, 400);
+    assert.equal((await editar('373', { extraAddresses: ['Rua solta'] })).status, 400);
+    assert.equal((await editar('373', { extraAddresses: { street: 'x' } })).status, 400);
+  });
+
   it('recusa um valor que não serve', async () => {
     const res = await editar('373', { emails: ['isto não é e-mail'] });
     assert.equal(res.status, 400);

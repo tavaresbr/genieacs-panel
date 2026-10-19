@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { contactsAPI, type ContactProfile } from '@/lib/api'
+import { contactsAPI, type ContactAddress, type ContactProfile } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -10,6 +10,11 @@ function addressLine(address: { street?: string; number?: string; district?: str
   const place = [address.district, [address.city, address.state].filter(Boolean).join('/')].filter(Boolean).join(' - ')
   return [street, place, address.zip].filter(Boolean).join(' · ')
 }
+
+/** The same address however it was typed: street, number and CEP, lower-cased and bare. */
+const addressKey = (address: ContactAddress) => [address.street, address.number, address.zip]
+  .map((part) => String(part ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+  .join('|')
 
 function riskBadge(risk: string | null) {
   const value = (risk ?? '').toUpperCase()
@@ -55,6 +60,26 @@ export function TeiahCard({ profile, onProfile, onReload }: {
       }
       if (res.data.cached) toast.info(t('contacts.profile.teiahFromCache', { date: formatDateTime(res.data.teiah.consultedAt) }))
       await onReload()
+    } catch {
+      toast.error(t('contacts.profile.teiahFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // One of the TeiaH's addresses kept on the record, among its other addresses.
+  const knownAddresses = new Set([profile.fields.address.value, ...profile.fields.extraAddresses.value]
+    .filter((address): address is ContactAddress => Boolean(address)).map(addressKey))
+  const addAddress = async (address: ContactAddress) => {
+    setBusy(true)
+    try {
+      const res = await contactsAPI.update(profile.key, { extraAddresses: [...profile.fields.extraAddresses.value, address] })
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('contacts.profile.teiahFailed'))
+        return
+      }
+      onProfile(res.data)
+      toast.success(t('contacts.profile.teiahAddressAdded'))
     } catch {
       toast.error(t('contacts.profile.teiahFailed'))
     } finally {
@@ -123,7 +148,25 @@ export function TeiahCard({ profile, onProfile, onReload }: {
           {teiah.addresses.length > 0 && (
             <div>
               <p className="mb-1 text-muted-foreground">{t('contacts.profile.teiahAddresses')}:</p>
-              <ul className="space-y-1">{teiah.addresses.map((address, index) => <li key={index} className="wrap-anywhere">{addressLine(address)}</li>)}</ul>
+              <ul className="space-y-1">
+                {teiah.addresses.map((address, index) => (
+                  <li key={index} className="flex flex-wrap items-center gap-2">
+                    <span className="wrap-anywhere">{addressLine(address)}</span>
+                    {knownAddresses.has(addressKey(address))
+                      ? <span className="modern-badge">{t('contacts.profile.teiahInRecord')}</span>
+                      : (
+                        <button
+                          type="button"
+                          className="text-primary hover:underline disabled:opacity-50"
+                          disabled={busy || profile.fields.extraAddresses.value.length >= 5}
+                          onClick={() => void addAddress(address)}
+                        >
+                          {t('contacts.profile.teiahAddAddress')}
+                        </button>
+                      )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
