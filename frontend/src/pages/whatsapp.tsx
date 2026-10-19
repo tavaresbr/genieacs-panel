@@ -43,7 +43,7 @@ import { NotifyToggle } from '@/components/whatsapp/message-notifier'
 import { focusedConversation } from '@/lib/wa-notify'
 import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
-import { visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
+import { cardHeightAboveKeyboard, visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation, useNavigate } from 'react-router'
@@ -803,17 +803,32 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   // (`lib/wa-keyboard.ts`). Com o teclado aberto o cartão passa a caber na
   // parte visível, com a caixa de escrever logo acima dele. Só no celular.
   const [keyboardHeight, setKeyboardHeight] = useState<number | null>(null)
+  // A altura do cartão com o teclado aberto, medida de onde ele está de fato
+  // (`cardHeightAboveKeyboard`): o Safari rola a página ao focar a caixa, e a
+  // conta fixa deixava um vazio entre o cartão e o teclado.
+  const [cardHeight, setCardHeight] = useState<number | null>(null)
+  const cardRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
     let last: number | null = null
+    let lastCard: number | null = null
     const update = () => {
       const next = visibleHeightWithKeyboard({ innerHeight: window.innerHeight, vvHeight: vv.height })
-      if (next === last) return
-      last = next
-      setKeyboardHeight(next)
-      // A barra fixa e as abas voltam ao topo da área visível.
-      if (next !== null) window.scrollTo(0, 0)
+      if (next !== last) {
+        last = next
+        setKeyboardHeight(next)
+        // A barra fixa e as abas voltam ao topo da área visível.
+        if (next !== null) window.scrollTo(0, 0)
+      }
+      const card = cardRef.current
+      const height = next !== null && card
+        ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: card.getBoundingClientRect().top })
+        : null
+      if (height !== lastCard) {
+        lastCard = height
+        setCardHeight(height)
+      }
     }
     update()
     vv.addEventListener('resize', update)
@@ -849,6 +864,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
           // página, nesta aba, troca o respiro de baixo pela área segura do
           // iPhone (ver `WhatsAppPage`), e a conta desconta o mesmo.
           <section
+            ref={cardRef}
             className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-88 grid-cols-1 overflow-hidden lg:h-auto lg:min-h-128 lg:flex-1 ${
               // Uma classe de colunas por vez: duas `lg:grid-cols-*` juntas
               // dependem da ordem do CSS gerado, e o painel caía numa segunda linha.
@@ -868,7 +884,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
             }`}
             // Sem a área segura (o teclado cobre o indicador de home) e sem o
             // `min-h`, que impediria o cartão de encolher.
-            style={keyboardHeight !== null ? { height: `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
+            style={keyboardHeight !== null ? { height: cardHeight !== null ? `${cardHeight}px` : `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
           >
             <div className={`${showSgpPanel && conversation ? 'hidden 2xl:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">
