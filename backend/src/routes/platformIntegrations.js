@@ -2,6 +2,7 @@ import express from 'express';
 import PlatformIntegrationsController from '../controllers/platformIntegrationsController.js';
 import PlatformSettingsController from '../controllers/platformSettingsController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
+import { BRANDING_KINDS } from '../services/platformBrandingService.js';
 
 /**
  * As integrações da plataforma com sistemas de fora — hoje, a conta dela no
@@ -22,7 +23,7 @@ router.get('/settings/profile', ...guard, PlatformSettingsController.getProfile)
 router.put('/settings/profile', ...guard, PlatformSettingsController.updateProfile);
 // A logo e o favicon. O corpo cru do PUT é lido em `app.js` (`BRANDING_UPLOAD_PATH`),
 // antes do parser JSON; aqui só a rota e a guarda.
-for (const kind of ['logo', 'favicon']) {
+for (const kind of BRANDING_KINDS) {
   router.put(`/settings/branding/${kind}`, ...guard, PlatformSettingsController.saveBranding(kind));
   router.delete(`/settings/branding/${kind}`, ...guard, PlatformSettingsController.removeBranding(kind));
 }

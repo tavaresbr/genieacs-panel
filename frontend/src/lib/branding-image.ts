@@ -9,6 +9,11 @@
  */
 export type BrandingKind = 'logo' | 'favicon'
 
+/** O ícone da tela de início do celular (apple-touch-icon): 180×180, opaco. */
+export const TOUCH_ICON_SIZE = 180
+/** A folga em volta da imagem, em fração do lado: o iOS arredonda os cantos. */
+const TOUCH_ICON_PADDING = 0.12
+
 /** Os mesmos tetos do servidor, mais o maior lado que vale a pena guardar. */
 export const BRANDING_LIMITS: Record<BrandingKind, { bytes: number; maxSide: number }> = {
   logo: { bytes: 512 * 1024, maxSide: 512 },
@@ -34,6 +39,19 @@ export function fitSize(width: number, height: number, maxSide: number): { width
   if (!(maior > 0)) return { width: maxSide, height: maxSide }
   const escala = Math.min(1, maxSide / maior)
   return { width: Math.max(1, Math.round(width * escala)), height: Math.max(1, Math.round(height * escala)) }
+}
+
+/** Onde a imagem cai dentro do ícone quadrado: inteira, centralizada, com folga. */
+export function touchIconLayout(width: number, height: number): { x: number; y: number; width: number; height: number } {
+  const miolo = TOUCH_ICON_SIZE * (1 - 2 * TOUCH_ICON_PADDING)
+  // Um SVG sem tamanho próprio chega como 0×0: vale o miolo inteiro. Diferente de
+  // `fitSize`, aqui uma imagem pequena cresce até o miolo.
+  const w0 = width > 0 ? width : miolo
+  const h0 = height > 0 ? height : miolo
+  const escala = Math.min(miolo / w0, miolo / h0)
+  const w = Math.max(1, Math.round(w0 * escala))
+  const h = Math.max(1, Math.round(h0 * escala))
+  return { x: Math.round((TOUCH_ICON_SIZE - w) / 2), y: Math.round((TOUCH_ICON_SIZE - h) / 2), width: w, height: h }
 }
 
 /** Se o arquivo já serve como está: tipo que o servidor aceita e dentro do teto. */
@@ -100,4 +118,27 @@ export async function prepareBrandingImage(file: File, kind: BrandingKind): Prom
     }
   }
   throw new BrandingImageError('too_large')
+}
+
+/**
+ * O ícone da tela de início, feito a partir da logo (ou do favicon, sem logo).
+ * Fundo branco e opaco: o iOS pinta o transparente de preto. Lança
+ * `BrandingImageError('decode')` quando o navegador não abre o arquivo.
+ */
+export async function makeTouchIcon(file: File): Promise<File> {
+  const img = await loadImage(file)
+  const lado = TOUCH_ICON_SIZE
+  const canvas = document.createElement('canvas')
+  canvas.width = lado
+  canvas.height = lado
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new BrandingImageError('decode')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, lado, lado)
+  ctx.imageSmoothingQuality = 'high'
+  const pos = touchIconLayout(img.naturalWidth || lado, img.naturalHeight || lado)
+  ctx.drawImage(img, pos.x, pos.y, pos.width, pos.height)
+  const blob = await toBlob(canvas, 'image/png')
+  if (!blob || blob.size === 0) throw new BrandingImageError('decode')
+  return new File([blob], 'apple-touch-icon.png', { type: 'image/png' })
 }

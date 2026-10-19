@@ -14,9 +14,10 @@ import { runInTenant } from '../config/tenantContext.js';
  */
 
 export const BRANDING_KEY = 'platform_branding';
-export const BRANDING_KINDS = Object.freeze(['logo', 'favicon']);
+/** `icon` é o ícone da tela de início do celular (apple-touch-icon): 180×180 opaco, gerado pelo painel. */
+export const BRANDING_KINDS = Object.freeze(['logo', 'favicon', 'icon']);
 
-const LIMITS = Object.freeze({ logo: 512 * 1024, favicon: 128 * 1024 });
+const LIMITS = Object.freeze({ logo: 512 * 1024, favicon: 128 * 1024, icon: 256 * 1024 });
 
 /** Os caminhos que recebem a imagem crua — montados em `app.js` antes do parser JSON. */
 export const BRANDING_UPLOAD_PATHS = BRANDING_KINDS.map((kind) => `/api/platform/settings/branding/${kind}`);

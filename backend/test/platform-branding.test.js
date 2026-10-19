@@ -46,7 +46,7 @@ describe('logo e favicon do sistema', () => {
   it('começa sem imagens', async () => {
     const res = await fetch(`${panelUrl}/api/tenant/brand`);
     const body = await res.json();
-    assert.deepEqual(body.data, { logoUrl: null, faviconUrl: null });
+    assert.deepEqual(body.data, { logoUrl: null, faviconUrl: null, iconUrl: null });
     assert.equal((await fetch(`${panelUrl}/api/tenant/brand/logo`)).status, 404);
   });
 
@@ -72,6 +72,17 @@ describe('logo e favicon do sistema', () => {
 
     assert.equal((await enviar('logo', null, { method: 'DELETE' })).status, 200);
     assert.equal((await fetch(`${panelUrl}/api/tenant/brand/logo`)).status, 404);
+  });
+
+  it('guarda o ícone da tela de início, com teto próprio', async () => {
+    assert.equal((await enviar('icon', PNG)).status, 200);
+    const info = (await (await fetch(`${panelUrl}/api/tenant/brand`)).json()).data;
+    assert.match(info.iconUrl, /^\/api\/tenant\/brand\/icon\?v=/);
+    const img = await fetch(`${panelUrl}${info.iconUrl}`);
+    assert.equal(img.headers.get('content-type'), 'image/png');
+    assert.equal((await enviar('icon', Buffer.concat([PNG, Buffer.alloc(300 * 1024)]))).status, 413);
+    assert.equal((await enviar('icon', null, { method: 'DELETE' })).status, 200);
+    assert.equal((await fetch(`${panelUrl}/api/tenant/brand/icon`)).status, 404);
   });
 
   it('recusa SVG, vazio, rota desconhecida e imagem grande', async () => {

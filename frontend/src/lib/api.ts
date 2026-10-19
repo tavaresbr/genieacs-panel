@@ -999,6 +999,8 @@ export const publicTenantAPI = {
 export interface PublicBrand {
   logoUrl: string | null
   faviconUrl: string | null
+  /** O ícone da tela de início do celular (apple-touch-icon). */
+  iconUrl: string | null
 }
 
 /**
@@ -2351,7 +2353,7 @@ export const platformAPI = {
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
   /** A logo ou o favicon do sistema. O corpo é a imagem crua; o servidor confere os bytes. */
-  uploadBranding: (kind: 'logo' | 'favicon', file: File) =>
+  uploadBranding: (kind: 'logo' | 'favicon' | 'icon', file: File) =>
     apiClient.sendBlob<{ kind: string }>(
       `/platform/settings/branding/${kind}`,
       file,
@@ -2360,7 +2362,7 @@ export const platformAPI = {
     ),
 
   /** Volta ao padrão do sistema. */
-  removeBranding: (kind: 'logo' | 'favicon') =>
+  removeBranding: (kind: 'logo' | 'favicon' | 'icon') =>
     apiClient.delete<{ kind: string }>(`/platform/settings/branding/${kind}`),
 
   /**

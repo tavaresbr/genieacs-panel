@@ -846,7 +846,7 @@ class TenantController {
       const url = (kind) => (brand[kind]
         ? `/api/tenant/brand/${kind}?v=${encodeURIComponent(brand[kind].updatedAt ?? '')}`
         : null);
-      return res.json(createResponse('ok', { logoUrl: url('logo'), faviconUrl: url('favicon') }));
+      return res.json(createResponse('ok', { logoUrl: url('logo'), faviconUrl: url('favicon'), iconUrl: url('icon') }));
     } catch (error) {
       console.error('Get brand error:', error);
       return res.status(500).json(createErrorResponse(req.t('tenant.publicFailed'), error.message));

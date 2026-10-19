@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { BRANDING_LIMITS, fitSize, isServerReady } from '@/lib/branding-image'
+import { BRANDING_LIMITS, TOUCH_ICON_SIZE, fitSize, isServerReady, touchIconLayout } from '@/lib/branding-image'
 
 describe('fitSize', () => {
   it('reduz pelo maior lado, mantendo a proporção', () => {
@@ -28,5 +28,27 @@ describe('isServerReady', () => {
     expect(isServerReady('image/svg+xml', 1000, 'logo')).toBe(false)
     expect(isServerReady('image/gif', 1000, 'logo')).toBe(false)
     expect(isServerReady('image/png', 0, 'logo')).toBe(false)
+  })
+})
+
+describe('touchIconLayout', () => {
+  it('centraliza a imagem dentro do quadrado, com folga', () => {
+    const l = touchIconLayout(400, 200)
+    expect(l.width).toBeGreaterThan(l.height)
+    expect(l.x).toBeGreaterThan(0)
+    // O arredondamento pode sobrar 1 px de um lado.
+    expect(Math.abs(l.x * 2 + l.width - TOUCH_ICON_SIZE)).toBeLessThanOrEqual(1)
+    expect(Math.abs(l.y * 2 + l.height - TOUCH_ICON_SIZE)).toBeLessThanOrEqual(1)
+  })
+
+  it('faz uma imagem pequena crescer até o miolo', () => {
+    const l = touchIconLayout(32, 32)
+    expect(l.width).toBe(l.height)
+    expect(l.width).toBeGreaterThan(100)
+  })
+
+  it('não quebra quando a imagem não diz o tamanho', () => {
+    const l = touchIconLayout(0, 0)
+    expect(l.width).toBeGreaterThan(0)
   })
 })

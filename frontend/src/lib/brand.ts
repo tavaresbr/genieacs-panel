@@ -7,7 +7,7 @@ import { publicTenantAPI, type PublicBrand } from '@/lib/api'
  * que nascem fora de qualquer provider (o portal do cliente, o login), e todas
  * leem a mesma resposta.
  */
-const VAZIO: PublicBrand = { logoUrl: null, faviconUrl: null }
+const VAZIO: PublicBrand = { logoUrl: null, faviconUrl: null, iconUrl: null }
 
 let atual: PublicBrand = VAZIO
 let pedido: Promise<void> | null = null
@@ -32,9 +32,26 @@ function aplicarFavicon(url: string | null) {
   }
 }
 
+/** O ícone padrão do site, que volta quando o console remove o ícone enviado. */
+let iconeOriginal: string | null = null
+
+/**
+ * O ícone da tela de início do celular. O iOS lê o `<link rel="apple-touch-icon">`
+ * no instante em que o operador toca em "Adicionar à Tela de Início", então
+ * trocar o `href` aqui basta — não precisa de HTML servido por modelo.
+ */
+function aplicarIcone(url: string | null) {
+  if (typeof document === 'undefined') return
+  const link = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+  if (!link) return
+  iconeOriginal ??= link.getAttribute('href') ?? ''
+  link.setAttribute('href', url ?? iconeOriginal)
+}
+
 function definir(brand: PublicBrand) {
   atual = brand
   aplicarFavicon(brand.faviconUrl)
+  aplicarIcone(brand.iconUrl)
   ouvintes.forEach((fn) => fn())
 }
 
