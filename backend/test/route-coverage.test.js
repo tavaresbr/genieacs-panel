@@ -50,6 +50,7 @@ const PUBLICAS = new Map([
   ['GET /api/tenant/brand', 'a logo e o favicon do sistema, que a tela de login mostra antes de haver sessão; da plataforma, iguais em todo host'],
   ['GET /api/tenant/brand/logo', 'os bytes da logo; não lê dado de provedor'],
   ['GET /api/tenant/brand/favicon', 'os bytes do favicon; não lê dado de provedor'],
+  ['GET /api/tenant/brand/icon', 'os bytes do ícone da tela de início do celular; não lê dado de provedor'],
   ['GET /api/auth/setup-status', 'a instalação já tem alguém? é a pergunta que a tela de instalação faz antes de existir sessão'],
   ['POST /api/auth/setup', 'cria a primeira conta do provedor; recusa se já houver uma'],
   ['POST /api/auth/signup', 'um ISP se cadastra; só na edição SaaS e só onde há domínio-base'],
@@ -621,6 +622,7 @@ describe('a allowlist do endereço da plataforma', () => {
       '/api/genieacs-agent/install.sh',
       '/api/tenant/brand',
       '/api/tenant/brand/favicon',
+      '/api/tenant/brand/icon',
       '/api/tenant/brand/logo',
       '/api/tenant/public'
     ]);

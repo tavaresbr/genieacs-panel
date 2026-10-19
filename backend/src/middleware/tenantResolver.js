@@ -236,6 +236,7 @@ const PLATFORM_HOST_PATHS = new Set([
   '/api/tenant/brand',
   '/api/tenant/brand/logo',
   '/api/tenant/brand/favicon',
+  '/api/tenant/brand/icon',
   '/api/auth/signup',
   // O instalador e o programa do agente do GenieACS. Não tocam em dado de
   // provedor nenhum (são dois arquivos do disco), e precisam responder aqui

@@ -11,7 +11,7 @@ import {
   type PlatformProfileField
 } from '@/lib/api'
 import { refreshBrand, useBrand } from '@/lib/brand'
-import { BrandingImageError, prepareBrandingImage } from '@/lib/branding-image'
+import { BrandingImageError, makeTouchIcon, prepareBrandingImage } from '@/lib/branding-image'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
@@ -163,6 +163,15 @@ function BrandingSection({ canSave }: { canSave: boolean }) {
       const pronto = await prepareBrandingImage(file, kind)
       const res = await platformAPI.uploadBranding(kind, pronto)
       if (res.success) {
+        // O ícone da tela de início do celular sai da logo; sem logo, do favicon.
+        // Falhar aqui não desfaz o envio: o site só fica com o ícone padrão.
+        if (kind === 'logo' || !brand.logoUrl) {
+          try {
+            await platformAPI.uploadBranding('icon', await makeTouchIcon(file))
+          } catch {
+            // segue com o ícone anterior
+          }
+        }
         await refreshBrand()
         toast.success(t('platform.profile.brandingSaved'))
       } else if (res.code === 'branding_too_large') {
@@ -188,6 +197,8 @@ function BrandingSection({ canSave }: { canSave: boolean }) {
     try {
       const res = await platformAPI.removeBranding(kind)
       if (res.success) {
+        // Sem a logo o ícone da tela de início volta ao padrão do site.
+        if (kind === 'logo') await platformAPI.removeBranding('icon')
         await refreshBrand()
         toast.success(t('platform.profile.brandingRemoved'))
       } else {

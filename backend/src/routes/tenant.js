@@ -25,6 +25,7 @@ router.get('/public', TenantController.getPublicProfile);
 router.get('/brand', TenantController.getBrand);
 router.get('/brand/logo', TenantController.getBrandImage('logo'));
 router.get('/brand/favicon', TenantController.getBrandImage('favicon'));
+router.get('/brand/icon', TenantController.getBrandImage('icon'));
 
 // E do outro lado da linha que o parágrafo acima descreve: tudo que este
 // provedor cadastrou, num arquivo. Autenticada e com capacidade própria.
