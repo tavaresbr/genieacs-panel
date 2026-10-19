@@ -3647,6 +3647,8 @@ export interface ContactProfile {
     gender: ContactField<string | null>
     birthDate: ContactField<string | null>
     address: ContactField<ContactAddress | null>
+    /** Other addresses besides the main one (up to 5). */
+    extraAddresses: ContactField<ContactAddress[]>
     phones: ContactField<string[]>
     emails: ContactField<string[]>
   }
@@ -3708,6 +3710,7 @@ export type ContactProfilePatch = Partial<{
   gender: string | null
   birthDate: string | null
   address: ContactAddress | null
+  extraAddresses: ContactAddress[] | null
   phones: string[] | null
   emails: string[] | null
   notes: string | null

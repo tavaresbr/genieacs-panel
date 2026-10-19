@@ -17,8 +17,11 @@ const waConversations = async () => (await import('./waConversationService.js'))
  * wins over the SGP's until someone restores it.
  */
 export const PROFILE_FIELDS = Object.freeze([
-  'name', 'personType', 'document', 'gender', 'birthDate', 'address', 'phones', 'emails'
+  'name', 'personType', 'document', 'gender', 'birthDate', 'address', 'extraAddresses', 'phones', 'emails'
 ]);
+
+/** Other addresses a client may keep besides the main one (home, work, billing). */
+const MAX_EXTRA_ADDRESSES = 5;
 
 const ADDRESS_PARTS = Object.freeze([
   'street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference', 'line'
@@ -92,6 +95,22 @@ function cleanField(field, value) {
       }
       return address;
     }
+    case 'extraAddresses': {
+      if (!Array.isArray(value) || value.length > MAX_EXTRA_ADDRESSES) throw invalid(field);
+      const list = [];
+      for (const item of value) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) throw invalid(field);
+        const address = {};
+        for (const part of ADDRESS_PARTS) {
+          if (part === 'line') continue;
+          const cleaned = item[part] === undefined ? null : text(item[part], field, 255);
+          if (cleaned) address[part] = cleaned;
+        }
+        // A block left empty in the form is no address.
+        if (Object.keys(address).length > 0) list.push(address);
+      }
+      return list;
+    }
     case 'phones': {
       if (!Array.isArray(value) || value.length > 20) throw invalid(field);
       return [...new Set(value.map((phone) => {
@@ -121,6 +140,7 @@ function sgpValue(field, client, row) {
     case 'gender': return client?.gender ?? null;
     case 'birthDate': return client?.birth_date ?? null;
     case 'address': return client?.address ?? null;
+    case 'extraAddresses': return [];
     case 'phones': return client?.phones?.length ? client.phones : (row?.phone_e164 ? [row.phone_e164] : []);
     case 'emails': return client?.emails ?? [];
     default: return null;

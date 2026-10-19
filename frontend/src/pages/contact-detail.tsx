@@ -27,8 +27,17 @@ import { ServiceStatusCard } from '@/components/contacts/service-status-card'
 import { TeiahCard } from '@/components/contacts/teiah-card'
 import { LinkDeviceModal } from '@/components/contacts/link-device-modal'
 import { parseAmountToCents } from '@/lib/utils'
+import {
+  ADDRESS_FORM_PARTS as ADDRESS_PARTS,
+  addressFormFrom,
+  addressPayload,
+  applyCep,
+  emptyAddressForm,
+  maskCep,
+  sameAddress,
+  type AddressForm
+} from '@/lib/contact-address'
 
-const ADDRESS_PARTS = ['street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference'] as const
 
 /** An address on one line, from its parts or as the SGP sent it. */
 export function addressText(address: ContactAddress | null | undefined) {
@@ -284,6 +293,13 @@ export default function ContactDetailPage() {
               <FieldRow label={t('contacts.profile.address')} field={fields.address} canEdit={canEdit} onRestore={restore('address')}>
                 {addressText(fields.address.value)}
               </FieldRow>
+              {(fields.extraAddresses.value.length > 0 || fields.extraAddresses.edited) && (
+                <FieldRow label={t('contacts.profile.extraAddresses')} field={fields.extraAddresses} canEdit={canEdit} onRestore={restore('extraAddresses')}>
+                  <ul className="space-y-1">
+                    {fields.extraAddresses.value.map((address, index) => <li key={index} className="wrap-anywhere">{addressText(address)}</li>)}
+                  </ul>
+                </FieldRow>
+              )}
             </dl>
           </Card>
 
@@ -852,7 +868,8 @@ interface EditForm {
   document: string
   gender: string
   birthDate: string
-  address: Record<(typeof ADDRESS_PARTS)[number], string>
+  address: AddressForm
+  extraAddresses: AddressForm[]
   phones: string[]
   emails: string
   whatsappPhone: string
@@ -860,16 +877,14 @@ interface EditForm {
 }
 
 function formFrom(profile: ContactProfile): EditForm {
-  const address = profile.fields.address.value ?? {}
   return {
     name: profile.fields.name.value ?? '',
     personType: profile.fields.personType.value ?? '',
     document: profile.fields.document.value ?? '',
     gender: profile.fields.gender.value ?? '',
     birthDate: profile.fields.birthDate.value ?? '',
-    address: Object.fromEntries(ADDRESS_PARTS.map((part) => [
-      part, part === 'street' && !address.street && address.line ? address.line : (address[part] ?? '')
-    ])) as EditForm['address'],
+    address: addressFormFrom(profile.fields.address.value),
+    extraAddresses: profile.fields.extraAddresses.value.map(addressFormFrom),
     phones: profile.fields.phones.value.length > 0 ? profile.fields.phones.value.map(maskPhone) : [''],
     emails: profile.fields.emails.value.join('\n'),
     whatsappPhone: maskPhone(profile.whatsappPhone ?? ''),
@@ -885,9 +900,9 @@ function patchFrom(before: EditForm, after: EditForm): ContactProfilePatch {
   for (const field of ['name', 'personType', 'document', 'gender', 'birthDate'] as const) {
     if (after[field].trim() !== before[field].trim()) patch[field] = after[field].trim() || null
   }
-  if (ADDRESS_PARTS.some((part) => after.address[part].trim() !== before.address[part].trim())) {
-    patch.address = Object.fromEntries(ADDRESS_PARTS.map((part) => [part, after.address[part].trim()]).filter(([, value]) => value))
-  }
+  if (!sameAddress(after.address, before.address)) patch.address = addressPayload(after.address)
+  const extrasOf = (form: EditForm) => form.extraAddresses.map(addressPayload).filter((address) => Object.keys(address).length > 0)
+  if (JSON.stringify(extrasOf(after)) !== JSON.stringify(extrasOf(before))) patch.extraAddresses = extrasOf(after)
   const phonesOf = (form: EditForm) => form.phones.map(phoneDigits).filter(Boolean)
   if (phonesOf(after).join() !== phonesOf(before).join()) patch.phones = phonesOf(after)
   if (lines(after.emails).join() !== lines(before.emails).join()) patch.emails = lines(after.emails)
@@ -915,8 +930,8 @@ function EditModal({ profile, onClose, onSave }: {
       const phones = current.phones.filter((_, at) => at !== index)
       return { ...current, phones: phones.length > 0 ? phones : [''] }
     })
-  const setAddress = (part: (typeof ADDRESS_PARTS)[number]) => (event: { target: { value: string } }) =>
-    setForm((current) => ({ ...current, address: { ...current.address, [part]: event.target.value } }))
+  const setExtra = (index: number, address: AddressForm) =>
+    setForm((current) => ({ ...current, extraAddresses: current.extraAddresses.map((entry, at) => (at === index ? address : entry)) }))
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title">
@@ -939,16 +954,45 @@ function EditModal({ profile, onClose, onSave }: {
           <TextInput id="contact-gender" label={t('contacts.profile.gender')} value={form.gender} onChange={set('gender')} />
 
           <h3 className="mt-2 font-semibold sm:col-span-2">{t('contacts.profile.address')}</h3>
-          {ADDRESS_PARTS.map((part) => (
-            <TextInput
-              key={part}
-              id={`contact-address-${part}`}
-              label={t(`contacts.profile.addressPart.${part}`)}
-              value={form.address[part]}
-              onChange={setAddress(part)}
-              wide={part === 'street' || part === 'reference'}
-            />
+          <AddressBlock
+            idPrefix="contact-address"
+            value={form.address}
+            savedZip={initial.address.zip}
+            onChange={(address) => setForm((current) => ({ ...current, address }))}
+          />
+
+          {form.extraAddresses.map((address, index) => (
+            <div key={index} className="grid gap-4 rounded-lg border border-border p-3 sm:col-span-2 sm:grid-cols-2">
+              <div className="flex items-center justify-between gap-2 sm:col-span-2">
+                <h4 className="font-medium">{t('contacts.profile.extraAddressN', { n: index + 1 })}</h4>
+                <button
+                  type="button"
+                  className="modern-button-secondary shrink-0"
+                  aria-label={t('contacts.profile.removeAddress')}
+                  title={t('contacts.profile.removeAddress')}
+                  onClick={() => setForm((current) => ({ ...current, extraAddresses: current.extraAddresses.filter((_, at) => at !== index) }))}
+                >
+                  <Icon name="trash" size={14} />
+                </button>
+              </div>
+              <AddressBlock
+                idPrefix={`contact-address-${index + 2}`}
+                value={address}
+                savedZip={initial.extraAddresses[index]?.zip ?? ''}
+                onChange={(next) => setExtra(index, next)}
+              />
+            </div>
           ))}
+          <div className="sm:col-span-2">
+            <button
+              type="button"
+              className="modern-button-secondary"
+              disabled={form.extraAddresses.length >= 5}
+              onClick={() => setForm((current) => ({ ...current, extraAddresses: [...current.extraAddresses, emptyAddressForm()] }))}
+            >
+              <Icon name="check" size={14} /> {t('contacts.profile.addAddress')}
+            </button>
+          </div>
 
           <h3 className="mt-2 font-semibold sm:col-span-2">{t('contacts.profile.contacts')}</h3>
           <div>
@@ -1028,6 +1072,74 @@ function EditModal({ profile, onClose, onSave }: {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * One address of the edit form. Leaving the CEP field fills the street,
+ * district, city and state from it — replacing them when the CEP is a new one,
+ * completing only the empty ones when it is the saved one.
+ */
+function AddressBlock({ idPrefix, value, savedZip, onChange }: {
+  idPrefix: string
+  value: AddressForm
+  /** The CEP this address had when the form opened. */
+  savedZip: string
+  onChange: (address: AddressForm) => void
+}) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [looking, setLooking] = useState(false)
+  const set = (part: (typeof ADDRESS_PARTS)[number]) => (event: { target: { value: string } }) =>
+    onChange({ ...value, [part]: part === 'zip' ? maskCep(event.target.value) : event.target.value })
+
+  const fillFromCep = async () => {
+    const digits = value.zip.replace(/\D/g, '')
+    if (digits.length !== 8) return
+    setLooking(true)
+    try {
+      const res = await contactsAPI.lookupCep(digits)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('contacts.new.cepNotFound'))
+        return
+      }
+      onChange(applyCep(value, res.data, digits !== savedZip.replace(/\D/g, '')))
+    } catch {
+      toast.error(t('contacts.new.cepNotFound'))
+    } finally {
+      setLooking(false)
+    }
+  }
+
+  return (
+    <>
+      {ADDRESS_PARTS.map((part) => (
+        part === 'zip' ? (
+          <div key={part}>
+            <label className="field-label" htmlFor={`${idPrefix}-zip`}>{t('contacts.profile.addressPart.zip')}</label>
+            <input
+              id={`${idPrefix}-zip`}
+              className="modern-input"
+              inputMode="numeric"
+              placeholder="00000-000"
+              value={value.zip}
+              onChange={set('zip')}
+              onBlur={() => void fillFromCep()}
+            />
+            <p className="field-hint">{looking ? t('contacts.profile.loading') : t('contacts.new.zipHint')}</p>
+          </div>
+        ) : (
+          <TextInput
+            key={part}
+            id={`${idPrefix}-${part}`}
+            label={t(`contacts.profile.addressPart.${part}`)}
+            value={value[part]}
+            onChange={set(part)}
+            wide={part === 'street' || part === 'reference'}
+          />
+        )
+      ))}
+    </>
   )
 }
 
