@@ -199,6 +199,7 @@ export function ChatbotTab() {
         ai: {
           enabled: config.ai.enabled,
           suggest: config.ai.suggest,
+          sales: config.ai.sales,
           provider: config.ai.provider,
           workspaceId: config.ai.workspaceId,
           baseUrl: config.ai.baseUrl,
@@ -275,6 +276,13 @@ export function ChatbotTab() {
             onChange={(value) => patchAi({ suggest: value })}
             title={t('settings.chatbot.aiSuggest')}
             hint={t('settings.chatbot.aiSuggestHint')}
+          />
+          <Caixa
+            checked={config.ai.sales}
+            disabled={!config.ai.enabled}
+            onChange={(value) => patchAi({ sales: value })}
+            title={t('settings.chatbot.aiSales')}
+            hint={t('settings.chatbot.aiSalesHint')}
           />
           <div>
             <label htmlFor="bot-ai-provider" className="field-label">{t('settings.chatbot.aiProvider')}</label>

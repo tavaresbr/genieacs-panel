@@ -200,6 +200,7 @@ export function BotReportPanel() {
                 ['whatsapp.botReport.signalChecks', report.signalChecks],
                 ['whatsapp.botReport.noOpenInvoice', report.noOpenInvoice],
                 ['whatsapp.botReport.identified', report.identified],
+                ['whatsapp.botReport.leads', report.leads],
                 ['whatsapp.botReport.documentFailures', report.documentFailures],
                 ['whatsapp.botReport.replies', report.replies]
               ] as const).map(([chave, valor]) => (

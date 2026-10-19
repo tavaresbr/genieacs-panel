@@ -438,6 +438,73 @@ describe('a IA atendendo', () => {
     });
   });
 
+  describe('vendas: registrar_interesse_comercial', () => {
+    const notasDe = async (telefone) => {
+      const conversa = await conversaDe(telefone);
+      return getDb()('wa_messages').where({ conversation_id: conversa.id, is_note: true }).pluck('body');
+    };
+
+    it('vira nota interna, etiqueta Venda e passagem à equipe; o bot cala depois', async () => {
+      await limparFio(DESCONHECIDO);
+      roteiro = [
+        { tool: 'registrar_interesse_comercial', args: { nome: 'Maria  Silva', plano: '500 Mega', endereco: 'Centro, Itaituba', observacao: 'prefere ligar à noite' }, content: 'Anotei, Maria.' }
+      ];
+      await receber(DESCONHECIDO, 'quero contratar internet');
+      const saidas = await respostas(DESCONHECIDO);
+      assert.equal(saidas.length, 1, JSON.stringify(saidas));
+      assert.match(saidas[0], /^Anotei, Maria\./);
+      assert.match(saidas[0], /atendente vai te responder/i);
+
+      const notas = await notasDe(DESCONHECIDO);
+      assert.equal(notas.length, 1);
+      assert.match(notas[0], /Interesse comercial/);
+      assert.match(notas[0], /Nome: Maria Silva/);
+      assert.match(notas[0], /Plano de interesse: 500 Mega/);
+      assert.match(notas[0], /Endereço\/bairro: Centro, Itaituba/);
+      assert.match(notas[0], new RegExp(`WhatsApp: ${DESCONHECIDO}`));
+
+      const conversa = await conversaDe(DESCONHECIDO);
+      const etiquetas = await getDb()('wa_conversation_tags as ct').join('wa_tags as t', 't.id', 'ct.tag_id')
+        .where('ct.conversation_id', conversa.id).pluck('t.name');
+      assert.ok(etiquetas.includes('Venda'), JSON.stringify(etiquetas));
+      assert.ok(new Date(conversa.bot_paused_until) > new Date(), 'o bot ficou em pausa');
+      const eventos = await getDb()('wa_bot_events').where({ conversation_id: conversa.id, intent: 'lead' });
+      assert.equal(eventos.length, 1);
+    });
+
+    it('sem nome não registra; registrado uma vez, não repete em 24 h', async () => {
+      await limparFio(DESCONHECIDO);
+      roteiro = [{ content: 'Oi!' }];
+      await receber(DESCONHECIDO, 'oi');
+      const conversa = await conversaDe(DESCONHECIDO);
+      const chamar = (dados) => asTenant(() => WaAiService.registrarInteresse({ conversation: conversa, dados }));
+      const semNome = await chamar({ nome: '   ' });
+      assert.match(semNome.paraModelo, /nome/i);
+      assert.equal((await notasDe(DESCONHECIDO)).length, 0);
+
+      const primeira = await chamar({ nome: 'Ana' });
+      assert.equal(primeira.intent, 'lead');
+      await asTenant(() => getDb()('wa_bot_events').insert({ conversation_id: conversa.id, intent: 'lead', created_at: new Date(), tenant_id: conversa.tenant_id }));
+      const segunda = await chamar({ nome: 'Ana' });
+      assert.match(segunda.paraModelo, /já foi registrado/i);
+      assert.equal((await notasDe(DESCONHECIDO)).length, 1);
+    });
+
+    it('com sales desligado a ferramenta não é oferecida', async () => {
+      await asTenant(() => WaBotConfigService.saveConfig({ ai: { sales: false } }));
+      try {
+        await limparFio(ASSINANTE);
+        pedidosIa = [];
+        roteiro = [{ content: 'ok' }];
+        await receber(ASSINANTE, 'quero contratar mais um ponto');
+        const nomes = pedidosIa[0].payload.tools.map((t) => t.function.name);
+        assert.ok(!nomes.includes('registrar_interesse_comercial'));
+      } finally {
+        await asTenant(() => WaBotConfigService.saveConfig({ ai: { sales: true } }));
+      }
+    });
+  });
+
   it('a fatura: o texto da IA e o PIX literal do SGP', async () => {
     await limparFio(ASSINANTE);
     roteiro = [{ tool: 'consultar_fatura' }, { content: 'Encontrei sua fatura de R$ 99,90, os dados estão logo abaixo.' }];
