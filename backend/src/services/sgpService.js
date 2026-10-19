@@ -953,6 +953,15 @@ function refusalText(data, text) {
   return parts.join('; ').slice(0, 400);
 }
 
+/** The message for a refusal by status: what it usually means and what to do. */
+function statusKey(status) {
+  if (status === 400) return 'sgp.error.statusBadRequest';
+  if (status === 404) return 'sgp.error.statusNotFound';
+  if (status === 429) return 'sgp.error.statusRateLimited';
+  if (status >= 500) return 'sgp.error.statusServer';
+  return 'sgp.error.status';
+}
+
 class SgpService {
   static configCache = new TenantCache(CONFIG_CACHE_TTL_MS);
 
@@ -1414,7 +1423,7 @@ class SgpService {
       });
     }
     if (!response.ok) {
-      throw new SgpError('sgp.error.status', {
+      throw new SgpError(statusKey(response.status), {
         vars: { status: response.status },
         code: 'http_error',
         status: 502,

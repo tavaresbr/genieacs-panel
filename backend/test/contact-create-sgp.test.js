@@ -53,6 +53,7 @@ function startSgpStub() {
         if (modoCriacao === 'recusa') return send({ message: 'CPF já cadastrado' }, 400);
         if (modoCriacao === 'recusa-campos') return send({ logradouro: ['Informe o nome completo da rua.'], cep: ['CEP não encontrado'] }, 400);
         if (modoCriacao === 'recusa-vazia') return send({}, 400);
+        if (modoCriacao === 'erro-500') return send({}, 503);
         proximoId += 1;
         return send({ cliente_id: proximoId, message: `Cliente ${payload.nome} cadastrado via API.` });
       }
@@ -299,6 +300,17 @@ describe('cadastrar no SGP', () => {
     assert.equal(res.status, 502);
     assert.match(res.body.message, /logradouro: Informe o nome completo da rua\./);
     assert.match(res.body.message, /cep: CEP não encontrado/);
+  });
+
+  it('uma recusa sem motivo diz o que costuma ser e o que fazer, por status', async () => {
+    modoCriacao = 'recusa-vazia';
+    const vazia = await criarNoSgp({ ...PESSOA, document: '39053344705' });
+    assert.equal(vazia.status, 502);
+    assert.match(vazia.body.message, /sem dizer o motivo/);
+    assert.match(vazia.body.message, /CPF\/CNPJ, logradouro, bairro, cidade, UF e CEP/);
+    modoCriacao = 'erro-500';
+    const fora = await criarNoSgp({ ...PESSOA, document: '39053344705' });
+    assert.match(fora.body.message, /problema do lado dele \(status 503\)/);
   });
 
   it('quem não tem sgp.act não cria no SGP', async () => {
