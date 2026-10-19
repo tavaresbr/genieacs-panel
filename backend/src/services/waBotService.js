@@ -270,6 +270,8 @@ const JANELA_TENTATIVAS_MS = 60 * 60 * 1000;
 const MAX_CONTRATOS_NA_LISTA = 9;
 const PASSO_DOCUMENTO = 'aguardando_documento';
 const PASSO_ESCOLHA = 'escolhendo_contrato';
+/** A IA pediu o desbloqueio em confiança e espera o "sim" do cliente. */
+const PASSO_LIBERACAO = 'ia_confirmar_liberacao';
 
 /**
  * Server-side text has no request locale: a WhatsApp message carries no
@@ -541,6 +543,10 @@ class WaBotService {
   static TENTATIVAS_DOCUMENTO = TENTATIVAS_DOCUMENTO;
 
   static PASSO_VALIDADE_MS = PASSO_VALIDADE_MS;
+
+  static PASSO_LIBERACAO = PASSO_LIBERACAO;
+
+  static passoAtivo = passoAtivo;
 
   /**
    * Answers one inbound message, or stays quiet.
