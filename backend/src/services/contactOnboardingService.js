@@ -23,6 +23,9 @@ function invalid(field) {
   return new ContactProfileError('contacts.error.invalidField', { code: 'invalid_field', vars: { field } });
 }
 
+// A street that is only its kind: "RUA", "AV.", "TRAVESSA".
+const BARE_STREET = /^(rua|r|av|avenida|tv|travessa|alameda|al|pra[cç]a|pc|estrada|rodovia|vila|beco|vi[aá]|sn|s\/n)\.?$/i;
+
 function clean(value, max = 255) {
   if (value === null || value === undefined) return '';
   return String(value).replace(/\s+/g, ' ').trim().slice(0, max);
@@ -173,6 +176,9 @@ class ContactOnboardingService {
    */
   static async completeAddress(address, { digits, personType, fromReceita }) {
     const result = { ...(address || {}) };
+    // The TeiaH sometimes gives only the kind of street ("RUA"): that is no
+    // street, and the SGP refuses it. Blank, it is filled from the CEP or typed.
+    if (BARE_STREET.test(clean(result.street, 64))) result.street = '';
     const fill = (extra) => {
       for (const [field, value] of Object.entries(extra)) {
         if (value && !result[field]) result[field] = value;

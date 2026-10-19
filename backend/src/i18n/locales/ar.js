@@ -469,6 +469,10 @@ export default {
   'sgp.error.credentialsRejected': 'رفض SGP بيانات اعتماد التكامل (التطبيق/الرمز)',
 
   'sgp.error.status': 'استجاب SGP بالرمز {status}',
+  'sgp.error.statusBadRequest': 'رفض SGP الطلب (الحالة 400) دون ذكر السبب. تحقق من البيانات المرسلة (الاسم، الرقم الضريبي، الشارع، الحي، المدينة، الولاية والرمز البريدي) وأعد المحاولة',
+  'sgp.error.statusNotFound': 'لم يجد SGP عنوان واجهة API (الحالة 404). تحقق من المسارات في الإعدادات ← SGP',
+  'sgp.error.statusRateLimited': 'قيّد SGP الطلبات (الحالة 429). انتظر قليلاً ثم أعد المحاولة',
+  'sgp.error.statusServer': 'يواجه SGP مشكلة من جانبه (الحالة {status}). أعد المحاولة بعد بضع دقائق',
   'sgp.error.invalidResponse': 'استجابة غير صالحة من SGP',
   'sgp.error.queryFailed': 'أعاد SGP خطأً لهذا الاستعلام',
   'sgp.error.identifierRequired': 'أدخل رقم مستند أو عقد أو اسم دخول PPPoE للاستعلام من SGP',
