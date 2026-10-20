@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
+import { formatBrPhone } from '@/lib/phone'
 import type { TranslationKey } from '@/lib/i18n'
 
 /**
@@ -386,11 +387,11 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
               <p className="truncate text-sm font-semibold text-foreground">
                 <ContactLink
                   contract={panel.ready ? panel.attendance.contract : null}
-                  name={(panel.ready && panel.attendance.clientName) || attendance.pushName || phone || '—'}
+                  name={(panel.ready && panel.attendance.clientName) || attendance.pushName || formatBrPhone(phone) || '—'}
                   className=""
                 />
               </p>
-              {phone && <p className="font-mono text-xs text-muted-foreground">{phone}</p>}
+              {phone && <p className="font-mono text-xs text-muted-foreground" title={phone}>{formatBrPhone(phone)}</p>}
               {panel.ready && panel.attendance.matchedOn && (
                 <p className="mt-1 text-xs text-muted-foreground">{t(MATCHED_ON[panel.attendance.matchedOn])}</p>
               )}
