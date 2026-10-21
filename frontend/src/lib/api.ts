@@ -5370,6 +5370,8 @@ export type WaSubscriberPanel =
       }
       contracts: {
         items: WaSubscriberContract[]
+        /** SGP registrations with no contract, to bind the thread to the client itself. */
+        registrations: WaSubscriberRegistration[]
         selected: string | null
         /** The contract asked for is not among the ones found. Nothing was guessed. */
         missing: boolean
@@ -5419,6 +5421,16 @@ export interface WaSubscriberAttendance {
   pushName: string | null
   contract: string | null
   deviceId: string | null
+  /** The client with no contract this thread is bound to, by its `c:<id>` key. */
+  registration?: string | null
+}
+
+/** An SGP client with no contract, found by CPF/CNPJ, that a thread can be bound to. */
+export interface WaSubscriberRegistration {
+  key: string
+  name: string | null
+  document: string | null
+  clientId: string | null
 }
 
 /** An SGP subscriber as a WhatsApp contact — one per contract. */

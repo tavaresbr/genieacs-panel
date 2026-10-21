@@ -94,7 +94,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const [contract, setContract] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [searchedDocument, setSearchedDocument] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'unlock' | 'resume' | 'ticket' | 'bind' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
+  const [busy, setBusy] = useState<'unlock' | 'resume' | 'ticket' | 'bind' | 'registration' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
   const [templates, setTemplates] = useState<WhatsAppTemplate[] | null>(null)
   const [templateId, setTemplateId] = useState('')
   const [ticketOpen, setTicketOpen] = useState(false)
@@ -174,6 +174,30 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
     if (!digits) return
     setSearchedDocument(digits)
     void load({ document: digits })
+  }
+
+  // A client the SGP has with no contract: the thread is bound to the
+  // registration itself, which the server checks against this same search.
+  const bindRegistration = async (registration: { key: string; name: string | null }) => {
+    setBusy('registration')
+    try {
+      const res = await whatsappAPI.bindSubscriber(conversationId, {
+        contract: registration.key,
+        document: searchedDocument ?? undefined
+      })
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('detail.sgp.linkFailed'))
+        return
+      }
+      toast.success(t('whatsapp.sgp.registrationBound', { name: registration.name ?? '—' }))
+      setPanel(res.data)
+      setSearchedDocument(null)
+      onBound?.()
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(null)
+    }
   }
 
   const bind = async () => {
@@ -499,8 +523,36 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
 
               {panel.contracts.items.length === 0 && !panel.contracts.error && (
                 <p className="text-sm text-muted-foreground">
-                  {t(panel.contracts.searched ? 'whatsapp.sgp.noContracts' : 'whatsapp.sgp.unknownNumber')}
+                  {t(panel.contracts.registrations.length > 0
+                    ? 'whatsapp.sgp.registrationOnly'
+                    : panel.contracts.searched ? 'whatsapp.sgp.noContracts' : 'whatsapp.sgp.unknownNumber')}
                 </p>
+              )}
+
+              {panel.contracts.registrations.length > 0 && (
+                <div className="mt-2">
+                  <p className="metric-label">{t('whatsapp.sgp.registrations')}</p>
+                  <ul className="mt-1 space-y-1">
+                    {panel.contracts.registrations.map((registration) => (
+                      <li key={registration.key} className="flex items-center justify-between gap-2 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-2 text-sm">
+                        <span className="min-w-0 wrap-break-word font-semibold">{registration.name ?? '—'}</span>
+                        {registration.key === attendance.registration ? (
+                          <span className="modern-badge-success shrink-0">{t('whatsapp.sgp.registrationLinked')}</span>
+                        ) : canAct && (
+                          <button
+                            type="button"
+                            className="modern-button-secondary shrink-0"
+                            disabled={busy !== null}
+                            onClick={() => void bindRegistration(registration)}
+                          >
+                            <Icon name="check" size={14} />
+                            {t('whatsapp.sgp.registrationBind')}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
               {/* The manual search: for a number the panel does not know, or

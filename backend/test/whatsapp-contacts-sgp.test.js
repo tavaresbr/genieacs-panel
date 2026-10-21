@@ -217,6 +217,50 @@ describe('buscar no SGP um cliente sem contrato', () => {
   });
 });
 
+describe('o módulo SGP da conversa acha o cadastro sem contrato', () => {
+  const painel = (id, query = '') => call(
+    `${panelUrl}/api/whatsapp/conversations/${id}/subscriber${query}`, { headers: authHeaders(token) }
+  );
+  const vincular = (id, body) => call(`${panelUrl}/api/whatsapp/conversations/${id}/subscriber/bind`, {
+    method: 'POST', headers: authHeaders(token), body
+  });
+
+  it('busca por CPF traz o cadastro sem contrato e vincula a conversa a ele', async () => {
+    await hook(eventoV2({ id: 'MSG-SGP-CAD', remoteJid: '5521966667777@s.whatsapp.net' }));
+    const fio = await asTenant(() => WaConversation.getByThread(accountId, '5521966667777@s.whatsapp.net'));
+
+    const busca = await painel(fio.id, '?document=44444444444');
+    assert.equal(busca.status, 200);
+    const { contracts } = busca.body.data;
+    assert.equal(contracts.items.length, 0, 'não há contrato');
+    assert.equal(contracts.registrations.length, 1);
+    const cadastro = contracts.registrations[0];
+    assert.equal(cadastro.name, 'Diego Sem Contrato');
+    assert.match(cadastro.key, /^c:\d+$/);
+
+    const feito = await vincular(fio.id, { contract: cadastro.key, document: '44444444444' });
+    assert.equal(feito.status, 200, JSON.stringify(feito.body));
+    assert.equal(feito.body.data.attendance.registration, cadastro.key);
+    assert.equal(feito.body.data.attendance.clientName, 'Diego Sem Contrato');
+    assert.equal(feito.body.data.contracts.registrations[0].key, cadastro.key);
+    const depois = await asTenant(() => getDb()('wa_conversations').where({ id: fio.id }).first());
+    assert.equal(depois.contract, null);
+    assert.equal(`c:${depois.sgp_contact_id}`, cadastro.key);
+
+    // Reabrindo o módulo sem busca, o cadastro vinculado continua aparecendo.
+    const reaberto = await painel(fio.id);
+    assert.equal(reaberto.body.data.contracts.registrations[0].key, cadastro.key);
+  });
+
+  it('não vincula a um cadastro que a busca desta conversa não trouxe', async () => {
+    await hook(eventoV2({ id: 'MSG-SGP-CAD2', remoteJid: '5521955556666@s.whatsapp.net' }));
+    const fio = await asTenant(() => WaConversation.getByThread(accountId, '5521955556666@s.whatsapp.net'));
+    const res = await vincular(fio.id, { contract: 'c:999999', document: '44444444444' });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'contract_not_in_conversation');
+  });
+});
+
 describe('o contato sem ONT no resto do WhatsApp', () => {
   it('aparece na lista de contatos, ao lado de quem tem ONT', async () => {
     const res = await contatos();
