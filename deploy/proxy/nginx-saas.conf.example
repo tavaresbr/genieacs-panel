@@ -139,8 +139,8 @@ server {
     ssl_prefer_server_ciphers off;
 
     # O painel quase não recebe upload: o maior corpo JSON que ele aceita é 1 MB
-    # (`express.json`), e a mídia do WhatsApp ele busca, não recebe. A exceção
-    # é o envio de firmware, com `location` e teto próprios logo abaixo.
+    # (`express.json`). As exceções têm `location` e teto próprios logo abaixo:
+    # importação de contatos, anexos do WhatsApp e envio de firmware.
     client_max_body_size 2m;
 
     # --- O agente do GenieACS (WebSocket) ---------------------------------
@@ -193,6 +193,28 @@ server {
         client_max_body_size 6m;
         proxy_read_timeout 180s;
         proxy_send_timeout 180s;
+    }
+
+    # --- Anexos do atendimento (WhatsApp) -----------------------------------
+    #
+    # O atendente anexa um arquivo na conversa: o corpo é o arquivo cru e o
+    # painel aceita até 16 MB (`MAX_ATTACHMENT_MB`). O teto de 2 MB do servidor
+    # recusava qualquer PDF ou foto maior com uma página do nginx, que a tela
+    # não sabe ler ("a requisição falhou"). 17 MB dá folga sobre os 16.
+    location = /api/whatsapp/attachments {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        client_max_body_size 17m;
+        proxy_request_buffering off;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
     }
 
     # --- Envio de firmware ao GenieACS ---------------------------------------
@@ -305,6 +327,28 @@ server {
         client_max_body_size 6m;
         proxy_read_timeout 180s;
         proxy_send_timeout 180s;
+    }
+
+    # --- Anexos do atendimento (WhatsApp) -----------------------------------
+    #
+    # O atendente anexa um arquivo na conversa: o corpo é o arquivo cru e o
+    # painel aceita até 16 MB (`MAX_ATTACHMENT_MB`). O teto de 2 MB do servidor
+    # recusava qualquer PDF ou foto maior com uma página do nginx, que a tela
+    # não sabe ler ("a requisição falhou"). 17 MB dá folga sobre os 16.
+    location = /api/whatsapp/attachments {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        client_max_body_size 17m;
+        proxy_request_buffering off;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
     }
 
     # --- Envio de firmware ao GenieACS ---------------------------------------

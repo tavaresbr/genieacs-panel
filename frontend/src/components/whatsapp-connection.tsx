@@ -93,6 +93,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   // Attachments. `attachment_too_large` reads `{max}`, which is why the helper
   // above takes vars at all.
   attachment_too_large: 'whatsapp.error.attachmentTooLarge',
+  proxy_payload_too_large: 'whatsapp.error.proxyBodyTooLarge',
   attachment_type_not_allowed: 'whatsapp.error.attachmentTypeNotAllowed',
   tag_name_taken: 'whatsapp.tags.nameTaken',
   too_many_tags: 'whatsapp.tags.tooMany',

@@ -3198,6 +3198,7 @@ const hi: Dictionary = {
   'whatsapp.error.invalidPortalUrl': 'ग्राहक पोर्टल का पता अमान्य है।',
   'whatsapp.error.messageEmpty': 'भेजने से पहले कुछ लिखें।',
   'whatsapp.error.attachmentTooLarge': 'फ़ाइल {max} MB से बड़ी है।',
+  'whatsapp.error.proxyBodyTooLarge': "पैनल के आगे के वेब सर्वर ने आकार के कारण फ़ाइल अस्वीकार कर दी। व्यवस्थापक से /api/whatsapp/attachments के लिए nginx का client_max_body_size 17 MB करने को कहें।",
   'whatsapp.error.attachmentEmpty': 'फ़ाइल ख़ाली है।',
   'whatsapp.error.attachmentTypeNotAllowed': 'इस प्रकार की फ़ाइल यहाँ से नहीं भेजी जा सकती।',
   'whatsapp.error.attachmentNotAllowed': 'यह अनुलग्नक यहाँ से नहीं भेजा जा सकता।',

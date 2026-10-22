@@ -3219,6 +3219,7 @@ const en = {
   'whatsapp.error.invalidPortalUrl': 'The customer portal URL is invalid.',
   'whatsapp.error.messageEmpty': 'Write something before sending.',
   'whatsapp.error.attachmentTooLarge': 'The file is larger than {max} MB.',
+  'whatsapp.error.proxyBodyTooLarge': "The web server in front of the panel refused the file because of its size. Ask the administrator to raise nginx client_max_body_size to 17 MB for /api/whatsapp/attachments.",
   'whatsapp.error.attachmentEmpty': 'The file is empty.',
   'whatsapp.error.attachmentTypeNotAllowed': 'That kind of file cannot be sent from here.',
   'whatsapp.error.attachmentNotAllowed': 'That attachment cannot be sent from here.',
