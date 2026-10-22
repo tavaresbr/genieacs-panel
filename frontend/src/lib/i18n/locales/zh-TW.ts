@@ -3768,6 +3768,8 @@ const zhTW: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'WhatsApp 機器人申請的信任解鎖',
   'audit.action.outageNotified': '已通知客戶大規模故障',
   'audit.action.whatsappInvoiceSent': '已在 WhatsApp 對話中傳送帳單',
+  'audit.action.whatsappMessageDeleted': "已在 WhatsApp 對話中刪除訊息",
+  'audit.action.whatsappMessageReacted': "對 WhatsApp 訊息的回應",
   'audit.action.maintenanceScheduled': '已安排計畫維護',
   'audit.action.maintenanceNotified': '已通知客戶計畫維護',
   'audit.action.maintenanceCancelled': '已取消計畫維護',

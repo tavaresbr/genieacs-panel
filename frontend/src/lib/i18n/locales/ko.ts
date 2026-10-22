@@ -3774,6 +3774,8 @@ const ko: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'WhatsApp 봇이 요청한 신뢰 기반 해제',
   'audit.action.outageNotified': '대규모 장애를 고객에게 알림',
   'audit.action.whatsappInvoiceSent': 'WhatsApp 대화에서 청구서 전송',
+  'audit.action.whatsappMessageDeleted': "WhatsApp 대화에서 메시지 삭제",
+  'audit.action.whatsappMessageReacted': "WhatsApp 메시지에 반응",
   'audit.action.maintenanceScheduled': '계획 점검 예약',
   'audit.action.maintenanceNotified': '계획 점검을 고객에게 안내',
   'audit.action.maintenanceCancelled': '계획 점검 취소',

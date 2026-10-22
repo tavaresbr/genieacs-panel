@@ -3776,6 +3776,8 @@ const ar: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'فك حظر على سبيل الثقة طلبه بوت واتساب',
   'audit.action.outageNotified': 'تم إبلاغ العملاء بانقطاع جماعي',
   'audit.action.whatsappInvoiceSent': 'تم إرسال فاتورة في محادثة واتساب',
+  'audit.action.whatsappMessageDeleted': "تم حذف رسالة في محادثة واتساب",
+  'audit.action.whatsappMessageReacted': "تفاعل مع رسالة واتساب",
   'audit.action.maintenanceScheduled': 'تمت جدولة صيانة',
   'audit.action.maintenanceNotified': 'تم إبلاغ العملاء بصيانة مجدولة',
   'audit.action.maintenanceCancelled': 'أُلغيت صيانة مجدولة',

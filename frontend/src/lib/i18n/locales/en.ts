@@ -3769,6 +3769,8 @@ const en = {
   'audit.action.whatsappBotTrustUnlock': 'Trust unlock requested by the WhatsApp bot',
   'audit.action.outageNotified': 'Customers notified of a mass outage',
   'audit.action.whatsappInvoiceSent': 'Invoice sent in a WhatsApp chat',
+  'audit.action.whatsappMessageDeleted': "Message deleted in a WhatsApp chat",
+  'audit.action.whatsappMessageReacted': "Reaction to a WhatsApp message",
   'audit.action.maintenanceScheduled': 'Scheduled maintenance created',
   'audit.action.maintenanceNotified': 'Customers notified of scheduled maintenance',
   'audit.action.maintenanceCancelled': 'Scheduled maintenance cancelled',

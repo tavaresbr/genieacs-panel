@@ -8,6 +8,11 @@ import { deleteMessageRequest, sendReactionRequest } from '../utils/wa/evolution
 /** Um emoji só (com seletor de variação ou tom de pele): até 16 colunas, sem texto. */
 const REACTION_RE = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}‍️⃣]{1,8}$/u;
 
+/** Nossa mensagem já enviada é revogada no WhatsApp; qualquer outra só some do painel. */
+export function revokesRemotely(message) {
+  return message.direction === 'out' && Boolean(message.external_id) && message.delivery_status !== 'failed';
+}
+
 /** O endereço da conversa como o servidor Evolution o conhece. */
 function jidOf(conversation) {
   const destino = destinationFor(conversation);
@@ -75,7 +80,7 @@ class WaMessageActionService {
       throw new WaError('whatsapp.error.messageNotActionable', { code: 'message_pending', status: 409 });
     }
 
-    if (message.direction === 'out' && message.external_id && message.delivery_status !== 'failed') {
+    if (revokesRemotely(message)) {
       const conversation = await WaSendService.requireConversation(message.conversation_id);
       const remoteJid = jidOf(conversation);
       if (!remoteJid) throw new WaError('whatsapp.error.noDestination', { code: 'no_destination', status: 409 });
