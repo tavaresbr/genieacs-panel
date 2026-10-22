@@ -393,6 +393,32 @@ describe('the due time decides what the worker can see', () => {
   });
 });
 
+describe('the parts of one reply keep their order', () => {
+  it('holds a part while an earlier sibling waits for its retry, and frees it when that sibling is done', async () => {
+    const first = await seedMessage({
+      source: 'bot',
+      attempts: 1,
+      next_attempt_at: wholeSecond(Date.now() + 10 * 60_000)
+    });
+    const second = await seedMessage({ source: 'bot' });
+    // Outra conversa/origem não é irmã: o atendente digita uma de cada vez.
+    const operator = await seedMessage({ source: 'operator' });
+
+    assert.deepEqual(await sendable(), [operator.id], 'the PIX does not overtake the summary');
+
+    await makeDue(first.id);
+    const ids = (await sendable()).slice().sort((a, b) => a - b);
+    assert.deepEqual(ids, [first.id, second.id, operator.id].sort((a, b) => a - b));
+
+    // Esgotadas as tentativas a primeira vira 'failed' e solta as outras.
+    await asTenant(() => WaMessage.update(first.id, {
+      delivery_status: 'failed',
+      next_attempt_at: null
+    }));
+    assert.ok((await sendable()).includes(second.id), 'a failed sibling does not hold the reply');
+  });
+});
+
 describe('requeue makes a failed row sendable again', () => {
   it('clears the attempts and the wait, and refuses a row that never failed', async () => {
     const failed = await seedMessage({
