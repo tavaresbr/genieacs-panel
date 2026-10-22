@@ -131,8 +131,12 @@ class WaSubscriberPanelService {
     const searchDocument = onlyDigits(document) || onlyDigits(link?.document) || onlyDigits(contact?.document);
     const searchContract = conversation.contract || link?.contract || null;
 
+    // The SGP registrations with no contract (a client signed up but not yet
+    // contracted) — the contract lookup cannot see them. Best effort.
+    const registrations = await this.registrationsFor(conversation, contact, searchDocument);
+
     if (!searchDocument && !searchContract) {
-      return { link, matchedOn, contracts: [], error: null, stale: false, searched: false };
+      return { link, matchedOn, contracts: [], registrations, error: null, stale: false, searched: false };
     }
 
     try {
@@ -153,7 +157,7 @@ class WaSubscriberPanelService {
           }
         }
       }
-      return { link, matchedOn, contracts, error: null, stale: false, searched: true };
+      return { link, matchedOn, contracts, registrations, error: null, stale: false, searched: true };
     } catch (error) {
       if (error instanceof SgpError && error.code === 'not_configured') throw error;
       // The stored link stands in for the lookup: a stale contract the
@@ -163,12 +167,44 @@ class WaSubscriberPanelService {
         link,
         matchedOn,
         contracts: fallback ? [fallback] : [],
+        registrations,
         error: errorOf(error),
         cause: error,
         stale: Boolean(fallback),
         searched: true
       };
     }
+  }
+
+  /**
+   * The SGP clients of this search that have no contract, filed in the contacts
+   * list (so they can be bound by their `c:<id>` key), plus the registration
+   * this conversation is already bound to.
+   */
+  static async registrationsFor(conversation, contact, searchDocument) {
+    const found = new Map();
+    const add = (row, name, document, clientId) => {
+      if (!row) return;
+      const key = `c:${row.id}`;
+      if (!found.has(key)) found.set(key, { key, name: name ?? null, document: document ?? null, clientId: clientId ?? null });
+    };
+    if (conversation.sgp_contact_id) {
+      const bound = contact?.id === conversation.sgp_contact_id ? contact : await SgpContact.getById(conversation.sgp_contact_id);
+      if (bound && !bound.contract) add(bound, bound.client_name, bound.document, bound.client_ref || bound.sgp_client_id);
+    }
+    if (searchDocument) {
+      try {
+        const clients = await SgpService.lookupClients({ document: searchDocument });
+        for (const client of clients) {
+          if (client.contract) continue;
+          const stored = await SgpContact.upsertFromSgp(SgpService.contractToContactRow(client));
+          add(stored, client.name, client.document || searchDocument, client.clientId);
+        }
+      } catch (error) {
+        console.warn(`SGP client listing lookup failed: ${error.code || error.message}`);
+      }
+    }
+    return [...found.values()];
   }
 
   static async router(contract, conversation) {
@@ -238,7 +274,9 @@ class WaSubscriberPanelService {
       phone: conversation.wa_phone_e164 || null,
       pushName: conversation.push_name || null,
       contract: conversation.contract || null,
-      deviceId: conversation.device_id || null
+      deviceId: conversation.device_id || null,
+      // The client with no contract this thread is bound to, by its `c:<id>` key.
+      registration: !conversation.contract && conversation.sgp_contact_id ? `c:${conversation.sgp_contact_id}` : null
     };
 
     if (!SgpService.isReady(config)) {
@@ -247,6 +285,7 @@ class WaSubscriberPanelService {
 
     const found = await this.findContracts(conversation, { document });
     const contracts = found.contracts;
+    const bound = found.registrations.find((entry) => entry.key === attendance.registration) ?? null;
     const selected = wanted
       ? SgpService.exactContract(contracts, wanted)
       : SgpService.pickContract(contracts, conversation.contract || found.link?.contract || null);
@@ -263,13 +302,15 @@ class WaSubscriberPanelService {
       ready: true,
       attendance: {
         ...attendance,
-        clientName: selected?.name || found.link?.client_name || null,
-        document: selected?.document || found.link?.document || null,
+        clientName: selected?.name || found.link?.client_name || bound?.name || null,
+        document: selected?.document || found.link?.document || bound?.document || null,
         matchedOn: found.matchedOn || null
       },
       contracts: {
         items: contracts.map(publicContract),
         selected: selected?.contract ?? null,
+        // Cadastros no SGP que não têm contrato, para vincular pelo cadastro.
+        registrations: found.registrations,
         // "you asked for one that is not here" is its own answer, not a guess.
         missing: Boolean(wanted && !selected),
         searched: found.searched,
@@ -319,6 +360,19 @@ class WaSubscriberPanelService {
 
   /** The operator's correction: this thread belongs to that contract. */
   static async bind(conversationId, { contract, document = null }) {
+    // A client with no contract: bound by its registration, `c:<id>`, which has
+    // to be one this conversation's own lookup returned.
+    const registration = String(contract ?? '').trim();
+    if (/^c:\d+$/.test(registration)) {
+      const conversation = await WaConversationService.get(conversationId);
+      SgpService.requireReady(await SgpService.getConfig());
+      const { registrations } = await this.findContracts(conversation, { document });
+      if (!registrations.some((entry) => entry.key === registration)) {
+        throw new SgpError('sgp.error.contractNotInConversation', { code: 'contract_not_in_conversation', status: 409 });
+      }
+      await WaConversationService.linkSubscriber(conversation.id, { contract: registration });
+      return this.build(conversation.id);
+    }
     const { conversation, contract: clean } = await this.actionContract(conversationId, contract, { document });
     const [first] = await SgpLink.getByContract(clean);
     await WaConversation.update(conversation.id, {
