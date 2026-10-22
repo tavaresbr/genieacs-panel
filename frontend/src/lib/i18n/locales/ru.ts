@@ -148,6 +148,7 @@ const ru: Dictionary = {
   'contacts.profile.extraAddresses': 'Другие адреса',
   'contacts.profile.extraAddressN': 'Адрес {n}',
   'contacts.profile.addAddress': 'Добавить адрес',
+  'contacts.profile.makeMainAddress': 'Сделать основным',
   'contacts.profile.removeAddress': 'Удалить адрес',
   'contacts.profile.teiahAddAddress': 'Добавить в карточку',
   'contacts.profile.teiahAddressAdded': 'Адрес добавлен в карточку',

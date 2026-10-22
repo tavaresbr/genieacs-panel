@@ -150,6 +150,7 @@ const en = {
   'contacts.profile.extraAddresses': 'Other addresses',
   'contacts.profile.extraAddressN': 'Address {n}',
   'contacts.profile.addAddress': 'Add address',
+  'contacts.profile.makeMainAddress': 'Make main',
   'contacts.profile.removeAddress': 'Remove address',
   'contacts.profile.teiahAddAddress': 'Add to record',
   'contacts.profile.teiahAddressAdded': 'Address added to the record',
