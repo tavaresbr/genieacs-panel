@@ -473,7 +473,7 @@ export default function ContactDetailPage() {
           )}
         </Card>
 
-        {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} whatsappPhone={profile.whatsappPhone} settleMethods={profile.settle?.methods ?? null} />}
+        {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} contracts={profile.contracts} whatsappPhone={profile.whatsappPhone} settleMethods={profile.settle?.methods ?? null} />}
 
         {linking && (
           <LinkDeviceModal
@@ -551,8 +551,10 @@ function FieldRow<T>({ label, field, canEdit, onRestore, children }: {
   )
 }
 
-function InvoicesCard({ contactKey, whatsappPhone, settleMethods }: {
+function InvoicesCard({ contactKey, contracts, whatsappPhone, settleMethods }: {
   contactKey: string
+  /** The client's contracts: the heading of each group, and the ones with nothing open. */
+  contracts: ContactProfileContract[]
   whatsappPhone: string | null
   /** The payment methods "Receber" offers; `null` when settling is not set up. */
   settleMethods: string[] | null
@@ -564,6 +566,8 @@ function InvoicesCard({ contactKey, whatsappPhone, settleMethods }: {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
   const [settling, setSettling] = useState<(SgpInvoice & { contract: string }) | null>(null)
+  // `null` shows every contract; a contract number narrows the list to it.
+  const [only, setOnly] = useState<string | null>(null)
   const canSend = can('whatsapp.send')
   const canSettle = can('contacts.settle') && Boolean(settleMethods?.length)
 
@@ -579,6 +583,49 @@ function InvoicesCard({ contactKey, whatsappPhone, settleMethods }: {
   }
 
   const all = groups?.flatMap((group) => group.invoices.map((invoice) => ({ ...invoice, contract: group.contract }))) ?? []
+  // A client with several contracts gets one section per contract, the ones
+  // with nothing open included: a list that leaves them out reads as if they
+  // had not been looked at.
+  const several = contracts.length > 1
+  const countOf = (contract: string) => groups?.find((group) => group.contract === contract)?.invoices.length ?? 0
+
+  const renderInvoice = (invoice: SgpInvoice & { contract: string }, index: number, showContract: boolean) => (
+    <li key={`${invoice.contract}-${invoice.id ?? index}`} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+      <span>
+        <span className="font-semibold">{formatBrl(invoice.amount, intlLocale)}</span>
+        <span className="ms-2 text-muted-foreground">{t('contacts.profile.dueOn', { date: formatSgpDate(invoice.dueDate, intlLocale) })}</span>
+        {showContract && <span className="ms-2 font-mono text-xs text-muted-foreground">{invoice.contract}</span>}
+      </span>
+      <span className="flex flex-wrap gap-2">
+        {invoice.digitableLine && (
+          <button type="button" className="modern-button-secondary" onClick={() => void copyToClipboard(invoice.digitableLine!).then(() => toast.success(t('contacts.profile.copied')))}>
+            <Icon name="copy" size={14} /> {t('contacts.profile.copyLine')}
+          </button>
+        )}
+        {invoice.pix && (
+          <button type="button" className="modern-button-secondary" onClick={() => void copyToClipboard(invoice.pix!).then(() => toast.success(t('contacts.profile.copied')))}>
+            <Icon name="copy" size={14} /> PIX
+          </button>
+        )}
+        {canSend && invoice.id && (
+          <button
+            type="button"
+            className="modern-button-secondary"
+            disabled={!whatsappPhone}
+            title={whatsappPhone ? undefined : t('contacts.profile.sendInvoiceNoPhone')}
+            onClick={() => setSending(invoice.id)}
+          >
+            <Icon name="chat" size={14} /> {t('contacts.profile.sendInvoice')}
+          </button>
+        )}
+        {canSettle && invoice.id && invoice.sgpId && (
+          <button type="button" className="modern-button" onClick={() => setSettling(invoice)}>
+            <Icon name="check" size={14} /> {t('contacts.profile.settle')}
+          </button>
+        )}
+      </span>
+    </li>
+  )
 
   return (
     <Card title={t('contacts.profile.invoices')} className="mt-5">
@@ -586,48 +633,60 @@ function InvoicesCard({ contactKey, whatsappPhone, settleMethods }: {
         <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void load()}>
           <Icon name="invoice" size={16} /> {loading ? t('contacts.profile.loading') : t('contacts.profile.loadInvoices')}
         </button>
-      ) : all.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('contacts.profile.noInvoices')}</p>
+      ) : !several ? (
+        all.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('contacts.profile.noInvoices')}</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {all.map((invoice, index) => renderInvoice(invoice, index, true))}
+          </ul>
+        )
       ) : (
-        <ul className="divide-y divide-border">
-          {all.map((invoice, index) => (
-            <li key={`${invoice.contract}-${invoice.id ?? index}`} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-              <span>
-                <span className="font-semibold">{formatBrl(invoice.amount, intlLocale)}</span>
-                <span className="ms-2 text-muted-foreground">{t('contacts.profile.dueOn', { date: formatSgpDate(invoice.dueDate, intlLocale) })}</span>
-                <span className="ms-2 font-mono text-xs text-muted-foreground">{invoice.contract}</span>
-              </span>
-              <span className="flex flex-wrap gap-2">
-                {invoice.digitableLine && (
-                  <button type="button" className="modern-button-secondary" onClick={() => void copyToClipboard(invoice.digitableLine!).then(() => toast.success(t('contacts.profile.copied')))}>
-                    <Icon name="copy" size={14} /> {t('contacts.profile.copyLine')}
-                  </button>
-                )}
-                {invoice.pix && (
-                  <button type="button" className="modern-button-secondary" onClick={() => void copyToClipboard(invoice.pix!).then(() => toast.success(t('contacts.profile.copied')))}>
-                    <Icon name="copy" size={14} /> PIX
-                  </button>
-                )}
-                {canSend && invoice.id && (
-                  <button
-                    type="button"
-                    className="modern-button-secondary"
-                    disabled={!whatsappPhone}
-                    title={whatsappPhone ? undefined : t('contacts.profile.sendInvoiceNoPhone')}
-                    onClick={() => setSending(invoice.id)}
-                  >
-                    <Icon name="chat" size={14} /> {t('contacts.profile.sendInvoice')}
-                  </button>
-                )}
-                {canSettle && invoice.id && invoice.sgpId && (
-                  <button type="button" className="modern-button" onClick={() => setSettling(invoice)}>
-                    <Icon name="check" size={14} /> {t('contacts.profile.settle')}
-                  </button>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t('contacts.profile.invoicesFilter')}>
+            <button
+              type="button"
+              className={only === null ? 'modern-button' : 'modern-button-secondary'}
+              aria-pressed={only === null}
+              onClick={() => setOnly(null)}
+            >
+              {t('contacts.profile.invoicesAll')} ({all.length})
+            </button>
+            {contracts.map((contract) => (
+              <button
+                key={contract.contract}
+                type="button"
+                className={only === contract.contract ? 'modern-button' : 'modern-button-secondary'}
+                aria-pressed={only === contract.contract}
+                onClick={() => setOnly(contract.contract)}
+              >
+                <span className="font-mono">{contract.contract}</span> ({countOf(contract.contract)})
+              </button>
+            ))}
+          </div>
+          <div className="space-y-5">
+            {contracts.filter((contract) => only === null || contract.contract === only).map((contract) => {
+              const invoices = (groups.find((group) => group.contract === contract.contract)?.invoices ?? [])
+                .map((invoice) => ({ ...invoice, contract: contract.contract }))
+              return (
+                <section key={contract.contract}>
+                  <h3 className="flex flex-wrap items-baseline gap-x-3 text-sm font-semibold">
+                    <span>{t('contacts.profile.invoicesContract', { contract: contract.contract })}</span>
+                    {contract.status && <span className="text-xs font-normal text-muted-foreground">{contract.status}</span>}
+                    {contract.plan && <span className="text-xs font-normal text-muted-foreground">{contract.plan}</span>}
+                  </h3>
+                  {invoices.length === 0 ? (
+                    <p className="mt-2 text-sm text-muted-foreground">{t('contacts.profile.noInvoicesContract')}</p>
+                  ) : (
+                    <ul className="mt-1 divide-y divide-border">
+                      {invoices.map((invoice, index) => renderInvoice(invoice, index, false))}
+                    </ul>
+                  )}
+                </section>
+              )
+            })}
+          </div>
+        </>
       )}
       {sending && <SendInvoiceModal contactKey={contactKey} invoiceId={sending} onClose={() => setSending(null)} />}
       {settling && settleMethods && (
