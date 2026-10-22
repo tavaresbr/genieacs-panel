@@ -148,6 +148,7 @@ const ptBR: Dictionary = {
   'contacts.profile.extraAddresses': 'Outros endereços',
   'contacts.profile.extraAddressN': 'Endereço {n}',
   'contacts.profile.addAddress': 'Adicionar endereço',
+  'contacts.profile.makeMainAddress': 'Definir como principal',
   'contacts.profile.removeAddress': 'Remover endereço',
   'contacts.profile.teiahAddAddress': 'Adicionar à ficha',
   'contacts.profile.teiahAddressAdded': 'Endereço adicionado à ficha',

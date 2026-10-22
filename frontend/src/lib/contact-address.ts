@@ -53,3 +53,17 @@ export const addressFormFrom = (address: (Partial<Record<(typeof ADDRESS_FORM_PA
 
 export const sameAddress = (a: AddressForm, b: AddressForm) =>
   ADDRESS_FORM_PARTS.every((part) => a[part].trim() === b[part].trim())
+
+const isBlank = (form: AddressForm) => ADDRESS_FORM_PARTS.every((part) => !form[part].trim())
+
+/**
+ * Makes one of the other addresses the main one. The old main takes its place
+ * in the list (so the order the operator set does not move); an empty old main
+ * leaves nothing behind.
+ */
+export function promoteAddress(main: AddressForm, extras: AddressForm[], index: number): { main: AddressForm; extras: AddressForm[] } {
+  const chosen = extras[index]
+  if (!chosen) return { main, extras }
+  const rest = extras.map((entry, at) => (at === index ? main : entry))
+  return { main: chosen, extras: rest.filter((entry) => !isBlank(entry)) }
+}

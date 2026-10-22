@@ -35,6 +35,7 @@ import {
   applyCep,
   emptyAddressForm,
   maskCep,
+  promoteAddress,
   sameAddress,
   type AddressForm
 } from '@/lib/contact-address'
@@ -271,6 +272,11 @@ export default function ContactDetailPage() {
 
   const { fields } = profile
   const restore = (field: ContactProfileField) => () => void save({ [field]: null })
+  // One of the other addresses becomes the main one, and the old main takes its place in the list.
+  const makeMain = async (index: number) => {
+    const next = promoteAddress(addressFormFrom(fields.address.value), fields.extraAddresses.value.map(addressFormFrom), index)
+    await save({ address: addressPayload(next.main), extraAddresses: next.extras.map(addressPayload) })
+  }
 
   return (
     <div className="page-shell">
@@ -357,7 +363,16 @@ export default function ContactDetailPage() {
               {(fields.extraAddresses.value.length > 0 || fields.extraAddresses.edited) && (
                 <FieldRow label={t('contacts.profile.extraAddresses')} field={fields.extraAddresses} canEdit={canEdit} onRestore={restore('extraAddresses')}>
                   <ul className="space-y-1">
-                    {fields.extraAddresses.value.map((address, index) => <li key={index} className="wrap-anywhere">{addressText(address)}</li>)}
+                    {fields.extraAddresses.value.map((address, index) => (
+                      <li key={index} className="flex flex-wrap items-center gap-x-2">
+                        <span className="wrap-anywhere">{addressText(address)}</span>
+                        {canEdit && (
+                          <button type="button" className="text-xs text-primary hover:underline" onClick={() => void makeMain(index)}>
+                            {t('contacts.profile.makeMainAddress')}
+                          </button>
+                        )}
+                      </li>
+                    ))}
                   </ul>
                 </FieldRow>
               )}
@@ -1064,6 +1079,17 @@ function EditModal({ profile, onClose, onSave }: {
             <div key={index} className="grid gap-4 rounded-lg border border-border p-3 sm:col-span-2 sm:grid-cols-2">
               <div className="flex items-center justify-between gap-2 sm:col-span-2">
                 <h4 className="font-medium">{t('contacts.profile.extraAddressN', { n: index + 1 })}</h4>
+                <span className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  className="modern-button-secondary"
+                  onClick={() => setForm((current) => {
+                    const next = promoteAddress(current.address, current.extraAddresses, index)
+                    return { ...current, address: next.main, extraAddresses: next.extras }
+                  })}
+                >
+                  {t('contacts.profile.makeMainAddress')}
+                </button>
                 <button
                   type="button"
                   className="modern-button-secondary shrink-0"
@@ -1073,6 +1099,7 @@ function EditModal({ profile, onClose, onSave }: {
                 >
                   <Icon name="trash" size={14} />
                 </button>
+                </span>
               </div>
               <AddressBlock
                 idPrefix={`contact-address-${index + 2}`}

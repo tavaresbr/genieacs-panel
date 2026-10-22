@@ -148,6 +148,7 @@ const ja: Dictionary = {
   'contacts.profile.extraAddresses': 'その他の住所',
   'contacts.profile.extraAddressN': '住所 {n}',
   'contacts.profile.addAddress': '住所を追加',
+  'contacts.profile.makeMainAddress': 'メインにする',
   'contacts.profile.removeAddress': '住所を削除',
   'contacts.profile.teiahAddAddress': 'カルテに追加',
   'contacts.profile.teiahAddressAdded': '住所をカルテに追加しました',

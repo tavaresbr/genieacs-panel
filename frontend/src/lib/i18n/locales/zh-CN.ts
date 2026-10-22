@@ -148,6 +148,7 @@ const zhCN: Dictionary = {
   'contacts.profile.extraAddresses': '其他地址',
   'contacts.profile.extraAddressN': '地址 {n}',
   'contacts.profile.addAddress': '添加地址',
+  'contacts.profile.makeMainAddress': '设为主地址',
   'contacts.profile.removeAddress': '删除地址',
   'contacts.profile.teiahAddAddress': '添加到档案',
   'contacts.profile.teiahAddressAdded': '地址已添加到档案',

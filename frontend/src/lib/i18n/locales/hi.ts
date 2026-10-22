@@ -148,6 +148,7 @@ const hi: Dictionary = {
   'contacts.profile.extraAddresses': 'अन्य पते',
   'contacts.profile.extraAddressN': 'पता {n}',
   'contacts.profile.addAddress': 'पता जोड़ें',
+  'contacts.profile.makeMainAddress': 'मुख्य बनाएँ',
   'contacts.profile.removeAddress': 'पता हटाएँ',
   'contacts.profile.teiahAddAddress': 'रिकॉर्ड में जोड़ें',
   'contacts.profile.teiahAddressAdded': 'पता रिकॉर्ड में जोड़ा गया',

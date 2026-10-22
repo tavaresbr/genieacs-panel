@@ -148,6 +148,7 @@ const fr: Dictionary = {
   'contacts.profile.extraAddresses': 'Autres adresses',
   'contacts.profile.extraAddressN': 'Adresse {n}',
   'contacts.profile.addAddress': 'Ajouter une adresse',
+  'contacts.profile.makeMainAddress': 'Définir comme principale',
   'contacts.profile.removeAddress': 'Supprimer l\'adresse',
   'contacts.profile.teiahAddAddress': 'Ajouter à la fiche',
   'contacts.profile.teiahAddressAdded': 'Adresse ajoutée à la fiche',

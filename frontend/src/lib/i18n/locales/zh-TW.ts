@@ -148,6 +148,7 @@ const zhTW: Dictionary = {
   'contacts.profile.extraAddresses': '其他地址',
   'contacts.profile.extraAddressN': '地址 {n}',
   'contacts.profile.addAddress': '新增地址',
+  'contacts.profile.makeMainAddress': '設為主地址',
   'contacts.profile.removeAddress': '刪除地址',
   'contacts.profile.teiahAddAddress': '新增到檔案',
   'contacts.profile.teiahAddressAdded': '地址已新增到檔案',

@@ -148,6 +148,7 @@ const ko: Dictionary = {
   'contacts.profile.extraAddresses': '기타 주소',
   'contacts.profile.extraAddressN': '주소 {n}',
   'contacts.profile.addAddress': '주소 추가',
+  'contacts.profile.makeMainAddress': '기본으로 설정',
   'contacts.profile.removeAddress': '주소 삭제',
   'contacts.profile.teiahAddAddress': '카드에 추가',
   'contacts.profile.teiahAddressAdded': '주소를 카드에 추가했습니다',
