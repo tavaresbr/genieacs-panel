@@ -4,6 +4,12 @@ import { runUnscoped } from '../config/tenantContext.js';
 /** How long a message may sit in 'sending' before another pass may retake it. */
 export const RECLAIM_MS = 5 * 60 * 1000;
 
+/** Sources whose messages are held behind an earlier sibling in retry wait: the bot and alerts send replies in parts. */
+const ORDERED_SOURCES = ['bot', 'alert'];
+
+/** How close in time two messages are to count as parts of the same reply. */
+export const SIBLING_WINDOW_MS = 2 * 60 * 1000;
+
 /**
  * What the outbox may take, as one WHERE both the listing and the claim use.
  *
@@ -230,6 +236,37 @@ class WaMessage {
   }
 
   /**
+   * Tira da vez a mensagem que passaria na frente de uma irmã em espera.
+   *
+   * As partes de uma mesma resposta (a fatura em resumo, PIX e linha digitável)
+   * nascem juntas e têm que chegar na ordem. Se a primeira falha e fica na
+   * espera de uma nova tentativa, as outras estavam prontas e saíam antes dela.
+   * Aqui uma mensagem espera enquanto houver, na mesma conversa e da mesma
+   * origem (só o robô e os avisos, que mandam em partes; o atendente digita
+   * uma mensagem de cada vez), outra mais antiga (criada até `SIBLING_WINDOW_MS` antes) na espera
+   * de retentativa. Passada a janela, ou esgotadas as tentativas (a linha vira
+   * 'failed'), ela volta a ser enviada: uma falha não segura a conversa.
+   */
+  static async withoutOvertakers(rows, now) {
+    if (rows.length === 0) return [];
+    const conversations = [...new Set(rows.map((row) => row.conversation_id))];
+    const waiting = await tdb('wa_messages')
+      .whereIn('conversation_id', conversations)
+      .whereNull('external_id')
+      .where({ delivery_status: 'queued' })
+      .whereIn('source', ORDERED_SOURCES)
+      .where('next_attempt_at', '>', now)
+      .select('id', 'conversation_id', 'source', 'created_at');
+    if (waiting.length === 0) return rows.map((row) => row.id);
+    return rows
+      .filter((row) => !waiting.some((early) => early.conversation_id === row.conversation_id
+        && early.source === row.source
+        && early.id < row.id
+        && new Date(row.created_at).getTime() - new Date(early.created_at).getTime() <= SIBLING_WINDOW_MS))
+      .map((row) => row.id);
+  }
+
+  /**
    * Ids the outbox worker should try next, oldest first.
    *
    * `bulk: true` só as automáticas (`source='campaign'`), que saem no ritmo do
@@ -245,11 +282,12 @@ class WaMessage {
     else if (bulk === false) query.whereNot('source', 'campaign');
     // `id` desempata: as mensagens de uma mesma resposta (a fatura em partes)
     // nascem no mesmo instante e têm que sair na ordem em que foram escritas.
-    return query
+    const rows = await query
       .orderBy('created_at')
       .orderBy('id')
       .limit(limit)
-      .pluck('id');
+      .select('id', 'conversation_id', 'source', 'created_at');
+    return this.withoutOvertakers(rows, now);
   }
 
   /**
