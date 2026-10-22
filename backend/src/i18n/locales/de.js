@@ -616,6 +616,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "Das Maximum pro Lauf muss zwischen {min} und {max} liegen",
   'whatsapp.dunning.error.invalidReceiptPause': "Die Pause bei Zahlungsbeleg muss zwischen {min} und {max} Tagen liegen",
   'whatsapp.dunning.receiptNote': "Zahlungsbeleg erhalten — Mahnlauf für Vertrag {contract} bis {until} pausiert. Prüfen Sie die Zahlung im SGP.",
+  'whatsapp.dunning.codeSentNext': "(in der nächsten Nachricht)",
   'whatsapp.dunning.resumed': "Mahnlauf für diesen Vertrag fortgesetzt",
   'whatsapp.dunning.resumeFailed': "Mahnlauf konnte nicht fortgesetzt werden",
   'whatsapp.ai.error.timeout': 'Die KI hat zu lange für die Antwort gebraucht',

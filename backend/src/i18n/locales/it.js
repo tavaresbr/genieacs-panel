@@ -613,6 +613,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "Il massimo per passaggio deve essere tra {min} e {max}",
   'whatsapp.dunning.error.invalidReceiptPause': "La pausa per ricevuta deve essere tra {min} e {max} giorni",
   'whatsapp.dunning.receiptNote': "Ricevuta di pagamento ricevuta — solleciti in pausa per il contratto {contract} fino al {until}. Verifica il pagamento nel SGP.",
+  'whatsapp.dunning.codeSentNext': "(inviato nel messaggio successivo)",
   'whatsapp.dunning.resumed': "Solleciti ripresi per questo contratto",
   'whatsapp.dunning.resumeFailed': "Impossibile riprendere i solleciti",
   'whatsapp.ai.error.timeout': 'L’IA ha impiegato troppo tempo a rispondere',

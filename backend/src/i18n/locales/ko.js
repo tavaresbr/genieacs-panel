@@ -613,6 +613,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "실행당 최대 건수는 {min}에서 {max} 사이여야 합니다",
   'whatsapp.dunning.error.invalidReceiptPause': "영수증 일시 중지는 {min}~{max}일 사이여야 합니다",
   'whatsapp.dunning.receiptNote': "결제 영수증 수신 — 계약 {contract}의 독촉이 {until}까지 일시 중지되었습니다. SGP에서 결제를 확인하세요.",
+  'whatsapp.dunning.codeSentNext': "(다음 메시지로 전송)",
   'whatsapp.dunning.resumed': "이 계약의 독촉을 재개했습니다",
   'whatsapp.dunning.resumeFailed': "독촉을 재개할 수 없습니다",
   'whatsapp.ai.error.timeout': 'AI 응답 시간이 너무 오래 걸렸습니다',

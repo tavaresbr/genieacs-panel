@@ -614,6 +614,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "每次執行的上限須介於 {min} 到 {max}",
   'whatsapp.dunning.error.invalidReceiptPause': "憑證暫停天數須介於 {min} 到 {max} 天",
   'whatsapp.dunning.receiptNote': "已收到付款憑證 — 合約 {contract} 的催繳已暫停至 {until}。請在 SGP 核對付款。",
+  'whatsapp.dunning.codeSentNext': "（見下一則訊息）",
   'whatsapp.dunning.resumed': "已恢復此合約的催繳",
   'whatsapp.dunning.resumeFailed': "無法恢復催繳",
   'whatsapp.ai.error.timeout': 'AI 回應逾時',

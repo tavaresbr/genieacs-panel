@@ -8,6 +8,7 @@ import {
   diasEntre,
   variaveisDeCobranca,
   renderCobranca,
+  separarCodigos,
   modeloEhLembrete,
   variaveisDesconhecidas,
   maisAntigaEmAberto
@@ -156,5 +157,27 @@ describe('choosing the invoice to cite', () => {
 
   test('an empty wallet is not "only future"', () => {
     assert.deepEqual(maisAntigaEmAberto([], HOJE), { fatura: null, soFuturas: false });
+  });
+});
+
+describe('separarCodigos', () => {
+  const vars = { nome: 'Ana', pix: 'PIX-123', linha_digitavel: 'LINHA-456', link_boleto: 'https://x/b' };
+  const marcas = { pix: '(a seguir)', linha_digitavel: '(a seguir)' };
+
+  test('tira do texto só o que o modelo cita, PIX antes da linha', () => {
+    const r = separarCodigos('Oi {{nome}}. Linha: {{linha_digitavel}} PIX: {{pix}}', vars, marcas);
+    assert.deepEqual(r.extras, ['PIX-123', 'LINHA-456']);
+    assert.equal(renderCobranca('Oi {{nome}}. Linha: {{linha_digitavel}} PIX: {{pix}}', r.vars), 'Oi Ana. Linha: (a seguir) PIX: (a seguir)');
+  });
+
+  test('o modelo que cita só o PIX manda só o PIX; a linha fica como está', () => {
+    const r = separarCodigos('PIX: {{pix}} e {{link_boleto}}', vars, marcas);
+    assert.deepEqual(r.extras, ['PIX-123']);
+    assert.equal(r.vars.link_boleto, 'https://x/b');
+    assert.equal(r.vars.linha_digitavel, 'LINHA-456');
+  });
+
+  test('sem citação de código devolve null, e o modelo sai como está', () => {
+    assert.equal(separarCodigos('Oi {{nome}}, boleto {{link_boleto}}', vars, marcas), null);
   });
 });

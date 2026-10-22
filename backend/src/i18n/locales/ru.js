@@ -616,6 +616,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "Максимум за проход должен быть от {min} до {max}",
   'whatsapp.dunning.error.invalidReceiptPause': "Пауза по квитанции должна быть от {min} до {max} дней",
   'whatsapp.dunning.receiptNote': "Получена квитанция — напоминания по договору {contract} приостановлены до {until}. Проверьте оплату в SGP.",
+  'whatsapp.dunning.codeSentNext': "(отправлено следующим сообщением)",
   'whatsapp.dunning.resumed': "Напоминания по этому договору возобновлены",
   'whatsapp.dunning.resumeFailed': "Не удалось возобновить напоминания",
   'whatsapp.ai.error.timeout': 'ИИ отвечал слишком долго',

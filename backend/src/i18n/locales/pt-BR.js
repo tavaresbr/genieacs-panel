@@ -612,6 +612,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "O máximo por passada deve ficar entre {min} e {max}",
   'whatsapp.dunning.error.invalidReceiptPause': "A pausa por comprovante deve ficar entre {min} e {max} dias",
   'whatsapp.dunning.receiptNote': "Comprovante recebido — régua de cobrança pausada para o contrato {contract} até {until}. Confira o pagamento no SGP.",
+  'whatsapp.dunning.codeSentNext': "(enviado na próxima mensagem)",
   'whatsapp.dunning.resumed': "Régua retomada para este contrato",
   'whatsapp.dunning.resumeFailed': "Não foi possível retomar a régua",
   'whatsapp.ai.error.timeout': 'A IA demorou demais para responder',

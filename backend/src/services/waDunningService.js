@@ -22,6 +22,7 @@ import {
   maisAntigaEmAberto,
   modeloEhLembrete,
   renderCobranca,
+  separarCodigos,
   variaveisDeCobranca,
   variaveisVazias
 } from '../utils/wa/waCobranca.js';
@@ -716,6 +717,7 @@ class WaDunningService {
 
     let body = null;
     let metaTemplate = null;
+    let codigos = [];
     if (!result) {
       const vars = variaveisDeCobranca(fatura, subscriber.clientName, now);
       body = template ? renderCobranca(template.body, vars) : null;
@@ -726,6 +728,18 @@ class WaDunningService {
         // variáveis. Variável vazia lá também pula, com o mesmo motivo.
         metaTemplate = WaMetaTemplateService.buildPayload(template, vars, body);
         if (metaTemplate?.incomplete) result = skip('templateIncomplete', metaTemplate.incomplete);
+        // Os códigos saem em mensagens só deles, para copiar e colar. Com o
+        // modelo da Meta o texto vai inteiro, como foi aprovado, e uma mensagem
+        // livre logo depois dele a Meta recusaria: aí não separa.
+        if (!result && !metaTemplate) {
+          const t = translatorFor(DEFAULT_LOCALE);
+          const aparte = t('whatsapp.dunning.codeSentNext');
+          const separados = separarCodigos(template.body, vars, { pix: aparte, linha_digitavel: aparte });
+          if (separados) {
+            body = renderCobranca(template.body, separados.vars);
+            codigos = separados.extras;
+          }
+        }
       }
     }
 
@@ -762,6 +776,17 @@ class WaDunningService {
     try {
       const message = await this.enqueue({ account, subscriber, body, metaTemplate });
       await tdb('wa_dunning_sends').where({ id: sendId }).update({ message_id: message.id, updated_at: new Date() });
+      // Depois do texto, na ordem. Um código que não entrou na fila não desfaz o
+      // texto que já está nela: fica no log e o cliente ainda tem o boleto.
+      for (const codigo of codigos) {
+        try {
+          // eslint-disable-next-line no-await-in-loop -- a ordem é o ponto
+          await this.enqueue({ account, subscriber, body: codigo });
+        } catch (error) {
+          console.warn(`[wa] régua: contrato ${subscriber.contract}: código à parte: ${error.code || error.message}`);
+          break;
+        }
+      }
       return { status: 'queued', item };
     } catch (error) {
       // A linha fica como pulada, com o motivo: sem ela a etapa seria tentada

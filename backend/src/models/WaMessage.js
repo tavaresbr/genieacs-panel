@@ -4,8 +4,8 @@ import { runUnscoped } from '../config/tenantContext.js';
 /** How long a message may sit in 'sending' before another pass may retake it. */
 export const RECLAIM_MS = 5 * 60 * 1000;
 
-/** Sources whose messages are held behind an earlier sibling in retry wait: the bot and alerts send replies in parts. */
-const ORDERED_SOURCES = ['bot', 'alert'];
+/** Sources whose messages are held behind an earlier sibling in retry wait: the bot, alerts and the dunning ruler send replies in parts. */
+const ORDERED_SOURCES = ['bot', 'alert', 'campaign'];
 
 /** How close in time two messages are to count as parts of the same reply. */
 export const SIBLING_WINDOW_MS = 2 * 60 * 1000;
@@ -242,7 +242,7 @@ class WaMessage {
    * nascem juntas e têm que chegar na ordem. Se a primeira falha e fica na
    * espera de uma nova tentativa, as outras estavam prontas e saíam antes dela.
    * Aqui uma mensagem espera enquanto houver, na mesma conversa e da mesma
-   * origem (só o robô e os avisos, que mandam em partes; o atendente digita
+   * origem (o robô, os avisos e a régua, que mandam em partes; o atendente digita
    * uma mensagem de cada vez), outra mais antiga (criada até `SIBLING_WINDOW_MS` antes) na espera
    * de retentativa. Passada a janela, ou esgotadas as tentativas (a linha vira
    * 'failed'), ela volta a ser enviada: uma falha não segura a conversa.
