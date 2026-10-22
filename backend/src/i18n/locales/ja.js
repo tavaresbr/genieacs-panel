@@ -614,6 +614,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "1 回の実行あたりの上限は {min} から {max} の間で指定してください",
   'whatsapp.dunning.error.invalidReceiptPause': "受領証による一時停止は{min}〜{max}日の範囲で指定してください",
   'whatsapp.dunning.receiptNote': "支払いの受領証を受信 — 契約{contract}の督促を{until}まで一時停止しました。SGPで入金を確認してください。",
+  'whatsapp.dunning.codeSentNext': "（次のメッセージで送信）",
   'whatsapp.dunning.resumed': "この契約の督促を再開しました",
   'whatsapp.dunning.resumeFailed': "督促を再開できませんでした",
   'whatsapp.ai.error.timeout': 'AIの応答に時間がかかりすぎました',

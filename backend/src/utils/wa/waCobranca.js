@@ -112,6 +112,37 @@ export function variaveisDeCobranca(fatura, nome, hoje = new Date()) {
 }
 
 /**
+ * Os códigos de pagamento do modelo, tirados do texto para irem sozinhos.
+ *
+ * O cliente copia o PIX e a linha digitável com um toque quando cada código é
+ * uma mensagem só dele. Se o modelo cita `{{pix}}` ou `{{linha_digitavel}}`, o
+ * texto sai com `marcas` no lugar do código ("enviado a seguir") e os códigos
+ * vão depois, nesta ordem: PIX, linha. Só se separa o que o modelo cita e a
+ * fatura tem; sem citação nenhuma devolve `null` e o modelo sai como está.
+ *
+ * @param {string} modelo
+ * @param {Record<string,string>} vars as de `variaveisDeCobranca`
+ * @param {{ pix: string, linha_digitavel: string }} marcas
+ * @returns {{ vars: Record<string,string>, extras: string[] }|null}
+ */
+export function separarCodigos(modelo, vars, marcas) {
+  const citadas = new Set();
+  String(modelo ?? '').replace(PLACEHOLDER, (_completo, chave) => {
+    citadas.add(chave);
+    return '';
+  });
+  const extras = [];
+  const novas = { ...vars };
+  for (const chave of ['pix', 'linha_digitavel']) {
+    if (citadas.has(chave) && vars?.[chave]) {
+      extras.push(String(vars[chave]));
+      novas[chave] = marcas[chave];
+    }
+  }
+  return extras.length ? { vars: novas, extras } : null;
+}
+
+/**
  * Preenche o modelo, ou recusa.
  *
  * @returns {string|null} `null` quando qualquer variável citada está vazia

@@ -615,6 +615,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "प्रति रन अधिकतम {min} और {max} के बीच होना चाहिए",
   'whatsapp.dunning.error.invalidReceiptPause': "रसीद पर रोक {min} से {max} दिनों के बीच होनी चाहिए",
   'whatsapp.dunning.receiptNote': "भुगतान रसीद मिली — अनुबंध {contract} के रिमाइंडर {until} तक रोके गए। SGP में भुगतान जाँचें।",
+  'whatsapp.dunning.codeSentNext': "(अगले संदेश में भेजा गया)",
   'whatsapp.dunning.resumed': "इस अनुबंध के लिए रिमाइंडर फिर से शुरू हुए",
   'whatsapp.dunning.resumeFailed': "रिमाइंडर फिर से शुरू नहीं हो सके",
   'whatsapp.ai.error.timeout': 'AI ने जवाब देने में बहुत देर लगाई',

@@ -341,6 +341,18 @@ describe('ligada', () => {
     assert.match(textos, /venceu há 10 dias/);
     assert.match(textos, /vence em 3 dias/);
     assert.ok(mensagens.every((m) => m.source === 'campaign' && m.delivery_status === 'queued'));
+
+    // O PIX do modelo sai em mensagem só dele, depois do texto, para copiar e colar.
+    const joao = fila.find((l) => l.contract === 'R-ATRASO-10');
+    const texto = mensagens.find((m) => m.id === joao.message_id);
+    assert.ok(!texto.body.includes('pix-10'), 'o texto não leva o código: ele vai sozinho');
+    assert.match(texto.body, /PIX: \(enviado na próxima mensagem\)/);
+    const depois = await asTenant(() => getDb()('wa_messages')
+      .where({ conversation_id: texto.conversation_id, direction: 'out' })
+      .where('id', '>', texto.id)
+      .orderBy('id'));
+    assert.deepEqual(depois.map((m) => m.body), ['pix-10'], 'o PIX vai depois, sozinho');
+    assert.ok(depois.every((m) => m.source === 'campaign' && m.delivery_status === 'queued'));
   });
 
   it('rodar de novo no mesmo dia não repete ninguém', async () => {

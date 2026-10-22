@@ -615,6 +615,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "Maximum per pass must be between {min} and {max}",
   'whatsapp.dunning.error.invalidReceiptPause': "The receipt pause must be between {min} and {max} days",
   'whatsapp.dunning.receiptNote': "Payment receipt received — billing cadence paused for contract {contract} until {until}. Check the payment in SGP.",
+  'whatsapp.dunning.codeSentNext': "(sent in the next message)",
   'whatsapp.dunning.resumed': "Cadence resumed for this contract",
   'whatsapp.dunning.resumeFailed': "Could not resume the cadence",
   'whatsapp.ai.error.timeout': 'The AI took too long to answer',

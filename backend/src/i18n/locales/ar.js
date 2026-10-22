@@ -614,6 +614,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "يجب أن يكون الحد الأقصى لكل جولة بين {min} و{max}",
   'whatsapp.dunning.error.invalidReceiptPause': "يجب أن يكون الإيقاف عند الإيصال بين {min} و{max} يومًا",
   'whatsapp.dunning.receiptNote': "تم استلام إيصال دفع — التذكيرات متوقفة للعقد {contract} حتى {until}. تحقق من الدفع في SGP.",
+  'whatsapp.dunning.codeSentNext': "(أُرسل في الرسالة التالية)",
   'whatsapp.dunning.resumed': "تم استئناف التذكيرات لهذا العقد",
   'whatsapp.dunning.resumeFailed': "تعذّر استئناف التذكيرات",
   'whatsapp.ai.error.timeout': 'استغرق الذكاء الاصطناعي وقتًا طويلًا للرد',

@@ -632,6 +632,7 @@ export default {
   'whatsapp.dunning.error.invalidMaxPerRun': "Le maximum par passage doit être compris entre {min} et {max}",
   'whatsapp.dunning.error.invalidReceiptPause': "La pause sur justificatif doit être comprise entre {min} et {max} jours",
   'whatsapp.dunning.receiptNote': "Justificatif reçu — relances en pause pour le contrat {contract} jusqu’au {until}. Vérifiez le paiement dans le SGP.",
+  'whatsapp.dunning.codeSentNext': "(envoyé dans le message suivant)",
   'whatsapp.dunning.resumed': "Relances reprises pour ce contrat",
   'whatsapp.dunning.resumeFailed': "Impossible de reprendre les relances",
   'whatsapp.ai.error.timeout': 'L’IA a mis trop de temps à répondre',
