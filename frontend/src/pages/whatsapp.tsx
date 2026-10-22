@@ -803,14 +803,24 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   // (`lib/wa-keyboard.ts`). Com o teclado aberto o cartão passa a caber na
   // parte visível, com a caixa de escrever logo acima dele. Só no celular.
   const [keyboardHeight, setKeyboardHeight] = useState<number | null>(null)
-  // A altura do cartão com o teclado aberto, medida de onde ele está de fato
-  // (`cardHeightAboveKeyboard`): o Safari rola a página ao focar a caixa, e a
-  // conta fixa deixava um vazio entre o cartão e o teclado.
+  // A altura do cartão, medida de onde ele está de fato até o fim da área
+  // visível (`cardHeightAboveKeyboard`): o Safari rola a página ao focar a
+  // caixa, e a conta fixa deixava um vazio entre o cartão e o teclado. Sem
+  // teclado a mesma medida faz o cartão fechar a tela, qualquer que seja o
+  // número de faixas de aviso acima dele.
   const [cardHeight, setCardHeight] = useState<number | null>(null)
   const cardRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
+    // No celular só o cartão rola por dentro; a barra, as abas e os avisos
+    // ficam parados. A página volta a rolar ao sair desta aba.
+    const root = document.documentElement
+    const body = document.body
+    const before = { rootOverflow: root.style.overflow, bodyOverflow: body.style.overflow, bodyOverscroll: body.style.overscrollBehavior }
+    root.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    body.style.overscrollBehavior = 'none'
     let last: number | null = null
     let lastCard: number | null = null
     const update = () => {
@@ -818,11 +828,11 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       if (next !== last) {
         last = next
         setKeyboardHeight(next)
-        // A barra fixa e as abas voltam ao topo da área visível.
-        if (next !== null) window.scrollTo(0, 0)
       }
+      // A barra fixa e as abas ficam no topo da área visível.
+      if (window.scrollY !== 0) window.scrollTo(0, 0)
       const card = cardRef.current
-      const height = next !== null && card
+      const height = card
         ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: card.getBoundingClientRect().top })
         : null
       if (height !== lastCard) {
@@ -833,9 +843,16 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     update()
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
+    // Um aviso que aparece ou some acima do cartão empurra o topo dele.
+    const observer = new ResizeObserver(update)
+    observer.observe(body)
     return () => {
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
+      observer.disconnect()
+      root.style.overflow = before.rootOverflow
+      body.style.overflow = before.bodyOverflow
+      body.style.overscrollBehavior = before.bodyOverscroll
     }
   }, [])
 
@@ -884,7 +901,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
             }`}
             // Sem a área segura (o teclado cobre o indicador de home) e sem o
             // `min-h`, que impediria o cartão de encolher.
-            style={keyboardHeight !== null ? { height: cardHeight !== null ? `${cardHeight}px` : `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
+            style={cardHeight !== null ? { height: `${cardHeight}px`, minHeight: 0 } : keyboardHeight !== null ? { height: `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
           >
             <div className={`${showSgpPanel && conversation ? 'hidden 2xl:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">
