@@ -1,4 +1,5 @@
-import WaMessageActionService from '../services/waMessageActionService.js';
+import WaMessageActionService, { revokesRemotely } from '../services/waMessageActionService.js';
+import AuditLog from '../models/AuditLog.js';
 import WaSendService from '../services/waSendService.js';
 import WaConversationService from '../services/waConversationService.js';
 import WaContactService from '../services/waContactService.js';
@@ -383,6 +384,13 @@ class WhatsAppMessageController {
   static async react(req, res) {
     try {
       const message = await WaMessageActionService.react(req.params?.id, req.body?.emoji);
+      // Só o id e o emoji: o texto da mensagem não é do que se audita.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_MESSAGE_REACTED,
+        subjectType: 'wa_message',
+        subjectId: message.id,
+        detail: { conversationId: message.conversation_id, emoji: message.my_reaction ?? null }
+      });
       return res.json(createResponse(req.t('whatsapp.messageReacted'), WaSendService.publicMessage(message)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.messageActionFailed');
@@ -393,6 +401,13 @@ class WhatsAppMessageController {
   static async remove(req, res) {
     try {
       const message = await WaMessageActionService.remove(req.params?.id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_MESSAGE_DELETED,
+        subjectType: 'wa_message',
+        subjectId: message.id,
+        // `everyone`: revogada no WhatsApp; `panel`: só some da tela do painel.
+        detail: { conversationId: message.conversation_id, direction: message.direction, scope: revokesRemotely(message) ? 'everyone' : 'panel' }
+      });
       return res.json(createResponse(req.t('whatsapp.messageDeleted'), WaSendService.publicMessage(message)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.messageActionFailed');

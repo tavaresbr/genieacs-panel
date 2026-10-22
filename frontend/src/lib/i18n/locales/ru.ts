@@ -3775,6 +3775,8 @@ const ru: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'Разблокировка под обещание запрошена ботом WhatsApp',
   'audit.action.outageNotified': 'Клиенты уведомлены о массовом сбое',
   'audit.action.whatsappInvoiceSent': 'Счёт отправлен в чате WhatsApp',
+  'audit.action.whatsappMessageDeleted': "Сообщение удалено в чате WhatsApp",
+  'audit.action.whatsappMessageReacted': "Реакция на сообщение WhatsApp",
   'audit.action.maintenanceScheduled': 'Плановые работы запланированы',
   'audit.action.maintenanceNotified': 'Клиенты уведомлены о плановых работах',
   'audit.action.maintenanceCancelled': 'Плановые работы отменены',

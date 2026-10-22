@@ -3767,6 +3767,8 @@ const ja: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'WhatsAppボットによる信用解除の申請',
   'audit.action.outageNotified': '大規模障害を顧客に通知',
   'audit.action.whatsappInvoiceSent': 'WhatsAppの会話で請求書を送信',
+  'audit.action.whatsappMessageDeleted': "WhatsAppの会話でメッセージを削除",
+  'audit.action.whatsappMessageReacted': "WhatsAppメッセージへのリアクション",
   'audit.action.maintenanceScheduled': '計画メンテナンスを作成',
   'audit.action.maintenanceNotified': '計画メンテナンスを顧客に通知',
   'audit.action.maintenanceCancelled': '計画メンテナンスを中止',

@@ -3767,6 +3767,8 @@ const zhCN: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'WhatsApp 机器人申请的信任解锁',
   'audit.action.outageNotified': '已通知客户大面积故障',
   'audit.action.whatsappInvoiceSent': '已在 WhatsApp 对话中发送账单',
+  'audit.action.whatsappMessageDeleted': "已在 WhatsApp 对话中删除消息",
+  'audit.action.whatsappMessageReacted': "对 WhatsApp 消息的回应",
   'audit.action.maintenanceScheduled': '已安排计划维护',
   'audit.action.maintenanceNotified': '已通知客户计划维护',
   'audit.action.maintenanceCancelled': '已取消计划维护',

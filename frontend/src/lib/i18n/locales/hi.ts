@@ -3775,6 +3775,8 @@ const hi: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'WhatsApp बॉट द्वारा भरोसे पर बहाली का अनुरोध',
   'audit.action.outageNotified': 'ग्राहकों को सामूहिक आउटेज की सूचना दी गई',
   'audit.action.whatsappInvoiceSent': 'WhatsApp बातचीत में बिल भेजा गया',
+  'audit.action.whatsappMessageDeleted': "WhatsApp बातचीत में संदेश हटाया गया",
+  'audit.action.whatsappMessageReacted': "WhatsApp संदेश पर प्रतिक्रिया",
   'audit.action.maintenanceScheduled': 'निर्धारित रखरखाव बनाया गया',
   'audit.action.maintenanceNotified': 'ग्राहकों को निर्धारित रखरखाव की सूचना दी गई',
   'audit.action.maintenanceCancelled': 'निर्धारित रखरखाव रद्द किया गया',

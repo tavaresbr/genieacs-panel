@@ -3767,6 +3767,8 @@ const fr: Dictionary = {
   'audit.action.whatsappBotTrustUnlock': 'Déblocage de confiance demandé par le bot WhatsApp',
   'audit.action.outageNotified': 'Clients prévenus d\'une panne massive',
   'audit.action.whatsappInvoiceSent': 'Facture envoyée dans une conversation WhatsApp',
+  'audit.action.whatsappMessageDeleted': "Message supprimé dans une conversation WhatsApp",
+  'audit.action.whatsappMessageReacted': "Réaction à un message WhatsApp",
   'audit.action.maintenanceScheduled': 'Maintenance programmée créée',
   'audit.action.maintenanceNotified': 'Clients prévenus d\'une maintenance programmée',
   'audit.action.maintenanceCancelled': 'Maintenance programmée annulée',
