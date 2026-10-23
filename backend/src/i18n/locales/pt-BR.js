@@ -1100,6 +1100,7 @@ export default {
   'contacts.lookupFailed': 'Não foi possível consultar',
   'contacts.cepNotFound': 'CEP não encontrado',
   'contacts.createdInSgp': 'Cliente cadastrado no SGP',
+  'contacts.preRegistered': 'Pré-cadastro enviado ao SGP',
   'contacts.error.invalidDocument': 'CPF ou CNPJ inválido',
   'contacts.error.teiahNotConsulted': 'Consulte a TeiaH antes de aplicar',
   'contacts.error.invalidCep': 'CEP inválido',

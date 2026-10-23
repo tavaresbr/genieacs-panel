@@ -47,6 +47,13 @@ function startSgpStub() {
       };
       if (payload.app !== APP || payload.token !== TOKEN) return send({ status: 0, msg: 'Token inválido' });
       const doc = String(payload.cpfcnpj ?? '').replace(/\D/g, '');
+      if (req.url.startsWith('/api/precadastro/')) {
+        criados.push({ path: req.url, body: payload });
+        if (modoCriacao === 'recusa') return send({ status: 0, msg: 'Login já existe' });
+        if (modoCriacao === 'sem-id') return send({ message: 'Pré-cadastro recebido' });
+        proximoId += 1;
+        return send({ cliente_id: proximoId, precadastro_id: 900 + proximoId, message: 'ok' });
+      }
       if (req.url.startsWith('/api/crm/cliente/')) {
         criados.push({ path: req.url, body: payload });
         if (modoCriacao === 'sem-id') return send({ message: 'Campo obrigatório: bairro' });
@@ -487,5 +494,109 @@ describe('preencher pela TeiaH', () => {
     assert.equal(lido.address.city, 'SANTAREM');
     assert.deepEqual(lido.emails, ['x@y.test']);
     assert.equal(normalizeConsult({}).found, false);
+  });
+});
+
+describe('pré-cadastro com contrato', () => {
+  const COM_CONTRATO = (extra = {}) => ({
+    ...PESSOA,
+    document: '111.444.777-35',
+    planId: 7,
+    dueDayId: 10,
+    login: 'lucas.pereira',
+    password: 'senha-123',
+    ...extra
+  });
+  const preCadastrar = (body) => call(`${panelUrl}/api/contacts/sgp/precadastro`, { method: 'POST', ...auth(), body });
+
+  before(async () => {
+    const res = await call(`${panelUrl}/api/sgp/config`, {
+      method: 'PUT', ...auth(),
+      body: {
+        preRegPlans: [{ id: 7, name: 'Fibra 300' }, { id: 'x', name: 'inválido' }, { id: 8, name: '' }],
+        preRegDueDays: [{ id: 10, label: 'Dia 10' }],
+        preRegPopId: '3',
+        preRegPortadorId: 4,
+        preRegVendedorId: '',
+        preRegInstallOs: true,
+        preRegActivate: true
+      }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    // Só as entradas válidas ficam.
+    assert.deepEqual(res.body.data.preRegPlans, [{ id: 7, name: 'Fibra 300' }]);
+    assert.equal(res.body.data.preRegPopId, 3);
+    assert.equal(res.body.data.preRegVendedorId, null);
+  });
+
+  it('manda o corpo plano da API de pré-cadastro, com plano, vencimento e login', async () => {
+    criados.length = 0;
+    modoCriacao = 'ok';
+    const res = await preCadastrar(COM_CONTRATO());
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const [{ path, body }] = criados;
+    assert.equal(path, '/api/precadastro/F');
+    assert.equal(body.cpfcnpj, '111.444.777-35');
+    assert.equal(body.logradouro, 'Rua Joaquim Nabuco');
+    assert.equal(body.numero, '850');
+    assert.equal(body.cep, '60125-120');
+    assert.equal(body.uf, 'CE');
+    assert.equal(body.endereco, undefined, 'o pré-cadastro é plano, sem endereco aninhado');
+    assert.equal(body.datanasc, '1980-04-01');
+    assert.equal(body.plano_id, 7);
+    assert.equal(body.vencimento_id, 10);
+    assert.equal(body.pop_id, 3);
+    assert.equal(body.portador_id, 4);
+    assert.equal(body.vendedor_id, undefined);
+    assert.equal(body.login, 'lucas.pereira');
+    assert.equal(body.senha, 'senha-123');
+    assert.equal(body.os_instalacao, 1);
+    assert.equal(body.precadastro_ativar, 1);
+    assert.equal(res.body.data.filed, 'sgp');
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contact.created' }).orderBy('id', 'desc').first());
+    assert.equal(JSON.parse(trilha.detail).preRegistration, true);
+    assert.equal(trilha.detail.includes('senha-123'), false, 'a trilha guardou a senha');
+  });
+
+  it('o formulário recebe só as listas, sem a configuração do SGP', async () => {
+    const res = await call(`${panelUrl}/api/contacts/sgp/precadastro/options`, auth());
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.data.plans, [{ id: 7, name: 'Fibra 300' }]);
+    assert.deepEqual(res.body.data.dueDays, [{ id: 10, label: 'Dia 10' }]);
+    assert.equal(res.body.data.installOs, true);
+    assert.equal(JSON.stringify(res.body).includes(TOKEN), false, 'o token do SGP vazou');
+  });
+
+  it('recusa plano ou vencimento fora da lista configurada, sem chamar o SGP', async () => {
+    criados.length = 0;
+    const plano = await preCadastrar(COM_CONTRATO({ document: '390.533.447-05', planId: 99 }));
+    assert.equal(plano.status, 400);
+    const venc = await preCadastrar(COM_CONTRATO({ document: '390.533.447-05', dueDayId: 99 }));
+    assert.equal(venc.status, 400);
+    const login = await preCadastrar(COM_CONTRATO({ document: '390.533.447-05', login: 'com espaco' }));
+    assert.equal(login.status, 400);
+    assert.deepEqual(criados, []);
+  });
+
+  it('não pré-cadastra quem já está no SGP', async () => {
+    criados.length = 0;
+    const res = await preCadastrar(COM_CONTRATO({ document: CPF_EXISTENTE }));
+    assert.equal(res.status, 409);
+    assert.deepEqual(criados, []);
+  });
+
+  it('a recusa do SGP chega com as palavras dele', async () => {
+    modoCriacao = 'recusa';
+    const res = await preCadastrar(COM_CONTRATO({ document: '390.533.447-05' }));
+    assert.equal(res.status, 502);
+    assert.match(res.body.message, /Login já existe/);
+  });
+
+  it('sem id na resposta, o cliente fica no painel com a nota do pré-cadastro', async () => {
+    modoCriacao = 'sem-id';
+    const res = await preCadastrar(COM_CONTRATO({ document: '390.533.447-05' }));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.data.filed, 'panel');
+    assert.match(res.body.data.notes ?? '', /Pré-cadastro enviado ao SGP/);
   });
 });

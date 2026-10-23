@@ -237,7 +237,13 @@ class ContactOnboardingService {
    * The SGP is asked first whether the document is already there: a second
    * client with the same CPF is the one mistake this button must not make.
    */
-  static async createInSgp(body) {
+  /**
+   * The client fields both SGP calls need, checked here in the operator's
+   * language instead of refused by the SGP in its own — and the SGP asked
+   * first whether the document is already there: a second client with the
+   * same CPF is the one mistake these buttons must not make.
+   */
+  static async prepareSgpClient(body) {
     const input = body && typeof body === 'object' ? body : {};
     const document = String(input.document ?? '').replace(/\D/g, '');
     const personType = personTypeOf(document);
@@ -250,8 +256,6 @@ class ContactOnboardingService {
     const address = input.address && typeof input.address === 'object' ? input.address : {};
     const zip = String(address.zip ?? '').replace(/\D/g, '');
     const state = clean(address.state, 2).toUpperCase();
-    // What the SGP marks mandatory, refused here in the operator's language
-    // instead of by the SGP in its own.
     if (!clean(address.street)) throw invalid('street');
     if (!clean(address.district)) throw invalid('district');
     if (!clean(address.city)) throw invalid('city');
@@ -263,7 +267,7 @@ class ContactOnboardingService {
     const email = clean(input.email).toLowerCase();
     if (email && !/^[^\s@]+@[^\s@]+$/.test(email)) throw invalid('email');
 
-    SgpService.requireReady(await SgpService.getConfig());
+    const config = SgpService.requireReady(await SgpService.getConfig());
     const existing = await WaContactService.lookupSgp(document);
     if (existing.total > 0) {
       throw new ContactProfileError('contacts.error.alreadyInSgp', {
@@ -283,6 +287,39 @@ class ContactOnboardingService {
       zip,
       reference: clean(address.reference)
     };
+    return { input, config, document, personType, name, phone, email, address, cleanAddress };
+  }
+
+  /** Files the client just created in the SGP here, under the SGP's own id. */
+  static async fileSgpClient({ clientId, document, personType, name, birthDate, cleanAddress, phone, email }) {
+    const record = Object.fromEntries(Object.entries(cleanAddress).filter(([, value]) => value));
+    await SgpClient.upsertFromSgp({
+      clientId,
+      document,
+      personType,
+      name,
+      birthDate: birthDate || null,
+      address: record,
+      phones: phone ? [phone] : [],
+      emails: email ? [email] : []
+    });
+    const row = await SgpContact.upsertFromSgp(SgpService.contractToContactRow({
+      contract: null, clientId, document, name, phone
+    }));
+    if (!row) {
+      throw new SgpError('sgp.error.clientCreateFailed', { code: 'client_create_failed', status: 502 });
+    }
+    return row;
+  }
+
+  /**
+   * Creates the client in the SGP, then files it here under the SGP's own id,
+   * so the next contacts sync finds the same record instead of a second one.
+   */
+  static async createInSgp(body) {
+    const {
+      input, document, personType, name, phone, email, address, cleanAddress
+    } = await this.prepareSgpClient(body);
     const created = await SgpService.createClient({
       personType,
       document,
@@ -297,30 +334,97 @@ class ContactOnboardingService {
       address: { ...cleanAddress, latitude: address.latitude, longitude: address.longitude }
     });
 
-    // The record, as the SGP will send it on the next sync.
-    const record = Object.fromEntries(Object.entries(cleanAddress).filter(([, value]) => value));
-    await SgpClient.upsertFromSgp({
-      clientId: created.clientId,
-      document,
-      personType,
-      name,
-      birthDate: clean(input.birthDate, 32) || null,
-      address: record,
-      phones: phone ? [phone] : [],
-      emails: email ? [email] : []
+    const row = await this.fileSgpClient({
+      clientId: created.clientId, document, personType, name,
+      birthDate: clean(input.birthDate, 32), cleanAddress, phone, email
     });
-    const row = await SgpContact.upsertFromSgp(SgpService.contractToContactRow({
-      contract: null,
-      clientId: created.clientId,
-      document,
-      name,
-      phone
-    }));
-    if (!row) {
-      throw new SgpError('sgp.error.clientCreateFailed', { code: 'client_create_failed', status: 502 });
-    }
     const profile = await ContactProfileService.get(`c:${row.id}`);
     return { profile, clientId: created.clientId, message: created.message };
+  }
+
+  /**
+   * The client WITH a contract, through the SGP's pre-registration: plan and
+   * due day picked from the lists the admin keeps in Settings → SGP, POP,
+   * carrier and seller from the same place, and the PPPoE login typed here.
+   *
+   * The pre-registration's answer is not documented. When the SGP names the
+   * client, the client is filed here under that id, like `createInSgp`; when
+   * it does not (a pre-registration not converted yet), the SGP is asked by
+   * document, and failing that the client is kept here with a note — the next
+   * contacts sync joins it to what the SGP made of it.
+   */
+  static async createPreRegistration(body) {
+    const prepared = await this.prepareSgpClient(body);
+    const {
+      input, config, document, personType, name, phone, email, address, cleanAddress
+    } = prepared;
+
+    const planId = Number.parseInt(String(input.planId ?? ''), 10);
+    if (!config.preRegPlans.some((plan) => plan.id === planId)) throw invalid('planId');
+    const dueDayId = Number.parseInt(String(input.dueDayId ?? ''), 10);
+    if (!config.preRegDueDays.some((day) => day.id === dueDayId)) throw invalid('dueDayId');
+    const login = clean(input.login, 64);
+    if (login && /\s/.test(login)) throw invalid('login');
+    const password = String(input.password ?? '').trim().slice(0, 64);
+
+    const sent = await SgpService.createPreRegistration({
+      personType,
+      document,
+      name,
+      email,
+      phone,
+      birthDate: clean(input.birthDate, 32),
+      notes: clean(input.notes, 2000),
+      serviceDescription: clean(input.serviceDescription, 500),
+      address: { ...cleanAddress, latitude: address.latitude, longitude: address.longitude },
+      planId,
+      dueDayId,
+      popId: config.preRegPopId,
+      portadorId: config.preRegPortadorId,
+      vendedorId: config.preRegVendedorId,
+      login,
+      password,
+      installOs: input.installOs === undefined ? config.preRegInstallOs : input.installOs === true,
+      activate: config.preRegActivate
+    });
+
+    let row = null;
+    if (sent.clientId) {
+      row = await this.fileSgpClient({
+        clientId: sent.clientId, document, personType, name,
+        birthDate: clean(input.birthDate, 32), cleanAddress, phone, email
+      });
+    } else {
+      // Not named: what the SGP holds under the document now, if anything.
+      try {
+        const found = await WaContactService.lookupSgp(document);
+        const key = found.contacts[0]?.key;
+        if (key) {
+          return { profile: await ContactProfileService.get(key), sent, filed: 'sgp' };
+        }
+      } catch (error) {
+        console.warn(`SGP lookup after pre-registration failed: ${error.code || error.message}`);
+      }
+    }
+    if (row) {
+      return { profile: await ContactProfileService.get(`c:${row.id}`), sent, filed: 'sgp' };
+    }
+
+    // Kept here until the sync brings the SGP's record: the operator's work
+    // is not lost because the SGP answered without an id.
+    const plan = config.preRegPlans.find((entry) => entry.id === planId);
+    const profile = await ContactProfileService.create({
+      name,
+      document,
+      personType,
+      ...(email ? { emails: [email] } : {}),
+      ...(phone ? { whatsappPhone: phone } : {}),
+      birthDate: clean(input.birthDate, 32) || undefined,
+      address: Object.fromEntries(Object.entries(cleanAddress).filter(([, value]) => value)),
+      notes: `Pré-cadastro enviado ao SGP em ${new Date().toISOString().slice(0, 10)}`
+        + `${plan ? ` — plano ${plan.name}` : ''}${sent.preRegistrationId ? ` (#${sent.preRegistrationId})` : ''}.`
+    }, null);
+    return { profile, sent, filed: 'panel' };
   }
 }
 

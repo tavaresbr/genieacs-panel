@@ -1093,6 +1093,7 @@ export default {
   'contacts.lookupFailed': 'تعذر الاستعلام',
   'contacts.cepNotFound': 'الرمز البريدي غير موجود',
   'contacts.createdInSgp': 'تم تسجيل العميل في SGP',
+  'contacts.preRegistered': 'تم إرسال التسجيل المسبق إلى SGP',
   'contacts.error.invalidDocument': 'رقم CPF أو CNPJ غير صالح',
   'contacts.error.teiahNotConsulted': 'استعلم من TeiaH قبل التطبيق',
   'contacts.error.invalidCep': 'رمز بريدي غير صالح',

@@ -1101,6 +1101,7 @@ export default {
   'contacts.lookupFailed': '照会できませんでした',
   'contacts.cepNotFound': '郵便番号が見つかりません',
   'contacts.createdInSgp': '顧客を SGP に登録しました',
+  'contacts.preRegistered': '事前登録を SGP に送信しました',
   'contacts.error.invalidDocument': 'CPF または CNPJ が無効です',
   'contacts.error.teiahNotConsulted': '適用する前に TeiaH で照会してください',
   'contacts.error.invalidCep': '郵便番号が無効です',

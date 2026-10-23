@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { contactsAPI, type ContactDocumentLookup } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
@@ -82,6 +82,15 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<Form>(EMPTY_FORM)
   const [inSgp, setInSgp] = useState(true)
+  // With a contract (the SGP's pre-registration): the lists come from
+  // Settings → SGP, and the option shows only once a plan is configured there.
+  const [withContract, setWithContract] = useState(false)
+  const [preRegOptions, setPreRegOptions] = useState<{
+    plans: { id: number; name: string }[]
+    dueDays: { id: number; label: string }[]
+    installOs: boolean
+  } | null>(null)
+  const [contract, setContract] = useState({ planId: '', dueDayId: '', login: '', password: '', installOs: true })
   const [saving, setSaving] = useState(false)
   const [cepLooking, setCepLooking] = useState(false)
 
@@ -89,6 +98,33 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   const canCreateInSgp = can('sgp.act') && Boolean(lookup?.sgpChecked)
   const toSgp = canCreateInSgp && inSgp
   const set = (field: keyof Form, value: string) => setForm((current) => ({ ...current, [field]: value }))
+
+  const canPreRegister = toSgp && Boolean(preRegOptions?.plans.length) && Boolean(preRegOptions?.dueDays.length)
+  const toPreRegister = canPreRegister && withContract
+
+  useEffect(() => {
+    if (!canCreateInSgp || preRegOptions) return
+    void contactsAPI.preRegistrationOptions().then((res) => {
+      if (!res.success || !res.data) return
+      setPreRegOptions(res.data)
+      setContract((current) => ({ ...current, installOs: res.data?.installOs !== false }))
+    })
+  }, [canCreateInSgp, preRegOptions])
+
+  // A login out of the name ("maria.silva") and a password to change, so the
+  // operator rarely has to invent either.
+  const suggestLogin = () => {
+    const parts = form.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean)
+    return parts.length ? [parts[0], parts.at(-1)].filter((part, index, all) => all.indexOf(part) === index).join('.') : ''
+  }
+  const suggestPassword = () => {
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789'
+    const bytes = new Uint8Array(10)
+    crypto.getRandomValues(bytes)
+    return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('')
+  }
+  const missingContract = toPreRegister && (!contract.planId || !contract.dueDayId)
 
   const open = (key: string) => navigate(`/contacts/${encodeURIComponent(key)}`)
 
@@ -174,7 +210,29 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
       zip: form.zip.replace(/\D/g, ''),
       reference: form.reference.trim()
     }
-    const res = toSgp
+    const sgpClient = {
+      document: lookup?.document ?? '',
+      name: form.name.trim(),
+      ...(isCompany ? {
+        tradeName: form.tradeName.trim(),
+        responsibleName: form.responsibleName.trim(),
+        responsibleDocument: form.responsibleDocument.trim()
+      } : {}),
+      email: form.email.trim(),
+      whatsappPhone: form.whatsappPhone.trim(),
+      birthDate: form.birthDate,
+      address: { ...address, latitude: form.latitude, longitude: form.longitude }
+    }
+    const res = toPreRegister
+      ? await contactsAPI.createPreRegistration({
+        ...sgpClient,
+        planId: Number(contract.planId),
+        dueDayId: Number(contract.dueDayId),
+        login: contract.login.trim(),
+        password: contract.password,
+        installOs: contract.installOs
+      })
+      : toSgp
       ? await contactsAPI.createInSgp({
         document: lookup?.document ?? '',
         name: form.name.trim(),
@@ -203,7 +261,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
       toast.error(res.message || t('contacts.profile.saveFailed'))
       return
     }
-    toast.success(t(toSgp ? 'contacts.new.createdInSgp' : 'contacts.profile.created'))
+    toast.success(t(toPreRegister ? 'contacts.new.preRegistered' : toSgp ? 'contacts.new.createdInSgp' : 'contacts.profile.created'))
     open(res.data.key)
   }
 
@@ -420,6 +478,88 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
             {toSgp && missingForSgp && (
               <p className="mt-2 text-xs text-[hsl(var(--status-warning))]">{t('contacts.new.requiredForSgp')}</p>
             )}
+            {canPreRegister && preRegOptions && (
+              <div className="mt-4 rounded-md border border-border p-3" data-testid="new-contact-contract">
+                <div className="flex flex-wrap gap-4 text-sm" role="radiogroup">
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="new-contact-mode" checked={!withContract} onChange={() => setWithContract(false)} />
+                    {t('contacts.new.clientOnly')}
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="new-contact-mode"
+                      checked={withContract}
+                      onChange={() => {
+                        setWithContract(true)
+                        setContract((current) => ({
+                          ...current,
+                          login: current.login || suggestLogin(),
+                          password: current.password || suggestPassword()
+                        }))
+                      }}
+                    />
+                    {t('contacts.new.withContract')}
+                  </label>
+                </div>
+                {withContract && (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="field-label" htmlFor="new-contact-plan">{t('contacts.new.plan')}</label>
+                      <select
+                        id="new-contact-plan"
+                        className="modern-input"
+                        value={contract.planId}
+                        onChange={(event) => setContract((current) => ({ ...current, planId: event.target.value }))}
+                      >
+                        <option value="">—</option>
+                        {preRegOptions.plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="new-contact-due">{t('contacts.new.dueDay')}</label>
+                      <select
+                        id="new-contact-due"
+                        className="modern-input"
+                        value={contract.dueDayId}
+                        onChange={(event) => setContract((current) => ({ ...current, dueDayId: event.target.value }))}
+                      >
+                        <option value="">—</option>
+                        {preRegOptions.dueDays.map((day) => <option key={day.id} value={day.id}>{day.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="new-contact-login">{t('contacts.new.login')}</label>
+                      <input
+                        id="new-contact-login"
+                        className="modern-input font-mono"
+                        autoComplete="off"
+                        value={contract.login}
+                        onChange={(event) => setContract((current) => ({ ...current, login: event.target.value.replace(/\s/g, '') }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="new-contact-password">{t('contacts.new.password')}</label>
+                      <input
+                        id="new-contact-password"
+                        className="modern-input font-mono"
+                        autoComplete="off"
+                        value={contract.password}
+                        onChange={(event) => setContract((current) => ({ ...current, password: event.target.value }))}
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={contract.installOs}
+                        onChange={(event) => setContract((current) => ({ ...current, installOs: event.target.checked }))}
+                      />
+                      {t('contacts.new.installOs')}
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -429,10 +569,10 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               className="modern-button"
-              disabled={saving || !form.name.trim() || (toSgp && missingForSgp)}
+              disabled={saving || !form.name.trim() || (toSgp && missingForSgp) || missingContract}
               onClick={() => void save()}
             >
-              {toSgp ? t('contacts.new.createInSgp') : t('common.save')}
+              {toPreRegister ? t('contacts.new.preRegister') : toSgp ? t('contacts.new.createInSgp') : t('common.save')}
             </button>
           )}
         </div>
