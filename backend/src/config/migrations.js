@@ -6568,7 +6568,6 @@ export const migrations = [
         for (const add of missing) add(t);
       });
     }
-    }
   },
   {
     /** O status dos modelos da Meta atualizado sozinho — ver `WA_META_TEMPLATE_STATUS_COLUMNS`. */
