@@ -724,6 +724,25 @@ const META_HEADER_FORMATS = new Set(['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT', 'LOCA
 const POSICIONAL = /\{\{\s*(\d+)\s*\}\}/g;
 const NOMEADO = /\{\{\s*[A-Za-z_][\w]*\s*\}\}/;
 
+/**
+ * O motivo da recusa como a Meta o manda (`INVALID_FORMAT`, `SCAM`…). `NONE` é
+ * o "sem motivo" dela, e vira `null` como a ausência do campo.
+ */
+export function readRejectedReason(valor) {
+  const texto = String(valor ?? '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 64);
+  return texto && texto !== 'NONE' ? texto : null;
+}
+
+/**
+ * A nota de qualidade: a Graph devolve `{score: 'GREEN', date}`, e há quem
+ * repasse só a string. `UNKNOWN` (modelo novo, sem envios) vira `null`.
+ */
+export function readQualityScore(valor) {
+  const bruto = valor && typeof valor === 'object' ? valor.score : valor;
+  const texto = String(bruto ?? '').trim().toUpperCase().replace(/[^A-Z_]/g, '').slice(0, 16);
+  return texto && texto !== 'UNKNOWN' ? texto : null;
+}
+
 /** O maior `{{n}}` do texto — a Meta numera de 1 sem pular. */
 function maiorIndice(texto) {
   const nums = [...String(texto ?? '').matchAll(POSICIONAL)].map((m) => Number(m[1]));
@@ -747,6 +766,10 @@ function maiorIndice(texto) {
  *
  * `headerFormat` é `NONE` sem cabeçalho; `buttons` lista todos os botões, e
  * `urlHasParam` marca os que pedem o sufixo no envio.
+ *
+ * `rejectedReason` e `qualityScore` vêm quando a resposta os traz — a Graph só
+ * os devolve se pedidos em `fields=`, e o `/template/find` do Evolution não
+ * pede; o que faltar o `waMetaTemplateService` completa pela Graph direto.
  */
 export function readMetaTemplates(data) {
   const raw = data ?? {};
@@ -796,6 +819,8 @@ export function readMetaTemplates(data) {
       headerParamCount,
       buttons: buttons.map(({ index, type, urlHasParam }) => ({ index, type, urlHasParam })),
       supported: !nomeados && headerOk && botoesOk && category !== 'AUTHENTICATION',
+      rejectedReason: readRejectedReason(it.rejected_reason),
+      qualityScore: readQualityScore(it.quality_score),
       components
     });
   }

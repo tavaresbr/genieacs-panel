@@ -4802,6 +4802,13 @@ export interface WhatsAppMetaTemplate {
   supported: boolean
   /** Aprovado e com formato que o painel sabe enviar. */
   usable: boolean
+  /** O motivo da recusa como a Meta o manda (`INVALID_FORMAT`…); só com REJECTED/PAUSED/DISABLED. */
+  rejectedReason: string | null
+  /** A nota de qualidade da Meta: `GREEN`, `YELLOW` ou `RED`. */
+  qualityScore: string | null
+  /** O status antes da última mudança, e quando ela foi vista. */
+  previousStatus: string | null
+  statusChangedAt: string | null
   syncedAt: string | null
 }
 

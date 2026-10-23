@@ -78,6 +78,10 @@ class AuditLog {
     // Uma mensagem foi apagada (do painel, ou para todos no WhatsApp) ou recebeu reação.
     WHATSAPP_MESSAGE_DELETED: 'whatsapp.message_deleted',
     WHATSAPP_MESSAGE_REACTED: 'whatsapp.message_reacted',
+    // A Meta decidiu sobre um modelo (aprovou, recusou, pausou, desativou) e a
+    // sincronização — a do botão ou a do vigia — trouxe a mudança. O `detail`
+    // guarda nome, idioma, de/para e o motivo da recusa; nada de assinante.
+    WHATSAPP_META_TEMPLATE_STATUS: 'whatsapp.meta_template_status',
     // Os clientes de uma queda em massa foram avisados por WhatsApp.
     OUTAGE_NOTIFIED: 'outage.notified',
     // Manutenção programada: agendar, avisar os clientes e cancelar mexem com

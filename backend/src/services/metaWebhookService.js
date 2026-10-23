@@ -87,6 +87,63 @@ export async function subscribeWabaWebhook({ wabaId, metaToken, callbackUrl, ver
   return { ok: false, error: graphRefusal(resposta.status, dados) };
 }
 
+/** Os campos que a revisão dos modelos precisa — `rejected_reason` só vem se pedido. */
+const TEMPLATE_STATUS_FIELDS = 'id,name,language,status,category,rejected_reason,quality_score';
+const TEMPLATE_PAGE_SIZE = 200;
+/** Teto de páginas: 1000 modelos numa WABA já é muito mais que o normal. */
+const TEMPLATE_MAX_PAGES = 5;
+
+/**
+ * O status de cada modelo da conta WABA, direto na Graph API. Nunca lança.
+ *
+ * Existe porque o `/template/find` do Evolution chama a Graph sem `fields=`, e
+ * sem isso ela não devolve `rejected_reason` — o motivo de uma recusa, que é
+ * justamente o que o provedor precisa para corrigir o modelo. A lista em si
+ * continua vindo do Evolution (é o caminho do envio e da criação); isto só
+ * COMPLETA o motivo e a qualidade, e quem chama segue sem eles se falhar.
+ *
+ * Segue `paging.next` só quando ele aponta para a própria Graph: o endereço
+ * vem da resposta, e o token vai no cabeçalho de cada página.
+ *
+ * @param {{ wabaId: string, metaToken: string }} p
+ * @returns {Promise<{ ok: true, templates: object[] } | { ok: false, error: string }>}
+ */
+export async function fetchTemplateStatuses({ wabaId, metaToken }) {
+  const waba = String(wabaId ?? '').trim();
+  if (!WABA_ID.test(waba) || !metaToken) return { ok: false, error: 'meta_webhook_invalid_account' };
+  const params = new URLSearchParams({ fields: TEMPLATE_STATUS_FIELDS, limit: String(TEMPLATE_PAGE_SIZE) });
+  let url = `${GRAPH_BASE}/${META_GRAPH_VERSION}/${waba}/message_templates?${params}`;
+  const templates = [];
+  for (let pagina = 0; url && pagina < TEMPLATE_MAX_PAGES; pagina += 1) {
+    let resposta;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- uma página depende da anterior
+      resposta = await fetcher(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${metaToken}` },
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+        redirect: 'manual'
+      });
+    } catch {
+      return { ok: false, error: 'meta_unreachable' };
+    }
+    let dados = null;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- idem
+      dados = await resposta.json();
+    } catch {
+      dados = null;
+    }
+    if (!resposta.ok || dados?.error || !Array.isArray(dados?.data)) {
+      return { ok: false, error: graphRefusal(resposta.status, dados) };
+    }
+    templates.push(...dados.data);
+    const proxima = typeof dados.paging?.next === 'string' ? dados.paging.next : '';
+    url = proxima.startsWith(`${GRAPH_BASE}/`) ? proxima : '';
+  }
+  return { ok: true, templates };
+}
+
 class MetaWebhookService {
   /**
    * Registra o webhook do número e grava o resultado na linha. Nunca lança:

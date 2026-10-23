@@ -84,6 +84,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'operator.sessions_revoked': 'audit.action.operatorSessionsRevoked',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.bot_trust_unlock': 'audit.action.whatsappBotTrustUnlock',
+  'whatsapp.meta_template_status': 'audit.action.whatsappMetaTemplateStatus',
   'outage.notified': 'audit.action.outageNotified',
   'whatsapp.invoice_sent': 'audit.action.whatsappInvoiceSent',
   'whatsapp.message_deleted': 'audit.action.whatsappMessageDeleted',
