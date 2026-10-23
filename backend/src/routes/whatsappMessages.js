@@ -157,6 +157,15 @@ router.post(
 );
 
 router.post(
+  '/conversations/:id/subscriber/unbind',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('sgp.act'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.unbind
+);
+
+router.post(
   '/conversations/:id/subscriber/unlock',
   authenticateToken,
   requirePermission('whatsapp.read'),

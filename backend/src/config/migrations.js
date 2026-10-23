@@ -1754,6 +1754,15 @@ const WA_MESSAGE_ACTION_COLUMNS = [
   ['deleted_at', (t) => t.timestamp('deleted_at').nullable()]
 ];
 
+/**
+ * "Desvincular" na conversa (0117): quando o atendente tira o vínculo à mão,
+ * `unlinked_at` fica marcado e o vínculo automático por telefone não volta a
+ * refazê-lo. Um vínculo manual novo apaga a marca.
+ */
+const WA_CONVERSATION_UNLINK_COLUMNS = [
+  ['unlinked_at', (t) => t.timestamp('unlinked_at').nullable()]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -6444,6 +6453,22 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'teiah_consultations', teiahConsultationsTable(db));
+    }
+  },
+  {
+    /** Desvincular a conversa do cadastro — ver `WA_CONVERSATION_UNLINK_COLUMNS`. */
+    id: '0117_wa_conversation_unlinked',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_UNLINK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_UNLINK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

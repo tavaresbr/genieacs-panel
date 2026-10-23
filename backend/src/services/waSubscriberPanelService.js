@@ -377,9 +377,16 @@ class WaSubscriberPanelService {
     const [first] = await SgpLink.getByContract(clean);
     await WaConversation.update(conversation.id, {
       contract: clean,
-      device_id: first?.device_id ?? null
+      device_id: first?.device_id ?? null,
+      unlinked_at: null
     });
     return this.build(conversation.id, { contract: clean });
+  }
+
+  /** O atendente desvincula a conversa: ela passa a "não vinculada" e fica assim. */
+  static async unbind(conversationId) {
+    const conversation = await WaConversationService.unlinkSubscriber(conversationId);
+    return this.build(conversation.id);
   }
 
   static async unlock(conversationId, { contract }) {

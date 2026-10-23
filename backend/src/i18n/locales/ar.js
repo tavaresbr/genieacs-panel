@@ -429,6 +429,7 @@ export default {
   'sgp.dataLoaded': 'تم تحميل بيانات SGP',
   'sgp.dataLoadFailed': 'تعذّر تحميل بيانات SGP',
   'sgp.contractLinked': 'رُبط عقد SGP بالجهاز',
+  'whatsapp.sgp.unlinked': "تم فصل المحادثة",
   'sgp.linkFailed': 'تعذّر ربط عقد SGP',
   'sgp.noLink': 'لا يملك هذا الجهاز ارتباطًا بـ SGP',
   'sgp.linkRemoved': 'أُزيل ارتباط SGP',

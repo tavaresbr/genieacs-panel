@@ -1,4 +1,6 @@
 import WaSubscriberPanelService from '../services/waSubscriberPanelService.js';
+import WaConversationService from '../services/waConversationService.js';
+import AuditLog from '../models/AuditLog.js';
 import { SgpError } from '../services/sgpService.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -56,6 +58,24 @@ class WhatsAppSubscriberController {
         document: req.body?.document || null
       });
       return res.json(createResponse(req.t('sgp.contractLinked'), present(req, panel)));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.linkFailed');
+    }
+  }
+
+  /** `POST /conversations/:id/subscriber/unbind` — tira o vínculo da conversa. */
+  static async unbind(req, res) {
+    try {
+      const before = await WaConversationService.get(req.params?.id);
+      const panel = await WaSubscriberPanelService.unbind(req.params?.id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_SUBSCRIBER_UNLINKED,
+        subjectType: 'wa_conversation',
+        subjectId: before.id,
+        // O vínculo que saiu, sem telefone nem nome.
+        detail: { contract: before.contract ?? null, registration: before.sgp_contact_id ? `c:${before.sgp_contact_id}` : null }
+      });
+      return res.json(createResponse(req.t('whatsapp.sgp.unlinked'), present(req, panel)));
     } catch (error) {
       return handleError(req, res, error, 'sgp.linkFailed');
     }

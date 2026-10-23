@@ -430,6 +430,7 @@ export default {
   'sgp.dataLoaded': '已加载 SGP 数据',
   'sgp.dataLoadFailed': '无法加载 SGP 数据',
   'sgp.contractLinked': 'SGP 合同已关联到该 ONT',
+  'whatsapp.sgp.unlinked': "已取消关联对话",
   'sgp.linkFailed': '无法关联 SGP 合同',
   'sgp.noLink': '该 ONT 没有 SGP 关联记录',
   'sgp.linkRemoved': 'SGP 关联已取消',

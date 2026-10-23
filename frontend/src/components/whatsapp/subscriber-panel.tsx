@@ -94,7 +94,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const [contract, setContract] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [searchedDocument, setSearchedDocument] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'unlock' | 'resume' | 'ticket' | 'bind' | 'registration' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
+  const [busy, setBusy] = useState<'unlock' | 'resume' | 'ticket' | 'bind' | 'unbind' | 'registration' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
   const [templates, setTemplates] = useState<WhatsAppTemplate[] | null>(null)
   const [templateId, setTemplateId] = useState('')
   const [ticketOpen, setTicketOpen] = useState(false)
@@ -216,6 +216,28 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
       // The effect above tells the list: the new answer carries the new contract.
       setPanel(res.data)
       setSearchedDocument(null)
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // A conversa estava no cliente errado: o telefone no SGP não muda, só o
+  // vínculo da conversa, e ele não volta sozinho.
+  const unbind = async () => {
+    if (!window.confirm(t('whatsapp.sgp.unbindConfirm'))) return
+    setBusy('unbind')
+    try {
+      const res = await whatsappAPI.unbindSubscriber(conversationId)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('detail.sgp.linkFailed'))
+        return
+      }
+      toast.success(t('whatsapp.sgp.unbound'))
+      setPanel(res.data)
+      setSearchedDocument(null)
+      onBound?.()
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -446,6 +468,17 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
             >
               <Icon name="phone" size={15} />
               {t('whatsapp.sgp.savePhone', { contract: panel.contract.contract })}
+            </button>
+          )}
+          {canAct && panel.ready && (attendance.contract || attendance.registration) && (
+            <button
+              type="button"
+              className="modern-button-secondary mt-2 w-full"
+              disabled={busy !== null}
+              onClick={() => void unbind()}
+            >
+              <Icon name="x" size={15} />
+              {t('whatsapp.sgp.unbind')}
             </button>
           )}
         </Card>
