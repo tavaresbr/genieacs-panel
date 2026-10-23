@@ -96,6 +96,7 @@ describe('rascunho de edição', () => {
     id: 7, accountId: 1, name: 'aviso_geral', language: 'pt_BR', category: 'MARKETING', status: 'APPROVED',
     bodyText: 'Olá {{1}}', paramCount: 1, paramFormat: 'positional', headerFormat: 'TEXT', headerParamCount: 0,
     buttons: [], supported: true, usable: true, syncedAt: null, hasMetaId: true, editable: true,
+    rejectedReason: null, qualityScore: null, previousStatus: null, statusChangedAt: null,
     draft: { headerText: 'Aviso', bodyText: 'Olá {{1}}', examples: ['Ana'], footerText: '', buttons: [{ type: 'QUICK_REPLY', text: 'Ok', url: '' }] },
     ...patch
   })
