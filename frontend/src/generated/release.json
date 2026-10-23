@@ -1,681 +1,1863 @@
 {
-  "version": "1.18.0",
-  "build": 795,
-  "sourceCommit": "793edcc6cf0f",
-  "releasedAt": "2026-09-26",
-  "basedOnTag": "v1.17.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/2771df9a8985...793edcc6cf0f",
+  "version": "1.19.0",
+  "build": 1364,
+  "sourceCommit": "92ebb6d0faf4",
+  "releasedAt": "2026-10-23",
+  "basedOnTag": "v1.18.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/72362c25a7a2...92ebb6d0faf4",
   "changes": [
     {
-      "shortHash": "77d5af9",
-      "date": "2026-09-22",
-      "title": "O servidor que respondeu sem dizer o sabor não é \"Respondeu ()\"",
+      "shortHash": "90ffa4d0",
+      "date": "2026-09-26",
+      "title": "Configurações: salvar não para mais numa chave interna",
       "category": "Maintenance"
     },
     {
-      "shortHash": "f0d036a",
-      "date": "2026-09-22",
-      "title": "O que o prazo zero custa, dito onde a decisão é tomada",
+      "shortHash": "99e479e0",
+      "date": "2026-09-26",
+      "title": "Tell the operator when \"Solicitar Inform\" could not reach the ONT",
       "category": "Maintenance"
     },
     {
-      "shortHash": "2e647b6",
-      "date": "2026-09-22",
-      "title": "O prazo da trilha deixa de ser uma constante no agendador",
+      "shortHash": "9738763b",
+      "date": "2026-09-26",
+      "title": "Portal do cliente: andamento da sincronização de IDs",
       "category": "Maintenance"
     },
     {
-      "shortHash": "46632e9",
-      "date": "2026-09-22",
-      "title": "Apagar os mapeamentos de segurança WiFi, que nunca foram ligados",
+      "shortHash": "c633c090",
+      "date": "2026-09-26",
+      "title": "Bot do WhatsApp, etapa 2: identificação por CPF/CNPJ e liberação em confiança",
       "category": "Maintenance"
     },
     {
-      "shortHash": "13f9ca1",
-      "date": "2026-09-22",
-      "title": "Teto próprio para quem enfileira, e outro para quem enfileira em bloco",
+      "shortHash": "dcf634b9",
+      "date": "2026-09-26",
+      "title": "Exportar em KML",
       "category": "Maintenance"
     },
     {
-      "shortHash": "e94e475",
-      "date": "2026-09-22",
-      "title": "O prazo da trilha ganha campo na tela",
+      "shortHash": "7cd2cb82",
+      "date": "2026-09-26",
+      "title": "Só um owner troca a senha de um owner",
       "category": "Maintenance"
     },
     {
-      "shortHash": "bc6f8f7",
-      "date": "2026-09-22",
-      "title": "Os números do painel que faltavam viram recorte da lista",
+      "shortHash": "a699fce2",
+      "date": "2026-09-26",
+      "title": "Estado ao vivo dos pontos com PPPoE",
       "category": "Maintenance"
     },
     {
-      "shortHash": "fc4fdce",
-      "date": "2026-09-22",
-      "title": "Keep an unstable ONT pair dismissed while it keeps trading the login",
+      "shortHash": "47c45396",
+      "date": "2026-09-26",
+      "title": "Dashboard, dispositivos, auditoria, plano e gráficos",
       "category": "Maintenance"
     },
     {
-      "shortHash": "0538004",
-      "date": "2026-09-22",
-      "title": "Dotenv 17→18, express-rate-limit 7→8",
+      "shortHash": "de7c5a20",
+      "date": "2026-09-26",
+      "title": "Detalhe do dispositivo e cards",
       "category": "Maintenance"
     },
     {
-      "shortHash": "c760bcb",
-      "date": "2026-09-22",
-      "title": "O minuto gasto do envio passa a atravessar o processo",
+      "shortHash": "5921b05c",
+      "date": "2026-09-26",
+      "title": "Configurações",
       "category": "Maintenance"
     },
     {
-      "shortHash": "c682609",
-      "date": "2026-09-22",
-      "title": "Reach the SGP contract for ONTs whose login the panel could not match",
+      "shortHash": "39a60d12",
+      "date": "2026-09-26",
+      "title": "Casca do painel, CSS global e telas de acesso",
       "category": "Maintenance"
     },
     {
-      "shortHash": "66513f1",
-      "date": "2026-09-22",
-      "title": "O provedor que sai leva os dados dele: exportação pelo console",
+      "shortHash": "7ab4f446",
+      "date": "2026-09-26",
+      "title": "Portal do cliente, mapa de rede e console da plataforma",
       "category": "Maintenance"
     },
     {
-      "shortHash": "17eb206",
-      "date": "2026-09-23",
-      "title": "Há quanto tempo, e não desde quando",
+      "shortHash": "9e25d464",
+      "date": "2026-09-26",
+      "title": "Clientes e portas livres por caixa",
       "category": "Maintenance"
     },
     {
-      "shortHash": "51e145f",
-      "date": "2026-09-23",
-      "title": "Filter SSIDs by enabled/disabled on the device WiFi tab",
-      "category": "New"
-    },
-    {
-      "shortHash": "5b029b1",
-      "date": "2026-09-23",
-      "title": "Tag each ONT in GenieACS with its contract, customer ID, store and technician",
+      "shortHash": "926dbdf3",
+      "date": "2026-09-26",
+      "title": "WhatsApp, contatos e detalhe do contato",
       "category": "Maintenance"
     },
     {
-      "shortHash": "9eeb119",
-      "date": "2026-09-23",
-      "title": "Contatos dos assinantes do SGP na caixa de entrada",
-      "category": "New"
-    },
-    {
-      "shortHash": "9fa3514",
-      "date": "2026-09-23",
-      "title": "O módulo SGP vem para o lado da conversa do WhatsApp",
+      "shortHash": "aa8ca76c",
+      "date": "2026-09-27",
+      "title": "Aba Chatbot em Configurações: opções, mensagens e horário do bot",
       "category": "Maintenance"
     },
     {
-      "shortHash": "24569d4",
-      "date": "2026-09-23",
-      "title": "Show the ONT's WAN and LAN MAC on the device page",
+      "shortHash": "71076b45",
+      "date": "2026-09-27",
+      "title": "Viewport-fit=cover e margens de segurança",
       "category": "Maintenance"
     },
     {
-      "shortHash": "8e95363",
-      "date": "2026-09-23",
-      "title": "Três leituras escritas duas vezes, e a segunda cópia errava",
+      "shortHash": "a30a5edd",
+      "date": "2026-09-27",
+      "title": "Find active contracts whose ONT went silent for days, and move the link",
       "category": "Maintenance"
     },
     {
-      "shortHash": "570a711",
-      "date": "2026-09-23",
-      "title": "Contatos de assinantes do SGP sem ONT no painel",
-      "category": "New"
-    },
-    {
-      "shortHash": "410649f",
-      "date": "2026-09-23",
-      "title": "A 2ª via e o número do assinante, a partir do módulo SGP da conversa",
+      "shortHash": "deb811b3",
+      "date": "2026-09-27",
+      "title": "Interactive-widget=resizes-content",
       "category": "Maintenance"
     },
     {
-      "shortHash": "87f9e14",
-      "date": "2026-09-23",
-      "title": "Remember WiFi filter and add it to the customer portal",
-      "category": "New"
-    },
-    {
-      "shortHash": "64030f1",
-      "date": "2026-09-23",
-      "title": "Filter device invoices by open / cancelled / other",
-      "category": "New"
-    },
-    {
-      "shortHash": "e20208a",
-      "date": "2026-09-23",
-      "title": "A fila ociosa do WhatsApp deixa de visitar provedor sem nada a enviar",
+      "shortHash": "ca08a712",
+      "date": "2026-09-27",
+      "title": "Alerta de rompimento: caixa pequena, mensagem completa e aviso no mapa",
       "category": "Maintenance"
     },
     {
-      "shortHash": "87d4f1d",
-      "date": "2026-09-23",
-      "title": "Sincroniza todos os clientes do SGP para os contatos do WhatsApp",
-      "category": "New"
-    },
-    {
-      "shortHash": "5ff2bc3",
-      "date": "2026-09-23",
-      "title": "Usa /api/ura/clientes/ como listagem padrão de clientes",
-      "category": "New"
-    },
-    {
-      "shortHash": "638df1d",
-      "date": "2026-09-23",
-      "title": "Liberação em confiança pela rota que o SGP atende: /api/ura/liberacaopromessa/",
+      "shortHash": "ad4a38d2",
+      "date": "2026-09-27",
+      "title": "Aba Integrações com configuração do Asaas",
       "category": "Maintenance"
     },
     {
-      "shortHash": "3b556fe",
-      "date": "2026-09-23",
-      "title": "Código morto sai; e uma função \"morta\" era a que a tela devia usar",
+      "shortHash": "be291e4b",
+      "date": "2026-09-27",
+      "title": "O primeiro usuário é o dono; provedor sem dono ganha dono",
       "category": "Maintenance"
     },
     {
-      "shortHash": "8b96264",
-      "date": "2026-09-23",
-      "title": "Know which networks are on, and stop counting unknown as disabled",
+      "shortHash": "f4973115",
+      "date": "2026-09-27",
+      "title": "Tabela de operadores cabe no desktop",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bcb568a0",
+      "date": "2026-09-27",
+      "title": "Cobrança: Asaas configurável pelo console, criação de cliente e ciclo da cobrança",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "48af97ad",
+      "date": "2026-09-27",
+      "title": "Provedor não define a senha de quem administra a plataforma",
       "category": "Fixed"
     },
     {
-      "shortHash": "b55e76f",
-      "date": "2026-09-23",
-      "title": "Read Nokia optics and WAN VLAN by name, and show what GenieACS holds",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "3143fc1",
-      "date": "2026-09-23",
-      "title": "Torna a sincronização de contatos do SGP fácil de achar",
+      "shortHash": "d5f72abb",
+      "date": "2026-09-27",
+      "title": "Dossiê e exclusão recortam a ONT pelo período de posse",
       "category": "Fixed"
     },
     {
-      "shortHash": "6e4554c",
-      "date": "2026-09-23",
-      "title": "Fatura cancelada deixa de contar como \"em aberto\"",
+      "shortHash": "15b72ae7",
+      "date": "2026-09-27",
+      "title": "Aviso de queda em massa aos clientes afetados",
       "category": "Maintenance"
     },
     {
-      "shortHash": "75e72b6",
-      "date": "2026-09-23",
-      "title": "Drop a pasted Postman {{url}} from endpoint paths",
+      "shortHash": "5632253d",
+      "date": "2026-09-27",
+      "title": "Tabelas mais baixas em telas estreitas",
       "category": "Maintenance"
     },
     {
-      "shortHash": "a3aca17",
-      "date": "2026-09-23",
-      "title": "Open the WiFi tab on \"Ativas\" by default",
-      "category": "New"
-    },
-    {
-      "shortHash": "28a833e",
-      "date": "2026-09-23",
-      "title": "SGP contacts: own deadline for the listing, background sync",
+      "shortHash": "43b41b11",
+      "date": "2026-09-27",
+      "title": "CEP da fixture só com dígitos, como a coluna guarda",
       "category": "Maintenance"
     },
     {
-      "shortHash": "29d2881",
-      "date": "2026-09-23",
-      "title": "Botão \"Abrir no SGP\" no lugar de \"Abrir roteador\" no módulo SGP",
+      "shortHash": "607c499a",
+      "date": "2026-09-27",
+      "title": "Portal do cliente: nome do provedor inteiro no cabeçalho",
       "category": "Maintenance"
     },
     {
-      "shortHash": "6924c9e",
-      "date": "2026-09-23",
-      "title": "Cada número do WhatsApp tem a sua cor na caixa de entrada",
+      "shortHash": "ddb8d8d5",
+      "date": "2026-09-27",
+      "title": "Colocar cliente no mapa, ocupação das caixas, histórico de rompimentos e como chegar",
       "category": "Maintenance"
     },
     {
-      "shortHash": "339f93f",
-      "date": "2026-09-23",
-      "title": "Read the temperature from DeviceInfo.TemperatureStatus",
+      "shortHash": "42031f91",
+      "date": "2026-09-27",
+      "title": "Gráfico de tendência: id do degradê por instância",
       "category": "Maintenance"
     },
     {
-      "shortHash": "850c415",
-      "date": "2026-09-23",
-      "title": "SGP contacts: read more listing shapes, keep partial runs, time each page",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "acd5b7e",
-      "date": "2026-09-23",
-      "title": "Save the contacts section's settings through PUT /config",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "27e10f9",
-      "date": "2026-09-23",
-      "title": "O topo da página de WhatsApp cabe numa linha",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "234993d",
-      "date": "2026-09-23",
-      "title": "Read the PPPoE login off ZTE ONTs that never reported it",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "4544666",
-      "date": "2026-09-23",
-      "title": "Contacts entry below the device inventory",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d13b984",
-      "date": "2026-09-23",
-      "title": "O que o operador faz na ONT passa a deixar linha na trilha",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "5d6f892",
-      "date": "2026-09-23",
-      "title": "Read Nokia optics from X_ALU_OntOpticalParam",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "65104b8",
-      "date": "2026-09-24",
-      "title": "Reset de fábrica da ONT, confirmado pelo número de série",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "92de914",
-      "date": "2026-09-24",
-      "title": "Reorder the menu and give Plano its own icon",
-      "category": "New"
-    },
-    {
-      "shortHash": "0c43a91",
-      "date": "2026-09-24",
-      "title": "Botões \"Abrir no SGP\" e \"Chamar no WhatsApp\" na tela do equipamento",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f96037d",
-      "date": "2026-09-24",
-      "title": "Ping e traceroute pela ONT, no modelo de dados que ela fala",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "89bad19",
-      "date": "2026-09-24",
-      "title": "Tela do equipamento: botões do topo em ordem alfabética",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "7830723",
-      "date": "2026-09-24",
-      "title": "Full SGP client record, editable in the panel",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "4a7a82b",
-      "date": "2026-09-24",
-      "title": "Reset de fábrica: exigir a senha do operador duas vezes",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "5e422ad",
-      "date": "2026-09-24",
-      "title": "Escolher o centro do mapa clicando no mapa",
-      "category": "New"
-    },
-    {
-      "shortHash": "7980c92",
-      "date": "2026-09-24",
-      "title": "Show the build commit next to the version; wrap invoice filter on mobile",
-      "category": "New"
-    },
-    {
-      "shortHash": "253b0d9",
-      "date": "2026-09-24",
-      "title": "Firmware da ONT pelo painel, com os arquivos do GenieACS",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "604ca0e",
-      "date": "2026-09-24",
-      "title": "Export and import the base as a CSV spreadsheet",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "15e49f4",
-      "date": "2026-09-24",
-      "title": "Show the session's provider (name and slug) in the menu header",
-      "category": "New"
-    },
-    {
-      "shortHash": "2403c9d",
-      "date": "2026-09-24",
-      "title": "Centro do mapa editável nas Configurações",
-      "category": "New"
-    },
-    {
-      "shortHash": "965880b",
-      "date": "2026-09-24",
-      "title": "Boas-vindas: checklist \"Primeiros passos\" e conclusão guardada no provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "6252600",
-      "date": "2026-09-24",
-      "title": "Retry SGP link/contact upserts the database dropped for deadlock",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "3f6e87e",
-      "date": "2026-09-24",
-      "title": "Separar a configuração da plataforma da configuração de cada provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "2ce62cd",
-      "date": "2026-09-24",
-      "title": "Trocar tiles escuros do CARTO por OSM com filtro escuro",
+      "shortHash": "80990280",
+      "date": "2026-09-27",
+      "title": "Token salvo do SGP só vai para o endereço salvo",
       "category": "Fixed"
     },
     {
-      "shortHash": "f7fbe78",
-      "date": "2026-09-24",
-      "title": "Reiniciar vários equipamentos de uma vez",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d32cd46",
-      "date": "2026-09-24",
-      "title": "Clearer WiFi password gap; console header says platform administrator",
-      "category": "New"
-    },
-    {
-      "shortHash": "dee80bd",
-      "date": "2026-09-24",
-      "title": "Endereço principal do provedor com ponto no mapa",
-      "category": "New"
-    },
-    {
-      "shortHash": "ec4a478",
-      "date": "2026-09-24",
-      "title": "Firmware em lote, com cada ONT conferida contra o arquivo",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ec200ee",
-      "date": "2026-09-24",
-      "title": "Assistente de boas-vindas: tela inicial, progresso, SGP, WhatsApp e resumo",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "99445ba",
-      "date": "2026-09-24",
-      "title": "Bot de autoatendimento: menu numerado, pedir atendente e liga/desliga",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "6164f82",
-      "date": "2026-09-24",
-      "title": "Aba Geral própria para o endereço principal do provedor",
-      "category": "New"
-    },
-    {
-      "shortHash": "f0ae6cf",
-      "date": "2026-09-24",
-      "title": "Cadastro completo do provedor na aba Geral",
-      "category": "New"
-    },
-    {
-      "shortHash": "f04eead",
-      "date": "2026-09-24",
-      "title": "Esconder \"Painel e ACS\" e \"Parâmetros TR-069\" do provedor na SaaS",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ae9d3cb",
-      "date": "2026-09-24",
-      "title": "Login em duas etapas com app autenticador",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "04a80f7",
-      "date": "2026-09-24",
-      "title": "Preencher o cadastro do provedor pelo CNPJ",
-      "category": "New"
-    },
-    {
-      "shortHash": "303e17c",
-      "date": "2026-09-24",
-      "title": "Consulta de CNPJ com três fontes em cascata e motivo no log",
+      "shortHash": "da8e6dc9",
+      "date": "2026-09-27",
+      "title": "A própria senha não se troca pela rota da equipe",
       "category": "Fixed"
     },
     {
-      "shortHash": "5662fea",
-      "date": "2026-09-24",
-      "title": "Longitude fora de ±180 ao arrastar para outra cópia do mundo",
+      "shortHash": "b4c0c945",
+      "date": "2026-09-27",
+      "title": "Provedor suspenso derruba sessões, refresh e login",
       "category": "Fixed"
     },
     {
-      "shortHash": "1ed75a1",
-      "date": "2026-09-24",
-      "title": "O dono exige o login em duas etapas da equipe, e a equipe destrava quem perdeu tudo",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "2b7dc83",
-      "date": "2026-09-24",
-      "title": "Send an open invoice to the client over WhatsApp",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "6d01127",
-      "date": "2026-09-24",
-      "title": "Centro padrão em Brasília, não Jacarta",
+      "shortHash": "508d2a69",
+      "date": "2026-09-27",
+      "title": "Tipo e nome do anexo do WhatsApp saem do arquivo gravado",
       "category": "Fixed"
     },
     {
-      "shortHash": "fde9268",
-      "date": "2026-09-24",
-      "title": "Planilha do inventário: o recorte da lista de equipamentos em CSV",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "8b9e76a",
-      "date": "2026-09-24",
-      "title": "Open the menu entry on the active subscribers",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "c3cd766",
-      "date": "2026-09-24",
-      "title": "Enviar o slug de confirmação ao apagar um provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "9ec1a01",
-      "date": "2026-09-24",
-      "title": "Inventário: buscar pelo nome do assinante e pelo contrato SGP",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "3d15c00",
-      "date": "2026-09-24",
-      "title": "Alertas técnicos também por e-mail",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "44553e3",
-      "date": "2026-09-24",
-      "title": "Client record: one masked field per phone in the edit form",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "dcf7b0b",
-      "date": "2026-09-24",
-      "title": "Alertas técnicos também pelo Telegram, com o bot do próprio provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "9207a0b",
-      "date": "2026-09-25",
-      "title": "Configuração: aba \"Sobre\" com as informações do painel",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "5029851",
-      "date": "2026-09-25",
-      "title": "Renomear o produto para \"TR69 Controle\"",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ada0c00",
-      "date": "2026-09-26",
-      "title": "Client record: open the client's WhatsApp conversation from the record",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "2b41c6d",
-      "date": "2026-09-26",
-      "title": "Separa provedores que dividem o mesmo GenieACS por tag de equipamentos",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "0cebf6b",
-      "date": "2026-09-26",
-      "title": "Stop the old ONT from taking the account back after a swap",
+      "shortHash": "5a353007",
+      "date": "2026-09-27",
+      "title": "Erro 500 não expõe texto interno sem APP_ENV",
       "category": "Fixed"
     },
     {
-      "shortHash": "f7e8966",
-      "date": "2026-09-26",
-      "title": "Editar membro da equipe e mandar o link de senha pelo WhatsApp",
+      "shortHash": "85abb2f9",
+      "date": "2026-09-27",
+      "title": "Segredos fora da imagem e do git, e sem valor de exemplo",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "8cc1d150",
+      "date": "2026-09-27",
+      "title": "Relatório do chatbot do WhatsApp",
       "category": "Maintenance"
     },
     {
-      "shortHash": "924f69c",
-      "date": "2026-09-26",
-      "title": "CEP, localizar no mapa, sede na Topologia e CNPJ no onboarding",
+      "shortHash": "f2712faa",
+      "date": "2026-09-27",
+      "title": "Aviso abaixo do cabeçalho e URL do webhook sempre completa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1c8004b1",
+      "date": "2026-09-27",
+      "title": "Sincronização de IDs: segundo clique não ouve \"em andamento\" à toa; histórico ao segundo no MySQL",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "fb90d464",
+      "date": "2026-09-27",
+      "title": "Modo túnel por provedor e a tabela de conexão",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "94822eeb",
+      "date": "2026-09-27",
+      "title": "Muro da personificação compara o caminho sem caixa",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "83b6aea5",
+      "date": "2026-09-27",
+      "title": "Cortar window.opener da aba de personificação",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "f19ab3a0",
+      "date": "2026-09-27",
+      "title": "Guarda de egresso do SGP e do Asaas usa deploymentIsShared",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "f70b2564",
+      "date": "2026-09-27",
+      "title": "Ler a senha do reset-password só do ambiente ou da entrada padrão",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "b1c3e409",
+      "date": "2026-09-27",
+      "title": "Teste de conexão de banco passa pelo portão de provedor único",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "19790272",
+      "date": "2026-09-27",
+      "title": "Fixar actions por SHA e auditar dependências do frontend",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f5c21b3e",
+      "date": "2026-09-27",
+      "title": "Fixar a imagem base node:22-alpine por digest e ligar o Dependabot",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "3cdaf520",
+      "date": "2026-09-27",
+      "title": "Mudar o segundo fator derruba as outras sessões",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "d8493c4e",
+      "date": "2026-09-27",
+      "title": "Redefinir a senha do portal encerra a sessão aberta",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "95910f5b",
+      "date": "2026-09-27",
+      "title": "Bloqueio por conta após tentativas de senha e 2FA erradas",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "5f84b276",
+      "date": "2026-09-27",
+      "title": "Tela diz que a conta está bloqueada, e não que a senha está errada",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "1ff44d66",
+      "date": "2026-09-27",
+      "title": "Cliente Evolution conecta ao endereço que conferiu",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "1a8edd51",
+      "date": "2026-09-27",
+      "title": "Plano do provedor: catálogo, troca de plano e pagar agora (tela)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d5a63980",
+      "date": "2026-09-27",
+      "title": "\"Solicitar Inform\" says since when an unreachable ONT has been silent",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "27148f44",
+      "date": "2026-09-27",
+      "title": "Plano do provedor: rotas de troca de plano e pagar agora, e correções da revisão",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "054e7c97",
+      "date": "2026-09-27",
+      "title": "Plano do provedor: tela do downgrade agendado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0531ae16",
+      "date": "2026-09-27",
+      "title": "Configuração: aba \"Painel e ACS\" de volta para o provedor na SaaS",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ad6acc54",
+      "date": "2026-09-27",
+      "title": "Plano do provedor: downgrade só na renovação",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "08e6338f",
+      "date": "2026-09-27",
+      "title": "Dependência ws: o servidor WebSocket do agente do GenieACS",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a08b6854",
+      "date": "2026-09-27",
+      "title": "Modais compartilhados, rodapé do console, abas do WhatsApp",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4eb53c82",
+      "date": "2026-09-27",
+      "title": "Modo agente, o lado do painel",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8efc76f3",
+      "date": "2026-09-27",
+      "title": "Agente do GenieACS: o programa que o provedor instala na rede dele",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "51a3042c",
+      "date": "2026-09-27",
+      "title": "Tela do agente do GenieACS: modo Agente no console e nas Configurações",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a60ed292",
+      "date": "2026-09-27",
+      "title": "Cartão da conexão do GenieACS: o título é o rótulo do seletor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "339452a6",
+      "date": "2026-09-27",
+      "title": "Instalador do agente do GenieACS (deploy/install-agent.sh)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "532fdddf",
+      "date": "2026-09-27",
+      "title": "O painel serve o instalador e o programa do agente",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8aaaa54a",
+      "date": "2026-09-27",
+      "title": "Proxy e documentação do agente do GenieACS",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e7c2e742",
+      "date": "2026-09-27",
+      "title": "Agente do GenieACS: as duas pontas juntas, e o que a integração mostrou",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c294a66b",
+      "date": "2026-09-27",
+      "title": "\"Sincronizar SGP\" button on the device inventory",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ce451a97",
+      "date": "2026-09-27",
+      "title": "Plano do provedor: esconde ações recusadas e trata agendamento travado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "eeb667ac",
+      "date": "2026-09-27",
+      "title": "Plano do provedor: fecha as brechas de cobrança da revisão final",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8ae8cd4d",
+      "date": "2026-09-27",
+      "title": "Manutenção programada: aviso automático, silêncio dos alertas e \"concluída\"",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "568e871e",
+      "date": "2026-09-27",
+      "title": "Provedor com servidor próprio na SaaS",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "62c6c027",
+      "date": "2026-09-27",
+      "title": "\"Solicitar Inform\" as a batch action on the device inventory",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "595ff4d0",
+      "date": "2026-09-27",
+      "title": "Importador da TeiaH Valid para inadimplentes cancelados",
       "category": "New"
     },
     {
-      "shortHash": "d5414f5",
-      "date": "2026-09-26",
-      "title": "Open the conversation on the number the client record shows",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "1576fe6",
-      "date": "2026-09-26",
-      "title": "Marca sozinho as ONTs novas com a tag do provedor pelo prefixo PPPoE",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "3a557f2",
-      "date": "2026-09-26",
-      "title": "Mais tipos de arquivo, colar print, arrastar e vários anexos de uma vez",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "42469dc",
-      "date": "2026-09-26",
-      "title": "Salvar da aba Geral grava só a aba, sem sincronizar IDs",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "fc3d942",
-      "date": "2026-09-26",
-      "title": "Provedor sem tag num GenieACS compartilhado não vê mais a frota alheia",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "204857f",
-      "date": "2026-09-26",
-      "title": "Contacts list: show the number the client record shows for ONT contracts",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d0fc752",
-      "date": "2026-09-26",
-      "title": "\"Está funcionando?\" vira um sino no canto superior",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "0106a55",
-      "date": "2026-09-26",
-      "title": "Link de senha e convite com endereço mesmo sem domínio-base",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "4d1d4c6",
-      "date": "2026-09-26",
-      "title": "Client record: open a WhatsApp conversation with any of the client's numbers",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "996e335",
-      "date": "2026-09-26",
-      "title": "Corrige \"Abrir o painel\" do console num deploy de host único",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d1f9977",
-      "date": "2026-09-26",
-      "title": "Remove an ONT from GenieACS from its device page",
+      "shortHash": "e2b866b7",
+      "date": "2026-09-28",
+      "title": "Preenche o campo aluguel (equipamento em comodato)",
       "category": "New"
     },
     {
-      "shortHash": "6d05fe2",
-      "date": "2026-09-26",
-      "title": "WhatsApp no celular: lista ou conversa, botões em ícone, caixa de escrever enxuta",
+      "shortHash": "e1f30184",
+      "date": "2026-09-28",
+      "title": "Aba Assinaturas (tela)",
       "category": "Maintenance"
     },
     {
-      "shortHash": "aaf0406",
-      "date": "2026-09-26",
-      "title": "Sessão de atendimento da plataforma com acesso total ao painel do provedor",
+      "shortHash": "38ba71bb",
+      "date": "2026-09-28",
+      "title": "Rotas da aba Assinaturas",
       "category": "Maintenance"
     },
     {
-      "shortHash": "9870b95",
-      "date": "2026-09-26",
-      "title": "Botões da conversa só em ícone também no notebook",
+      "shortHash": "c9a42a25",
+      "date": "2026-09-28",
+      "title": "Console Assinaturas: ações conforme as regras do backend, datas de São Paulo",
       "category": "Maintenance"
     },
     {
-      "shortHash": "ee53b8d",
-      "date": "2026-09-26",
-      "title": "Sincronização de IDs de cliente: motivo real e frotas grandes",
+      "shortHash": "dcf5d2c3",
+      "date": "2026-09-28",
+      "title": "Console Assinaturas: correções de cobrança da revisão",
       "category": "Maintenance"
     },
     {
-      "shortHash": "be67f72",
-      "date": "2026-09-26",
-      "title": "Buscar endereço e adicionar ponto no lugar achado",
+      "shortHash": "18a634f4",
+      "date": "2026-09-28",
+      "title": "Prazo do PUT sem milissegundos, como o MySQL grava",
       "category": "Maintenance"
     },
     {
-      "shortHash": "b4a076b",
-      "date": "2026-09-26",
-      "title": "Portal do cliente: contato do provedor",
+      "shortHash": "9b5e08b2",
+      "date": "2026-09-28",
+      "title": "Módulo SGP: \"Enviar na conversa\" em cada fatura em aberto",
       "category": "Maintenance"
     },
     {
-      "shortHash": "5843707",
-      "date": "2026-09-26",
-      "title": "Importar KML/KMZ",
+      "shortHash": "4e16162b",
+      "date": "2026-09-28",
+      "title": "O Módulo SGP não cobre mais a conversa",
       "category": "Maintenance"
     },
     {
-      "shortHash": "a7185a5",
-      "date": "2026-09-26",
-      "title": "Find the previous release by its release commit, not by a tag",
+      "shortHash": "99b967b5",
+      "date": "2026-09-28",
+      "title": "Régua de cobrança automática, com parada no pagamento",
+      "category": "New"
+    },
+    {
+      "shortHash": "a21de376",
+      "date": "2026-09-28",
+      "title": "Console Assinaturas: botão Estornar (tela)",
       "category": "Maintenance"
     },
     {
-      "shortHash": "793edcc",
-      "date": "2026-09-26",
-      "title": "Exclude every release already cut, and run through a symlinked path",
+      "shortHash": "e5cabfd6",
+      "date": "2026-09-28",
+      "title": "Sino na linha das abas, sem o título",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5074c6b5",
+      "date": "2026-09-28",
+      "title": "Console Assinaturas: estorno de pagamento",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "21616935",
+      "date": "2026-09-28",
+      "title": "Console Assinaturas: estorno recusado por estado divergente no gateway",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6549023d",
+      "date": "2026-09-28",
+      "title": "Correções da revisão",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "287635c7",
+      "date": "2026-09-28",
+      "title": "Colocar no mapa: abrir na casa do cliente, pelo endereço do SGP",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "651e7358",
+      "date": "2026-09-28",
+      "title": "Página pública com planos do banco, cadastro com plano e leads",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "31c50dbd",
+      "date": "2026-09-28",
+      "title": "PLATFORM_EXTRA_HOSTS: domínio de marketing servindo como o ápice",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "488b8c7f",
+      "date": "2026-09-28",
+      "title": "Novo cliente pelo CPF/CNPJ, com cadastro no SGP",
+      "category": "New"
+    },
+    {
+      "shortHash": "0835e8f6",
+      "date": "2026-09-28",
+      "title": "PLATFORM_EXTRA_HOSTS também sem TENANT_BASE_DOMAIN (endereço único)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "20db9880",
+      "date": "2026-09-29",
+      "title": "Novo cliente preenchido pela TeiaH quando não está no SGP",
+      "category": "New"
+    },
+    {
+      "shortHash": "8456fa81",
+      "date": "2026-09-29",
+      "title": "Não mostrar dados de outro provedor ao trocar de painel",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "0d0d6d76",
+      "date": "2026-09-29",
+      "title": "Botão \"Usar modelos prontos\" na régua automática",
+      "category": "New"
+    },
+    {
+      "shortHash": "73206fec",
+      "date": "2026-09-29",
+      "title": "Página pública: hero com ilustração do painel, faixa de números, rodapé completo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ccdd4e79",
+      "date": "2026-09-29",
+      "title": "Colocar todos no mapa pelo endereço do SGP",
+      "category": "New"
+    },
+    {
+      "shortHash": "f5d94304",
+      "date": "2026-09-29",
+      "title": "Isento de cobrança no painel Plano e na aba Assinaturas",
+      "category": "New"
+    },
+    {
+      "shortHash": "b56f7975",
+      "date": "2026-09-29",
+      "title": "Isento de cobrança — manter o provedor ativo sem gerar fatura",
+      "category": "New"
+    },
+    {
+      "shortHash": "35e9296f",
+      "date": "2026-09-29",
+      "title": "Respostas rápidas na conversa com \"/\"",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2d81b7d0",
+      "date": "2026-09-29",
+      "title": "Comentário do serviço de modelos: validação pela categoria final",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2165904a",
+      "date": "2026-09-29",
+      "title": "Régua usa o celular do contato sincronizado do SGP",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "3eb395a2",
+      "date": "2026-09-29",
+      "title": "Isento de cobrança — fatura do período volta ao desligar e corrida com a emissão",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "1719c99a",
+      "date": "2026-09-29",
+      "title": "Botão \"Duplicar\" nos modelos",
+      "category": "New"
+    },
+    {
+      "shortHash": "65210645",
+      "date": "2026-09-29",
+      "title": "\"Simular hoje\" roda em segundo plano, com progresso",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "ef23294c",
+      "date": "2026-09-29",
+      "title": "Intervalo entre mensagens automáticas para não bloquear o número",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b3619d6f",
+      "date": "2026-09-29",
+      "title": "Cobrança automática não enche a caixa de entrada",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "dc8de7cd",
+      "date": "2026-09-29",
+      "title": "Comparar last_message_at em segundos inteiros (MySQL)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d2817f0a",
+      "date": "2026-09-30",
+      "title": "Nome do assinante abre o cadastro na régua de cobrança",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "829851c9",
+      "date": "2026-09-30",
+      "title": "Nodemailer 10.0.13 (GHSA-g57g-f23g-4646, GHSA-v53p-9fqp-m79j)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8ae53ed1",
+      "date": "2026-09-30",
+      "title": "Configurações → Dados do SaaS, usados no site",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f0f26d84",
+      "date": "2026-09-30",
+      "title": "Dados do SaaS: preencher o cadastro pelo CNPJ",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "99399681",
+      "date": "2026-09-30",
+      "title": "Datas das faturas do SGP no padrão brasileiro",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "46a6188c",
+      "date": "2026-09-30",
+      "title": "Módulo \"Nova campanha\" (avisos para grupos de clientes)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b6cf2b0f",
+      "date": "2026-09-30",
+      "title": "Variável que faltou, detalhe da campanha e não cobrar quem já pagou",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "effa8414",
+      "date": "2026-09-30",
+      "title": "Número preso em \"conectando\" não bloqueia mais a resposta",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a91e847b",
+      "date": "2026-10-01",
+      "title": "Configuração: aba Integrações com cards (SGP, TeiaH, WhatsApp, Chatbot)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e5c40be7",
+      "date": "2026-10-01",
+      "title": "Alerta de número de WhatsApp caído: faixa no painel e aviso à equipe",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "75652d37",
+      "date": "2026-10-01",
+      "title": "Pesquisa de satisfação no WhatsApp ao encerrar a conversa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7ec8ea4d",
+      "date": "2026-10-01",
+      "title": "Número oficial da Meta pela integração WHATSAPP-BUSINESS do Evolution",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "abd7f7c6",
+      "date": "2026-10-01",
+      "title": "WhatsApp oficial: modelos aprovados da Meta fora da janela de 24 h",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a5185316",
+      "date": "2026-10-01",
+      "title": "WhatsApp oficial: links para criar o app, gerar o token e gerenciar modelos na Meta",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d8ef25d6",
+      "date": "2026-10-02",
+      "title": "Configurações: formato da data para todo o painel e o portal",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8805d71b",
+      "date": "2026-10-02",
+      "title": "Filtro \"Sem telefone\"",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b1a03b12",
+      "date": "2026-10-03",
+      "title": "Distribuição de conversas do WhatsApp entre atendentes",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6bba945a",
+      "date": "2026-10-03",
+      "title": "Quedas em massa: filtros de período, situação, ponto do mapa e aviso",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "75c1f7a0",
+      "date": "2026-10-03",
+      "title": "Teclado do iPhone não cobre mais a caixa de escrever",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "951a7ccc",
+      "date": "2026-10-03",
+      "title": "Caixa mais próxima, ligar todos, viabilidade e sinal fraco por caixa",
+      "category": "New"
+    },
+    {
+      "shortHash": "89d0d4ec",
+      "date": "2026-10-03",
+      "title": "Consulta de viabilidade abre no meio das caixas",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "6e0ae7c9",
+      "date": "2026-10-03",
+      "title": "Relatório de tempo de resposta do WhatsApp",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b899ed17",
+      "date": "2026-10-03",
+      "title": "Relatório de receita no console: MRR, recebido, estornado, em aberto, por plano e CSV",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e436229f",
+      "date": "2026-10-03",
+      "title": "Isenção de cobrança com data de fim (0091)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b2fd0ce2",
+      "date": "2026-10-03",
+      "title": "Fechar outros caminhos de dado entre provedores na aba",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "7fceb5d1",
+      "date": "2026-10-03",
+      "title": "NFS-e pelo Asaas: fila, emissão pelo agendador, webhook e console",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f1856b22",
+      "date": "2026-10-03",
+      "title": "Reconhecer o ACS compartilhado por IP/alias, não por texto",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "b9cffa8c",
+      "date": "2026-10-03",
+      "title": "Diagnóstico não conta instâncias de outros provedores",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "1e84134c",
+      "date": "2026-10-03",
+      "title": "Atualizar o token da Meta de um número oficial",
+      "category": "New"
+    },
+    {
+      "shortHash": "ecd57c88",
+      "date": "2026-10-03",
+      "title": "Cupom de desconto na assinatura (migração 0093)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ea1a52c0",
+      "date": "2026-10-03",
+      "title": "Régua de lembretes de cobrança (antes, no vencimento e em atraso)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "fc73ffcd",
+      "date": "2026-10-03",
+      "title": "Modelos da Meta com mídia no cabeçalho e botão de URL dinâmica",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ab7ee458",
+      "date": "2026-10-03",
+      "title": "No ACS compartilhado, cada provedor vê só o próprio firmware",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "10c075a0",
+      "date": "2026-10-03",
+      "title": "WhatsApp oficial: relatório de modelos da Meta enviados por mês",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "da992c06",
+      "date": "2026-10-03",
+      "title": "Alertas técnicos: sub-abas \"Quedas em massa\" e \"Configuração\"",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2663ac48",
+      "date": "2026-10-03",
+      "title": "WhatsApp oficial: criar modelos da Meta pelo painel",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "030eefc5",
+      "date": "2026-10-03",
+      "title": "Correções da revisão — cupons, lembretes, NFS-e e receita",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "9cd29e1f",
+      "date": "2026-10-03",
+      "title": "Prazo no segundo inteiro no teste de expiry_warned_for (MySQL arredonda ms)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f4cd4f57",
+      "date": "2026-10-03",
+      "title": "Gravar e enviar áudio, e ouvir áudio na conversa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1e5387e9",
+      "date": "2026-10-03",
+      "title": "Etiquetas nas conversas do WhatsApp",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "482198c1",
+      "date": "2026-10-04",
+      "title": "Etiqueta automática pelo bot",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "23d1e1b7",
+      "date": "2026-10-05",
+      "title": "Aviso de conversa esperando atendente",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4f539ace",
+      "date": "2026-10-05",
+      "title": "Notificação no navegador para mensagem nova no WhatsApp",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "254cb611",
+      "date": "2026-10-05",
+      "title": "Sino do navegador: cursor por id da mensagem, não por hora",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "3c69f119",
+      "date": "2026-10-05",
+      "title": "Régua de cobrança: pausa ao receber comprovante e reconfere o SGP antes de enviar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a0db36d1",
+      "date": "2026-10-05",
+      "title": "Pendências entre provedores (catálogo, conflito de login, cache de slug, avisos)",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "da02c76d",
+      "date": "2026-10-05",
+      "title": "Envio pelo painel e reatribuição dos sem dono no ACS compartilhado",
+      "category": "New"
+    },
+    {
+      "shortHash": "52171059",
+      "date": "2026-10-05",
+      "title": "Não perturbe: buscar cliente e escolher os tipos de comunicação",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c7d5dde9",
+      "date": "2026-10-05",
+      "title": "Importar a agenda do WhatsApp conectado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d8919928",
+      "date": "2026-10-05",
+      "title": "Atendimento por IA no WhatsApp (API compatível com OpenAI, como a z.ai)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "707c5aa5",
+      "date": "2026-10-06",
+      "title": "Teste da caixa de entrada: folga de 1 minuto contra o arredondamento do TIMESTAMP no MySQL",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0753c5fe",
+      "date": "2026-10-06",
+      "title": "Teste da espera: folga para o segundo arredondado do MySQL",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "25ad4516",
+      "date": "2026-10-06",
+      "title": "Filtro \"Importados\" para separar quem veio de importação",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d31686fd",
+      "date": "2026-10-06",
+      "title": "Número de contatos em cada filtro",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d3adec1b",
+      "date": "2026-10-06",
+      "title": "Estabilizar a fila de espera no MySQL",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d4f68296",
+      "date": "2026-10-06",
+      "title": "Mostrar por que o provedor recusou (status e mensagem)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e4bec78e",
+      "date": "2026-10-06",
+      "title": "Npm audit fix no frontend (source-map-js e brace-expansion)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "789f0e90",
+      "date": "2026-10-06",
+      "title": "Tabela cabe no tablet sem rolar de lado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "424ed079",
+      "date": "2026-10-06",
+      "title": "Console → Integrações: a Asaas dividida em balões",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a118810d",
+      "date": "2026-10-06",
+      "title": "Multa, juros e desconto por antecipação nas cobranças do Asaas",
+      "category": "New"
+    },
+    {
+      "shortHash": "2ce853d6",
+      "date": "2026-10-06",
+      "title": "Suspensão automática por inadimplência (0102)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2bf43aa0",
+      "date": "2026-10-06",
+      "title": "Inventário de dados pessoais e mapa do painel, com o teste que os mantém",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "cfff4ddc",
+      "date": "2026-10-06",
+      "title": "Fatura de pró-rata na subida de plano no meio do período (0101)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a4213d32",
+      "date": "2026-10-06",
+      "title": "Cartão recorrente nas assinaturas (migração 0100)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "215f74e4",
+      "date": "2026-10-06",
+      "title": "Integração das quatro melhorias de cobrança",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "5e416714",
+      "date": "2026-10-06",
+      "title": "O navegador não preenche mais a chave, e a tela mostra o fim dela",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4d0a4266",
+      "date": "2026-10-06",
+      "title": "Correções das revisões — cartão, desconto, pró-rata e suspensão",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "d26efb92",
+      "date": "2026-10-06",
+      "title": "WhatsApp no celular: cabeçalho da conversa em uma linha com o teclado aberto",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8e6acf4f",
+      "date": "2026-10-06",
+      "title": "A tela do mapa do painel, e o robots.txt que mantém o painel fora das buscas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "071ca0f4",
+      "date": "2026-10-06",
+      "title": "Notificações do WhatsApp e sessão entre abas por dono",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "6772faf5",
+      "date": "2026-10-06",
+      "title": "Chave salva só vale para o mesmo endereço",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "853be190",
+      "date": "2026-10-06",
+      "title": "Migrar para o Tailwind CSS 4",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f6c10a9e",
+      "date": "2026-10-06",
+      "title": "Telas do WhatsApp e do Inventário cabem em notebook",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "55e81bba",
+      "date": "2026-10-06",
+      "title": "Caixa de entrada: marca piscando em quem falou e não teve resposta",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7cc8f4f2",
+      "date": "2026-10-06",
+      "title": "Mensagem com texto sem espaço não corta mais a conversa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "90478deb",
+      "date": "2026-10-06",
+      "title": "Espaçamentos que a migração para o Tailwind 4 mudou",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6f974eae",
+      "date": "2026-10-06",
+      "title": "Abas e tabelas que escondiam conteúdo em notebook",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4836aa7e",
+      "date": "2026-10-06",
+      "title": "Painel cadastra o webhook da Meta; token some da tela do provedor",
+      "category": "New"
+    },
+    {
+      "shortHash": "63bae603",
+      "date": "2026-10-06",
+      "title": "Cobrança por excedente: preço por unidade acima do teto, pico de uso por período e excedente na fatura da renovação (0104)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "43519702",
+      "date": "2026-10-06",
+      "title": "Plano anual com desconto: ciclo de cobrança mensal ou anual (0103)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7cffe696",
+      "date": "2026-10-06",
+      "title": "O IP do lead, que era gravado e nunca lido, e um prazo para os pedidos antigos",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d4ebf132",
+      "date": "2026-10-06",
+      "title": "Indicação de provedores e créditos na fatura (migração 0105)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "411748ec",
+      "date": "2026-10-06",
+      "title": "Retenção no cancelamento: motivo, desconto ou pausa, e cancelamento no fim do período (0106)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "24bb9a92",
+      "date": "2026-10-06",
+      "title": "Corrige achados da revisão de anual, excedente, indicação e retenção (0103–0106)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e838a398",
+      "date": "2026-10-06",
+      "title": "Id da cobrança inserida pelo returning (Postgres)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1b2465c4",
+      "date": "2026-10-06",
+      "title": "Cor da situação financeira: verde em dia, amarelo vence hoje, vermelho atrasado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ef0b3c69",
+      "date": "2026-10-06",
+      "title": "Import the contacts exported from Google Contacts (Gmail)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d1ee43a7",
+      "date": "2026-10-07",
+      "title": "Régua de cobrança: abrir em \"Histórico e resultados\"",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b7deed60",
+      "date": "2026-10-07",
+      "title": "Alinha Situação com a aba Contatos (Ativos/Suspensos/Cancelados/Sem contrato)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4afb68b9",
+      "date": "2026-10-07",
+      "title": "Google contacts import: read phone books the way Brazilian ones are written",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1776106a",
+      "date": "2026-10-07",
+      "title": "Contacts import: send the file gzipped, so a 1 MB proxy limit does not stop it",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "dbfd3be2",
+      "date": "2026-10-07",
+      "title": "Campo de resposta: botões só com ícone quando o campo é estreito",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b983403d",
+      "date": "2026-10-07",
+      "title": "Botão \"Modelos\" na caixa de mensagem da conversa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5c10da7c",
+      "date": "2026-10-07",
+      "title": "Abas da caixa de entrada numa linha só, com ícones no celular",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1731ed6b",
+      "date": "2026-10-07",
+      "title": "Busca, categoria e tipo de cobrança com o número de cada filtro",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "68502b7f",
+      "date": "2026-10-07",
+      "title": "Botão Sincronizar na ficha do cliente (SGP + TR-069)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9b544412",
+      "date": "2026-10-07",
+      "title": "Nome do cliente na conversa leva ao cadastro dele",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "92602e1a",
+      "date": "2026-10-07",
+      "title": "Contrato selecionado no Módulo SGP abre o cadastro no SGP",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "242c4f0b",
+      "date": "2026-10-07",
+      "title": "WhatsApp no celular: compositor compacto com o teclado aberto",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "616fa633",
+      "date": "2026-10-07",
+      "title": "Botão Receber em cada título da ficha (baixa no SGP)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7dd3db7e",
+      "date": "2026-10-07",
+      "title": "Número do contrato na lista de conversas abre o cadastro no SGP",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "eb37bb5d",
+      "date": "2026-10-07",
+      "title": "Contrato no cabeçalho da conversa abre o cadastro no SGP",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7a88c966",
+      "date": "2026-10-07",
+      "title": "Baixa com resposta vazia do SGP conta como feita",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ae485ca6",
+      "date": "2026-10-07",
+      "title": "Ficha do cliente: botão Equipamento no topo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "56488225",
+      "date": "2026-10-07",
+      "title": "Página do equipamento: nome do cliente leva à ficha",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f54adf10",
+      "date": "2026-10-07",
+      "title": "Página do Embedded Signup da Meta (coexistência) servida pelo painel",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bec0f44b",
+      "date": "2026-10-07",
+      "title": "Escolher o número de WhatsApp que envia",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7863a11a",
+      "date": "2026-10-08",
+      "title": "Escrever e melhorar o texto com IA",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a1be6376",
+      "date": "2026-10-08",
+      "title": "Lista de mensagens que a z.ai aceita (corrige 400 · 1214 no Sugerir (IA))",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4a8fd860",
+      "date": "2026-10-08",
+      "title": "Ritmo de envio próprio (padrão, lento, muito lento)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f3651f8b",
+      "date": "2026-10-08",
+      "title": "Detalhe do equipamento (nova varredura) e rótulo da LGPD",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5fc8b871",
+      "date": "2026-10-08",
+      "title": "Painel, inventário, auditoria, plano, quedas e manutenções (nova varredura)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7b894659",
+      "date": "2026-10-08",
+      "title": "Configurações (nova varredura)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "00de2a1c",
+      "date": "2026-10-08",
+      "title": "Casca, telas de acesso e página pública (nova varredura)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "570d2a86",
+      "date": "2026-10-08",
+      "title": "WhatsApp e contatos (nova varredura)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "22dcd3c5",
+      "date": "2026-10-08",
+      "title": "Detalhe do equipamento: breakpoint dos seletores do histórico em rem",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a5cccc97",
+      "date": "2026-10-08",
+      "title": "Portal do cliente, mapa de rede e console da plataforma (nova varredura)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5b29a044",
+      "date": "2026-10-08",
+      "title": "Voltar para a lista clicando em \"Conversas\" ou em \"WhatsApp\" no menu",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f12de3fa",
+      "date": "2026-10-08",
+      "title": "Alertas técnicos: juntar vários alertas em um resumo a cada 5/10/15/30 min",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1a335d90",
+      "date": "2026-10-08",
+      "title": "Editar rascunho ou campanha agendada",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b61eb7a1",
+      "date": "2026-10-08",
+      "title": "Varredura por id: cobre PUT /whatsapp/broadcasts/:id",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "654ed7a8",
+      "date": "2026-10-08",
+      "title": "Indique e ganhe: link por cliente, página pública e lista de indicações",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "73f2aa6c",
+      "date": "2026-10-08",
+      "title": "Histórico da régua: filtro \"Falhou\" (entrega que falhou)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d7c57cc5",
+      "date": "2026-10-08",
+      "title": "Cliente trocou de número no cadastro: a conversa antiga sai do contrato",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "411896e4",
+      "date": "2026-10-08",
+      "title": "Troca de número: a verificação começa pela consulta barata",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8461fd30",
+      "date": "2026-10-08",
+      "title": "Importar contatos do Focus Chat",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "612a0c92",
+      "date": "2026-10-08",
+      "title": "Coluna Equipamento e filtros com/sem equipamento",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "829fcf33",
+      "date": "2026-10-08",
+      "title": "Histórico da régua: botão Exportar (CSV do filtro atual)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "34f15560",
+      "date": "2026-10-08",
+      "title": "Dois testes de cobrança deixam de quebrar quando o job atravessa 00:00 UTC",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4df81972",
+      "date": "2026-10-08",
+      "title": "Teste ponta a ponta da cobrança no sandbox do Asaas (npm run e2e:asaas-sandbox)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "340b1030",
+      "date": "2026-10-08",
+      "title": "Manual de cobrança no painel: aba Ajuda no console e \"Como funciona\" no Plano",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "38ac0a6b",
+      "date": "2026-10-08",
+      "title": "Alertas para o admin da plataforma (0112)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1400827d",
+      "date": "2026-10-08",
+      "title": "Painel de inadimplência no console: lista e ações em massa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "fa6b4871",
+      "date": "2026-10-08",
+      "title": "Máscara no número de telefone da lista",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d2e36c69",
+      "date": "2026-10-08",
+      "title": "Alertas e inadimplência: correções da revisão e manuais alinhados",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "dd927e72",
+      "date": "2026-10-08",
+      "title": "Política de privacidade do site em /privacidade, com aviso na coleta",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "51207e36",
+      "date": "2026-10-08",
+      "title": "Ficha do cliente: cartão Status do serviço (ONT, TR-069)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e4aebaf3",
+      "date": "2026-10-08",
+      "title": "Registro de retenção: os prazos num lugar só, e o documento gerado dele",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e8b9dc13",
+      "date": "2026-10-08",
+      "title": "Inventário: são 14 as tabelas globais",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "3635e66f",
+      "date": "2026-10-09",
+      "title": "Mensagem sem texto deixa de aparecer só como \"Anexo\"",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d4438cad",
+      "date": "2026-10-09",
+      "title": "Botão \"Ligar\" na conversa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a3070056",
+      "date": "2026-10-09",
+      "title": "Manter os filtros ao voltar para a página",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0870469d",
+      "date": "2026-10-09",
+      "title": "Anexo de operador, lista de compartilhamento e modelo de aviso ao assinante",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0092b5cc",
+      "date": "2026-10-09",
+      "title": "Lista de contatos: botão Abrir no SGP em cada linha",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "fae4a89a",
+      "date": "2026-10-09",
+      "title": "Novo cliente pela TeiaH: completar o endereço (varredura da resposta, CEP e Receita)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4eba3bdd",
+      "date": "2026-10-09",
+      "title": "Conversas do WhatsApp: número com máscara e botão copiar no cabeçalho",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6f10e407",
+      "date": "2026-10-14",
+      "title": "Módulo SGP lista todos os contratos do cliente, mesmo sem ONT",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1915dbd3",
+      "date": "2026-10-14",
+      "title": "Provedor escolhe a API de IA (Claude ou compatível com OpenAI)",
+      "category": "New"
+    },
+    {
+      "shortHash": "3a5e38e7",
+      "date": "2026-10-14",
+      "title": "Corrige chamadas ao Claude e à OpenAI oficial",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "9ad52e09",
+      "date": "2026-10-14",
+      "title": "Lista do WhatsApp: filtros de atendente e etiqueta num botão Filtros, com chips",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "394bfbbc",
+      "date": "2026-10-14",
+      "title": "Selo de não lidas e faixa de espera viram atalhos clicáveis",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e1f2c7a9",
+      "date": "2026-10-14",
+      "title": "Preencher mensagens com sugestões e melhorar texto com IA",
+      "category": "New"
+    },
+    {
+      "shortHash": "9db3f130",
+      "date": "2026-10-15",
+      "title": "Conversa do WhatsApp: links no texto das mensagens ficam clicáveis",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bab409cf",
+      "date": "2026-10-15",
+      "title": "Conversa do WhatsApp: menu da mensagem com Responder, Copiar e Encaminhar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "36f1a08c",
+      "date": "2026-10-15",
+      "title": "Conversa do WhatsApp: Reagir e Apagar nas mensagens",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a789eddc",
+      "date": "2026-10-15",
+      "title": "Varredura de ids: casos de reação e exclusão de mensagem",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "09cb756b",
+      "date": "2026-10-15",
+      "title": "Dados de pagamento em mensagens separadas para copiar e colar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d3e1354f",
+      "date": "2026-10-16",
+      "title": "Link para comprar créditos do provedor de IA escolhido",
+      "category": "New"
+    },
+    {
+      "shortHash": "b47c531e",
+      "date": "2026-10-16",
+      "title": "Composer do WhatsApp no celular: nota, ações e Enviar numa linha só",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "abd4e15d",
+      "date": "2026-10-16",
+      "title": "Links de compra de créditos não são destino de dados",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ff155aad",
+      "date": "2026-10-16",
+      "title": "TeiaH na ficha: score, mãe, endereços, telefones e e-mails; adicionar à ficha",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "dfe430e8",
+      "date": "2026-10-16",
+      "title": "Cabeçalho da conversa no celular em duas linhas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d5d7159c",
+      "date": "2026-10-16",
+      "title": "Campo opcional de workspace para chaves Anthropic sem workspace",
+      "category": "New"
+    },
+    {
+      "shortHash": "1e109a23",
+      "date": "2026-10-16",
+      "title": "Buscar telefones na TeiaH dos ativos sem telefone, com prévia e Aplicar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "553281f1",
+      "date": "2026-10-16",
+      "title": "Não consultar de novo o que foi consultado há menos de 30 dias",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "97b44cb3",
+      "date": "2026-10-16",
+      "title": "Trocar o WhatsApp solta a conversa do número anterior",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "fd71e369",
+      "date": "2026-10-16",
+      "title": "Abrir conversa: só reaproveita a conversa no número atual do cliente",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e8913651",
+      "date": "2026-10-16",
+      "title": "Conversa do WhatsApp: a mensagem nova sempre leva ao fim da conversa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8121722f",
+      "date": "2026-10-16",
+      "title": "Choose the contract whose login matches the ONT's PPPoE login",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "e7277109",
+      "date": "2026-10-18",
+      "title": "Logo e favicon do sistema em Configurações > Dados do SaaS",
+      "category": "New"
+    },
+    {
+      "shortHash": "db06182d",
+      "date": "2026-10-18",
+      "title": "Data do auto_suspended no fuso de Brasília",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e4e81cea",
+      "date": "2026-10-18",
+      "title": "Botão 'Enviar e-mail de teste' para provar o SMTP do deploy",
+      "category": "New"
+    },
+    {
+      "shortHash": "0fbc7bea",
+      "date": "2026-10-18",
+      "title": "Search contracts and link from the synced contacts",
+      "category": "New"
+    },
+    {
+      "shortHash": "e12e19a9",
+      "date": "2026-10-18",
+      "title": "Rolar até o formulário ao clicar em Editar modelo",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "eda38dd9",
+      "date": "2026-10-18",
+      "title": "Link an ONT to a contract from the contract list",
+      "category": "New"
+    },
+    {
+      "shortHash": "3e631fb2",
+      "date": "2026-10-18",
+      "title": "Reduzir e converter logo e favicon no envio",
+      "category": "New"
+    },
+    {
+      "shortHash": "0ed8af0c",
+      "date": "2026-10-18",
+      "title": "Novo cliente no SGP: mostra o motivo da recusa e não preenche logradouro que é só o tipo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4ab648a6",
+      "date": "2026-10-19",
+      "title": "Erros do SGP: mensagem por status (400, 404, 429, 5xx) com o que fazer, nos 13 idiomas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e4b03a69",
+      "date": "2026-10-19",
+      "title": "Preencher o endereço pelo CEP na edição e guardar outros endereços",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ba36dfe1",
+      "date": "2026-10-19",
+      "title": "Teclado do iPhone: o cartão da conversa termina logo acima do teclado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2e979096",
+      "date": "2026-10-19",
+      "title": "Ícone da tela de início do celular (apple-touch-icon)",
+      "category": "New"
+    },
+    {
+      "shortHash": "2e337722",
+      "date": "2026-10-19",
+      "title": "Inventário cita o provedor de IA do atendimento",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "cf78af7e",
+      "date": "2026-10-19",
+      "title": "Desbloqueio em confiança só depois do 'sim' do cliente",
+      "category": "New"
+    },
+    {
+      "shortHash": "da6a2c78",
+      "date": "2026-10-19",
+      "title": "Show every ONT of a contract, flag wrong links, swap/unlink from the contact",
+      "category": "New"
+    },
+    {
+      "shortHash": "5aae051e",
+      "date": "2026-10-19",
+      "title": "A IA entrega quem quer contratar à equipe comercial",
+      "category": "New"
+    },
+    {
+      "shortHash": "068384fb",
+      "date": "2026-10-19",
+      "title": "Confirmação do desbloqueio compara por id de mensagem, não por horário",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "967cc6fd",
+      "date": "2026-10-20",
+      "title": "Máscara no número do contato no módulo SGP",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "77dadbba",
+      "date": "2026-10-20",
+      "title": "WhatsApp (celular): só o cartão da conversa rola, o resto fica fixo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "047e43d1",
+      "date": "2026-10-21",
+      "title": "Módulo SGP da conversa: achar e vincular o cadastro do cliente sem contrato",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0fbd1a1b",
+      "date": "2026-10-21",
+      "title": "Group the open invoices by contract with a contract filter",
+      "category": "New"
+    },
+    {
+      "shortHash": "3d845a17",
+      "date": "2026-10-22",
+      "title": "Partes de uma resposta do robô saem na ordem mesmo se a primeira falhar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "126a3cb2",
+      "date": "2026-10-22",
+      "title": "Apagar e reagir a mensagem entram na trilha de auditoria",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2597ca18",
+      "date": "2026-10-22",
+      "title": "Régua de cobrança: PIX e linha digitável saem em mensagens separadas, para copiar e colar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "43c5b423",
+      "date": "2026-10-22",
+      "title": "Definir um dos outros endereços como o principal",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c4406689",
+      "date": "2026-10-22",
+      "title": "Anexos do WhatsApp: nginx com teto de 17 MB na rota e aviso claro quando o proxy recusa por tamanho",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "58833714",
+      "date": "2026-10-23",
+      "title": "Módulo SGP: o nome do cadastro sem contrato abre a ficha do contato",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d1da6346",
+      "date": "2026-10-23",
+      "title": "Contrato vinculado sem nome herda o nome do cliente do SGP",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "92ebb6d0",
+      "date": "2026-10-23",
+      "title": "Refuse a shallow clone, and check a release before writing any of it",
       "category": "Maintenance"
     }
   ]
