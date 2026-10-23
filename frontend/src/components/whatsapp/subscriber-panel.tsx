@@ -411,6 +411,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
               <p className="truncate text-sm font-semibold text-foreground">
                 <ContactLink
                   contract={panel.ready ? panel.attendance.contract : null}
+                  registration={panel.ready ? panel.attendance.registration : null}
                   name={(panel.ready && panel.attendance.clientName) || attendance.pushName || formatBrPhone(phone) || '—'}
                   className=""
                 />
@@ -535,7 +536,9 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                   <ul className="mt-1 space-y-1">
                     {panel.contracts.registrations.map((registration) => (
                       <li key={registration.key} className="flex items-center justify-between gap-2 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-2 text-sm">
-                        <span className="min-w-0 wrap-break-word font-semibold">{registration.name ?? '—'}</span>
+                        <span className="min-w-0 wrap-break-word font-semibold">
+                          <ContactLink contract={null} registration={registration.key} name={registration.name} className="" />
+                        </span>
                         {registration.key === attendance.registration ? (
                           <span className="modern-badge-success shrink-0">{t('whatsapp.sgp.registrationLinked')}</span>
                         ) : canAct && (
