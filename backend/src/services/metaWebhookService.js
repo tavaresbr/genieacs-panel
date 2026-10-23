@@ -1,5 +1,6 @@
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
+import { GRAPH_ERROR_LIMIT as ERROR_LIMIT, META_GRAPH_VERSION, graphRequest, setMetaGraphFetcher } from './metaGraphClient.js';
 
 /**
  * O webhook de um número oficial registrado pelo próprio painel na Meta.
@@ -23,31 +24,11 @@ import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
  * nunca na URL, e nada daqui devolve a exceção do `fetch` nem a URL.
  */
 
-const GRAPH_BASE = 'https://graph.facebook.com';
-/** A versão da Graph API; `META_GRAPH_VERSION` troca sem novo deploy de código. */
-export const META_GRAPH_VERSION = /^v\d{1,3}\.\d{1,2}$/.test(String(process.env.META_GRAPH_VERSION || '').trim())
-  ? String(process.env.META_GRAPH_VERSION).trim()
-  : 'v21.0';
-const GRAPH_TIMEOUT_MS = 10_000;
-/** O tamanho da coluna `meta_webhook_error`. */
-const ERROR_LIMIT = 255;
 const WABA_ID = /^\d{5,32}$/;
 
-let fetcher = (...args) => fetch(...args);
-
-/** Para os testes: a Graph falsa entra aqui. */
-export function setMetaGraphFetcher(fn) {
-  fetcher = fn || ((...args) => fetch(...args));
-}
-
-/** A recusa da Graph em texto curto: `(<código>) <mensagem>`, sem o token. */
-function graphRefusal(status, data) {
-  const erro = data?.error;
-  const mensagem = typeof erro?.message === 'string' ? erro.message : '';
-  const codigo = erro?.code ?? status;
-  const texto = mensagem ? `(${codigo}) ${mensagem}` : `meta_http_${status}`;
-  return texto.slice(0, ERROR_LIMIT);
-}
+// O cliente da Graph mora em `metaGraphClient.js`; os testes continuam
+// trocando a Graph falsa por aqui.
+export { META_GRAPH_VERSION, setMetaGraphFetcher };
 
 /**
  * Registra o webhook da conta WABA na Meta. Nunca lança.
@@ -62,29 +43,13 @@ export async function subscribeWabaWebhook({ wabaId, metaToken, callbackUrl, ver
   const waba = String(wabaId ?? '').trim();
   if (!WABA_ID.test(waba) || !metaToken) return { ok: false, error: 'meta_webhook_invalid_account' };
 
-  let resposta;
-  try {
-    resposta = await fetcher(`${GRAPH_BASE}/${META_GRAPH_VERSION}/${waba}/subscribed_apps`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${metaToken}`
-      },
-      body: JSON.stringify({ override_callback_uri: callbackUrl, verify_token: verifyToken }),
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-      redirect: 'manual'
-    });
-  } catch {
-    return { ok: false, error: 'meta_unreachable' };
-  }
-  let dados = null;
-  try {
-    dados = await resposta.json();
-  } catch {
-    dados = null;
-  }
-  if (resposta.ok && dados?.success !== false && !dados?.error) return { ok: true, error: null };
-  return { ok: false, error: graphRefusal(resposta.status, dados) };
+  const r = await graphRequest({
+    path: `/${waba}/subscribed_apps`,
+    method: 'POST',
+    token: metaToken,
+    body: { override_callback_uri: callbackUrl, verify_token: verifyToken }
+  });
+  return r.ok ? { ok: true, error: null } : { ok: false, error: r.error };
 }
 
 class MetaWebhookService {

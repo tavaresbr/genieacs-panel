@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import type { WhatsAppMetaTemplate } from '@/lib/api'
 import {
   bodyVariables,
+  draftFromTemplate,
   emptyMetaDraft,
   nextVariable,
   normalizeMetaName,
@@ -85,5 +87,27 @@ describe('o pedido e a prévia', () => {
 
   it('a prévia troca cada variável pelo exemplo, e deixa a que não tem', () => {
     expect(renderMetaPreview('Olá {{1}}, vence {{2}}.', ['Ana'])).toBe('Olá Ana, vence {{2}}.')
+  })
+})
+
+/** A edição parte do modelo como está na Meta, com nome e idioma travados. */
+describe('rascunho de edição', () => {
+  const modelo = (patch: Partial<WhatsAppMetaTemplate> = {}): WhatsAppMetaTemplate => ({
+    id: 7, accountId: 1, name: 'aviso_geral', language: 'pt_BR', category: 'MARKETING', status: 'APPROVED',
+    bodyText: 'Olá {{1}}', paramCount: 1, paramFormat: 'positional', headerFormat: 'TEXT', headerParamCount: 0,
+    buttons: [], supported: true, usable: true, syncedAt: null, hasMetaId: true, editable: true,
+    draft: { headerText: 'Aviso', bodyText: 'Olá {{1}}', examples: ['Ana'], footerText: '', buttons: [{ type: 'QUICK_REPLY', text: 'Ok', url: '' }] },
+    ...patch
+  })
+
+  it('preenche o formulário com o que o modelo tem, e passa na validação', () => {
+    const d = draftFromTemplate(modelo())
+    expect(d).toMatchObject({ name: 'aviso_geral', language: 'pt_BR', category: 'MARKETING', headerText: 'Aviso', examples: ['Ana'] })
+    expect(validateDraft(d!)).toEqual([])
+  })
+
+  it('não abre o formulário para o que não é editável pelo painel', () => {
+    expect(draftFromTemplate(modelo({ editable: false }))).toBeNull()
+    expect(draftFromTemplate(modelo({ draft: null }))).toBeNull()
   })
 })

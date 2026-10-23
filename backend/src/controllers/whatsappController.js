@@ -19,7 +19,11 @@ export function handleError(req, res, error, fallbackKey) {
     // refused" without dumping the Evolution response at the operator.
     return res.status(error.status).json({
       ...createErrorResponse(translateError(req.t, error), error.details || error.code),
-      code: error.code
+      code: error.code,
+      // O que a tela precisa para decidir, fora do ambiente de
+      // desenvolvimento também (`details` só sai lá): hoje, a lista de
+      // ligações do 409 `meta_template_in_use`.
+      ...(error.extra && typeof error.extra === 'object' ? error.extra : {})
     });
   }
   console.error(`${fallbackKey}:`, error);
@@ -267,6 +271,37 @@ class WhatsAppController {
       return res.status(201).json(createResponse(req.t('whatsapp.metaTemplates.created'), template));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.metaTemplates.createFailed');
+    }
+  }
+
+  /**
+   * Edita um modelo da Meta (`PUT /accounts/:id/templates/:templateId`). Nome e
+   * idioma não mudam; o modelo volta a PENDING e a resposta lista as ligações
+   * que ficam sem envio fora da janela até a nova aprovação.
+   */
+  static async updateMetaTemplate(req, res) {
+    try {
+      const { template, links } = await WaMetaTemplateService.update(req.params?.id, req.params?.templateId, req.body ?? {});
+      return res.json(createResponse(req.t('whatsapp.metaTemplates.updated'), { template, links }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.metaTemplates.updateFailed');
+    }
+  }
+
+  /**
+   * Apaga um modelo da Meta (`DELETE /accounts/:id/templates/:templateId`). Com
+   * ligações, 409 e a lista em `metaLinks`; `?unlink=1` desfaz e apaga.
+   */
+  static async deleteMetaTemplate(req, res) {
+    try {
+      const unlink = ['1', 'true'].includes(String(req.query?.unlink ?? ''));
+      const result = await WaMetaTemplateService.remove(req.params?.id, req.params?.templateId, { unlink });
+      return res.json(createResponse(req.t('whatsapp.metaTemplates.deleted', {
+        templates: result.unlinked.templates,
+        notices: result.unlinked.notices
+      }), result));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.metaTemplates.deleteFailed');
     }
   }
 

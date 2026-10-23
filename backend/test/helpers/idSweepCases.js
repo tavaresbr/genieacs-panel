@@ -319,6 +319,26 @@ export const casos = [
     controleSoNaoAchou: true
   },
   {
+    // Editar e apagar modelo na Meta. A conta vem antes do modelo e do corpo:
+    // o id do vizinho dá 404 com qualquer `templateId`; no controle, o número
+    // semeado (por QR) dá 409 `meta_templates_cloud_only` — achado, recusado.
+    chave: 'account',
+    label: 'PUT /api/whatsapp/accounts/:id/templates/:templateId',
+    method: 'PUT',
+    path: (id) => `/api/whatsapp/accounts/${id}/templates/1`,
+    body: { category: 'UTILITY', bodyText: 'Olá' },
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
+    chave: 'account',
+    label: 'DELETE /api/whatsapp/accounts/:id/templates/:templateId',
+    method: 'DELETE',
+    path: (id) => `/api/whatsapp/accounts/${id}/templates/1?unlink=1`,
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
     chave: 'account',
     label: 'POST /api/whatsapp/accounts/:id/meta-token',
     method: 'POST',

@@ -56,6 +56,10 @@ router.post('/accounts/:id/meta-webhook', authenticateToken, requirePermission('
 // WABA do número (custo por categoria, nota de qualidade, revisão da Meta) —
 // é configuração do número, não campanha.
 router.post('/accounts/:id/templates', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.createMetaTemplate);
+// Editar e apagar, pela mesma razão: mexem no modelo na conta WABA. Vão
+// direto à Graph API (o servidor Evolution não tem essas rotas).
+router.put('/accounts/:id/templates/:templateId', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMetaTemplate);
+router.delete('/accounts/:id/templates/:templateId', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.deleteMetaTemplate);
 router.get('/meta-templates', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listMetaTemplates);
 router.get('/accounts/:id/status', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getStatus);
 router.post('/accounts/:id/restart', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.restartAccount);
