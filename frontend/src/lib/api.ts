@@ -421,7 +421,10 @@ class ApiClient {
             data.code === 'missing_permission' ? 'api.missingPermission' : 'api.requestFailed'
           ),
           error: data.error || translate(getActiveLocale(), 'api.unknownError'),
-          code: data.code,
+          // O 413 sem corpo de API é do servidor web na frente do painel (o nginx
+          // com `client_max_body_size` curto): a tela precisa de um código para
+          // dizer isso, em vez de "a requisição falhou".
+          code: data.code ?? (response.status === 413 ? 'proxy_payload_too_large' : undefined),
           ...(typeof data.reason === 'string' ? { reason: data.reason } : {}),
           // Forwarded, not rebuilt away: see `skipped` above.
           ...(data.skipped ? { skipped: data.skipped } : {}),

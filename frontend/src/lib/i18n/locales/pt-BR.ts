@@ -3217,6 +3217,7 @@ const ptBR: Dictionary = {
   'whatsapp.error.invalidPortalUrl': 'A URL do portal do cliente é inválida.',
   'whatsapp.error.messageEmpty': 'Escreva algo antes de enviar.',
   'whatsapp.error.attachmentTooLarge': 'O arquivo passa de {max} MB.',
+  'whatsapp.error.proxyBodyTooLarge': "O servidor web na frente do painel recusou o arquivo por tamanho. Peça ao administrador para aumentar o client_max_body_size do nginx para 17 MB em /api/whatsapp/attachments.",
   'whatsapp.error.attachmentEmpty': 'O arquivo está vazio.',
   'whatsapp.error.attachmentTypeNotAllowed': 'Esse tipo de arquivo não sai daqui.',
   'whatsapp.error.attachmentNotAllowed': 'Esse anexo não sai daqui.',

@@ -3223,6 +3223,7 @@ const it: Dictionary = {
   'whatsapp.error.invalidPortalUrl': 'L’URL del portale clienti non è valido.',
   'whatsapp.error.messageEmpty': 'Scrivi qualcosa prima di inviare.',
   'whatsapp.error.attachmentTooLarge': 'Il file supera {max} MB.',
+  'whatsapp.error.proxyBodyTooLarge': "Il server web davanti al pannello ha rifiutato il file per le dimensioni. Chiedi all'amministratore di portare client_max_body_size di nginx a 17 MB per /api/whatsapp/attachments.",
   'whatsapp.error.attachmentEmpty': 'Il file è vuoto.',
   'whatsapp.error.attachmentTypeNotAllowed': 'Quel tipo di file non può essere inviato da qui.',
   'whatsapp.error.attachmentNotAllowed': 'Quell’allegato non può essere inviato da qui.',

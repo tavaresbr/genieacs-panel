@@ -3198,6 +3198,7 @@ const ar: Dictionary = {
   'whatsapp.error.invalidPortalUrl': 'عنوان بوابة المشترك غير صالح.',
   'whatsapp.error.messageEmpty': 'اكتب شيئًا قبل الإرسال.',
   'whatsapp.error.attachmentTooLarge': 'حجم الملف أكبر من {max} ميغابايت.',
+  'whatsapp.error.proxyBodyTooLarge': "رفض خادم الويب أمام اللوحة الملف بسبب حجمه. اطلب من المسؤول رفع client_max_body_size في nginx إلى 17 ميغابايت للمسار /api/whatsapp/attachments.",
   'whatsapp.error.attachmentEmpty': 'الملف فارغ.',
   'whatsapp.error.attachmentTypeNotAllowed': 'لا يمكن إرسال هذا النوع من الملفات من هنا.',
   'whatsapp.error.attachmentNotAllowed': 'لا يمكن إرسال هذا المرفق من هنا.',

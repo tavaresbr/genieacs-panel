@@ -3217,6 +3217,7 @@ const zhCN: Dictionary = {
   'whatsapp.error.invalidPortalUrl': '客户门户地址无效。',
   'whatsapp.error.messageEmpty': '请先输入内容再发送。',
   'whatsapp.error.attachmentTooLarge': '文件超过 {max} MB。',
+  'whatsapp.error.proxyBodyTooLarge': "面板前面的网页服务器因文件过大拒绝了它。请让管理员把 nginx 的 client_max_body_size 调到 17 MB（/api/whatsapp/attachments）。",
   'whatsapp.error.attachmentEmpty': '文件是空的.',
   'whatsapp.error.attachmentTypeNotAllowed': '这里不能发送这种类型的文件。',
   'whatsapp.error.attachmentNotAllowed': '这里不能发送该附件。',

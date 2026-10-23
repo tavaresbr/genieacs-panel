@@ -3225,6 +3225,7 @@ const ru: Dictionary = {
   'whatsapp.error.invalidPortalUrl': 'Адрес портала абонента указан неверно.',
   'whatsapp.error.messageEmpty': 'Введите текст перед отправкой.',
   'whatsapp.error.attachmentTooLarge': 'Файл больше {max} МБ.',
+  'whatsapp.error.proxyBodyTooLarge': "Веб-сервер перед панелью отклонил файл из-за размера. Попросите администратора увеличить client_max_body_size в nginx до 17 МБ для /api/whatsapp/attachments.",
   'whatsapp.error.attachmentEmpty': 'Файл пуст.',
   'whatsapp.error.attachmentTypeNotAllowed': 'Файлы такого типа отсюда отправить нельзя.',
   'whatsapp.error.attachmentNotAllowed': 'Это вложение отсюда отправить нельзя.',

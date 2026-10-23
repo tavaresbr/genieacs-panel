@@ -3227,6 +3227,7 @@ const ja: Dictionary = {
   'whatsapp.down.dismiss': '閉じる',
   'whatsapp.error.messageEmpty': '送信する前に何か入力してください。',
   'whatsapp.error.attachmentTooLarge': 'ファイルが {max} MB を超えています。',
+  'whatsapp.error.proxyBodyTooLarge': "パネルの前段のWebサーバーがサイズを理由にファイルを拒否しました。管理者に、/api/whatsapp/attachments の nginx client_max_body_size を17 MBに上げるよう依頼してください。",
   'whatsapp.error.attachmentEmpty': 'ファイルが空です.',
   'whatsapp.error.attachmentTypeNotAllowed': 'その種類のファイルはここからは送れません。',
   'whatsapp.error.attachmentNotAllowed': 'その添付ファイルはここからは送れません。',

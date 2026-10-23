@@ -3223,6 +3223,7 @@ const ko: Dictionary = {
   'whatsapp.error.invalidPortalUrl': '고객 포털 URL이 올바르지 않습니다.',
   'whatsapp.error.messageEmpty': '보내기 전에 내용을 입력하십시오.',
   'whatsapp.error.attachmentTooLarge': '파일이 {max} MB보다 큽니다.',
+  'whatsapp.error.proxyBodyTooLarge': "패널 앞의 웹 서버가 파일 크기 때문에 거부했습니다. 관리자에게 /api/whatsapp/attachments 의 nginx client_max_body_size 를 17 MB로 올려 달라고 요청하세요.",
   'whatsapp.error.attachmentEmpty': '파일이 비어 있습니다.',
   'whatsapp.error.attachmentTypeNotAllowed': '이 종류의 파일은 여기에서 보낼 수 없습니다.',
   'whatsapp.error.attachmentNotAllowed': '이 첨부 파일은 여기에서 보낼 수 없습니다.',
