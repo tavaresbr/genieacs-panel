@@ -465,7 +465,15 @@ class WaConversationService {
         if (contact.client_ref) clientIds.set(contact.contract, contact.client_ref);
       }
       const links = await tdb('sgp_links').whereIn('contract', contracts).select('contract', 'client_name');
-      for (const link of links) names.set(link.contract, link.client_name);
+      // Um nome vazio na ONT não apaga o que o contrato já tinha.
+      for (const link of links) if (link.client_name) names.set(link.contract, link.client_name);
+      // O contrato sem nome (visto só numa consulta ao SGP) ainda é de um
+      // cliente que o painel conhece por outra linha: o cadastro sem contrato.
+      const semNome = contracts.filter((contract) => !names.get(contract) && clientIds.get(contract));
+      if (semNome.length > 0) {
+        const doCliente = await this.namesOfClients(semNome.map((contract) => clientIds.get(contract)));
+        for (const contract of semNome) names.set(contract, doCliente.get(String(clientIds.get(contract))) ?? null);
+      }
     }
     const blocked = await WaOptOut.activeBlocks(rows.map((r) => r.wa_phone_e164));
     const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
@@ -545,6 +553,31 @@ class WaConversationService {
     return mapa;
   }
 
+  /**
+   * O nome de cada cliente do SGP, pelo id dele, lido de qualquer linha que o
+   * tenha: a do cadastro sem contrato (`sgp_client_id`) ou a de outro contrato
+   * do mesmo cliente (`client_ref`). Para o contrato que só chegou por uma
+   * consulta e ficou sem nome.
+   *
+   * @returns {Promise<Map<string, string>>} id do cliente → nome
+   */
+  static async namesOfClients(clientRefs) {
+    const refs = [...new Set(clientRefs.filter(Boolean).map(String))];
+    const names = new Map();
+    if (refs.length === 0) return names;
+    const rows = await tdb('sgp_contacts')
+      .where((q) => q.whereIn('sgp_client_id', refs).orWhereIn('client_ref', refs))
+      .whereNotNull('client_name')
+      .where('client_name', '<>', '')
+      .orderBy('id', 'asc')
+      .select('sgp_client_id', 'client_ref', 'client_name');
+    for (const row of rows) {
+      const ref = String(row.sgp_client_id ?? row.client_ref);
+      if (!names.has(ref)) names.set(ref, row.client_name);
+    }
+    return names;
+  }
+
   /** The thread as the browser wants it, with the two facts the row cannot hold. */
   static async decorate(conversation) {
     const link = conversation.contract && conversation.device_id
@@ -572,7 +605,9 @@ class WaConversationService {
         ? (await BillingStatusService.forContracts([conversation.contract])).get(conversation.contract) ?? null
         : null,
       assignedTo: conversation.assigned_user_id ? atendentes.get(Number(conversation.assigned_user_id)) ?? null : null,
-      clientName: link?.client_name ?? contact?.client_name ?? null,
+      clientName: link?.client_name || contact?.client_name
+        || (doContrato?.client_ref ? (await this.namesOfClients([doContrato.client_ref])).get(String(doContrato.client_ref)) : null)
+        || null,
       ...optOutOf(await this.optOutEntries(conversation))
     });
   }
