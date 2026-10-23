@@ -2016,6 +2016,35 @@ export interface TenantChargeView {
   pricing?: ChargePricing | null
   /** O crédito (indicação, ajuste) abatido nela, em centavos. Opcional: servidores antigos não mandam. */
   creditCents?: number
+  /** Quando foi paga (dia `YYYY-MM-DD` ou instante ISO). Opcional: servidores antigos não mandam. */
+  paidAt?: string | null
+  /** O meio do pagamento (`PIX`, `BOLETO`, `CREDIT_CARD`, `MANUAL`…), ou nulo quando não informado. */
+  paymentMethod?: string | null
+  /** O desconto por antecipação que o pagamento ganhou, em centavos. */
+  earlyDiscountCents?: number
+  /** O cupom que valeu nesta cobrança. */
+  couponCode?: string | null
+  /** Se há recibo (só a paga). */
+  receiptAvailable?: boolean
+  /** Se há segunda via (em aberto e emitida no gateway). */
+  paymentInfoAvailable?: boolean
+}
+
+/** O filtro de estado da lista de faturas: os da coluna, e `open` (os em aberto). */
+export type TenantChargeStatusFilter = 'open' | TenantChargeView['status']
+
+/** A "segunda via" de uma cobrança em aberto, lida do gateway na hora. */
+export interface TenantChargePaymentInfo {
+  chargeId: number
+  status: TenantChargeView['status']
+  amountCents: number
+  currency: string
+  dueDate: string | null
+  billingType: string
+  invoiceUrl: string | null
+  boleto: { identificationField: string; barCode: string | null; bankSlipUrl: string | null } | null
+  pix: { payload: string; encodedImage: string | null; expirationDate: string | null } | null
+  fetchedAt: string
 }
 
 /**
@@ -2847,7 +2876,28 @@ export const subscriptionAPI = {
    * que dá a saída do muro do 402, e por isso a tela de bloqueio também a
    * chama.
    */
-  charges: () => apiClient.get<{ charges: TenantChargeView[] }>('/tenant/charges'),
+  charges: (filters: { year?: number | null; status?: TenantChargeStatusFilter | null } = {}) => {
+    const params = new URLSearchParams()
+    if (filters.year) params.set('year', String(filters.year))
+    if (filters.status) params.set('status', filters.status)
+    const suffix = params.toString()
+    return apiClient.get<{
+      charges: TenantChargeView[]
+      /** Os anos com cobrança, do mais recente ao mais antigo. Opcional: servidores antigos não mandam. */
+      years?: number[]
+    }>(`/tenant/charges${suffix ? `?${suffix}` : ''}`)
+  },
+
+  /**
+   * A segunda via de uma cobrança em aberto: a página, a linha digitável e o
+   * QR do Pix de agora. 409 `not_open`/`no_gateway_charge`/`already_paid`,
+   * 404 para a cobrança que não é deste provedor, 502 `gateway_failed`.
+   */
+  chargePaymentInfo: (chargeId: number) =>
+    apiClient.get<{ paymentInfo: TenantChargePaymentInfo }>(`/tenant/charges/${chargeId}/payment-info`),
+
+  /** O recibo (HTML para imprimir) de uma cobrança paga. 409 `not_paid` nas outras. */
+  chargeReceipt: (chargeId: number) => apiClient.getBlob(`/tenant/charges/${chargeId}/receipt`),
 
   /** Os planos à venda, com o atual marcado. */
   plans: () => apiClient.get<TenantPlanOption[]>('/tenant/plans'),

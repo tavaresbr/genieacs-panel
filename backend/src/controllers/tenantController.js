@@ -21,6 +21,29 @@ import { lookupCnpj } from '../services/cnpjLookupService.js';
 import { lookupCep, geocodeAddress } from '../services/addressLookupService.js';
 import ReferralService from '../services/referralService.js';
 import { readBranding, readBrandingImage } from '../services/platformBrandingService.js';
+import TenantChargeService, { TenantChargeError } from '../services/tenantChargeService.js';
+import { receiptData, renderReceipt, RECEIPT_CSP } from '../services/chargeReceiptService.js';
+
+/** As mensagens das recusas das faturas do provedor, por código. */
+const TENANT_CHARGE_MESSAGES = Object.freeze({
+  invalid_filter: 'charges.invalidFilter',
+  charge_not_found: 'charges.notFound',
+  not_open: 'charges.notOpen',
+  no_gateway_charge: 'charges.noGatewayCharge',
+  already_paid: 'charges.alreadyPaid',
+  gateway_failed: 'charges.paymentInfoFailed',
+  not_paid: 'receipt.notPaid'
+});
+
+/** A recusa das faturas do provedor: o código no topo, a frase traduzida. */
+function tenantChargeRefusal(req, res, error) {
+  const chave = TENANT_CHARGE_MESSAGES[error.code] ?? 'charges.retrieveFailed';
+  return res.status(error.status).json({
+    ...createErrorResponse(req.t(chave)),
+    code: error.code,
+    ...(error.detail?.status ? { status: error.detail.status } : {})
+  });
+}
 
 /**
  * O cadastro fiscal vindo do corpo, normalizado — ou o motivo de recusa.
@@ -667,17 +690,74 @@ class TenantController {
    * FORA da porta da assinatura — ver o comentário em `subscriptionGate.js`.
    */
   static async listCharges(req, res) {
+    let filtros;
     try {
-      const cobrancas = await BillingCharge.listRecent({ limit: 24 });
+      // `?year=` e `?status=` (faturas do provedor): sem eles, as 24 mais
+      // recentes de sempre — que é o que o muro do 402 lê.
+      filtros = TenantChargeService.parseFilters(req.query);
+    } catch (error) {
+      if (error instanceof TenantChargeError) return tenantChargeRefusal(req, res, error);
+      throw error;
+    }
+    try {
+      const cobrancas = await TenantChargeService.listCharges(filtros);
       const notas = await BillingInvoice.forCharges(cobrancas.map((linha) => linha.id));
+      const fatos = await TenantChargeService.paymentFactsFor(cobrancas);
       return res.json(createResponse(req.t('charges.retrieved'), {
-        charges: cobrancas.map((linha) => BillingCharge.present(linha, notas.get(Number(linha.id)) || null))
+        charges: cobrancas.map((linha) => TenantChargeService.presentWithFacts(linha, notas.get(Number(linha.id)) || null, fatos)),
+        years: await TenantChargeService.chargeYears(),
+        filters: filtros
       }));
     } catch (error) {
       console.error('List charges error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('charges.retrieveFailed'), error.message)
       );
+    }
+  }
+
+  /**
+   * `GET /api/tenant/charges/:id/payment-info` — a "segunda via": a página de
+   * pagamento, a linha digitável do boleto e o QR do Pix que valem AGORA, lidos
+   * do gateway. Só da cobrança em aberto (`pending`/`overdue`) deste provedor;
+   * o id de outro é 404, como o que não existe. Fora da porta da assinatura,
+   * como a lista: o bloqueado é quem mais precisa disto.
+   *
+   * Só lê. O gateway fora do ar é um 502 `gateway_failed` e nada muda na linha.
+   */
+  static async chargePaymentInfo(req, res) {
+    try {
+      const info = await TenantChargeService.paymentInfo(req.params.id);
+      return res.json(createResponse(req.t('charges.paymentInfoReady'), { paymentInfo: info }));
+    } catch (error) {
+      if (error instanceof TenantChargeError) {
+        if (error.status === 502) console.warn(`Payment info for charge ${req.params.id} (provider ${req.tenantId}): ${error.message}`);
+        return tenantChargeRefusal(req, res, error);
+      }
+      console.error('Charge payment info error:', error);
+      return res.status(500).json(createErrorResponse(req.t('charges.paymentInfoFailed'), error.message));
+    }
+  }
+
+  /**
+   * `GET /api/tenant/charges/:id/receipt` — o recibo de uma cobrança PAGA, em
+   * HTML para imprimir (409 `not_paid` nas outras). A CSP da resposta é a do
+   * recibo, que não deixa rodar nada: o documento leva o nome do provedor,
+   * digitado por ele, e o escape é a primeira trava, não a única.
+   */
+  static async chargeReceipt(req, res) {
+    try {
+      const dados = await receiptData(req.params.id);
+      const html = renderReceipt(dados, { locale: req.locale });
+      res.setHeader('Content-Security-Policy', RECEIPT_CSP);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="recibo-${Number(dados.charge.id)}.html"`);
+      return res.send(html);
+    } catch (error) {
+      if (error instanceof TenantChargeError) return tenantChargeRefusal(req, res, error);
+      console.error('Charge receipt error:', error);
+      return res.status(500).json(createErrorResponse(req.t('receipt.failed'), error.message));
     }
   }
 

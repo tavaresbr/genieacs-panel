@@ -163,6 +163,45 @@ describe('e vê estando bloqueado, que é quando precisa', () => {
   }
 });
 
+/**
+ * A segunda via e o recibo (faturas do provedor), endereçados por id: a porta
+ * os conhece por um padrão fechado, e é ele que se prova aqui. A segunda via
+ * de uma cobrança sem gateway recusa no CONTROLADOR (409), que só existe se a
+ * porta deixou passar; o recibo da paga sai inteiro.
+ */
+describe('a segunda via e o recibo também passam pela porta', () => {
+  for (const status of ['past_due', 'suspended']) {
+    it(`para um provedor ${status}`, async () => {
+      const aberta = await cobranca(alfa);
+      const paga = await cobranca(alfa, { period_end: '2026-02-28', status: 'paid', invoice_url: null });
+      await estado({ status });
+
+      const comum = await call(`${panelUrl}/api/users`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: { username: `alguem-via-${status}`, password: 'senha-de-alguem-1', role: 'viewer' }
+      });
+      assert.equal(comum.status, 402, 'o provedor precisava estar bloqueado');
+
+      const via = await call(`${panelUrl}/api/tenant/charges/${aberta}/payment-info`, { headers: authHeaders(token) });
+      assert.equal(via.status, 409, JSON.stringify(via.body));
+      assert.equal(via.body.code, 'no_gateway_charge');
+
+      const recibo = await call(`${panelUrl}/api/tenant/charges/${paga}/receipt`, { headers: authHeaders(token) });
+      assert.equal(recibo.status, 200);
+    });
+  }
+
+  it('e o padrão é fechado: outra palavra embaixo do id não herda a isenção', async () => {
+    const { subscriptionRefusal } = await import('../src/middleware/subscriptionGate.js');
+    await estado({ status: 'past_due' });
+    const recusa = await runInTenant(alfa, () => subscriptionRefusal({
+      method: 'POST', originalUrl: '/api/tenant/charges/1/qualquer-coisa', headers: {}
+    }));
+    assert.ok(recusa, 'um caminho fora do padrão precisava ser recusado');
+  });
+});
+
 describe('e não é rota aberta', () => {
   it('sem sessão, 401', async () => {
     assert.equal((await call(`${panelUrl}/api/tenant/charges`)).status, 401);
