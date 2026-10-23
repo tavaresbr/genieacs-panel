@@ -195,6 +195,19 @@ describe('POST /broadcasts', () => {
     await asTenant(() => WaBroadcastService.setStatus(id, 'canceled'));
   });
 
+  it('uma campanha antiga com lista de contratos devolve a lista pelos destinatários, para poder ser editada', async () => {
+    const criada = await criar({ title: 'Lista antiga', filters: { contracts: ['101', '103'] }, body: 'Oi' });
+    assert.equal(criada.status, 201, JSON.stringify(criada.body));
+    const id = criada.body.data.broadcast.id;
+    // Como se fosse de antes de a lista ser guardada: só a contagem.
+    await getDb()('wa_broadcasts').where({ id }).update({
+      audience_json: JSON.stringify({ states: [], plans: [], districts: [], cities: [], contracts: 2 })
+    });
+    const lista = await api('/broadcasts');
+    const antiga = lista.body.data.find((b) => b.id === id);
+    assert.deepEqual(antiga.audience.contractList, ['101', '103']);
+  });
+
   it('recusa agendamento no passado', async () => {
     const { status } = await criar({
       title: 'Atrasada', filters: { contracts: ['101'] }, body: 'Oi', scheduledAt: new Date(Date.now() - 3600_000).toISOString()
