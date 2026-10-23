@@ -5,13 +5,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { fileURLToPath } from 'node:url';
+
 import {
+  assertCompleteHistory,
+  assertReleasable,
   collectCommits,
   createGit,
   determineBump,
   findPreviousRelease,
   pickPrevious
 } from '../../scripts/prepare-release.mjs';
+
+const SCRIPT = fileURLToPath(new URL('../../scripts/prepare-release.mjs', import.meta.url));
 
 /**
  * Where the release script decides the last release was, and what the next
@@ -60,7 +66,7 @@ function makeRepo() {
   };
   const merge = (branch, message) => run('merge', '-q', '--no-ff', '-m', message, branch);
   const { git, tryGit } = createGit(dir);
-  return { run, commit, merge, git, tryGit };
+  return { dir, run, commit, merge, git, tryGit };
 }
 
 const subjects = (commits) => commits.map((commit) => commit.subject);
@@ -232,5 +238,121 @@ describe('the commits the next release is made of', () => {
     const previous = findPreviousRelease(repo.tryGit);
     assert.equal(previous.version, '1.18.0');
     assert.deepEqual(subjects(collectCommits(repo.git, previous)), ['fix: later']);
+  });
+});
+
+describe('refusing before anything is written', () => {
+  it('refuses a version that is already in the CHANGELOG', () => {
+    assert.throws(
+      () => assertReleasable({ nextVersion: '1.18.0', currentVersion: '1.17.0', changelog: '## [1.18.0] - x' }),
+      /already contains version 1\.18\.0/
+    );
+  });
+
+  /** The shallow clone's 1.12.0 against a tree at 1.18.0. */
+  it('refuses to move the version backwards', () => {
+    assert.throws(
+      () => assertReleasable({ nextVersion: '1.12.0', currentVersion: '1.18.0', changelog: '' }),
+      /would be 1\.12\.0, but package\.json is already at 1\.18\.0/
+    );
+  });
+
+  it('refuses to cut the version the tree already declares', () => {
+    assert.throws(() => assertReleasable({ nextVersion: '1.18.0', currentVersion: '1.18.0', changelog: '' }));
+  });
+
+  it('lets a higher version through', () => {
+    assert.doesNotThrow(() => assertReleasable({ nextVersion: '1.19.0', currentVersion: '1.18.0', changelog: '## [1.18.0]' }));
+  });
+});
+
+describe('a release cut from a shallow clone', () => {
+  let origin;
+
+  /**
+   * A tree laid out like this one, with the release commit for 1.18.0 buried
+   * under enough later work that a shallow clone cuts it off.
+   */
+  before(() => {
+    origin = makeRepo();
+    const write = (relative, content) => {
+      const file = path.join(origin.dir, relative);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, content);
+    };
+    const manifest = (name) => `${JSON.stringify({ name, version: '1.18.0' }, null, 2)}\n`;
+    const lock = (name) => `${JSON.stringify({ name, version: '1.18.0', packages: { '': { version: '1.18.0' } } }, null, 2)}\n`;
+    write('scripts/prepare-release.mjs', fs.readFileSync(SCRIPT, 'utf8'));
+    write('package.json', manifest('root'));
+    write('backend/package.json', manifest('backend'));
+    write('frontend/package.json', manifest('frontend'));
+    write('backend/package-lock.json', lock('backend'));
+    write('frontend/package-lock.json', lock('frontend'));
+    write('frontend/src/generated/release.json', '{}\n');
+    write('CHANGELOG.md', '# Changelog\n\n## [1.18.0] - 2026-09-26\n\n- earlier\n');
+    origin.run('add', '-A');
+    origin.commit('feat: the tree as it stood');
+    origin.commit('chore(release): v1.18.0');
+    for (let i = 1; i <= 12; i += 1) origin.commit(i % 4 ? `fix: change ${i}` : `feat: change ${i}`);
+  });
+
+  const cloneOf = (...flags) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-release-clone-'));
+    scratch.push(dir);
+    fs.rmSync(dir, { recursive: true, force: true });
+    execFileSync('git', ['clone', '-q', ...flags, `file://${origin.dir}`, dir], { stdio: 'ignore' });
+    return dir;
+  };
+
+  const release = (dir) => {
+    try {
+      const out = execFileSync(process.execPath, ['scripts/prepare-release.mjs'], {
+        cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']
+      });
+      return { ok: true, out };
+    } catch (error) {
+      return { ok: false, out: `${error.stdout}${error.stderr}` };
+    }
+  };
+
+  const dirty = (dir) => execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' }).trim();
+  const version = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version;
+
+  it('is told to fetch the full history, and leaves every file as it was', () => {
+    const dir = cloneOf('--depth', '5');
+    const { tryGit } = createGit(dir);
+    assert.throws(() => assertCompleteHistory(tryGit), /shallow clone/);
+
+    const result = release(dir);
+    assert.equal(result.ok, false);
+    assert.match(result.out, /git fetch --unshallow/);
+    assert.equal(dirty(dir), '');
+    assert.equal(version(dir), '1.18.0');
+  });
+
+  /** The guard that does not depend on knowing why the anchor went missing. */
+  it('refuses a downgrade without writing, whatever lost the release commit', () => {
+    const dir = cloneOf();
+    const run = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
+    run('config', 'user.name', 'Release Test');
+    run('config', 'user.email', 'release-test@example.invalid');
+    // package.json moved ahead by hand: the next release by the commits is 1.19.0.
+    fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify({ name: 'root', version: '2.0.0' }, null, 2)}\n`);
+    run('commit', '-q', '-am', 'chore: bump by hand');
+
+    const result = release(dir);
+    assert.equal(result.ok, false);
+    assert.match(result.out, /never moves the version backwards/);
+    assert.equal(dirty(dir), '');
+  });
+
+  it('cuts the release once the history is complete', () => {
+    const dir = cloneOf('--depth', '5');
+    execFileSync('git', ['fetch', '-q', '--unshallow'], { cwd: dir, stdio: 'ignore' });
+
+    const result = release(dir);
+    assert.equal(result.ok, true, result.out);
+    assert.match(result.out, /v1\.19\.0 .* after v1\.18\.0 \(release commit\)/);
+    assert.equal(version(dir), '1.19.0');
   });
 });

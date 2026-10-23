@@ -201,6 +201,44 @@ export function collectCommits(git, previous) {
     .filter((commit) => !/^chore\(release\)/i.test(commit.subject));
 }
 
+/**
+ * Refuses a history that cannot answer where the last release was.
+ *
+ * In a shallow clone the release commits may lie past the cut, and then no
+ * previous release is found at all: the version is recomputed from 1.0.0 over
+ * whatever commits survived. On a depth-50 clone of this repository that gave
+ * 1.12.0 — a downgrade from 1.18.0. `install.sh` clones with `--depth 1` and
+ * `actions/checkout` is shallow by default, so this is the ordinary state of
+ * most checkouts, not an exotic one.
+ */
+export function assertCompleteHistory(tryGit) {
+  if (tryGit(['rev-parse', '--is-shallow-repository']) === 'true') {
+    throw new Error(
+      'This is a shallow clone, so earlier releases may be missing from its history '
+      + 'and the next version cannot be worked out. Run `git fetch --unshallow` and try again.'
+    );
+  }
+}
+
+/**
+ * Everything that can stop a release, checked before any file is touched.
+ *
+ * The script used to write the manifests, the lockfiles and `release.json`
+ * first and only then notice that the CHANGELOG already carried the version —
+ * leaving a tree with the version rewritten and nothing to show why.
+ */
+export function assertReleasable({ nextVersion, currentVersion, changelog }) {
+  if (changelog.includes(`## [${nextVersion}]`)) {
+    throw new Error(`CHANGELOG.md already contains version ${nextVersion}.`);
+  }
+  if (currentVersion && compareVersions(nextVersion, currentVersion) <= 0) {
+    throw new Error(
+      `The next version would be ${nextVersion}, but package.json is already at ${currentVersion}. `
+      + 'A release never moves the version backwards; the previous release was not found where it should be.'
+    );
+  }
+}
+
 export function renderChangelog(version, date, commits, compareUrl) {
   const categoryOrder = ['Breaking', 'New', 'Improved', 'Fixed', 'Changed', 'Security', 'Maintenance'];
   const groups = new Map();
@@ -224,6 +262,7 @@ export function renderChangelog(version, date, commits, compareUrl) {
 
 function main() {
   const { git, tryGit } = createGit(rootDir);
+  assertCompleteHistory(tryGit);
   const previous = findPreviousRelease(tryGit);
   const commits = collectCommits(git, previous);
   if (commits.length === 0) {
@@ -241,6 +280,10 @@ function main() {
   const compareUrl = previous
     ? `${repositoryUrl}/compare/${previous.ref.slice(0, 12)}...${currentCommit}`
     : `${repositoryUrl}/commits/${currentCommit}`;
+
+  const changelogFile = path.join(rootDir, changelogPath);
+  const changelog = fs.readFileSync(changelogFile, 'utf8');
+  assertReleasable({ nextVersion, currentVersion: readJson(packagePaths[0]).version, changelog });
 
   for (const relativePath of packagePaths) {
     const manifest = readJson(relativePath);
@@ -269,11 +312,6 @@ function main() {
     }))
   });
 
-  const changelogFile = path.join(rootDir, changelogPath);
-  const changelog = fs.readFileSync(changelogFile, 'utf8');
-  if (changelog.includes(`## [${nextVersion}]`)) {
-    throw new Error(`CHANGELOG.md already contains version ${nextVersion}.`);
-  }
   const firstReleaseIndex = changelog.indexOf('\n## ');
   const header = firstReleaseIndex === -1 ? changelog.trimEnd() : changelog.slice(0, firstReleaseIndex).trimEnd();
   const previousReleases = firstReleaseIndex === -1 ? '' : changelog.slice(firstReleaseIndex + 1).trim();
