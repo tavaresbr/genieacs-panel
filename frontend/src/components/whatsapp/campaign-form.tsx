@@ -104,6 +104,8 @@ export function CampaignForm({ onClose, onCreated, editing }: {
   const [mode, setMode] = useState<'template' | 'text'>(editing?.templateId ? 'template' : 'text')
   const [templateId, setTemplateId] = useState(editing?.templateId ? String(editing.templateId) : '')
   const [body, setBody] = useState(editing && !editing.templateId ? editing.body : '')
+  // Promocional: quem pediu para não receber promoção é pulado no envio.
+  const [promotional, setPromotional] = useState(Boolean(editing?.promotional))
   const [attachment, setAttachment] = useState<{ path: string; name: string } | null>(null)
   // Na edição, o anexo que já está na campanha fica até alguém trocar ou tirar.
   const [keepOldAttachment, setKeepOldAttachment] = useState(Boolean(editing?.attachment))
@@ -163,7 +165,7 @@ export function CampaignForm({ onClose, onCreated, editing }: {
     : (body.trim() ? { body } : null)
 
   // Qualquer mudança no público ou no texto torna a prévia velha.
-  useEffect(() => { setPreview(null) }, [filters, mode, templateId, body])
+  useEffect(() => { setPreview(null) }, [filters, mode, templateId, body, promotional])
 
   const optionLabel = (group: Group, option: WhatsAppCampaignOption) => (
     group === 'states' && STATE_LABEL[option.value] ? t(STATE_LABEL[option.value]) : option.value
@@ -208,7 +210,7 @@ export function CampaignForm({ onClose, onCreated, editing }: {
     }
     setPreviewing(true)
     try {
-      const res = await whatsappAPI.previewCampaign({ filters, ...message })
+      const res = await whatsappAPI.previewCampaign({ filters, ...message, promotional })
       if (!res.success || !res.data) {
         toast.error(errorText(res, t, 'whatsapp.campaign.createFailed'))
         return
@@ -235,7 +237,8 @@ export function CampaignForm({ onClose, onCreated, editing }: {
         ...message,
         scheduledAt: scheduledIso,
         accountId: accountId ? Number(accountId) : null,
-        pace
+        pace,
+        promotional
       }
       const res = editing
         ? await whatsappAPI.updateCampaign(editing.id, {
@@ -385,6 +388,19 @@ export function CampaignForm({ onClose, onCreated, editing }: {
               </div>
             )}
             <p className="field-hint">{t('whatsapp.campaign.variablesHint')}</p>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={promotional}
+                onChange={(event) => setPromotional(event.target.checked)}
+                data-testid="campaign-promotional"
+              />
+              <span>
+                <span className="block font-semibold">{t('whatsapp.campaign.promotional')}</span>
+                <span className="text-muted-foreground">{t('whatsapp.campaign.promotionalHint')}</span>
+              </span>
+            </label>
           </fieldset>
 
           <div>
@@ -486,6 +502,11 @@ export function CampaignForm({ onClose, onCreated, editing }: {
                     incomplete: preview.counts.templateIncomplete
                   })}
                 </p>
+                {preview.marketing && (
+                  <p className="text-sm" data-testid="campaign-preview-marketing">
+                    {t('whatsapp.campaign.previewMarketingOptOut', { count: preview.counts.marketingOptOut ?? 0 })}
+                  </p>
+                )}
                 {preview.counts.reachable > 0 && effectivePerHour > 0 && (
                   <p className="field-hint">
                     {t('whatsapp.campaign.previewDuration', {

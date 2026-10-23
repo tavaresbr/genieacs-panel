@@ -15,6 +15,8 @@ import DeviceHistoryService from './services/deviceHistoryService.js';
 import WaBroadcastService from './services/waBroadcastService.js';
 import WaMediaSweeper from './services/waMediaSweeper.js';
 import WaMessageSweeper from './services/waMessageSweeper.js';
+import MetaNumberHealthService from './services/metaNumberHealthService.js';
+import WaMetaTemplateWatcher from './services/waMetaTemplateWatcher.js';
 import { forEachTenant } from './config/tenantJobs.js';
 import { installTenantTaggedConsole } from './utils/logger.js';
 import { applyRowLevelSecurity, assertRoleEnforcesRls, rlsEnabled } from './config/rls.js';
@@ -177,6 +179,14 @@ export const startServer = async () => {
       // installation that never sets one. Like its neighbour it does not sweep
       // at boot: a restart must not be a fresh chance to delete history.
       WaMessageSweeper.start();
+      // A saúde dos números oficiais na Meta: uma consulta por número por hora,
+      // por provedor ativo. Sem número oficial, a passada não faz nada.
+      MetaNumberHealthService.start();
+      // O vigia dos modelos da Meta em análise: a cada dez minutos, sincroniza
+      // de novo só os números oficiais com modelo PENDING, para a aprovação ou
+      // a recusa aparecer sem ninguém apertar "Sincronizar". Número sem
+      // pendência não é consultado.
+      WaMetaTemplateWatcher.start();
       console.log(`Panel: http://localhost:${PORT}`);
     });
     // O agente do GenieACS (modo `agent`) conecta por WebSocket no servidor do
@@ -208,6 +218,8 @@ async function shutdown(signal) {
   WaBroadcastService.stop();
   WaMediaSweeper.stop();
   WaMessageSweeper.stop();
+  MetaNumberHealthService.stop();
+  WaMetaTemplateWatcher.stop();
   // Antes de fechar o servidor: um WebSocket aberto é uma conexão que o
   // `server.close` esperaria para sempre.
   agentHub.close();

@@ -64,6 +64,7 @@ import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType
 import { MfaCard } from '@/components/mfa-card'
 import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
+import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-panel'
 import { IntegrationsHub } from '@/components/settings/integrations-hub'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
@@ -3048,6 +3049,9 @@ export default function Settings() {
             )}
           </div>
         )}
+
+        {/* O "parar promoções" vale para todos os números, e mora junto. */}
+        {activeTab === 'whatsapp' && can('whatsapp.config') && <MarketingOptOutPanel />}
 
         {activeTab === 'security' && (
           <div className="modern-card max-w-5xl p-4 sm:p-6">

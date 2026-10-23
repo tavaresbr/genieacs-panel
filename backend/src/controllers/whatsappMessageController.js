@@ -5,6 +5,7 @@ import WaConversationService from '../services/waConversationService.js';
 import WaContactService from '../services/waContactService.js';
 import WaAssignmentService from '../services/waAssignmentService.js';
 import WaTagService from '../services/waTagService.js';
+import WaMarketingOptOutService from '../services/waMarketingOptOutService.js';
 import WaResponseTimeService from '../services/waResponseTimeService.js';
 import WaNotificationService from '../services/waNotificationService.js';
 import WaAlertService from '../services/waAlertService.js';
@@ -125,6 +126,42 @@ class WhatsAppMessageController {
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
+    }
+  }
+
+  /**
+   * "Não quer promoções", marcado ou desmarcado pela equipe na conversa.
+   * Marcar protege o cliente e é de quem atende; desmarcar devolve a promoção
+   * a alguém, e pede quem decide campanha (ver a rota). Os dois vão para a
+   * trilha.
+   */
+  static async setMarketingOptOut(req, res) {
+    return WhatsAppMessageController.marketingOptOut(req, res, true);
+  }
+
+  static async clearMarketingOptOut(req, res) {
+    return WhatsAppMessageController.marketingOptOut(req, res, false);
+  }
+
+  static async marketingOptOut(req, res, optedOut) {
+    try {
+      const { changed, conversation } = await WaMarketingOptOutService.setForConversation(
+        req.params?.id,
+        optedOut,
+        { userId: req.user?.userId ?? null }
+      );
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_MARKETING_OPT_OUT_CHANGED,
+        subjectType: 'conversation',
+        subjectId: String(conversation.id),
+        detail: { optedOut, changed }
+      });
+      return res.json(createResponse(
+        req.t(optedOut ? 'whatsapp.marketingOptOut.marked' : 'whatsapp.marketingOptOut.cleared'),
+        conversation
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.marketingOptOut.failed');
     }
   }
 

@@ -1727,6 +1727,27 @@ const WA_ACCOUNT_META_WEBHOOK_COLUMNS = [
 ];
 
 /**
+ * A saúde do número oficial na Meta (0118), lida pela Graph API
+ * (`GET /{phone_number_id}`) de hora em hora e no botão "Atualizar":
+ * a nota de qualidade (GREEN/YELLOW/RED/UNKNOWN), o limite de conversas
+ * iniciadas por dia (`TIER_250`, `TIER_1K`…), o nome verificado e o status do
+ * número. Os valores ficam da última leitura boa; `meta_health_error` diz se a
+ * última consulta falhou, e `meta_health_at` quando foi. Nulo é "ainda não
+ * consultado".
+ */
+const WA_ACCOUNT_META_HEALTH_COLUMNS = [
+  ['meta_quality_rating', (t) => t.string('meta_quality_rating', 16).nullable()],
+  ['meta_messaging_limit', (t) => t.string('meta_messaging_limit', 32).nullable()],
+  ['meta_verified_name', (t) => t.string('meta_verified_name', 255).nullable()],
+  ['meta_display_phone', (t) => t.string('meta_display_phone', 32).nullable()],
+  ['meta_name_status', (t) => t.string('meta_name_status', 32).nullable()],
+  ['meta_number_status', (t) => t.string('meta_number_status', 32).nullable()],
+  ['meta_throughput', (t) => t.string('meta_throughput', 32).nullable()],
+  ['meta_health_at', (t) => t.timestamp('meta_health_at').nullable()],
+  ['meta_health_error', (t) => t.string('meta_health_error', 255).nullable()]
+];
+
+/**
  * Como a mensagem saiu: texto livre ou modelo aprovado da Meta. `meta_template`
  * é a foto do modelo no momento do enfileiramento ({name, language, params}) —
  * o envio fora da janela de 24 h só é aceito assim.
@@ -2033,6 +2054,19 @@ const WA_TEMPLATE_META_MEDIA_COLUMNS = [
   ['meta_header', (t) => t.text('meta_header')],
   ['meta_button_param', (t) => t.string('meta_button_param', 64)],
   ['meta_button_index', (t) => t.integer('meta_button_index')]
+];
+
+/**
+ * O que a revisão da Meta disse de cada modelo (0117): o motivo da recusa
+ * (`INVALID_FORMAT`, `TAG_CONTENT_MISMATCH`…), a nota de qualidade
+ * (`GREEN`/`YELLOW`/`RED`) e QUANDO o status mudou, de quê — é isso que a tela
+ * mostra como "aprovado há 2 h" sem o provedor ter de apertar "Sincronizar".
+ */
+const WA_META_TEMPLATE_STATUS_COLUMNS = [
+  ['rejected_reason', (t) => t.string('rejected_reason', 64).nullable()],
+  ['quality_score', (t) => t.string('quality_score', 16).nullable()],
+  ['previous_status', (t) => t.string('previous_status', 24).nullable()],
+  ['status_changed_at', (t) => t.timestamp('status_changed_at').nullable()]
 ];
 
 const WA_META_MEDIA_COLUMN_TABLES = [
@@ -2910,6 +2944,69 @@ const COUPON_SYSTEM_COLUMNS = [
 ];
 
 /**
+ * Quem pediu para não receber PROMOÇÃO pelo WhatsApp (0120). Ver
+ * `models/WaMarketingOptOut.js`.
+ *
+ * Não é o "não perturbe" (`wa_opt_outs`). Aquele é a equipe dizendo que o
+ * provedor não inicia contato — por tipo de comunicação — e o "SAIR" do
+ * cliente o grava inteiro. Este é mais estreito e anda sozinho: o cliente
+ * respondeu "parar" a uma promoção, ou tocou no botão "Parar promoções" que a
+ * Meta põe nos modelos de MARKETING, e a partir daí só o que é promoção deixa
+ * de sair. Fatura, aviso técnico e atendimento continuam — e a volta ("VOLTAR")
+ * é do próprio cliente, pela mesma conversa.
+ *
+ * Chaveado por telefone e LID, como o não perturbe, e pelo mesmo motivo: o
+ * pedido foi feito por um número, e tem que sobreviver ao cadastro ser
+ * apagado e recriado. A revogação é suave (`revoked_at`) para o histórico de
+ * quem saiu e voltou, e quando, continuar existindo.
+ *
+ *   source         keyword (texto digitado), button (o botão da Meta) ou
+ *                  operator (a equipe marcou na conversa).
+ *   trigger_text   o que o cliente mandou, cortado — é o que responde "por
+ *                  que este número está fora da campanha?".
+ *   revoked_source keyword (o cliente mandou VOLTAR) ou operator.
+ */
+const waMarketingOptOutsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('wa_phone_e164', 24);
+  t.string('wa_lid', 32);
+  t.integer('conversation_id').unsigned()
+    .references('id').inTable('wa_conversations').onDelete('SET NULL');
+  t.string('source', 16).notNullable().defaultTo('keyword');
+  t.string('trigger_text', 120);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('opted_out_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('revoked_at');
+  t.string('revoked_source', 16);
+  t.integer('revoked_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.index(['tenant_id', 'wa_phone_e164'], 'wa_marketing_opt_outs_phone_idx');
+  t.index(['tenant_id', 'wa_lid'], 'wa_marketing_opt_outs_lid_idx');
+};
+
+const WA_MARKETING_OPT_OUT_TABLES = [
+  ['wa_marketing_opt_outs', waMarketingOptOutsTable]
+];
+
+/**
+ * O que é promoção, para o bloqueio acima poder valer até a hora do envio
+ * (0120):
+ *
+ *   wa_broadcasts.promotional  a campanha de texto livre marcada como
+ *                              promocional na tela. Com modelo da Meta, a
+ *                              categoria do modelo (MARKETING) já responde.
+ *   wa_messages.marketing      a mensagem enfileirada como promoção. A fila
+ *                              pode levar horas numa campanha grande, e quem
+ *                              pediu para sair no meio dela não pode receber a
+ *                              mensagem que já estava na fila.
+ */
+const WA_MARKETING_COLUMN_TABLES = [
+  ['wa_broadcasts', [['promotional', (t) => t.boolean('promotional').notNullable().defaultTo(false)]]],
+  ['wa_messages', [['marketing', (t) => t.boolean('marketing').notNullable().defaultTo(false)]]]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -2951,7 +3048,8 @@ export const SCHEMA_TABLES = [
   ...USAGE_PEAK_TABLES,
   ...REFERRAL_TABLES,
   ...CANCELLATION_TABLES,
-  ...PLATFORM_ALERT_TABLES
+  ...PLATFORM_ALERT_TABLES,
+  ...WA_MARKETING_OPT_OUT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6469,6 +6567,66 @@ export const migrations = [
       await db.schema.alterTable('wa_conversations', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** O status dos modelos da Meta atualizado sozinho — ver `WA_META_TEMPLATE_STATUS_COLUMNS`. */
+    id: '0118_wa_meta_template_status',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_meta_templates'))) return true;
+      return (await missingColumns(db, 'wa_meta_templates', WA_META_TEMPLATE_STATUS_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_meta_templates'))) return;
+      const missing = await missingColumns(db, 'wa_meta_templates', WA_META_TEMPLATE_STATUS_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_meta_templates', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** A qualidade e o limite do número oficial — ver `WA_ACCOUNT_META_HEALTH_COLUMNS`. */
+    id: '0119_wa_meta_number_health',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_HEALTH_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const missing = await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_HEALTH_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * O pedido de não receber promoção pelo WhatsApp — ver
+     * `waMarketingOptOutsTable` e `WA_MARKETING_COLUMN_TABLES`.
+     */
+    id: '0120_wa_marketing_opt_out',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasTable('wa_marketing_opt_outs'))) return false;
+      for (const [table, columns] of WA_MARKETING_COLUMN_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        if ((await missingColumns(db, table, columns)).length > 0) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'wa_marketing_opt_outs', waMarketingOptOutsTable(db));
+      for (const [table, columns] of WA_MARKETING_COLUMN_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        const missing = await missingColumns(db, table, columns);
+        if (!missing.length) continue;
+        await db.schema.alterTable(table, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
     }
   }
 ];

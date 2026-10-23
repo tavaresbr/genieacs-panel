@@ -307,6 +307,12 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
           {t('whatsapp.inbox.optedOut')}
         </span>
       )}
+      {!contact.optedOut && contact.marketingOptOut && (
+        <span className="modern-badge-warning" title={t('whatsapp.marketingOptOut.hint')}>
+          <Icon name="bell" size={12} />
+          {t('whatsapp.marketingOptOut.badge')}
+        </span>
+      )}
     </span>
   ) : (
     <span className="text-muted-foreground">{t('whatsapp.contacts.noPhone')}</span>

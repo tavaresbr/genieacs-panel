@@ -1,5 +1,8 @@
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
+import {
+  GRAPH_ERROR_LIMIT, META_GRAPH_VERSION, META_ID, graphRefusal, graphRequest, setMetaGraphFetcher
+} from './metaGraphClient.js';
 
 /**
  * O webhook de um número oficial registrado pelo próprio painel na Meta.
@@ -18,36 +21,16 @@ import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
  * vê. A Meta confere a URL na hora (o desafio `hub.challenge`), então um
  * `success` aqui já é a prova de que a volta funciona.
  *
- * O host é fixo, como o do Telegram (`telegramClient.js`): não passa pela
- * guarda de egresso dos endereços que vêm de dado. O token vai no cabeçalho,
- * nunca na URL, e nada daqui devolve a exceção do `fetch` nem a URL.
+ * A chamada em si é do `metaGraphClient.js`: host fixo, token só no
+ * cabeçalho, nada da exceção do `fetch` nem da URL volta para quem chamou.
  */
 
-const GRAPH_BASE = 'https://graph.facebook.com';
-/** A versão da Graph API; `META_GRAPH_VERSION` troca sem novo deploy de código. */
-export const META_GRAPH_VERSION = /^v\d{1,3}\.\d{1,2}$/.test(String(process.env.META_GRAPH_VERSION || '').trim())
-  ? String(process.env.META_GRAPH_VERSION).trim()
-  : 'v21.0';
-const GRAPH_TIMEOUT_MS = 10_000;
 /** O tamanho da coluna `meta_webhook_error`. */
-const ERROR_LIMIT = 255;
-const WABA_ID = /^\d{5,32}$/;
+const ERROR_LIMIT = GRAPH_ERROR_LIMIT;
 
-let fetcher = (...args) => fetch(...args);
-
-/** Para os testes: a Graph falsa entra aqui. */
-export function setMetaGraphFetcher(fn) {
-  fetcher = fn || ((...args) => fetch(...args));
-}
-
-/** A recusa da Graph em texto curto: `(<código>) <mensagem>`, sem o token. */
-function graphRefusal(status, data) {
-  const erro = data?.error;
-  const mensagem = typeof erro?.message === 'string' ? erro.message : '';
-  const codigo = erro?.code ?? status;
-  const texto = mensagem ? `(${codigo}) ${mensagem}` : `meta_http_${status}`;
-  return texto.slice(0, ERROR_LIMIT);
-}
+// Reexportados: o cliente da Graph mora em `metaGraphClient.js`, e quem já
+// importava daqui (os testes) continua importando.
+export { META_GRAPH_VERSION, setMetaGraphFetcher };
 
 /**
  * Registra o webhook da conta WABA na Meta. Nunca lança.
@@ -60,31 +43,61 @@ export async function subscribeWabaWebhook({ wabaId, metaToken, callbackUrl, ver
   // dizer por quê é mais útil que a recusa dela.
   if (!callbackUrl || !verifyToken) return { ok: false, error: 'meta_webhook_unconfigured' };
   const waba = String(wabaId ?? '').trim();
-  if (!WABA_ID.test(waba) || !metaToken) return { ok: false, error: 'meta_webhook_invalid_account' };
+  if (!META_ID.test(waba) || !metaToken) return { ok: false, error: 'meta_webhook_invalid_account' };
 
-  let resposta;
-  try {
-    resposta = await fetcher(`${GRAPH_BASE}/${META_GRAPH_VERSION}/${waba}/subscribed_apps`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${metaToken}`
-      },
-      body: JSON.stringify({ override_callback_uri: callbackUrl, verify_token: verifyToken }),
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-      redirect: 'manual'
-    });
-  } catch {
-    return { ok: false, error: 'meta_unreachable' };
+  const resposta = await graphRequest({
+    method: 'POST',
+    path: `/${waba}/subscribed_apps`,
+    metaToken,
+    body: { override_callback_uri: callbackUrl, verify_token: verifyToken }
+  });
+  if (resposta.ok && resposta.data?.success !== false) return { ok: true, error: null };
+  return { ok: false, error: resposta.error || graphRefusal(resposta.status, resposta.data) };
+}
+
+/** Os campos que a revisão dos modelos precisa — `rejected_reason` só vem se pedido. */
+const TEMPLATE_STATUS_FIELDS = 'id,name,language,status,category,rejected_reason,quality_score';
+const TEMPLATE_PAGE_SIZE = 200;
+/** Teto de páginas: 1000 modelos numa WABA já é muito mais que o normal. */
+const TEMPLATE_MAX_PAGES = 5;
+
+/**
+ * O status de cada modelo da conta WABA, direto na Graph API. Nunca lança.
+ *
+ * Existe porque o `/template/find` do Evolution chama a Graph sem `fields=`, e
+ * sem isso ela não devolve `rejected_reason` — o motivo de uma recusa, que é
+ * justamente o que o provedor precisa para corrigir o modelo. A lista em si
+ * continua vindo do Evolution (é o caminho do envio e da criação); isto só
+ * COMPLETA o motivo e a qualidade, e quem chama segue sem eles se falhar.
+ *
+ * Pagina pelo cursor `paging.cursors.after`, nunca pela URL `paging.next`: o
+ * endereço é sempre o da Graph, e o token vai no cabeçalho de cada página.
+ *
+ * @param {{ wabaId: string, metaToken: string }} p
+ * @returns {Promise<{ ok: true, templates: object[] } | { ok: false, error: string }>}
+ */
+export async function fetchTemplateStatuses({ wabaId, metaToken }) {
+  const waba = String(wabaId ?? '').trim();
+  if (!META_ID.test(waba) || !metaToken) return { ok: false, error: 'meta_webhook_invalid_account' };
+  const templates = [];
+  let depois = '';
+  for (let pagina = 0; pagina < TEMPLATE_MAX_PAGES; pagina += 1) {
+    const query = { fields: TEMPLATE_STATUS_FIELDS, limit: String(TEMPLATE_PAGE_SIZE) };
+    if (depois) query.after = depois;
+    // eslint-disable-next-line no-await-in-loop -- uma página depende da anterior
+    const resposta = await graphRequest({ path: `/${waba}/message_templates`, metaToken, query });
+    if (!resposta.ok) return { ok: false, error: resposta.error };
+    if (!Array.isArray(resposta.data?.data)) {
+      return { ok: false, error: graphRefusal(resposta.status, resposta.data) };
+    }
+    templates.push(...resposta.data.data);
+    // Só o cursor da resposta segue adiante, nunca a URL `paging.next`: o
+    // endereço continua sendo o nosso, com o token no cabeçalho.
+    const cursor = resposta.data.paging?.next ? resposta.data.paging?.cursors?.after : '';
+    if (typeof cursor !== 'string' || !cursor) break;
+    depois = cursor;
   }
-  let dados = null;
-  try {
-    dados = await resposta.json();
-  } catch {
-    dados = null;
-  }
-  if (resposta.ok && dados?.success !== false && !dados?.error) return { ok: true, error: null };
-  return { ok: false, error: graphRefusal(resposta.status, dados) };
+  return { ok: true, templates };
 }
 
 class MetaWebhookService {

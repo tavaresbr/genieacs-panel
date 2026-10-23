@@ -94,7 +94,7 @@ describe('GET /broadcasts/:id/recipients', () => {
     assert.equal(status, 200, JSON.stringify(body));
     assert.equal(body.data.broadcast.id, broadcastId);
     assert.deepEqual(body.data.summary, {
-      total: 4, pending: 0, sent: 4, delivered: 2, read: 1, replied: 1, optedOut: 1, failed: 0, skipped: 0, paid: 0
+      total: 4, pending: 0, sent: 4, delivered: 2, read: 1, replied: 1, optedOut: 1, failed: 0, skipped: 0, paid: 0, marketingOptOut: 0
     });
     assert.equal(body.data.total, 4);
     assert.equal(body.data.hasMore, false);

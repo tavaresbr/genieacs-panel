@@ -1,5 +1,6 @@
 import WaConversation from '../models/WaConversation.js';
 import { optOutOf } from '../utils/wa/waOptOutTipos.js';
+import WaMarketingOptOut from '../models/WaMarketingOptOut.js';
 import WaOptOut from '../models/WaOptOut.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
@@ -377,6 +378,7 @@ class WaContactService {
       .orderBy('last_message_at', 'desc')
       .select('id', 'contract', 'sgp_contact_id', 'wa_phone_e164', 'last_message_at', 'closed_at');
     const blocked = await WaOptOut.activeBlocks(phones);
+    const semPromocao = await WaMarketingOptOut.activePhones(phones);
     const sgpUrls = await this.sgpPageUrls(contracts, contactIds);
 
     return subscribers.map((subscriber) => {
@@ -409,6 +411,8 @@ class WaContactService {
         phone: subscriber.phone,
         phoneSource: subscriber.phoneSource,
         ...optOutOf(spellings.map((phone) => blocked.get(phone)).filter((tipos) => tipos !== undefined)),
+        // Pediu para não receber promoção; o resto continua saindo.
+        marketingOptOut: spellings.some((phone) => semPromocao.has(phone)),
         conversationId: thread?.id ?? null,
         lastMessageAt: thread?.last_message_at ?? null,
         sgpUrl: (subscriber.contract

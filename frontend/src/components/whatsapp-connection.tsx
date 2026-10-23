@@ -15,6 +15,9 @@ import type { TranslationKey } from '@/lib/i18n'
 import { copyToClipboard, formatRelativeTime } from '@/lib/utils'
 import { metaWebhookAuto, metaWebhookState } from '@/lib/meta-webhook'
 import {
+  QUALITY_LABEL, healthError, healthNeedsAttention, messagingLimit, qualityTone, type QualityTone
+} from '@/lib/meta-health'
+import {
   WA_ACCOUNT_CLASS,
   WA_ACCOUNT_COLORS,
   WA_ACCOUNT_COLOR_LABEL,
@@ -66,6 +69,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   no_destination: 'whatsapp.error.noDestination',
   // A API oficial da Meta.
   meta_window_closed: 'whatsapp.error.metaWindowClosed',
+  marketing_opt_out: 'whatsapp.marketingOptOut.blocked',
   cloud_requires_v2: 'whatsapp.error.cloudRequiresV2',
   invalid_meta_credentials: 'whatsapp.error.invalidMetaCredentials',
   not_applicable_cloud: 'whatsapp.error.notApplicableCloud',
@@ -83,6 +87,13 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   meta_button_mismatch: 'whatsapp.error.metaButtonMismatch',
   meta_header_missing: 'whatsapp.error.metaHeaderMissing',
   invalid_meta_template: 'whatsapp.error.invalidMetaTemplate',
+  meta_template_not_found: 'whatsapp.error.metaTemplateNotFound',
+  meta_template_not_editable: 'whatsapp.error.metaTemplateNotEditable',
+  meta_template_edit_limit: 'whatsapp.error.metaTemplateEditLimit',
+  meta_template_in_use: 'whatsapp.error.metaTemplateInUse',
+  meta_template_not_synced: 'whatsapp.error.metaTemplateNotSynced',
+  meta_waba_missing: 'whatsapp.error.metaWabaMissing',
+  meta_refused: 'whatsapp.error.metaRefused',
   invalid_meta_price: 'whatsapp.error.invalidMetaPrice',
   // Both reachable only from the inbox, and both were missing until the screen
   // that provokes them was built: an unknown code degrades to the generic
@@ -137,7 +148,8 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   alerts_disabled: 'whatsapp.alerts.disabledSkip',
   no_devices: 'whatsapp.alerts.noDevices',
   scan_failed: 'whatsapp.error.scanFailed',
-  meta_webhook_failed: 'whatsapp.error.metaWebhookFailed'
+  meta_webhook_failed: 'whatsapp.error.metaWebhookFailed',
+  meta_health_failed: 'whatsapp.error.metaHealthFailed'
 }
 
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string
@@ -506,6 +518,89 @@ function CopyField({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** A cor da bolinha de qualidade, nos tons de estado que o painel já usa. */
+const QUALITY_DOT: Record<QualityTone, string> = {
+  green: 'bg-[hsl(var(--status-success))]',
+  yellow: 'bg-[hsl(var(--status-warning))]',
+  red: 'bg-[hsl(var(--status-danger))]',
+  unknown: 'bg-muted-foreground/40'
+}
+
+/**
+ * A saúde do número oficial na Meta: a bolinha da nota de qualidade, o limite
+ * diário, o nome verificado e quando foi a consulta, com o "Atualizar". O
+ * painel consulta sozinho de hora em hora; o botão é para quem não quer
+ * esperar.
+ */
+function MetaHealthStatus({
+  account,
+  busy,
+  onRefresh
+}: {
+  account: WhatsAppAccount
+  busy: boolean
+  onRefresh: () => void
+}) {
+  const { t, formatNumber } = useTranslation()
+  const tone = qualityTone(account.metaQualityRating)
+  const limit = messagingLimit(account.metaMessagingLimit)
+  const erro = healthError(account.metaHealthError)
+  const consultado = Boolean(account.metaHealthAt && account.metaQualityRating)
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-foreground">{t('whatsapp.cloud.healthTitle')}</span>
+        {consultado ? (
+          <>
+            <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+              <span className={`size-2.5 shrink-0 rounded-full ${QUALITY_DOT[tone]}`} aria-hidden="true" />
+              {t(QUALITY_LABEL[tone])}
+            </span>
+            {limit && (
+              <span className="modern-badge">
+                {limit.kind === 'count'
+                  ? t('whatsapp.cloud.healthLimit', { count: formatNumber(limit.count) })
+                  : limit.kind === 'unlimited' ? t('whatsapp.cloud.healthLimitUnlimited') : limit.text}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground">{t('whatsapp.cloud.healthNever')}</span>
+        )}
+        {account.metaHealthAt && (
+          <span className="text-xs text-muted-foreground">
+            {t('whatsapp.cloud.healthCheckedAt', { when: formatRelativeTime(account.metaHealthAt) })}
+          </span>
+        )}
+        <button
+          type="button"
+          className="modern-button-secondary min-h-9 px-3 py-1 text-xs"
+          disabled={busy}
+          onClick={onRefresh}
+        >
+          <Icon name="refresh" size={14} />
+          {t('whatsapp.cloud.healthRefresh')}
+        </button>
+      </div>
+      {consultado && (account.metaVerifiedName || account.metaNumberStatus) && (
+        <p className="text-xs text-muted-foreground">
+          {account.metaVerifiedName && t('whatsapp.cloud.healthVerifiedName', { name: account.metaVerifiedName })}
+          {account.metaVerifiedName && account.metaNumberStatus && ' · '}
+          {account.metaNumberStatus && t('whatsapp.cloud.healthStatus', { status: account.metaNumberStatus })}
+        </p>
+      )}
+      {consultado && healthNeedsAttention(account) && (
+        <p className="text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.cloud.healthAttention')}</p>
+      )}
+      {erro && (
+        <p className="break-words text-xs text-[hsl(var(--status-danger))]">
+          {erro.key ? t(erro.key) : erro.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /** O selo do registro do webhook de um número, com a explicação e o "registrar de novo". */
 function MetaWebhookStatus({
   account,
@@ -844,6 +939,22 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
     }
   }, [load, t, toast])
 
+  const refreshMetaHealth = useCallback(async (account: WhatsAppAccount) => {
+    setBusyId(account.id)
+    try {
+      const res = await whatsappAPI.refreshMetaHealth(account.id)
+      if (!res.success) {
+        toast.error(res.message || whatsappErrorMessage(t, res.code))
+        await load()
+        return
+      }
+      toast.success(t('whatsapp.cloud.healthRefreshed'))
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }, [load, t, toast])
+
   const saveEdit = useCallback(async (account: WhatsAppAccount) => {
     setBusyId(account.id)
     try {
@@ -1163,6 +1274,14 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                     {' — '}
                     {formatRelativeTime(account.webhookRefusedAt)}
                   </p>
+                )}
+
+                {cloud && (
+                  <MetaHealthStatus
+                    account={account}
+                    busy={busy}
+                    onRefresh={() => void refreshMetaHealth(account)}
+                  />
                 )}
 
                 {editing === account.id ? (

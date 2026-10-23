@@ -473,6 +473,89 @@ export function findMetaTemplatesRequest(name) {
 }
 
 /**
+ * Os `components` da Graph API (HEADER, BODY, FOOTER, BUTTONS, nessa ordem) de
+ * um modelo já validado (`validateMetaTemplateInput`). Servem à criação, pelo
+ * servidor Evolution, e à edição, direto na Graph — o formato é o mesmo.
+ *
+ * @param {{ bodyText: string, examples?: string[], headerText?: string|null, footerText?: string|null,
+ *           buttons?: { type: 'URL'|'QUICK_REPLY', text: string, url?: string }[] }} t
+ */
+export function metaTemplateComponents(t) {
+  const components = [];
+  if (t.headerText) components.push({ type: 'HEADER', format: 'TEXT', text: t.headerText });
+  const corpo = { type: 'BODY', text: t.bodyText };
+  const examples = Array.isArray(t.examples) ? t.examples : [];
+  if (/\{\{\s*\d+\s*\}\}/.test(String(t.bodyText ?? '')) && examples.length) {
+    corpo.example = { body_text: [examples.map((v) => String(v))] };
+  }
+  components.push(corpo);
+  if (t.footerText) components.push({ type: 'FOOTER', text: t.footerText });
+  const buttons = Array.isArray(t.buttons) ? t.buttons : [];
+  if (buttons.length) {
+    components.push({
+      type: 'BUTTONS',
+      buttons: buttons.map((b) => (b.type === 'URL'
+        ? { type: 'URL', text: b.text, url: b.url }
+        : { type: 'QUICK_REPLY', text: b.text }))
+    });
+  }
+  return components;
+}
+
+/**
+ * O caminho de volta de `metaTemplateComponents`: os campos do formulário a
+ * partir dos `components` guardados de um modelo, para editá-lo pelo painel.
+ *
+ * `null` quando o modelo tem algo que o formulário não sabe representar
+ * (cabeçalho de mídia ou com variável, botão de URL dinâmica, de telefone, de
+ * código…) — editar pelo painel mandaria os `components` sem essa parte e a
+ * Meta a apagaria. Esse modelo se edita no Gerenciador do WhatsApp.
+ *
+ * @returns {{ headerText: string, bodyText: string, examples: string[], footerText: string,
+ *             buttons: { type: 'URL'|'QUICK_REPLY', text: string, url: string }[] } | null}
+ */
+export function readMetaTemplateDraft(components) {
+  const lista = Array.isArray(components) ? components : [];
+  const tipo = (c) => String(c?.type ?? '').toUpperCase();
+  let headerText = '';
+  let bodyText = '';
+  let examples = [];
+  let footerText = '';
+  let buttons = [];
+  let temCorpo = false;
+  for (const c of lista) {
+    const t = tipo(c);
+    if (t === 'HEADER') {
+      const formato = String(c?.format ?? 'TEXT').toUpperCase();
+      headerText = String(c?.text ?? '');
+      if (formato !== 'TEXT' || /\{\{/.test(headerText)) return null;
+    } else if (t === 'BODY') {
+      temCorpo = true;
+      bodyText = String(c?.text ?? '');
+      if (NOMEADO.test(bodyText)) return null;
+      const linha = Array.isArray(c?.example?.body_text) ? c.example.body_text[0] : null;
+      examples = Array.isArray(linha) ? linha.map((v) => String(v ?? '')) : [];
+    } else if (t === 'FOOTER') {
+      footerText = String(c?.text ?? '');
+    } else if (t === 'BUTTONS') {
+      const brutos = Array.isArray(c?.buttons) ? c.buttons : [];
+      buttons = [];
+      for (const b of brutos) {
+        const bt = String(b?.type ?? '').toUpperCase();
+        const url = String(b?.url ?? '');
+        if (bt === 'QUICK_REPLY') buttons.push({ type: 'QUICK_REPLY', text: String(b?.text ?? ''), url: '' });
+        else if (bt === 'URL' && !/\{\{/.test(url)) buttons.push({ type: 'URL', text: String(b?.text ?? ''), url });
+        else return null;
+      }
+    } else {
+      return null;
+    }
+  }
+  if (!temCorpo) return null;
+  return { headerText, bodyText, examples, footerText, buttons };
+}
+
+/**
  * Pede à Meta (pelo servidor Evolution) um modelo novo na conta WABA do número.
  *
  * O servidor repassa o corpo à Graph API (`POST /{waba}/message_templates`)
@@ -497,24 +580,7 @@ export function findMetaTemplatesRequest(name) {
  * @returns {EvoRequest}
  */
 export function createMetaTemplateRequest(instanceName, t) {
-  const components = [];
-  if (t.headerText) components.push({ type: 'HEADER', format: 'TEXT', text: t.headerText });
-  const corpo = { type: 'BODY', text: t.bodyText };
-  const examples = Array.isArray(t.examples) ? t.examples : [];
-  if (/\{\{\s*\d+\s*\}\}/.test(String(t.bodyText ?? '')) && examples.length) {
-    corpo.example = { body_text: [examples.map((v) => String(v))] };
-  }
-  components.push(corpo);
-  if (t.footerText) components.push({ type: 'FOOTER', text: t.footerText });
-  const buttons = Array.isArray(t.buttons) ? t.buttons : [];
-  if (buttons.length) {
-    components.push({
-      type: 'BUTTONS',
-      buttons: buttons.map((b) => (b.type === 'URL'
-        ? { type: 'URL', text: b.text, url: b.url }
-        : { type: 'QUICK_REPLY', text: b.text }))
-    });
-  }
+  const components = metaTemplateComponents(t);
   return {
     path: `/template/create/${enc(instanceName)}`,
     method: 'POST',
@@ -724,6 +790,25 @@ const META_HEADER_FORMATS = new Set(['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT', 'LOCA
 const POSICIONAL = /\{\{\s*(\d+)\s*\}\}/g;
 const NOMEADO = /\{\{\s*[A-Za-z_][\w]*\s*\}\}/;
 
+/**
+ * O motivo da recusa como a Meta o manda (`INVALID_FORMAT`, `SCAM`…). `NONE` é
+ * o "sem motivo" dela, e vira `null` como a ausência do campo.
+ */
+export function readRejectedReason(valor) {
+  const texto = String(valor ?? '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 64);
+  return texto && texto !== 'NONE' ? texto : null;
+}
+
+/**
+ * A nota de qualidade: a Graph devolve `{score: 'GREEN', date}`, e há quem
+ * repasse só a string. `UNKNOWN` (modelo novo, sem envios) vira `null`.
+ */
+export function readQualityScore(valor) {
+  const bruto = valor && typeof valor === 'object' ? valor.score : valor;
+  const texto = String(bruto ?? '').trim().toUpperCase().replace(/[^A-Z_]/g, '').slice(0, 16);
+  return texto && texto !== 'UNKNOWN' ? texto : null;
+}
+
 /** O maior `{{n}}` do texto — a Meta numera de 1 sem pular. */
 function maiorIndice(texto) {
   const nums = [...String(texto ?? '').matchAll(POSICIONAL)].map((m) => Number(m[1]));
@@ -747,6 +832,10 @@ function maiorIndice(texto) {
  *
  * `headerFormat` é `NONE` sem cabeçalho; `buttons` lista todos os botões, e
  * `urlHasParam` marca os que pedem o sufixo no envio.
+ *
+ * `rejectedReason` e `qualityScore` vêm quando a resposta os traz — a Graph só
+ * os devolve se pedidos em `fields=`, e o `/template/find` do Evolution não
+ * pede; o que faltar o `waMetaTemplateService` completa pela Graph direto.
  */
 export function readMetaTemplates(data) {
   const raw = data ?? {};
@@ -796,6 +885,8 @@ export function readMetaTemplates(data) {
       headerParamCount,
       buttons: buttons.map(({ index, type, urlHasParam }) => ({ index, type, urlHasParam })),
       supported: !nomeados && headerOk && botoesOk && category !== 'AUTHENTICATION',
+      rejectedReason: readRejectedReason(it.rejected_reason),
+      qualityScore: readQualityScore(it.quality_score),
       components
     });
   }

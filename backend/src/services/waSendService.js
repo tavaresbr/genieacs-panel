@@ -1,6 +1,7 @@
 import path from 'node:path';
 import WaConversation from '../models/WaConversation.js';
 import WaMessage from '../models/WaMessage.js';
+import WaMarketingOptOut from '../models/WaMarketingOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { DATA_DIR } from '../config/paths.js';
@@ -77,6 +78,12 @@ class WaSendService {
    * the provider does not *initiate* contact; it must never stop an operator
    * answering someone who wrote in. Campaigns and alerts enforce it — the reply
    * box does not.
+   *
+   * O pedido de não receber PROMOÇÃO é a exceção, e vale para todo remetente,
+   * operador incluído: uma mensagem promocional (`marketing`, ou um modelo da
+   * Meta de categoria MARKETING) não sai para quem pediu para parar. A Meta
+   * recusaria o modelo de qualquer jeito, e cada recusa dessas pesa na nota
+   * do número. O que não é promoção — cobrança, aviso, atendimento — sai.
    */
   static async enqueue({
     conversationId,
@@ -86,7 +93,8 @@ class WaSendService {
     userId = null,
     source = 'operator',
     metaTemplate = null,
-    replyToId = null
+    replyToId = null,
+    marketing = false
   } = {}) {
     // Defaulting to 'operator' rather than to the caller's intent: a sender
     // that forgets to say must never end up claiming to be the bot, because
@@ -117,6 +125,7 @@ class WaSendService {
     }
     const modelo = note ? null : normalizeMetaTemplate(metaTemplate);
     let textoDoModelo = null;
+    let promocional = false;
     if (!note) {
       const account = await this.resolveAccount(conversation);
       if (!account) {
@@ -135,6 +144,9 @@ class WaSendService {
       // recusar. Dizer agora, com o texto ainda na caixa, é melhor que uma
       // linha que falha sozinha minutos depois.
       if (cloudDecision(account, conversation, modelo) === 'refuse') throw windowClosed();
+      promocional = marketing === true
+        || (modelo ? await WaMarketingOptOut.isMarketingTemplate(modelo, account?.id ?? null) : false);
+      if (promocional && await marketingRefused(conversation)) throw marketingOptOut();
     }
 
     // A resposta só cita uma mensagem desta mesma conversa; qualquer outro id
@@ -154,6 +166,8 @@ class WaSendService {
       attachment_type: anexo?.type ?? null,
       attachment_name: anexo?.name ?? null,
       is_note: note,
+      // Promoção: o envio confere de novo o pedido de parar na hora de sair.
+      marketing: promocional,
       // A note has no delivery state at all. 'queued' would hand it to the
       // worker, and the one thing a note must never do is reach the customer.
       delivery_status: note ? null : 'queued',
@@ -212,6 +226,11 @@ class WaSendService {
       config,
       WhatsAppConfigService.decryptInstanceToken(account)
     );
+    // A promoção confere o pedido de parar outra vez: numa campanha longa, o
+    // cliente pode ter mandado "parar" depois de a mensagem entrar na fila.
+    if ((message.marketing === true || Number(message.marketing) === 1) && await marketingRefused(conversation)) {
+      throw marketingOptOut();
+    }
     // De novo na hora do envio, e esta é a que vale: a campanha anda por
     // horas, e a janela que estava aberta no enfileiramento pode ter fechado.
     const modelo = parseMetaTemplate(message.meta_template);
@@ -335,6 +354,15 @@ class WaSendService {
 
 function windowClosed() {
   return new WaError('whatsapp.error.metaWindowClosed', { code: 'meta_window_closed', status: 409 });
+}
+
+/** Quem está do outro lado pediu para não receber promoção. */
+function marketingOptOut() {
+  return new WaError('whatsapp.error.marketingOptOut', { code: 'marketing_opt_out', status: 409 });
+}
+
+async function marketingRefused(conversation) {
+  return WaMarketingOptOut.isActive({ waPhone: conversation.wa_phone_e164, waLid: conversation.wa_lid });
 }
 
 /** A regra da janela para ESTE número e ESTA conversa. */

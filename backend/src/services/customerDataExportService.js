@@ -454,6 +454,13 @@ class CustomerDataExportService {
         if (conversaIds.length) q.orWhereIn('conversation_id', conversaIds);
       }).orderBy('id')
       : []);
+    // O pedido de não receber promoção, pelo telefone ou pela conversa.
+    guardar('wa_marketing_opt_outs', (todosTelefones.length || conversaIds.length)
+      ? await tdb('wa_marketing_opt_outs').where((q) => {
+        if (todosTelefones.length) q.whereIn('wa_phone_e164', todosTelefones);
+        if (conversaIds.length) q.orWhereIn('conversation_id', conversaIds);
+      }).orderBy('id')
+      : []);
     guardar('wa_broadcast_recipients', (todosTelefones.length || contratos.length)
       ? await tdb('wa_broadcast_recipients').where((q) => {
         if (todosTelefones.length) q.whereIn('phone_e164', todosTelefones);

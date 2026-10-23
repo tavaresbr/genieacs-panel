@@ -45,6 +45,7 @@ const STATUS: Record<WhatsAppBroadcastRecipient['status'], { label: TranslationK
 const ERRORS: Record<string, TranslationKey> = {
   opt_out: 'whatsapp.campaign.detail.error.optOut',
   paid: 'whatsapp.campaign.detail.error.paid',
+  marketing_opt_out: 'whatsapp.campaign.detail.error.marketingOptOut',
   no_destination: 'whatsapp.campaign.detail.error.noDestination'
 }
 
@@ -143,7 +144,10 @@ export function CampaignDetail({ broadcast, onClose }: { broadcast: WhatsAppBroa
             <Tile
               label={t('whatsapp.campaign.detail.notSent')}
               value={summary.failed + summary.skipped}
-              hint={summary.paid > 0 ? t('whatsapp.campaign.detail.paidCount', { count: summary.paid }) : undefined}
+              hint={[
+                summary.paid > 0 ? t('whatsapp.campaign.detail.paidCount', { count: summary.paid }) : null,
+                summary.marketingOptOut ? t('whatsapp.campaign.detail.marketingOptOutCount', { count: summary.marketingOptOut }) : null
+              ].filter(Boolean).join(' · ') || undefined}
             />
           </div>
         )}
