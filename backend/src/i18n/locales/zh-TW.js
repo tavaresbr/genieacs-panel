@@ -1206,5 +1206,15 @@ export default {
   'platformAlert.test.body': '這是平台的測試警示。如果您收到了，代表警示功能正常。',
   'platformAlert.digest.subject': '每日摘要：{count} 則警示',
   'platformAlert.digest.body': '{date} 的平台警示摘要：',
-  'platformAlert.digest.more': '… 另有 {count} 則'
+  'platformAlert.digest.more': '… 另有 {count} 則',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "月度報告：{month}",
+  'platformAlert.monthly_report.body': "{month} 平台概要:",
+  'platformAlert.monthly_report.mrr': "MRR: {value}（{count} 個付費）",
+  'platformAlert.monthly_report.received': "實收（淨額）: {value}",
+  'platformAlert.monthly_report.refunded': "已退款: {value}",
+  'platformAlert.monthly_report.tenants': "服務商: 新增 {new} 個，取消 {canceled} 個",
+  'platformAlert.monthly_report.churn': "流失率: {value}",
+  'platformAlert.monthly_report.overdue': "月底逾期: {value}（{count} 筆帳單）",
+  'platformAlert.monthly_report.note': "已結束月份的 MRR 與逾期金額係依帳務明細重建，為近似值。"
 };

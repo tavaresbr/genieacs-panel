@@ -1202,5 +1202,15 @@ export default {
   'platformAlert.test.body': 'Ceci est une alerte de test de la plateforme. Si vous l’avez reçue, les alertes fonctionnent.',
   'platformAlert.digest.subject': 'Résumé quotidien : {count} alerte(s)',
   'platformAlert.digest.body': 'Résumé des alertes de la plateforme du {date} :',
-  'platformAlert.digest.more': '… et {count} de plus'
+  'platformAlert.digest.more': '… et {count} de plus',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "Rapport mensuel : {month}",
+  'platformAlert.monthly_report.body': "Résumé de la plateforme pour {month} :",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} payant(s))",
+  'platformAlert.monthly_report.received': "Encaissé (net): {value}",
+  'platformAlert.monthly_report.refunded': "Remboursé: {value}",
+  'platformAlert.monthly_report.tenants': "Fournisseurs: {new} nouveau(x), {canceled} résilié(s)",
+  'platformAlert.monthly_report.churn': "Churn: {value}",
+  'platformAlert.monthly_report.overdue': "Impayés en fin de mois: {value} ({count} facture(s))",
+  'platformAlert.monthly_report.note': "Le MRR et les impayés des mois clôturés sont reconstruits à partir du relevé et sont approximatifs."
 };

@@ -1207,5 +1207,15 @@ export default {
   'platformAlert.test.body': 'Это тестовое оповещение платформы. Если вы его получили, оповещения работают.',
   'platformAlert.digest.subject': 'Ежедневная сводка: оповещений — {count}',
   'platformAlert.digest.body': 'Сводка оповещений платформы за {date}:',
-  'platformAlert.digest.more': '… и ещё {count}'
+  'platformAlert.digest.more': '… и ещё {count}',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "Ежемесячный отчёт: {month}",
+  'platformAlert.monthly_report.body': "Сводка платформы за {month}:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} платящих)",
+  'platformAlert.monthly_report.received': "Получено (нетто): {value}",
+  'platformAlert.monthly_report.refunded': "Возвращено: {value}",
+  'platformAlert.monthly_report.tenants': "Провайдеры: новых {new}, отменено {canceled}",
+  'platformAlert.monthly_report.churn': "Отток: {value}",
+  'platformAlert.monthly_report.overdue': "Просрочено на конец месяца: {value} ({count} счетов)",
+  'platformAlert.monthly_report.note': "MRR и просрочка за закрытые месяцы восстановлены по выписке и являются приблизительными."
 };

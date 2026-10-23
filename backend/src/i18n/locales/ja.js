@@ -1206,5 +1206,15 @@ export default {
   'platformAlert.test.body': 'これはプラットフォームからのテストアラートです。受信できていれば、アラートは正常に動作しています。',
   'platformAlert.digest.subject': '日次サマリー: {count} 件のアラート',
   'platformAlert.digest.body': '{date} のプラットフォームアラートのまとめ:',
-  'platformAlert.digest.more': '… ほか {count} 件'
+  'platformAlert.digest.more': '… ほか {count} 件',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "月次レポート: {month}",
+  'platformAlert.monthly_report.body': "{month} のプラットフォーム概要:",
+  'platformAlert.monthly_report.mrr': "MRR: {value}（支払い中 {count} 件）",
+  'platformAlert.monthly_report.received': "入金（純額）: {value}",
+  'platformAlert.monthly_report.refunded': "返金: {value}",
+  'platformAlert.monthly_report.tenants': "プロバイダー: 新規 {new} 件、解約 {canceled} 件",
+  'platformAlert.monthly_report.churn': "解約率: {value}",
+  'platformAlert.monthly_report.overdue': "月末時点の延滞: {value}（{count} 件の請求）",
+  'platformAlert.monthly_report.note': "締め済みの月の MRR と延滞は取引履歴から再構成した概算値です。"
 };

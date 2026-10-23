@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
 import { PlatformCancellations } from '@/components/platform/platform-cancellations'
+import { PlatformRevenueCharts } from '@/components/platform/platform-revenue-charts'
 import {
   lastTwelveMonths,
   monthLabel,
@@ -91,6 +92,9 @@ export function PlatformRevenue() {
 
   return (
     <div className="space-y-6">
+      {/* A série mês a mês (meses de Brasília), com período próprio. */}
+      <PlatformRevenueCharts />
+
       <section className="modern-card p-4" aria-labelledby="revenue-period-title">
         <h2 id="revenue-period-title" className="section-heading mb-3">{t('platform.revenue.period')}</h2>
         <form

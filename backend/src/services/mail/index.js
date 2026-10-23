@@ -37,9 +37,13 @@ class SmtpMailTransport extends MailTransport {
     return 'smtp';
   }
 
-  async send({ to, subject, text }) {
+  async send({ to, subject, text, html }) {
     try {
-      await this.transporter.sendMail({ from: this.from, to, subject, text });
+      // `html` é opcional (o relatório mensal da plataforma): o `text` vai
+      // sempre, e é o que o cliente de e-mail sem HTML mostra.
+      await this.transporter.sendMail({
+        from: this.from, to, subject, text, ...(typeof html === 'string' && html ? { html } : {})
+      });
       log.info('mail_sent', { to: maskAddress(to), subject });
       return true;
     } catch (error) {

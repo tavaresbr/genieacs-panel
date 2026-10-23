@@ -1198,5 +1198,15 @@ export default {
   'platformAlert.test.body': 'هذا تنبيه تجريبي من المنصة. إذا وصلك، فالتنبيهات تعمل.',
   'platformAlert.digest.subject': 'الملخص اليومي: {count} تنبيه',
   'platformAlert.digest.body': 'ملخص تنبيهات المنصة ليوم {date}:',
-  'platformAlert.digest.more': '… و{count} أخرى'
+  'platformAlert.digest.more': '… و{count} أخرى',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "التقرير الشهري: {month}",
+  'platformAlert.monthly_report.body': "ملخص المنصة لشهر {month}:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} مشترك يدفع)",
+  'platformAlert.monthly_report.received': "المستلم (صافي): {value}",
+  'platformAlert.monthly_report.refunded': "المسترد: {value}",
+  'platformAlert.monthly_report.tenants': "المزودون: {new} جديد، {canceled} ملغى",
+  'platformAlert.monthly_report.churn': "معدل الإلغاء: {value}",
+  'platformAlert.monthly_report.overdue': "المتأخرات في نهاية الشهر: {value} ({count} فاتورة)",
+  'platformAlert.monthly_report.note': "الإيراد الشهري المتكرر والمتأخرات للأشهر المغلقة يُعاد بناؤها من كشف الحساب وهي تقريبية."
 };

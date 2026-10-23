@@ -1207,5 +1207,15 @@ export default {
   'platformAlert.test.body': 'Dies ist ein Testalarm der Plattform. Wenn Sie ihn erhalten haben, funktionieren die Alarme.',
   'platformAlert.digest.subject': 'Tageszusammenfassung: {count} Alarm(e)',
   'platformAlert.digest.body': 'Zusammenfassung der Plattformalarme vom {date}:',
-  'platformAlert.digest.more': '… und {count} weitere'
+  'platformAlert.digest.more': '… und {count} weitere',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "Monatsbericht: {month}",
+  'platformAlert.monthly_report.body': "Plattformübersicht für {month}:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} zahlend)",
+  'platformAlert.monthly_report.received': "Eingegangen (netto): {value}",
+  'platformAlert.monthly_report.refunded': "Erstattet: {value}",
+  'platformAlert.monthly_report.tenants': "Anbieter: {new} neu, {canceled} gekündigt",
+  'platformAlert.monthly_report.churn': "Churn: {value}",
+  'platformAlert.monthly_report.overdue': "Überfällig zum Monatsende: {value} ({count} Rechnung(en))",
+  'platformAlert.monthly_report.note': "MRR und Überfälligkeiten abgeschlossener Monate werden aus dem Kontoauszug rekonstruiert und sind Näherungswerte."
 };

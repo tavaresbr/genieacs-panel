@@ -1205,5 +1205,15 @@ export default {
   'platformAlert.test.body': 'Este é um alerta de teste da plataforma. Se você recebeu, os alertas estão funcionando.',
   'platformAlert.digest.subject': 'Resumo diário: {count} alerta(s)',
   'platformAlert.digest.body': 'Resumo dos alertas da plataforma de {date}:',
-  'platformAlert.digest.more': '+{count} mais'
+  'platformAlert.digest.more': '+{count} mais',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "Relatório mensal: {month}",
+  'platformAlert.monthly_report.body': "Resumo da plataforma em {month}:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} pagante(s))",
+  'platformAlert.monthly_report.received': "Recebido (líquido): {value}",
+  'platformAlert.monthly_report.refunded': "Estornado: {value}",
+  'platformAlert.monthly_report.tenants': "Provedores: {new} novo(s), {canceled} cancelado(s)",
+  'platformAlert.monthly_report.churn': "Churn: {value}",
+  'platformAlert.monthly_report.overdue': "Inadimplência no fim do mês: {value} ({count} cobrança(s))",
+  'platformAlert.monthly_report.note': "O MRR e a inadimplência dos meses fechados são reconstruídos pelo extrato e são aproximados."
 };
