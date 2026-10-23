@@ -1,6 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { asTenant, authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -72,5 +72,45 @@ describe('o nome do cliente depois de vincular um contrato sem nome', () => {
     assert.equal(status, 200, JSON.stringify(body));
     const linha = body.data.find((row) => row.id === conversaId);
     assert.equal(linha.clientName, 'HENRIQUE RODRIGUES DE OLIVEIRA');
+  });
+});
+
+describe('desvincular a conversa', () => {
+  const unbind = () => call(`${panelUrl}/api/whatsapp/conversations/${conversaId}/subscriber/unbind`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: {}
+  });
+
+  it('tira o vínculo, grava na trilha e o telefone não o refaz sozinho', async () => {
+    const { status, body } = await unbind();
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.attendance.contract, null);
+
+    const linha = await asTenant(() => WaConversation.getById(conversaId));
+    assert.equal(linha.contract, null);
+    assert.equal(linha.sgp_contact_id, null);
+    assert.ok(linha.unlinked_at, 'a marca de desvinculada ficou na conversa');
+
+    // A lista e a conversa aberta (que tentam vincular pelo telefone) não a vinculam de novo.
+    await asTenant(() => SgpContact.upsertFromSgp({
+      contract: '700', document: '99988877766', client_name: 'DONO DO TELEFONE', state: 'active', phone_e164: FONE, client_ref: 'CL-700'
+    }));
+    const lista = await call(`${panelUrl}/api/whatsapp/conversations`, { headers: authHeaders(token) });
+    assert.equal(lista.body.data.find((row) => row.id === conversaId).contract, null);
+    const aberta = await call(`${panelUrl}/api/whatsapp/conversations/${conversaId}`, { headers: authHeaders(token) });
+    assert.equal(aberta.body.data.contract, null);
+
+    const trilha = await getDb()('audit_log').where({ action: 'whatsapp.subscriber_unlinked' }).orderBy('id', 'desc').first();
+    assert.ok(trilha, 'a desvinculação não foi para a trilha');
+    assert.ok(!String(trilha.detail).includes(FONE), 'o telefone foi para a trilha');
+  });
+
+  it('vincular de novo à mão apaga a marca', async () => {
+    const { default: WaConversationService } = await import('../src/services/waConversationService.js');
+    await asTenant(() => WaConversationService.linkSubscriber(conversaId, { contract: '700' }));
+    const linha = await asTenant(() => WaConversation.getById(conversaId));
+    assert.equal(linha.contract, '700');
+    assert.equal(linha.unlinked_at, null);
   });
 });

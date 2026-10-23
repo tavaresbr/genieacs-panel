@@ -13,7 +13,7 @@ import ContactOnboardingService from '../services/contactOnboardingService.js';
 import ContactTeiahService from '../services/contactTeiahService.js';
 import { TeiahError } from '../services/teiahService.js';
 import { WaError } from '../services/whatsappConfigService.js';
-import { SgpError } from '../services/sgpService.js';
+import SgpService, { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
@@ -305,6 +305,43 @@ class ContactController {
       return handleError(req, res, error, 'contacts.saveFailed');
     }
   }
+  /** `GET /api/contacts/sgp/precadastro/options` — the lists the form offers. */
+  static async preRegistrationOptions(req, res) {
+    try {
+      const config = await SgpService.getConfig();
+      return res.json(createResponse(null, {
+        ready: SgpService.isReady(config),
+        plans: config.preRegPlans,
+        dueDays: config.preRegDueDays,
+        installOs: config.preRegInstallOs
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.lookupFailed');
+    }
+  }
+
+  /** `POST /api/contacts/sgp/precadastro` — the client with a contract, through the SGP's pre-registration. */
+  static async createPreRegistration(req, res) {
+    try {
+      const { profile, sent, filed } = await ContactOnboardingService.createPreRegistration(req.body);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_CREATED,
+        subjectType: 'contact',
+        subjectId: profile.key,
+        detail: {
+          sgp: true,
+          preRegistration: true,
+          filed,
+          sgpClientId: sent.clientId,
+          preRegistrationId: sent.preRegistrationId
+        }
+      });
+      return res.status(201).json(createResponse(req.t('contacts.preRegistered'), { ...profile, filed }));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.saveFailed');
+    }
+  }
+
 }
 
 /** The day in the file name, so two exports of the same day sort together. */

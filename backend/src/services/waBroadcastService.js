@@ -83,7 +83,19 @@ class WaBroadcastService {
 
   static async list() {
     const rows = await WaBroadcast.list();
-    return rows.map((row) => this.publicBroadcast(row));
+    const publicos = rows.map((row) => this.publicBroadcast(row));
+    // Uma campanha de aviso ainda editável, criada antes de a lista de
+    // contratos colada ser guardada: a lista sai dos destinatários, para a
+    // edição não ampliar o público sem aviso. Os que o não-perturbe ou a
+    // duplicidade já tiravam não estavam na lista alcançada, e continuam fora.
+    for (const publico of publicos) {
+      const audience = publico.audience;
+      if (publico.kind !== 'general' || !['draft', 'queued'].includes(publico.status)) continue;
+      if (!audience || !(audience.contracts > 0) || audience.contractList) continue;
+      // eslint-disable-next-line no-await-in-loop -- poucas campanhas editáveis por vez
+      audience.contractList = await WaBroadcast.recipientContracts(publico.id);
+    }
+    return publicos;
   }
 
   /**

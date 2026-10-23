@@ -482,7 +482,43 @@ export async function getCharge(chargeId) {
     // conferido por ele (ver `SubscriptionService.recordPayment`).
     paidOn: /^\d{4}-\d{2}-\d{2}/.test(String(resposta?.paymentDate ?? resposta?.confirmedDate ?? ''))
       ? String(resposta.paymentDate ?? resposta.confirmedDate).slice(0, 10)
-      : null
+      : null,
+    // A "segunda via" do provedor lê o resto: a página atual, o meio e o
+    // vencimento como o gateway os tem hoje — que podem não ser os da linha.
+    invoiceUrl: resposta?.invoiceUrl ? String(resposta.invoiceUrl) : null,
+    bankSlipUrl: resposta?.bankSlipUrl ? String(resposta.bankSlipUrl) : null,
+    billingType: resposta?.billingType ? String(resposta.billingType).toUpperCase() : null,
+    dueDate: /^\d{4}-\d{2}-\d{2}/.test(String(resposta?.dueDate ?? '')) ? String(resposta.dueDate).slice(0, 10) : null
+  };
+}
+
+/**
+ * O QR do Pix de uma cobrança — `GET /payments/{id}/pixQrCode`: a imagem (PNG
+ * em base64), o copia-e-cola e até quando ele vale. Só leitura: pedir de novo
+ * não cria cobrança nenhuma do lado de lá.
+ *
+ * @returns {Promise<{ encodedImage: string|null, payload: string|null, expirationDate: string|null }>}
+ */
+export async function getPixQrCode(chargeId) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/pixQrCode`, { method: 'GET' });
+  return {
+    encodedImage: resposta?.encodedImage ? String(resposta.encodedImage) : null,
+    payload: resposta?.payload ? String(resposta.payload) : null,
+    expirationDate: resposta?.expirationDate ? String(resposta.expirationDate) : null
+  };
+}
+
+/**
+ * A linha digitável do boleto — `GET /payments/{id}/identificationField`. Só
+ * leitura, como a de cima.
+ *
+ * @returns {Promise<{ identificationField: string|null, barCode: string|null }>}
+ */
+export async function getIdentificationField(chargeId) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/identificationField`, { method: 'GET' });
+  return {
+    identificationField: resposta?.identificationField ? String(resposta.identificationField) : null,
+    barCode: resposta?.barCode ? String(resposta.barCode) : null
   };
 }
 
@@ -680,7 +716,7 @@ export async function cancelInvoice(invoiceId) {
 }
 
 export default {
-  createCharge, chargeTermsFor, cancelCharge, getCharge, getPaymentCard, findChargesByReference, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
+  createCharge, chargeTermsFor, cancelCharge, getCharge, getPixQrCode, getIdentificationField, getPaymentCard, findChargesByReference, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
   createCustomer, testConnection, apiKey, baseUrl, AsaasError,
   createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment
 };

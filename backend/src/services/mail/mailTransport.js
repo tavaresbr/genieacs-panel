@@ -14,8 +14,8 @@
  */
 export class MailTransport {
   /**
-   * Manda uma mensagem.
-   * @param {{to: string, subject: string, text: string}} _message
+   * Manda uma mensagem. `html` é opcional: quando vem, vai junto do `text`.
+   * @param {{to: string, subject: string, text: string, html?: string}} _message
    * @returns {Promise<boolean>} entregue ao servidor de e-mail, ou não
    */
   async send(_message) {

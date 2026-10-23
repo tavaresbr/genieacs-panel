@@ -421,6 +421,7 @@ class BillingWebhookController {
           currency: 'BRL',
           externalId: leitura.externalId,
           paidOn: leitura.paidOn ?? null,
+          paymentMethod: leitura.billingType ?? null,
           actorUserId: null
         });
         // E a cobrança que o painel emitiu para isto, se houver, deixa de estar

@@ -1775,6 +1775,15 @@ const WA_MESSAGE_ACTION_COLUMNS = [
   ['deleted_at', (t) => t.timestamp('deleted_at').nullable()]
 ];
 
+/**
+ * "Desvincular" na conversa (0117): quando o atendente tira o vínculo à mão,
+ * `unlinked_at` fica marcado e o vínculo automático por telefone não volta a
+ * refazê-lo. Um vínculo manual novo apaga a marca.
+ */
+const WA_CONVERSATION_UNLINK_COLUMNS = [
+  ['unlinked_at', (t) => t.timestamp('unlinked_at').nullable()]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -6545,8 +6554,25 @@ export const migrations = [
     }
   },
   {
+    /** Desvincular a conversa do cadastro — ver `WA_CONVERSATION_UNLINK_COLUMNS`. */
+    id: '0117_wa_conversation_unlinked',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_UNLINK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_UNLINK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+    }
+  },
+  {
     /** O status dos modelos da Meta atualizado sozinho — ver `WA_META_TEMPLATE_STATUS_COLUMNS`. */
-    id: '0117_wa_meta_template_status',
+    id: '0118_wa_meta_template_status',
     async isApplied(db) {
       if (!(await db.schema.hasTable('wa_meta_templates'))) return true;
       return (await missingColumns(db, 'wa_meta_templates', WA_META_TEMPLATE_STATUS_COLUMNS)).length === 0;
@@ -6562,7 +6588,7 @@ export const migrations = [
   },
   {
     /** A qualidade e o limite do número oficial — ver `WA_ACCOUNT_META_HEALTH_COLUMNS`. */
-    id: '0118_wa_meta_number_health',
+    id: '0119_wa_meta_number_health',
     async isApplied(db) {
       if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
       return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_HEALTH_COLUMNS)).length === 0;
@@ -6581,7 +6607,7 @@ export const migrations = [
      * O pedido de não receber promoção pelo WhatsApp — ver
      * `waMarketingOptOutsTable` e `WA_MARKETING_COLUMN_TABLES`.
      */
-    id: '0119_wa_marketing_opt_out',
+    id: '0120_wa_marketing_opt_out',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       if (!(await db.schema.hasTable('wa_marketing_opt_outs'))) return false;

@@ -18,5 +18,8 @@ router.get('/reports/revenue.csv', ...guard, PlatformReportsController.revenueCs
 router.get('/reports/revenue', ...guard, PlatformReportsController.revenue);
 // Os pedidos de cancelamento (0107): motivos, ofertas aceitas e retenção.
 router.get('/reports/cancellations', ...guard, CancellationController.report);
+// As métricas mês a mês (gráficos da Receita) e o "Enviar relatório agora".
+router.get('/metrics/monthly', ...guard, PlatformReportsController.monthlyMetrics);
+router.post('/metrics/monthly-report/send', ...guard, PlatformReportsController.sendMonthlyReport);
 
 export default router;

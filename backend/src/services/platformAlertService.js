@@ -46,10 +46,26 @@ const PASS_BUDGET_MS = 20_000;
 const DIGEST_MAX_ITEMS = 50;
 /** O teto do texto do resumo, com folga para o WhatsApp (4096) e o assunto. */
 const DIGEST_MAX_CHARS = 3500;
+/**
+ * Quantos ids de alerta o resumo que desistiu grava no payload: são eles que
+ * o "Reenviar" do resumo põe de volta na fila. Acima disso, o reenvio cai na
+ * janela de datas (como nas linhas antigas, gravadas sem ids).
+ */
+const DIGEST_MAX_IDS = 500;
 /** O fuso do resumo diário. */
 const FUSO = 'America/Sao_Paulo';
 const DIGEST_EVENT = 'digest';
 const TEST_EVENT = 'test';
+/**
+ * O relatório mensal: fora de `ALERT_EVENTS`, como o resumo e o teste — a
+ * configuração dele é `alerts.monthlyReport`, e ele nunca entra no resumo
+ * diário (sai sozinho, pela passada, mesmo com o resumo ligado).
+ */
+export const MONTHLY_EVENT = 'monthly_report';
+/** Até que dia do mês o relatório do mês anterior ainda sai, se o 1º passou sem ele. */
+const MONTHLY_CATCHUP_DAYS = 3;
+/** Os eventos que a passada um a um e o resumo diário não tocam. */
+const FORA_DA_FILA = Object.freeze([DIGEST_EVENT, TEST_EVENT, MONTHLY_EVENT]);
 /** As cobranças que contam no `big_overdue`: só as que estão no gateway, à espera. */
 const BIG_OVERDUE_STATUSES = Object.freeze(['pending', 'overdue']);
 
@@ -121,6 +137,28 @@ export function saoPauloClock(now = new Date()) {
   return { day: `${partes.year}-${partes.month}-${partes.day}`, hour: Number(partes.hour) };
 }
 
+/** O mês anterior ao do dia `AAAA-MM-DD`, como `AAAA-MM`. */
+export function mesAnteriorDe(dia) {
+  const [ano, mes] = String(dia).split('-').map(Number);
+  return new Date(Date.UTC(ano, mes - 2, 1)).toISOString().slice(0, 7);
+}
+
+/** `AAAA-MM` por extenso, no idioma das mensagens: "setembro de 2026". */
+function rotuloDoMes(month, locale = DEFAULT_LOCALE) {
+  const [ano, mes] = String(month).split('-').map(Number);
+  if (!ano || !mes) return String(month);
+  const opcoes = { month: 'long', year: 'numeric', timeZone: 'UTC' };
+  const data = new Date(Date.UTC(ano, mes - 1, 1));
+  try {
+    return new Intl.DateTimeFormat(locale, opcoes).format(data);
+  } catch {
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, opcoes).format(data);
+  }
+}
+
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const escaparHtml = (texto) => String(texto ?? '').replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+
 function lerPayload(linha) {
   try {
     const lido = linha?.payload ? JSON.parse(linha.payload) : {};
@@ -155,6 +193,74 @@ export function renderAlert(linha) {
   };
 }
 
+/** Os estados de uma linha da fila, na ordem em que o console os mostra. */
+export const ALERT_STATUSES = Object.freeze(['pending', 'sent', 'failed', 'skipped']);
+/**
+ * Os estados que o console pode mandar de novo. `sent` já saiu (mandar de
+ * novo seria repetir) e `pending` ainda vai sair.
+ */
+export const RESENDABLE = Object.freeze(['failed', 'skipped']);
+/** Os eventos que aparecem no histórico: os configuráveis, o resumo e o teste. */
+export const HISTORY_EVENTS = Object.freeze([...ALERT_EVENTS, DIGEST_EVENT, TEST_EVENT, MONTHLY_EVENT]);
+const SUMMARY_MAX = 200;
+
+/**
+ * A linha do histórico numa frase: o assunto da mensagem, no idioma de quem
+ * lê. Sai do payload, que já entrou limpo (`sanitizePayload`) — nem destino
+ * nem segredo passam por aqui.
+ */
+export function summarizeAlert(linha, locale = DEFAULT_LOCALE) {
+  const evento = linha?.event;
+  if (!HISTORY_EVENTS.includes(evento)) return String(evento ?? '').slice(0, SUMMARY_MAX);
+  const payload = lerPayload(linha);
+  let vars;
+  if (evento === DIGEST_EVENT) vars = { count: payload.count ?? '-', date: dataBr(payload.day) };
+  else if (evento === MONTHLY_EVENT) vars = { month: payload.month ? rotuloDoMes(payload.month, locale) : '-' };
+  else vars = variaveis(payload);
+  return translate(locale, `platformAlert.${evento}.subject`, vars).slice(0, SUMMARY_MAX);
+}
+
+function isoOuNulo(valor) {
+  const data = asDate(valor);
+  return data ? data.toISOString() : null;
+}
+
+/** A linha (com o provedor do `leftJoin`) como o console a recebe. */
+function linhaDoHistorico(linha, locale) {
+  let tenant = null;
+  if (linha.tenant_id !== null && linha.tenant_id !== undefined) {
+    // O provedor pode ter sido apagado depois do alerta: o nome que a
+    // mensagem levou continua no payload.
+    const payload = lerPayload(linha);
+    const existe = linha.tenant_name !== null && linha.tenant_name !== undefined;
+    tenant = {
+      id: Number(linha.tenant_id),
+      name: existe ? linha.tenant_name : (payload.provider ?? null),
+      slug: existe ? linha.tenant_slug : (payload.slug ?? null),
+      deleted: !existe
+    };
+  }
+  return {
+    id: Number(linha.id),
+    event: linha.event,
+    tenant,
+    summary: summarizeAlert(linha, locale),
+    status: linha.status,
+    attempts: Number(linha.attempts || 0),
+    lastError: linha.last_error ?? null,
+    createdAt: isoOuNulo(linha.created_at),
+    sentAt: isoOuNulo(linha.sent_at),
+    nextAttemptAt: isoOuNulo(linha.next_attempt_at)
+  };
+}
+
+/** A consulta do histórico com o provedor ao lado (nulo se não há ou se foi apagado). */
+function comProvedor(db) {
+  return db('platform_alerts')
+    .leftJoin('tenants', 'tenants.id', 'platform_alerts.tenant_id')
+    .select('platform_alerts.*', 'tenants.name as tenant_name', 'tenants.slug as tenant_slug');
+}
+
 /** O provedor como a mensagem o nomeia. Nunca lança. */
 async function provedor(tenantId) {
   if (!tenantId) return {};
@@ -164,6 +270,30 @@ async function provedor(tenantId) {
   } catch {
     return {};
   }
+}
+
+/** A meia-noite de Brasília que abre o dia `AAAA-MM-DD` (sem horário de verão desde 2019). */
+function inicioDoDiaSp(dia) {
+  const data = new Date(`${dia}T00:00:00-03:00`);
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
+/**
+ * A janela do resumo antigo (sem ids no payload): do dia do resumo anterior
+ * ao fim do dia deste, em Brasília. Sem resumo anterior, sem limite de baixo.
+ */
+async function janelaDoResumo(trx, resumo) {
+  const dia = lerPayload(resumo).day ?? String(resumo.dedupe_key ?? '').slice(DIGEST_EVENT.length + 1);
+  const inicio = /^\d{4}-\d{2}-\d{2}$/.test(dia) ? inicioDoDiaSp(dia) : null;
+  const ate = inicio ? new Date(inicio.getTime() + 24 * 60 * 60 * 1000) : null;
+  const anterior = await trx('platform_alerts')
+    .where({ event: DIGEST_EVENT })
+    .where('dedupe_key', '<', resumo.dedupe_key)
+    .orderBy('dedupe_key', 'desc')
+    .first('dedupe_key');
+  const diaAnterior = anterior ? String(anterior.dedupe_key).slice(DIGEST_EVENT.length + 1) : null;
+  const desde = diaAnterior && /^\d{4}-\d{2}-\d{2}$/.test(diaAnterior) ? inicioDoDiaSp(diaAnterior) : null;
+  return { desde, ate };
 }
 
 class PlatformAlertService {
@@ -179,9 +309,10 @@ class PlatformAlertService {
       const { default: PlatformNotifyService } = await import('./platformNotifyService.js');
       return PlatformNotifyService.sendWhatsapp(to, `*${subject}*\n\n${text}`);
     },
-    email: async (to, { subject, text }) => {
+    email: async (to, { subject, text, html }) => {
       const { mailTransport } = await import('./mail/index.js');
-      return mailTransport().send({ to, subject, text });
+      // `html` só no relatório mensal; os outros alertas são texto puro.
+      return mailTransport().send({ to, subject, text, ...(html ? { html } : {}) });
     }
   };
 
@@ -295,12 +426,22 @@ class PlatformAlertService {
    */
   static async sendOne(linha, { now = new Date(), config, destinos, channels = null } = {}) {
     const db = getDb();
-    const regra = linha.event === TEST_EVENT ? { enabled: true, channels: channels ?? [...ALERT_CHANNELS] } : config.events[linha.event];
+    let regra;
+    if (linha.event === TEST_EVENT || (linha.event === MONTHLY_EVENT && channels)) {
+      regra = { enabled: true, channels: channels ?? [...ALERT_CHANNELS] };
+    } else if (linha.event === MONTHLY_EVENT) {
+      regra = config.monthlyReport;
+    } else {
+      regra = config.events[linha.event];
+    }
     if (!regra?.enabled) {
       await db('platform_alerts').where({ id: linha.id }).update({ status: 'skipped', last_error: 'disabled', next_attempt_at: null });
       return { status: 'skipped', reason: 'disabled' };
     }
-    const resultado = await this.deliver(regra.channels, renderAlert(linha), destinos);
+    const mensagem = linha.event === MONTHLY_EVENT
+      ? await this.renderMonthlyReport(lerPayload(linha).month, { now })
+      : renderAlert(linha);
+    const resultado = await this.deliver(regra.channels, mensagem, destinos);
     const valores = Object.values(resultado);
     if (valores.some((v) => v === true)) {
       const falhas = Object.entries(resultado).filter(([, v]) => v === false).map(([c]) => c);
@@ -329,11 +470,23 @@ class PlatformAlertService {
     const inicio = clock();
     try {
       const config = await alertsConfig();
+      // O relatório mensal sai sozinho, antes e fora do resumo diário.
+      const mensal = await this.processMonthly({ now, config });
+      if (mensal) resumo.monthly = mensal;
       if (config.dailyDigest.enabled) return { ...resumo, digest: await this.processDigest({ now, config }) };
       const db = getDb();
+      // Com o resumo desligado, nenhuma linha de resumo sai mais (a passada um
+      // a um não as manda): a pendente vira `skipped`, para não ficar parada
+      // para sempre. Os alertas dela continuam pendentes e saem um a um. A
+      // linha tomada por outra passada (`next_attempt_at` no futuro) fica com
+      // quem a tomou.
+      await db('platform_alerts')
+        .where({ event: DIGEST_EVENT, status: 'pending' })
+        .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
+        .update({ status: 'skipped', last_error: 'disabled', next_attempt_at: null });
       const linhas = await db('platform_alerts')
         .where({ status: 'pending' })
-        .whereNotIn('event', [DIGEST_EVENT, TEST_EVENT])
+        .whereNotIn('event', FORA_DA_FILA)
         .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
         .orderBy('id')
         .limit(BATCH);
@@ -418,7 +571,7 @@ class PlatformAlertService {
 
     const pendentes = await db('platform_alerts')
       .where({ status: 'pending' })
-      .whereNotIn('event', [DIGEST_EVENT, TEST_EVENT])
+      .whereNotIn('event', FORA_DA_FILA)
       .where('created_at', '<=', aoSegundo(now))
       .orderBy('id');
     const ativos = pendentes.filter((p) => config.events[p.event]?.enabled);
@@ -465,6 +618,14 @@ class PlatformAlertService {
       // O resumo desistiu: os alertas dele também, para não ficarem para sempre.
       await db('platform_alerts').whereIn('id', ids)
         .update({ status: 'failed', last_error: 'digest_failed', next_attempt_at: null });
+      // E o resumo guarda QUAIS alertas eram dele (até `DIGEST_MAX_IDS`): o
+      // "Reenviar" dele devolve só esses à fila, e não os de outro resumo.
+      const truncado = ids.length > DIGEST_MAX_IDS;
+      await db('platform_alerts').where({ id: linha.id }).update({
+        payload: JSON.stringify({
+          day, count: ativos.length, ids: ids.slice(0, DIGEST_MAX_IDS), ...(truncado ? { idsTruncated: true } : {})
+        })
+      });
     }
     return { action: fim === 'failed' ? 'failed' : 'retry', channels: resultado };
   }
@@ -595,6 +756,317 @@ class PlatformAlertService {
     }
   }
 
+  /**
+   * O histórico do console: a fila inteira, a mais nova primeiro, paginada.
+   * `from` (inclusive) e `until` (exclusive) são instantes já resolvidos por
+   * quem chama. `counts` conta por estado com os MESMOS filtros menos o de
+   * estado — são os números das abas, que não podem sumir ao escolher uma.
+   *
+   * As duas tabelas são da plataforma (compartilhadas): nada de escopo de
+   * provedor aqui, como no resto deste serviço.
+   */
+  static async history({ status = null, event = null, from = null, until = null, page = 1, pageSize = 25, locale = DEFAULT_LOCALE } = {}) {
+    const db = getDb();
+    const filtros = (q) => {
+      if (event) q.where('platform_alerts.event', event);
+      if (from) q.where('platform_alerts.created_at', '>=', from);
+      if (until) q.where('platform_alerts.created_at', '<', until);
+      return q;
+    };
+    const comEstado = (q) => (status ? q.where('platform_alerts.status', status) : q);
+
+    const linhas = await comEstado(filtros(comProvedor(db)))
+      .orderBy('platform_alerts.id', 'desc')
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+    const [{ n: total } = { n: 0 }] = await comEstado(filtros(db('platform_alerts'))).count('* as n');
+    const porEstado = await filtros(db('platform_alerts'))
+      .select('platform_alerts.status')
+      .count('* as n')
+      .groupBy('platform_alerts.status');
+    const counts = Object.fromEntries(ALERT_STATUSES.map((s) => [s, 0]));
+    for (const { status: estado, n } of porEstado) {
+      if (estado in counts) counts[estado] = Number(n);
+    }
+    return {
+      alerts: linhas.map((l) => linhaDoHistorico(l, locale)),
+      total: Number(total),
+      page,
+      pageSize,
+      counts
+    };
+  }
+
+  /**
+   * O "Reenviar" do histórico: a linha `failed`/`skipped` volta para a fila
+   * (`pending`, tentativas zeradas, vencida agora) e a próxima passada do
+   * agendador a manda pela regra de sempre — com o evento desligado ou sem
+   * destino ela volta a `skipped`, como qualquer outra.
+   *
+   * O `UPDATE` condicional é a guarda: dois cliques (ou o clique e a passada
+   * do agendador) dão em UMA linha reaberta; o outro recebe `not_resendable`.
+   *
+   *   - `test` não volta: a passada do agendador não manda teste (é o botão
+   *     que manda na hora), e ele ficaria pendente para sempre.
+   *   - `digest` volta, e com ele os alertas que caíram junto
+   *     (`failed`/`digest_failed`) — esses nunca saíram, então não há envio
+   *     em dobro. Só os DESSE resumo: os ids que ele gravou ao desistir, ou,
+   *     na linha antiga (sem ids, ou com a lista cortada), os criados entre o
+   *     dia do resumo anterior e o fim do dia deste (Brasília). Se o resumo
+   *     for de um dia que passou, a próxima passada o marca `superseded` e os
+   *     alertas entram no resumo de hoje: é o `processDigest` de sempre.
+   *     Com o resumo diário DESLIGADO, o resumo não sai mais (a passada um a
+   *     um não o manda): os alertas dele voltam para sair um a um, e a linha
+   *     do resumo fica `skipped`/`disabled` — nada parado em `pending`.
+   *   - O relatório mensal do "Enviar agora" (`manual`) volta marcado
+   *     `resent`: é o sinal para a passada mandá-lo (ver `processMonthly`).
+   *
+   * Devolve `{ alert, requeued, previousStatus }`, ou `{ error }`:
+   * `not_found`, `not_resendable` (com o `status` atual).
+   */
+  static async resend(id, { now = new Date(), locale = DEFAULT_LOCALE } = {}) {
+    const db = getDb();
+    const config = await alertsConfig();
+    const resultado = await db.transaction(async (trx) => {
+      const antes = await trx('platform_alerts').where({ id }).first('id', 'event', 'status', 'payload', 'dedupe_key');
+      if (!antes) return { error: 'not_found' };
+      const mudou = await trx('platform_alerts')
+        .where({ id })
+        .whereIn('status', RESENDABLE)
+        .whereNot('event', TEST_EVENT)
+        .update({ status: 'pending', attempts: 0, next_attempt_at: aoSegundo(now), last_error: null });
+      if (!mudou) {
+        const agora = await trx('platform_alerts').where({ id }).first('status');
+        return { error: 'not_resendable', status: agora?.status ?? antes.status };
+      }
+      let requeued = 0;
+      if (antes.event === DIGEST_EVENT) {
+        const payload = lerPayload(antes);
+        const daLista = Array.isArray(payload.ids) && !payload.idsTruncated
+          ? payload.ids.map(Number).filter((n) => Number.isSafeInteger(n) && n > 0) : null;
+        let alvo = trx('platform_alerts')
+          .where({ status: 'failed', last_error: 'digest_failed' })
+          .whereNotIn('event', FORA_DA_FILA);
+        if (daLista) {
+          alvo = alvo.whereIn('id', daLista.length ? daLista : [0]);
+        } else {
+          const janela = await janelaDoResumo(trx, antes);
+          if (janela.desde) alvo = alvo.where('created_at', '>=', janela.desde);
+          if (janela.ate) alvo = alvo.where('created_at', '<', janela.ate);
+        }
+        requeued = await alvo.update({ status: 'pending', attempts: 0, next_attempt_at: null, last_error: null });
+        if (!config.dailyDigest?.enabled) {
+          // Resumo desligado: os alertas saem um a um, e a linha do resumo
+          // não fica pendente à espera de uma passada que nunca a manda.
+          await trx('platform_alerts').where({ id })
+            .update({ status: 'skipped', last_error: 'disabled', next_attempt_at: null });
+        }
+      } else if (antes.event === MONTHLY_EVENT) {
+        const payload = lerPayload(antes);
+        if (payload.manual) {
+          await trx('platform_alerts').where({ id })
+            .update({ payload: JSON.stringify({ ...payload, resent: true }) });
+        }
+      }
+      return { requeued: Number(requeued) || 0, previousStatus: antes.status, event: antes.event };
+    });
+    if (resultado.error) return resultado;
+    const linha = await comProvedor(db).where('platform_alerts.id', id).first();
+    return { ...resultado, alert: linhaDoHistorico(linha, locale) };
+  }
+
+  /**
+   * O relatório mensal: no dia 1º, a partir da hora escolhida (Brasília) —
+   * ou nos dias 2 e 3, se o 1º passou sem ele (o processo fora do ar) —, UMA
+   * linha na fila com `dedupe_key` `monthly:AAAA-MM` do mês que acabou. A
+   * chave única é a garra: dois processos, dois reinícios, um relatório. O
+   * envio é o da passada (`processMonthly`). Nunca lança.
+   */
+  static async checkMonthlyReport({ now = new Date(), config = null } = {}) {
+    try {
+      const regras = config ?? await alertsConfig();
+      const regra = regras.monthlyReport;
+      if (!regra?.enabled) return { checked: false, reason: 'disabled' };
+      const { day, hour } = saoPauloClock(now);
+      const dia = Number(day.slice(8, 10));
+      if (dia > MONTHLY_CATCHUP_DAYS) return { checked: true, enqueued: false, reason: 'outside_window' };
+      if (dia === 1 && hour < regra.hour) return { checked: true, enqueued: false, reason: 'waiting' };
+      const month = mesAnteriorDe(day);
+      const chave = `monthly:${month}`;
+      const db = getDb();
+      if (await db('platform_alerts').where({ dedupe_key: chave }).first('id')) {
+        return { checked: true, enqueued: false, reason: 'duplicate', month };
+      }
+      try {
+        await db('platform_alerts').insert({
+          event: MONTHLY_EVENT,
+          tenant_id: null,
+          payload: JSON.stringify({ month }),
+          dedupe_key: chave,
+          status: 'pending',
+          attempts: 0,
+          next_attempt_at: null,
+          created_at: aoSegundo(now)
+        });
+      } catch (error) {
+        if (isUniqueViolation(error)) return { checked: true, enqueued: false, reason: 'duplicate', month };
+        throw error;
+      }
+      return { checked: true, enqueued: true, month };
+    } catch (error) {
+      log.warn('monthly report check failed', { err: error });
+      return { checked: false, reason: 'error' };
+    }
+  }
+
+  /**
+   * Manda os relatórios mensais pendentes e vencidos, um a um — com garra e
+   * novas tentativas como qualquer alerta. Devolve o resumo, ou nulo sem nada.
+   */
+  static async processMonthly({ now = new Date(), config }) {
+    const db = getDb();
+    const vencidas = await db('platform_alerts')
+      .where({ status: 'pending', event: MONTHLY_EVENT })
+      .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
+      .orderBy('id')
+      .limit(20);
+    // A do "Enviar agora" (`manual`) é mandada pelo botão, na hora: se ainda
+    // está pendente com a garra vencida, o processo caiu no meio — e o
+    // relatório pode já ter saído. Mandar de novo seria repetir: ela vira
+    // `failed`/`interrupted`, e quem quiser a reenvia pelo histórico (aí ela
+    // volta marcada `resent` e sai por aqui).
+    const interrompidas = [];
+    const linhas = [];
+    for (const linha of vencidas) {
+      const payload = lerPayload(linha);
+      if (payload.manual && !payload.resent) interrompidas.push(linha.id);
+      else linhas.push(linha);
+    }
+    if (interrompidas.length) {
+      await db('platform_alerts').whereIn('id', interrompidas).where({ status: 'pending' })
+        .update({ status: 'failed', last_error: 'interrupted', next_attempt_at: null });
+    }
+    if (!linhas.length) return interrompidas.length ? { sent: 0, failed: interrompidas.length, skipped: 0, retry: 0 } : null;
+    const resumo = { sent: 0, failed: interrompidas.length, skipped: 0, retry: 0 };
+    const destinos = await this.destinations();
+    for (const linha of linhas.slice(0, 5)) {
+      // eslint-disable-next-line no-await-in-loop -- um relatório por mês
+      if (!(await this.claim(linha, now))) continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await this.sendOne(linha, { now, config, destinos });
+        if (r.status === 'sent') resumo.sent += 1;
+        else if (r.status === 'skipped') resumo.skipped += 1;
+        else if (r.status === 'failed') resumo.failed += 1;
+        else resumo.retry += 1;
+      } catch (error) {
+        log.warn('monthly report send failed', { id: linha.id, err: error });
+        // eslint-disable-next-line no-await-in-loop
+        await this.falhou(linha, 'error', now).catch(() => {});
+        resumo.retry += 1;
+      }
+    }
+    return resumo;
+  }
+
+  /**
+   * O texto (WhatsApp e corpo do e-mail) e o HTML simples do relatório de
+   * `month` (`AAAA-MM`), com a variação sobre o mês anterior. Os números são
+   * recalculados na hora do envio (`platformMetricsService.monthSummary`): o
+   * mês já fechou, e o que muda entre duas tentativas é só o que o extrato
+   * corrigiu depois.
+   */
+  static async renderMonthlyReport(month, { now = new Date() } = {}) {
+    const { monthSummary } = await import('./platformMetricsService.js');
+    const { current: atual, previous: antes } = await monthSummary(month, { now });
+    const vazio = {
+      mrrCents: 0, payingCount: 0, receivedCents: 0, refundedCents: 0, newTenants: 0,
+      canceledTenants: 0, churnRate: null, overdueCents: 0, overdueCount: 0
+    };
+    const m = atual ?? vazio;
+    const rotulo = rotuloDoMes(month);
+    const variacao = (campo) => {
+      if (!antes) return '';
+      const delta = Number(m[campo]) - Number(antes[campo]);
+      if (!delta) return '';
+      return ` (${delta > 0 ? '+' : '-'}${formatBrl(Math.abs(delta))})`;
+    };
+    const churn = m.churnRate === null || m.churnRate === undefined
+      ? '-' : `${(m.churnRate * 100).toFixed(1).replace('.', ',')}%`;
+    const t = (chave, vars = {}) => translate(DEFAULT_LOCALE, `platformAlert.monthly_report.${chave}`, vars);
+    const linhas = [
+      t('mrr', { value: `${formatBrl(m.mrrCents)}${variacao('mrrCents')}`, count: m.payingCount }),
+      t('received', { value: `${formatBrl(m.receivedCents)}${variacao('receivedCents')}` }),
+      t('refunded', { value: formatBrl(m.refundedCents) }),
+      t('tenants', { new: m.newTenants, canceled: m.canceledTenants }),
+      t('churn', { value: churn }),
+      t('overdue', { value: formatBrl(m.overdueCents), count: m.overdueCount })
+    ];
+    const subject = t('subject', { month: rotulo });
+    const cabecalho = t('body', { month: rotulo });
+    const nota = t('note');
+    const text = `${cabecalho}\n\n${linhas.map((l) => `• ${l}`).join('\n')}\n\n${nota}`;
+    const html = [
+      '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111">',
+      `<h2 style="font-size:18px;margin:0 0 12px">${escaparHtml(subject)}</h2>`,
+      `<p style="margin:0 0 12px">${escaparHtml(cabecalho)}</p>`,
+      '<table cellpadding="6" cellspacing="0" style="border-collapse:collapse">',
+      ...linhas.map((l) => {
+        const [nome, ...resto] = l.split(': ');
+        return `<tr><td style="border-bottom:1px solid #ddd;color:#555">${escaparHtml(nome)}</td>`
+          + `<td style="border-bottom:1px solid #ddd;font-weight:bold">${escaparHtml(resto.join(': '))}</td></tr>`;
+      }),
+      '</table>',
+      `<p style="margin:12px 0 0;color:#777;font-size:12px">${escaparHtml(nota)}</p>`,
+      '</div>'
+    ].join('');
+    return { subject, text, html };
+  }
+
+  /**
+   * O "Enviar relatório agora": o relatório do mês anterior, AGORA, fora da
+   * deduplicação do agendador (a chave leva o instante), pelos `channels`
+   * pedidos — sem pedido, os da configuração do relatório. Devolve o
+   * resultado por canal e o mês.
+   */
+  static async sendMonthlyReportNow({ channels = null, now = new Date() } = {}) {
+    const config = await alertsConfig();
+    const configurados = config.monthlyReport?.channels?.length ? config.monthlyReport.channels : [...ALERT_CHANNELS];
+    const canais = Array.isArray(channels) && channels.length
+      ? ALERT_CHANNELS.filter((c) => channels.includes(c))
+      : [...configurados];
+    const month = mesAnteriorDe(saoPauloClock(now).day);
+    const destinos = await this.destinations();
+    if (!canais.some((c) => destinos[c])) return { status: 'skipped', reason: 'no_destination', channels: {}, month };
+    const chave = `monthly:${month}:manual:${now.getTime()}:${crypto.randomUUID()}`;
+    const db = getDb();
+    await db('platform_alerts').insert({
+      event: MONTHLY_EVENT,
+      tenant_id: null,
+      payload: JSON.stringify({ month, manual: true }),
+      dedupe_key: chave,
+      status: 'pending',
+      attempts: 0,
+      // Já tomada: a passada do agendador não a manda de novo no meio.
+      next_attempt_at: aoSegundo(new Date(now.getTime() + CLAIM_MS)),
+      created_at: aoSegundo(now)
+    });
+    const linha = await db('platform_alerts').where({ dedupe_key: chave }).first();
+    let r;
+    try {
+      r = await this.sendOne(linha, { now, config, destinos, channels: canais });
+    } catch (error) {
+      await db('platform_alerts').where({ id: linha.id })
+        .update({ status: 'failed', last_error: 'error', next_attempt_at: null });
+      throw error;
+    }
+    if (r.status !== 'sent') {
+      // Como o teste: quem apertou o botão vê o resultado, e nada tenta sozinho.
+      await db('platform_alerts').where({ id: linha.id }).update({ status: 'failed', next_attempt_at: null });
+    }
+    return { ...r, month };
+  }
+
   /** O passo da plataforma no agendador: o atraso grande, depois o envio. Nunca lança. */
   static lastOverdueCheckAt = 0;
   static OVERDUE_CHECK_MS = 15 * 60_000;
@@ -605,6 +1077,7 @@ class PlatformAlertService {
       this.lastOverdueCheckAt = now.getTime();
       resumo.bigOverdue = await this.checkBigOverdue({ now });
     }
+    resumo.monthlyReport = await this.checkMonthlyReport({ now });
     resumo.send = await this.processDue({ now });
     return resumo;
   }

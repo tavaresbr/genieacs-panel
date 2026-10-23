@@ -79,6 +79,8 @@ class AuditLog {
     // Uma fatura do SGP foi mandada ao cliente pelo painel da conversa.
     WHATSAPP_INVOICE_SENT: 'whatsapp.invoice_sent',
     // Uma mensagem foi apagada (do painel, ou para todos no WhatsApp) ou recebeu reação.
+    // Uma conversa foi desvinculada do contrato ou do cadastro do SGP.
+    WHATSAPP_SUBSCRIBER_UNLINKED: 'whatsapp.subscriber_unlinked',
     WHATSAPP_MESSAGE_DELETED: 'whatsapp.message_deleted',
     WHATSAPP_MESSAGE_REACTED: 'whatsapp.message_reacted',
     // A Meta decidiu sobre um modelo (aprovou, recusou, pausou, desativou) e a

@@ -107,7 +107,8 @@ class WaConversationService {
    * the next inbound message.
    */
   static async bindSubscriber(conversation) {
-    if (!conversation || conversation.contract || conversation.sgp_contact_id) return conversation;
+    // `unlinked_at`: o atendente tirou o vínculo à mão; o telefone não o refaz.
+    if (!conversation || conversation.contract || conversation.sgp_contact_id || conversation.unlinked_at) return conversation;
     const { link, account } = await this.resolveSubscriber(conversation.wa_phone_e164);
     if (!link) {
       // No ONT for this number, but maybe a subscriber an operator already
@@ -167,7 +168,7 @@ class WaConversationService {
    * learned. A thread that already carries a contract is never touched.
    */
   static async bindUnlinked(rows) {
-    const pending = rows.filter((row) => !row.contract && !row.sgp_contact_id && row.wa_phone_e164);
+    const pending = rows.filter((row) => !row.contract && !row.sgp_contact_id && !row.unlinked_at && row.wa_phone_e164);
     if (pending.length === 0) return rows;
 
     const spellingsOf = new Map(pending.map((row) => [row.id, variantesTelefoneBr(row.wa_phone_e164)]));
@@ -329,6 +330,26 @@ class WaConversationService {
     return ids;
   }
 
+  /**
+   * Tira o vínculo da conversa com o contrato ou o cadastro do SGP.
+   *
+   * É a correção do atendente para o cliente errado: marca `unlinked_at`, e o
+   * vínculo automático por telefone (`bindSubscriber`, `bindUnlinked`) deixa a
+   * conversa em paz até alguém vincular de novo. O telefone no SGP não é
+   * mexido; só a conversa.
+   */
+  static async unlinkSubscriber(id) {
+    const conversation = await this.get(id);
+    const updated = await WaConversation.update(conversation.id, {
+      contract: null,
+      device_id: null,
+      sgp_contact_id: null,
+      customer_account_id: null,
+      unlinked_at: new Date()
+    });
+    return updated;
+  }
+
   static async linkSubscriber(id, { contract, savePhone = false } = {}) {
     const conversation = await this.get(id);
     const key = String(contract ?? '').trim();
@@ -348,8 +369,8 @@ class WaConversationService {
     const link = links[0] ?? null;
     const account = link?.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
     const updated = await WaConversation.update(conversation.id, link
-      ? { contract: link.contract, device_id: link.device_id ?? null, sgp_contact_id: null, customer_account_id: account?.id ?? null }
-      : { ...this.contactBinding(contact), customer_account_id: null });
+      ? { contract: link.contract, device_id: link.device_id ?? null, sgp_contact_id: null, customer_account_id: account?.id ?? null, unlinked_at: null }
+      : { ...this.contactBinding(contact), customer_account_id: null, unlinked_at: null });
 
     const phone = normalizarTelefoneBr(conversation.wa_phone_e164);
     if (savePhone && phone) {

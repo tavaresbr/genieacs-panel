@@ -68,7 +68,15 @@ class SgpController {
         // The "Receber" button on a client record: where the money goes.
         settleReceivingPoint: body.settleReceivingPoint,
         settlePaymentMethods: body.settlePaymentMethods,
-        settleFees: body.settleFees
+        settleFees: body.settleFees,
+        // The "Pré-cadastro" section saves through this same route.
+        preRegPlans: body.preRegPlans,
+        preRegDueDays: body.preRegDueDays,
+        preRegPopId: body.preRegPopId,
+        preRegPortadorId: body.preRegPortadorId,
+        preRegVendedorId: body.preRegVendedorId,
+        preRegInstallOs: body.preRegInstallOs,
+        preRegActivate: body.preRegActivate
         // `webhookSecret` is deliberately not accepted here: it is only ever
         // set through the rotate action, which shows it once.
       });

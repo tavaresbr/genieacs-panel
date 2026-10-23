@@ -313,11 +313,14 @@ export class AsaasBillingProvider extends BillingProvider {
   }
 
   async recordPayment({
-    amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, paidOn = null, now
+    amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, paidOn = null, now,
+    paymentMethod = null
   }) {
     return SubscriptionService.recordPayment({
       amountCents,
       paidOn,
+      // O meio (`PIX`, `BOLETO`, `CREDIT_CARD`) vai ao extrato, para o recibo.
+      paymentMethod,
       currency,
       provider: this.name,
       externalId,
