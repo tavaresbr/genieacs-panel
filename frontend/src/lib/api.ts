@@ -4630,6 +4630,20 @@ export interface WhatsAppAccount {
   metaWebhookStatus?: 'ok' | 'error' | null
   metaWebhookError?: string | null
   metaWebhookAt?: string | null
+  /**
+   * A saúde do número na Meta, da última leitura boa: nota de qualidade
+   * (GREEN/YELLOW/RED/UNKNOWN), limite diário (`TIER_1K`…), nome verificado e
+   * status. `metaHealthError` diz se a última consulta falhou.
+   */
+  metaQualityRating?: string | null
+  metaMessagingLimit?: string | null
+  metaVerifiedName?: string | null
+  metaDisplayPhone?: string | null
+  metaNameStatus?: string | null
+  metaNumberStatus?: string | null
+  metaThroughput?: string | null
+  metaHealthAt?: string | null
+  metaHealthError?: string | null
   baseUrl: string
   status: WhatsAppStatus
   /**
@@ -5863,6 +5877,10 @@ export const whatsappAPI = {
   /** Registra de novo o webhook da conta WABA na Meta, pelo servidor do painel. */
   registerMetaWebhook: (id: number) =>
     apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-webhook`, {}),
+
+  /** Consulta agora a qualidade e o limite do número oficial na Meta. */
+  refreshMetaHealth: (id: number) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-health`, {}),
 
   /** Sai PENDING: a Meta revisa, e só a sincronização depois da aprovação o libera. */
   createMetaTemplate: (accountId: number, payload: MetaTemplateCreatePayload) =>

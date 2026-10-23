@@ -337,6 +337,16 @@ export const casos = [
     controleSoNaoAchou: true
   },
   {
+    // Consultar a saúde do número na Meta. No controle, o número semeado (por
+    // QR) dá 409 `not_cloud` — achado, recusado; nenhuma chamada sai para a Meta.
+    chave: 'account',
+    label: 'POST /api/whatsapp/accounts/:id/meta-health',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/accounts/${id}/meta-health`,
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
     chave: 'account',
     label: 'POST /api/whatsapp/accounts/:id/webhook/probe',
     method: 'POST',

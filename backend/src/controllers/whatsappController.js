@@ -2,6 +2,7 @@ import WaMetaTemplateService from '../services/waMetaTemplateService.js';
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import MetaWebhookService from '../services/metaWebhookService.js';
+import MetaNumberHealthService from '../services/metaNumberHealthService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
 import WaAiService from '../services/waAiService.js';
 import WaBotReportService from '../services/waBotReportService.js';
@@ -250,6 +251,18 @@ class WhatsAppController {
     try {
       const { account } = await MetaWebhookService.retry(req.params?.id);
       return res.json(createResponse(req.t('whatsapp.metaWebhook.registered'), {
+        account: WhatsAppConfigService.publicAccount(account)
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /** A saúde do número oficial na Meta, consultada de novo agora (botão "Atualizar"). */
+  static async refreshMetaHealth(req, res) {
+    try {
+      const { account } = await MetaNumberHealthService.retry(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.metaHealth.refreshed'), {
         account: WhatsAppConfigService.publicAccount(account)
       }));
     } catch (error) {

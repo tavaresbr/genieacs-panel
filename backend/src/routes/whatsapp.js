@@ -52,6 +52,9 @@ router.post('/accounts/:id/meta-token', authenticateToken, requirePermission('wh
 // O webhook da conta WABA, registrado de novo na Meta pelo painel. Mesma
 // permissão da troca de token: mexe na configuração do número na Meta.
 router.post('/accounts/:id/meta-webhook', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.registerMetaWebhook);
+// A qualidade e o limite do número na Meta, consultados agora. Mesma permissão
+// do webhook: usa o token da Meta do número e grava na linha dele.
+router.post('/accounts/:id/meta-health', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.refreshMetaHealth);
 // Criar pede a mesma permissão da sincronização: o modelo vai para a conta
 // WABA do número (custo por categoria, nota de qualidade, revisão da Meta) —
 // é configuração do número, não campanha.

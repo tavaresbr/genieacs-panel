@@ -542,6 +542,17 @@ class WhatsAppConfigService {
         : null,
       metaWebhookError: row.meta_webhook_error || null,
       metaWebhookAt: row.meta_webhook_at || null,
+      // A saúde do número na Meta (`MetaNumberHealthService`): a última leitura
+      // boa e, se a última consulta falhou, o porquê — nunca o token.
+      metaQualityRating: row.meta_quality_rating || null,
+      metaMessagingLimit: row.meta_messaging_limit || null,
+      metaVerifiedName: row.meta_verified_name || null,
+      metaDisplayPhone: row.meta_display_phone || null,
+      metaNameStatus: row.meta_name_status || null,
+      metaNumberStatus: row.meta_number_status || null,
+      metaThroughput: row.meta_throughput || null,
+      metaHealthAt: row.meta_health_at || null,
+      metaHealthError: row.meta_health_error || null,
       baseUrl: row.base_url,
       status: row.status,
       // O QR NÃO sai daqui.

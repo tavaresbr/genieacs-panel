@@ -1727,6 +1727,27 @@ const WA_ACCOUNT_META_WEBHOOK_COLUMNS = [
 ];
 
 /**
+ * A saúde do número oficial na Meta (0118), lida pela Graph API
+ * (`GET /{phone_number_id}`) de hora em hora e no botão "Atualizar":
+ * a nota de qualidade (GREEN/YELLOW/RED/UNKNOWN), o limite de conversas
+ * iniciadas por dia (`TIER_250`, `TIER_1K`…), o nome verificado e o status do
+ * número. Os valores ficam da última leitura boa; `meta_health_error` diz se a
+ * última consulta falhou, e `meta_health_at` quando foi. Nulo é "ainda não
+ * consultado".
+ */
+const WA_ACCOUNT_META_HEALTH_COLUMNS = [
+  ['meta_quality_rating', (t) => t.string('meta_quality_rating', 16).nullable()],
+  ['meta_messaging_limit', (t) => t.string('meta_messaging_limit', 32).nullable()],
+  ['meta_verified_name', (t) => t.string('meta_verified_name', 255).nullable()],
+  ['meta_display_phone', (t) => t.string('meta_display_phone', 32).nullable()],
+  ['meta_name_status', (t) => t.string('meta_name_status', 32).nullable()],
+  ['meta_number_status', (t) => t.string('meta_number_status', 32).nullable()],
+  ['meta_throughput', (t) => t.string('meta_throughput', 32).nullable()],
+  ['meta_health_at', (t) => t.timestamp('meta_health_at').nullable()],
+  ['meta_health_error', (t) => t.string('meta_health_error', 255).nullable()]
+];
+
+/**
  * Como a mensagem saiu: texto livre ou modelo aprovado da Meta. `meta_template`
  * é a foto do modelo no momento do enfileiramento ({name, language, params}) —
  * o envio fora da janela de 24 h só é aceito assim.
@@ -6444,6 +6465,22 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'teiah_consultations', teiahConsultationsTable(db));
+    }
+  },
+  {
+    /** A qualidade e o limite do número oficial — ver `WA_ACCOUNT_META_HEALTH_COLUMNS`. */
+    id: '0118_wa_meta_number_health',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_HEALTH_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const missing = await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_META_HEALTH_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

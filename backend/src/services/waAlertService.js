@@ -88,7 +88,12 @@ const RULE_KEYS = Object.freeze({
   mass_outage: { firing: 'whatsapp.alerts.massOutage', cleared: 'whatsapp.alerts.massOutageCleared' },
   wa_disconnected: { firing: 'whatsapp.alerts.waDisconnected', cleared: 'whatsapp.alerts.waDisconnectedCleared' },
   // Respondida não vira mensagem: seria um aviso para cada conversa atendida.
-  wa_waiting: { firing: 'whatsapp.alerts.waWaiting', cleared: null }
+  wa_waiting: { firing: 'whatsapp.alerts.waWaiting', cleared: null },
+  // Não é regra da varredura: é o aviso, de uma vez só, de que o número
+  // oficial piorou na Meta (`MetaNumberHealthService`). Fica fora de
+  // `ALERT_RULES` — não tem limite nem cooldown para configurar —, mas sai
+  // pelos mesmos canais e pelo mesmo resumo.
+  wa_meta_quality: { firing: 'whatsapp.alerts.metaQualityDropped', cleared: null }
 });
 
 /**
@@ -1133,6 +1138,26 @@ class WaAlertService {
       return [channels?.whatsapp, channels?.email, channels?.telegram].filter(Boolean).length;
     }
     return this.deliver(channels, body);
+  }
+
+  /**
+   * Um aviso avulso, fora da varredura — hoje, o número oficial que piorou na
+   * Meta. Sai pelos canais prontos e pelo resumo, como os da varredura, e só
+   * com os alertas ligados: quem os desligou não pediu nenhum. Nunca lança.
+   *
+   * @returns {Promise<number>} quantas cópias saíram (ou entraram no resumo)
+   */
+  static async notifyEvent({ rule, subject = '', vars = {} }) {
+    try {
+      const settings = await this.getSettings();
+      if (!settings.enabled) return 0;
+      const channels = await this.readyChannels(settings);
+      if (!channels.whatsapp && !channels.email && !channels.telegram) return 0;
+      return await this.notify({ channels, condition: { rule, subject: String(subject), vars }, cleared: false });
+    } catch (error) {
+      console.warn(`WhatsApp alert event not sent: ${error.message}`);
+      return 0;
+    }
   }
 
   static async deliver(channels, body) {
