@@ -108,6 +108,16 @@ class WaBroadcast {
     return Number(changed) > 0;
   }
 
+  /** Os contratos distintos que a campanha alcança — a lista que uma campanha antiga não guardou. */
+  static async recipientContracts(broadcastId) {
+    const rows = await tdb('wa_broadcast_recipients')
+      .where({ broadcast_id: broadcastId })
+      .whereNotNull('contract')
+      .distinct('contract')
+      .orderBy('contract');
+    return rows.map((row) => String(row.contract));
+  }
+
   /** Swaps the whole recipient list; only for a campaign that has not started. */
   static async replaceRecipients(broadcastId, recipients) {
     await tdb('wa_broadcast_recipients').where({ broadcast_id: broadcastId }).del();
