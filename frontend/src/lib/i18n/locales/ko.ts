@@ -2773,7 +2773,7 @@ const ko: Dictionary = {
   'whatsapp.referral.title': '추천하고 혜택 받기',
   'whatsapp.referral.description': '고객마다 고유 링크가 있습니다. 링크로 가입한 사람은 추천한 고객과 연결되어 여기에 표시됩니다.',
   'whatsapp.referral.baseUrl': '링크 주소',
-  'whatsapp.referral.baseUrlHint': '링크가 열리는 곳 — 가입자 포털 주소(예: https://portal.example.kr). 캠페인에서 {{link_indicacao}}를 사용하면 각 고객에게 본인 링크를 보낼 수 있습니다.',
+  'whatsapp.referral.baseUrlHint': '링크가 열리는 곳 — 사용 중인 사업자의 가입자 포털 주소. 캠페인에서 {{link_indicacao}}를 사용하면 각 고객에게 본인 링크를 보낼 수 있습니다.',
   'whatsapp.referral.baseUrlSave': '주소 저장',
   'whatsapp.referral.baseUrlMissing': '링크가 작동하도록 주소를 입력하세요.',
   'whatsapp.referral.noSecret': '서버에 링크 서명용 비밀 값이 설정되어 있지 않습니다.',

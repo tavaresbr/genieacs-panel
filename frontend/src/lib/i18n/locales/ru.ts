@@ -2775,7 +2775,7 @@ const ru: Dictionary = {
   'whatsapp.referral.title': 'Приведи друга и получи награду',
   'whatsapp.referral.description': 'У каждого клиента своя ссылка. Всякий, кто зарегистрируется по ней, появится здесь — с привязкой к рекомендовавшему клиенту.',
   'whatsapp.referral.baseUrl': 'Адрес ссылки',
-  'whatsapp.referral.baseUrlHint': 'Откуда открывается ссылка — адрес портала абонента, например https://portal.vash-provayder.ru. Используйте {{link_indicacao}} в рассылках, чтобы отправить каждому клиенту его ссылку.',
+  'whatsapp.referral.baseUrlHint': 'Откуда открывается ссылка — адрес портала абонента вашего провайдера. Используйте {{link_indicacao}} в рассылках, чтобы отправить каждому клиенту его ссылку.',
   'whatsapp.referral.baseUrlSave': 'Сохранить адрес',
   'whatsapp.referral.baseUrlMissing': 'Укажите адрес, чтобы ссылки работали.',
   'whatsapp.referral.noSecret': 'На сервере не настроен секрет для подписи ссылок.',

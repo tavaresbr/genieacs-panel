@@ -2748,7 +2748,7 @@ const ar: Dictionary = {
   'whatsapp.referral.title': 'أحِل واكسب',
   'whatsapp.referral.description': 'لكل عميل رابطه الخاص. من يسجّل عبره يظهر هنا مرتبطًا بالعميل الذي أحاله.',
   'whatsapp.referral.baseUrl': 'عنوان الرابط',
-  'whatsapp.referral.baseUrlHint': 'المكان الذي يُفتح منه الرابط — عنوان بوابة المشترك، مثل https://portal.example.com. استخدم {{link_indicacao}} في الحملات لإرسال رابط كل عميل إليه.',
+  'whatsapp.referral.baseUrlHint': 'المكان الذي يُفتح منه الرابط — عنوان بوابة المشترك لدى مزوّدك. استخدم {{link_indicacao}} في الحملات لإرسال رابط كل عميل إليه.',
   'whatsapp.referral.baseUrlSave': 'حفظ العنوان',
   'whatsapp.referral.baseUrlMissing': 'أدخل العنوان لكي تعمل الروابط.',
   'whatsapp.referral.noSecret': 'لم يُضبط على الخادم سر لتوقيع الروابط.',

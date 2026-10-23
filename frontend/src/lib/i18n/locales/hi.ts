@@ -2748,7 +2748,7 @@ const hi: Dictionary = {
   'whatsapp.referral.title': 'रेफ़र करें और पाएँ',
   'whatsapp.referral.description': 'हर ग्राहक का अपना लिंक होता है। जो इससे रजिस्टर करता है वह यहाँ दिखता है, रेफ़र करने वाले ग्राहक से जुड़ा हुआ।',
   'whatsapp.referral.baseUrl': 'लिंक का पता',
-  'whatsapp.referral.baseUrlHint': 'लिंक कहाँ खुलता है — सब्सक्राइबर पोर्टल का पता, जैसे https://portal.example.in। अभियानों में {{link_indicacao}} का उपयोग करें ताकि हर ग्राहक को उसका अपना लिंक मिले।',
+  'whatsapp.referral.baseUrlHint': 'लिंक कहाँ खुलता है — आपके प्रोवाइडर के सब्सक्राइबर पोर्टल का पता। अभियानों में {{link_indicacao}} का उपयोग करें ताकि हर ग्राहक को उसका अपना लिंक मिले।',
   'whatsapp.referral.baseUrlSave': 'पता सहेजें',
   'whatsapp.referral.baseUrlMissing': 'लिंक काम करें इसके लिए पता दर्ज करें।',
   'whatsapp.referral.noSecret': 'सर्वर पर लिंक पर हस्ताक्षर के लिए कोई सीक्रेट सेट नहीं है।',

@@ -2768,7 +2768,7 @@ const zhTW: Dictionary = {
   'whatsapp.referral.title': '推薦有禮',
   'whatsapp.referral.description': '每位客戶都有專屬連結。透過該連結註冊的人會顯示在這裡，並關聯到推薦他的客戶。',
   'whatsapp.referral.baseUrl': '連結位址',
-  'whatsapp.referral.baseUrlHint': '連結開啟的位置 — 用戶入口網站位址，例如 https://portal.example.tw。在群發中使用 {{link_indicacao}}，可向每位客戶傳送其專屬連結。',
+  'whatsapp.referral.baseUrlHint': '連結開啟的位置 — 您的服務商的用戶入口網站位址。在群發中使用 {{link_indicacao}}，可向每位客戶傳送其專屬連結。',
   'whatsapp.referral.baseUrlSave': '儲存位址',
   'whatsapp.referral.baseUrlMissing': '請填寫位址以使連結生效。',
   'whatsapp.referral.noSecret': '伺服器未設定用於簽署連結的密鑰。',

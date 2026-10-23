@@ -2519,7 +2519,7 @@ const fr: Dictionary = {
   'whatsapp.referral.title': 'Parrainez et gagnez',
   'whatsapp.referral.description': 'Chaque client a son propre lien. Toute personne qui s’inscrit par ce lien apparaît ici, rattachée au client qui l’a recommandée.',
   'whatsapp.referral.baseUrl': 'Adresse du lien',
-  'whatsapp.referral.baseUrlHint': 'D’où le lien s’ouvre — l’adresse du portail abonné, par exemple https://portail.votrefai.fr. Utilisez {{link_indicacao}} dans les campagnes pour envoyer à chaque client son propre lien.',
+  'whatsapp.referral.baseUrlHint': 'D’où le lien s’ouvre — l’adresse du portail abonné de votre fournisseur. Utilisez {{link_indicacao}} dans les campagnes pour envoyer à chaque client son propre lien.',
   'whatsapp.referral.baseUrlSave': 'Enregistrer l’adresse',
   'whatsapp.referral.baseUrlMissing': 'Indiquez l’adresse pour que les liens fonctionnent.',
   'whatsapp.referral.noSecret': 'Le serveur n’a pas de secret configuré pour signer les liens.',

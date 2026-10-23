@@ -2774,7 +2774,7 @@ const it: Dictionary = {
   'whatsapp.referral.title': 'Segnala e guadagna',
   'whatsapp.referral.description': 'Ogni cliente ha il proprio link. Chi si registra tramite il link compare qui, collegato al cliente che l’ha segnalato.',
   'whatsapp.referral.baseUrl': 'Indirizzo del link',
-  'whatsapp.referral.baseUrlHint': 'Da dove si apre il link — l’indirizzo del portale abbonati, ad esempio https://portale.tuoprovider.it. Usa {{link_indicacao}} nelle campagne per inviare a ogni cliente il suo link.',
+  'whatsapp.referral.baseUrlHint': 'Da dove si apre il link — l’indirizzo del portale abbonati del tuo provider. Usa {{link_indicacao}} nelle campagne per inviare a ogni cliente il suo link.',
   'whatsapp.referral.baseUrlSave': 'Salva indirizzo',
   'whatsapp.referral.baseUrlMissing': 'Inserisci l’indirizzo perché i link funzionino.',
   'whatsapp.referral.noSecret': 'Il server non ha un segreto configurato per firmare i link.',

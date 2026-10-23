@@ -2768,7 +2768,7 @@ const zhCN: Dictionary = {
   'whatsapp.referral.title': '推荐有礼',
   'whatsapp.referral.description': '每位客户都有专属链接。通过该链接注册的人会显示在这里，并关联到推荐他的客户。',
   'whatsapp.referral.baseUrl': '链接地址',
-  'whatsapp.referral.baseUrlHint': '链接打开的位置 — 用户门户地址，例如 https://portal.example.cn。在群发中使用 {{link_indicacao}}，可向每位客户发送其专属链接。',
+  'whatsapp.referral.baseUrlHint': '链接打开的位置 — 您的服务商的用户门户地址。在群发中使用 {{link_indicacao}}，可向每位客户发送其专属链接。',
   'whatsapp.referral.baseUrlSave': '保存地址',
   'whatsapp.referral.baseUrlMissing': '请填写地址以使链接生效。',
   'whatsapp.referral.noSecret': '服务器未配置用于签名链接的密钥。',

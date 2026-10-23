@@ -2726,7 +2726,7 @@ const ja: Dictionary = {
   'whatsapp.referral.title': '紹介でおトク',
   'whatsapp.referral.description': 'お客様ごとに専用リンクがあります。リンクから登録した人は、紹介したお客様と紐づいてここに表示されます。',
   'whatsapp.referral.baseUrl': 'リンクのアドレス',
-  'whatsapp.referral.baseUrlHint': 'リンクが開く場所（契約者ポータルのアドレス。例：https://portal.example.jp）。キャンペーンで {{link_indicacao}} を使うと、各お客様に専用リンクを送れます。',
+  'whatsapp.referral.baseUrlHint': 'リンクが開く場所（お使いのプロバイダーの契約者ポータルのアドレス）。キャンペーンで {{link_indicacao}} を使うと、各お客様に専用リンクを送れます。',
   'whatsapp.referral.baseUrlSave': 'アドレスを保存',
   'whatsapp.referral.baseUrlMissing': 'リンクが機能するようアドレスを入力してください。',
   'whatsapp.referral.noSecret': 'リンクに署名するためのシークレットがサーバーに設定されていません。',

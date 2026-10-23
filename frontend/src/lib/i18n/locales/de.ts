@@ -2651,7 +2651,7 @@ const de: Dictionary = {
   'whatsapp.referral.title': 'Empfehlen und gewinnen',
   'whatsapp.referral.description': 'Jeder Kunde hat seinen eigenen Link. Wer sich darüber anmeldet, erscheint hier, dem empfehlenden Kunden zugeordnet.',
   'whatsapp.referral.baseUrl': 'Adresse des Links',
-  'whatsapp.referral.baseUrlHint': 'Wo sich der Link öffnet — die Adresse des Teilnehmerportals, z. B. https://portal.ihrprovider.de. Verwenden Sie {{link_indicacao}} in Kampagnen, um jedem Kunden seinen eigenen Link zu senden.',
+  'whatsapp.referral.baseUrlHint': 'Wo sich der Link öffnet — die Adresse des Teilnehmerportals Ihres Anbieters. Verwenden Sie {{link_indicacao}} in Kampagnen, um jedem Kunden seinen eigenen Link zu senden.',
   'whatsapp.referral.baseUrlSave': 'Adresse speichern',
   'whatsapp.referral.baseUrlMissing': 'Geben Sie die Adresse ein, damit die Links funktionieren.',
   'whatsapp.referral.noSecret': 'Auf dem Server ist kein Geheimnis zum Signieren der Links konfiguriert.',
