@@ -1204,5 +1204,15 @@ export default {
   'platformAlert.test.body': 'Questo è un avviso di prova della piattaforma. Se lo hai ricevuto, gli avvisi funzionano.',
   'platformAlert.digest.subject': 'Riepilogo giornaliero: {count} avviso/i',
   'platformAlert.digest.body': 'Riepilogo degli avvisi della piattaforma del {date}:',
-  'platformAlert.digest.more': '… e altri {count}'
+  'platformAlert.digest.more': '… e altri {count}',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "Report mensile: {month}",
+  'platformAlert.monthly_report.body': "Riepilogo della piattaforma per {month}:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} paganti)",
+  'platformAlert.monthly_report.received': "Incassato (netto): {value}",
+  'platformAlert.monthly_report.refunded': "Rimborsato: {value}",
+  'platformAlert.monthly_report.tenants': "Provider: {new} nuovi, {canceled} cancellati",
+  'platformAlert.monthly_report.churn': "Churn: {value}",
+  'platformAlert.monthly_report.overdue': "Insoluti a fine mese: {value} ({count} addebito/i)",
+  'platformAlert.monthly_report.note': "MRR e insoluti dei mesi chiusi sono ricostruiti dall'estratto conto e sono approssimativi."
 };

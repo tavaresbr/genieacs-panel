@@ -1689,6 +1689,8 @@ export interface PlatformAlertsConfig {
   bigOverdueCents: number
   /** `hour` no horário de Brasília. */
   dailyDigest: { enabled: boolean; hour: number }
+  /** O relatório mensal: dia 1º, à `hour` de Brasília, o resumo do mês que acabou. */
+  monthlyReport?: { enabled: boolean; channels: PlatformAlertChannel[]; hour: number }
 }
 
 /** O patch dos alertas: ausente mantém. */
@@ -1696,6 +1698,7 @@ export interface PlatformAlertsUpdate {
   events?: Partial<Record<PlatformAlertEvent, { enabled?: boolean; channels?: PlatformAlertChannel[] }>>
   bigOverdueCents?: number | null
   dailyDigest?: { enabled?: boolean; hour?: number }
+  monthlyReport?: { enabled?: boolean; channels?: PlatformAlertChannel[]; hour?: number }
 }
 
 /** O crédito da indicação de provedores, em centavos (0106); 0 desliga o programa. */
@@ -6469,8 +6472,62 @@ export interface RevenueReport {
   discountApproximate?: boolean
 }
 
+/**
+ * Um mês da série de métricas (`GET /platform/metrics/monthly`), no calendário
+ * de Brasília. Nos meses fechados, MRR e inadimplência são reconstruídos pelo
+ * extrato (`mrrApproximate`/`overdueApproximate`); o mês corrente é a foto de agora.
+ */
+export interface MonthlyMetricsMonth {
+  month: string
+  current: boolean
+  mrrCents: number
+  payingCount: number
+  mrrApproximate: boolean
+  /** Líquido: pagamentos do mês menos estornos do mês. */
+  receivedCents: number
+  grossCents: number
+  refundedCents: number
+  payments: number
+  newTenants: number
+  canceledTenants: number
+  /** Cancelados sobre os pagantes do fim do mês anterior; nulo sem base. */
+  churnRate: number | null
+  overdueCents: number
+  overdueCount: number
+  overdueTenants: number
+  overdueApproximate: boolean
+}
+
+export interface MonthlyMetricsPlanRow {
+  planId: number | null
+  name: string | null
+  receivedCents: number
+  mrrCents: number
+  payingCount: number
+}
+
+export interface MonthlyMetrics {
+  currency: string
+  timeZone: string
+  months: MonthlyMetricsMonth[]
+  /** A receita por plano do último mês da série (`revenueByPlanMonth`). */
+  revenueByPlan: MonthlyMetricsPlanRow[]
+  revenueByPlanMonth: string
+}
+
 /** Os relatórios do console: a receita, e a planilha das cobranças do período. */
 export const platformReportsAPI = {
+  /** A série mês a mês (1 a 24 meses). 400 `invalid_months`. */
+  monthlyMetrics: (months = 12) =>
+    apiClient.get<MonthlyMetrics>(`/platform/metrics/monthly?months=${encodeURIComponent(String(months))}`),
+  /**
+   * Manda agora o relatório do mês anterior. 409 `no_destination`; 502
+   * `send_failed`; 400 `invalid_channels`.
+   */
+  sendMonthlyReport: (channels?: PlatformAlertChannel[]) =>
+    apiClient.post<{ month: string; channels: Partial<Record<PlatformAlertChannel, boolean | null>> }>(
+      '/platform/metrics/monthly-report/send', channels ? { channels } : {}
+    ),
   revenue: (range: { from: string; to: string }) =>
     apiClient.get<RevenueReport>(
       `/platform/reports/revenue?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`

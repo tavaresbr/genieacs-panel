@@ -1206,5 +1206,15 @@ export default {
   'platformAlert.test.body': 'This is a test alert from the platform. If you received it, alerts are working.',
   'platformAlert.digest.subject': 'Daily summary: {count} alert(s)',
   'platformAlert.digest.body': 'Summary of platform alerts for {date}:',
-  'platformAlert.digest.more': '… and {count} more'
+  'platformAlert.digest.more': '… and {count} more',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "Monthly report: {month}",
+  'platformAlert.monthly_report.body': "Platform summary for {month}:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} paying)",
+  'platformAlert.monthly_report.received': "Received (net): {value}",
+  'platformAlert.monthly_report.refunded': "Refunded: {value}",
+  'platformAlert.monthly_report.tenants': "Providers: {new} new, {canceled} canceled",
+  'platformAlert.monthly_report.churn': "Churn: {value}",
+  'platformAlert.monthly_report.overdue': "Overdue at month end: {value} ({count} charge(s))",
+  'platformAlert.monthly_report.note': "MRR and overdue figures for closed months are rebuilt from the ledger and are approximate."
 };

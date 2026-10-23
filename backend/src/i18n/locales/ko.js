@@ -1209,5 +1209,15 @@ export default {
   'platformAlert.test.body': '플랫폼의 테스트 알림입니다. 받으셨다면 알림이 정상적으로 작동하고 있습니다.',
   'platformAlert.digest.subject': '일일 요약: 알림 {count}건',
   'platformAlert.digest.body': '{date} 플랫폼 알림 요약:',
-  'platformAlert.digest.more': '… 외 {count}건'
+  'platformAlert.digest.more': '… 외 {count}건',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "월간 보고서: {month}",
+  'platformAlert.monthly_report.body': "{month} 플랫폼 요약:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} (결제 중 {count}곳)",
+  'platformAlert.monthly_report.received': "수납 (순액): {value}",
+  'platformAlert.monthly_report.refunded': "환불: {value}",
+  'platformAlert.monthly_report.tenants': "공급자: 신규 {new}곳, 해지 {canceled}곳",
+  'platformAlert.monthly_report.churn': "이탈률: {value}",
+  'platformAlert.monthly_report.overdue': "월말 연체: {value} (청구 {count}건)",
+  'platformAlert.monthly_report.note': "마감된 달의 MRR과 연체는 거래 내역으로 재구성한 추정치입니다."
 };

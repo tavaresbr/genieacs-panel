@@ -1203,5 +1203,15 @@ export default {
   'platformAlert.test.body': 'Esta es una alerta de prueba de la plataforma. Si la recibiste, las alertas funcionan.',
   'platformAlert.digest.subject': 'Resumen diario: {count} alerta(s)',
   'platformAlert.digest.body': 'Resumen de las alertas de la plataforma del {date}:',
-  'platformAlert.digest.more': '… y {count} más'
+  'platformAlert.digest.more': '… y {count} más',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "Informe mensual: {month}",
+  'platformAlert.monthly_report.body': "Resumen de la plataforma en {month}:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} pagando)",
+  'platformAlert.monthly_report.received': "Recibido (neto): {value}",
+  'platformAlert.monthly_report.refunded': "Reembolsado: {value}",
+  'platformAlert.monthly_report.tenants': "Proveedores: {new} nuevo(s), {canceled} cancelado(s)",
+  'platformAlert.monthly_report.churn': "Churn: {value}",
+  'platformAlert.monthly_report.overdue': "Morosidad al cierre del mes: {value} ({count} cobro(s))",
+  'platformAlert.monthly_report.note': "El MRR y la morosidad de los meses cerrados se reconstruyen a partir del extracto y son aproximados."
 };

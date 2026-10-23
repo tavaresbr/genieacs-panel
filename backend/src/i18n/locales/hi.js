@@ -1206,5 +1206,15 @@ export default {
   'platformAlert.test.body': 'यह प्लेटफ़ॉर्म का परीक्षण अलर्ट है। अगर आपको मिला, तो अलर्ट काम कर रहे हैं।',
   'platformAlert.digest.subject': 'दैनिक सारांश: {count} अलर्ट',
   'platformAlert.digest.body': '{date} के प्लेटफ़ॉर्म अलर्ट का सारांश:',
-  'platformAlert.digest.more': '… और {count} अन्य'
+  'platformAlert.digest.more': '… और {count} अन्य',
+  // O relatório mensal da plataforma (dia 1º, por WhatsApp e e-mail)
+  'platformAlert.monthly_report.subject': "मासिक रिपोर्ट: {month}",
+  'platformAlert.monthly_report.body': "{month} के लिए प्लेटफ़ॉर्म सारांश:",
+  'platformAlert.monthly_report.mrr': "MRR: {value} ({count} भुगतान करने वाले)",
+  'platformAlert.monthly_report.received': "प्राप्त (शुद्ध): {value}",
+  'platformAlert.monthly_report.refunded': "रिफ़ंड: {value}",
+  'platformAlert.monthly_report.tenants': "प्रदाता: {new} नए, {canceled} रद्द",
+  'platformAlert.monthly_report.churn': "चर्न: {value}",
+  'platformAlert.monthly_report.overdue': "महीने के अंत में बकाया: {value} ({count} शुल्क)",
+  'platformAlert.monthly_report.note': "बंद महीनों का MRR और बकाया लेजर से पुनर्निर्मित है और अनुमानित है।"
 };
