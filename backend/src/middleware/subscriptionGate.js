@@ -109,8 +109,17 @@ const EXEMPT_PATHS = new Set([
 // lista pelo dia em que alguém o mover para baixo.
 const WEBHOOK_PREFIXES = ['/api/sgp/events/webhook', '/api/whatsapp-webhook'];
 
+// As faturas do provedor endereçadas por id: a segunda via de uma cobrança
+// em aberto e o recibo de uma paga. Só leitura, só do provedor em escopo, e
+// pela mesma razão de `/api/tenant/charges`: quem está bloqueado é quem
+// precisa do boleto atual para sair do muro. Um padrão fechado (id numérico e
+// as duas palavras), e não um prefixo, para que uma rota nova embaixo de
+// `/charges/:id` não herde a isenção sem alguém escrevê-la aqui.
+const EXEMPT_PATTERNS = [/^\/api\/tenant\/charges\/\d+\/(payment-info|receipt)$/];
+
 function isExempt(path) {
   if (EXEMPT_PATHS.has(path)) return true;
+  if (EXEMPT_PATTERNS.some((padrao) => padrao.test(path))) return true;
   return EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 

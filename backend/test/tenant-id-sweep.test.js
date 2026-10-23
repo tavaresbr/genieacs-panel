@@ -304,6 +304,19 @@ async function semear(tenantId, slug) {
       phone_e164: '5511922222222'
     });
 
+    // A cobrança PAGA de cada provedor, com o mesmo período nos dois: a
+    // segunda via e o recibo endereçam pelo id da linha. Paga para que o
+    // recibo do controle saia (200) e a segunda via recuse com 409 — os dois
+    // só depois de achar a linha aqui.
+    alvo.paidCharge = await semearLinha('billing_charges', {
+      period_end: '2026-03-31',
+      amount_cents: 19900,
+      currency: 'BRL',
+      provider: 'asaas',
+      status: 'paid',
+      gateway_charge_id: `pay_${slug}_0001`
+    });
+
     return alvo;
   });
 }
