@@ -573,10 +573,14 @@ describe('when the bot stays quiet', () => {
     assert.deepEqual(await respostas(telefone), primeira);
   });
 
-  it('says nothing to an opt-out request', async () => {
+  it('does not route an opt-out request — only the opt-out confirmation goes out', async () => {
     const telefone = '5593981110033';
     await receber(telefone, 'SAIR');
-    assert.deepEqual(await respostas(telefone), []);
+    // A única resposta é a confirmação do pedido (uma vez, com como voltar),
+    // escrita por `waMarketingOptOutService`; o bot não passa o "SAIR" pela
+    // tabela de intenções.
+    const { DEFAULT_CONFIG } = await import('../src/services/waMarketingOptOutService.js');
+    assert.deepEqual(await respostas(telefone), [DEFAULT_CONFIG.confirmText]);
     const optOut = await getDb()('wa_opt_outs').where({ wa_phone_e164: telefone }).first();
     assert.ok(optOut, 'the opt-out itself must still be recorded');
   });

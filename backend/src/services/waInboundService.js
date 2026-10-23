@@ -15,6 +15,7 @@ import WaSatisfactionService from './waSatisfactionService.js';
 import WaAssignmentService from './waAssignmentService.js';
 import WaConversationService from './waConversationService.js';
 import WaDunningService, { pareceComprovante } from './waDunningService.js';
+import WaMarketingOptOutService from './waMarketingOptOutService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DATA_DIR } from '../config/paths.js';
@@ -82,7 +83,32 @@ function textoDaMensagem(mensagem, profundidade = 0) {
     return mensagem.templateButtonReplyMessage.selectedDisplayText;
   }
   if (typeof mensagem.listResponseMessage?.title === 'string') return mensagem.listResponseMessage.title;
+  // A resposta de botão no formato da própria Meta, quando o servidor a repassa
+  // sem converter: `button.text` no modelo, `interactive.button_reply` no
+  // botão interativo.
+  if (typeof mensagem.button?.text === 'string') return mensagem.button.text;
+  if (typeof mensagem.interactive?.button_reply?.title === 'string') return mensagem.interactive.button_reply.title;
+  if (typeof mensagem.interactiveResponseMessage?.body?.text === 'string') return mensagem.interactiveResponseMessage.body.text;
   return '';
+}
+
+/**
+ * Se a mensagem é o toque num botão — a resposta rápida de um modelo, como o
+ * "Parar promoções" que a Meta põe nos modelos de MARKETING.
+ *
+ * Cada sabor diz isso de um jeito: o Baileys pelo nó da resposta, o Evolution
+ * da API oficial pelo `messageType` que ele mesmo escreve ao converter o
+ * evento da Meta, e a Meta crua pelo `button`/`interactive`. O texto já foi
+ * lido por `textoDaMensagem`; aqui só se pergunta de onde ele veio.
+ */
+function ehRespostaDeBotao(dados, mensagem) {
+  const tipo = String(dados?.messageType ?? '');
+  if (['buttonMessage', 'buttonsResponseMessage', 'templateButtonReplyMessage', 'interactiveMessage', 'interactiveResponseMessage'].includes(tipo)) {
+    return true;
+  }
+  if (!mensagem || typeof mensagem !== 'object') return false;
+  return Boolean(mensagem.buttonsResponseMessage || mensagem.templateButtonReplyMessage
+    || mensagem.interactiveResponseMessage || mensagem.button || mensagem.interactive);
 }
 
 function cortar(valor, teto) {
@@ -370,9 +396,20 @@ async function gravarMensagem(account, item) {
     });
   }
 
+  // 7a. O pedido de não receber PROMOÇÃO ("parar", o botão "Parar promoções"
+  // da Meta) e a volta ("VOLTAR"). Grava, responde uma vez e consome a
+  // mensagem: o bot não a responde de novo e ela não vai para a fila. Nunca
+  // lança. Vale para número por QR e oficial — os dois chegam aqui.
+  const promocao = await WaMarketingOptOutService.handleInbound({
+    conversation,
+    text: texto,
+    button: ehRespostaDeBotao(dados, mensagem),
+    fromMe
+  });
+
   // 7b. A resposta da pesquisa de satisfação, numa conversa encerrada. Uma
   // nota não reabre o fio nem cai no bot; outro assunto segue o fluxo normal.
-  const pesquisa = !fromMe && conversation.closed_at
+  const pesquisa = !fromMe && conversation.closed_at && !promocao?.consumed
     ? await WaSatisfactionService.captureReply({ conversation, text: texto })
     : null;
   const soPesquisa = pesquisa?.consumed === true && pesquisa.reopen === false;
@@ -430,7 +467,11 @@ async function gravarMensagem(account, item) {
   // tem que engolir — uma falha dele virando 500 aqui faria o servidor reenviar
   // este evento para sempre.
   let resultadoDoBot = null;
-  if (!pesquisa?.consumed) {
+  if (promocao?.consumed) {
+    // Já respondido acima. O motivo é o mesmo do "SAIR": quem pediu para
+    // receber menos não precisa de atendente por isso.
+    resultadoDoBot = { replied: false, reason: 'opt_out_request' };
+  } else if (!pesquisa?.consumed) {
     resultadoDoBot = await WaBotService.responder({
       conversation,
       messageId,
@@ -604,5 +645,5 @@ class WaInboundService {
   }
 }
 
-export { textoDaMensagem, nomeExibido, identidades, estadoDaConexao, telefonePareado };
+export { textoDaMensagem, ehRespostaDeBotao, nomeExibido, identidades, estadoDaConexao, telefonePareado };
 export default WaInboundService;

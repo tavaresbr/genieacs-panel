@@ -36,8 +36,11 @@ import { WaError } from './whatsappConfigService.js';
  * and are not — a number reconnects, a setting gets filled in, and the message
  * itself was sendable the whole time. `unauthorized` and `license_required` are
  * the same story with a different fix.
+ *
+ * `marketing_opt_out` é sobre a pessoa, não sobre o servidor: ela pediu para
+ * não receber promoção, e tentar de novo daqui a um minuto não muda o pedido.
  */
-const PERMANENT_CODES = new Set(['no_destination', 'meta_window_closed']);
+const PERMANENT_CODES = new Set(['no_destination', 'meta_window_closed', 'marketing_opt_out']);
 
 /**
  * Recusas da Meta (API oficial) que não mudam com o tempo, pelo código numérico
@@ -47,6 +50,7 @@ const PERMANENT_CODES = new Set(['no_destination', 'meta_window_closed']);
  *   131026  o destino não pode receber (não tem WhatsApp, versão antiga…)
  *   131051  tipo de mensagem não suportado
  *   131049  a Meta escolheu não entregar (limite de marketing por pessoa)
+ *   131050  a pessoa parou as promoções do provedor no próprio WhatsApp
  *   132000  quantidade de parâmetros não bate com o modelo
  *   132001  o modelo não existe naquele idioma
  *   132005  texto do modelo grande demais depois de preenchido
@@ -57,7 +61,7 @@ const PERMANENT_CODES = new Set(['no_destination', 'meta_window_closed']);
  * Ficam DE FORA, e caem na nova tentativa: 190 (token vencido — conserta-se
  * trocando o token, como `unauthorized`) e 130429/131056 (limite de vazão).
  */
-const META_PERMANENT = /"code"\s*:\s*(?:131047|131026|131051|131049|132000|132001|132005|132007|132012|132015|132016)\b/;
+const META_PERMANENT = /"code"\s*:\s*(?:131047|131026|131051|131049|131050|132000|132001|132005|132007|132012|132015|132016)\b/;
 
 /**
  * The server saying this recipient is not a WhatsApp user.

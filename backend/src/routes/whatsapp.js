@@ -18,6 +18,9 @@ router.get('/bot-config', authenticateToken, requirePermission('whatsapp.config'
 router.put('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateBotConfig);
 router.post('/bot-config/ai-test', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.testBotAi);
 router.post('/bot-config/ai-improve-message', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.improveBotMessage);
+// "Parar promoções": as palavras que o cliente manda e o que o painel responde.
+router.get('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getMarketingOptOutConfig);
+router.put('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMarketingOptOutConfig);
 // O relatório do bot é leitura de quem atende, não de quem configura.
 router.get('/bot-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getBotReport);
 // A pesquisa de satisfação: leitura de quem atende, como o relatório do bot.

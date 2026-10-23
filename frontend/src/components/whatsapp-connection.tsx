@@ -66,6 +66,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   no_destination: 'whatsapp.error.noDestination',
   // A API oficial da Meta.
   meta_window_closed: 'whatsapp.error.metaWindowClosed',
+  marketing_opt_out: 'whatsapp.marketingOptOut.blocked',
   cloud_requires_v2: 'whatsapp.error.cloudRequiresV2',
   invalid_meta_credentials: 'whatsapp.error.invalidMetaCredentials',
   not_applicable_cloud: 'whatsapp.error.notApplicableCloud',

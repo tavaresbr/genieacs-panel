@@ -107,6 +107,26 @@ export const casos = [
     codigoDeNaoAchou: 'conversation_not_found'
   },
   {
+    // "Não quer promoções" marcado e desmarcado pela equipe. O id do vizinho
+    // dá 404 antes de qualquer escrita em `wa_marketing_opt_outs`.
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/marketing-opt-out',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/marketing-opt-out`,
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
+    label: 'DELETE /api/whatsapp/conversations/:id/marketing-opt-out',
+    method: 'DELETE',
+    path: (id) => `/api/whatsapp/conversations/${id}/marketing-opt-out`,
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
     // A indicação de um cliente: o estado mudado por quem atende. O id do
     // vizinho dá 404 antes de qualquer validação do corpo.
     chave: 'referral',

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { Link } from 'react-router'
 import { AssigneeControl } from '@/components/whatsapp/assignment'
 import { TagPicker } from '@/components/whatsapp/tags'
+import { MarketingOptOutControl } from '@/components/whatsapp/marketing-opt-out'
 import { Icon } from '@/components/ui/icon'
 import { ContactLink } from '@/components/whatsapp/contact-link'
 import { useTranslation } from '@/contexts/language-context'
@@ -288,6 +289,7 @@ export function ConversationThread({
               )}
               <AssigneeControl conversation={conversation} onChange={onLinked} />
               <TagPicker conversation={conversation} onChange={onLinked} />
+              <MarketingOptOutControl conversation={conversation} onChange={onLinked} />
               {closed && (
                 <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
                   <Icon name="check" size={12} />

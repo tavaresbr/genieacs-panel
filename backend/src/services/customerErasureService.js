@@ -44,6 +44,9 @@ import { resolveStoredAttachment } from './waMediaFile.js';
  *   para sobreviver a conta apagada e recriada. Apagar o "não me perturbe" de
  *   quem pediu exclusão é desfazer o pedido: a próxima sincronização do ERP
  *   traz o número de volta e a campanha o alcança.
+ * - **`wa_marketing_opt_outs`, intocada**, pelo mesmo motivo: é o "não quero
+ *   promoção" de um número, e apagá-lo devolveria a promoção a quem pediu
+ *   para sair.
  * - **`device_profiles`**, que é data de instalação de equipamento, e
  *   **`billing_events`/`subscriptions`**, que são o contrato do ISP conosco e
  *   não têm uma coluna de assinante sequer.

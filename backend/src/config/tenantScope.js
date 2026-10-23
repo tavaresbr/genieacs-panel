@@ -88,6 +88,9 @@ export const SCOPED_TABLES = new Set([
   'wa_conversations',
   'wa_messages',
   'wa_opt_outs',
+  // Quem pediu para não receber promoção (o "parar" ou o botão da Meta).
+  // Telefone de assinante, e o pedido foi feito a UM provedor.
+  'wa_marketing_opt_outs',
   // Campaigns and the alert cooldown. Scoping these lets the campaign flush
   // run per provider, and stops one provider's ONT outage from suppressing
   // another provider's alert for the same rule.
