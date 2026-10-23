@@ -2047,6 +2047,19 @@ const WA_TEMPLATE_META_MEDIA_COLUMNS = [
   ['meta_button_index', (t) => t.integer('meta_button_index')]
 ];
 
+/**
+ * O que a revisão da Meta disse de cada modelo (0117): o motivo da recusa
+ * (`INVALID_FORMAT`, `TAG_CONTENT_MISMATCH`…), a nota de qualidade
+ * (`GREEN`/`YELLOW`/`RED`) e QUANDO o status mudou, de quê — é isso que a tela
+ * mostra como "aprovado há 2 h" sem o provedor ter de apertar "Sincronizar".
+ */
+const WA_META_TEMPLATE_STATUS_COLUMNS = [
+  ['rejected_reason', (t) => t.string('rejected_reason', 64).nullable()],
+  ['quality_score', (t) => t.string('quality_score', 16).nullable()],
+  ['previous_status', (t) => t.string('previous_status', 24).nullable()],
+  ['status_changed_at', (t) => t.timestamp('status_changed_at').nullable()]
+];
+
 const WA_META_MEDIA_COLUMN_TABLES = [
   ['wa_meta_templates', WA_META_TEMPLATE_MEDIA_COLUMNS],
   ['wa_templates', WA_TEMPLATE_META_MEDIA_COLUMNS]
@@ -6465,6 +6478,22 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'teiah_consultations', teiahConsultationsTable(db));
+    }
+  },
+  {
+    /** O status dos modelos da Meta atualizado sozinho — ver `WA_META_TEMPLATE_STATUS_COLUMNS`. */
+    id: '0117_wa_meta_template_status',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_meta_templates'))) return true;
+      return (await missingColumns(db, 'wa_meta_templates', WA_META_TEMPLATE_STATUS_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_meta_templates'))) return;
+      const missing = await missingColumns(db, 'wa_meta_templates', WA_META_TEMPLATE_STATUS_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_meta_templates', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   },
   {

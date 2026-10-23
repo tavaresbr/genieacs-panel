@@ -1,16 +1,30 @@
 import AppState from '../models/AppState.js';
+import AuditLog from '../models/AuditLog.js';
 import WaMetaTemplate from '../models/WaMetaTemplate.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
-import { WaError } from './whatsappConfigService.js';
+import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
+import { fetchTemplateStatuses } from './metaWebhookService.js';
 import {
   createMetaTemplateRequest,
   findMetaTemplatesRequest,
   readCreatedTemplate,
   readMetaTemplates,
+  readQualityScore,
+  readRejectedReason,
   sanitizeMetaFilename,
   sanitizeMetaLink,
   sanitizeMetaParam
 } from '../utils/wa/evolutionApi.js';
+
+/**
+ * Os status em que a Meta ainda vai decidir — é por eles que o vigia
+ * (`waMetaTemplateWatcher`) volta a perguntar sozinho.
+ */
+export const META_PENDING_STATUSES = Object.freeze(['PENDING', 'IN_APPEAL']);
+/** Os status em que a Meta explica o porquê em `rejected_reason`. */
+const COM_MOTIVO = new Set(['REJECTED', 'PAUSED', 'DISABLED']);
+/** As mudanças que merecem registro: a Meta decidiu algo sobre o modelo. */
+export const META_NOTABLE_STATUSES = Object.freeze(['APPROVED', 'REJECTED', 'PAUSED', 'DISABLED']);
 
 /** O texto inteiro já renderizado, em uma linha — vale para qualquer modelo. */
 export const TEXTO_COMPLETO = 'texto';
@@ -194,20 +208,88 @@ class WaMetaTemplateService {
     return { account, EvolutionInstanceService };
   }
 
-  /** Busca na Meta (pelo servidor Evolution) e troca a cópia local. */
+  /**
+   * Busca na Meta (pelo servidor Evolution) e troca a cópia local.
+   *
+   * Chamado pelo botão "Sincronizar", pela criação de um modelo e pelo vigia
+   * que volta sozinho enquanto há modelo em análise. Quando um status muda para
+   * uma decisão da Meta (aprovado, recusado, pausado, desativado), a mudança
+   * fica na trilha de auditoria e na própria linha (`status_changed_at`), que a
+   * tela mostra.
+   */
   static async sync(accountId) {
     const { account, EvolutionInstanceService } = await this.requireCloudAccount(accountId);
     const config = await EvolutionInstanceService.requireConfig();
     const client = EvolutionInstanceService.clientFor(account, config);
+    let resultado;
     try {
       const result = await client.sendOrThrow(findMetaTemplatesRequest(account.name));
-      const rows = await WaMetaTemplate.replaceForAccount(account.id, readMetaTemplates(result.data));
+      const lidos = await this.withRejectionReasons(account, readMetaTemplates(result.data));
+      resultado = await WaMetaTemplate.replaceForAccount(account.id, lidos);
       await WhatsAppAccount.update(account.id, { meta_templates_synced_at: new Date(), meta_templates_error: null });
-      return rows.map((row) => this.publicMetaTemplate(row));
     } catch (error) {
       await WhatsAppAccount.update(account.id, { meta_templates_error: falha(error) });
       throw error;
     }
+    for (const mudanca of resultado.changes) {
+      if (!META_NOTABLE_STATUSES.includes(mudanca.to)) continue;
+      const linha = resultado.rows.find((r) => r.name === mudanca.name && r.language === mudanca.language);
+      // eslint-disable-next-line no-await-in-loop -- poucas mudanças por volta
+      await AuditLog.record({
+        action: AuditLog.ACTIONS.WHATSAPP_META_TEMPLATE_STATUS,
+        actorKind: 'system',
+        actorUsername: 'meta',
+        subjectType: 'wa_meta_template',
+        subjectId: linha?.id ?? null,
+        detail: {
+          accountId: account.id,
+          name: mudanca.name,
+          language: mudanca.language,
+          from: mudanca.from,
+          to: mudanca.to,
+          reason: linha?.rejected_reason ?? null
+        }
+      });
+    }
+    return resultado.rows.map((row) => this.publicMetaTemplate(row));
+  }
+
+  /**
+   * Completa o motivo da recusa (e a nota de qualidade) pela Graph API.
+   *
+   * O `/template/find` do Evolution chama a Graph sem `fields=` e por isso, em
+   * geral, não traz `rejected_reason`. Trocar a lista inteira para a Graph
+   * duplicaria o caminho que já funciona (e que é o mesmo da criação e do
+   * envio); então a lista segue vindo do Evolution e só quando há modelo
+   * recusado/pausado/desativado SEM motivo o painel pergunta à Graph direto,
+   * com o token da Meta do próprio número. Qualquer falha ali é engolida: o
+   * status já veio, e o motivo fica para a próxima volta.
+   */
+  static async withRejectionReasons(account, lidos) {
+    const faltando = lidos.some((r) => COM_MOTIVO.has(r.status) && !r.rejectedReason);
+    if (!faltando || !account.meta_waba_id) return lidos;
+    let metaToken = '';
+    try {
+      metaToken = WhatsAppConfigService.decryptInstanceToken(account);
+    } catch {
+      metaToken = '';
+    }
+    if (!metaToken) return lidos;
+    const graph = await fetchTemplateStatuses({ wabaId: account.meta_waba_id, metaToken });
+    if (!graph.ok) {
+      console.warn(`[wa] motivo dos modelos da Meta indisponível (conta ${account.id}): ${graph.error}`);
+      return lidos;
+    }
+    const porChave = new Map(graph.templates.map((t) => [`${t?.name}\u0000${t?.language}`, t]));
+    return lidos.map((r) => {
+      const t = porChave.get(`${r.name}\u0000${r.language}`);
+      if (!t) return r;
+      return {
+        ...r,
+        rejectedReason: r.rejectedReason || readRejectedReason(t.rejected_reason),
+        qualityScore: r.qualityScore || readQualityScore(t.quality_score)
+      };
+    });
   }
 
   /**
@@ -286,6 +368,10 @@ class WaMetaTemplateService {
       buttons: metaButtons(row),
       supported: Boolean(row.supported),
       usable: row.status === 'APPROVED' && Boolean(row.supported),
+      rejectedReason: row.rejected_reason || null,
+      qualityScore: row.quality_score || null,
+      previousStatus: row.previous_status || null,
+      statusChangedAt: row.status_changed_at || null,
       syncedAt: row.synced_at || null
     };
   }

@@ -55,6 +55,51 @@ export async function subscribeWabaWebhook({ wabaId, metaToken, callbackUrl, ver
   return { ok: false, error: resposta.error || graphRefusal(resposta.status, resposta.data) };
 }
 
+/** Os campos que a revisão dos modelos precisa — `rejected_reason` só vem se pedido. */
+const TEMPLATE_STATUS_FIELDS = 'id,name,language,status,category,rejected_reason,quality_score';
+const TEMPLATE_PAGE_SIZE = 200;
+/** Teto de páginas: 1000 modelos numa WABA já é muito mais que o normal. */
+const TEMPLATE_MAX_PAGES = 5;
+
+/**
+ * O status de cada modelo da conta WABA, direto na Graph API. Nunca lança.
+ *
+ * Existe porque o `/template/find` do Evolution chama a Graph sem `fields=`, e
+ * sem isso ela não devolve `rejected_reason` — o motivo de uma recusa, que é
+ * justamente o que o provedor precisa para corrigir o modelo. A lista em si
+ * continua vindo do Evolution (é o caminho do envio e da criação); isto só
+ * COMPLETA o motivo e a qualidade, e quem chama segue sem eles se falhar.
+ *
+ * Pagina pelo cursor `paging.cursors.after`, nunca pela URL `paging.next`: o
+ * endereço é sempre o da Graph, e o token vai no cabeçalho de cada página.
+ *
+ * @param {{ wabaId: string, metaToken: string }} p
+ * @returns {Promise<{ ok: true, templates: object[] } | { ok: false, error: string }>}
+ */
+export async function fetchTemplateStatuses({ wabaId, metaToken }) {
+  const waba = String(wabaId ?? '').trim();
+  if (!META_ID.test(waba) || !metaToken) return { ok: false, error: 'meta_webhook_invalid_account' };
+  const templates = [];
+  let depois = '';
+  for (let pagina = 0; pagina < TEMPLATE_MAX_PAGES; pagina += 1) {
+    const query = { fields: TEMPLATE_STATUS_FIELDS, limit: String(TEMPLATE_PAGE_SIZE) };
+    if (depois) query.after = depois;
+    // eslint-disable-next-line no-await-in-loop -- uma página depende da anterior
+    const resposta = await graphRequest({ path: `/${waba}/message_templates`, metaToken, query });
+    if (!resposta.ok) return { ok: false, error: resposta.error };
+    if (!Array.isArray(resposta.data?.data)) {
+      return { ok: false, error: graphRefusal(resposta.status, resposta.data) };
+    }
+    templates.push(...resposta.data.data);
+    // Só o cursor da resposta segue adiante, nunca a URL `paging.next`: o
+    // endereço continua sendo o nosso, com o token no cabeçalho.
+    const cursor = resposta.data.paging?.next ? resposta.data.paging?.cursors?.after : '';
+    if (typeof cursor !== 'string' || !cursor) break;
+    depois = cursor;
+  }
+  return { ok: true, templates };
+}
+
 class MetaWebhookService {
   /**
    * Registra o webhook do número e grava o resultado na linha. Nunca lança:

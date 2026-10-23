@@ -14,8 +14,38 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { MetaTemplateCreateForm } from '@/components/whatsapp/meta-template-create'
+import { formatRelativeTime } from '@/lib/utils'
 
 const NOTICE_KEYS: MetaNoticeKey[] = ['maintenance', 'outage', 'alert']
+
+type MetaStatus = 'APPROVED' | 'PENDING' | 'IN_APPEAL' | 'REJECTED' | 'PAUSED' | 'DISABLED'
+type MetaReason = 'INVALID_FORMAT' | 'ABUSIVE_CONTENT' | 'INCORRECT_CATEGORY' | 'TAG_CONTENT_MISMATCH' | 'SCAM' | 'PROMOTIONAL'
+type MetaQuality = 'GREEN' | 'YELLOW' | 'RED'
+
+/** Os status da revisão da Meta que têm nome traduzido, e a cor de cada um. */
+const STATUS_BADGE: Record<MetaStatus, string> = {
+  APPROVED: 'modern-badge-success',
+  PENDING: 'modern-badge-info',
+  IN_APPEAL: 'modern-badge-info',
+  REJECTED: 'modern-badge-error',
+  PAUSED: 'modern-badge-warning',
+  DISABLED: 'modern-badge-error'
+}
+/** Os motivos de recusa que a Meta documenta; outro código aparece cru. */
+const REASONS: readonly MetaReason[] = ['INVALID_FORMAT', 'ABUSIVE_CONTENT', 'INCORRECT_CATEGORY', 'TAG_CONTENT_MISMATCH', 'SCAM', 'PROMOTIONAL']
+const QUALITY: readonly MetaQuality[] = ['GREEN', 'YELLOW', 'RED']
+const isStatus = (v: string | null): v is MetaStatus => v !== null && Object.hasOwn(STATUS_BADGE, v)
+const isReason = (v: string): v is MetaReason => (REASONS as readonly string[]).includes(v)
+const isQuality = (v: string): v is MetaQuality => (QUALITY as readonly string[]).includes(v)
+/** Por quanto tempo uma decisão da Meta fica destacada na lista. */
+const RECENT_MS = 24 * 3600 * 1000
+
+/** Se a Meta mudou o status deste modelo nas últimas 24 h. */
+export const changedRecently = (m: WhatsAppMetaTemplate, now: number = Date.now()) => {
+  if (!m.statusChangedAt) return false
+  const quando = new Date(m.statusChangedAt).getTime()
+  return Number.isFinite(quando) && now - quando < RECENT_MS
+}
 
 /** Se o modelo pede mais que o corpo: mídia no cabeçalho, variável no cabeçalho ou sufixo de botão. */
 export const needsExtras = (m: WhatsAppMetaTemplate) =>
@@ -79,6 +109,13 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
   }, [accountId, loadTemplates])
 
   const account = accounts.find((a) => a.id === accountId) ?? null
+  const recentes = useMemo(() => templates.filter((m) => changedRecently(m)).length, [templates])
+  const statusLabel = (status: string | null) =>
+    isStatus(status)
+      ? t(`whatsapp.metaTemplates.status.${status}`)
+      : t('whatsapp.metaTemplates.notApproved', { status: status || '—' })
+  const reasonLabel = (reason: string) =>
+    isReason(reason) ? t(`whatsapp.metaTemplates.reason.${reason}`) : reason
   // Um aviso é texto livre: só serve modelo com no máximo um parâmetro, que
   // recebe o aviso inteiro — e sem cabeçalho de mídia/variável nem botão
   // dinâmico, que o aviso não teria de onde preencher.
@@ -183,7 +220,15 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
           : t('whatsapp.metaTemplates.neverSynced')}
         {' · '}
         {t('whatsapp.metaTemplates.costHint')}
+        {' '}
+        {t('whatsapp.metaTemplates.autoRefresh')}
       </p>
+      {recentes > 0 && (
+        <p role="status" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-semibold text-foreground">
+          <Icon name="info" size={12} className="mr-1 inline" />
+          {t('whatsapp.metaTemplates.recentChanges', { count: recentes })}
+        </p>
+      )}
       <a
         href="https://business.facebook.com/wa/manage/message-templates/"
         target="_blank"
@@ -210,18 +255,32 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
       ) : (
         <ul className="flex flex-col gap-2" role="list">
           {templates.map((m) => (
-            <li key={m.id} className="rounded-md border border-border p-3">
+            <li
+              key={m.id}
+              className={`rounded-md border p-3 ${changedRecently(m) ? 'border-primary' : 'border-border'}`}
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-sm font-semibold text-foreground">{m.name}</span>
                 <span className="modern-badge">{m.language}</span>
                 {m.category && <span className="modern-badge">{m.category}</span>}
-                <span className={m.usable ? 'modern-badge-success' : 'modern-badge-warning'}>
-                  {m.usable
-                    ? t('whatsapp.metaTemplates.usable')
-                    : m.status !== 'APPROVED'
-                      ? t('whatsapp.metaTemplates.notApproved', { status: m.status || '—' })
-                      : t('whatsapp.metaTemplates.unsupported')}
+                <span
+                  className={isStatus(m.status) ? STATUS_BADGE[m.status] : 'modern-badge-warning'}
+                  title={m.rejectedReason ? t('whatsapp.metaTemplates.rejectedReason', { reason: reasonLabel(m.rejectedReason) }) : undefined}
+                >
+                  {statusLabel(m.status)}
                 </span>
+                {m.status === 'APPROVED' && (
+                  <span className={m.usable ? 'modern-badge-success' : 'modern-badge-warning'}>
+                    {m.usable ? t('whatsapp.metaTemplates.usable') : t('whatsapp.metaTemplates.unsupported')}
+                  </span>
+                )}
+                {m.qualityScore && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('whatsapp.metaTemplates.quality', {
+                      score: isQuality(m.qualityScore) ? t(`whatsapp.metaTemplates.quality.${m.qualityScore}`) : m.qualityScore
+                    })}
+                  </span>
+                )}
                 <span className="text-xs text-muted-foreground">
                   {t('whatsapp.metaTemplates.params', { count: m.paramCount })}
                 </span>
@@ -240,6 +299,22 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
                   </span>
                 )}
               </div>
+              {m.rejectedReason && (
+                <p className="mt-2 text-xs font-semibold text-[hsl(var(--status-danger))]">
+                  {t('whatsapp.metaTemplates.rejectedReason', { reason: reasonLabel(m.rejectedReason) })}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {m.statusChangedAt && m.previousStatus
+                  ? t('whatsapp.metaTemplates.statusChanged', {
+                    from: statusLabel(m.previousStatus),
+                    to: statusLabel(m.status),
+                    when: formatRelativeTime(m.statusChangedAt)
+                  })
+                  : null}
+                {m.statusChangedAt && m.previousStatus && m.syncedAt ? ' · ' : null}
+                {m.syncedAt ? t('whatsapp.metaTemplates.updatedAgo', { when: formatRelativeTime(m.syncedAt) }) : null}
+              </p>
               {m.bodyText && (
                 <p className="mt-2 whitespace-pre-wrap wrap-break-word font-mono text-[0.78rem] leading-6 text-muted-foreground">
                   {m.bodyText}
