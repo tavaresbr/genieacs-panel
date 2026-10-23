@@ -29,6 +29,9 @@ for (const kind of BRANDING_KINDS) {
 }
 // Configurações → Alertas (0112): a configuração vai no perfil; o teste, aqui.
 router.post('/alerts/test', ...guard, PlatformSettingsController.testAlert);
+// O histórico da fila de alertas, e o reenvio do que falhou ou foi pulado.
+router.get('/alerts', ...guard, PlatformSettingsController.listAlerts);
+router.post('/alerts/:id/resend', ...guard, PlatformSettingsController.resendAlert);
 // Configurações → E-mail: prova o SMTP do deploy mandando uma mensagem de verdade.
 router.post('/mail/test', ...guard, PlatformSettingsController.testMail);
 

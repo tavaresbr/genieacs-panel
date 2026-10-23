@@ -155,6 +155,73 @@ export function renderAlert(linha) {
   };
 }
 
+/** Os estados de uma linha da fila, na ordem em que o console os mostra. */
+export const ALERT_STATUSES = Object.freeze(['pending', 'sent', 'failed', 'skipped']);
+/**
+ * Os estados que o console pode mandar de novo. `sent` já saiu (mandar de
+ * novo seria repetir) e `pending` ainda vai sair.
+ */
+export const RESENDABLE = Object.freeze(['failed', 'skipped']);
+/** Os eventos que aparecem no histórico: os configuráveis, o resumo e o teste. */
+export const HISTORY_EVENTS = Object.freeze([...ALERT_EVENTS, DIGEST_EVENT, TEST_EVENT]);
+const SUMMARY_MAX = 200;
+
+/**
+ * A linha do histórico numa frase: o assunto da mensagem, no idioma de quem
+ * lê. Sai do payload, que já entrou limpo (`sanitizePayload`) — nem destino
+ * nem segredo passam por aqui.
+ */
+export function summarizeAlert(linha, locale = DEFAULT_LOCALE) {
+  const evento = linha?.event;
+  if (!HISTORY_EVENTS.includes(evento)) return String(evento ?? '').slice(0, SUMMARY_MAX);
+  const payload = lerPayload(linha);
+  const vars = evento === DIGEST_EVENT
+    ? { count: payload.count ?? '-', date: dataBr(payload.day) }
+    : variaveis(payload);
+  return translate(locale, `platformAlert.${evento}.subject`, vars).slice(0, SUMMARY_MAX);
+}
+
+function isoOuNulo(valor) {
+  const data = asDate(valor);
+  return data ? data.toISOString() : null;
+}
+
+/** A linha (com o provedor do `leftJoin`) como o console a recebe. */
+function linhaDoHistorico(linha, locale) {
+  let tenant = null;
+  if (linha.tenant_id !== null && linha.tenant_id !== undefined) {
+    // O provedor pode ter sido apagado depois do alerta: o nome que a
+    // mensagem levou continua no payload.
+    const payload = lerPayload(linha);
+    const existe = linha.tenant_name !== null && linha.tenant_name !== undefined;
+    tenant = {
+      id: Number(linha.tenant_id),
+      name: existe ? linha.tenant_name : (payload.provider ?? null),
+      slug: existe ? linha.tenant_slug : (payload.slug ?? null),
+      deleted: !existe
+    };
+  }
+  return {
+    id: Number(linha.id),
+    event: linha.event,
+    tenant,
+    summary: summarizeAlert(linha, locale),
+    status: linha.status,
+    attempts: Number(linha.attempts || 0),
+    lastError: linha.last_error ?? null,
+    createdAt: isoOuNulo(linha.created_at),
+    sentAt: isoOuNulo(linha.sent_at),
+    nextAttemptAt: isoOuNulo(linha.next_attempt_at)
+  };
+}
+
+/** A consulta do histórico com o provedor ao lado (nulo se não há ou se foi apagado). */
+function comProvedor(db) {
+  return db('platform_alerts')
+    .leftJoin('tenants', 'tenants.id', 'platform_alerts.tenant_id')
+    .select('platform_alerts.*', 'tenants.name as tenant_name', 'tenants.slug as tenant_slug');
+}
+
 /** O provedor como a mensagem o nomeia. Nunca lança. */
 async function provedor(tenantId) {
   if (!tenantId) return {};
@@ -593,6 +660,95 @@ class PlatformAlertService {
       log.warn('big overdue check failed', { err: error });
       return { checked: false, reason: 'error' };
     }
+  }
+
+  /**
+   * O histórico do console: a fila inteira, a mais nova primeiro, paginada.
+   * `from` (inclusive) e `until` (exclusive) são instantes já resolvidos por
+   * quem chama. `counts` conta por estado com os MESMOS filtros menos o de
+   * estado — são os números das abas, que não podem sumir ao escolher uma.
+   *
+   * As duas tabelas são da plataforma (compartilhadas): nada de escopo de
+   * provedor aqui, como no resto deste serviço.
+   */
+  static async history({ status = null, event = null, from = null, until = null, page = 1, pageSize = 25, locale = DEFAULT_LOCALE } = {}) {
+    const db = getDb();
+    const filtros = (q) => {
+      if (event) q.where('platform_alerts.event', event);
+      if (from) q.where('platform_alerts.created_at', '>=', from);
+      if (until) q.where('platform_alerts.created_at', '<', until);
+      return q;
+    };
+    const comEstado = (q) => (status ? q.where('platform_alerts.status', status) : q);
+
+    const linhas = await comEstado(filtros(comProvedor(db)))
+      .orderBy('platform_alerts.id', 'desc')
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+    const [{ n: total } = { n: 0 }] = await comEstado(filtros(db('platform_alerts'))).count('* as n');
+    const porEstado = await filtros(db('platform_alerts'))
+      .select('platform_alerts.status')
+      .count('* as n')
+      .groupBy('platform_alerts.status');
+    const counts = Object.fromEntries(ALERT_STATUSES.map((s) => [s, 0]));
+    for (const { status: estado, n } of porEstado) {
+      if (estado in counts) counts[estado] = Number(n);
+    }
+    return {
+      alerts: linhas.map((l) => linhaDoHistorico(l, locale)),
+      total: Number(total),
+      page,
+      pageSize,
+      counts
+    };
+  }
+
+  /**
+   * O "Reenviar" do histórico: a linha `failed`/`skipped` volta para a fila
+   * (`pending`, tentativas zeradas, vencida agora) e a próxima passada do
+   * agendador a manda pela regra de sempre — com o evento desligado ou sem
+   * destino ela volta a `skipped`, como qualquer outra.
+   *
+   * O `UPDATE` condicional é a guarda: dois cliques (ou o clique e a passada
+   * do agendador) dão em UMA linha reaberta; o outro recebe `not_resendable`.
+   *
+   *   - `test` não volta: a passada do agendador não manda teste (é o botão
+   *     que manda na hora), e ele ficaria pendente para sempre.
+   *   - `digest` volta, e com ele os alertas que caíram junto
+   *     (`failed`/`digest_failed`) — esses nunca saíram, então não há envio
+   *     em dobro. Se o resumo for de um dia que passou, a próxima passada o
+   *     marca `superseded` e os alertas entram no resumo de hoje (ou saem um a
+   *     um, com o resumo desligado): é o `processDigest` de sempre.
+   *
+   * Devolve `{ alert, requeued, previousStatus }`, ou `{ error }`:
+   * `not_found`, `not_resendable` (com o `status` atual).
+   */
+  static async resend(id, { now = new Date(), locale = DEFAULT_LOCALE } = {}) {
+    const db = getDb();
+    const resultado = await db.transaction(async (trx) => {
+      const antes = await trx('platform_alerts').where({ id }).first('id', 'event', 'status');
+      if (!antes) return { error: 'not_found' };
+      const mudou = await trx('platform_alerts')
+        .where({ id })
+        .whereIn('status', RESENDABLE)
+        .whereNot('event', TEST_EVENT)
+        .update({ status: 'pending', attempts: 0, next_attempt_at: aoSegundo(now), last_error: null });
+      if (!mudou) {
+        const agora = await trx('platform_alerts').where({ id }).first('status');
+        return { error: 'not_resendable', status: agora?.status ?? antes.status };
+      }
+      let requeued = 0;
+      if (antes.event === DIGEST_EVENT) {
+        requeued = await trx('platform_alerts')
+          .where({ status: 'failed', last_error: 'digest_failed' })
+          .whereNotIn('event', [DIGEST_EVENT, TEST_EVENT])
+          .update({ status: 'pending', attempts: 0, next_attempt_at: null, last_error: null });
+      }
+      return { requeued: Number(requeued) || 0, previousStatus: antes.status, event: antes.event };
+    });
+    if (resultado.error) return resultado;
+    const linha = await comProvedor(db).where('platform_alerts.id', id).first();
+    return { ...resultado, alert: linhaDoHistorico(linha, locale) };
   }
 
   /** O passo da plataforma no agendador: o atraso grande, depois o envio. Nunca lança. */

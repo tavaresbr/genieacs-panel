@@ -6585,3 +6585,69 @@ export const referralsAPI = {
   adjust: (tenantId: number, payload: { amountCents: number; reason: string }) =>
     apiClient.post<CreditAdjustResult>(`/platform/tenants/${tenantId}/credits`, payload),
 }
+
+/** O estado de uma linha da fila de alertas da plataforma. */
+export type PlatformAlertStatus = 'pending' | 'sent' | 'failed' | 'skipped'
+export const PLATFORM_ALERT_STATUSES: readonly PlatformAlertStatus[] = ['pending', 'sent', 'failed', 'skipped']
+
+/** Os eventos do histórico: os configuráveis, o resumo diário e o teste. */
+export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test'
+
+export interface PlatformAlertHistoryItem {
+  id: number
+  event: PlatformAlertHistoryEvent
+  /** Nulo para o resumo e o teste; `deleted` quando o provedor foi apagado (o nome vem do alerta). */
+  tenant: { id: number; name: string | null; slug: string | null; deleted: boolean } | null
+  /** O assunto da mensagem, no idioma de quem lê — nunca o destino. */
+  summary: string
+  status: PlatformAlertStatus
+  attempts: number
+  lastError: string | null
+  createdAt: string | null
+  sentAt: string | null
+  nextAttemptAt: string | null
+}
+
+export interface PlatformAlertHistoryPage {
+  alerts: PlatformAlertHistoryItem[]
+  total: number
+  page: number
+  pageSize: number
+  /** Por estado, com os mesmos filtros menos o de estado (os números das abas). */
+  counts: Record<PlatformAlertStatus, number>
+}
+
+export interface PlatformAlertHistoryQuery {
+  status?: PlatformAlertStatus
+  event?: PlatformAlertHistoryEvent
+  /** `YYYY-MM-DD`, dia de Brasília, inclusive. */
+  from?: string
+  /** `YYYY-MM-DD`, dia de Brasília, inclusive. */
+  to?: string
+  page?: number
+  pageSize?: number
+}
+
+export const platformAlertHistoryAPI = {
+  /**
+   * O histórico da fila de alertas, o mais novo primeiro. 400 com `code`
+   * (`invalid_status`, `invalid_event`, `invalid_from`, `invalid_to`,
+   * `invalid_range`, `invalid_page`, `invalid_page_size`).
+   */
+  list: (query: PlatformAlertHistoryQuery = {}) => {
+    const params = new URLSearchParams()
+    for (const [chave, valor] of Object.entries(query)) {
+      if (valor !== undefined && valor !== null && valor !== '') params.set(chave, String(valor))
+    }
+    const qs = params.toString()
+    return apiClient.get<PlatformAlertHistoryPage>(`/platform/alerts${qs ? `?${qs}` : ''}`)
+  },
+
+  /**
+   * Põe de novo na fila um alerta `failed`/`skipped` (o teste não). 404
+   * `not_found`; 409 `not_resendable`. `requeued` conta os alertas que voltaram
+   * junto com um resumo diário.
+   */
+  resend: (id: number) =>
+    apiClient.post<{ alert: PlatformAlertHistoryItem; requeued: number }>(`/platform/alerts/${id}/resend`, {}),
+}
