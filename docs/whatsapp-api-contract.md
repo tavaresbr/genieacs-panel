@@ -66,7 +66,14 @@ webhook de entrada, que é público e tem credencial própria.
 | `not_applicable_cloud` | QR, reinício ou desconexão num número oficial | `whatsapp.error.notApplicableCloud` |
 | `not_supported_cloud` | consulta de números sem nenhum número por QR | `whatsapp.error.notSupportedCloud` |
 | `invalid_cloud_callback_url` | URL de callback da Meta inválida | `whatsapp.error.invalidCloudCallbackUrl` |
-| `meta_templates_cloud_only` | sincronizar modelos de um número por QR | `whatsapp.error.metaTemplatesCloudOnly` |
+| `meta_templates_cloud_only` | sincronizar, criar, editar ou apagar modelos de um número por QR | `whatsapp.error.metaTemplatesCloudOnly` |
+| `meta_template_not_found` | editar/apagar um modelo que não é deste número (404) | `whatsapp.error.metaTemplateNotFound` |
+| `meta_template_not_editable` | editar modelo fora de `APPROVED`/`REJECTED`/`PAUSED` (409) | `whatsapp.error.metaTemplateNotEditable` |
+| `meta_template_edit_limit` | a Meta recusou por limite de edição (409) | `whatsapp.error.metaTemplateEditLimit` |
+| `meta_template_in_use` | apagar modelo ligado a modelo do painel ou aviso, sem `unlink=1` (409, `metaLinks`) | `whatsapp.error.metaTemplateInUse` |
+| `meta_template_not_synced` | cópia local sem o id da Meta (409) | `whatsapp.error.metaTemplateNotSynced` |
+| `meta_waba_missing` | número sem ID da conta WABA ou sem token (409) | `whatsapp.error.metaWabaMissing` |
+| `meta_refused` | a Graph API recusou ou não respondeu (502, motivo na mensagem) | `whatsapp.error.metaRefused` |
 | `meta_template_unavailable` | modelo da Meta não aprovado, não suportado ou com parâmetro faltando | `whatsapp.error.metaTemplateUnavailable` |
 | `meta_param_mismatch` | variáveis ligadas não batem com os parâmetros do modelo | `whatsapp.error.metaParamMismatch` |
 | `timeout` / `unreachable` | o Evolution não respondeu | `whatsapp.error.timeout` / `…unreachable` |
@@ -330,6 +337,8 @@ Gerenciador do WhatsApp, o resultado é o mesmo).
 | --- | --- | --- |
 | `POST /api/whatsapp/accounts/:id/templates/sync` | `whatsapp.config` | busca em `GET /template/find/{instância}` e troca a cópia local (o que sumiu da Meta some daqui) |
 | `POST /api/whatsapp/accounts/:id/templates` | `whatsapp.config` | cria o modelo em `POST /template/create/{instância}` e sincroniza; responde 201 com o modelo (`PENDING`) |
+| `PUT /api/whatsapp/accounts/:id/templates/:templateId` | `whatsapp.config` | edita na Graph (`POST /{id do modelo}`) e sincroniza; responde `{ template, links }` |
+| `DELETE /api/whatsapp/accounts/:id/templates/:templateId[?unlink=1]` | `whatsapp.config` | apaga na Graph (`DELETE /{waba}/message_templates?name=&hsm_id=`) e a cópia local; responde `{ id, name, language, unlinked: { templates, notices } }` |
 | `GET /api/whatsapp/meta-templates?accountId=&usable=1` | `whatsapp.read` | lista; `usable` = `APPROVED` e formato suportado |
 | `GET/PUT /api/whatsapp/meta-notice-bindings` | `campaigns.read` / `campaigns.manage` | modelo de cada aviso automático (`maintenance`, `outage`, `alert`) |
 | `GET /api/whatsapp/meta-usage?months=3\|6\|12` | `campaigns.read` | modelos enviados por mês e categoria (outro valor de `months` vira 6) |
@@ -382,6 +391,41 @@ sincroniza; se a sincronização falhar, devolve o mínimo (`id: null`, `status`
 da resposta da Meta ou `PENDING`, `metaId`) e a próxima sincronização traz a
 linha. O modelo só fica `usable` quando a Meta aprova e uma sincronização
 traz o `APPROVED`.
+
+**Editar e apagar.** O servidor Evolution não tem rota para isso, então o
+painel vai direto à Graph API (`services/metaGraphClient.js`, versão em
+`META_GRAPH_VERSION`) com o token da Meta do número — só no cabeçalho
+`Authorization`; nem o token nem a URL aparecem em erro. `:templateId` é o id
+da linha em `wa_meta_templates` (o da lista), e a linha precisa ter o id da
+Meta (`meta_id`, vindo da sincronização) e o número o `meta_waba_id`. Ordem das
+recusas: conta (`account_not_found` 404, `meta_templates_cloud_only` 409),
+modelo (`meta_template_not_found` 404), estado/corpo, e só então a rede.
+
+Cada modelo da lista traz `hasMetaId`, `editable` (estado editável e formato
+que o formulário representa) e `draft` (`{headerText, bodyText, examples,
+footerText, buttons}` lido de `components_json`, ou `null` quando há
+cabeçalho de mídia/variável, botão dinâmico ou de outro tipo — esses se
+editam no Gerenciador do WhatsApp).
+
+- **Editar** (`PUT`): corpo igual ao de criar; `name` e `language` são
+  ignorados (a Meta não deixa trocá-los). Só `APPROVED`, `REJECTED` ou
+  `PAUSED` (`meta_template_not_editable` 409). Vai `components`; `category`
+  só quando o modelo não está aprovado e ela mudou. A Meta limita um aprovado
+  a 1 edição por 24 h e 10 por 30 dias — a recusa vira
+  `meta_template_edit_limit` (409); outras, `meta_refused` (502, com o
+  motivo da Meta). O modelo volta a `PENDING` e sai do envio até a nova
+  aprovação; as ligações ficam, e `links` diz quais param de sair fora da
+  janela enquanto isso.
+- **Apagar** (`DELETE`): só o idioma da linha (vai o `hsm_id`). Se o modelo
+  está ligado a modelos do painel ou avisos automáticos, responde 409
+  `meta_template_in_use` com `metaLinks: [{kind:'template', id, name} |
+  {kind:'notice', key}]` **sem chamar a Meta** — apagar em silêncio faria a
+  régua, a cobrança e os avisos pularem envio fora da janela. Com
+  `?unlink=1`, apaga na Meta, apaga a linha, zera `meta_*` dos modelos do
+  painel e as chaves em `wa_meta_notice_bindings`, e devolve as contagens em
+  `unlinked`. A ligação é por nome + idioma em qualquer número oficial: se
+  outro número ainda tem o mesmo modelo `APPROVED`, ela não conta. "Não
+  existe" da Meta é tratado como apagado (já saiu pelo Gerenciador).
 
 **Ligações.**
 

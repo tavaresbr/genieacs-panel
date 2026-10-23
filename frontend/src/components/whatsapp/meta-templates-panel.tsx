@@ -6,6 +6,7 @@ import {
   type MetaNoticeBindings,
   type MetaTemplateCreatePayload,
   type MetaNoticeKey,
+  type MetaTemplateLink,
   type WhatsAppAccount,
   type WhatsAppMetaTemplate
 } from '@/lib/api'
@@ -13,7 +14,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
-import { MetaTemplateCreateForm } from '@/components/whatsapp/meta-template-create'
+import { MetaTemplateCreateForm, draftFromTemplate } from '@/components/whatsapp/meta-template-create'
 import { formatRelativeTime } from '@/lib/utils'
 
 const NOTICE_KEYS: MetaNoticeKey[] = ['maintenance', 'outage', 'alert']
@@ -74,6 +75,8 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
   const [bindings, setBindings] = useState<Record<MetaNoticeKey, string>>({ maintenance: '', outage: '', alert: '' })
   const [savingBindings, setSavingBindings] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<WhatsAppMetaTemplate | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const loadAccounts = useCallback(async () => {
     const res = await whatsappAPI.listAccounts()
@@ -160,6 +163,68 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
     return null
   }
 
+  /** Uma ligação em texto: "Modelo «Cobrança»" ou "Aviso de queda". */
+  const describeLink = (l: MetaTemplateLink) => (l.kind === 'template'
+    ? t('whatsapp.metaTemplates.linkTemplate', { name: l.name })
+    : t('whatsapp.metaTemplates.linkNotice', { notice: t(`whatsapp.metaTemplates.notice.${l.key}`) }))
+
+  /**
+   * A edição volta o modelo para análise na Meta. Mesmo contrato de
+   * `createTemplate`: devolve o texto da recusa para o formulário mostrar.
+   */
+  const updateTemplate = async (payload: MetaTemplateCreatePayload): Promise<string | null> => {
+    if (!accountId || !editing) return null
+    const { name: _name, language: _language, ...campos } = payload
+    const res = await whatsappAPI.updateMetaTemplate(accountId, editing.id, campos)
+    if (!res.success) {
+      const texto = whatsappErrorMessage(t, res.code)
+      toast.error(texto)
+      return (res.code === 'http_error' || res.code === 'meta_refused') && res.message ? res.message : texto
+    }
+    toast.success(t('whatsapp.metaTemplates.editSent'))
+    const links = res.data?.links ?? []
+    if (links.length) {
+      toast.warning(t('whatsapp.metaTemplates.editLinksPending', { list: links.map(describeLink).join(', ') }))
+    }
+    setEditing(null)
+    await loadTemplates(accountId)
+    onSynced?.()
+    return null
+  }
+
+  /**
+   * Apagar pede confirmação; se o modelo estiver em uso, o servidor recusa com
+   * a lista das ligações, e só uma segunda confirmação — que mostra a lista —
+   * apaga desfazendo-as.
+   */
+  const deleteTemplate = async (m: WhatsAppMetaTemplate) => {
+    if (!accountId) return
+    if (!window.confirm(t('whatsapp.metaTemplates.deleteConfirm', { name: m.name, language: m.language }))) return
+    setDeletingId(m.id)
+    try {
+      let res = await whatsappAPI.deleteMetaTemplate(accountId, m.id)
+      if (!res.success && res.code === 'meta_template_in_use' && res.metaLinks?.length) {
+        const list = res.metaLinks.map((l) => `• ${describeLink(l)}`).join('\n')
+        if (!window.confirm(t('whatsapp.metaTemplates.deleteInUse', { count: res.metaLinks.length, list }))) return
+        res = await whatsappAPI.deleteMetaTemplate(accountId, m.id, { unlink: true })
+      }
+      if (!res.success) {
+        toast.error(res.code === 'meta_refused' && res.message ? res.message : whatsappErrorMessage(t, res.code))
+        return
+      }
+      const desfeitos = res.data?.unlinked ?? { templates: 0, notices: 0 }
+      toast.success(desfeitos.templates || desfeitos.notices
+        ? t('whatsapp.metaTemplates.deletedUnlinked', desfeitos)
+        : t('whatsapp.metaTemplates.deletedOk'))
+      if (editing?.id === m.id) setEditing(null)
+      await loadTemplates(accountId)
+      await loadBindings()
+      onSynced?.()
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const saveBindings = async () => {
     setSavingBindings(true)
     try {
@@ -202,7 +267,7 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
             type="button"
             className="modern-button-secondary"
             disabled={creating || !accountId}
-            onClick={() => setCreating(true)}
+            onClick={() => { setEditing(null); setCreating(true) }}
           >
             <Icon name="edit" size={16} />
             {t('whatsapp.metaTemplates.create')}
@@ -249,6 +314,20 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
           onCancel={() => setCreating(false)}
         />
       )}
+
+      {editing && accountId && (() => {
+        const inicial = draftFromTemplate(editing)
+        return inicial && (
+          <MetaTemplateCreateForm
+            key={`edit-${editing.id}`}
+            mode="edit"
+            initial={inicial}
+            lockCategory={editing.status === 'APPROVED'}
+            onSubmit={updateTemplate}
+            onCancel={() => setEditing(null)}
+          />
+        )
+      })()}
 
       {templates.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('whatsapp.metaTemplates.empty')}</p>
@@ -298,6 +377,31 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
                     })}
                   </span>
                 )}
+                <span className="ml-auto flex items-center gap-1">
+                  {m.editable && (
+                    <button
+                      type="button"
+                      className="modern-button-secondary text-xs"
+                      disabled={deletingId === m.id}
+                      onClick={() => { setCreating(false); setEditing(m) }}
+                    >
+                      <Icon name="edit" size={14} />
+                      {t('whatsapp.metaTemplates.edit')}
+                    </button>
+                  )}
+                  {m.hasMetaId && (
+                    <button
+                      type="button"
+                      className="modern-button-secondary text-xs"
+                      aria-label={t('whatsapp.metaTemplates.delete')}
+                      title={t('whatsapp.metaTemplates.delete')}
+                      disabled={deletingId === m.id}
+                      onClick={() => void deleteTemplate(m)}
+                    >
+                      <Icon name="trash" size={14} />
+                    </button>
+                  )}
+                </span>
               </div>
               {m.rejectedReason && (
                 <p className="mt-2 text-xs font-semibold text-[hsl(var(--status-danger))]">

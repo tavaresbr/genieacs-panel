@@ -188,6 +188,11 @@ export interface ApiResponse<T = any> {
    * cobrança está paga, lá ela está neste estado (`PENDING`, por exemplo).
    */
   gatewayStatus?: string
+  /**
+   * Só no 409 `meta_template_in_use`: o que deixaria de sair fora da janela se
+   * o modelo da Meta fosse apagado. A tela lista e pergunta antes de `unlink`.
+   */
+  metaLinks?: MetaTemplateLink[]
 }
 
 /**
@@ -447,6 +452,8 @@ class ApiClient {
           ...(typeof data.detail === 'string' ? { detail: data.detail } : {}),
           // O 409 `not_paid` do estorno: o estado que o gateway diz ter.
           ...(typeof data.gatewayStatus === 'string' ? { gatewayStatus: data.gatewayStatus } : {}),
+          // O 409 de modelo da Meta em uso: a lista das ligações que cairiam.
+          ...(Array.isArray(data.metaLinks) ? { metaLinks: data.metaLinks } : {}),
         }
       }
 
@@ -4824,7 +4831,27 @@ export interface WhatsAppMetaTemplate {
   previousStatus: string | null
   statusChangedAt: string | null
   syncedAt: string | null
+  /** Se a cópia local tem o id do modelo na Meta (sem ele não dá para editar nem apagar). */
+  hasMetaId?: boolean
+  /** APPROVED/REJECTED/PAUSED e num formato que o formulário do painel representa. */
+  editable?: boolean
+  /** Os campos do formulário, lidos dos components guardados; `null` quando não cabem nele. */
+  draft?: MetaTemplateDraftFields | null
 }
+
+/** Os campos editáveis de um modelo da Meta, como o formulário do painel os mostra. */
+export interface MetaTemplateDraftFields {
+  headerText: string
+  bodyText: string
+  examples: string[]
+  footerText: string
+  buttons: { type: 'URL' | 'QUICK_REPLY'; text: string; url: string }[]
+}
+
+/** Uma ligação a um modelo da Meta: um modelo do painel ou um aviso automático. */
+export type MetaTemplateLink =
+  | { kind: 'template'; id: number; name: string }
+  | { kind: 'notice'; key: MetaNoticeKey }
 
 /**
  * Um modelo novo para a Meta revisar. Só o que o painel sabe enviar depois:
@@ -5892,6 +5919,19 @@ export const whatsappAPI = {
   /** Sai PENDING: a Meta revisa, e só a sincronização depois da aprovação o libera. */
   createMetaTemplate: (accountId: number, payload: MetaTemplateCreatePayload) =>
     apiClient.post<WhatsAppMetaTemplate>(`/whatsapp/accounts/${accountId}/templates`, payload),
+
+  /** Volta a PENDING; nome e idioma não mudam. `links` = o que fica sem envio fora da janela até aprovar. */
+  updateMetaTemplate: (accountId: number, templateId: number, payload: Omit<MetaTemplateCreatePayload, 'name' | 'language'>) =>
+    apiClient.put<{ template: WhatsAppMetaTemplate; links: MetaTemplateLink[] }>(
+      `/whatsapp/accounts/${accountId}/templates/${templateId}`,
+      payload
+    ),
+
+  /** Sem `unlink`, um modelo em uso volta 409 com `metaLinks`; com ele, as ligações são desfeitas. */
+  deleteMetaTemplate: (accountId: number, templateId: number, { unlink = false }: { unlink?: boolean } = {}) =>
+    apiClient.delete<{ id: number; name: string; language: string; unlinked: { templates: number; notices: number } }>(
+      `/whatsapp/accounts/${accountId}/templates/${templateId}${unlink ? '?unlink=1' : ''}`
+    ),
 
   listMetaTemplates: (params: { accountId?: number; usable?: boolean } = {}) => {
     const query = new URLSearchParams()

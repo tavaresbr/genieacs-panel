@@ -86,6 +86,13 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   meta_button_mismatch: 'whatsapp.error.metaButtonMismatch',
   meta_header_missing: 'whatsapp.error.metaHeaderMissing',
   invalid_meta_template: 'whatsapp.error.invalidMetaTemplate',
+  meta_template_not_found: 'whatsapp.error.metaTemplateNotFound',
+  meta_template_not_editable: 'whatsapp.error.metaTemplateNotEditable',
+  meta_template_edit_limit: 'whatsapp.error.metaTemplateEditLimit',
+  meta_template_in_use: 'whatsapp.error.metaTemplateInUse',
+  meta_template_not_synced: 'whatsapp.error.metaTemplateNotSynced',
+  meta_waba_missing: 'whatsapp.error.metaWabaMissing',
+  meta_refused: 'whatsapp.error.metaRefused',
   invalid_meta_price: 'whatsapp.error.invalidMetaPrice',
   // Both reachable only from the inbox, and both were missing until the screen
   // that provokes them was built: an unknown code degrades to the generic

@@ -1,13 +1,17 @@
+import { tdb } from '../config/database.js';
 import AppState from '../models/AppState.js';
 import AuditLog from '../models/AuditLog.js';
 import WaMetaTemplate from '../models/WaMetaTemplate.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { fetchTemplateStatuses } from './metaWebhookService.js';
+import { deleteMetaTemplate, editMetaTemplate, isMetaId } from './metaGraphClient.js';
 import {
   createMetaTemplateRequest,
   findMetaTemplatesRequest,
+  metaTemplateComponents,
   readCreatedTemplate,
+  readMetaTemplateDraft,
   readMetaTemplates,
   readQualityScore,
   readRejectedReason,
@@ -106,6 +110,40 @@ const META_BUTTON_TYPES = new Set(['URL', 'QUICK_REPLY']);
 const META_NAME = /^[a-z0-9_]{1,512}$/;
 const META_LANGUAGE = /^[a-z]{2,3}(_[A-Z]{2})?$/;
 
+/** Os estados em que a Meta deixa editar um modelo. */
+const EDITAVEIS = new Set(['APPROVED', 'REJECTED', 'PAUSED']);
+/**
+ * Recusa da Meta por limite de edição (aprovado: uma por 24 h, dez por 30
+ * dias). Os subcódigos não são documentados com estabilidade, então o texto
+ * também conta.
+ */
+const LIMITE_EDICAO = /edit(s|ed|ing)?\b.*\b(limit|24 hours|30 days)|(limit|maximum).*\bedit/i;
+const SUBCODIGOS_LIMITE = new Set([2388023, 2388024, 2388025]);
+/** "Modelo não existe" na hora de apagar: já foi apagado no Gerenciador. */
+const NAO_EXISTE = /not\s*found|does not exist|doesn't exist|no template/i;
+/** As colunas da ligação de um modelo do painel (`wa_templates`) a um da Meta. */
+const LIGACAO_VAZIA = Object.freeze({
+  meta_template_name: null,
+  meta_language: null,
+  meta_params: null,
+  meta_header: null,
+  meta_button_param: null,
+  meta_button_index: null
+});
+
+function recusaDaMeta(result) {
+  const erro = result?.data?.error;
+  const texto = [erro?.message, erro?.error_user_title, erro?.error_user_msg].filter(Boolean).join(' ');
+  if (SUBCODIGOS_LIMITE.has(Number(erro?.error_subcode)) || LIMITE_EDICAO.test(texto)) {
+    return new WaError('whatsapp.error.metaTemplateEditLimit', { code: 'meta_template_edit_limit', status: 409 });
+  }
+  return new WaError('whatsapp.error.metaRefused', {
+    code: 'meta_refused',
+    status: 502,
+    vars: { reason: result?.error || 'meta_refused' }
+  });
+}
+
 function recusa(field) {
   return new WaError('whatsapp.error.invalidMetaTemplate', {
     code: 'invalid_meta_template',
@@ -119,13 +157,17 @@ function recusa(field) {
  * Confere e normaliza o modelo que o operador quer criar. Pura: nada de banco
  * nem de rede, para a recusa sair antes de qualquer pedido ao servidor.
  *
+ * Na edição (`fixed`), nome e idioma vêm do modelo guardado e o que veio no
+ * corpo é ignorado: a Meta não deixa trocar nenhum dos dois.
+ *
  * @returns {{ name: string, category: string, language: string, bodyText: string,
  *             examples: string[], headerText: string|null, footerText: string|null,
  *             buttons: { type: 'URL'|'QUICK_REPLY', text: string, url?: string }[],
  *             paramCount: number }}
  */
-export function validateMetaTemplateInput(input) {
-  const i = input && typeof input === 'object' ? input : {};
+export function validateMetaTemplateInput(input, { fixed = null } = {}) {
+  const base = input && typeof input === 'object' ? input : {};
+  const i = fixed ? { ...base, name: fixed.name, language: fixed.language } : base;
 
   // Nome: a Meta só aceita minúsculas, dígitos e `_`. Espaço vira `_` para o
   // operador poder digitar "aviso fatura" sem errar.
@@ -333,8 +375,160 @@ class WaMetaTemplateService {
       supported: true,
       usable: false,
       syncedAt: null,
-      metaId: created.id
+      metaId: created.id,
+      hasMetaId: false,
+      editable: false,
+      draft: null
     };
+  }
+
+  // ── Editar e apagar (Graph API direto) ─────────────────────────────
+  //
+  // O servidor Evolution só sabe listar e criar modelo; editar e apagar vão
+  // direto à Graph, com o token da Meta do próprio número (o mesmo que o
+  // servidor guarda como chave da instância) — ver `metaGraphClient.js`.
+
+  /**
+   * O número oficial e o modelo dele, na ordem que a varredura de ids pede:
+   * conta (404 de outro provedor, 409 de número por QR), depois o modelo
+   * (404 se não é deste número), e só então o que falta para falar com a Meta.
+   */
+  static async loadOwned(accountId, templateId) {
+    const { account } = await this.requireCloudAccount(accountId);
+    const id = Number.parseInt(String(templateId ?? ''), 10);
+    const row = Number.isInteger(id) && id > 0
+      ? (await tdb('wa_meta_templates').where({ id, account_id: account.id }).first()) || null
+      : null;
+    if (!row) {
+      throw new WaError('whatsapp.error.metaTemplateNotFound', { code: 'meta_template_not_found', status: 404 });
+    }
+    return { account, row };
+  }
+
+  /** O token e a conta WABA do número, ou a recusa que diz o que falta. */
+  static credentials(account, row) {
+    if (!isMetaId(row.meta_id)) {
+      throw new WaError('whatsapp.error.metaTemplateNotSynced', { code: 'meta_template_not_synced', status: 409 });
+    }
+    const token = WhatsAppConfigService.decryptInstanceToken(account);
+    if (!isMetaId(account.meta_waba_id) || !token) {
+      throw new WaError('whatsapp.error.metaWabaMissing', { code: 'meta_waba_missing', status: 409 });
+    }
+    return { token, wabaId: String(account.meta_waba_id).trim() };
+  }
+
+  /**
+   * Quem depende deste modelo: modelos do painel (`wa_templates`) e avisos
+   * automáticos. A ligação é por nome + idioma e vale para qualquer número
+   * oficial — se OUTRO número ainda tem o mesmo modelo aprovado, ela continua
+   * de pé e não entra na lista.
+   *
+   * @returns {Promise<{ kind: 'template'|'notice', id?: number, name?: string, key?: string }[]>}
+   */
+  static async findLinks(row) {
+    const outro = await tdb('wa_meta_templates')
+      .where({ name: row.name, language: row.language, status: 'APPROVED', supported: true })
+      .whereNot({ account_id: row.account_id })
+      .first();
+    if (outro) return [];
+    const modelos = await tdb('wa_templates')
+      .where({ meta_template_name: row.name, meta_language: row.language })
+      .orderBy('name');
+    const avisos = await this.getNoticeBindings();
+    return [
+      ...modelos.map((m) => ({ kind: 'template', id: m.id, name: m.name })),
+      ...NOTICE_KEYS
+        .filter((key) => avisos[key]?.name === row.name && avisos[key]?.language === row.language)
+        .map((key) => ({ kind: 'notice', key }))
+    ];
+  }
+
+  /**
+   * Edita o modelo na Meta: `POST /{id do modelo}` com os `components` novos.
+   *
+   * A Meta só aceita APPROVED, REJECTED ou PAUSED, e um aprovado tem limite
+   * (uma edição por 24 h, dez por 30 dias); o modelo volta a PENDING e fica
+   * fora do envio até a nova aprovação. A categoria só vai quando o modelo
+   * não está aprovado — num aprovado a Meta recusa a troca.
+   *
+   * As ligações não mudam (nome e idioma são os mesmos), mas a resposta as
+   * lista: enquanto a Meta revisa, elas não saem fora da janela de 24 h.
+   */
+  static async update(accountId, templateId, input) {
+    const { account, row } = await this.loadOwned(accountId, templateId);
+    const status = String(row.status || '').toUpperCase();
+    if (!EDITAVEIS.has(status)) {
+      throw new WaError('whatsapp.error.metaTemplateNotEditable', {
+        code: 'meta_template_not_editable', status: 409, vars: { status: status || '—' }
+      });
+    }
+    const modelo = validateMetaTemplateInput(input, { fixed: { name: row.name, language: row.language } });
+    const { token } = this.credentials(account, row);
+    const atual = String(row.category || '').toUpperCase();
+    const result = await editMetaTemplate({
+      templateId: row.meta_id,
+      token,
+      components: metaTemplateComponents(modelo),
+      category: status !== 'APPROVED' && modelo.category !== atual ? modelo.category : null
+    });
+    if (!result.ok) throw recusaDaMeta(result);
+
+    const links = await this.findLinks(row);
+    let rows = [];
+    try {
+      rows = await this.sync(account.id);
+    } catch {
+      rows = [];
+    }
+    const linha = rows.find((r) => r.name === row.name && r.language === row.language)
+      ?? { ...this.publicMetaTemplate(row), status: 'PENDING', usable: false };
+    return { template: linha, links };
+  }
+
+  /**
+   * Apaga o modelo na Meta (só este idioma: vai o `hsm_id`) e a cópia local.
+   *
+   * Com ligações, recusa com 409 `meta_template_in_use` e a lista — sem ir à
+   * Meta. Apagar em silêncio deixaria a régua, a cobrança e os avisos pulando
+   * envio fora da janela sem ninguém saber por quê. Com `unlink`, desfaz as
+   * ligações depois que a Meta apagou, e diz quantas.
+   *
+   * "Não existe" da Meta conta como apagado: o modelo já tinha saído pelo
+   * Gerenciador do WhatsApp e só a cópia daqui estava atrasada.
+   */
+  static async remove(accountId, templateId, { unlink = false } = {}) {
+    const { account, row } = await this.loadOwned(accountId, templateId);
+    const links = await this.findLinks(row);
+    if (links.length && !unlink) {
+      throw Object.assign(
+        new WaError('whatsapp.error.metaTemplateInUse', {
+          code: 'meta_template_in_use', status: 409, vars: { count: links.length }
+        }),
+        { extra: { metaLinks: links } }
+      );
+    }
+    const { token, wabaId } = this.credentials(account, row);
+    const result = await deleteMetaTemplate({ wabaId, token, name: row.name, hsmId: row.meta_id });
+    if (!result.ok) {
+      const erro = result.data?.error;
+      const texto = [erro?.message, erro?.error_user_msg].filter(Boolean).join(' ');
+      if (!(result.status === 404 || (Number(erro?.code) === 100 && NAO_EXISTE.test(texto)))) {
+        throw recusaDaMeta(result);
+      }
+    }
+
+    await tdb('wa_meta_templates').where({ id: row.id, account_id: account.id }).del();
+    const ids = links.filter((l) => l.kind === 'template').map((l) => l.id);
+    if (ids.length) {
+      await tdb('wa_templates').whereIn('id', ids).update({ ...LIGACAO_VAZIA, updated_at: new Date() });
+    }
+    const avisos = links.filter((l) => l.kind === 'notice').map((l) => l.key);
+    if (avisos.length) {
+      const atual = await this.getNoticeBindings();
+      for (const key of avisos) atual[key] = null;
+      await AppState.upsert(NOTICE_BINDINGS_KEY, JSON.stringify(atual));
+    }
+    return { id: row.id, name: row.name, language: row.language, unlinked: { templates: ids.length, notices: avisos.length } };
   }
 
   /** Os modelos de um número, ou de todos os números oficiais do provedor. */
@@ -353,6 +547,10 @@ class WaMetaTemplateService {
 
   static publicMetaTemplate(row) {
     if (!row) return null;
+    // O formulário de edição só abre para o que ele sabe representar; o resto
+    // se edita no Gerenciador do WhatsApp (ver `readMetaTemplateDraft`).
+    const draft = readMetaTemplateDraft(lerJson(row.components_json, []));
+    const status = String(row.status || '').toUpperCase();
     return {
       id: row.id,
       accountId: row.account_id,
@@ -372,7 +570,11 @@ class WaMetaTemplateService {
       qualityScore: row.quality_score || null,
       previousStatus: row.previous_status || null,
       statusChangedAt: row.status_changed_at || null,
-      syncedAt: row.synced_at || null
+      syncedAt: row.synced_at || null,
+      // O id do modelo na Meta: sem ele não há como editar nem apagar daqui.
+      hasMetaId: isMetaId(row.meta_id),
+      editable: EDITAVEIS.has(status) && isMetaId(row.meta_id) && draft !== null,
+      draft
     };
   }
 
