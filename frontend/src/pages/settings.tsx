@@ -33,6 +33,7 @@ import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
+import { SgpPreRegistrationPanel } from '@/components/settings/sgp-preregistration-panel'
 import { TeiahPanel } from '@/components/settings/teiah-panel'
 import { FocusChatPanel } from '@/components/settings/focuschat-panel'
 import {
@@ -2580,6 +2581,7 @@ export default function Settings() {
                 integration was ready, it was simply not found. It says itself
                 what is missing. */}
             {sgpConfig && <SgpContactsSyncPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
+            {sgpConfig && <SgpPreRegistrationPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
 
             <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
           </div>

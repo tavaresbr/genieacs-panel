@@ -409,6 +409,18 @@ operator can restore) and gives a contract with no WhatsApp number the first mob
 there is removed or replaced. The answer is personal data: it is part of the client's data export and
 is deleted with the client.
 
+### Pre-registration with a contract
+
+**Settings → SGP → Pre-registration with contract** holds the SGP ids that a client with a contract needs. The URA API has no call that lists them, so the admin types them once:
+
+- the plans and due days, each with an id and a name, which the form shows as lists;
+- the POP, carrier and seller ids, sent with every pre-registration;
+- whether to create an installation work order by default, and whether to convert the pre-registration into a definitive client right away.
+
+With plans configured, **New client** offers **Client with contract**. The panel then sends `POST /api/precadastro/F` or `/J` with the plan, due day, PPPoE login and password. The password is generated and can be edited.
+
+If the SGP answers without a client id (a pre-registration not converted yet), the client is kept in the panel with a note, and the contacts sync joins it later.
+
 ## TeiaH Valid Integration
 
 Open **Settings → TeiaH Valid** to send the addresses of contracts that were

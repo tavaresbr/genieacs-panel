@@ -1097,6 +1097,7 @@ export default {
   'contacts.lookupFailed': 'No se pudo consultar',
   'contacts.cepNotFound': 'Código postal no encontrado',
   'contacts.createdInSgp': 'Cliente registrado en el SGP',
+  'contacts.preRegistered': 'Prerregistro enviado al SGP',
   'contacts.error.invalidDocument': 'CPF o CNPJ no válido',
   'contacts.error.teiahNotConsulted': 'Consulta a TeiaH antes de aplicar',
   'contacts.error.invalidCep': 'Código postal no válido',

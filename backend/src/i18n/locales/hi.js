@@ -1100,6 +1100,7 @@ export default {
   'contacts.lookupFailed': 'जाँच नहीं हो सकी',
   'contacts.cepNotFound': 'पिन कोड नहीं मिला',
   'contacts.createdInSgp': 'ग्राहक SGP में पंजीकृत हुआ',
+  'contacts.preRegistered': 'पूर्व-पंजीकरण SGP को भेजा गया',
   'contacts.error.invalidDocument': 'अमान्य CPF या CNPJ',
   'contacts.error.teiahNotConsulted': 'लागू करने से पहले TeiaH में खोजें',
   'contacts.error.invalidCep': 'अमान्य पिन कोड',

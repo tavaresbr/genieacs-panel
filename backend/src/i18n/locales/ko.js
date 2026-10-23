@@ -1103,6 +1103,7 @@ export default {
   'contacts.lookupFailed': '조회할 수 없습니다',
   'contacts.cepNotFound': '우편번호를 찾을 수 없습니다',
   'contacts.createdInSgp': '고객을 SGP에 등록했습니다',
+  'contacts.preRegistered': '사전 등록을 SGP로 보냈습니다',
   'contacts.error.invalidDocument': 'CPF 또는 CNPJ가 올바르지 않습니다',
   'contacts.error.teiahNotConsulted': '적용하기 전에 TeiaH에서 조회하세요',
   'contacts.error.invalidCep': '우편번호가 올바르지 않습니다',

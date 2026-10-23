@@ -1100,6 +1100,7 @@ export default {
   'contacts.lookupFailed': '無法查詢',
   'contacts.cepNotFound': '找不到郵遞區號',
   'contacts.createdInSgp': '已在 SGP 中登錄客戶',
+  'contacts.preRegistered': '預先登錄已傳送到 SGP',
   'contacts.error.invalidDocument': 'CPF 或 CNPJ 無效',
   'contacts.error.teiahNotConsulted': '請先在 TeiaH 查詢再套用',
   'contacts.error.invalidCep': '郵遞區號無效',

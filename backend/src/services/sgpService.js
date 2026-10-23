@@ -62,6 +62,9 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   // Client creation (the SGP's CRM API): `F` or `J` is appended for a person or
   // a company — `/api/crm/cliente/F`. Answers `{ cliente_id, message }`.
   crmClient: '/api/crm/cliente/',
+  // Pre-registration with a contract: `F`/`J` appended, flat body (plan, due
+  // day, POP, carrier, PPPoE login). Optionally converted into a client at once.
+  preRegistration: '/api/precadastro/',
   // The settlement of one invoice ("baixa"), from the SGP's banking API: the
   // invoice's own SGP id goes where `{id}` is.
   invoiceSettle: '/api/banco/titulo/{id}/baixar/'
@@ -832,7 +835,14 @@ const DEFAULT_CONFIG = Object.freeze({
   contactsLimitParam: 'limit',
   settleReceivingPoint: 0,
   settlePaymentMethods: DEFAULT_SETTLE_PAYMENT_METHODS,
-  settleFees: 0
+  settleFees: 0,
+  preRegPlans: [],
+  preRegDueDays: [],
+  preRegPopId: null,
+  preRegPortadorId: null,
+  preRegVendedorId: null,
+  preRegInstallOs: true,
+  preRegActivate: false
 });
 
 /**
@@ -960,6 +970,14 @@ function statusKey(status) {
   if (status === 429) return 'sgp.error.statusRateLimited';
   if (status >= 500) return 'sgp.error.statusServer';
   return 'sgp.error.status';
+}
+
+/** An SGP body without its empty fields, so the SGP's own defaults apply. */
+function compactBody(object) {
+  return Object.fromEntries(Object.entries(object)
+    .map(([key, value]) => [key, value && typeof value === 'object' ? compactBody(value) : value])
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim?.() !== ''
+      && !(typeof value === 'object' && Object.keys(value).length === 0)));
 }
 
 class SgpService {
@@ -1102,6 +1120,7 @@ class SgpService {
       ),
       ...this.readContactsSync(stored),
       ...this.readSettle(stored),
+      ...this.readPreRegistration(stored),
       updatedAt: stored.updatedAt || null
     };
     this.configCache.set(config);
@@ -1130,6 +1149,46 @@ class SgpService {
       contactsLimitParam: paramName(
         source.contactsLimitParam, paramName(fallback.contactsLimitParam, 'limit')
       )
+    };
+  }
+
+  /**
+   * The pre-registration settings: the SGP ids an operator picks from when a
+   * client is created with a contract. The panel cannot list them from the
+   * SGP's URA API, so the admin types them once — plan and due-day ids with a
+   * name each, and the POP, carrier and seller every contract gets.
+   * Shared by the reader and the writer, like `readContactsSync`.
+   */
+  static readPreRegistration(source, fallback = DEFAULT_CONFIG) {
+    const optionalId = (value, fallbackValue) => {
+      if (value === undefined) return fallbackValue ?? null;
+      if (value === null || value === '') return null;
+      const parsed = Number.parseInt(String(value), 10);
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    };
+    const list = (value, fallbackValue, labelKey, max) => {
+      if (!Array.isArray(value)) return Array.isArray(fallbackValue) ? fallbackValue : [];
+      const seen = new Set();
+      const items = [];
+      for (const entry of value) {
+        const id = Number.parseInt(String(entry?.id ?? ''), 10);
+        const label = String(entry?.[labelKey] ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+        if (!Number.isInteger(id) || id <= 0 || !label || seen.has(id)) continue;
+        seen.add(id);
+        items.push({ id, [labelKey]: label });
+        if (items.length >= max) break;
+      }
+      return items;
+    };
+    const flag = (value, fallbackValue) => (value === undefined ? fallbackValue === true : value === true);
+    return {
+      preRegPlans: list(source.preRegPlans, fallback.preRegPlans, 'name', 50),
+      preRegDueDays: list(source.preRegDueDays, fallback.preRegDueDays, 'label', 31),
+      preRegPopId: optionalId(source.preRegPopId, fallback.preRegPopId),
+      preRegPortadorId: optionalId(source.preRegPortadorId, fallback.preRegPortadorId),
+      preRegVendedorId: optionalId(source.preRegVendedorId, fallback.preRegVendedorId),
+      preRegInstallOs: flag(source.preRegInstallOs, fallback.preRegInstallOs),
+      preRegActivate: flag(source.preRegActivate, fallback.preRegActivate)
     };
   }
 
@@ -1254,12 +1313,16 @@ class SgpService {
         crmClient: this.normalizeEndpoint(
           patch.endpoints?.crmClient ?? current.endpoints.crmClient, DEFAULT_ENDPOINTS.crmClient
         ),
+        preRegistration: this.normalizeEndpoint(
+          patch.endpoints?.preRegistration ?? current.endpoints.preRegistration, DEFAULT_ENDPOINTS.preRegistration
+        ),
         invoiceSettle: this.normalizeSettleEndpoint(
           patch.endpoints?.invoiceSettle ?? current.endpoints.invoiceSettle
         )
       },
       ...this.readContactsSync(patch, current),
       ...this.readSettle(patch, current),
+      ...this.readPreRegistration(patch, current),
       updatedAt: new Date().toISOString()
     };
 
@@ -1863,38 +1926,24 @@ class SgpService {
    * @param {object} input.address `{ street, number, complement, district, city, state, zip, reference, latitude, longitude }`
    */
   static buildCrmClientBody(input) {
-    const digits = String(input.document ?? '').replace(/\D/g, '');
-    const cpfcnpj = digits.length === 14
-      ? digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
-      : digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
-    const zip = String(input.address?.zip ?? '').replace(/\D/g, '');
+    const { cpfcnpj, cep, celular, numero, complemento, mapLl } = this.crmParts(input);
     const brDate = (value) => {
       const text = String(value ?? '').trim();
       const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
       return /^\d{2}\/\d{2}\/\d{4}$/.test(text) ? text : '';
     };
-    // National digits: the SGP formats it itself, and "55" in front would read
-    // as a two-digit area code.
-    const phone = normalizarTelefoneBr(input.phone);
-    const celular = phone ? phone.replace(/^55/, '') : '';
-    const number = String(input.address?.number ?? '').trim();
-    const lat = Number(input.address?.latitude);
-    const lng = Number(input.address?.longitude);
-
     const endereco = {
       logradouro: input.address?.street,
-      // An integer to the SGP: "S/N" and "120A" are left to the complement.
-      numero: /^\d+$/.test(number) ? number : '',
-      complemento: [input.address?.complement, /^\d+$/.test(number) ? '' : number]
-        .map((part) => String(part ?? '').trim()).filter(Boolean).join(' - '),
+      numero,
+      complemento,
       bairro: input.address?.district,
       cidade: input.address?.city,
-      cep: zip.length === 8 ? `${zip.slice(0, 5)}-${zip.slice(5)}` : zip,
+      cep,
       uf: String(input.address?.state ?? '').toUpperCase(),
       pais: 'BR',
       pontoreferencia: input.address?.reference,
-      map_ll: Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0 ? `${lat},${lng}` : ''
+      map_ll: mapLl
     };
     const body = {
       nome: input.name,
@@ -1914,11 +1963,106 @@ class SgpService {
     } else {
       Object.assign(body, { datanasc: brDate(input.birthDate) });
     }
-    const compact = (object) => Object.fromEntries(Object.entries(object)
-      .map(([key, value]) => [key, value && typeof value === 'object' ? compact(value) : value])
-      .filter(([, value]) => value !== undefined && value !== null && String(value).trim?.() !== ''
-        && !(typeof value === 'object' && Object.keys(value).length === 0)));
-    return compact(body);
+    return compactBody(body);
+  }
+
+  /**
+   * The parts both SGP client bodies share, formatted the way the SGP's docs
+   * show them: the document and the CEP punctuated, the mobile as national
+   * digits (the SGP formats it itself, and "55" in front would read as an area
+   * code), the number as an integer — "S/N" and "120A" go to the complement —
+   * and the map point as "lat,lng".
+   */
+  static crmParts(input) {
+    const digits = String(input.document ?? '').replace(/\D/g, '');
+    const cpfcnpj = digits.length === 14
+      ? digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+      : digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    const zip = String(input.address?.zip ?? '').replace(/\D/g, '');
+    const phone = normalizarTelefoneBr(input.phone);
+    const number = String(input.address?.number ?? '').trim();
+    const numeric = /^\d+$/.test(number);
+    const lat = Number(input.address?.latitude);
+    const lng = Number(input.address?.longitude);
+    return {
+      cpfcnpj,
+      cep: zip.length === 8 ? `${zip.slice(0, 5)}-${zip.slice(5)}` : zip,
+      celular: phone ? phone.replace(/^55/, '') : '',
+      numero: numeric ? number : '',
+      complemento: [input.address?.complement, numeric ? '' : number]
+        .map((part) => String(part ?? '').trim()).filter(Boolean).join(' - '),
+      mapLl: Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0 ? `${lat},${lng}` : ''
+    };
+  }
+
+  /**
+   * The body of `POST /api/precadastro/{F|J}`: unlike the CRM call, flat — the
+   * address at the top level — with the birth date as AAAA-MM-DD, and the
+   * contract's ids (plan, due day, POP, carrier, seller) and PPPoE login.
+   */
+  static buildPreRegistrationBody(input) {
+    const { cpfcnpj, cep, celular, numero, complemento, mapLl } = this.crmParts(input);
+    const isoDate = (() => {
+      const text = String(input.birthDate ?? '').trim();
+      const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return iso[0];
+      const br = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      return br ? `${br[3]}-${br[2]}-${br[1]}` : '';
+    })();
+    return compactBody({
+      nome: input.name,
+      cpfcnpj,
+      email: input.email,
+      celular,
+      datanasc: input.personType === 'PJ' ? '' : isoDate,
+      logradouro: input.address?.street,
+      numero,
+      complemento,
+      bairro: input.address?.district,
+      cidade: input.address?.city,
+      cep,
+      uf: String(input.address?.state ?? '').toUpperCase(),
+      pais: 'BR',
+      pontoreferencia: input.address?.reference,
+      map_ll: mapLl,
+      plano_id: input.planId,
+      vencimento_id: input.dueDayId,
+      pop_id: input.popId,
+      portador_id: input.portadorId,
+      vendedor_id: input.vendedorId,
+      login: input.login,
+      senha: input.password,
+      os_instalacao: input.installOs ? 1 : '',
+      precadastro_ativar: input.activate ? 1 : '',
+      servicodesc: input.serviceDescription,
+      observacao: input.notes
+    });
+  }
+
+  /**
+   * Sends the pre-registration. Its answer is not documented, so success is a
+   * 2xx the shared `request` did not already reject (it throws on a `status`
+   * flag of 0/erro/false) — and whatever id the SGP names, under any of the
+   * usual names, is passed on.
+   *
+   * @returns {Promise<{ clientId: string|null, preRegistrationId: string|null, message: string|null }>}
+   */
+  static async createPreRegistration(input) {
+    const body = this.buildPreRegistrationBody(input);
+    let data;
+    try {
+      data = await this.request('preRegistration', body, null, { pathSuffix: input.personType === 'PJ' ? 'J' : 'F' });
+    } catch (error) {
+      if (error instanceof SgpError && error.code === 'http_error' && error.details) {
+        throw new SgpError(String(error.details), { code: 'sgp_rejected', status: 502, raw: true });
+      }
+      throw error;
+    }
+    return {
+      clientId: asText(pick(data || {}, ['cliente_id', 'clienteId'])),
+      preRegistrationId: asText(pick(data || {}, ['precadastro_id', 'precadastroId', 'id'])),
+      message: asText(pick(data || {}, ['message', 'msg', 'mensagem']))
+    };
   }
 
   /**

@@ -1100,6 +1100,7 @@ export default {
   'contacts.lookupFailed': 'Could not look it up',
   'contacts.cepNotFound': 'Postal code not found',
   'contacts.createdInSgp': 'Client registered in SGP',
+  'contacts.preRegistered': 'Pre-registration sent to SGP',
   'contacts.error.invalidDocument': 'Invalid CPF or CNPJ',
   'contacts.error.teiahNotConsulted': 'Look the client up in TeiaH before applying',
   'contacts.error.invalidCep': 'Invalid postal code',

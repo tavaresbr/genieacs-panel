@@ -58,6 +58,24 @@ router.post(
   sgpAdminLimiter,
   ContactController.createInSgp
 );
+// What the "Novo cliente" form offers for a contract: the plan and due-day
+// lists an admin keeps in Settings → SGP. Only the lists, not the SGP config.
+router.get(
+  '/sgp/precadastro/options',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('sgp.act'),
+  ContactController.preRegistrationOptions
+);
+// The same, with a contract (SGP pre-registration): plan, due day, login.
+router.post(
+  '/sgp/precadastro',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('sgp.act'),
+  sgpAdminLimiter,
+  ContactController.createPreRegistration
+);
 // Before `/:key`, or `export` would be read as a key. The whole base in one
 // file — admin and owner only, like `tenant.export`.
 router.get('/export', authenticateToken, requirePermission('contacts.export'), ContactController.exportSheet);

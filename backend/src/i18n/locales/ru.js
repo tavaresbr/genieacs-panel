@@ -1101,6 +1101,7 @@ export default {
   'contacts.lookupFailed': 'Не удалось выполнить проверку',
   'contacts.cepNotFound': 'Индекс не найден',
   'contacts.createdInSgp': 'Клиент зарегистрирован в SGP',
+  'contacts.preRegistered': 'Предварительная регистрация отправлена в SGP',
   'contacts.error.invalidDocument': 'Неверный CPF или CNPJ',
   'contacts.error.teiahNotConsulted': 'Сначала запросите данные в TeiaH',
   'contacts.error.invalidCep': 'Неверный индекс',

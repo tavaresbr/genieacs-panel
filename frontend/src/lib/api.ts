@@ -3392,6 +3392,8 @@ export interface SgpConfig {
     customerList: string
     /** The settlement route; `{id}` is the invoice's SGP id. */
     invoiceSettle?: string
+    /** Pre-registration, `F`/`J` appended. */
+    preRegistration?: string
   }
   tokenConfigured: boolean
   ready: boolean
@@ -3414,6 +3416,14 @@ export interface SgpConfig {
   settlePaymentMethods: string[]
   settleFees: number
   settleReady: boolean
+  /** Pre-registration (client with a contract): the SGP ids the admin keeps. */
+  preRegPlans: { id: number; name: string }[]
+  preRegDueDays: { id: number; label: string }[]
+  preRegPopId: number | null
+  preRegPortadorId: number | null
+  preRegVendedorId: number | null
+  preRegInstallOs: boolean
+  preRegActivate: boolean
   contactsSyncEnabled: boolean
   contactsSyncIntervalHours: number
   contactsPageSize: number
@@ -3871,6 +3881,22 @@ export const contactsAPI = {
   /** Creates the client in the SGP, then files it here under the SGP's id. */
   createInSgp: (data: ContactCreateInSgp) =>
     apiClient.post<ContactProfile>('/contacts/sgp', data),
+
+  /** The client WITH a contract, through the SGP's pre-registration. */
+  createPreRegistration: (data: ContactCreateInSgp & {
+    planId: number
+    dueDayId: number
+    login?: string
+    password?: string
+    installOs?: boolean
+  }) =>
+    apiClient.post<ContactProfile & { filed: 'sgp' | 'panel' }>('/contacts/sgp/precadastro', data),
+
+  /** The pre-registration lists (plans, due days) the "Novo cliente" form offers. */
+  preRegistrationOptions: () =>
+    apiClient.get<{ plans: { id: number; name: string }[]; dueDays: { id: number; label: string }[]; installOs: boolean }>(
+      '/contacts/sgp/precadastro/options'
+    ),
 
   /** The contacts as a CSV, with the list's search and state filter. */
   exportSheet: (filters: { search?: string; state?: string; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter } = {}) => {
