@@ -1689,6 +1689,8 @@ export interface PlatformAlertsConfig {
   bigOverdueCents: number
   /** `hour` no horário de Brasília. */
   dailyDigest: { enabled: boolean; hour: number }
+  /** O relatório mensal: dia 1º, à `hour` de Brasília, o resumo do mês que acabou. */
+  monthlyReport?: { enabled: boolean; channels: PlatformAlertChannel[]; hour: number }
 }
 
 /** O patch dos alertas: ausente mantém. */
@@ -1696,6 +1698,7 @@ export interface PlatformAlertsUpdate {
   events?: Partial<Record<PlatformAlertEvent, { enabled?: boolean; channels?: PlatformAlertChannel[] }>>
   bigOverdueCents?: number | null
   dailyDigest?: { enabled?: boolean; hour?: number }
+  monthlyReport?: { enabled?: boolean; channels?: PlatformAlertChannel[]; hour?: number }
 }
 
 /** O crédito da indicação de provedores, em centavos (0106); 0 desliga o programa. */
@@ -2016,6 +2019,35 @@ export interface TenantChargeView {
   pricing?: ChargePricing | null
   /** O crédito (indicação, ajuste) abatido nela, em centavos. Opcional: servidores antigos não mandam. */
   creditCents?: number
+  /** Quando foi paga (dia `YYYY-MM-DD` ou instante ISO). Opcional: servidores antigos não mandam. */
+  paidAt?: string | null
+  /** O meio do pagamento (`PIX`, `BOLETO`, `CREDIT_CARD`, `MANUAL`…), ou nulo quando não informado. */
+  paymentMethod?: string | null
+  /** O desconto por antecipação que o pagamento ganhou, em centavos. */
+  earlyDiscountCents?: number
+  /** O cupom que valeu nesta cobrança. */
+  couponCode?: string | null
+  /** Se há recibo (só a paga). */
+  receiptAvailable?: boolean
+  /** Se há segunda via (em aberto e emitida no gateway). */
+  paymentInfoAvailable?: boolean
+}
+
+/** O filtro de estado da lista de faturas: os da coluna, e `open` (os em aberto). */
+export type TenantChargeStatusFilter = 'open' | TenantChargeView['status']
+
+/** A "segunda via" de uma cobrança em aberto, lida do gateway na hora. */
+export interface TenantChargePaymentInfo {
+  chargeId: number
+  status: TenantChargeView['status']
+  amountCents: number
+  currency: string
+  dueDate: string | null
+  billingType: string
+  invoiceUrl: string | null
+  boleto: { identificationField: string; barCode: string | null; bankSlipUrl: string | null } | null
+  pix: { payload: string; encodedImage: string | null; expirationDate: string | null } | null
+  fetchedAt: string
 }
 
 /**
@@ -2847,7 +2879,28 @@ export const subscriptionAPI = {
    * que dá a saída do muro do 402, e por isso a tela de bloqueio também a
    * chama.
    */
-  charges: () => apiClient.get<{ charges: TenantChargeView[] }>('/tenant/charges'),
+  charges: (filters: { year?: number | null; status?: TenantChargeStatusFilter | null } = {}) => {
+    const params = new URLSearchParams()
+    if (filters.year) params.set('year', String(filters.year))
+    if (filters.status) params.set('status', filters.status)
+    const suffix = params.toString()
+    return apiClient.get<{
+      charges: TenantChargeView[]
+      /** Os anos com cobrança, do mais recente ao mais antigo. Opcional: servidores antigos não mandam. */
+      years?: number[]
+    }>(`/tenant/charges${suffix ? `?${suffix}` : ''}`)
+  },
+
+  /**
+   * A segunda via de uma cobrança em aberto: a página, a linha digitável e o
+   * QR do Pix de agora. 409 `not_open`/`no_gateway_charge`/`already_paid`,
+   * 404 para a cobrança que não é deste provedor, 502 `gateway_failed`.
+   */
+  chargePaymentInfo: (chargeId: number) =>
+    apiClient.get<{ paymentInfo: TenantChargePaymentInfo }>(`/tenant/charges/${chargeId}/payment-info`),
+
+  /** O recibo (HTML para imprimir) de uma cobrança paga. 409 `not_paid` nas outras. */
+  chargeReceipt: (chargeId: number) => apiClient.getBlob(`/tenant/charges/${chargeId}/receipt`),
 
   /** Os planos à venda, com o atual marcado. */
   plans: () => apiClient.get<TenantPlanOption[]>('/tenant/plans'),
@@ -6499,8 +6552,62 @@ export interface RevenueReport {
   discountApproximate?: boolean
 }
 
+/**
+ * Um mês da série de métricas (`GET /platform/metrics/monthly`), no calendário
+ * de Brasília. Nos meses fechados, MRR e inadimplência são reconstruídos pelo
+ * extrato (`mrrApproximate`/`overdueApproximate`); o mês corrente é a foto de agora.
+ */
+export interface MonthlyMetricsMonth {
+  month: string
+  current: boolean
+  mrrCents: number
+  payingCount: number
+  mrrApproximate: boolean
+  /** Líquido: pagamentos do mês menos estornos do mês. */
+  receivedCents: number
+  grossCents: number
+  refundedCents: number
+  payments: number
+  newTenants: number
+  canceledTenants: number
+  /** Cancelados sobre os pagantes do fim do mês anterior; nulo sem base. */
+  churnRate: number | null
+  overdueCents: number
+  overdueCount: number
+  overdueTenants: number
+  overdueApproximate: boolean
+}
+
+export interface MonthlyMetricsPlanRow {
+  planId: number | null
+  name: string | null
+  receivedCents: number
+  mrrCents: number
+  payingCount: number
+}
+
+export interface MonthlyMetrics {
+  currency: string
+  timeZone: string
+  months: MonthlyMetricsMonth[]
+  /** A receita por plano do último mês da série (`revenueByPlanMonth`). */
+  revenueByPlan: MonthlyMetricsPlanRow[]
+  revenueByPlanMonth: string
+}
+
 /** Os relatórios do console: a receita, e a planilha das cobranças do período. */
 export const platformReportsAPI = {
+  /** A série mês a mês (1 a 24 meses). 400 `invalid_months`. */
+  monthlyMetrics: (months = 12) =>
+    apiClient.get<MonthlyMetrics>(`/platform/metrics/monthly?months=${encodeURIComponent(String(months))}`),
+  /**
+   * Manda agora o relatório do mês anterior. 409 `no_destination`; 502
+   * `send_failed`; 400 `invalid_channels`.
+   */
+  sendMonthlyReport: (channels?: PlatformAlertChannel[]) =>
+    apiClient.post<{ month: string; channels: Partial<Record<PlatformAlertChannel, boolean | null>> }>(
+      '/platform/metrics/monthly-report/send', channels ? { channels } : {}
+    ),
   revenue: (range: { from: string; to: string }) =>
     apiClient.get<RevenueReport>(
       `/platform/reports/revenue?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
@@ -6614,4 +6721,70 @@ export const referralsAPI = {
    */
   adjust: (tenantId: number, payload: { amountCents: number; reason: string }) =>
     apiClient.post<CreditAdjustResult>(`/platform/tenants/${tenantId}/credits`, payload),
+}
+
+/** O estado de uma linha da fila de alertas da plataforma. */
+export type PlatformAlertStatus = 'pending' | 'sent' | 'failed' | 'skipped'
+export const PLATFORM_ALERT_STATUSES: readonly PlatformAlertStatus[] = ['pending', 'sent', 'failed', 'skipped']
+
+/** Os eventos do histórico: os configuráveis, o resumo diário e o teste. */
+export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test' | 'monthly_report'
+
+export interface PlatformAlertHistoryItem {
+  id: number
+  event: PlatformAlertHistoryEvent
+  /** Nulo para o resumo e o teste; `deleted` quando o provedor foi apagado (o nome vem do alerta). */
+  tenant: { id: number; name: string | null; slug: string | null; deleted: boolean } | null
+  /** O assunto da mensagem, no idioma de quem lê — nunca o destino. */
+  summary: string
+  status: PlatformAlertStatus
+  attempts: number
+  lastError: string | null
+  createdAt: string | null
+  sentAt: string | null
+  nextAttemptAt: string | null
+}
+
+export interface PlatformAlertHistoryPage {
+  alerts: PlatformAlertHistoryItem[]
+  total: number
+  page: number
+  pageSize: number
+  /** Por estado, com os mesmos filtros menos o de estado (os números das abas). */
+  counts: Record<PlatformAlertStatus, number>
+}
+
+export interface PlatformAlertHistoryQuery {
+  status?: PlatformAlertStatus
+  event?: PlatformAlertHistoryEvent
+  /** `YYYY-MM-DD`, dia de Brasília, inclusive. */
+  from?: string
+  /** `YYYY-MM-DD`, dia de Brasília, inclusive. */
+  to?: string
+  page?: number
+  pageSize?: number
+}
+
+export const platformAlertHistoryAPI = {
+  /**
+   * O histórico da fila de alertas, o mais novo primeiro. 400 com `code`
+   * (`invalid_status`, `invalid_event`, `invalid_from`, `invalid_to`,
+   * `invalid_range`, `invalid_page`, `invalid_page_size`).
+   */
+  list: (query: PlatformAlertHistoryQuery = {}) => {
+    const params = new URLSearchParams()
+    for (const [chave, valor] of Object.entries(query)) {
+      if (valor !== undefined && valor !== null && valor !== '') params.set(chave, String(valor))
+    }
+    const qs = params.toString()
+    return apiClient.get<PlatformAlertHistoryPage>(`/platform/alerts${qs ? `?${qs}` : ''}`)
+  },
+
+  /**
+   * Põe de novo na fila um alerta `failed`/`skipped` (o teste não). 404
+   * `not_found`; 409 `not_resendable`. `requeued` conta os alertas que voltaram
+   * junto com um resumo diário.
+   */
+  resend: (id: number) =>
+    apiClient.post<{ alert: PlatformAlertHistoryItem; requeued: number }>(`/platform/alerts/${id}/resend`, {}),
 }

@@ -201,7 +201,8 @@ const POR_ID = new Map([
   // crédito de um não aparece nem é abatido no outro está no mesmo arquivo.
   ['GET /api/platform/tenants/:id/referrals', 'plano de controle; prova em referrals.test.js — inclusive o 404 da caixa da plataforma'],
   ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
-  ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404']
+  ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404'],
+  ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -429,7 +430,13 @@ describe('toda rota endereçada por um parâmetro', () => {
   // (`DELETE .../subscription/cancellation`, 0107). Mesmo pedágio: uma linha
   // em `DO_CONSOLE` e mais uma aqui; a prova de que só mexe no provedor da URL
   // está em cancellation-retention.test.js. São 72.
-  const TETO_DE_EXCECOES = 72;
+  //
+  // E o reenvio de um alerta da plataforma (`POST /alerts/:id/resend`,
+  // histórico dos alertas). O id é de `platform_alerts`, tabela da PLATAFORMA,
+  // acima dos provedores — não há linha de provedor para vazar. Mesmo pedágio:
+  // uma linha em `DO_CONSOLE` e mais uma aqui; prova em
+  // platform-alerts-history.test.js. São 73.
+  const TETO_DE_EXCECOES = 73;
 
 
   /**
@@ -486,7 +493,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/gateway/asaas-customer',
     'GET /api/platform/tenants/:id/referrals',
     'POST /api/platform/tenants/:id/credits',
-    'DELETE /api/platform/tenants/:id/subscription/cancellation'
+    'DELETE /api/platform/tenants/:id/subscription/cancellation',
+    'POST /api/platform/alerts/:id/resend'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

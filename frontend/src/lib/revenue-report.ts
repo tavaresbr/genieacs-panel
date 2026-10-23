@@ -95,3 +95,15 @@ export function niceCeiling(max: number): number {
 export function netCents(report: { receivedCents: number; refundedCents: number }): number {
   return report.receivedCents - report.refundedCents
 }
+
+/**
+ * A variação de um número sobre o mês anterior da série: o valor do último
+ * mês, a diferença e a porcentagem (nula quando o anterior é zero ou não há).
+ */
+export function monthOverMonth<T>(series: readonly T[], pick: (item: T) => number | null) {
+  const atual = series.length ? pick(series[series.length - 1]) : null
+  const anterior = series.length > 1 ? pick(series[series.length - 2]) : null
+  const delta = atual !== null && anterior !== null ? atual - anterior : null
+  const pct = delta !== null && anterior ? delta / Math.abs(anterior) : null
+  return { value: atual, previous: anterior, delta, pct }
+}

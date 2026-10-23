@@ -67,10 +67,26 @@ export function buildAlertsPatch(
   if (original.dailyDigest.hour !== draft.dailyDigest.hour) digest.hour = draft.dailyDigest.hour
   if (Object.keys(digest).length) patch.dailyDigest = digest
 
+  // O relatório mensal: só quando o servidor o conhece (vem no perfil).
+  if (original.monthlyReport && draft.monthlyReport) {
+    const antes = original.monthlyReport
+    const depois = draft.monthlyReport
+    const mensal: NonNullable<PlatformAlertsUpdate['monthlyReport']> = {}
+    if (antes.enabled !== depois.enabled) mensal.enabled = depois.enabled
+    if (!mesmosCanais(antes.channels, depois.channels)) mensal.channels = [...depois.channels]
+    if (antes.hour !== depois.hour) mensal.hour = depois.hour
+    if (Object.keys(mensal).length) patch.monthlyReport = mensal
+  }
+
   return { patch, invalidThreshold }
 }
 
 /** Um evento ligado sem canal nenhum não avisa ninguém: a tela pede ao menos um. */
 export function eventsWithoutChannel(config: PlatformAlertsConfig): PlatformAlertEvent[] {
   return PLATFORM_ALERT_EVENTS.filter((e) => config.events[e].enabled && config.events[e].channels.length === 0)
+}
+
+/** O relatório mensal ligado sem canal nenhum não chega a ninguém. */
+export function monthlyReportWithoutChannel(config: PlatformAlertsConfig): boolean {
+  return Boolean(config.monthlyReport?.enabled && config.monthlyReport.channels.length === 0)
 }

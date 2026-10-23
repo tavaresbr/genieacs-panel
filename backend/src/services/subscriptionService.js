@@ -2556,7 +2556,8 @@ class SubscriptionService {
    */
   static async recordPayment({
     amountCents, currency = 'BRL', provider = 'manual', externalId = null,
-    actorUserId = null, periodDays = null, allowUnderpayment = false, paidOn = null, now = new Date(), chargeId = null
+    actorUserId = null, periodDays = null, allowUnderpayment = false, paidOn = null, now = new Date(), chargeId = null,
+    paymentMethod = null
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -2948,7 +2949,12 @@ class SubscriptionService {
             // A indicação recompensada por este pagamento, e o crédito que a
             // cobrança paga gastou (0106) — o estorno lê os dois.
             ...(recompensa ?? {}),
-            ...(creditoGasto ? { creditConsumed: { chargeId: cobrancaComCredito, cents: creditoGasto } } : {})
+            ...(creditoGasto ? { creditConsumed: { chargeId: cobrancaComCredito, cents: creditoGasto } } : {}),
+            // O dia e o meio do pagamento, como o gateway os disse — o que a
+            // lista de faturas e o recibo do provedor mostram. Só registro:
+            // nada do crédito acima depende destes dois.
+            ...(/^\d{4}-\d{2}-\d{2}$/.test(String(paidOn ?? '')) ? { paidOn: String(paidOn) } : {}),
+            ...(paymentMethod && /^[A-Z_]{2,24}$/.test(String(paymentMethod)) ? { paymentMethod: String(paymentMethod) } : {})
           }
         }, trx);
         // Na mesma transação do pagamento: um período novo que começasse no

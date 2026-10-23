@@ -825,6 +825,23 @@ export const casos = [
     tabela: 'wa_messages',
     esperado: 409
   },
+  // As faturas do provedor: o recibo da cobrança paga e a segunda via da em
+  // aberto. O id do vizinho é 404 nas duas; no controle, o recibo sai (200)
+  // e a segunda via recusa a cobrança paga com 409 — sem falar com gateway.
+  {
+    chave: 'paidCharge',
+    label: 'GET /api/tenant/charges/:id/receipt',
+    method: 'GET',
+    path: (id) => `/api/tenant/charges/${id}/receipt`,
+    tabela: 'billing_charges'
+  },
+  {
+    chave: 'paidCharge',
+    label: 'GET /api/tenant/charges/:id/payment-info',
+    method: 'GET',
+    path: (id) => `/api/tenant/charges/${id}/payment-info`,
+    tabela: 'billing_charges'
+  },
   // A conta do WhatsApp por último: apagá-la leva as conversas junto, e os
   // casos acima precisam delas de pé.
   {

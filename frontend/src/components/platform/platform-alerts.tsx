@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   platformAPI,
+  platformReportsAPI,
   PLATFORM_ALERT_EVENTS,
   type PlatformAlertChannel,
   type PlatformAlertEvent,
@@ -17,6 +18,7 @@ import {
   PLATFORM_ALERT_CHANNELS,
   buildAlertsPatch,
   eventsWithoutChannel,
+  monthlyReportWithoutChannel,
   toggleChannel
 } from '@/lib/platform-alerts'
 
@@ -37,6 +39,7 @@ export function PlatformAlertsSettings() {
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [testando, setTestando] = useState(false)
+  const [enviandoMensal, setEnviandoMensal] = useState(false)
 
   const aplicar = useCallback((dados: PlatformProfile) => {
     setPerfil(dados)
@@ -76,7 +79,7 @@ export function PlatformAlertsSettings() {
   const salvar = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!perfil?.alerts || !rascunho) return
-    if (eventsWithoutChannel(rascunho).length) {
+    if (eventsWithoutChannel(rascunho).length || monthlyReportWithoutChannel(rascunho)) {
       toast.error(t('platform.alerts.noChannel'))
       return
     }
@@ -117,6 +120,37 @@ export function PlatformAlertsSettings() {
     } finally {
       setTestando(false)
     }
+  }
+
+  // O "Enviar relatório agora": o mês anterior, pelos canais da configuração
+  // salva (sem ela, os dois).
+  const enviarMensal = async () => {
+    setEnviandoMensal(true)
+    try {
+      const res = await platformReportsAPI.sendMonthlyReport()
+      if (res.success) toast.success(t('platform.alerts.monthlySent', { month: res.data?.month ?? '' }))
+      else if (res.code === 'no_destination') toast.error(t('platform.alerts.noDestination'))
+      else toast.error(t('platform.alerts.monthlyFailed'))
+    } catch {
+      toast.error(t('platform.alerts.monthlyFailed'))
+    } finally {
+      setEnviandoMensal(false)
+    }
+  }
+
+  const mudarMensal = (patch: { enabled?: boolean; channel?: PlatformAlertChannel; hour?: number }) => {
+    setRascunho((r) => {
+      if (!r?.monthlyReport) return r
+      const atual = r.monthlyReport
+      return {
+        ...r,
+        monthlyReport: {
+          enabled: patch.enabled ?? atual.enabled,
+          channels: patch.channel ? toggleChannel(atual.channels, patch.channel) : atual.channels,
+          hour: patch.hour ?? atual.hour
+        }
+      }
+    })
   }
 
   if (erro) return <p className="alert-error text-sm">{erro}</p>
@@ -211,6 +245,55 @@ export function PlatformAlertsSettings() {
           </div>
         </div>
       </section>
+
+      {rascunho.monthlyReport && (
+        <section className="rounded-md border border-border p-4 sm:p-5" aria-labelledby="alerts-monthly-title">
+          <h3 id="alerts-monthly-title" className="font-semibold text-foreground">{t('platform.alerts.monthly')}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{t('platform.alerts.monthlyHint')}</p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+            <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <input
+                type="checkbox"
+                checked={rascunho.monthlyReport.enabled}
+                disabled={!perfil.canSave}
+                onChange={(e) => mudarMensal({ enabled: e.target.checked })}
+              />
+              {t('platform.alerts.monthlyEnabled')}
+            </label>
+            <div className="flex gap-4" role="group" aria-label={t('platform.alerts.channels')}>
+              {PLATFORM_ALERT_CHANNELS.map((canal) => (
+                <label key={canal} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={rascunho.monthlyReport?.channels.includes(canal) ?? false}
+                    disabled={!perfil.canSave || !rascunho.monthlyReport?.enabled}
+                    onChange={() => mudarMensal({ channel: canal })}
+                  />
+                  {t(ROTULO_CANAL[canal])}
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="alerts-monthly-hour" className="text-sm text-muted-foreground">{t('platform.alerts.monthlyHour')}</label>
+              <select
+                id="alerts-monthly-hour"
+                className="modern-input w-24"
+                value={rascunho.monthlyReport.hour}
+                disabled={!perfil.canSave || !rascunho.monthlyReport.enabled}
+                onChange={(e) => mudarMensal({ hour: Number(e.target.value) })}
+              >
+                {HORAS.map((h) => <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00`}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="mt-4">
+            <button type="button" className="modern-button-secondary" disabled={enviandoMensal || semDestino} onClick={() => void enviarMensal()}>
+              {enviandoMensal ? t('platform.alerts.monthlySending') : t('platform.alerts.monthlySendNow')}
+            </button>
+            <p className="field-hint">{t('platform.alerts.monthlySendNowHint')}</p>
+          </div>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="modern-button" disabled={salvando || !perfil.canSave}>

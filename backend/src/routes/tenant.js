@@ -43,6 +43,12 @@ router.get('/subscription', authenticateToken, requirePermission('settings.read'
 // `/subscription`, e também fora da porta da assinatura — quem está bloqueado é
 // exatamente quem precisa desta lista.
 router.get('/charges', authenticateToken, requirePermission('settings.read'), TenantController.listCharges);
+// A segunda via de uma cobrança em aberto e o recibo de uma paga. Mesma
+// capacidade e mesmo lado da porta da assinatura que a lista (o caminho com
+// id está em `subscriptionGate.js`); o id de outro provedor é 404, e a prova
+// está na varredura (`idSweepCases.js`).
+router.get('/charges/:id/payment-info', authenticateToken, requirePermission('settings.read'), TenantController.chargePaymentInfo);
+router.get('/charges/:id/receipt', authenticateToken, requirePermission('settings.read'), TenantController.chargeReceipt);
 
 // O catálogo de planos, com preço, e o do provedor marcado. Mesma capacidade
 // e mesmo lado da porta da assinatura que `/subscription`: é a tela onde se

@@ -82,7 +82,9 @@ export const ALERT_EVENTS = Object.freeze([
 export const ALERT_CHANNELS = Object.freeze(['whatsapp', 'email']);
 export const ALERT_DEFAULTS = Object.freeze({
   bigOverdueCents: 50_000,
-  digestHour: 8
+  digestHour: 8,
+  // O relatório mensal: dia 1º às 8h de Brasília, desligado por padrão.
+  monthlyReportHour: 8
 });
 const BIG_OVERDUE_MAX_CENTS = 100_000_000;
 
@@ -99,6 +101,7 @@ function alertasDe(stored) {
   const limite = gravado.bigOverdueCents;
   const digest = gravado.dailyDigest && typeof gravado.dailyDigest === 'object' ? gravado.dailyDigest : {};
   const hora = digest.hour;
+  const mensal = gravado.monthlyReport && typeof gravado.monthlyReport === 'object' ? gravado.monthlyReport : {};
   return {
     events,
     bigOverdueCents: Number.isInteger(limite) && limite > 0 && limite <= BIG_OVERDUE_MAX_CENTS
@@ -106,6 +109,15 @@ function alertasDe(stored) {
     dailyDigest: {
       enabled: digest.enabled === true,
       hour: Number.isInteger(hora) && hora >= 0 && hora <= 23 ? hora : ALERT_DEFAULTS.digestHour
+    },
+    // O relatório mensal (ver `platformAlertService.checkMonthlyReport`): no
+    // dia 1º, à hora escolhida (Brasília), o resumo do mês que acabou.
+    monthlyReport: {
+      enabled: mensal.enabled === true,
+      channels: Array.isArray(mensal.channels)
+        ? ALERT_CHANNELS.filter((c) => mensal.channels.includes(c)) : [...ALERT_CHANNELS],
+      hour: Number.isInteger(mensal.hour) && mensal.hour >= 0 && mensal.hour <= 23
+        ? mensal.hour : ALERT_DEFAULTS.monthlyReportHour
     }
   };
 }
@@ -161,6 +173,32 @@ function normalizarAlertas(bruto, atual) {
         throw new PlatformProfileError('dailyDigest.hour must be an integer from 0 to 23', { field: 'dailyDigest' });
       }
       novo.dailyDigest.hour = d.hour;
+    }
+  }
+  if (bruto.monthlyReport !== undefined) {
+    const m = bruto.monthlyReport;
+    if (!m || typeof m !== 'object' || Array.isArray(m)) {
+      throw new PlatformProfileError('Invalid monthlyReport', { field: 'monthlyReport' });
+    }
+    if (m.enabled !== undefined) {
+      if (typeof m.enabled !== 'boolean') throw new PlatformProfileError('Invalid monthlyReport', { field: 'monthlyReport' });
+      novo.monthlyReport.enabled = m.enabled;
+    }
+    if (m.channels !== undefined) {
+      if (!Array.isArray(m.channels) || m.channels.some((c) => !ALERT_CHANNELS.includes(c))) {
+        throw new PlatformProfileError('Invalid channels for monthlyReport', { field: 'monthlyReport' });
+      }
+      novo.monthlyReport.channels = ALERT_CHANNELS.filter((c) => m.channels.includes(c));
+    }
+    if (m.hour !== undefined) {
+      if (!Number.isInteger(m.hour) || m.hour < 0 || m.hour > 23) {
+        throw new PlatformProfileError('monthlyReport.hour must be an integer from 0 to 23', { field: 'monthlyReport' });
+      }
+      novo.monthlyReport.hour = m.hour;
+    }
+    // Ligado sem canal nenhum não chega a ninguém.
+    if (novo.monthlyReport.enabled && !novo.monthlyReport.channels.length) {
+      throw new PlatformProfileError('monthlyReport needs at least one channel', { field: 'monthlyReport' });
     }
   }
   return novo;

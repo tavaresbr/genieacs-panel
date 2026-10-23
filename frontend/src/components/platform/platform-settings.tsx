@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { PlatformIntegrations } from '@/components/platform/platform-integrations'
 import { PlatformProfileForm } from '@/components/platform/platform-profile'
 import { PlatformAlertsSettings } from '@/components/platform/platform-alerts'
+import { PlatformAlertsPanel } from '@/components/platform/platform-alert-history'
 import { PlatformMailSettings } from '@/components/platform/platform-mail'
 import { useTranslation } from '@/contexts/language-context'
 
@@ -40,7 +41,7 @@ export function PlatformSettings() {
       </nav>
       <div className="min-w-0">
         {sub === 'profile' && <PlatformProfileForm />}
-        {sub === 'alerts' && <PlatformAlertsSettings />}
+        {sub === 'alerts' && <PlatformAlertsPanel settings={<PlatformAlertsSettings />} />}
         {sub === 'mail' && <PlatformMailSettings />}
         {sub === 'integrations' && <PlatformIntegrations />}
       </div>

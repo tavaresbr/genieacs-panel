@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { subscriptionAPI, type TenantChargeView } from '@/lib/api'
+import { subscriptionAPI, type TenantChargeStatusFilter, type TenantChargeView } from '@/lib/api'
 import { formatMoney } from '@/lib/money'
 import { ChargePricingBreakdown } from '@/components/charge-pricing'
 import { Icon } from '@/components/ui/icon'
@@ -9,6 +9,10 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { displayDate } from '@/lib/date-format'
 import { safeInvoiceUrl } from '@/lib/invoice'
+import { ChargePaymentModal } from '@/components/charge-payment-modal'
+import {
+  CHARGE_STATUS_FILTERS, CHARGE_STATUS_FILTER_KEYS, chargeKindKey, chargeYearOptions, paymentMethodKey, tenantChargesCsv
+} from '@/lib/tenant-charges'
 
 /**
  * O que foi cobrado deste provedor, e onde ele paga.
@@ -74,34 +78,127 @@ export function cobrancaDeProrata(charges: TenantChargeView[]) {
 export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) {
   const { t } = useTranslation()
   const [charges, setCharges] = useState<TenantChargeView[] | null>(null)
+  const [years, setYears] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Sem ano, as mais recentes — a lista de sempre. Com ano, todas daquele ano.
+  const [year, setYear] = useState<number | null>(null)
+  const [status, setStatus] = useState<TenantChargeStatusFilter | null>(null)
+  const [paying, setPaying] = useState<number | null>(null)
+  const [receiptBusy, setReceiptBusy] = useState<number | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await subscriptionAPI.charges()
+    const res = await subscriptionAPI.charges({ year, status })
     if (res.success && res.data) {
       setCharges(res.data.charges)
+      setYears(res.data.years ?? [])
       setError(null)
     } else {
       setError(res.message || '')
     }
     setLoading(false)
-  }, [])
+  }, [year, status])
 
   useEffect(() => {
     void load()
   }, [load, refreshKey])
 
+  const statusLabel = (value: string) => {
+    const key = STATUS_KEYS[value as TenantChargeView['status']]
+    return key ? t(key) : value
+  }
+
+  const exportar = () => {
+    if (!charges?.length) return
+    const csv = tenantChargesCsv(charges, [
+      'id', t('charges.col.kind'), t('charges.period'), t('charges.dueDate'), t('charges.col.status'), 'currency',
+      t('charges.col.amount'), t('charges.col.discount'), t('charges.col.credit'), t('charges.col.coupon'),
+      t('charges.paidAt'), t('charges.col.method'), t('nfse.column')
+    ], {
+      status: statusLabel,
+      kind: (kind) => t(chargeKindKey(kind)),
+      method: (method) => t(paymentMethodKey(method))
+    })
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `faturas-${year ?? 'recentes'}-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  /**
+   * O recibo abre numa aba nova, pronto para imprimir. A aba é aberta ANTES de
+   * esperar a resposta: aberta depois de um `await`, o bloqueador de pop-up a
+   * recusaria. Sem aba (bloqueada mesmo assim), o arquivo é baixado.
+   */
+  const abrirRecibo = async (chargeId: number) => {
+    setActionError(null)
+    setReceiptBusy(chargeId)
+    const janela = window.open('', '_blank')
+    const res = await subscriptionAPI.chargeReceipt(chargeId)
+    setReceiptBusy(null)
+    if (!res.success || !res.blob) {
+      janela?.close()
+      setActionError(res.message || t('charges.receiptFailed'))
+      return
+    }
+    const url = URL.createObjectURL(new Blob([res.blob], { type: 'text/html;charset=utf-8' }))
+    if (janela) {
+      janela.opener = null
+      janela.location.href = url
+    } else {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = res.filename || `recibo-${chargeId}.html`
+      link.click()
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+
+  const fecharSegundaVia = useCallback(() => setPaying(null), [])
+
   return (
     <section className="modern-card p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="section-heading">{t('charges.title')}</h2>
-        <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void load()}>
-          <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
-          {t('common.refresh')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="modern-input w-auto"
+            aria-label={t('charges.filter.year')}
+            value={year ?? ''}
+            onChange={(event) => setYear(event.target.value ? Number(event.target.value) : null)}
+          >
+            <option value="">{t('charges.filter.recent')}</option>
+            {chargeYearOptions(years).map((ano) => (
+              <option key={ano} value={ano}>{ano}</option>
+            ))}
+          </select>
+          <select
+            className="modern-input w-auto"
+            aria-label={t('charges.filter.status')}
+            value={status ?? ''}
+            onChange={(event) => setStatus((event.target.value || null) as TenantChargeStatusFilter | null)}
+          >
+            <option value="">{t('charges.filter.allStatuses')}</option>
+            {CHARGE_STATUS_FILTERS.map((valor) => (
+              <option key={valor} value={valor}>{t(CHARGE_STATUS_FILTER_KEYS[valor])}</option>
+            ))}
+          </select>
+          <button type="button" className="modern-button-secondary" disabled={loading || !charges?.length} onClick={exportar}>
+            <Icon name="document" size={17} />
+            {t('charges.exportCsv')}
+          </button>
+          <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void load()}>
+            <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
+            {t('common.refresh')}
+          </button>
+        </div>
       </div>
+
+      {actionError && <p className="mt-3 text-sm text-destructive" role="alert">{actionError}</p>}
 
       {loading ? (
         <p className="mt-3 text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -109,8 +206,8 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
         <p className="mt-3 text-sm text-destructive">{error || t('charges.loadFailed')}</p>
       ) : !charges?.length ? (
         /* Sem cobrança não é erro: é o provedor em teste, o de plano grátis e o
-           que ainda não chegou na primeira emissão. */
-        <p className="mt-3 text-sm text-muted-foreground">{t('charges.empty')}</p>
+           que ainda não chegou na primeira emissão. Com filtro, é o filtro. */
+        <p className="mt-3 text-sm text-muted-foreground">{year || status ? t('charges.noMatch') : t('charges.empty')}</p>
       ) : (
         <ul className="mt-4 divide-y divide-border">
           {charges.map((charge) => (
@@ -118,20 +215,40 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
                   {formatMoney(charge.amountCents, charge.currency)}
-                  {/* A avulsa da subida no meio do período: não é a do mês. */}
-                  {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
-                  {charge.kind === 'overage' && <span className="modern-badge-info">{t('charges.overage')}</span>}
+                  {/* O tipo: a mensalidade, a avulsa da subida no meio do
+                      período ou a de só excedente. */}
+                  <span className={charge.kind === 'proration' || charge.kind === 'overage' ? 'modern-badge-info' : 'modern-badge'}>
+                    {t(chargeKindKey(charge.kind))}
+                  </span>
                   {/* O crédito de indicação (ou do console) abatido nela (0106). */}
                   {(charge.creditCents ?? 0) > 0 && (
                     <span className="modern-badge-success">
                       {t('referrals.creditApplied', { amount: formatMoney(charge.creditCents ?? 0, charge.currency) })}
                     </span>
                   )}
+                  {(charge.earlyDiscountCents ?? 0) > 0 && (
+                    <span className="modern-badge-success">
+                      {t('charges.earlyDiscount', { amount: formatMoney(charge.earlyDiscountCents ?? 0, charge.currency) })}
+                    </span>
+                  )}
+                  {charge.couponCode && (
+                    <span className="modern-badge-success">{t('charges.coupon', { code: charge.couponCode })}</span>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {t('charges.period')}: {formatDate(charge.periodEnd) ?? charge.periodEnd}
                   {formatDate(charge.dueDate) && ` · ${t('charges.dueDate')}: ${formatDate(charge.dueDate)}`}
                 </p>
+                {/* Quando e como foi paga — o meio "não informado" é o de
+                    pagamentos anteriores a esta versão. */}
+                {charge.paidAt && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('charges.paidOn', {
+                      date: formatDate(charge.paidAt) ?? charge.paidAt,
+                      method: t(paymentMethodKey(charge.paymentMethod))
+                    })}
+                  </p>
+                )}
                 {/* O plano e o excedente do período (0105), quando há excedente. */}
                 <ChargePricingBreakdown pricing={charge.pricing} currency={charge.currency} />
                 {/* A nota fiscal emitida: o número e o PDF, para o financeiro do
@@ -152,12 +269,27 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Um status que este frontend ainda não conhece (backend mais novo)
                     aparece cru, que é pouco, mas é mais do que uma célula vazia. */}
-                <span className={badgeClass(charge.status)}>
-                  {STATUS_KEYS[charge.status] ? t(STATUS_KEYS[charge.status]) : charge.status}
-                </span>
+                <span className={badgeClass(charge.status)}>{statusLabel(charge.status)}</span>
+                {charge.receiptAvailable && (
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    disabled={receiptBusy === charge.id}
+                    onClick={() => void abrirRecibo(charge.id)}
+                  >
+                    <Icon name="invoice" size={16} />
+                    {t('charges.receipt')}
+                  </button>
+                )}
+                {charge.paymentInfoAvailable && (
+                  <button type="button" className="modern-button-secondary" onClick={() => setPaying(charge.id)}>
+                    <Icon name="copy" size={16} />
+                    {t('charges.secondCopy.button')}
+                  </button>
+                )}
                 {charge.invoiceUrl && (
                   /* `noopener` porque é endereço de terceiro, e o alvo ganharia
                      acesso a esta janela por `window.opener` sem ele. */
@@ -175,6 +307,7 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
           ))}
         </ul>
       )}
+      <ChargePaymentModal chargeId={paying} onClose={fecharSegundaVia} />
     </section>
   )
 }

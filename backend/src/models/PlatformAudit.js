@@ -60,6 +60,14 @@ class PlatformAudit {
     // O "Enviar alerta de teste" dos alertas da plataforma (0112). O detalhe
     // diz os canais e o resultado de cada um, nunca o destino.
     PLATFORM_ALERT_TEST: 'platform.alert_test',
+    // O "Reenviar" do histórico de alertas: a linha que falhou (ou foi
+    // pulada) voltou para a fila. O detalhe diz qual linha, o evento, o estado
+    // de antes e quantos alertas do resumo voltaram junto — nunca o destino nem
+    // o payload.
+    PLATFORM_ALERT_RESENT: 'platform.alert_resent',
+    // O "Enviar relatório agora" do relatório mensal. O detalhe diz o mês, os
+    // canais e o resultado de cada um, nunca o destino.
+    PLATFORM_MONTHLY_REPORT_SENT: 'platform.monthly_report_sent',
     // O "Enviar e-mail de teste" do SMTP do deploy. O detalhe diz se saiu e,
     // se não, o código do motivo — nunca o destino nem o texto do erro.
     PLATFORM_MAIL_TEST: 'platform.mail_test',
