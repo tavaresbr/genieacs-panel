@@ -2935,6 +2935,69 @@ const COUPON_SYSTEM_COLUMNS = [
 ];
 
 /**
+ * Quem pediu para não receber PROMOÇÃO pelo WhatsApp (0120). Ver
+ * `models/WaMarketingOptOut.js`.
+ *
+ * Não é o "não perturbe" (`wa_opt_outs`). Aquele é a equipe dizendo que o
+ * provedor não inicia contato — por tipo de comunicação — e o "SAIR" do
+ * cliente o grava inteiro. Este é mais estreito e anda sozinho: o cliente
+ * respondeu "parar" a uma promoção, ou tocou no botão "Parar promoções" que a
+ * Meta põe nos modelos de MARKETING, e a partir daí só o que é promoção deixa
+ * de sair. Fatura, aviso técnico e atendimento continuam — e a volta ("VOLTAR")
+ * é do próprio cliente, pela mesma conversa.
+ *
+ * Chaveado por telefone e LID, como o não perturbe, e pelo mesmo motivo: o
+ * pedido foi feito por um número, e tem que sobreviver ao cadastro ser
+ * apagado e recriado. A revogação é suave (`revoked_at`) para o histórico de
+ * quem saiu e voltou, e quando, continuar existindo.
+ *
+ *   source         keyword (texto digitado), button (o botão da Meta) ou
+ *                  operator (a equipe marcou na conversa).
+ *   trigger_text   o que o cliente mandou, cortado — é o que responde "por
+ *                  que este número está fora da campanha?".
+ *   revoked_source keyword (o cliente mandou VOLTAR) ou operator.
+ */
+const waMarketingOptOutsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('wa_phone_e164', 24);
+  t.string('wa_lid', 32);
+  t.integer('conversation_id').unsigned()
+    .references('id').inTable('wa_conversations').onDelete('SET NULL');
+  t.string('source', 16).notNullable().defaultTo('keyword');
+  t.string('trigger_text', 120);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('opted_out_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('revoked_at');
+  t.string('revoked_source', 16);
+  t.integer('revoked_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.index(['tenant_id', 'wa_phone_e164'], 'wa_marketing_opt_outs_phone_idx');
+  t.index(['tenant_id', 'wa_lid'], 'wa_marketing_opt_outs_lid_idx');
+};
+
+const WA_MARKETING_OPT_OUT_TABLES = [
+  ['wa_marketing_opt_outs', waMarketingOptOutsTable]
+];
+
+/**
+ * O que é promoção, para o bloqueio acima poder valer até a hora do envio
+ * (0120):
+ *
+ *   wa_broadcasts.promotional  a campanha de texto livre marcada como
+ *                              promocional na tela. Com modelo da Meta, a
+ *                              categoria do modelo (MARKETING) já responde.
+ *   wa_messages.marketing      a mensagem enfileirada como promoção. A fila
+ *                              pode levar horas numa campanha grande, e quem
+ *                              pediu para sair no meio dela não pode receber a
+ *                              mensagem que já estava na fila.
+ */
+const WA_MARKETING_COLUMN_TABLES = [
+  ['wa_broadcasts', [['promotional', (t) => t.boolean('promotional').notNullable().defaultTo(false)]]],
+  ['wa_messages', [['marketing', (t) => t.boolean('marketing').notNullable().defaultTo(false)]]]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -2976,7 +3039,8 @@ export const SCHEMA_TABLES = [
   ...USAGE_PEAK_TABLES,
   ...REFERRAL_TABLES,
   ...CANCELLATION_TABLES,
-  ...PLATFORM_ALERT_TABLES
+  ...PLATFORM_ALERT_TABLES,
+  ...WA_MARKETING_OPT_OUT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6510,6 +6574,34 @@ export const migrations = [
       await db.schema.alterTable('whatsapp_accounts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /**
+     * O pedido de não receber promoção pelo WhatsApp — ver
+     * `waMarketingOptOutsTable` e `WA_MARKETING_COLUMN_TABLES`.
+     */
+    id: '0119_wa_marketing_opt_out',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasTable('wa_marketing_opt_outs'))) return false;
+      for (const [table, columns] of WA_MARKETING_COLUMN_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        if ((await missingColumns(db, table, columns)).length > 0) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'wa_marketing_opt_outs', waMarketingOptOutsTable(db));
+      for (const [table, columns] of WA_MARKETING_COLUMN_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        const missing = await missingColumns(db, table, columns);
+        if (!missing.length) continue;
+        await db.schema.alterTable(table, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
     }
   }
 ];

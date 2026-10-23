@@ -57,7 +57,7 @@ São as que o dossiê percorre quando um assinante exerce o direito de acesso
 | **Contrato no ERP** | `sgp_links`, `sgp_contacts`, `sgp_clients`, `sgp_events` | nome, documento, telefone, login PPPoE, plano, situação |
 | **O aparelho** | `device_profiles`, `device_swaps`, `device_samples`, `device_sample_hours` | id da ONT, telemetria, histórico de troca |
 | **Rede** | `mapping_nodes`, `mapping_edges` | posição do assinante na planta de fibra |
-| **Atendimento (WhatsApp)** | `wa_conversations`, `wa_messages`, `wa_opt_outs`, `wa_satisfaction`, `wa_bot_events`, `wa_conversation_tags`, `wa_alert_state`, `wa_broadcast_recipients`, `wa_dunning_sends`, `wa_dunning_pauses` | telefone, conteúdo das mensagens, anexos, avaliação |
+| **Atendimento (WhatsApp)** | `wa_conversations`, `wa_messages`, `wa_opt_outs`, `wa_marketing_opt_outs`, `wa_satisfaction`, `wa_bot_events`, `wa_conversation_tags`, `wa_alert_state`, `wa_broadcast_recipients`, `wa_dunning_sends`, `wa_dunning_pauses` | telefone, conteúdo das mensagens, anexos, avaliação |
 | **Operação** | `provisioning_runs`, `outage_incident_devices`, `maintenance_window_devices` | que aparelho foi ativado, atingido por queda ou avisado |
 | **Indicações e situação financeira** | `customer_referrals`, `sgp_billing_status` | nome e telefone de quem foi indicado (ainda não é cliente), contrato e fatura em aberto mais antiga |
 | **Trilha** | `audit_log` | quem fez o quê sobre aquele assinante |
@@ -156,7 +156,7 @@ diz isso; escolher um número para elas é decisão de negócio que ainda não f
 
 Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **vale** é o menor dos dois, e "para sempre" vira o próprio teto (`SubscriptionService.effectiveRetention`). É a única janela que o provedor não escolheu: a tela mostra o número dele, não o que vale.
 
-### 4.2 O que nenhuma rotina apaga por idade — 23 tabelas com dado de assinante
+### 4.2 O que nenhuma rotina apaga por idade — 24 tabelas com dado de assinante
 
 "Sem prazo" não é "nunca sai": várias têm saída pelo ciclo de vida, e todas as do assinante saem pela exclusão do art. 18. O que não existe é uma rotina que as apague porque ficaram velhas.
 
@@ -173,6 +173,7 @@ Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **
 | `mapping_edges` | a ligação entre dois nós da planta; sai quando o operador remove a ligação ou limpa o mapa |
 | `wa_conversations` | a conversa e o telefone do assinante; o varredor de mensagens se recusa a tocá-la, por desenho — sai pela exclusão do art. 18 |
 | `wa_opt_outs` | quem pediu para não receber mensagens; nenhuma rotina o apaga |
+| `wa_marketing_opt_outs` | quem pediu para não receber promoções, e quando voltou; nenhuma rotina o apaga — apagar seria desfazer o pedido |
 | `wa_satisfaction` | a avaliação do atendimento dada pelo assinante; sai só pela exclusão do art. 18 |
 | `wa_conversation_tags` | as etiquetas postas na conversa; saem ao tirar a etiqueta, ao apagá-la ou pela exclusão do art. 18 |
 | `wa_alert_state` | o estado dos avisos já enviados; sai quando a condição que o gerou se recupera |

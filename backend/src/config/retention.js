@@ -236,6 +236,7 @@ export const SEM_PRAZO = Object.freeze({
   // Atendimento (WhatsApp)
   wa_conversations: 'a conversa e o telefone do assinante; o varredor de mensagens se recusa a tocá-la, por desenho — sai pela exclusão do art. 18',
   wa_opt_outs: 'quem pediu para não receber mensagens; nenhuma rotina o apaga',
+  wa_marketing_opt_outs: 'quem pediu para não receber promoções, e quando voltou; nenhuma rotina o apaga — apagar seria desfazer o pedido',
   wa_satisfaction: 'a avaliação do atendimento dada pelo assinante; sai só pela exclusão do art. 18',
   wa_conversation_tags: 'as etiquetas postas na conversa; saem ao tirar a etiqueta, ao apagá-la ou pela exclusão do art. 18',
   wa_alert_state: 'o estado dos avisos já enviados; sai quando a condição que o gerou se recupera',

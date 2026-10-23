@@ -5112,6 +5112,8 @@ export interface WhatsAppBroadcastSummary {
   failed: number
   skipped: number
   paid: number
+  /** Pulados porque pediram para não receber promoção. */
+  marketingOptOut?: number
 }
 
 export interface WhatsAppBroadcastDetail {
@@ -5137,6 +5139,8 @@ export interface WhatsAppBroadcast {
   scheduledAt?: string | null
   attachment?: { name: string | null; type: string | null } | null
   audience?: (Omit<WhatsAppCampaignFilters, 'contracts'> & { contracts: number; contractList?: string[] }) | null
+  /** Marcada como promocional: quem pediu para não receber promoção é pulado. */
+  promotional?: boolean
   /** O número que envia, o modelo escolhido e o ritmo próprio (mensagens por hora; nulo é o do WhatsApp). */
   accountId?: number | null
   templateId?: number | null
@@ -5200,7 +5204,11 @@ export interface WhatsAppCampaignPreview {
     duplicate: number
     templateIncomplete: number
     reachable: number
+    /** Ficam na lista e serão pulados no envio: pediram para não receber promoção. */
+    marketingOptOut?: number
   }
+  /** A campanha é promoção (marcada assim, ou com modelo da Meta de MARKETING). */
+  marketing?: boolean
   max: number
   sample: { contract: string | null; clientName: string | null; phone: string; body: string }[]
 }
@@ -5217,6 +5225,8 @@ export interface WhatsAppCampaignInput {
   accountId?: number | null
   /** Só desacelera o ritmo geral: `default` (o do WhatsApp), `slow` (30/h) ou `very_slow` (12/h). */
   pace?: 'default' | 'slow' | 'very_slow'
+  /** Campanha promocional: quem pediu para não receber promoção é pulado. */
+  promotional?: boolean
 }
 
 /**
@@ -5333,6 +5343,8 @@ export interface WhatsAppConversation {
   clientName: string | null
   /** The contact asked not to be contacted. Replying is still allowed. */
   optedOut: boolean
+  /** Pediu para não receber promoção: desde quando e por onde. Só a promoção para. */
+  marketingOptOut?: WhatsAppMarketingOptOut | null
   lastMessageAt: string | null
   lastInboundAt: string | null
   unreadCount: number
@@ -5354,6 +5366,24 @@ export interface WhatsAppConversation {
   tags?: WhatsAppTag[]
   createdAt: string | null
   updatedAt: string | null
+}
+
+/** O pedido de não receber promoção: o texto ("parar"), o botão da Meta, ou a equipe. */
+export interface WhatsAppMarketingOptOut {
+  since: string | null
+  source: 'keyword' | 'button' | 'operator'
+}
+
+/** As palavras do "parar promoções" e o que o painel responde. */
+export interface WhatsAppMarketingOptOutConfig {
+  enabled: boolean
+  stopWords: string[]
+  resumeWords: string[]
+  confirmText: string
+  resumeText: string
+  /** Os rótulos do botão da Meta, reconhecidos sempre. */
+  metaButtons: string[]
+  defaults: { stopWords: string[]; resumeWords: string[]; confirmText: string; resumeText: string }
 }
 
 /** Uma etiqueta de conversa; a cor é uma da paleta dos números (`WA_ACCOUNT_COLORS`). */
@@ -5510,6 +5540,8 @@ export interface WhatsAppContact {
   optedOut: boolean
   /** Blocked only for these kinds; `null` when not blocked or blocked for everything. */
   optOutCategories?: string[] | null
+  /** Pediu para não receber promoção (o resto continua saindo). */
+  marketingOptOut?: boolean
   /** The thread already open with this subscriber, if any. */
   conversationId: number | null
   lastMessageAt: string | null
@@ -5744,6 +5776,21 @@ export const whatsappAPI = {
 
   getBotConfig: () =>
     apiClient.get<BotConfig>('/whatsapp/bot-config'),
+
+  /** As palavras e as respostas do "parar promoções". */
+  getMarketingOptOutConfig: () =>
+    apiClient.get<WhatsAppMarketingOptOutConfig>('/whatsapp/marketing-opt-out'),
+
+  /** Campo ausente mantém o gravado. */
+  updateMarketingOptOutConfig: (config: Partial<Omit<WhatsAppMarketingOptOutConfig, 'defaults' | 'metaButtons'>>) =>
+    apiClient.put<WhatsAppMarketingOptOutConfig>('/whatsapp/marketing-opt-out', config),
+
+  /** A equipe marca "não quer promoções" na conversa; desmarcar pede `campaigns.manage`. */
+  setMarketingOptOut: (conversationId: number) =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/marketing-opt-out`, {}),
+
+  clearMarketingOptOut: (conversationId: number) =>
+    apiClient.delete<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/marketing-opt-out`),
 
   /** Campo ausente mantém o gravado. */
   updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults' | 'ai'>> & { ai?: BotAiInput }) =>

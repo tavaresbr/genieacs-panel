@@ -3,6 +3,7 @@ import { retryDelayMs } from './waOutboxWorker.js';
 import { isPermanentFailure } from './waSendFailure.js';
 import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
+import WaMarketingOptOut from '../models/WaMarketingOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import WaSendService from './waSendService.js';
@@ -205,12 +206,14 @@ class WaBroadcastService {
       optedOut: 0,
       failed: 0,
       skipped: 0,
-      paid: 0
+      paid: 0,
+      marketingOptOut: 0
     };
     for (const item of items) {
       if (item.status === 'pending' || item.status === 'sending') summary.pending += 1;
       else if (item.status in summary) summary[item.status] += 1;
       if (item.error === 'paid') summary.paid += 1;
+      if (item.error === 'marketing_opt_out') summary.marketingOptOut += 1;
       if (item.deliveryStatus === 'delivered' || item.deliveryStatus === 'read') summary.delivered += 1;
       if (item.deliveryStatus === 'read') summary.read += 1;
       if (item.replied) summary.replied += 1;
@@ -437,6 +440,20 @@ class WaBroadcastService {
       return 'skipped';
     }
 
+    // 1a. O pedido de não receber PROMOÇÃO. A campanha é promoção quando foi
+    // marcada assim na tela (texto livre) ou quando o modelo da Meta dela é de
+    // MARKETING; o resto — cobrança, aviso — passa por aqui sem parar.
+    const modelo = lerModeloMeta(recipient.meta_template);
+    const promocional = Boolean(broadcast?.promotional)
+      || (modelo ? await WaMarketingOptOut.isMarketingTemplate(modelo, account?.id ?? null) : false);
+    if (promocional && await WaMarketingOptOut.isActive({ waPhone: recipient.phone_e164 })) {
+      await WaBroadcast.updateRecipient(recipient.id, {
+        status: 'skipped',
+        error_msg: 'marketing_opt_out'
+      });
+      return 'skipped';
+    }
+
     // 1b. Paid since the build. A draft can sit for days, and charging someone
     // who has already paid is the complaint that makes a provider switch the
     // whole thing off.
@@ -482,7 +499,9 @@ class WaBroadcastService {
         body: recipient.rendered_body,
         // A foto do modelo da Meta tirada na montagem; o envio decide pela
         // janela se ela é usada.
-        metaTemplate: lerModeloMeta(recipient.meta_template),
+        metaTemplate: modelo,
+        // Promoção: o envio confere o pedido de parar de novo na hora de sair.
+        marketing: promocional,
         // O anexo da campanha (um só arquivo para todos). O caminho passa de
         // novo pelo confinamento de `normalizeAttachment` dentro do enqueue.
         attachment: broadcast?.attachment_path
@@ -521,6 +540,12 @@ class WaBroadcastService {
       }
       return 'sent';
     } catch (error) {
+      // O pedido de parar chegou pelo LID da conversa, que o telefone do
+      // destinatário não alcança: é o mesmo pulo do passo 1a, não uma falha.
+      if (error?.code === 'marketing_opt_out') {
+        await WaBroadcast.updateRecipient(recipient.id, { status: 'skipped', error_msg: 'marketing_opt_out' });
+        return 'skipped';
+      }
       // `claimRecipient` incremented the counter, so this is the number of the
       // attempt just made. Below the cap the row goes back to 'pending', which
       // is what `listPendingIds` looks for — leaving it 'failed' would put it
@@ -605,6 +630,9 @@ class WaBroadcastService {
       accountId: row.account_id ?? null,
       templateId: row.template_id ?? null,
       kind: row.kind === 'general' ? 'general' : 'billing',
+      // Marcada como promocional na tela: quem pediu para não receber
+      // promoção fica de fora.
+      promotional: Boolean(row.promotional),
       scheduledAt: this.asIso(row.scheduled_at),
       attachment: row.attachment_path
         ? { name: row.attachment_name || null, type: row.attachment_type || null }

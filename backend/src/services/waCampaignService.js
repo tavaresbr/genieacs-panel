@@ -3,6 +3,7 @@ import SgpContact from '../models/SgpContact.js';
 import SgpLink from '../models/SgpLink.js';
 import WaBroadcast from '../models/WaBroadcast.js';
 import WaOptOut from '../models/WaOptOut.js';
+import WaMarketingOptOut from '../models/WaMarketingOptOut.js';
 import WaTemplate from '../models/WaTemplate.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WaBillingService from './waBillingService.js';
@@ -332,13 +333,40 @@ class WaCampaignService {
     return { prontos, templateIncomplete };
   }
 
+  /**
+   * Se a campanha é promoção: marcada assim na tela, ou com um modelo do
+   * painel ligado a um modelo da Meta de categoria MARKETING.
+   */
+  static async isMarketing(template, promotional) {
+    if (promotional === true) return true;
+    if (!template?.meta_template_name) return false;
+    return WaMarketingOptOut.isMarketingTemplate({
+      name: template.meta_template_name,
+      language: template.meta_language
+    });
+  }
+
+  /**
+   * Quantos dos prontos vão ser pulados por terem pedido para não receber
+   * promoção. Eles ficam na lista — a campanha os registra como pulados, com
+   * o motivo, na hora do envio —, e a tela avisa antes.
+   */
+  static async countMarketingOptOut(prontos, marketing) {
+    if (!marketing || prontos.length === 0) return 0;
+    const fora = await WaMarketingOptOut.activePhones(prontos.map((r) => r.phone));
+    return prontos.filter((r) => fora.has(r.phone)).length;
+  }
+
   /** Quem receberia e o quê, sem gravar nada. */
-  static async preview({ filters, templateId, body } = {}) {
+  static async preview({ filters, templateId, body, promotional = false } = {}) {
     const mensagem = await this.resolveMessage({ templateId, body });
     const { recipients, counts } = await this.resolveAudience(filters);
     const { prontos, templateIncomplete } = this.renderAll(mensagem.body, recipients, mensagem.template);
+    const marketing = await this.isMarketing(mensagem.template, promotional === true);
+    const marketingOptOut = await this.countMarketingOptOut(prontos, marketing);
     return {
-      counts: { ...counts, templateIncomplete, reachable: prontos.length },
+      marketing,
+      counts: { ...counts, templateIncomplete, reachable: prontos.length, marketingOptOut },
       max: MAX_CAMPAIGN_RECIPIENTS,
       sample: prontos.slice(0, PREVIEW_SAMPLE).map((r) => ({
         contract: r.contract,
@@ -387,7 +415,7 @@ class WaCampaignService {
    * `attachment`: `undefined` mantém o anexo de quem edita, `null` tira, um
    * objeto troca.
    */
-  static async prepare({ filters, templateId, body, attachment, scheduledAt, accountId = null, pace = 'default' }) {
+  static async prepare({ filters, templateId, body, attachment, scheduledAt, accountId = null, pace = 'default', promotional = false }) {
     if (!Object.hasOwn(RITMOS, pace ?? 'default')) {
       throw invalido('whatsapp.campaign.invalidPace', 'invalid_pace');
     }
@@ -411,9 +439,10 @@ class WaCampaignService {
 
     const config = await WhatsAppConfigService.getConfig();
     const account = await this.resolveAccount(accountId);
+    const marketing = await this.isMarketing(mensagem.template, promotional === true);
     return {
       prontos,
-      counts: { ...counts, templateIncomplete },
+      counts: { ...counts, templateIncomplete, marketingOptOut: await this.countMarketingOptOut(prontos, marketing) },
       anexo,
       anexoMantido: attachment === undefined,
       fields: {
@@ -421,6 +450,8 @@ class WaCampaignService {
         body: mensagem.body,
         account_id: account?.id ?? null,
         pace_per_hour: RITMOS[pace ?? 'default'],
+        // Só a escolha da tela; o modelo de MARKETING é conferido no envio.
+        promotional: promotional === true,
         status: agendada ? 'queued' : 'draft',
         scheduled_at: agendada,
         // A lista colada pode ter milhares de contratos; o cartão só precisa

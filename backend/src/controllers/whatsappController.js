@@ -4,6 +4,7 @@ import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import MetaWebhookService from '../services/metaWebhookService.js';
 import MetaNumberHealthService from '../services/metaNumberHealthService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
+import WaMarketingOptOutService from '../services/waMarketingOptOutService.js';
 import WaAiService from '../services/waAiService.js';
 import WaBotReportService from '../services/waBotReportService.js';
 import WaSatisfactionService from '../services/waSatisfactionService.js';
@@ -130,6 +131,31 @@ class WhatsAppController {
         autoTags: body.autoTags,
         ai: body.ai
       }, req.locale);
+      return res.json(createResponse(req.t('whatsapp.configSaved'), config));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configSaveFailed');
+    }
+  }
+
+  /** `GET /api/whatsapp/marketing-opt-out` — as palavras e as respostas do "parar promoções". */
+  static async getMarketingOptOutConfig(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), await WaMarketingOptOutService.getPublic()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  static async updateMarketingOptOutConfig(req, res) {
+    try {
+      const body = req.body ?? {};
+      const config = await WaMarketingOptOutService.saveConfig({
+        enabled: body.enabled,
+        stopWords: body.stopWords,
+        resumeWords: body.resumeWords,
+        confirmText: body.confirmText,
+        resumeText: body.resumeText
+      });
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configSaveFailed');
