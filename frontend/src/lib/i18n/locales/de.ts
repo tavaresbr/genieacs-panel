@@ -4989,6 +4989,7 @@ const de: Dictionary = {
   'platform.alertHistory.status.skipped': "Übersprungen",
   'platform.alertHistory.event.digest': "Tägliche Zusammenfassung",
   'platform.alertHistory.event.test': "Testalarm",
+  'platform.alertHistory.event.monthlyReport': "Monatsbericht",
   'platform.alertHistory.cols.when': "Wann",
   'platform.alertHistory.cols.event': "Ereignis",
   'platform.alertHistory.cols.provider': "Anbieter",

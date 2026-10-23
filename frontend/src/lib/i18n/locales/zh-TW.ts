@@ -4986,6 +4986,7 @@ const zhTW: Dictionary = {
   'platform.alertHistory.status.skipped': "已略過",
   'platform.alertHistory.event.digest': "每日摘要",
   'platform.alertHistory.event.test': "測試警示",
+  'platform.alertHistory.event.monthlyReport': "月度報告",
   'platform.alertHistory.cols.when': "時間",
   'platform.alertHistory.cols.event': "事件",
   'platform.alertHistory.cols.provider': "服務商",

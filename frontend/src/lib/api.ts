@@ -6698,7 +6698,7 @@ export type PlatformAlertStatus = 'pending' | 'sent' | 'failed' | 'skipped'
 export const PLATFORM_ALERT_STATUSES: readonly PlatformAlertStatus[] = ['pending', 'sent', 'failed', 'skipped']
 
 /** Os eventos do histórico: os configuráveis, o resumo diário e o teste. */
-export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test'
+export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test' | 'monthly_report'
 
 export interface PlatformAlertHistoryItem {
   id: number

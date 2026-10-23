@@ -234,6 +234,14 @@ export function clearPaymentInfoCache() {
   cache.clear();
 }
 
+/** Apaga a segunda via guardada de uma cobrança deste provedor. */
+function esquecer(chargeId) {
+  const prefixo = `${currentTenantId()}:${chargeId}:`;
+  for (const chave of cache.keys()) {
+    if (chave.startsWith(prefixo)) cache.delete(chave);
+  }
+}
+
 /** Só `https:` vira link na tela do provedor. */
 function urlSegura(valor) {
   try {
@@ -252,6 +260,13 @@ function imagemSegura(valor) {
 
 /** O gateway diz que a cobrança já está paga — a linha daqui só não soube ainda. */
 const PAGA_NO_GATEWAY = new Set(['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH']);
+/**
+ * Os únicos estados do gateway em que ainda há o que pagar. Qualquer outro —
+ * estornada, apagada, estorno pedido, chargeback, um estado novo que o gateway
+ * inventar — não ganha segunda via: mostrar o boleto de uma cobrança que não
+ * está mais em aberto levaria o provedor a pagar o que não deve.
+ */
+const ABERTA_NO_GATEWAY = new Set(['PENDING', 'OVERDUE']);
 
 /**
  * A segunda via de uma cobrança em aberto deste provedor: a página atual, a
@@ -265,6 +280,9 @@ export async function paymentInfo(chargeId, { client = asaasClient, now = Date.n
   const linha = await BillingCharge.findById(chargeId);
   if (!linha) throw new TenantChargeError('charge not found', { status: 404, code: 'charge_not_found' });
   if (!['pending', 'overdue'].includes(linha.status)) {
+    // A linha saiu do aberto (o webhook a quitou, o console a cancelou): a
+    // segunda via guardada dela não serve mais para ninguém.
+    esquecer(linha.id);
     throw new TenantChargeError('the charge is not open', { status: 409, code: 'not_open', detail: { status: linha.status } });
   }
   if (!linha.gateway_charge_id || linha.provider !== 'asaas') {
@@ -287,6 +305,12 @@ export async function paymentInfo(chargeId, { client = asaasClient, now = Date.n
   if (PAGA_NO_GATEWAY.has(situacao)) {
     // Não grava nada: quem quita a linha é o webhook, que credita junto.
     throw new TenantChargeError('the gateway already has this charge as paid', { status: 409, code: 'already_paid' });
+  }
+  if (!ABERTA_NO_GATEWAY.has(situacao)) {
+    // Também só lê: quem acerta a linha é o webhook (ou a conciliação).
+    throw new TenantChargeError('the charge is not open at the gateway', {
+      status: 409, code: 'not_open', detail: { gatewayStatus: situacao.slice(0, 40) || null }
+    });
   }
 
   const meio = String(cobranca?.billingType ?? linha.billing_type ?? 'UNDEFINED').toUpperCase();

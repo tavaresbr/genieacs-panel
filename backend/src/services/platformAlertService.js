@@ -46,6 +46,12 @@ const PASS_BUDGET_MS = 20_000;
 const DIGEST_MAX_ITEMS = 50;
 /** O teto do texto do resumo, com folga para o WhatsApp (4096) e o assunto. */
 const DIGEST_MAX_CHARS = 3500;
+/**
+ * Quantos ids de alerta o resumo que desistiu grava no payload: são eles que
+ * o "Reenviar" do resumo põe de volta na fila. Acima disso, o reenvio cai na
+ * janela de datas (como nas linhas antigas, gravadas sem ids).
+ */
+const DIGEST_MAX_IDS = 500;
 /** O fuso do resumo diário. */
 const FUSO = 'America/Sao_Paulo';
 const DIGEST_EVENT = 'digest';
@@ -138,11 +144,16 @@ export function mesAnteriorDe(dia) {
 }
 
 /** `AAAA-MM` por extenso, no idioma das mensagens: "setembro de 2026". */
-function rotuloDoMes(month) {
+function rotuloDoMes(month, locale = DEFAULT_LOCALE) {
   const [ano, mes] = String(month).split('-').map(Number);
   if (!ano || !mes) return String(month);
-  return new Intl.DateTimeFormat(DEFAULT_LOCALE, { month: 'long', year: 'numeric', timeZone: 'UTC' })
-    .format(new Date(Date.UTC(ano, mes - 1, 1)));
+  const opcoes = { month: 'long', year: 'numeric', timeZone: 'UTC' };
+  const data = new Date(Date.UTC(ano, mes - 1, 1));
+  try {
+    return new Intl.DateTimeFormat(locale, opcoes).format(data);
+  } catch {
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, opcoes).format(data);
+  }
 }
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -190,7 +201,7 @@ export const ALERT_STATUSES = Object.freeze(['pending', 'sent', 'failed', 'skipp
  */
 export const RESENDABLE = Object.freeze(['failed', 'skipped']);
 /** Os eventos que aparecem no histórico: os configuráveis, o resumo e o teste. */
-export const HISTORY_EVENTS = Object.freeze([...ALERT_EVENTS, DIGEST_EVENT, TEST_EVENT]);
+export const HISTORY_EVENTS = Object.freeze([...ALERT_EVENTS, DIGEST_EVENT, TEST_EVENT, MONTHLY_EVENT]);
 const SUMMARY_MAX = 200;
 
 /**
@@ -202,9 +213,10 @@ export function summarizeAlert(linha, locale = DEFAULT_LOCALE) {
   const evento = linha?.event;
   if (!HISTORY_EVENTS.includes(evento)) return String(evento ?? '').slice(0, SUMMARY_MAX);
   const payload = lerPayload(linha);
-  const vars = evento === DIGEST_EVENT
-    ? { count: payload.count ?? '-', date: dataBr(payload.day) }
-    : variaveis(payload);
+  let vars;
+  if (evento === DIGEST_EVENT) vars = { count: payload.count ?? '-', date: dataBr(payload.day) };
+  else if (evento === MONTHLY_EVENT) vars = { month: payload.month ? rotuloDoMes(payload.month, locale) : '-' };
+  else vars = variaveis(payload);
   return translate(locale, `platformAlert.${evento}.subject`, vars).slice(0, SUMMARY_MAX);
 }
 
@@ -258,6 +270,30 @@ async function provedor(tenantId) {
   } catch {
     return {};
   }
+}
+
+/** A meia-noite de Brasília que abre o dia `AAAA-MM-DD` (sem horário de verão desde 2019). */
+function inicioDoDiaSp(dia) {
+  const data = new Date(`${dia}T00:00:00-03:00`);
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
+/**
+ * A janela do resumo antigo (sem ids no payload): do dia do resumo anterior
+ * ao fim do dia deste, em Brasília. Sem resumo anterior, sem limite de baixo.
+ */
+async function janelaDoResumo(trx, resumo) {
+  const dia = lerPayload(resumo).day ?? String(resumo.dedupe_key ?? '').slice(DIGEST_EVENT.length + 1);
+  const inicio = /^\d{4}-\d{2}-\d{2}$/.test(dia) ? inicioDoDiaSp(dia) : null;
+  const ate = inicio ? new Date(inicio.getTime() + 24 * 60 * 60 * 1000) : null;
+  const anterior = await trx('platform_alerts')
+    .where({ event: DIGEST_EVENT })
+    .where('dedupe_key', '<', resumo.dedupe_key)
+    .orderBy('dedupe_key', 'desc')
+    .first('dedupe_key');
+  const diaAnterior = anterior ? String(anterior.dedupe_key).slice(DIGEST_EVENT.length + 1) : null;
+  const desde = diaAnterior && /^\d{4}-\d{2}-\d{2}$/.test(diaAnterior) ? inicioDoDiaSp(diaAnterior) : null;
+  return { desde, ate };
 }
 
 class PlatformAlertService {
@@ -439,6 +475,15 @@ class PlatformAlertService {
       if (mensal) resumo.monthly = mensal;
       if (config.dailyDigest.enabled) return { ...resumo, digest: await this.processDigest({ now, config }) };
       const db = getDb();
+      // Com o resumo desligado, nenhuma linha de resumo sai mais (a passada um
+      // a um não as manda): a pendente vira `skipped`, para não ficar parada
+      // para sempre. Os alertas dela continuam pendentes e saem um a um. A
+      // linha tomada por outra passada (`next_attempt_at` no futuro) fica com
+      // quem a tomou.
+      await db('platform_alerts')
+        .where({ event: DIGEST_EVENT, status: 'pending' })
+        .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
+        .update({ status: 'skipped', last_error: 'disabled', next_attempt_at: null });
       const linhas = await db('platform_alerts')
         .where({ status: 'pending' })
         .whereNotIn('event', FORA_DA_FILA)
@@ -573,6 +618,14 @@ class PlatformAlertService {
       // O resumo desistiu: os alertas dele também, para não ficarem para sempre.
       await db('platform_alerts').whereIn('id', ids)
         .update({ status: 'failed', last_error: 'digest_failed', next_attempt_at: null });
+      // E o resumo guarda QUAIS alertas eram dele (até `DIGEST_MAX_IDS`): o
+      // "Reenviar" dele devolve só esses à fila, e não os de outro resumo.
+      const truncado = ids.length > DIGEST_MAX_IDS;
+      await db('platform_alerts').where({ id: linha.id }).update({
+        payload: JSON.stringify({
+          day, count: ativos.length, ids: ids.slice(0, DIGEST_MAX_IDS), ...(truncado ? { idsTruncated: true } : {})
+        })
+      });
     }
     return { action: fim === 'failed' ? 'failed' : 'retry', channels: resultado };
   }
@@ -757,17 +810,25 @@ class PlatformAlertService {
    *     que manda na hora), e ele ficaria pendente para sempre.
    *   - `digest` volta, e com ele os alertas que caíram junto
    *     (`failed`/`digest_failed`) — esses nunca saíram, então não há envio
-   *     em dobro. Se o resumo for de um dia que passou, a próxima passada o
-   *     marca `superseded` e os alertas entram no resumo de hoje (ou saem um a
-   *     um, com o resumo desligado): é o `processDigest` de sempre.
+   *     em dobro. Só os DESSE resumo: os ids que ele gravou ao desistir, ou,
+   *     na linha antiga (sem ids, ou com a lista cortada), os criados entre o
+   *     dia do resumo anterior e o fim do dia deste (Brasília). Se o resumo
+   *     for de um dia que passou, a próxima passada o marca `superseded` e os
+   *     alertas entram no resumo de hoje: é o `processDigest` de sempre.
+   *     Com o resumo diário DESLIGADO, o resumo não sai mais (a passada um a
+   *     um não o manda): os alertas dele voltam para sair um a um, e a linha
+   *     do resumo fica `skipped`/`disabled` — nada parado em `pending`.
+   *   - O relatório mensal do "Enviar agora" (`manual`) volta marcado
+   *     `resent`: é o sinal para a passada mandá-lo (ver `processMonthly`).
    *
    * Devolve `{ alert, requeued, previousStatus }`, ou `{ error }`:
    * `not_found`, `not_resendable` (com o `status` atual).
    */
   static async resend(id, { now = new Date(), locale = DEFAULT_LOCALE } = {}) {
     const db = getDb();
+    const config = await alertsConfig();
     const resultado = await db.transaction(async (trx) => {
-      const antes = await trx('platform_alerts').where({ id }).first('id', 'event', 'status');
+      const antes = await trx('platform_alerts').where({ id }).first('id', 'event', 'status', 'payload', 'dedupe_key');
       if (!antes) return { error: 'not_found' };
       const mudou = await trx('platform_alerts')
         .where({ id })
@@ -780,10 +841,32 @@ class PlatformAlertService {
       }
       let requeued = 0;
       if (antes.event === DIGEST_EVENT) {
-        requeued = await trx('platform_alerts')
+        const payload = lerPayload(antes);
+        const daLista = Array.isArray(payload.ids) && !payload.idsTruncated
+          ? payload.ids.map(Number).filter((n) => Number.isSafeInteger(n) && n > 0) : null;
+        let alvo = trx('platform_alerts')
           .where({ status: 'failed', last_error: 'digest_failed' })
-          .whereNotIn('event', [DIGEST_EVENT, TEST_EVENT])
-          .update({ status: 'pending', attempts: 0, next_attempt_at: null, last_error: null });
+          .whereNotIn('event', FORA_DA_FILA);
+        if (daLista) {
+          alvo = alvo.whereIn('id', daLista.length ? daLista : [0]);
+        } else {
+          const janela = await janelaDoResumo(trx, antes);
+          if (janela.desde) alvo = alvo.where('created_at', '>=', janela.desde);
+          if (janela.ate) alvo = alvo.where('created_at', '<', janela.ate);
+        }
+        requeued = await alvo.update({ status: 'pending', attempts: 0, next_attempt_at: null, last_error: null });
+        if (!config.dailyDigest?.enabled) {
+          // Resumo desligado: os alertas saem um a um, e a linha do resumo
+          // não fica pendente à espera de uma passada que nunca a manda.
+          await trx('platform_alerts').where({ id })
+            .update({ status: 'skipped', last_error: 'disabled', next_attempt_at: null });
+        }
+      } else if (antes.event === MONTHLY_EVENT) {
+        const payload = lerPayload(antes);
+        if (payload.manual) {
+          await trx('platform_alerts').where({ id })
+            .update({ payload: JSON.stringify({ ...payload, resent: true }) });
+        }
       }
       return { requeued: Number(requeued) || 0, previousStatus: antes.status, event: antes.event };
     });
@@ -841,15 +924,32 @@ class PlatformAlertService {
    * novas tentativas como qualquer alerta. Devolve o resumo, ou nulo sem nada.
    */
   static async processMonthly({ now = new Date(), config }) {
-    const linhas = await getDb()('platform_alerts')
+    const db = getDb();
+    const vencidas = await db('platform_alerts')
       .where({ status: 'pending', event: MONTHLY_EVENT })
       .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
       .orderBy('id')
-      .limit(5);
-    if (!linhas.length) return null;
-    const resumo = { sent: 0, failed: 0, skipped: 0, retry: 0 };
+      .limit(20);
+    // A do "Enviar agora" (`manual`) é mandada pelo botão, na hora: se ainda
+    // está pendente com a garra vencida, o processo caiu no meio — e o
+    // relatório pode já ter saído. Mandar de novo seria repetir: ela vira
+    // `failed`/`interrupted`, e quem quiser a reenvia pelo histórico (aí ela
+    // volta marcada `resent` e sai por aqui).
+    const interrompidas = [];
+    const linhas = [];
+    for (const linha of vencidas) {
+      const payload = lerPayload(linha);
+      if (payload.manual && !payload.resent) interrompidas.push(linha.id);
+      else linhas.push(linha);
+    }
+    if (interrompidas.length) {
+      await db('platform_alerts').whereIn('id', interrompidas).where({ status: 'pending' })
+        .update({ status: 'failed', last_error: 'interrupted', next_attempt_at: null });
+    }
+    if (!linhas.length) return interrompidas.length ? { sent: 0, failed: interrompidas.length, skipped: 0, retry: 0 } : null;
+    const resumo = { sent: 0, failed: interrompidas.length, skipped: 0, retry: 0 };
     const destinos = await this.destinations();
-    for (const linha of linhas) {
+    for (const linha of linhas.slice(0, 5)) {
       // eslint-disable-next-line no-await-in-loop -- um relatório por mês
       if (!(await this.claim(linha, now))) continue;
       try {

@@ -4993,6 +4993,7 @@ const ru: Dictionary = {
   'platform.alertHistory.status.skipped': "Пропущено",
   'platform.alertHistory.event.digest': "Ежедневная сводка",
   'platform.alertHistory.event.test': "Тестовое оповещение",
+  'platform.alertHistory.event.monthlyReport': "Ежемесячный отчёт",
   'platform.alertHistory.cols.when': "Когда",
   'platform.alertHistory.cols.event': "Событие",
   'platform.alertHistory.cols.provider': "Провайдер",

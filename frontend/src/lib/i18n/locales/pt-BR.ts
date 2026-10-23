@@ -4985,6 +4985,7 @@ const ptBR: Dictionary = {
   'platform.alertHistory.status.skipped': "Pulado",
   'platform.alertHistory.event.digest': "Resumo diário",
   'platform.alertHistory.event.test': "Alerta de teste",
+  'platform.alertHistory.event.monthlyReport': "Relatório mensal",
   'platform.alertHistory.cols.when': "Quando",
   'platform.alertHistory.cols.event': "Evento",
   'platform.alertHistory.cols.provider': "Provedor",

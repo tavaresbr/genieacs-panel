@@ -54,6 +54,7 @@ describe('platform alert history', () => {
     }
     expect(HISTORY_EVENTS).toContain('digest')
     expect(HISTORY_EVENTS).toContain('test')
+    expect(HISTORY_EVENTS).toContain('monthly_report')
     expect(en['platform.alertHistory.page']).toContain('{page}')
     expect(en['platform.alertHistory.resentDigest']).toContain('{count}')
   })

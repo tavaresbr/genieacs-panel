@@ -14,7 +14,7 @@ process.env.EDITION = 'saas';
 
 const { authHeaders, call, getDb, startTestServers, stopTestServers } = await import('./helpers/harness.js');
 const { default: PlatformAlertService } = await import('../src/services/platformAlertService.js');
-const { saveProfile, invalidatePlatformProfile } = await import('../src/services/platformProfileService.js');
+const { saveProfile, invalidatePlatformProfile, alertsConfig } = await import('../src/services/platformProfileService.js');
 
 const HORA = 60 * 60 * 1000;
 const DIA = 24 * HORA;
@@ -300,10 +300,18 @@ describe('o reenvio', () => {
     assert.equal(trilha.length, 1);
   });
 
+  const resumoLigado = async (enabled) => {
+    await saveProfile({ alerts: { dailyDigest: { enabled, hour: 8 } } });
+    invalidatePlatformProfile();
+  };
+
   it('o resumo volta com os alertas que caíram junto, e só esses', async () => {
-    const resumo = await linha({ event: 'digest', status: 'failed', payload: { day: '2026-10-20' } });
+    await resumoLigado(true);
     const junto1 = await linha({ status: 'failed', last_error: 'digest_failed' });
     const junto2 = await linha({ event: 'nfse_error', status: 'failed', last_error: 'digest_failed' });
+    const resumo = await linha({ event: 'digest', status: 'failed', payload: { day: '2026-10-20', count: 2, ids: [junto1, junto2] } });
+    // De OUTRO resumo que desistiu: não volta junto.
+    const deOutro = await linha({ status: 'failed', last_error: 'digest_failed' });
     const outro = await linha({ status: 'failed', last_error: 'send_failed' });
     const res = await reenviar(resumo);
     assert.equal(res.status, 200, JSON.stringify(res.body));
@@ -320,7 +328,133 @@ describe('o reenvio', () => {
     const o = await db('platform_alerts').where({ id: outro }).first();
     assert.equal(o.status, 'failed');
     assert.equal(o.last_error, 'send_failed');
+    const d = await db('platform_alerts').where({ id: deOutro }).first();
+    assert.equal(d.status, 'failed');
+    assert.equal(d.last_error, 'digest_failed');
     const trilha = await db('platform_audit').where({ action: 'platform.alert_resent' }).first();
     assert.equal(JSON.parse(trilha.detail).requeued, 2);
+  });
+
+  it('o resumo que desiste grava os ids dele, e o reenvio usa só esses', async () => {
+    await ligar(['card_refused']);
+    await resumoLigado(true);
+    const falhaTudo = async () => false;
+    PlatformAlertService.senders = { whatsapp: falhaTudo, email: falhaTudo };
+    try {
+      // Dois resumos que desistem, em dois dias, cada um com o seu alerta.
+      const dia1 = new Date('2026-10-20T12:00:00Z');
+      await PlatformAlertService.enqueue('card_refused', { tenantId: alfa, dedupeKey: 'dig-1', now: new Date(dia1.getTime() - HORA) });
+      const config = await alertsConfig();
+      for (let i = 0; i < 5; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await PlatformAlertService.processDigest({ now: new Date(dia1.getTime() + i * HORA), config });
+        // eslint-disable-next-line no-await-in-loop
+        await getDb()('platform_alerts').where({ event: 'digest', status: 'pending' }).update({ next_attempt_at: null });
+      }
+      const db = getDb();
+      const [r1] = await db('platform_alerts').where({ event: 'digest' });
+      assert.equal(r1.status, 'failed');
+      const [a1] = await db('platform_alerts').where({ event: 'card_refused' });
+      assert.equal(a1.last_error, 'digest_failed');
+      assert.deepEqual(JSON.parse(r1.payload).ids, [Number(a1.id)]);
+      // O segundo resumo, de outro dia, que também desistiu (sem passar pelo envio).
+      const a2 = await linha({ status: 'failed', last_error: 'digest_failed', createdAt: Date.parse('2026-10-21T12:00:00Z') });
+      await linha({ event: 'digest', status: 'failed', payload: { day: '2026-10-21', count: 1, ids: [a2] } });
+      const res = await reenviar(Number(r1.id));
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.body.data.requeued, 1);
+      assert.equal((await db('platform_alerts').where({ id: a1.id }).first()).status, 'pending');
+      assert.equal((await db('platform_alerts').where({ id: a2 }).first()).status, 'failed');
+    } finally {
+      PlatformAlertService.senders = {
+        whatsapp: async (to, msg) => { enviados.push({ canal: 'whatsapp', to, ...msg }); return true; },
+        email: async (to, msg) => { enviados.push({ canal: 'email', to, ...msg }); return true; }
+      };
+    }
+  });
+
+  it('o resumo antigo, sem ids, devolve só os da janela dele (do resumo anterior ao fim do dia)', async () => {
+    await resumoLigado(true);
+    const db = getDb();
+    // Os resumos com a chave de verdade (`digest:AAAA-MM-DD`).
+    const resumoDe = async (dia) => {
+      await db('platform_alerts').insert({
+        event: 'digest', tenant_id: null, payload: JSON.stringify({ day: dia }), dedupe_key: `digest:${dia}`,
+        status: 'failed', attempts: 5, next_attempt_at: null, last_error: 'send_failed',
+        created_at: aoSegundo(Date.parse(`${dia}T12:00:00Z`))
+      });
+      return Number((await db('platform_alerts').where({ dedupe_key: `digest:${dia}` }).first('id')).id);
+    };
+    await resumoDe('2026-10-18');
+    const alvo = await resumoDe('2026-10-20');
+    const velho = await linha({ status: 'failed', last_error: 'digest_failed', createdAt: Date.parse('2026-10-17T12:00:00Z') });
+    const dentro1 = await linha({ status: 'failed', last_error: 'digest_failed', createdAt: Date.parse('2026-10-18T15:00:00Z') });
+    // 23:59 de Brasília do dia 20 (02:59 UTC do dia 21): ainda é dele.
+    const dentro2 = await linha({ status: 'failed', last_error: 'digest_failed', createdAt: Date.parse('2026-10-21T02:59:00Z') });
+    const depois = await linha({ status: 'failed', last_error: 'digest_failed', createdAt: Date.parse('2026-10-21T03:00:00Z') });
+    const res = await reenviar(alvo);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.requeued, 2);
+    const estado = async (id) => (await db('platform_alerts').where({ id }).first()).status;
+    assert.equal(await estado(dentro1), 'pending');
+    assert.equal(await estado(dentro2), 'pending');
+    assert.equal(await estado(velho), 'failed');
+    assert.equal(await estado(depois), 'failed');
+  });
+
+  it('com o resumo diário desligado, o reenvio do resumo solta os alertas um a um e não deixa o resumo pendente', async () => {
+    await ligar(['card_refused']);
+    const junto = await linha({ tenantId: alfa, status: 'failed', last_error: 'digest_failed', payload: { provider: 'Alfa', reason: 'x' } });
+    const resumo = await linha({ event: 'digest', status: 'failed', payload: { day: '2026-10-20', count: 1, ids: [junto] } });
+    const res = await reenviar(resumo);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.requeued, 1);
+    assert.equal(res.body.data.alert.status, 'skipped');
+    assert.equal(res.body.data.alert.lastError, 'disabled');
+    const passada = await PlatformAlertService.processDue({ now: new Date(Date.now() + 2000) });
+    assert.equal(passada.sent, 1, JSON.stringify(passada));
+    const db = getDb();
+    assert.equal((await db('platform_alerts').where({ id: junto }).first()).status, 'sent');
+    assert.equal((await db('platform_alerts').where({ id: resumo }).first()).status, 'skipped');
+  });
+
+  it('a passada com o resumo desligado não deixa linha de resumo pendente', async () => {
+    await resumoLigado(false);
+    const pendente = await linha({ event: 'digest', status: 'pending', payload: { day: '2026-10-20' } });
+    await PlatformAlertService.processDue({ now: new Date(Date.now() + 2000) });
+    const l = await getDb()('platform_alerts').where({ id: pendente }).first();
+    assert.equal(l.status, 'skipped');
+    assert.equal(l.last_error, 'disabled');
+  });
+
+  it('o relatório mensal aparece no histórico com o mês, e filtra pelo evento', async () => {
+    await linha({ event: 'monthly_report', status: 'failed', payload: { month: '2026-09' } });
+    const res = await listar('?event=monthly_report');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.total, 1);
+    assert.match(res.body.data.alerts[0].summary, /setembro de 2026/);
+    const en = await call(`${panelUrl}/api/platform/alerts?event=monthly_report`, {
+      headers: { ...authHeaders(token), 'Accept-Language': 'en' }
+    });
+    assert.match(en.body.data.alerts[0].summary, /^Monthly report: September 2026/);
+  });
+
+  it('o "Enviar agora" reenviado volta marcado resent, e a passada o manda', async () => {
+    await saveProfile({ alerts: { monthlyReport: { enabled: true, channels: ['email'], hour: 8 } } });
+    invalidatePlatformProfile();
+    try {
+      const id = await linha({ event: 'monthly_report', status: 'failed', payload: { month: '2026-09', manual: true } });
+      const res = await reenviar(id);
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      const l = await getDb()('platform_alerts').where({ id }).first();
+      assert.equal(l.status, 'pending');
+      assert.deepEqual(JSON.parse(l.payload), { month: '2026-09', manual: true, resent: true });
+      await PlatformAlertService.processDue({ now: new Date(Date.now() + 2000) });
+      assert.equal((await getDb()('platform_alerts').where({ id }).first()).status, 'sent');
+      assert.deepEqual(enviados.map((e) => e.canal), ['email']);
+    } finally {
+      await saveProfile({ alerts: { monthlyReport: { enabled: false } } });
+      invalidatePlatformProfile();
+    }
   });
 });

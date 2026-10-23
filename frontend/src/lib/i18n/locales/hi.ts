@@ -4993,6 +4993,7 @@ const hi: Dictionary = {
   'platform.alertHistory.status.skipped': "छोड़ा गया",
   'platform.alertHistory.event.digest': "दैनिक सारांश",
   'platform.alertHistory.event.test': "परीक्षण अलर्ट",
+  'platform.alertHistory.event.monthlyReport': "मासिक रिपोर्ट",
   'platform.alertHistory.cols.when': "कब",
   'platform.alertHistory.cols.event': "इवेंट",
   'platform.alertHistory.cols.provider': "प्रदाता",

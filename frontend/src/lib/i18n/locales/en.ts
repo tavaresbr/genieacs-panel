@@ -4987,6 +4987,7 @@ const en = {
   'platform.alertHistory.status.skipped': "Skipped",
   'platform.alertHistory.event.digest': "Daily digest",
   'platform.alertHistory.event.test': "Test alert",
+  'platform.alertHistory.event.monthlyReport': "Monthly report",
   'platform.alertHistory.cols.when': "When",
   'platform.alertHistory.cols.event': "Event",
   'platform.alertHistory.cols.provider': "Provider",

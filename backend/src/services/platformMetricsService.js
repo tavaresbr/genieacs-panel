@@ -430,8 +430,17 @@ async function carregar(desdeMs) {
     Tenant.list(), Subscription.listWithPlans(), Plan.list()
   ]);
   const db = getDb();
+  // As cobranças que podem contar na janela: as abertas (a foto de agora e a
+  // inadimplência dos meses fechados) e as tocadas desde o início do extrato
+  // lido — a paga ou cancelada só conta se foi paga/cancelada depois do fim
+  // de um mês da janela, e pagar ou cancelar toca o `updated_at`. A velha já
+  // resolvida, de antes disso, não muda nenhum número: fica fora da leitura.
+  const desde = new Date(Math.floor(desdeMs / 1000) * 1000);
   // tenant-scope-exempt: métricas do plano de controle, acima dos provedores.
   const charges = await runUnscoped('the console monthly metrics read every provider\'s charges', () => db('billing_charges')
+    .where((q) => q.whereIn('status', OPEN_CHARGE_STATUSES)
+      .orWhere('updated_at', '>=', desde)
+      .orWhereNull('updated_at'))
     .select(
       'id', 'tenant_id', 'subscription_id', 'amount_cents', 'currency', 'status', 'due_date',
       'gateway_charge_id', 'superseded_charges', 'created_at', 'updated_at'

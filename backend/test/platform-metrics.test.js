@@ -276,6 +276,23 @@ describe('métricas: a rota', () => {
     assert.equal(direto.months[0].receivedCents, 4321);
   });
 
+  it('a cobrança velha paga há pouco ainda conta (a leitura é limitada, o número não muda)', async () => {
+    const db = getDb();
+    await db('tenants').insert({ slug: 'metrica-velha', name: 'Métrica Velha', status: 'active' });
+    const tenant = await db('tenants').where({ slug: 'metrica-velha' }).first();
+    const antes = await monthly({ months: 2 });
+    const tresAnos = aoSegundo(Date.now() - 3 * 365 * 24 * 3600_000);
+    const base = { tenant_id: tenant.id, currency: 'BRL', provider: 'manual', due_date: tresAnos, created_at: tresAnos };
+    // Vencida há três anos e paga AGORA: no fim do mês passado ela devia.
+    await db('billing_charges').insert({ ...base, period_end: '2023-01-01', amount_cents: 3333, status: 'paid', updated_at: aoSegundo(Date.now()) });
+    // Vencida e paga há três anos: fora da leitura, e fora de qualquer mês da janela.
+    await db('billing_charges').insert({ ...base, period_end: '2023-02-01', amount_cents: 7777, status: 'paid', updated_at: tresAnos });
+    const depois = await monthly({ months: 2 });
+    assert.equal(depois.months[0].overdueCents - antes.months[0].overdueCents, 3333);
+    assert.equal(depois.months[1].overdueCents, antes.months[1].overdueCents);
+    await db('billing_charges').where({ tenant_id: tenant.id }).del();
+  });
+
   it('400 invalid_months fora de 1..24', async () => {
     for (const ruim of ['0', '25', 'doze']) {
       // eslint-disable-next-line no-await-in-loop
@@ -320,6 +337,21 @@ describe('relatório mensal: a configuração', () => {
       assert.equal(r.status, 400, JSON.stringify(monthlyReport));
       assert.equal(r.body.field, 'monthlyReport');
     }
+  });
+
+  it('ligado nunca fica sem canal: nem tirando os canais, nem ligando o que ficou sem', async () => {
+    const ligado = await perfil({ method: 'PUT', body: { alerts: { monthlyReport: { enabled: true, channels: ['email'] } } } });
+    assert.equal(ligado.status, 200);
+    const semCanal = await perfil({ method: 'PUT', body: { alerts: { monthlyReport: { channels: [] } } } });
+    assert.equal(semCanal.status, 400);
+    assert.equal(semCanal.body.field, 'monthlyReport');
+    // Desligado e sem canal pode; ligar depois, sem canal, não.
+    const desligado = await perfil({ method: 'PUT', body: { alerts: { monthlyReport: { enabled: false, channels: [] } } } });
+    assert.equal(desligado.status, 200);
+    const religar = await perfil({ method: 'PUT', body: { alerts: { monthlyReport: { enabled: true } } } });
+    assert.equal(religar.status, 400);
+    assert.equal(religar.body.field, 'monthlyReport');
+    assert.deepEqual((await perfil()).body.data.alerts.monthlyReport.channels, []);
   });
 });
 
@@ -443,6 +475,25 @@ describe('relatório mensal: enviar agora', () => {
     enviados = [];
     await PlatformAlertService.processDue({ now: new Date(Date.now() + 24 * 3600_000) });
     assert.equal(enviados.length, 0);
+  });
+
+  it('o "Enviar agora" que o processo largou no meio não sai de novo pela passada', async () => {
+    await saveProfile({ alerts: { monthlyReport: { enabled: true, channels: ['whatsapp', 'email'], hour: 8 } } });
+    invalidatePlatformProfile();
+    // A linha como o botão a grava, com a garra já vencida: o processo caiu
+    // depois de gravá-la — e talvez depois de mandar.
+    const agora = aoSegundo(Date.now());
+    await getDb()('platform_alerts').insert({
+      event: 'monthly_report', tenant_id: null, payload: JSON.stringify({ month: '2026-09', manual: true }),
+      dedupe_key: 'monthly:2026-09:manual:caiu', status: 'pending', attempts: 0,
+      next_attempt_at: new Date(agora.getTime() - 60_000), created_at: agora
+    });
+    const r = await PlatformAlertService.processDue({ now: new Date(agora.getTime() + 1000) });
+    assert.equal(r.monthly.failed, 1);
+    assert.equal(enviados.length, 0);
+    const [linha] = await mensais();
+    assert.equal(linha.status, 'failed');
+    assert.equal(linha.last_error, 'interrupted');
   });
 
   it('sem destino é 409; canal inválido é 400; falha é 502', async () => {

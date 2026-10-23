@@ -4992,6 +4992,7 @@ const ko: Dictionary = {
   'platform.alertHistory.status.skipped': "건너뜀",
   'platform.alertHistory.event.digest': "일일 요약",
   'platform.alertHistory.event.test': "테스트 알림",
+  'platform.alertHistory.event.monthlyReport': "월간 보고서",
   'platform.alertHistory.cols.when': "시각",
   'platform.alertHistory.cols.event': "이벤트",
   'platform.alertHistory.cols.provider': "제공자",

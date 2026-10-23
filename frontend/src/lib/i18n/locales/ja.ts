@@ -4985,6 +4985,7 @@ const ja: Dictionary = {
   'platform.alertHistory.status.skipped': "スキップ",
   'platform.alertHistory.event.digest': "日次サマリー",
   'platform.alertHistory.event.test': "テストアラート",
+  'platform.alertHistory.event.monthlyReport': "月次レポート",
   'platform.alertHistory.cols.when': "日時",
   'platform.alertHistory.cols.event': "イベント",
   'platform.alertHistory.cols.provider': "プロバイダー",

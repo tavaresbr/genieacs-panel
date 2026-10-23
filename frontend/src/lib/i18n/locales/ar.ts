@@ -4994,6 +4994,7 @@ const ar: Dictionary = {
   'platform.alertHistory.status.skipped': "تم تخطيه",
   'platform.alertHistory.event.digest': "الملخص اليومي",
   'platform.alertHistory.event.test': "تنبيه تجريبي",
+  'platform.alertHistory.event.monthlyReport': "التقرير الشهري",
   'platform.alertHistory.cols.when': "متى",
   'platform.alertHistory.cols.event': "الحدث",
   'platform.alertHistory.cols.provider': "المزوّد",

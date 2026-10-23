@@ -226,6 +226,44 @@ describe('a segunda via', () => {
     assert.equal((await getDb()('billing_charges').where({ id }).first()).status, 'pending');
   });
 
+  it('qualquer estado do gateway fora de PENDING/OVERDUE é 409, sem marcar nada', async () => {
+    const casos = [
+      ['CONFIRMED', 'already_paid'], ['RECEIVED_IN_CASH', 'already_paid'],
+      ['REFUNDED', 'not_open'], ['DELETED', 'not_open'], ['REFUND_REQUESTED', 'not_open'],
+      ['CHARGEBACK_REQUESTED', 'not_open'], ['ESTADO_NOVO', 'not_open']
+    ];
+    for (const [status, code] of casos) {
+      // eslint-disable-next-line no-await-in-loop
+      const id = await cobranca(alfa, { gateway_charge_id: `pay_${status}` });
+      noGateway.set(`pay_${status}`, { billingType: 'BOLETO', status });
+      // eslint-disable-next-line no-await-in-loop
+      const r = await segundaVia(id);
+      assert.equal(r.status, 409, status);
+      assert.equal(r.body.code, code, status);
+      // eslint-disable-next-line no-await-in-loop
+      assert.equal((await getDb()('billing_charges').where({ id }).first()).status, 'pending', status);
+    }
+    // Sem a leitura do boleto nem do Pix: não há o que mostrar.
+    assert.ok(!recebidas.some((x) => x.path.endsWith('/pixQrCode') || x.path.endsWith('/identificationField')));
+  });
+
+  it('a linha que saiu do aberto descarta a segunda via guardada', async () => {
+    const id = await cobranca(alfa, { gateway_charge_id: 'pay_quitada' });
+    noGateway.set('pay_quitada', { billingType: 'PIX' });
+    assert.equal((await segundaVia(id)).status, 200);
+    // O webhook quitou a linha: a guardada não sai mais.
+    await getDb()('billing_charges').where({ id }).update({ status: 'paid' });
+    const paga = await segundaVia(id);
+    assert.equal(paga.status, 409);
+    assert.equal(paga.body.code, 'not_open');
+    // E se ela voltar ao aberto (estorno do pagamento, por exemplo), a próxima
+    // leitura vai ao gateway de novo, e não ao que estava guardado.
+    await getDb()('billing_charges').where({ id }).update({ status: 'pending' });
+    const antes = recebidas.length;
+    assert.equal((await segundaVia(id)).status, 200);
+    assert.ok(recebidas.length > antes);
+  });
+
   it('recusa a que não está em aberto e a que não chegou ao gateway', async () => {
     const paga = await cobranca(alfa, { gateway_charge_id: 'pay_x', status: 'paid' });
     const r1 = await segundaVia(paga);

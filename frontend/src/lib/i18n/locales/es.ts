@@ -4985,6 +4985,7 @@ const es: Dictionary = {
   'platform.alertHistory.status.skipped': "Omitida",
   'platform.alertHistory.event.digest': "Resumen diario",
   'platform.alertHistory.event.test': "Alerta de prueba",
+  'platform.alertHistory.event.monthlyReport': "Informe mensual",
   'platform.alertHistory.cols.when': "Cuándo",
   'platform.alertHistory.cols.event': "Evento",
   'platform.alertHistory.cols.provider': "Proveedor",

@@ -4985,6 +4985,7 @@ const zhCN: Dictionary = {
   'platform.alertHistory.status.skipped': "已跳过",
   'platform.alertHistory.event.digest': "每日摘要",
   'platform.alertHistory.event.test': "测试告警",
+  'platform.alertHistory.event.monthlyReport': "月度报告",
   'platform.alertHistory.cols.when': "时间",
   'platform.alertHistory.cols.event': "事件",
   'platform.alertHistory.cols.provider': "服务商",
