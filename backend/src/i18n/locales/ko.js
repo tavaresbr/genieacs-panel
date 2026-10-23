@@ -431,6 +431,7 @@ export default {
   'sgp.dataLoaded': 'SGP 데이터를 불러왔습니다',
   'sgp.dataLoadFailed': 'SGP 데이터를 불러오지 못했습니다',
   'sgp.contractLinked': 'SGP 계약을 ONT에 연결했습니다',
+  'whatsapp.sgp.unlinked': "대화 연결 해제됨",
   'sgp.linkFailed': 'SGP 계약을 연결하지 못했습니다',
   'sgp.noLink': '이 ONT에는 SGP 연결이 없습니다',
   'sgp.linkRemoved': 'SGP 연결을 해제했습니다',

@@ -6201,6 +6201,10 @@ export const whatsappAPI = {
   bindSubscriber: (conversationId: number, payload: { contract: string; document?: string }) =>
     apiClient.post<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber/bind`, payload),
 
+  /** Tira o vínculo da conversa com o contrato ou o cadastro; o telefone no SGP não muda. */
+  unbindSubscriber: (conversationId: number) =>
+    apiClient.post<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber/unbind`, {}),
+
   /** "Retomar régua": tira a pausa por comprovante do contrato desta conversa. */
   subscriberResumeDunning: (conversationId: number, contract: string) =>
     apiClient.post<{ contract: string; dunningPause: null }>(

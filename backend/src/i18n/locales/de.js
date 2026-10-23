@@ -384,6 +384,7 @@ export default {
   'sgp.dataLoaded': 'SGP-Daten geladen',
   'sgp.dataLoadFailed': 'Die SGP-Daten konnten nicht geladen werden',
   'sgp.contractLinked': 'SGP-Vertrag mit dem ONT verknüpft',
+  'whatsapp.sgp.unlinked': "Unterhaltung getrennt",
   'sgp.linkFailed': 'Der SGP-Vertrag konnte nicht verknüpft werden',
   'sgp.noLink': 'Dieses ONT hat keine SGP-Verknüpfung',
   'sgp.linkRemoved': 'SGP-Verknüpfung entfernt',

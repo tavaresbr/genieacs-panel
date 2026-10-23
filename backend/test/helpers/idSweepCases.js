@@ -582,6 +582,16 @@ export const casos = [
   },
   {
     chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/subscriber/unbind',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber/unbind`,
+    body: {},
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
     label: 'POST /api/whatsapp/conversations/:id/subscriber/bind',
     method: 'POST',
     path: (id) => `/api/whatsapp/conversations/${id}/subscriber/bind`,

@@ -429,6 +429,7 @@ export default {
   'sgp.dataLoaded': 'SGP のデータを読み込みました',
   'sgp.dataLoadFailed': 'SGP のデータを読み込めませんでした',
   'sgp.contractLinked': 'SGP の契約を ONT に紐づけました',
+  'whatsapp.sgp.unlinked': "会話の関連付けを解除しました",
   'sgp.linkFailed': 'SGP の契約を紐づけられませんでした',
   'sgp.noLink': 'この ONT には SGP の紐づけがありません',
   'sgp.linkRemoved': 'SGP の紐づけを解除しました',

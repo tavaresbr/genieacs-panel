@@ -430,6 +430,7 @@ export default {
   'sgp.dataLoaded': 'Данные SGP загружены',
   'sgp.dataLoadFailed': 'Не удалось загрузить данные SGP',
   'sgp.contractLinked': 'Договор SGP привязан к ONT',
+  'whatsapp.sgp.unlinked': "Диалог отвязан",
   'sgp.linkFailed': 'Не удалось привязать договор SGP',
   'sgp.noLink': 'У этого ONT нет связи с SGP',
   'sgp.linkRemoved': 'Связь с SGP удалена',

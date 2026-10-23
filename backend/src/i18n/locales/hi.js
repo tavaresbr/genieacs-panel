@@ -428,6 +428,7 @@ export default {
   'sgp.dataLoaded': 'SGP डेटा लोड हुआ',
   'sgp.dataLoadFailed': 'SGP डेटा लोड नहीं हो सका',
   'sgp.contractLinked': 'SGP अनुबंध ONT से जोड़ दिया गया',
+  'whatsapp.sgp.unlinked': "बातचीत अनलिंक की गई",
   'sgp.linkFailed': 'SGP अनुबंध जोड़ा नहीं जा सका',
   'sgp.noLink': 'इस ONT का कोई SGP लिंक नहीं है',
   'sgp.linkRemoved': 'SGP लिंक हटा दिया गया',

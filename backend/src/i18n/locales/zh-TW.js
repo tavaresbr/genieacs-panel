@@ -429,6 +429,7 @@ export default {
   'sgp.dataLoaded': '已載入 SGP 資料',
   'sgp.dataLoadFailed': '無法載入 SGP 資料',
   'sgp.contractLinked': 'SGP 合約已連結到該 ONT',
+  'whatsapp.sgp.unlinked': "已取消關聯對話",
   'sgp.linkFailed': '無法連結 SGP 合約',
   'sgp.noLink': '該 ONT 沒有 SGP 連結紀錄',
   'sgp.linkRemoved': 'SGP 連結已取消',
