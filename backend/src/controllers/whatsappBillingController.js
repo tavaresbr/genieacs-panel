@@ -573,7 +573,8 @@ class WhatsAppBillingController {
       const preview = await WaCampaignService.preview({
         filters: body.filters,
         templateId: body.templateId,
-        body: body.body
+        body: body.body,
+        promotional: body.promotional === true
       });
       return res.json(createResponse(req.t('whatsapp.campaign.previewReady', { count: preview.counts.reachable }), preview));
     } catch (error) {
@@ -593,6 +594,7 @@ class WhatsAppBillingController {
         scheduledAt: body.scheduledAt,
         accountId: body.accountId,
         pace: body.pace,
+        promotional: body.promotional === true,
         userId: req.user?.userId ?? null
       });
       const publico = WaBroadcastService.publicBroadcast(broadcast);
@@ -605,6 +607,7 @@ class WhatsAppBillingController {
           recipients,
           scheduledAt: publico.scheduledAt,
           attachment: Boolean(publico.attachment),
+          promotional: publico.promotional,
           audience: publico.audience
         }
       });
@@ -628,7 +631,8 @@ class WhatsAppBillingController {
         attachment: body.attachment,
         scheduledAt: body.scheduledAt,
         accountId: body.accountId,
-        pace: body.pace
+        pace: body.pace,
+        promotional: body.promotional === true
       });
       const publico = WaBroadcastService.publicBroadcast(broadcast);
       await AuditLog.fromRequest(req, {
@@ -639,7 +643,8 @@ class WhatsAppBillingController {
           title: publico.title,
           recipients,
           scheduledAt: publico.scheduledAt,
-          attachment: Boolean(publico.attachment)
+          attachment: Boolean(publico.attachment),
+          promotional: publico.promotional
         }
       });
       return res.json(createResponse(

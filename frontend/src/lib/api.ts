@@ -188,6 +188,11 @@ export interface ApiResponse<T = any> {
    * cobrança está paga, lá ela está neste estado (`PENDING`, por exemplo).
    */
   gatewayStatus?: string
+  /**
+   * Só no 409 `meta_template_in_use`: o que deixaria de sair fora da janela se
+   * o modelo da Meta fosse apagado. A tela lista e pergunta antes de `unlink`.
+   */
+  metaLinks?: MetaTemplateLink[]
 }
 
 /**
@@ -447,6 +452,8 @@ class ApiClient {
           ...(typeof data.detail === 'string' ? { detail: data.detail } : {}),
           // O 409 `not_paid` do estorno: o estado que o gateway diz ter.
           ...(typeof data.gatewayStatus === 'string' ? { gatewayStatus: data.gatewayStatus } : {}),
+          // O 409 de modelo da Meta em uso: a lista das ligações que cairiam.
+          ...(Array.isArray(data.metaLinks) ? { metaLinks: data.metaLinks } : {}),
         }
       }
 
@@ -4709,6 +4716,20 @@ export interface WhatsAppAccount {
   metaWebhookStatus?: 'ok' | 'error' | null
   metaWebhookError?: string | null
   metaWebhookAt?: string | null
+  /**
+   * A saúde do número na Meta, da última leitura boa: nota de qualidade
+   * (GREEN/YELLOW/RED/UNKNOWN), limite diário (`TIER_1K`…), nome verificado e
+   * status. `metaHealthError` diz se a última consulta falhou.
+   */
+  metaQualityRating?: string | null
+  metaMessagingLimit?: string | null
+  metaVerifiedName?: string | null
+  metaDisplayPhone?: string | null
+  metaNameStatus?: string | null
+  metaNumberStatus?: string | null
+  metaThroughput?: string | null
+  metaHealthAt?: string | null
+  metaHealthError?: string | null
   baseUrl: string
   status: WhatsAppStatus
   /**
@@ -4881,8 +4902,35 @@ export interface WhatsAppMetaTemplate {
   supported: boolean
   /** Aprovado e com formato que o painel sabe enviar. */
   usable: boolean
+  /** O motivo da recusa como a Meta o manda (`INVALID_FORMAT`…); só com REJECTED/PAUSED/DISABLED. */
+  rejectedReason: string | null
+  /** A nota de qualidade da Meta: `GREEN`, `YELLOW` ou `RED`. */
+  qualityScore: string | null
+  /** O status antes da última mudança, e quando ela foi vista. */
+  previousStatus: string | null
+  statusChangedAt: string | null
   syncedAt: string | null
+  /** Se a cópia local tem o id do modelo na Meta (sem ele não dá para editar nem apagar). */
+  hasMetaId?: boolean
+  /** APPROVED/REJECTED/PAUSED e num formato que o formulário do painel representa. */
+  editable?: boolean
+  /** Os campos do formulário, lidos dos components guardados; `null` quando não cabem nele. */
+  draft?: MetaTemplateDraftFields | null
 }
+
+/** Os campos editáveis de um modelo da Meta, como o formulário do painel os mostra. */
+export interface MetaTemplateDraftFields {
+  headerText: string
+  bodyText: string
+  examples: string[]
+  footerText: string
+  buttons: { type: 'URL' | 'QUICK_REPLY'; text: string; url: string }[]
+}
+
+/** Uma ligação a um modelo da Meta: um modelo do painel ou um aviso automático. */
+export type MetaTemplateLink =
+  | { kind: 'template'; id: number; name: string }
+  | { kind: 'notice'; key: MetaNoticeKey }
 
 /**
  * Um modelo novo para a Meta revisar. Só o que o painel sabe enviar depois:
@@ -5143,6 +5191,8 @@ export interface WhatsAppBroadcastSummary {
   failed: number
   skipped: number
   paid: number
+  /** Pulados porque pediram para não receber promoção. */
+  marketingOptOut?: number
 }
 
 export interface WhatsAppBroadcastDetail {
@@ -5168,6 +5218,8 @@ export interface WhatsAppBroadcast {
   scheduledAt?: string | null
   attachment?: { name: string | null; type: string | null } | null
   audience?: (Omit<WhatsAppCampaignFilters, 'contracts'> & { contracts: number; contractList?: string[] }) | null
+  /** Marcada como promocional: quem pediu para não receber promoção é pulado. */
+  promotional?: boolean
   /** O número que envia, o modelo escolhido e o ritmo próprio (mensagens por hora; nulo é o do WhatsApp). */
   accountId?: number | null
   templateId?: number | null
@@ -5231,7 +5283,11 @@ export interface WhatsAppCampaignPreview {
     duplicate: number
     templateIncomplete: number
     reachable: number
+    /** Ficam na lista e serão pulados no envio: pediram para não receber promoção. */
+    marketingOptOut?: number
   }
+  /** A campanha é promoção (marcada assim, ou com modelo da Meta de MARKETING). */
+  marketing?: boolean
   max: number
   sample: { contract: string | null; clientName: string | null; phone: string; body: string }[]
 }
@@ -5248,6 +5304,8 @@ export interface WhatsAppCampaignInput {
   accountId?: number | null
   /** Só desacelera o ritmo geral: `default` (o do WhatsApp), `slow` (30/h) ou `very_slow` (12/h). */
   pace?: 'default' | 'slow' | 'very_slow'
+  /** Campanha promocional: quem pediu para não receber promoção é pulado. */
+  promotional?: boolean
 }
 
 /**
@@ -5364,6 +5422,8 @@ export interface WhatsAppConversation {
   clientName: string | null
   /** The contact asked not to be contacted. Replying is still allowed. */
   optedOut: boolean
+  /** Pediu para não receber promoção: desde quando e por onde. Só a promoção para. */
+  marketingOptOut?: WhatsAppMarketingOptOut | null
   lastMessageAt: string | null
   lastInboundAt: string | null
   unreadCount: number
@@ -5385,6 +5445,24 @@ export interface WhatsAppConversation {
   tags?: WhatsAppTag[]
   createdAt: string | null
   updatedAt: string | null
+}
+
+/** O pedido de não receber promoção: o texto ("parar"), o botão da Meta, ou a equipe. */
+export interface WhatsAppMarketingOptOut {
+  since: string | null
+  source: 'keyword' | 'button' | 'operator'
+}
+
+/** As palavras do "parar promoções" e o que o painel responde. */
+export interface WhatsAppMarketingOptOutConfig {
+  enabled: boolean
+  stopWords: string[]
+  resumeWords: string[]
+  confirmText: string
+  resumeText: string
+  /** Os rótulos do botão da Meta, reconhecidos sempre. */
+  metaButtons: string[]
+  defaults: { stopWords: string[]; resumeWords: string[]; confirmText: string; resumeText: string }
 }
 
 /** Uma etiqueta de conversa; a cor é uma da paleta dos números (`WA_ACCOUNT_COLORS`). */
@@ -5541,6 +5619,8 @@ export interface WhatsAppContact {
   optedOut: boolean
   /** Blocked only for these kinds; `null` when not blocked or blocked for everything. */
   optOutCategories?: string[] | null
+  /** Pediu para não receber promoção (o resto continua saindo). */
+  marketingOptOut?: boolean
   /** The thread already open with this subscriber, if any. */
   conversationId: number | null
   lastMessageAt: string | null
@@ -5776,6 +5856,21 @@ export const whatsappAPI = {
   getBotConfig: () =>
     apiClient.get<BotConfig>('/whatsapp/bot-config'),
 
+  /** As palavras e as respostas do "parar promoções". */
+  getMarketingOptOutConfig: () =>
+    apiClient.get<WhatsAppMarketingOptOutConfig>('/whatsapp/marketing-opt-out'),
+
+  /** Campo ausente mantém o gravado. */
+  updateMarketingOptOutConfig: (config: Partial<Omit<WhatsAppMarketingOptOutConfig, 'defaults' | 'metaButtons'>>) =>
+    apiClient.put<WhatsAppMarketingOptOutConfig>('/whatsapp/marketing-opt-out', config),
+
+  /** A equipe marca "não quer promoções" na conversa; desmarcar pede `campaigns.manage`. */
+  setMarketingOptOut: (conversationId: number) =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/marketing-opt-out`, {}),
+
+  clearMarketingOptOut: (conversationId: number) =>
+    apiClient.delete<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/marketing-opt-out`),
+
   /** Campo ausente mantém o gravado. */
   updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults' | 'ai'>> & { ai?: BotAiInput }) =>
     apiClient.put<BotConfig>('/whatsapp/bot-config', config),
@@ -5943,9 +6038,26 @@ export const whatsappAPI = {
   registerMetaWebhook: (id: number) =>
     apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-webhook`, {}),
 
+  /** Consulta agora a qualidade e o limite do número oficial na Meta. */
+  refreshMetaHealth: (id: number) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-health`, {}),
+
   /** Sai PENDING: a Meta revisa, e só a sincronização depois da aprovação o libera. */
   createMetaTemplate: (accountId: number, payload: MetaTemplateCreatePayload) =>
     apiClient.post<WhatsAppMetaTemplate>(`/whatsapp/accounts/${accountId}/templates`, payload),
+
+  /** Volta a PENDING; nome e idioma não mudam. `links` = o que fica sem envio fora da janela até aprovar. */
+  updateMetaTemplate: (accountId: number, templateId: number, payload: Omit<MetaTemplateCreatePayload, 'name' | 'language'>) =>
+    apiClient.put<{ template: WhatsAppMetaTemplate; links: MetaTemplateLink[] }>(
+      `/whatsapp/accounts/${accountId}/templates/${templateId}`,
+      payload
+    ),
+
+  /** Sem `unlink`, um modelo em uso volta 409 com `metaLinks`; com ele, as ligações são desfeitas. */
+  deleteMetaTemplate: (accountId: number, templateId: number, { unlink = false }: { unlink?: boolean } = {}) =>
+    apiClient.delete<{ id: number; name: string; language: string; unlinked: { templates: number; notices: number } }>(
+      `/whatsapp/accounts/${accountId}/templates/${templateId}${unlink ? '?unlink=1' : ''}`
+    ),
 
   listMetaTemplates: (params: { accountId?: number; usable?: boolean } = {}) => {
     const query = new URLSearchParams()

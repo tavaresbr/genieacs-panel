@@ -43,6 +43,11 @@ router.post(
 // Etiquetas: pôr e tirar de uma conversa é de quem atende; criar, renomear e
 // excluir a lista é de quem configura. O relatório é leitura.
 router.put('/conversations/:id/tags', authenticateToken, requirePermission('whatsapp.send'), WhatsAppMessageController.setTags);
+// "Não quer promoções": marcar protege o cliente e é de quem atende;
+// desmarcar devolve a promoção a alguém, e é de quem decide campanha — a mesma
+// linha que tirar alguém do não perturbe.
+router.post('/conversations/:id/marketing-opt-out', authenticateToken, requirePermission('whatsapp.send'), WhatsAppMessageController.setMarketingOptOut);
+router.delete('/conversations/:id/marketing-opt-out', authenticateToken, requirePermission('campaigns.manage'), WhatsAppMessageController.clearMarketingOptOut);
 router.get('/tags', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listTags);
 router.get('/tags/report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.tagsReport);
 router.post('/tags', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.createTag);

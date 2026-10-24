@@ -24,9 +24,29 @@ class WaMetaTemplate {
     return (await tdb('wa_meta_templates').where({ name, language }).first()) || null;
   }
 
-  /** Troca a lista do número pela que a Meta acabou de devolver. */
+  /** Os números oficiais com algum modelo ainda em análise na Meta. */
+  static async accountIdsWithStatus(statuses) {
+    const rows = await tdb('wa_meta_templates').distinct('account_id').whereIn('status', statuses);
+    return rows.map((r) => Number(r.account_id));
+  }
+
+  /**
+   * Troca a lista do número pela que a Meta acabou de devolver.
+   *
+   * Quando o status de um modelo que já estava aqui muda, a linha guarda o de
+   * antes (`previous_status`) e quando mudou (`status_changed_at`); as mudanças
+   * voltam em `changes` para quem sincronizou avisar. Modelo novo não conta como
+   * mudança: ele nasce com o status que tem.
+   *
+   * O motivo da recusa e a nota de qualidade que não vierem nesta resposta ficam
+   * os de antes enquanto o status for o mesmo — a Graph pode falhar numa volta e
+   * acertar na próxima, e o motivo não pode piscar na tela por isso.
+   *
+   * @returns {Promise<{ rows: object[], changes: { name: string, language: string, from: string|null, to: string|null }[] }>}
+   */
   static async replaceForAccount(accountId, rows) {
     const now = new Date();
+    const changes = [];
     const atuais = await tdb('wa_meta_templates').where({ account_id: accountId });
     const chave = (r) => `${r.name}\u0000${r.language}`;
     const novas = new Map(rows.map((r) => [chave(r), r]));
@@ -37,10 +57,13 @@ class WaMetaTemplate {
       }
     }
     for (const row of rows) {
+      const existente = atuais.find((a) => chave(a) === chave(row));
+      const status = String(row.status || '').slice(0, 24) || null;
+      const mesmoStatus = existente && existente.status === status;
       const dados = {
         meta_id: row.metaId ? String(row.metaId).slice(0, 64) : null,
         category: String(row.category || '').slice(0, 24) || null,
-        status: String(row.status || '').slice(0, 24) || null,
+        status,
         body_text: row.bodyText || null,
         param_count: Number(row.paramCount) || 0,
         param_format: row.paramFormat === 'named' ? 'named' : 'positional',
@@ -49,9 +72,19 @@ class WaMetaTemplate {
         header_param_count: Number(row.headerParamCount) || 0,
         buttons_json: JSON.stringify(Array.isArray(row.buttons) ? row.buttons : []),
         components_json: JSON.stringify(row.components ?? []),
+        rejected_reason: row.rejectedReason
+          ? String(row.rejectedReason).slice(0, 64)
+          : (mesmoStatus ? existente.rejected_reason ?? null : null),
+        quality_score: row.qualityScore
+          ? String(row.qualityScore).slice(0, 16)
+          : (mesmoStatus ? existente.quality_score ?? null : null),
         synced_at: now
       };
-      const existente = atuais.find((a) => chave(a) === chave(row));
+      if (existente && !mesmoStatus) {
+        dados.previous_status = existente.status || null;
+        dados.status_changed_at = now;
+        changes.push({ name: existente.name, language: existente.language, from: existente.status || null, to: status });
+      }
       if (existente) {
         // eslint-disable-next-line no-await-in-loop -- idem
         await tdb('wa_meta_templates').where({ id: existente.id }).update(dados);
@@ -65,7 +98,7 @@ class WaMetaTemplate {
         });
       }
     }
-    return this.listByAccount(accountId);
+    return { rows: await this.listByAccount(accountId), changes };
   }
 }
 

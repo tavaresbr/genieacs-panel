@@ -84,6 +84,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'operator.sessions_revoked': 'audit.action.operatorSessionsRevoked',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.bot_trust_unlock': 'audit.action.whatsappBotTrustUnlock',
+  'whatsapp.meta_template_status': 'audit.action.whatsappMetaTemplateStatus',
   'outage.notified': 'audit.action.outageNotified',
   'whatsapp.invoice_sent': 'audit.action.whatsappInvoiceSent',
   'whatsapp.subscriber_unlinked': 'audit.action.whatsappSubscriberUnlinked',
@@ -102,6 +103,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'whatsapp.campaign_updated': 'audit.action.whatsappCampaignUpdated',
   'whatsapp.referral_updated': 'audit.action.whatsappReferralUpdated',
   'whatsapp.opt_out_changed': 'audit.action.whatsappOptOutChanged',
+  'whatsapp.marketing_opt_out_changed': 'audit.action.whatsappMarketingOptOutChanged',
   'whatsapp.template_ai_draft': 'audit.action.whatsappTemplateAiDraft'
 }
 

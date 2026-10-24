@@ -18,6 +18,9 @@ router.get('/bot-config', authenticateToken, requirePermission('whatsapp.config'
 router.put('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateBotConfig);
 router.post('/bot-config/ai-test', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.testBotAi);
 router.post('/bot-config/ai-improve-message', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.improveBotMessage);
+// "Parar promoções": as palavras que o cliente manda e o que o painel responde.
+router.get('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getMarketingOptOutConfig);
+router.put('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMarketingOptOutConfig);
 // O relatório do bot é leitura de quem atende, não de quem configura.
 router.get('/bot-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getBotReport);
 // A pesquisa de satisfação: leitura de quem atende, como o relatório do bot.
@@ -52,10 +55,17 @@ router.post('/accounts/:id/meta-token', authenticateToken, requirePermission('wh
 // O webhook da conta WABA, registrado de novo na Meta pelo painel. Mesma
 // permissão da troca de token: mexe na configuração do número na Meta.
 router.post('/accounts/:id/meta-webhook', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.registerMetaWebhook);
+// A qualidade e o limite do número na Meta, consultados agora. Mesma permissão
+// do webhook: usa o token da Meta do número e grava na linha dele.
+router.post('/accounts/:id/meta-health', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.refreshMetaHealth);
 // Criar pede a mesma permissão da sincronização: o modelo vai para a conta
 // WABA do número (custo por categoria, nota de qualidade, revisão da Meta) —
 // é configuração do número, não campanha.
 router.post('/accounts/:id/templates', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.createMetaTemplate);
+// Editar e apagar, pela mesma razão: mexem no modelo na conta WABA. Vão
+// direto à Graph API (o servidor Evolution não tem essas rotas).
+router.put('/accounts/:id/templates/:templateId', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMetaTemplate);
+router.delete('/accounts/:id/templates/:templateId', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.deleteMetaTemplate);
 router.get('/meta-templates', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listMetaTemplates);
 router.get('/accounts/:id/status', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getStatus);
 router.post('/accounts/:id/restart', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.restartAccount);

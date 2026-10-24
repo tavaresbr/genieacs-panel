@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import type { MetaTemplateCreatePayload } from '@/lib/api'
+import type { MetaTemplateCreatePayload, WhatsAppMetaTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -54,6 +54,26 @@ export const emptyMetaDraft = (): MetaTemplateDraft => ({
   footerText: '',
   buttons: []
 })
+
+/**
+ * O rascunho de edição de um modelo já existente: nome e idioma do modelo (que
+ * a Meta não deixa trocar) e o resto lido dos components guardados. `null`
+ * quando o modelo não é editável pelo painel — mídia no cabeçalho, botão
+ * dinâmico… —, que se edita no Gerenciador do WhatsApp.
+ */
+export function draftFromTemplate(m: WhatsAppMetaTemplate): MetaTemplateDraft | null {
+  if (!m.editable || !m.draft) return null
+  return {
+    name: m.name,
+    category: m.category === 'MARKETING' ? 'MARKETING' : 'UTILITY',
+    language: m.language,
+    headerText: m.draft.headerText,
+    bodyText: m.draft.bodyText,
+    examples: [...m.draft.examples],
+    footerText: m.draft.footerText,
+    buttons: m.draft.buttons.map((b) => ({ ...b }))
+  }
+}
 
 /** O nome como a Meta aceita: minúsculas, dígitos e `_`; espaço vira `_`. */
 export function normalizeMetaName(raw: string): string {
@@ -164,13 +184,23 @@ const FIELD_LABEL: Record<MetaDraftField, TranslationKey> = {
  */
 export function MetaTemplateCreateForm({
   onSubmit,
-  onCancel
+  onCancel,
+  initial,
+  mode = 'create',
+  lockCategory = false
 }: {
   onSubmit: (payload: MetaTemplateCreatePayload) => Promise<string | null>
   onCancel: () => void
+  /** Na edição: o modelo como está (ver `draftFromTemplate`). */
+  initial?: MetaTemplateDraft
+  /** Na edição nome e idioma ficam travados — a Meta não deixa trocá-los. */
+  mode?: 'create' | 'edit'
+  /** Aprovado: a Meta não deixa trocar a categoria na edição. */
+  lockCategory?: boolean
 }) {
   const { t } = useTranslation()
-  const [draft, setDraft] = useState<MetaTemplateDraft>(emptyMetaDraft)
+  const editing = mode === 'edit'
+  const [draft, setDraft] = useState<MetaTemplateDraft>(() => initial ?? emptyMetaDraft())
   const [submitting, setSubmitting] = useState(false)
   const [refusal, setRefusal] = useState('')
   const bodyRef = useRef<HTMLTextAreaElement>(null)
@@ -178,7 +208,7 @@ export function MetaTemplateCreateForm({
   const problems = validateDraft(draft)
   const vars = bodyVariables(draft.bodyText)
   const invalid = new Set(problems)
-  const tocado = draft.name !== '' || draft.bodyText !== ''
+  const tocado = editing || draft.name !== '' || draft.bodyText !== ''
 
   const update = (patch: Partial<MetaTemplateDraft>) => {
     setDraft((atual) => ({ ...atual, ...patch }))
@@ -230,8 +260,10 @@ export function MetaTemplateCreateForm({
 
   return (
     <div className="rounded-md border border-border p-4">
-      <h4 className="text-sm font-semibold text-foreground">{t('whatsapp.metaTemplates.createTitle')}</h4>
-      <p className="field-hint">{t('whatsapp.metaTemplates.createHint')}</p>
+      <h4 className="text-sm font-semibold text-foreground">
+        {editing ? t('whatsapp.metaTemplates.editTitle', { name: draft.name }) : t('whatsapp.metaTemplates.createTitle')}
+      </h4>
+      <p className="field-hint">{editing ? t('whatsapp.metaTemplates.editHint') : t('whatsapp.metaTemplates.createHint')}</p>
 
       <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
         <div className="flex min-w-0 flex-col gap-3">
@@ -243,6 +275,7 @@ export function MetaTemplateCreateForm({
                 className={`${inputClass('name')} font-mono`}
                 value={draft.name}
                 autoComplete="off"
+                readOnly={editing}
                 onChange={(event) => update({ name: normalizeMetaName(event.target.value) })}
               />
               <p className="field-hint">{t('whatsapp.metaTemplates.nameHint')}</p>
@@ -253,6 +286,7 @@ export function MetaTemplateCreateForm({
                 id="meta-create-category"
                 className={inputClass('category')}
                 value={draft.category}
+                disabled={editing && lockCategory}
                 onChange={(event) => update({ category: event.target.value as MetaTemplateDraft['category'] })}
               >
                 <option value="UTILITY">{t('whatsapp.metaTemplates.categoryUtility')}</option>
@@ -266,6 +300,7 @@ export function MetaTemplateCreateForm({
                 className={`${inputClass('language')} font-mono`}
                 value={draft.language}
                 autoComplete="off"
+                readOnly={editing}
                 onChange={(event) => update({ language: event.target.value.trim() })}
               />
             </div>
@@ -433,7 +468,9 @@ export function MetaTemplateCreateForm({
           disabled={problems.length > 0 || submitting}
           onClick={() => void submit()}
         >
-          {submitting ? t('whatsapp.metaTemplates.submitting') : t('whatsapp.metaTemplates.submit')}
+          {submitting
+            ? t('whatsapp.metaTemplates.submitting')
+            : editing ? t('whatsapp.metaTemplates.editSubmit') : t('whatsapp.metaTemplates.submit')}
         </button>
         <button type="button" className="modern-button-secondary" disabled={submitting} onClick={onCancel}>
           {t('common.cancel')}

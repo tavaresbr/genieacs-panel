@@ -64,6 +64,9 @@ class AuditLog {
     // A equipe pôs um número no "não perturbe" ou mudou os tipos de comunicação
     // que ele bloqueia. O `detail` guarda os tipos, nunca o telefone.
     WHATSAPP_OPT_OUT_CHANGED: 'whatsapp.opt_out_changed',
+    // A equipe marcou ou desmarcou "não quer promoções" numa conversa. O
+    // `detail` diz para que lado e se mudou algo, nunca o telefone.
+    WHATSAPP_MARKETING_OPT_OUT_CHANGED: 'whatsapp.marketing_opt_out_changed',
     WHATSAPP_TEMPLATE_AI_DRAFT: 'whatsapp.template_ai_draft',
     // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
     // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
@@ -80,6 +83,10 @@ class AuditLog {
     WHATSAPP_SUBSCRIBER_UNLINKED: 'whatsapp.subscriber_unlinked',
     WHATSAPP_MESSAGE_DELETED: 'whatsapp.message_deleted',
     WHATSAPP_MESSAGE_REACTED: 'whatsapp.message_reacted',
+    // A Meta decidiu sobre um modelo (aprovou, recusou, pausou, desativou) e a
+    // sincronização — a do botão ou a do vigia — trouxe a mudança. O `detail`
+    // guarda nome, idioma, de/para e o motivo da recusa; nada de assinante.
+    WHATSAPP_META_TEMPLATE_STATUS: 'whatsapp.meta_template_status',
     // Os clientes de uma queda em massa foram avisados por WhatsApp.
     OUTAGE_NOTIFIED: 'outage.notified',
     // Manutenção programada: agendar, avisar os clientes e cancelar mexem com

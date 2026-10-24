@@ -107,6 +107,26 @@ export const casos = [
     codigoDeNaoAchou: 'conversation_not_found'
   },
   {
+    // "Não quer promoções" marcado e desmarcado pela equipe. O id do vizinho
+    // dá 404 antes de qualquer escrita em `wa_marketing_opt_outs`.
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/marketing-opt-out',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/marketing-opt-out`,
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
+    label: 'DELETE /api/whatsapp/conversations/:id/marketing-opt-out',
+    method: 'DELETE',
+    path: (id) => `/api/whatsapp/conversations/${id}/marketing-opt-out`,
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
     // A indicação de um cliente: o estado mudado por quem atende. O id do
     // vizinho dá 404 antes de qualquer validação do corpo.
     chave: 'referral',
@@ -319,6 +339,26 @@ export const casos = [
     controleSoNaoAchou: true
   },
   {
+    // Editar e apagar modelo na Meta. A conta vem antes do modelo e do corpo:
+    // o id do vizinho dá 404 com qualquer `templateId`; no controle, o número
+    // semeado (por QR) dá 409 `meta_templates_cloud_only` — achado, recusado.
+    chave: 'account',
+    label: 'PUT /api/whatsapp/accounts/:id/templates/:templateId',
+    method: 'PUT',
+    path: (id) => `/api/whatsapp/accounts/${id}/templates/1`,
+    body: { category: 'UTILITY', bodyText: 'Olá' },
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
+    chave: 'account',
+    label: 'DELETE /api/whatsapp/accounts/:id/templates/:templateId',
+    method: 'DELETE',
+    path: (id) => `/api/whatsapp/accounts/${id}/templates/1?unlink=1`,
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
     chave: 'account',
     label: 'POST /api/whatsapp/accounts/:id/meta-token',
     method: 'POST',
@@ -333,6 +373,16 @@ export const casos = [
     label: 'POST /api/whatsapp/accounts/:id/meta-webhook',
     method: 'POST',
     path: (id) => `/api/whatsapp/accounts/${id}/meta-webhook`,
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
+    // Consultar a saúde do número na Meta. No controle, o número semeado (por
+    // QR) dá 409 `not_cloud` — achado, recusado; nenhuma chamada sai para a Meta.
+    chave: 'account',
+    label: 'POST /api/whatsapp/accounts/:id/meta-health',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/accounts/${id}/meta-health`,
     tabela: 'whatsapp_accounts',
     controleSoNaoAchou: true
   },

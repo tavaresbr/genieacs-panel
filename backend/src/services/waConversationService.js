@@ -2,6 +2,7 @@ import WaConversation from '../models/WaConversation.js';
 import { optOutOf, tiposGravados } from '../utils/wa/waOptOutTipos.js';
 import WaMessage from '../models/WaMessage.js';
 import WaOptOut from '../models/WaOptOut.js';
+import WaMarketingOptOut from '../models/WaMarketingOptOut.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
 import CustomerAccount from '../models/CustomerAccount.js';
@@ -33,6 +34,18 @@ const PAGE = 100;
  * has a customer portal with a real password for that, and the bot's job is to
  * send its link rather than to become a second, weaker door into the same data.
  */
+/**
+ * O "não quero promoção" como a tela o lê: desde quando e por onde veio
+ * (`keyword`, `button` ou `operator`); null quando não há pedido ativo.
+ */
+export function publicMarketingOptOut(row) {
+  if (!row) return null;
+  const quando = row.opted_out_at instanceof Date
+    ? row.opted_out_at.toISOString()
+    : (typeof row.opted_out_at === 'number' ? new Date(row.opted_out_at).toISOString() : row.opted_out_at || null);
+  return { since: quando, source: row.source || 'keyword' };
+}
+
 class WaConversationService {
   /**
    * Resolves the subscriber behind a phone number.
@@ -384,6 +397,9 @@ class WaConversationService {
       optedOut: extra.optedOut ?? false,
       // Só quando o bloqueio é parcial: os tipos que ele cobre.
       optOutCategories: extra.optOutCategories ?? null,
+      // Pediu para não receber promoção ("parar", o botão da Meta, ou a equipe
+      // marcou): desde quando e por onde. Só a promoção para — o resto sai.
+      marketingOptOut: extra.marketingOptOut ?? null,
       lastMessageAt: row.last_message_at || null,
       lastInboundAt: row.last_inbound_at || null,
       unreadCount: Number(row.unread_count || 0),
@@ -497,6 +513,7 @@ class WaConversationService {
       }
     }
     const blocked = await WaOptOut.activeBlocks(rows.map((r) => r.wa_phone_e164));
+    const semPromocao = await WaMarketingOptOut.activeByPhone(rows.map((r) => r.wa_phone_e164));
     const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
     const etiquetas = await WaTagService.tagsFor(rows.map((r) => r.id));
     const aguardando = await this.awaitingSince(rows.filter((r) => !r.closed_at).map((r) => r.id));
@@ -518,7 +535,8 @@ class WaConversationService {
       clientName: row.contract
         ? names.get(row.contract) ?? null
         : (row.sgp_contact_id ? contactNames.get(Number(row.sgp_contact_id)) ?? null : null),
-      ...optOutOf(blocked.has(row.wa_phone_e164) ? [blocked.get(row.wa_phone_e164)] : [])
+      ...optOutOf(blocked.has(row.wa_phone_e164) ? [blocked.get(row.wa_phone_e164)] : []),
+      marketingOptOut: publicMarketingOptOut(semPromocao.get(row.wa_phone_e164))
     }));
   }
 
@@ -629,7 +647,11 @@ class WaConversationService {
       clientName: link?.client_name || contact?.client_name
         || (doContrato?.client_ref ? (await this.namesOfClients([doContrato.client_ref])).get(String(doContrato.client_ref)) : null)
         || null,
-      ...optOutOf(await this.optOutEntries(conversation))
+      ...optOutOf(await this.optOutEntries(conversation)),
+      marketingOptOut: publicMarketingOptOut(await WaMarketingOptOut.findActive({
+        waPhone: conversation.wa_phone_e164,
+        waLid: conversation.wa_lid
+      }))
     });
   }
 
