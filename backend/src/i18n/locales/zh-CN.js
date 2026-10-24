@@ -1197,6 +1197,7 @@ export default {
   'teiah.exportStarted': '已开始发送到 TeiaH Valid',
   'teiah.exportFailed': '发送到 TeiaH Valid 失败',
   'teiah.error.urlInvalid': 'TeiaH Valid API 地址无效',
+  'teiah.error.webUrlInvalid': 'TeiaH 面板地址无效',
   'teiah.error.notConfigured': 'TeiaH Valid 集成尚未配置',
   'teiah.error.apiKeyInvalid': 'API 密钥无效',
   'teiah.error.apiKeyMissing': '请输入 TeiaH Valid API 密钥',

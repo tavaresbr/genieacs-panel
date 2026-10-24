@@ -146,6 +146,7 @@ describe('consultar e aplicar na ficha', () => {
 
     const ficha = await call(`${panelUrl}/api/contacts/T-100`, auth());
     assert.equal(ficha.body.data.teiahReady, true);
+    assert.equal(ficha.body.data.teiahWebUrl, 'https://valid.teiah.ai', 'o botão Abrir TeiaH precisa do endereço do painel');
     assert.equal(ficha.body.data.teiah.score.score, 700);
     assert.equal(ficha.body.data.teiah.addresses.length, 2);
 

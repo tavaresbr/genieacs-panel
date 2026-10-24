@@ -269,6 +269,25 @@ describe('configuração', () => {
     assert.equal(again.body.data.apiKeyConfigured, true, 'um PUT sem a chave apagou a chave');
   });
 
+  it('o endereço do painel web: padrão, troca, e só http(s) sem senha', async () => {
+    const padrao = await call(`${panelUrl}/api/teiah/config`, auth());
+    assert.equal(padrao.body.data.webUrl, 'https://valid.teiah.ai');
+
+    const troca = await call(`${panelUrl}/api/teiah/config`, { method: 'PUT', ...auth(), body: { webUrl: 'painel.exemplo.com.br/teiah/' } });
+    assert.equal(troca.status, 200, JSON.stringify(troca.body));
+    assert.equal(troca.body.data.webUrl, 'https://painel.exemplo.com.br/teiah');
+    assert.equal(troca.body.data.apiKeyConfigured, true, 'a chave de API continua');
+
+    for (const ruim of ['javascript:alert(1)', 'https://u:p@painel.exemplo.com.br', 'ftp://painel.exemplo.com.br']) {
+      const res = await call(`${panelUrl}/api/teiah/config`, { method: 'PUT', ...auth(), body: { webUrl: ruim } });
+      assert.equal(res.status, 400, ruim);
+      assert.equal(res.body.code, 'invalid_web_url');
+    }
+
+    const vazio = await call(`${panelUrl}/api/teiah/config`, { method: 'PUT', ...auth(), body: { webUrl: '' } });
+    assert.equal(vazio.body.data.webUrl, 'https://valid.teiah.ai', 'em branco volta ao padrão');
+  });
+
   it('o teste manda a chave e não grava nada na TeiaH', async () => {
     const before = teiah.batches.length;
     const res = await call(`${panelUrl}/api/teiah/test`, { method: 'POST', ...auth(), body: {} });

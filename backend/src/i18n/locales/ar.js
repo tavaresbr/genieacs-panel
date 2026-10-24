@@ -1189,6 +1189,7 @@ export default {
   'teiah.exportStarted': 'بدأ الإرسال إلى TeiaH Valid',
   'teiah.exportFailed': 'فشل الإرسال إلى TeiaH Valid',
   'teiah.error.urlInvalid': 'عنوان واجهة TeiaH Valid غير صالح',
+  'teiah.error.webUrlInvalid': 'عنوان لوحة TeiaH غير صالح',
   'teiah.error.notConfigured': 'تكامل TeiaH Valid غير مُعد',
   'teiah.error.apiKeyInvalid': 'مفتاح API غير صالح',
   'teiah.error.apiKeyMissing': 'أدخل مفتاح API الخاص بـ TeiaH Valid',

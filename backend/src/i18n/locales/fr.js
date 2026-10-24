@@ -1193,6 +1193,7 @@ export default {
   'teiah.exportStarted': 'Envoi vers TeiaH Valid démarré',
   'teiah.exportFailed': 'Échec de l’envoi vers TeiaH Valid',
   'teiah.error.urlInvalid': 'Adresse de l’API TeiaH Valid invalide',
+  'teiah.error.webUrlInvalid': 'Adresse du panneau TeiaH invalide',
   'teiah.error.notConfigured': 'L’intégration TeiaH Valid n’est pas configurée',
   'teiah.error.apiKeyInvalid': 'Clé d’API invalide',
   'teiah.error.apiKeyMissing': 'Saisissez la clé d’API TeiaH Valid',

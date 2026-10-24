@@ -250,6 +250,7 @@ class ContactProfileService {
 
     const config = await SgpService.getConfig().catch(() => null);
     const clientId = client?.sgp_client_id ?? null;
+    const teiahConfig = await TeiahService.getConfig().catch(() => null);
     return {
       key,
       source: client?.source ?? 'sgp',
@@ -261,7 +262,8 @@ class ContactProfileService {
       fields,
       // What the TeiaH said the last time it was asked, and whether it can be asked.
       teiah: client?.teiah ?? null,
-      teiahReady: TeiahService.isReady(await TeiahService.getConfig().catch(() => null)),
+      teiahReady: TeiahService.isReady(teiahConfig),
+      teiahWebUrl: TeiahService.isReady(teiahConfig) ? teiahConfig.webUrl : null,
       notes: client?.notes ?? null,
       registeredAt: client?.registered_at ?? null,
       lastSeenAt: client?.last_seen_at ?? row.last_seen_at ?? null,

@@ -1198,6 +1198,7 @@ export default {
   'teiah.exportStarted': 'Выгрузка в TeiaH Valid запущена',
   'teiah.exportFailed': 'Ошибка выгрузки в TeiaH Valid',
   'teiah.error.urlInvalid': 'Неверный адрес API TeiaH Valid',
+  'teiah.error.webUrlInvalid': 'Недопустимый адрес панели TeiaH',
   'teiah.error.notConfigured': 'Интеграция с TeiaH Valid не настроена',
   'teiah.error.apiKeyInvalid': 'Неверный ключ API',
   'teiah.error.apiKeyMissing': 'Введите ключ API TeiaH Valid',

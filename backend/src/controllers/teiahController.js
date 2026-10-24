@@ -38,6 +38,7 @@ class TeiahController {
         exportEnabled: body.exportEnabled,
         exportIntervalHours: body.exportIntervalHours,
         batchSize: body.batchSize,
+        webUrl: body.webUrl,
         rentalDefault: body.rentalDefault
       });
       return res.json(createResponse(req.t('teiah.configSaved'), config));

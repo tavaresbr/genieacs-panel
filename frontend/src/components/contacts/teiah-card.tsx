@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatBrPhone } from '@/lib/phone'
+import { isSafeExternalUrl } from '@/lib/sgp'
 
 function addressLine(address: { street?: string; number?: string; district?: string; city?: string; state?: string; zip?: string }) {
   const street = [address.street, address.number].filter(Boolean).join(', ')
@@ -117,10 +118,17 @@ export function TeiahCard({ profile, onProfile, onReload }: {
     <section className="modern-card mt-5 p-5 sm:p-6" data-testid="teiah-card">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="section-heading">{t('contacts.profile.teiah')}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+        {isSafeExternalUrl(profile.teiahWebUrl ?? null) && (
+          <a href={profile.teiahWebUrl ?? undefined} target="_blank" rel="noopener noreferrer" className="modern-button-secondary">
+            <Icon name="external" size={16} /> {t('contacts.profile.teiahOpen')}
+          </a>
+        )}
         <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void consult()}>
           <Icon name="refresh" size={16} className={busy ? 'animate-spin' : ''} />
           {' '}{t(teiah ? 'contacts.profile.teiahRefresh' : 'contacts.profile.teiahConsult')}
         </button>
+        </div>
       </div>
 
       {!teiah && <p className="text-sm text-muted-foreground">{t('contacts.profile.teiahNever')}</p>}

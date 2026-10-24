@@ -1196,6 +1196,7 @@ export default {
   'teiah.exportStarted': 'Envio à TeiaH Valid iniciado',
   'teiah.exportFailed': 'Falha no envio à TeiaH Valid',
   'teiah.error.urlInvalid': 'Endereço da API da TeiaH Valid inválido',
+  'teiah.error.webUrlInvalid': 'Endereço do painel da TeiaH inválido',
   'teiah.error.notConfigured': 'A integração com a TeiaH Valid não está configurada',
   'teiah.error.apiKeyInvalid': 'Chave de API inválida',
   'teiah.error.apiKeyMissing': 'Informe a chave de API da TeiaH Valid',

@@ -1200,6 +1200,7 @@ export default {
   'teiah.exportStarted': 'TeiaH Valid 전송을 시작했습니다',
   'teiah.exportFailed': 'TeiaH Valid 전송에 실패했습니다',
   'teiah.error.urlInvalid': 'TeiaH Valid API 주소가 올바르지 않습니다',
+  'teiah.error.webUrlInvalid': 'TeiaH 패널 주소가 올바르지 않습니다',
   'teiah.error.notConfigured': 'TeiaH Valid 연동이 설정되지 않았습니다',
   'teiah.error.apiKeyInvalid': 'API 키가 올바르지 않습니다',
   'teiah.error.apiKeyMissing': 'TeiaH Valid API 키를 입력하십시오',
