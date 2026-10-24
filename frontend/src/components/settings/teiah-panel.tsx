@@ -58,6 +58,7 @@ export function TeiahPanel() {
   const [form, setForm] = useState({
     enabled: false,
     baseUrl: '',
+    webUrl: '',
     apiKey: '',
     exportEnabled: false,
     exportIntervalHours: 24,
@@ -78,6 +79,7 @@ export function TeiahPanel() {
     setForm({
       enabled: next.enabled,
       baseUrl: next.baseUrl,
+      webUrl: next.webUrl,
       apiKey: '',
       exportEnabled: next.exportEnabled,
       exportIntervalHours: next.exportIntervalHours,
@@ -132,6 +134,7 @@ export function TeiahPanel() {
       const res = await teiahAPI.updateConfig({
         enabled: form.enabled,
         baseUrl: form.baseUrl.trim(),
+        webUrl: form.webUrl.trim(),
         exportEnabled: form.exportEnabled,
         exportIntervalHours: form.exportIntervalHours,
         batchSize: form.batchSize,
@@ -244,6 +247,17 @@ export function TeiahPanel() {
               onChange={(event) => setForm((current) => ({ ...current, baseUrl: event.target.value }))}
             />
             <p className="mt-1 text-xs text-muted-foreground">{t('settings.teiah.baseUrlHint')}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="field-label" htmlFor="teiah-web-url">{t('settings.teiah.webUrl')}</label>
+            <input
+              id="teiah-web-url"
+              className="modern-input font-mono"
+              value={form.webUrl}
+              placeholder="https://valid.teiah.ai"
+              onChange={(event) => setForm((current) => ({ ...current, webUrl: event.target.value }))}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">{t('settings.teiah.webUrlHint')}</p>
           </div>
 
           <h3 className="mt-2 font-semibold sm:col-span-2">{t('settings.teiah.export.title')}</h3>

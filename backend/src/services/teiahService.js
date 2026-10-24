@@ -27,6 +27,8 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 
 export const DEFAULT_BASE_URL = 'https://api.valid.teiah.ai';
+/** The TeiaH web panel: only a link the operator's browser opens, never called by the server. */
+export const DEFAULT_WEB_URL = 'https://valid.teiah.ai';
 export const IMPORT_ONE_PATH = '/api/import/address';
 export const IMPORT_MANY_PATH = '/api/import/addresses';
 export const CONSULT_DOCUMENT_PATH = '/api/whatsapp/consulta-cpf';
@@ -41,6 +43,7 @@ export const CONSULT_MISS_CACHE_DAYS = 7;
 const DEFAULT_CONFIG = Object.freeze({
   enabled: false,
   baseUrl: DEFAULT_BASE_URL,
+  webUrl: DEFAULT_WEB_URL,
   exportEnabled: false,
   exportIntervalHours: 24,
   batchSize: 50,
@@ -323,6 +326,22 @@ class TeiahService {
     return `${url.origin}${path}`;
   }
 
+  /** The panel's address, for a link: http(s) only, no credentials; blank is the default. */
+  static normalizeWebUrl(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return DEFAULT_WEB_URL;
+    let url;
+    try {
+      url = new URL(text.includes('://') ? text : `https://${text}`);
+    } catch {
+      throw new TeiahError('teiah.error.webUrlInvalid', { code: 'invalid_web_url', status: 400 });
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+      throw new TeiahError('teiah.error.webUrlInvalid', { code: 'invalid_web_url', status: 400 });
+    }
+    return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+  }
+
   /** Same API address, compared normalized (host case, trailing slash, `/api`). */
   static sameBaseUrl(a, b) {
     return this.normalizeBaseUrl(a) === this.normalizeBaseUrl(b);
@@ -349,6 +368,7 @@ class TeiahService {
     const config = {
       enabled: stored.enabled === true,
       baseUrl: String(stored.baseUrl || DEFAULT_BASE_URL),
+      webUrl: String(stored.webUrl || DEFAULT_WEB_URL),
       apiKey: decryptApiKey(stored.apiKey),
       exportEnabled: stored.exportEnabled === true,
       exportIntervalHours: clampNumber(stored.exportIntervalHours, 1, 168, DEFAULT_CONFIG.exportIntervalHours),
@@ -397,6 +417,7 @@ class TeiahService {
     const next = {
       enabled: patch.enabled === undefined ? current.enabled : patch.enabled === true,
       baseUrl,
+      webUrl: patch.webUrl === undefined ? current.webUrl : this.normalizeWebUrl(patch.webUrl),
       exportEnabled: patch.exportEnabled === undefined ? current.exportEnabled : patch.exportEnabled === true,
       exportIntervalHours: patch.exportIntervalHours === undefined
         ? current.exportIntervalHours

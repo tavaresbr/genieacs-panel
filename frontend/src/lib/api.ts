@@ -3756,6 +3756,8 @@ export interface ContactProfile {
   teiah?: ContactTeiah | null
   /** Whether the TeiaH integration is on, so the record can offer to ask it. */
   teiahReady?: boolean
+  /** The TeiaH web panel to open from the record; null while the integration is off. */
+  teiahWebUrl?: string | null
 }
 
 /** The TeiaH's answer about one client, as the last consultation kept it. */
@@ -4062,6 +4064,8 @@ export type TeiahRentalDefault = 'omit' | 'false' | 'true'
 export interface TeiahConfig {
   enabled: boolean
   baseUrl: string
+  /** The TeiaH web panel, for the "Open TeiaH" link. */
+  webUrl: string
   exportEnabled: boolean
   exportIntervalHours: number
   batchSize: number

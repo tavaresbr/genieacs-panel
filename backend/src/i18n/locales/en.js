@@ -1197,6 +1197,7 @@ export default {
   'teiah.exportStarted': 'TeiaH Valid export started',
   'teiah.exportFailed': 'TeiaH Valid export failed',
   'teiah.error.urlInvalid': 'Invalid TeiaH Valid API address',
+  'teiah.error.webUrlInvalid': 'Invalid TeiaH panel address',
   'teiah.error.notConfigured': 'The TeiaH Valid integration is not configured',
   'teiah.error.apiKeyInvalid': 'Invalid API key',
   'teiah.error.apiKeyMissing': 'Enter the TeiaH Valid API key',

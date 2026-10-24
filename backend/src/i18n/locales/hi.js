@@ -1197,6 +1197,7 @@ export default {
   'teiah.exportStarted': 'TeiaH Valid निर्यात शुरू हुआ',
   'teiah.exportFailed': 'TeiaH Valid निर्यात विफल रहा',
   'teiah.error.urlInvalid': 'TeiaH Valid API पता अमान्य है',
+  'teiah.error.webUrlInvalid': 'TeiaH पैनल का पता अमान्य है',
   'teiah.error.notConfigured': 'TeiaH Valid एकीकरण कॉन्फ़िगर नहीं है',
   'teiah.error.apiKeyInvalid': 'अमान्य API कुंजी',
   'teiah.error.apiKeyMissing': 'TeiaH Valid API कुंजी दर्ज करें',

@@ -1197,6 +1197,7 @@ export default {
   'teiah.exportStarted': 'TeiaH Valid への送信を開始しました',
   'teiah.exportFailed': 'TeiaH Valid への送信に失敗しました',
   'teiah.error.urlInvalid': 'TeiaH Valid の API アドレスが無効です',
+  'teiah.error.webUrlInvalid': 'TeiaH パネルのアドレスが無効です',
   'teiah.error.notConfigured': 'TeiaH Valid 連携が設定されていません',
   'teiah.error.apiKeyInvalid': 'API キーが無効です',
   'teiah.error.apiKeyMissing': 'TeiaH Valid の API キーを入力してください',
