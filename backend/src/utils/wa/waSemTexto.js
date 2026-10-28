@@ -45,6 +45,70 @@ function localizacao(no) {
   return ['📍 Localização', nome, link].filter(Boolean).join('\n');
 }
 
+/** Um item por linha, cortado: o payload vem de fora e uma lista não é um arquivo. */
+const linhas = (itens, teto = 10) => itens.map(texto).filter(Boolean).slice(0, teto).map((item) => `• ${item}`);
+
+/** O nome de um botão de fluxo nativo (`buttonParamsJson` é um JSON em texto). */
+function nomeDoBotaoNativo(botao) {
+  try {
+    const dados = JSON.parse(botao?.buttonParamsJson || '{}');
+    return texto(dados.display_text) || texto(dados.title) || texto(botao?.name);
+  } catch {
+    return texto(botao?.name);
+  }
+}
+
+/**
+ * Mensagens que o remetente monta com texto e botões: o menu de um robô de
+ * atendimento, um aviso com "Ver fatura". O atendente lê o texto e a lista das
+ * opções, que é o que o cliente via no celular. Devolve '' se não é uma delas.
+ */
+function estruturada(mensagem) {
+  const botoes = mensagem.buttonsMessage;
+  if (botoes && typeof botoes === 'object') {
+    const opcoes = Array.isArray(botoes.buttons) ? botoes.buttons.map((b) => b?.buttonText?.displayText) : [];
+    return [texto(botoes.contentText) || texto(botoes.text), ...linhas(opcoes), texto(botoes.footerText)].filter(Boolean).join('\n');
+  }
+
+  const lista = mensagem.listMessage;
+  if (lista && typeof lista === 'object') {
+    const secoes = Array.isArray(lista.sections) ? lista.sections : [];
+    const opcoes = secoes.flatMap((secao) => (Array.isArray(secao?.rows) ? secao.rows.map((linha) => linha?.title) : []));
+    return [texto(lista.title), texto(lista.description), ...linhas(opcoes), texto(lista.footerText)].filter(Boolean).join('\n');
+  }
+
+  const modelo = mensagem.templateMessage
+    ? (mensagem.templateMessage.hydratedTemplate || mensagem.templateMessage.hydratedFourRowTemplate || mensagem.templateMessage.fourRowTemplate)
+    : mensagem.highlyStructuredMessage?.hydratedHsm?.hydratedTemplate;
+  if (modelo && typeof modelo === 'object') {
+    const opcoes = Array.isArray(modelo.hydratedButtons)
+      ? modelo.hydratedButtons.map((b) => b?.quickReplyButton?.displayText || b?.urlButton?.displayText || b?.callButton?.displayText)
+      : [];
+    return [texto(modelo.hydratedTitleText), texto(modelo.hydratedContentText), ...linhas(opcoes), texto(modelo.hydratedFooterText)]
+      .filter(Boolean).join('\n');
+  }
+
+  const interativa = mensagem.interactiveMessage;
+  if (interativa && typeof interativa === 'object') {
+    const botoesNativos = Array.isArray(interativa.nativeFlowMessage?.buttons) ? interativa.nativeFlowMessage.buttons : [];
+    return [texto(interativa.header?.title), texto(interativa.body?.text), ...linhas(botoesNativos.map(nomeDoBotaoNativo)), texto(interativa.footer?.text)]
+      .filter(Boolean).join('\n');
+  }
+
+  const convite = mensagem.groupInviteMessage;
+  if (convite && typeof convite === 'object') return `👥 Convite para o grupo ${texto(convite.groupName) || 'sem nome'}`;
+  if (mensagem.orderMessage && typeof mensagem.orderMessage === 'object') {
+    return `🛒 Pedido${texto(mensagem.orderMessage.orderTitle) ? `: ${texto(mensagem.orderMessage.orderTitle)}` : ''}`;
+  }
+  const produto = mensagem.productMessage?.product;
+  if (produto && typeof produto === 'object') return `🛍️ Produto: ${texto(produto.title) || 'sem título'}`;
+  return '';
+}
+
+/** Chaves que acompanham toda mensagem e não dizem o que ela é. */
+const SO_CONTEXTO = new Set(['messageContextInfo', 'senderKeyDistributionMessage', 'contextInfo']);
+
+
 /**
  * @param {object|null} mensagem a mensagem já desembrulhada
  */
@@ -83,5 +147,18 @@ export function resumoSemTexto(mensagem) {
       return `${rotulo}${nome ? ` (${nome})` : ''} — não foi possível baixar o arquivo. Peça ao cliente para enviar de novo.`;
     }
   }
-  return '';
+
+  const montada = estruturada(mensagem);
+  if (montada) return montada;
+
+  // O cliente apagou uma mensagem para todos.
+  const protocolo = mensagem.protocolMessage;
+  if (protocolo && typeof protocolo === 'object' && (protocolo.type === 0 || protocolo.type === 'REVOKE')) {
+    return '🚫 Apagou uma mensagem';
+  }
+
+  // Nenhum tipo conhecido: diz qual foi, para o atendente saber que há algo no
+  // celular e para quem mantém o painel saber o que falta mostrar.
+  const tipo = Object.keys(mensagem).find((chave) => !SO_CONTEXTO.has(chave) && mensagem[chave] && typeof mensagem[chave] === 'object');
+  return tipo ? `❔ Mensagem do tipo ${tipo.replace(/[^\w]/g, '').slice(0, 48)}, que o painel não exibe. Veja no celular.` : '';
 }
