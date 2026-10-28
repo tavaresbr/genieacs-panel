@@ -815,12 +815,21 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
     // No celular só o cartão rola por dentro; a barra, as abas e os avisos
     // ficam parados. A página volta a rolar ao sair desta aba.
+    //
+    // Menos com o teclado aberto: o Safari, ao focar a caixa de escrever, desloca
+    // a área visível para mostrá-la, e com a página travada (`overflow: hidden`)
+    // não há como trazê-la de volta — a tela ficava vazia, só o teclado. Com o
+    // teclado aberto a página destrava, volta ao topo, e o cartão (medido logo
+    // abaixo) termina acima do teclado, de modo que nada precisa rolar.
     const root = document.documentElement
     const body = document.body
     const before = { rootOverflow: root.style.overflow, bodyOverflow: body.style.overflow, bodyOverscroll: body.style.overscrollBehavior }
-    root.style.overflow = 'hidden'
-    body.style.overflow = 'hidden'
-    body.style.overscrollBehavior = 'none'
+    const lock = (on: boolean) => {
+      root.style.overflow = on ? 'hidden' : before.rootOverflow
+      body.style.overflow = on ? 'hidden' : before.bodyOverflow
+      body.style.overscrollBehavior = on ? 'none' : before.bodyOverscroll
+    }
+    lock(true)
     let last: number | null = null
     let lastCard: number | null = null
     const update = () => {
@@ -828,9 +837,11 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       if (next !== last) {
         last = next
         setKeyboardHeight(next)
+        lock(next === null)
       }
-      // A barra fixa e as abas ficam no topo da área visível.
-      if (window.scrollY !== 0) window.scrollTo(0, 0)
+      // A barra fixa e as abas ficam no topo da área visível; com o teclado
+      // aberto, também quando só a área visível (e não a página) se deslocou.
+      if (window.scrollY !== 0 || (next !== null && vv.offsetTop > 0)) window.scrollTo(0, 0)
       const card = cardRef.current
       const height = card
         ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: card.getBoundingClientRect().top })
@@ -850,9 +861,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
       observer.disconnect()
-      root.style.overflow = before.rootOverflow
-      body.style.overflow = before.bodyOverflow
-      body.style.overscrollBehavior = before.bodyOverscroll
+      lock(false)
     }
   }, [])
 
