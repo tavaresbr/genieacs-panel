@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { PUBLIC_PATHS, SITEMAP_PATHS, robotsFor, sitemapFor } from '../src/services/seoFiles.js';
+import { AI_CRAWLERS, PUBLIC_PATHS, SITEMAP_PATHS, robotsFor, sitemapFor } from '../src/services/seoFiles.js';
 
 /**
  * O que estes dois arquivos dizem a um buscador.
@@ -68,8 +68,36 @@ describe('o robots.txt', () => {
     // buscador esconderia justamente o aviso que a LGPD (art. 9º) manda dar.
     assert.match(texto, /^Allow: \/privacidade$/m);
 
-    const liberadas = [...texto.matchAll(/^Allow: (.+)$/gm)].map((m) => m[1]);
+    // As exceções do grupo `*`: o primeiro bloco, até a linha em branco.
+    const grupo = texto.split('\n\n')[0];
+    const liberadas = [...grupo.matchAll(/^Allow: (.+)$/gm)].map((m) => m[1]);
     assert.equal(liberadas.length, PUBLIC_PATHS.length);
+  });
+
+  /**
+   * Um rastreador que acha o próprio nome lê só o grupo dele e ignora o `*`:
+   * o grupo dos robôs de IA tem que trazer as mesmas regras, senão liberar o
+   * robô seria liberar o painel inteiro.
+   */
+  it('libera os robôs de IA só nas páginas públicas, com as mesmas regras', () => {
+    const texto = robotsFor({ platformHost: true, host: 'tr69.com.br' });
+    const grupo = texto.split('\n\n').find((bloco) => bloco.includes('User-agent: GPTBot'));
+    assert.ok(grupo, 'sem grupo para os robôs de IA');
+    for (const robo of AI_CRAWLERS) assert.match(grupo, new RegExp(`^User-agent: ${robo}$`, 'm'), robo);
+    for (const robo of ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'PerplexityBot', 'Google-Extended']) {
+      assert.ok(AI_CRAWLERS.includes(robo), `${robo} fora da lista`);
+    }
+    assert.match(grupo, /^Disallow: \/$/m);
+    assert.deepEqual(
+      [...grupo.matchAll(/^Allow: (.+)$/gm)].map((m) => m[1]),
+      PUBLIC_PATHS.map((caminho) => (caminho === '/' ? '/$' : caminho))
+    );
+  });
+
+  it('fora do ápice nenhum robô de IA é mencionado: tudo fechado', () => {
+    const texto = robotsFor({ platformHost: false, host: 'painel.tr69.com.br' });
+    assert.doesNotMatch(texto, /GPTBot|ClaudeBot|PerplexityBot/);
+    assert.match(texto, /^Disallow: \/$/m);
   });
 
   it('e aponta o mapa no próprio host do pedido', () => {
