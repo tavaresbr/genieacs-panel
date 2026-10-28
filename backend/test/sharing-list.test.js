@@ -44,6 +44,7 @@ const EXTENSOES = new Set(['.js', '.ts', '.tsx', '.html']);
 const NAO_E_DESTINO = {
   'www.w3.org': 'namespace de XML/SVG, não é requisição',
   'www.sitemaps.org': 'namespace do sitemap.xml, não é requisição',
+  'schema.org': 'vocabulário do JSON-LD da vitrine (@context e tipos), um identificador no HTML, não é requisição',
   'www.opengis.net': 'namespace de XML geográfico, não é requisição',
   'genieacs.agent': 'nome interno do agente em processo, não resolve na rede',
   'painel.tr69.com.br': 'o próprio domínio do painel, citado em exemplos e comentários',
