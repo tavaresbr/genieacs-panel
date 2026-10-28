@@ -273,6 +273,21 @@ export default function Landing() {
     return () => { vivo = false }
   }, [])
 
+  // O servidor já entrega título e descrição em português (SEO, `seoHead.js`);
+  // ao trocar de idioma, a aba e a pré-visualização acompanham o texto da página.
+  useEffect(() => {
+    const titulo = `${info?.productName || 'TR69'} · ${copy.hero.kicker}`
+    const anterior = document.title
+    document.title = titulo
+    const meta = document.querySelector('meta[name="description"]')
+    const descricaoAnterior = meta?.getAttribute('content') ?? null
+    meta?.setAttribute('content', copy.hero.subtitle)
+    return () => {
+      document.title = anterior
+      if (meta && descricaoAnterior !== null) meta.setAttribute('content', descricaoAnterior)
+    }
+  }, [copy, info?.productName])
+
   const temAnual = useMemo(() => (plans ?? []).some((plan) => plan.priceYearlyCents !== null), [plans])
   const produto = info?.productName || 'TR69'
   const [marcaA, marcaB] = /^(.*?)(\d+)$/.test(produto.split(' ')[0])

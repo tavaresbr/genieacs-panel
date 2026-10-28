@@ -17,6 +17,8 @@
  * para isso que ele existe.
  */
 
+import { FAQ, FEATURES, SEO_PAGES, SITE_NAME, SITE_TAGLINE, STEPS, VENDORS } from './seoContent.js';
+
 /**
  * As rotas que a árvore do console serve sem sessão (`app.tsx`, `ConsoleRoutes`)
  * e que fazem sentido para um estranho. `/impersonate` também mora lá e NÃO
@@ -51,13 +53,88 @@ export function robotsFor({ platformHost, host }) {
     return ['User-agent: *', 'Disallow: /', ''].join('\n');
   }
 
-  const linhas = ['User-agent: *', 'Disallow: /'];
-  for (const caminho of PUBLIC_PATHS) {
-    linhas.push(`Allow: ${caminho === '/' ? '/$' : caminho}`);
-  }
+  const regras = ['Disallow: /', ...PUBLIC_PATHS.map((caminho) => `Allow: ${caminho === '/' ? '/$' : caminho}`)];
+  const linhas = ['User-agent: *', ...regras];
+  // Os robôs de IA ganham grupo próprio, com as mesmas regras repetidas: um
+  // rastreador que acha o seu nome lê SÓ o grupo dele e ignora o `*`, então um
+  // grupo sem as regras o deixaria entrar no painel inteiro.
+  linhas.push('', ...AI_CRAWLERS.map((nome) => `User-agent: ${nome}`), ...regras);
   const base = origemPublica(host);
   if (base) linhas.push('', `Sitemap: ${base}/sitemap.xml`);
   return [...linhas, ''].join('\n');
+}
+
+/**
+ * Os rastreadores de IA que a vitrine libera: os que treinam modelos, os que
+ * montam o índice de busca das respostas e os que buscam a página quando uma
+ * pessoa pergunta algo. Liberados só para as páginas públicas — o resto continua
+ * fechado, como para qualquer outro robô.
+ */
+export const AI_CRAWLERS = Object.freeze([
+  'GPTBot', 'OAI-SearchBot', 'ChatGPT-User',
+  'ClaudeBot', 'Claude-SearchBot', 'Claude-User', 'anthropic-ai',
+  'PerplexityBot', 'Perplexity-User',
+  'Google-Extended', 'Applebot-Extended', 'CCBot', 'cohere-ai', 'Meta-ExternalAgent', 'Bytespider'
+]);
+
+/**
+ * O `llms.txt` do ápice: o resumo da plataforma em Markdown, para um modelo ler
+ * sem passar pelo JavaScript da vitrine. Quando o host não é o ápice, `null` e a
+ * rota responde 404, como o `sitemap.xml`.
+ */
+export function llmsFor({ platformHost, host, plans = [] }) {
+  if (!platformHost) return null;
+  const base = origemPublica(host);
+  if (!base) return null;
+
+  const reais = (centavos, moeda) => {
+    try {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: moeda || 'BRL' }).format(centavos / 100);
+    } catch {
+      return `${(centavos / 100).toFixed(2)} ${moeda}`;
+    }
+  };
+  const periodo = (plano) => (plano.periodDays === 30 ? 'por mês' : plano.periodDays === 365 ? 'por ano' : `a cada ${plano.periodDays} dias`);
+  const limite = (valor, rotulo) => (valor === null ? `${rotulo} ilimitados` : `${valor} ${rotulo}`);
+
+  const linhas = [
+    `# ${SITE_NAME}`,
+    '',
+    `> ${SITE_TAGLINE} ${SEO_PAGES['/'].description}`,
+    '',
+    '## Recursos',
+    ...FEATURES.map((item) => `- **${item.title}**: ${item.text}`),
+    '',
+    '## Como funciona',
+    ...STEPS.map((item, i) => `${i + 1}. **${item.title}**: ${item.text}`),
+    '',
+    `Compatível com: ${VENDORS.join(', ')} e qualquer equipamento TR-069.`
+  ];
+
+  if (plans.length > 0) {
+    linhas.push('', '## Planos');
+    for (const plano of plans) {
+      const preco = plano.priceCents === 0 ? 'Grátis' : `${reais(plano.priceCents, plano.currency)} ${periodo(plano)}`;
+      const partes = [
+        limite(plano.limits?.devices ?? null, 'equipamentos'),
+        limite(plano.limits?.subscribers ?? null, 'assinantes'),
+        limite(plano.limits?.operators ?? null, 'operadores')
+      ];
+      if (plano.trialDays > 0) partes.push(`${plano.trialDays} dias grátis`);
+      linhas.push(`- **${plano.name}**: ${preco}. ${partes.join(', ')}. [Contratar](${base}/signup?plano=${encodeURIComponent(plano.code)})`);
+    }
+  }
+
+  linhas.push('', '## Dúvidas frequentes');
+  for (const item of FAQ) linhas.push(`### ${item.q}`, item.a, '');
+  linhas.push(
+    '## Páginas',
+    `- [Início](${base}/)`,
+    `- [Criar conta](${base}/signup)`,
+    `- [Política de privacidade](${base}/privacidade)`,
+    ''
+  );
+  return linhas.join('\n');
 }
 
 /**

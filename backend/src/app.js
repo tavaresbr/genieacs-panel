@@ -10,7 +10,8 @@ import { IS_SAAS, IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
 import { isPlatformHost, platformHostOnly, resolveTenant } from './middleware/tenantResolver.js';
-import { robotsFor, sitemapFor } from './services/seoFiles.js';
+import { llmsFor, robotsFor, sitemapFor } from './services/seoFiles.js';
+import { loadPublicPlans, renderSeo } from './services/seoHead.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
@@ -436,6 +437,41 @@ app.get('/sitemap.xml', (req, res) => {
   return res.send(xml);
 });
 
+app.get('/llms.txt', async (req, res) => {
+  const host = hostDoPedido(req);
+  const platformHost = isPlatformHost(host);
+  if (!platformHost) return res.status(404).type('text/plain; charset=utf-8').send('Not found\n');
+  const texto = llmsFor({ platformHost, host, plans: await loadPublicPlans() });
+  if (!texto) return res.status(404).type('text/plain; charset=utf-8').send('Not found\n');
+  res.type('text/markdown; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  return res.send(texto);
+});
+
+/**
+ * O `index.html` do painel com a troca de SEO (`services/seoHead.js`): título,
+ * canonical, dados estruturados e o texto da vitrine no ápice; `noindex` em
+ * qualquer outro host. O arquivo é lido do disco só quando muda.
+ */
+let indexCache = { path: null, mtimeMs: 0, html: '' };
+function indexHtml(htmlPath) {
+  const { mtimeMs } = fs.statSync(htmlPath);
+  if (indexCache.path !== htmlPath || indexCache.mtimeMs !== mtimeMs) {
+    indexCache = { path: htmlPath, mtimeMs, html: fs.readFileSync(htmlPath, 'utf8') };
+  }
+  return indexCache.html;
+}
+
+async function sendIndexWithSeo(req, res, htmlPath) {
+  const host = hostDoPedido(req);
+  const platformHost = isPlatformHost(host);
+  const pathname = req.path;
+  // Só a vitrine lê o catálogo; as outras páginas não pagam a consulta.
+  const plans = platformHost && pathname === '/' ? await loadPublicPlans() : [];
+  res.type('html');
+  return res.send(renderSeo({ html: indexHtml(htmlPath), platformHost, host, pathname, plans }));
+}
+
 function serveFrontend(target, htmlFile) {
   if (!fs.existsSync(FRONTEND_DIR)) return false;
   target.use(express.static(FRONTEND_DIR, {
@@ -475,6 +511,11 @@ function serveFrontend(target, htmlFile) {
     // resolver. Nada vindo da requisição chega aqui hoje, então nenhum teste
     // distingue as duas formas; a diferença é entre estar seguro por causa de
     // quem chama e estar seguro por construção.
+    // O painel passa pela troca de SEO; o portal do assinante (`portal.html`)
+    // e o cadastro do WhatsApp seguem como arquivo.
+    if (htmlFile === 'index.html') {
+      return sendIndexWithSeo(req, res, htmlPath).catch(next);
+    }
     return res.sendFile(htmlFile, { root: FRONTEND_DIR, dotfiles: 'deny' });
   });
   return true;
