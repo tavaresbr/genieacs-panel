@@ -13,9 +13,13 @@ import { useTranslation } from '@/contexts/language-context'
  * e as integrações com sistemas de fora (a conta Asaas). E os alertas para
  * quem opera a plataforma (0112), e o e-mail de teste do SMTP do deploy.
  */
-export function PlatformSettings() {
+export function PlatformSettings({ initialSub = 'profile', initialAlertsTab = 'settings' }: {
+  /** O submenu aberto ao montar (o painel Início abre direto nos alertas). */
+  initialSub?: 'profile' | 'alerts' | 'mail' | 'integrations'
+  initialAlertsTab?: 'settings' | 'history'
+} = {}) {
   const { t } = useTranslation()
-  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations'>('profile')
+  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations'>(initialSub)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
@@ -41,7 +45,7 @@ export function PlatformSettings() {
       </nav>
       <div className="min-w-0">
         {sub === 'profile' && <PlatformProfileForm />}
-        {sub === 'alerts' && <PlatformAlertsPanel settings={<PlatformAlertsSettings />} />}
+        {sub === 'alerts' && <PlatformAlertsPanel settings={<PlatformAlertsSettings />} initialTab={initialAlertsTab} />}
         {sub === 'mail' && <PlatformMailSettings />}
         {sub === 'integrations' && <PlatformIntegrations />}
       </div>

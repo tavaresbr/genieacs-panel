@@ -6,6 +6,7 @@ import { BarChart } from '@/components/charts/bar-chart'
 import { PieChart } from '@/components/charts/pie-chart'
 import { SeriesChart } from '@/components/charts/series-chart'
 import { Icon } from '@/components/ui/icon'
+import { StatTile } from '@/components/ui/stat-tile'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
 import { monthLabel, monthOverMonth } from '@/lib/revenue-report'
@@ -122,19 +123,19 @@ export function PlatformRevenueCharts() {
       {dados && !vazio && (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Tile
+            <MetricTile
               label={t('platform.metrics.mrr')}
               variacao={monthOverMonth(serie, (m) => m.mrrCents)}
               format={dinheiro}
               hint={t('platform.metrics.payingHint', { count: serie.at(-1)?.payingCount ?? 0 })}
             />
-            <Tile
+            <MetricTile
               label={t('platform.metrics.received')}
               variacao={monthOverMonth(serie, (m) => m.receivedCents)}
               format={dinheiro}
               hint={t('platform.metrics.receivedHint')}
             />
-            <Tile
+            <MetricTile
               label={t('platform.metrics.newVsCanceled')}
               variacao={monthOverMonth(serie, (m) => m.newTenants - m.canceledTenants)}
               format={(n) => `${n > 0 ? '+' : ''}${n}`}
@@ -144,7 +145,7 @@ export function PlatformRevenueCharts() {
                 churn: churnTexto(serie.at(-1)?.churnRate ?? null, locale)
               })}
             />
-            <Tile
+            <MetricTile
               label={t('platform.metrics.overdue')}
               variacao={monthOverMonth(serie, (m) => m.overdueCents)}
               format={dinheiro}
@@ -211,6 +212,28 @@ export function PlatformRevenueCharts() {
   )
 }
 
+/** O `StatTile` com a variação mês a mês de `monthOverMonth`. */
+function MetricTile({ label, variacao, format, hint, upIsBad = false }: {
+  label: string
+  variacao: { value: number | null; delta: number | null; pct: number | null }
+  format: (value: number) => string
+  hint?: string
+  /** Na inadimplência, subir é ruim. */
+  upIsBad?: boolean
+}) {
+  return (
+    <StatTile
+      label={label}
+      value={variacao.value === null ? '-' : format(variacao.value)}
+      delta={variacao.delta}
+      deltaPct={variacao.pct}
+      formatDelta={format}
+      hint={hint}
+      upIsBad={upIsBad}
+    />
+  )
+}
+
 function churnTexto(rate: number | null, locale: string) {
   if (rate === null) return '-'
   try {
@@ -226,36 +249,6 @@ function ChartCard({ title, hint, children }: { title: string; hint?: string; ch
       <h3 className="section-heading">{title}</h3>
       {hint && <p className="field-hint mb-2">{hint}</p>}
       {children}
-    </div>
-  )
-}
-
-function Tile({ label, variacao, format, hint, upIsBad = false }: {
-  label: string
-  variacao: { value: number | null; delta: number | null; pct: number | null }
-  format: (value: number) => string
-  hint?: string
-  /** Na inadimplência, subir é ruim. */
-  upIsBad?: boolean
-}) {
-  const { t, intlLocale: locale } = useTranslation()
-  const { value, delta, pct } = variacao
-  const bom = delta === null || delta === 0 ? null : (delta > 0) !== upIsBad
-  let textoDelta = t('platform.metrics.noChange')
-  if (delta !== null && delta !== 0) {
-    const sinal = delta > 0 ? '+' : '-'
-    const pctTexto = pct === null ? '' : ` (${sinal}${new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(Math.abs(pct))})`
-    textoDelta = `${sinal}${format(Math.abs(delta)).replace(/^[+-]/, '')}${pctTexto}`
-  }
-  return (
-    <div className="modern-card p-3">
-      <p className="metric-label">{label}</p>
-      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">{value === null ? '-' : format(value)}</p>
-      <p className={`text-xs font-medium ${bom === null ? 'text-muted-foreground' : bom ? 'text-[hsl(var(--status-success))]' : 'text-destructive'}`}>
-        <span className="sr-only">{t('platform.metrics.vsPrevious')}: </span>
-        {textoDelta}
-      </p>
-      {hint && <p className="field-hint">{hint}</p>}
     </div>
   )
 }

@@ -6904,3 +6904,78 @@ export const platformAlertHistoryAPI = {
   resend: (id: number) =>
     apiClient.post<{ alert: PlatformAlertHistoryItem; requeued: number }>(`/platform/alerts/${id}/resend`, {}),
 }
+
+// ---------------------------------------------------------------------------
+// Painel inicial do console (aba Início): `GET /platform/overview`.
+// ---------------------------------------------------------------------------
+
+/** Um número deste mês e do anterior (`pct` é fração; nulo sem base). */
+export interface PlatformOverviewDelta {
+  value: number | null
+  previous: number | null
+  delta: number | null
+  pct: number | null
+}
+
+export interface PlatformOverviewTenantRef {
+  id: number
+  name: string | null
+  slug: string | null
+}
+
+export interface PlatformOverviewPlanRef {
+  id: number | null
+  code: string | null
+  name: string | null
+}
+
+export interface PlatformOverviewRenewal {
+  tenant: PlatformOverviewTenantRef
+  plan: PlatformOverviewPlanRef
+  billingCycle: 'monthly' | 'annual'
+  renewsAt: string
+  amountCents: number
+  currency: string
+  cardAutopay: boolean
+  pendingPlanChange: boolean
+}
+
+export interface PlatformOverviewTrial {
+  tenant: PlatformOverviewTenantRef
+  plan: PlatformOverviewPlanRef
+  trialEndsAt: string
+  cardSaved: boolean
+}
+
+export type PlatformOverviewBlock =
+  'revenue' | 'delinquency' | 'alerts' | 'cancellations' | 'renewals' | 'trials' | 'newTenants'
+
+/** Cada bloco é `null` quando falhou no servidor (e o nome vem em `errors`). */
+export interface PlatformOverview {
+  generatedAt: string
+  timeZone: string
+  windowDays: number
+  revenue: {
+    month: string | null
+    currency: string
+    mrr: PlatformOverviewDelta
+    received: PlatformOverviewDelta
+    payingCount: number
+  } | null
+  delinquency: {
+    count: number
+    totalOverdueCents: number
+    totalsByCurrency: { currency: string; cents: number }[]
+    byBucket: Record<'1-7' | '8-15' | '16-30' | '30+', number>
+  } | null
+  alerts: { failed: number; since: string; windowDays: number } | null
+  cancellations: { pending: number; scheduled: number; nextScheduledAt: string | null } | null
+  renewals: { total: number; items: PlatformOverviewRenewal[] } | null
+  trials: { total: number; items: PlatformOverviewTrial[] } | null
+  newTenants: (PlatformOverviewDelta & { month: string; count: number }) | null
+  errors: PlatformOverviewBlock[]
+}
+
+export const platformOverviewAPI = {
+  get: () => apiClient.get<PlatformOverview>('/platform/overview'),
+}

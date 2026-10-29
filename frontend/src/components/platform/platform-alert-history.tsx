@@ -272,9 +272,13 @@ export function PlatformAlertHistory() {
  * Configurações → Alertas: a configuração e o histórico, lado a lado em duas
  * abas no topo do painel.
  */
-export function PlatformAlertsPanel({ settings }: { settings: ReactNode }) {
+export function PlatformAlertsPanel({ settings, initialTab = 'settings' }: {
+  settings: ReactNode
+  /** A metade aberta ao montar (o painel Início abre direto no histórico). */
+  initialTab?: 'settings' | 'history'
+}) {
   const { t } = useTranslation()
-  const [aba, setAba] = useState<'settings' | 'history'>('settings')
+  const [aba, setAba] = useState<'settings' | 'history'>(initialTab)
   return (
     <div className="grid gap-4">
       <div className="flex gap-2" role="tablist" aria-label={t('platform.settings.alerts')}>
