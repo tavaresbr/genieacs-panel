@@ -1966,6 +1966,13 @@ export interface TenantPlanOption {
    * fatura. Opcional: servidores antigos não mandam.
    */
   proration?: PlanProrationPreview | null
+  /**
+   * O que a troca para este plano faria em cada ciclo, pela regra do
+   * servidor: na hora ou na renovação (com a data), o preço a partir dali e a
+   * pró-rata. Nulo no plano e ciclo de agora e no ciclo que o plano não
+   * oferece. Opcional: servidores antigos não mandam.
+   */
+  changes?: Partial<Record<BillingCycle, PlanChangePreview | null>>
 }
 
 /** A prévia da pró-rata de uma subida, na lista de planos. */
@@ -2512,12 +2519,25 @@ export const platformAPI = {
       `/platform/tenants/${tenantId}/subscription`
     ),
 
-  /** `planId` and/or `status`; each becomes its own line on the statement. */
+  /**
+   * `planId` and/or `status`; each becomes its own line on the statement.
+   *
+   * A troca de plano segue a regra do provedor (`mode` ausente é `auto`):
+   * subir vale na hora, com a pró-rata; descer ou trocar de ciclo no meio do
+   * período fica para a renovação. `outcome` diz o que aconteceu. 409
+   * `pending_change` quando há uma troca agendada e não veio `replacePending`.
+   */
   updateSubscription: (tenantId: number, payload: {
     planId?: number; status?: SubscriptionStatus; reason?: string; trialEndsAt?: string | null; renewsAt?: string | null
-  }) =>
-    apiClient.requestWithBody<{ subscription: SubscriptionView; planId: number | null }>(
+  } & ConsolePlanChangeOptions) =>
+    apiClient.requestWithBody<{ subscription: SubscriptionView; planId: number | null; outcome?: ConsolePlanChangeOutcome }>(
       'PUT', `/platform/tenants/${tenantId}/subscription`, payload
+    ),
+
+  /** O que a troca para `planId` faria em cada modo — só lê. Ver `ConsolePlanPreview`. */
+  previewPlanChange: (tenantId: number, planId: number, cycle?: BillingCycle | null) =>
+    apiClient.get<{ preview: ConsolePlanPreview }>(
+      `/platform/tenants/${tenantId}/subscription/plan-preview?planId=${planId}${cycle ? `&cycle=${cycle}` : ''}`
     ),
 
   /** We mark it paid. `reference` is the Pix id, the boleto number — whatever names the payment. */
@@ -6903,4 +6923,92 @@ export const platformAlertHistoryAPI = {
    */
   resend: (id: number) =>
     apiClient.post<{ alert: PlatformAlertHistoryItem; requeued: number }>(`/platform/alerts/${id}/resend`, {}),
+}
+
+// ── A troca de plano com prévia (provedor e console) ─────────────────────
+
+export type PlanChangeMode = 'auto' | 'now' | 'renewal'
+export type PlanChangeTiming = 'now' | 'renewal'
+export type PlanChangeDirection = 'none' | 'cycle' | 'upgrade' | 'downgrade' | 'lateral'
+
+/**
+ * O que UMA troca faria, pela regra do servidor (`decidePlanChange`):
+ * quando vale, o preço da fatura do plano novo a partir de `nextChargeAt` e
+ * a pró-rata cobrada agora (nula quando não há).
+ */
+export interface PlanChangePreview {
+  cycle: BillingCycle
+  cycleFrom: BillingCycle
+  direction: PlanChangeDirection
+  timing: PlanChangeTiming
+  effectiveAt: string | null
+  renewalAt: string | null
+  /** A descida que vai para a renovação SEGUINTE porque o plano de agora veio de uma subida neste período. */
+  deferredByUpgrade: boolean
+  priceCents: number
+  listPriceCents: number
+  currency: string
+  nextChargeAt: string | null
+  proration: PlanProrationPreview | null
+  /** `cycle_change`: a troca de ciclo forçada para agora não cobra pró-rata. */
+  prorationSkipped?: 'cycle_change'
+}
+
+/** A prévia do console: cada modo, mais o que barraria a troca. */
+export interface ConsolePlanPreview {
+  planId: number
+  cycle: BillingCycle
+  current: { planId: number | null; cycle: BillingCycle; status: SubscriptionStatus | null; renewsAt: string | null }
+  direction: PlanChangeDirection
+  /** Forçar agora o que a regra deixaria para a renovação pede o motivo. */
+  reasonRequiredForNow: boolean
+  overLimit: Array<{ resource: 'operators' | 'subscribers' | 'devices'; used: number; limit: number }>
+  limitBlocksNow: boolean
+  pending: { planId: number; cycle: BillingCycle; effectiveAt: string | null; locked: boolean } | null
+  blockers: Array<'cancel_scheduled' | 'subscription_paused' | 'pending_locked' | 'cycle_unavailable'>
+  modes: {
+    auto: PlanChangePreview & { autoTiming: PlanChangeTiming; renewalAvailable: boolean }
+    now: PlanChangePreview & { autoTiming: PlanChangeTiming; renewalAvailable: boolean }
+    /** Nulo sem período pago correndo: não há renovação para agendar. */
+    renewal: (PlanChangePreview & { autoTiming: PlanChangeTiming; renewalAvailable: boolean }) | null
+  }
+}
+
+/** Os campos da troca de plano pelo console no `PUT` da assinatura. */
+export interface ConsolePlanChangeOptions {
+  cycle?: BillingCycle
+  mode?: PlanChangeMode
+  /** Padrão `true`: a subida cobra a pró-rata. */
+  prorate?: boolean
+  /** Troca na hora mesmo acima dos tetos do plano novo — com `reason`. */
+  skipLimitCheck?: boolean
+  replacePending?: boolean
+}
+
+/** O que a troca de plano pelo console fez. */
+export interface ConsolePlanChangeOutcome {
+  changed: boolean
+  scheduled: boolean
+  effectiveAt: string | null
+  timing: PlanChangeTiming | 'none'
+  mode: PlanChangeMode
+  forced: boolean
+  billingCycle: BillingCycle | null
+  cycleFrom?: BillingCycle
+  pendingCanceled?: boolean
+  canceledPlanId?: number | null
+  replacedPlanId?: number
+  deferredByUpgrade?: boolean
+  limitCheck: 'passed' | 'skipped' | 'deferred' | 'not_needed'
+  overLimit?: ConsolePlanPreview['overLimit']
+  openCharge: 'none' | 'reissued'
+  proration: {
+    amountCents?: number
+    remainingDays?: number | null
+    currency?: string | null
+    issued: boolean
+    skipped?: 'below_minimum' | 'waived' | 'cycle_change' | string
+    reason?: string
+    chargeId?: number
+  } | null
 }

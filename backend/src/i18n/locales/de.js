@@ -1284,5 +1284,9 @@ export default {
   'receipt.chargeId': 'Rechnung',
   'receipt.issuedAt': 'Ausgestellt am {date}',
   'receipt.statement': 'Wir haben von {payer} den Betrag von {amount} für {description} erhalten.',
-  'receipt.printHint': 'Zum Speichern als PDF im Browser Drucken (Strg+P) verwenden.'
+  'receipt.printHint': 'Zum Speichern als PDF im Browser Drucken (Strg+P) verwenden.',
+  'subscription.pendingChange': 'Für den {date} ist bereits ein Tarifwechsel geplant. Bestätigen Sie, dass Sie ihn ersetzen möchten.',
+  'subscription.reasonRequired': 'Geben Sie einen Grund an: Er ist erforderlich, um den Wechsel sofort zu erzwingen oder die Limitprüfung zu überspringen.',
+  'subscription.noRenewal': 'Es läuft kein bezahlter Zeitraum: Der Wechsel kann nicht zur Verlängerung geplant werden.',
+  'subscription.invalidMode': 'Der Wechselmodus muss auto, now oder renewal sein.'
 };

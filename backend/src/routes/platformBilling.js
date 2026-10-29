@@ -22,6 +22,8 @@ router.patch('/plans/:id', ...guard, PlatformBillingController.updatePlan);
 
 router.get('/tenants/:id/subscription', ...guard, PlatformBillingController.getSubscription);
 router.put('/tenants/:id/subscription', ...guard, PlatformBillingController.updateSubscription);
+// A prévia da troca de plano: o que cada modo (auto, agora, na renovação) faria.
+router.get('/tenants/:id/subscription/plan-preview', ...guard, PlatformBillingController.previewPlanChange);
 router.post('/tenants/:id/payments', ...guard, PlatformBillingController.recordPayment);
 router.get('/tenants/:id/usage', ...guard, PlatformBillingController.getUsage);
 

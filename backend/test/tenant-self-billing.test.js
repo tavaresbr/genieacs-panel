@@ -213,7 +213,16 @@ describe('a lista de planos', () => {
 
     const antigo = lista.find((p) => p.code === 'auto-antigo');
     assert.equal(antigo.current, true);
-    const { proration: previa, overagePriceCents: excedente, ...basico } = lista.find((p) => p.code === 'auto-basico');
+    const {
+      proration: previa, overagePriceCents: excedente, changes: troca, ...basico
+    } = lista.find((p) => p.code === 'auto-basico');
+    // A prévia da troca por ciclo (a regra de `decidePlanChange`): subida,
+    // na hora, no mensal; sem anual no plano, nada no anual. O atual não tem.
+    assert.equal(troca.monthly.timing, 'now');
+    assert.equal(troca.monthly.direction, 'upgrade');
+    assert.equal(troca.monthly.priceCents, 9990);
+    assert.equal(troca.annual, null);
+    assert.deepEqual(lista.find((p) => p.code === 'auto-antigo').changes, { monthly: null, annual: null });
     // Sem preço de excedente (0105): o teto barra, como sempre.
     assert.deepEqual(excedente, { operators: null, subscribers: null, devices: null });
     // Do Antigo (R$ 50,00) ao Básico com dois dias por correr: a diferença

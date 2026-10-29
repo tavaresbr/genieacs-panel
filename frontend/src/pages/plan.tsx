@@ -35,6 +35,7 @@ import {
   subscriptionAllowsChanges
 } from '@/lib/plan-options'
 import { displayDate, displayDayMonth } from '@/lib/date-format'
+import { kindFromPreview } from '@/lib/plan-change-console'
 import { couponAppliesToPlan, couponDurationLabel, couponPriceCents } from '@/lib/coupon'
 import { CouponBadge } from '@/components/platform/coupon-control'
 import { CardAutopay } from '@/components/card-autopay'
@@ -188,8 +189,7 @@ export default function PlanPage() {
   }
 
   /** A frase da pró-rata de subir para `plan`, ou nulo quando não há o que cobrar. */
-  const prorationLine = (plan: TenantPlanOption) => {
-    const previa = plan.proration
+  const prorationLine = (plan: TenantPlanOption, previa = plan.proration) => {
     if (!previa) return null
     if (previa.skipped) return t('plan.proration.belowMinimum')
     if (!(previa.amountCents > 0)) return null
@@ -204,16 +204,30 @@ export default function PlanPage() {
     const periodo = periodLabel(doCiclo.periodDays, formatMoney(doCiclo.priceCents, plan.currency))
     const preco = t(periodo.key, periodo.vars)
     const atual = plans?.find((p) => p.current) ?? null
-    const tipo = planChangeKind(atual, plan, data?.subscription, undefined, ciclo)
+    // A prévia do servidor para esta troca (a mesma regra da troca): quando
+    // vale, o preço a partir dali e a pró-rata. Sem ela (servidor antigo), a
+    // conta de sempre aqui.
+    const previa = plan.changes?.[ciclo] ?? null
+    const tipo = previa ? kindFromPreview(previa) : planChangeKind(atual, plan, data?.subscription, undefined, ciclo)
     if (tipo === 'same') return
-    const vars = { name: plan.name, price: preco, date: formatDate(data?.subscription?.renewsAt) ?? '' }
+    const quando = previa?.effectiveAt ?? data?.subscription?.renewsAt
+    const vars = { name: plan.name, price: preco, date: formatDate(quando) ?? '' }
     // A pró-rata, ANTES do clique que a cobra: "você vai pagar R$ X agora".
-    const prorata = tipo === 'upgrade' ? prorationLine(plan) : null
+    const prorata = tipo === 'upgrade' ? prorationLine(plan, previa ? previa.proration : plan.proration) : null
+    // A troca agendada: o preço da fatura a partir da data (com o cupom), e o
+    // aviso de quando a descida espera a renovação SEGUINTE.
+    const aPartirDe = previa && previa.timing === 'renewal' && previa.effectiveAt
+      ? t('plan.change.priceFrom', {
+        date: formatDate(previa.effectiveAt) ?? '',
+        price: formatMoney(previa.priceCents, previa.currency || plan.currency)
+      })
+      : null
+    const adiada = previa?.deferredByUpgrade ? t('plan.change.deferred') : null
     // O cupom de N faturas que a troca para o anual tira (0104), dito ANTES do clique.
     const cupomSai = couponDroppedOnAnnual(data?.subscription?.coupon, currentCycle(data?.subscription), ciclo)
       ? t('plan.cycle.couponDropped', { code: data?.subscription?.coupon?.code ?? '' })
       : null
-    const pergunta = [t(confirmKey(tipo), vars), prorata, cupomSai].filter(Boolean).join('\n\n')
+    const pergunta = [t(confirmKey(tipo), vars), prorata, aPartirDe, adiada, cupomSai].filter(Boolean).join('\n\n')
     if (!window.confirm(pergunta)) return
     setMudando(plan.id)
     await trocar(plan.id, t('plan.options.changed', { name: plan.name }), ciclo)

@@ -1284,5 +1284,9 @@ export default {
   'receipt.chargeId': 'Счёт',
   'receipt.issuedAt': 'Выдано {date}',
   'receipt.statement': 'Мы получили от {payer} сумму {amount} в счёт: {description}.',
-  'receipt.printHint': 'Чтобы сохранить в PDF, используйте «Печать» (Ctrl+P) в браузере.'
+  'receipt.printHint': 'Чтобы сохранить в PDF, используйте «Печать» (Ctrl+P) в браузере.',
+  'subscription.pendingChange': 'Смена тарифа уже запланирована на {date}. Подтвердите, что хотите её заменить.',
+  'subscription.reasonRequired': 'Укажите причину: она обязательна, чтобы применить смену сейчас или пропустить проверку лимитов.',
+  'subscription.noRenewal': 'Нет текущего оплаченного периода: смену нельзя запланировать на продление.',
+  'subscription.invalidMode': 'Режим смены должен быть auto, now или renewal.'
 };

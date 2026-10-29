@@ -1283,5 +1283,9 @@ export default {
   'receipt.chargeId': '账单',
   'receipt.issuedAt': '开具于 {date}',
   'receipt.statement': '我们已收到 {payer} 支付的 {amount}，用于 {description}。',
-  'receipt.printHint': '如需保存为 PDF，请在浏览器中使用“打印”(Ctrl+P)。'
+  'receipt.printHint': '如需保存为 PDF，请在浏览器中使用“打印”(Ctrl+P)。',
+  'subscription.pendingChange': '已有一个计划变更安排在 {date}。请确认要替换它。',
+  'subscription.reasonRequired': '请填写原因：强制立即变更或跳过限额检查时必须填写。',
+  'subscription.noRenewal': '当前没有已付费的周期：无法将变更安排在续订时。',
+  'subscription.invalidMode': '变更模式必须是 auto、now 或 renewal。'
 };

@@ -1275,5 +1275,9 @@ export default {
   'receipt.chargeId': 'الفاتورة',
   'receipt.issuedAt': 'صدر في {date}',
   'receipt.statement': 'استلمنا من {payer} مبلغ {amount} مقابل {description}.',
-  'receipt.printHint': 'للحفظ بصيغة PDF، استخدم الطباعة (Ctrl+P) في المتصفح.'
+  'receipt.printHint': 'للحفظ بصيغة PDF، استخدم الطباعة (Ctrl+P) في المتصفح.',
+  'subscription.pendingChange': 'يوجد بالفعل تغيير خطة مجدول في {date}. أكّد أنك تريد استبداله.',
+  'subscription.reasonRequired': 'أدخل السبب: إنه مطلوب لفرض التغيير الآن أو لتخطي التحقق من الحدود.',
+  'subscription.noRenewal': 'لا توجد فترة مدفوعة جارية: لا يمكن جدولة التغيير عند التجديد.',
+  'subscription.invalidMode': 'يجب أن يكون وضع التغيير auto أو now أو renewal.'
 };
