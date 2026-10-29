@@ -5335,6 +5335,8 @@ const ja: Dictionary = {
   'platform.planChange.prorationPending': '{amount} の日割り請求は今は発行されませんでした。再試行されます。',
   'plan.change.priceFrom': '{date} 以降の請求額は {price} になります。',
   'plan.change.deferred': '現在のプランはこの期間中のアップグレードによるものなので、ダウングレードは次の更新時にのみ有効になります。',
+  'platform.reminders.idLocked': '保存済み: ID はもう変更できません — システムはこの ID でこのステップが送信済みかを判断します。別の ID にするには、ステップを削除して新しく追加してください。',
+  'platform.reminders.restoreWarning': '注意: 既定に戻すと、ステップは ID before・due・after に置き換わります。現在の期日に対して別の ID ですでに送信されたステップが、既定の ID で再送される場合があります。',
 }
 
 export default ja

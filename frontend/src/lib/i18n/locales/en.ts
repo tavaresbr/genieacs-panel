@@ -5337,6 +5337,8 @@ const en = {
   'platform.planChange.prorationPending': 'The proration of {amount} was not issued now; it will be retried.',
   'plan.change.priceFrom': 'From {date}, your invoice will be {price}.',
   'plan.change.deferred': 'Since your current plan came from an upgrade in this period, the downgrade only takes effect at the following renewal.',
+  'platform.reminders.idLocked': 'Already saved: the id no longer changes — it is how the system knows this step was already sent. For another id, remove the step and add a new one.',
+  'platform.reminders.restoreWarning': 'Warning: restoring the default replaces the steps with the ids before, due and after. A step with a different id already sent for the current due date may be sent again under the default id.',
 }
 
 export default en

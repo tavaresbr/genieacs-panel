@@ -5336,6 +5336,8 @@ const zhTW: Dictionary = {
   'platform.planChange.prorationPending': '{amount} 的按比例帳單暫未開立，將會重試。',
   'plan.change.priceFrom': '自 {date} 起，您的帳單為 {price}。',
   'plan.change.deferred': '由於您目前的方案來自本期間內的升級，降級只會在下一次續約時生效。',
+  'platform.reminders.idLocked': '已儲存：ID 不能再變更——系統靠它判斷此步驟是否已傳送。如需其他 ID，請刪除該步驟並新增一個。',
+  'platform.reminders.restoreWarning': '注意：還原預設會把步驟換成 ID 為 before、due 和 after 的步驟。目前到期日已用其他 ID 傳送過的步驟，可能會以預設 ID 再次傳送。',
 }
 
 export default zhTW

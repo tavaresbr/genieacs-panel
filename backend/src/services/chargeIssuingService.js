@@ -125,11 +125,27 @@ class ChargeIssuingService {
    *
    * Emitir mais cedo não muda a chave da cobrança (`period_end`, o prazo):
    * a idempotência da emissão é a mesma.
+   *
+   * Duas exceções, nas opções:
+   *
+   *   trial       o prazo é o fim do teste (`trial_ends_at`): fica em
+   *               `LEAD_DAYS`. A fatura do primeiro pagamento vinte dias antes
+   *               do fim de um teste de trinta é cobrar quem mal começou a
+   *               testar — e o lembrete do teste tem texto próprio, sem link.
+   *   periodDays  os dias do ciclo pago (`cyclePeriodDays`): a antecedência
+   *               não passa de `periodDays − 1`, para a fatura do período
+   *               seguinte nunca sair antes de o período atual começar (um
+   *               plano de dez dias com um `before` a −20). Nunca menos que
+   *               `LEAD_DAYS`, a regra de antes da régua.
    */
-  static leadDaysFor(policy) {
+  static leadDaysFor(policy, { trial = false, periodDays = null } = {}) {
+    if (trial) return this.LEAD_DAYS;
     const antes = maxBeforeDays(policy);
     if (!(antes > this.LEAD_DAYS)) return this.LEAD_DAYS;
-    return Math.min(antes + 1, this.ISSUE_LEAD_MAX_DAYS);
+    let dias = Math.min(antes + 1, this.ISSUE_LEAD_MAX_DAYS);
+    const ciclo = Number(periodDays);
+    if (Number.isFinite(ciclo) && ciclo > 0) dias = Math.max(this.LEAD_DAYS, Math.min(dias, ciclo - 1));
+    return dias;
   }
 
   /**
@@ -987,7 +1003,12 @@ class ChargeIssuingService {
     // vencimento (no fuso da cobrança, desde a meia-noite: o pagamento chega
     // antes de o prazo virar `past_due`). O clique (`manual`) não espera.
     if (!manual) {
-      const antecedencia = this.leadDaysFor(await reminderPolicyConfig());
+      // Sem período pago (`renews_at` nulo), o prazo é o do teste: a régua
+      // não puxa essa emissão (`leadDaysFor`).
+      const antecedencia = this.leadDaysFor(await reminderPolicyConfig(), {
+        trial: !subscription.renews_at,
+        periodDays: SubscriptionService.cyclePeriodDays(subscription, plan)
+      });
       const aindaNao = this.chargesSavedCard(provider, subscription)
         ? periodo > this.isoDate(now)
         : vencimento.getTime() > now.getTime() + antecedencia * 86_400_000;

@@ -22,6 +22,9 @@ const { default: SubscriptionService } = await import('../src/services/subscript
 const { saveProfile, invalidatePlatformProfile } = await import('../src/services/platformProfileService.js');
 const { normalizeReminderPolicy, defaultReminderPolicy } = await import('../src/services/reminderPolicy.js');
 const { resetMailTransport } = await import('../src/services/mail/index.js');
+const { default: SelfBillingService } = await import('../src/services/selfBillingService.js');
+const { default: CouponService } = await import('../src/services/couponService.js');
+const { default: Coupon } = await import('../src/models/Coupon.js');
 
 const DIA = 86_400_000;
 
@@ -181,5 +184,139 @@ describe('a antecedência da emissão pela régua', () => {
     assert.equal(depois.issued, false, JSON.stringify(depois));
     assert.equal((await cobrancas()).length, 1);
     assert.equal(pedidos.filter((p) => p.path === '/payments' && p.method === 'POST').length, 1);
+  });
+});
+
+describe('a antecedência da régua não vale para o teste nem passa do ciclo', () => {
+  it('leadDaysFor: no teste fica em LEAD_DAYS; com o ciclo, no máximo periodDays − 1 (nunca menos que LEAD_DAYS)', () => {
+    const politica = normalizeReminderPolicy({ steps: [passo('d20', 'before', -20)] });
+    assert.equal(ChargeIssuingService.leadDaysFor(politica), 21);
+    assert.equal(ChargeIssuingService.leadDaysFor(politica, { trial: true }), ChargeIssuingService.LEAD_DAYS);
+    assert.equal(ChargeIssuingService.leadDaysFor(politica, { periodDays: 30 }), 21);
+    assert.equal(ChargeIssuingService.leadDaysFor(politica, { periodDays: 10 }), 9);
+    assert.equal(ChargeIssuingService.leadDaysFor(politica, { periodDays: 3 }), ChargeIssuingService.LEAD_DAYS);
+    assert.equal(ChargeIssuingService.leadDaysFor(defaultReminderPolicy(), { periodDays: 3 }), ChargeIssuingService.LEAD_DAYS);
+  });
+
+  it('no teste (prazo = trial_ends_at), um before a −10 não puxa a emissão: ela sai LEAD_DAYS antes', async () => {
+    await saveProfile({ reminderPolicy: { steps: [passo('d10', 'before', -10), passo('due', 'due', 0)] } });
+    const agora = seg(Date.now());
+    const fim = seg(agora.getTime() + 9 * DIA);
+    await runInTenant(alfa, async () => {
+      await Subscription.upsertForTenant(alfa, {
+        plan_id: planoPago.id, status: 'trial', renews_at: null, trial_ends_at: fim
+      });
+      SubscriptionService.cache.invalidate();
+    });
+    assert.equal((await emitir(agora)).reason, 'not_due_yet', 'nove dias antes do fim do teste, nada');
+    assert.equal((await emitir(new Date(fim.getTime() - 6 * DIA))).reason, 'not_due_yet', 'seis dias antes, nada');
+    const r = await emitir(new Date(fim.getTime() - 5 * DIA + 60_000));
+    assert.equal(r.issued, true, JSON.stringify(r));
+    assert.equal(pedidos.filter((p) => p.method === 'POST' && p.path === '/payments').length, 1);
+  });
+});
+
+describe('a fatura emitida cedo pela régua é reprecificada pelo que muda o preço no meio da janela', () => {
+  const semOnts = async () => 0;
+  let planoCaro;
+  let planoBarato;
+  let sequencia = 0;
+
+  before(async () => {
+    await runInTenant(alfa, async () => {
+      planoCaro = await Plan.create({
+        code: 'caro-regua', name: 'Caro', price_cents: 39990, currency: 'BRL', period_days: 30, active: true
+      });
+      planoBarato = await Plan.create({
+        code: 'barato-regua', name: 'Barato', price_cents: 9990, currency: 'BRL', period_days: 30, active: true
+      });
+    });
+    await getDb()('plans').where({ id: planoPago.id }).update({ price_yearly_cents: 199900 });
+  });
+
+  /** Vinte dias antes do prazo, com a régua a −20: a fatura já saiu. */
+  async function comFaturaCedo() {
+    await saveProfile({ reminderPolicy: { steps: [passo('d20', 'before', -20), passo('due', 'due', 0)] } });
+    const agora = seg(Date.now());
+    const renova = seg(agora.getTime() + 20 * DIA);
+    await runInTenant(alfa, async () => {
+      await Subscription.upsertForTenant(alfa, {
+        plan_id: planoPago.id,
+        status: 'active',
+        renews_at: renova,
+        trial_ends_at: null,
+        billing_cycle: 'monthly',
+        pending_plan_id: null,
+        pending_plan_at: null,
+        pending_billing_cycle: null,
+        pending_plan_locked_at: null,
+        upgraded_at: null,
+        coupon_id: null,
+        coupon_cycles_left: null
+      });
+      SubscriptionService.cache.invalidate();
+    });
+    const r = await emitir(agora);
+    assert.equal(r.issued, true, JSON.stringify(r));
+    const [linha] = await renovacoes();
+    assert.equal(Number(linha.amount_cents), 19990);
+    return { agora, renova, linha };
+  }
+
+  const renovacoes = () => getDb()('billing_charges')
+    .where({ tenant_id: alfa }).whereNotIn('kind', ['proration', 'overage']).orderBy('id');
+
+  /** A renovação em aberto do prazo, com o valor que pede agora — e só uma. */
+  async function abertaDoPrazo(renova) {
+    const linhas = (await renovacoes())
+      .filter((l) => String(l.period_end).slice(0, 10) === ChargeIssuingService.periodKey(renova));
+    assert.equal(linhas.length, 1, 'uma linha por período');
+    return linhas[0];
+  }
+
+  it('a subida na hora reemite a fatura em aberto pelo preço do plano novo', async () => {
+    const { renova } = await comFaturaCedo();
+    const r = await runInTenant(alfa, () => SelfBillingService.changePlan({ planId: planoCaro.id, countDevices: semOnts }));
+    assert.equal(r.scheduled, false);
+    assert.equal(r.charge, 'reissued');
+    const linha = await abertaDoPrazo(renova);
+    assert.equal(Number(linha.amount_cents), 39990);
+    assert.equal(Number(linha.plan_id), planoCaro.id);
+    assert.ok(pedidos.some((p) => p.method === 'DELETE'), 'a velha foi cancelada no gateway');
+  });
+
+  it('a descida agendada para a renovação reemite a fatura pelo preço do plano de baixo', async () => {
+    const { renova } = await comFaturaCedo();
+    const r = await runInTenant(alfa, () => SelfBillingService.changePlan({ planId: planoBarato.id, countDevices: semOnts }));
+    assert.equal(r.scheduled, true);
+    assert.equal(r.charge, 'reissued');
+    const linha = await abertaDoPrazo(renova);
+    assert.equal(Number(linha.amount_cents), 9990);
+    assert.equal(Number(linha.plan_id), planoBarato.id);
+  });
+
+  it('a troca de ciclo agendada (mensal → anual) reemite a fatura pelo preço do ano', async () => {
+    const { renova } = await comFaturaCedo();
+    const r = await runInTenant(alfa, () => SelfBillingService.changePlan({
+      planId: planoPago.id, cycle: 'annual', countDevices: semOnts
+    }));
+    assert.equal(r.scheduled, true);
+    assert.equal(r.charge, 'reissued');
+    const linha = await abertaDoPrazo(renova);
+    assert.equal(Number(linha.amount_cents), 199900);
+    assert.equal(linha.billing_cycle, 'annual');
+  });
+
+  it('o cupom aplicado reemite a fatura com o desconto', async () => {
+    const { renova } = await comFaturaCedo();
+    sequencia += 1;
+    const cupom = await Coupon.create({
+      code: `REGUA${sequencia}`, kind: 'percent', value: 50, duration: 'forever', redemptions: 0, active: true
+    });
+    const r = await CouponService.apply({ tenantId: alfa, code: cupom.code, countDevices: semOnts });
+    assert.equal(r.charge, 'reissued');
+    const linha = await abertaDoPrazo(renova);
+    assert.equal(Number(linha.amount_cents), 9995);
+    assert.equal(Number(linha.coupon_id), Number(cupom.id));
   });
 });

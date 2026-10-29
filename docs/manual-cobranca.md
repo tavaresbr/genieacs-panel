@@ -292,9 +292,16 @@ Cada passo vale do dia dele até o dia do próximo passo, por no máximo **7 dia
 
 Cada passo sai **uma vez só** por vencimento. Mudar os dias de um passo que já saiu não o manda de novo para o mesmo vencimento; um passo novo (adicionado agora) sai normalmente. Os lembretes mandados antes da régua configurável contam como os passos da régua padrão.
 
+Quem lembra o que já saiu é o **id** do passo. Por isso:
+
+- o id de um passo **já salvo não muda mais** na tela; o passo novo ganha um id automático, que dá para trocar só até salvar pela primeira vez;
+- trocar um passo por outro de **id diferente** (remover e adicionar, ou **Restaurar padrão** por cima de uma régua com outros ids) faz o passo novo contar como ainda não enviado — se a janela dele estiver aberta, ele pode sair para um vencimento que já recebeu o lembrete do passo antigo. Prefira fazer essas trocas longe dos vencimentos.
+
+Se dois passos estão com a janela aberta na mesma passada e um deles não tem para onde ir (sem telefone, sem e-mail) ou o envio falha, o outro sai — ainda assim, no máximo um lembrete por passada.
+
 ### Textos e variáveis
 
-Deixe o assunto ou o texto em branco para usar a mensagem padrão do sistema (no período de teste, a mensagem do teste). Para escrever a sua, use as variáveis:
+Deixe o assunto ou o texto em branco para usar a mensagem padrão do sistema. O texto próprio vale só para os lembretes da **renovação**: no período de teste sai sempre a mensagem do teste. Para escrever a sua, use as variáveis:
 
 | Variável | O que entra |
 | --- | --- |
@@ -313,7 +320,9 @@ A mensagem sai só em texto: o e-mail não leva HTML, e as variáveis entram sem
 
 ### A fatura sai antes do primeiro lembrete
 
-A fatura Pix/boleto sai **5 dias antes** do vencimento. Se o primeiro passo "antes" for mais cedo que isso, a fatura passa a sair **um dia antes desse passo**, para o lembrete já levar o link de pagar — até **25 dias antes**, no máximo. Um passo mais cedo que isso sai com o endereço do painel no lugar do link. A fatura do cartão automático continua saindo no dia do vencimento.
+A fatura Pix/boleto sai **5 dias antes** do vencimento. Se o primeiro passo "antes" for mais cedo que isso, a fatura passa a sair **um dia antes desse passo**, para o lembrete já levar o link de pagar — até **25 dias antes**, no máximo (e nunca antes de o período atual começar, num plano de ciclo curto). Um passo mais cedo que isso sai com o endereço do painel no lugar do link. A fatura do cartão automático continua saindo no dia do vencimento, e a do fim do **período de teste** continua saindo 5 dias antes.
+
+Trocar de plano (subida ou descida), de ciclo ou de cupom com essa fatura já emitida cancela a fatura no gateway e emite outra com o valor novo, como sempre.
 
 ## Inadimplência
 

@@ -296,6 +296,53 @@ describe('passos personalizados', () => {
   });
 });
 
+describe('os candidatos da mesma passada', () => {
+  it('o passo sem destino é pulado: o seguinte sai na mesma passada, e só ele', async () => {
+    // Os dois no mesmo dia, o só-WhatsApp primeiro — e sem telefone.
+    await regua([
+      passo('zap5', 'before', -5, { channels: ['whatsapp'] }),
+      passo('email5', 'before', -5, { channels: ['email'] }),
+      passo('mail5b', 'before', -5, { channels: ['email'] })
+    ]);
+    await comAssinatura({ renews_at: seg(Date.now() + 3 * DIA) });
+    const a = await avisar(new Date());
+    assert.equal(a.sent, true, JSON.stringify(a));
+    assert.equal(a.stepId, 'email5');
+    assert.equal(recebidas.length, 1, 'um envio por passada');
+    assert.deepEqual((await enviados()).map((l) => l.step_key), ['email5']);
+    const b = await avisar(new Date(Date.now() + 60_000));
+    assert.equal(b.stepId, 'mail5b');
+    // Nada mais a mandar: o que sobra é o sem destino, e a resposta é a dele.
+    const c = await avisar(new Date(Date.now() + 120_000));
+    assert.equal(c.sent, false);
+    assert.equal(c.reason, 'no_recipient');
+    assert.equal(recebidas.length, 2);
+  });
+
+  it('o envio que falhou também é pulado, e não fica marcado', async () => {
+    await regua([
+      passo('zap5', 'before', -5, { channels: ['whatsapp'] }),
+      passo('email5', 'before', -5, { channels: ['email'] })
+    ]);
+    await getDb()('tenants').where({ id: alfa }).update({ billing_phone: '11988887777' });
+    await comAssinatura({ renews_at: seg(Date.now() + 3 * DIA) });
+    const mock = PlatformNotifyService.sendWhatsapp;
+    PlatformNotifyService.sendWhatsapp = async () => false;
+    try {
+      const a = await avisar(new Date());
+      assert.equal(a.sent, true, JSON.stringify(a));
+      assert.equal(a.stepId, 'email5');
+    } finally {
+      PlatformNotifyService.sendWhatsapp = mock;
+    }
+    assert.deepEqual((await enviados()).filter((l) => l.sent_at).map((l) => l.step_key), ['email5']);
+    // O WhatsApp de volta: o passo que falhou sai na passada seguinte.
+    const b = await avisar(new Date(Date.now() + 60_000));
+    assert.equal(b.stepId, 'zap5');
+    assert.equal(whatsapps.length, 1);
+  });
+});
+
 describe('a deduplicação por passo', () => {
   it('mudar os dias de um passo sem mudar o id não o reenvia no mesmo prazo', async () => {
     const prazoReal = seg(Date.now() + 3 * DIA);
@@ -458,6 +505,17 @@ describe('os textos', () => {
     await comAssinatura({ status: 'trial', trial_ends_at: seg(Date.now() + 2 * DIA) });
     assert.equal((await avisar(new Date())).sent, true);
     assert.match(ultima(), /teste do Provedor/i);
+  });
+
+  it('o texto próprio é o da renovação: o lembrete do teste continua com o texto do teste', async () => {
+    await regua([passo('d4', 'before', -4, {
+      subject: 'Fatura {empresa}: {valor}', body: 'Sua fatura de {valor} vence em {vencimento}: {link}'
+    })]);
+    await comAssinatura({ status: 'trial', trial_ends_at: seg(Date.now() + 2 * DIA) });
+    assert.equal((await avisar(new Date())).sent, true);
+    assert.match(ultima(), /teste do Provedor/i);
+    assert.equal(/Sua fatura de/.test(ultima()), false, 'o corpo próprio não vale no teste');
+    assert.equal(/Subject: Fatura Provedor/.test(ultima()), false, 'nem o assunto próprio');
   });
 
   it('só o corpo próprio: o assunto continua o padrão', async () => {

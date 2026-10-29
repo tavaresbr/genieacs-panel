@@ -5344,6 +5344,8 @@ const ar: Dictionary = {
   'platform.planChange.prorationPending': 'لم يُصدر المبلغ التناسبي {amount} الآن؛ ستُعاد المحاولة.',
   'plan.change.priceFrom': 'اعتبارًا من {date} ستكون فاتورتك {price}.',
   'plan.change.deferred': 'بما أن خطتك الحالية جاءت من ترقية في هذه الفترة، فلن يسري التخفيض إلا عند التجديد التالي.',
+  'platform.reminders.idLocked': 'محفوظ بالفعل: لم يعد المعرّف يتغير — فبه يعرف النظام أن هذه الخطوة أُرسلت. لمعرّف آخر، احذف الخطوة وأضف خطوة جديدة.',
+  'platform.reminders.restoreWarning': 'تنبيه: استعادة الافتراضي تستبدل الخطوات بالمعرّفات before وdue وafter. قد تُرسل مرة أخرى بمعرّف الافتراضي خطوةٌ بمعرّف مختلف أُرسلت بالفعل لتاريخ الاستحقاق الحالي.',
 }
 
 export default ar

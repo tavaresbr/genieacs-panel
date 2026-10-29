@@ -5335,6 +5335,8 @@ const zhCN: Dictionary = {
   'platform.planChange.prorationPending': '{amount} 的按比例账单暂未开具，将会重试。',
   'plan.change.priceFrom': '自 {date} 起，您的账单为 {price}。',
   'plan.change.deferred': '由于您当前的套餐来自本周期内的升级，降级只会在下一次续订时生效。',
+  'platform.reminders.idLocked': '已保存：ID 不能再更改——系统靠它判断此步骤是否已发送。如需其他 ID，请删除该步骤并新增一个。',
+  'platform.reminders.restoreWarning': '注意：恢复默认会把步骤换成 ID 为 before、due 和 after 的步骤。当前到期日已用其他 ID 发送过的步骤，可能会以默认 ID 再次发送。',
 }
 
 export default zhCN

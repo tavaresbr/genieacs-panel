@@ -135,10 +135,22 @@ class PlatformOverviewService {
     const desde = new Date(Math.floor((now.getTime() - ALERTS_WINDOW_DAYS * DAY_MS) / 1000) * 1000);
     const db = getDb();
     const consulta = db('platform_alerts').where({ status: 'failed' }).select('created_at');
-    // No Postgres e no MySQL o filtro vai para o banco; no SQLite a coluna tem
-    // dois formatos de instante e a comparação é feita aqui embaixo (que vale
-    // nos três).
-    if (!String(db.client?.config?.client ?? '').includes('sqlite')) consulta.where('created_at', '>=', desde);
+    // No Postgres e no MySQL o filtro vai para o banco. No SQLite a coluna tem
+    // dois formatos de instante — o número em ms (o `Date` que o serviço
+    // grava) e o texto (`CURRENT_TIMESTAMP` do padrão, ou um ISO) — e um
+    // `>=` só não vale para os dois: número é sempre menor que texto. Então o
+    // banco corta cada formato pelo seu limite — o número pelo instante, o
+    // texto pela DATA do dia anterior (que começa todo formato de texto, e a
+    // folga de um dia cobre um fuso no ISO) — e a conta exata é a daqui de
+    // baixo, que vale nos três. O resultado é o mesmo; a leitura, limitada.
+    if (!String(db.client?.config?.client ?? '').includes('sqlite')) {
+      consulta.where('created_at', '>=', desde);
+    } else {
+      const diaAntes = new Date(desde.getTime() - DAY_MS).toISOString().slice(0, 10);
+      consulta.where((q) => q
+        .where((n) => n.whereRaw("typeof(created_at) IN ('integer', 'real')").andWhere('created_at', '>=', desde.getTime()))
+        .orWhere((t) => t.whereRaw("typeof(created_at) = 'text'").andWhere('created_at', '>=', diaAntes)));
+    }
     const linhas = await consulta;
     const failed = linhas.filter((l) => (instanteMs(l.created_at) ?? 0) >= desde.getTime()).length;
     return { failed, since: desde.toISOString(), windowDays: ALERTS_WINDOW_DAYS };

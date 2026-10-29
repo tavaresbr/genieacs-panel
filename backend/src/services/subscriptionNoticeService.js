@@ -166,8 +166,14 @@ class SubscriptionNoticeService {
     // destinatário é desconhecido, e `12/09` é ambíguo.
     const dueAt = ChargeIssuingService.periodKey(pendente.deadline);
     // Os passos com a janela aberta, o mais tardio primeiro: o que já saiu
-    // é pulado, e sai no máximo um por passada.
+    // é pulado, e sai no máximo um por passada. O que não saiu por falta de
+    // destino ou de transporte, ou porque o envio falhou, também é pulado —
+    // cada passo tem os seus canais, e o anterior (só e-mail, digamos) ainda
+    // pode sair quando o mais tardio (só WhatsApp) não tem para onde ir. O
+    // primeiro envio que sai encerra a passada.
+    const PULAVEIS = ['already_sent', 'no_recipient', 'no_transport', 'send_failed'];
     let resultado = null;
+    let primeiraFalha = null;
     let passo = pendente;
     for (const candidato of pendente.candidates ?? [pendente]) {
       passo = candidato;
@@ -175,9 +181,13 @@ class SubscriptionNoticeService {
       resultado = await this.sendStep({
         tenant, pendente: candidato, dueAt, now, plan, subscription, transporte
       });
-      if (resultado.sent || resultado.reason !== 'already_sent') break;
+      if (resultado.sent || !PULAVEIS.includes(resultado.reason)) break;
+      // A resposta, quando nenhum sai, é a do passo mais tardio que de fato
+      // tentou (falta de destino, envio falho) — e não um "já saiu" de um
+      // passo mais cedo.
+      if (resultado.reason !== 'already_sent' && !primeiraFalha) primeiraFalha = resultado;
     }
-    if (!resultado.sent) return resultado;
+    if (!resultado.sent) return PULAVEIS.includes(resultado.reason) ? (primeiraFalha ?? resultado) : resultado;
     await SubscriptionService.markExpiryWarned(pendente.deadline);
     return {
       sent: true,
@@ -630,8 +640,17 @@ class SubscriptionNoticeService {
       ? `subscription.reminder.trial${etapa}`
       : `subscription.reminder.${pendente.step}`;
     if (pendente.messageKey) chave = pendente.messageKey;
+    // O texto da régua (0121) é o da RENOVAÇÃO: "sua fatura de {valor} vence
+    // em {vencimento}". O lembrete do teste, que passa pelos mesmos passos,
+    // continua com o texto do teste do i18n — quem nunca pagou não tem fatura
+    // renovando, e o texto personalizado diria isso a ele.
+    const doTeste = pendente.kind === 'trial';
     const { assunto, texto } = this.composeMessage({
-      chave, vars, subject: pendente.subject, body: pendente.body, plano: nomePlano
+      chave,
+      vars,
+      subject: doTeste ? '' : pendente.subject,
+      body: doTeste ? '' : pendente.body,
+      plano: nomePlano
     });
 
     const enviados = await Promise.all(para.map((endereco) => transporte.send({

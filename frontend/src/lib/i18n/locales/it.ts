@@ -5341,6 +5341,8 @@ const it: Dictionary = {
   'platform.planChange.prorationPending': 'Il pro rata di {amount} non è stato emesso ora; verrà ritentato.',
   'plan.change.priceFrom': 'Dal {date}, la tua fattura sarà di {price}.',
   'plan.change.deferred': 'Poiché il tuo piano attuale deriva da un upgrade in questo periodo, il downgrade vale solo al rinnovo successivo.',
+  'platform.reminders.idLocked': 'Già salvato: l’id non cambia più — è da esso che il sistema sa che questo passo è già stato inviato. Per un altro id, rimuovi il passo e aggiungine uno nuovo.',
+  'platform.reminders.restoreWarning': 'Attenzione: ripristinare il predefinito sostituisce i passi con gli id before, due e after. Un passo con un altro id già inviato per la scadenza attuale può essere inviato di nuovo con l’id predefinito.',
 }
 
 export default it

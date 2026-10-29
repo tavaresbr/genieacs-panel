@@ -119,6 +119,23 @@ describe('painel inicial: a guarda', () => {
 });
 
 describe('painel inicial: a resposta', () => {
+  it('os alertas que falharam: a mesma conta com o instante em número ou em texto', async () => {
+    const db = getDb();
+    const iso = (ms) => new Date(segundo(ms)).toISOString();
+    const sql = (ms) => iso(ms).slice(0, 19).replace('T', ' ');
+    await db('platform_alerts').insert([
+      { event: 'charge_failed', dedupe_key: 'fmt-1', status: 'failed', created_at: segundo(Date.now() - 2 * DAY) },
+      { event: 'charge_failed', dedupe_key: 'fmt-2', status: 'failed', created_at: iso(Date.now() - 3 * DAY) },
+      { event: 'charge_failed', dedupe_key: 'fmt-3', status: 'failed', created_at: sql(Date.now() - 4 * DAY) },
+      { event: 'charge_failed', dedupe_key: 'fmt-4', status: 'failed', created_at: iso(Date.now() - 20 * DAY) },
+      { event: 'charge_failed', dedupe_key: 'fmt-5', status: 'failed', created_at: sql(Date.now() - 8 * DAY) },
+      { event: 'charge_failed', dedupe_key: 'fmt-6', status: 'failed', created_at: segundo(Date.now() - 30 * DAY) }
+    ]);
+    const r = await overview();
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.data.alerts.failed, 3);
+  });
+
   it('traz todos os blocos, sem erro', async () => {
     const db = getDb();
     const agora = segundo(Date.now());

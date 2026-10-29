@@ -71,8 +71,12 @@ describe('a edição', () => {
   })
 
   it('o passo novo tem id livre e cai depois do último', () => {
-    const novo = newStep([passo({ id: 'passo1', kind: 'after', offsetDays: 3 })])
-    expect(novo.id).toBe('passo2')
+    const agora = Date.UTC(2026, 9, 29, 12)
+    const novo = newStep([passo({ id: 'passo1', kind: 'after', offsetDays: 3 })], agora)
+    expect(novo.id).toBe(`p${agora.toString(36)}`)
+    expect(novo.id.length).toBeLessThanOrEqual(16)
+    // O mesmo instante com o id já na tela: desempata, sem repetir.
+    expect(newStep([novo], agora).id).toBe(`p${agora.toString(36)}-1`)
     expect(novo.offsetDays).toBe(4)
     expect(validateReminderPolicy({ steps: [novo] })).toBeNull()
   })

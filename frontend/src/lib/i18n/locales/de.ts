@@ -5339,6 +5339,8 @@ const de: Dictionary = {
   'platform.planChange.prorationPending': 'Die anteilige Gebühr von {amount} wurde jetzt nicht ausgestellt; es wird erneut versucht.',
   'plan.change.priceFrom': 'Ab {date} beträgt Ihre Rechnung {price}.',
   'plan.change.deferred': 'Da Ihr aktueller Tarif aus einem Upgrade in diesem Zeitraum stammt, gilt das Downgrade erst bei der nächsten Verlängerung.',
+  'platform.reminders.idLocked': 'Bereits gespeichert: Die ID ändert sich nicht mehr — an ihr erkennt das System, dass dieser Schritt schon gesendet wurde. Für eine andere ID den Schritt entfernen und einen neuen hinzufügen.',
+  'platform.reminders.restoreWarning': 'Achtung: Das Wiederherstellen des Standards ersetzt die Schritte durch die IDs before, due und after. Ein Schritt mit anderer ID, der für die aktuelle Fälligkeit schon gesendet wurde, kann unter der Standard-ID erneut gesendet werden.',
 }
 
 export default de

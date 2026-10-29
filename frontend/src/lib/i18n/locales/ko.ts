@@ -5342,6 +5342,8 @@ const ko: Dictionary = {
   'platform.planChange.prorationPending': '{amount}의 일할 청구가 지금 발행되지 않았습니다. 다시 시도됩니다.',
   'plan.change.priceFrom': '{date}부터 청구액은 {price}입니다.',
   'plan.change.deferred': '현재 요금제가 이번 기간의 업그레이드로 바뀐 것이므로 다운그레이드는 다음 갱신 때만 적용됩니다.',
+  'platform.reminders.idLocked': '이미 저장됨: ID는 더 이상 바뀌지 않습니다 — 시스템은 이 ID로 이 단계가 이미 발송되었는지 판단합니다. 다른 ID가 필요하면 단계를 삭제하고 새로 추가하세요.',
+  'platform.reminders.restoreWarning': '주의: 기본값으로 복원하면 단계가 before, due, after ID로 바뀝니다. 현재 만기일에 다른 ID로 이미 발송된 단계가 기본 ID로 다시 발송될 수 있습니다.',
 }
 
 export default ko

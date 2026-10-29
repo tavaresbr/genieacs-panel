@@ -63,20 +63,27 @@ export function offsetForKind(kind: ReminderStepKind, atual: number): number {
   return Math.min(max, Math.max(min, comSinal))
 }
 
-/** Um id novo, curto e livre: `passo1`, `passo2`... */
-export function newStepId(steps: ReminderStep[]): string {
+/**
+ * Um id novo, curto e que nunca existiu: `p` + o instante em base 36 (`p` +
+ * 8 caracteres, até 16 com o desempate). O id é a chave da deduplicação no
+ * servidor — um `passo1` apagado e recriado com o mesmo nome contaria como
+ * já enviado no prazo de agora. Sem colidir com os da régua na tela.
+ */
+export function newStepId(steps: ReminderStep[], now: number = Date.now()): string {
   const usados = new Set(steps.map((s) => s.id))
+  const base = `p${Math.max(0, Math.floor(now)).toString(36)}`.slice(0, 13)
+  if (!usados.has(base)) return base
   for (let n = 1; ; n += 1) {
-    const id = `passo${n}`
+    const id = `${base}-${n}`
     if (!usados.has(id)) return id
   }
 }
 
 /** O passo novo do "Adicionar": depois do vencimento, um dia depois do último. */
-export function newStep(steps: ReminderStep[]): ReminderStep {
+export function newStep(steps: ReminderStep[], now: number = Date.now()): ReminderStep {
   const maior = steps.reduce((m, s) => Math.max(m, s.offsetDays), 0)
   return {
-    id: newStepId(steps),
+    id: newStepId(steps, now),
     kind: 'after',
     offsetDays: Math.min(REMINDER_OFFSETS.after.max, Math.max(1, maior + 1)),
     channels: ['whatsapp', 'email'],

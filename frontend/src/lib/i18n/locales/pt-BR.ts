@@ -5335,6 +5335,8 @@ const ptBR: Dictionary = {
   'platform.planChange.prorationPending': 'A pró-rata de {amount} não saiu agora; ela será tentada de novo.',
   'plan.change.priceFrom': 'A partir de {date}, sua fatura será de {price}.',
   'plan.change.deferred': 'Como o plano atual veio de uma subida neste período, a descida só vale na renovação seguinte.',
+  'platform.reminders.idLocked': 'Já salvo: o id não muda mais — é por ele que o sistema sabe que este passo já saiu. Para outro id, remova o passo e adicione um novo.',
+  'platform.reminders.restoreWarning': 'Atenção: restaurar o padrão troca os passos pelos ids before, due e after. Um passo de id diferente que já saiu para o vencimento atual pode sair de novo com o id do padrão.',
 }
 
 export default ptBR

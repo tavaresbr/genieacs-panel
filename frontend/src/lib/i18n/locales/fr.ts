@@ -5335,6 +5335,8 @@ const fr: Dictionary = {
   'platform.planChange.prorationPending': 'Le prorata de {amount} n\'a pas été émis maintenant ; il sera retenté.',
   'plan.change.priceFrom': 'À partir du {date}, votre facture sera de {price}.',
   'plan.change.deferred': 'Comme votre forfait actuel vient d\'une montée de gamme sur cette période, la descente ne prend effet qu\'au renouvellement suivant.',
+  'platform.reminders.idLocked': 'Déjà enregistré : l’id ne change plus — c’est par lui que le système sait que cette étape est déjà partie. Pour un autre id, supprimez l’étape et ajoutez-en une nouvelle.',
+  'platform.reminders.restoreWarning': 'Attention : restaurer la valeur par défaut remplace les étapes par les ids before, due et after. Une étape d’un autre id déjà envoyée pour l’échéance actuelle peut être renvoyée sous l’id par défaut.',
 }
 
 export default fr

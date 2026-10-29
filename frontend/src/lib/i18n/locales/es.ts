@@ -5335,6 +5335,8 @@ const es: Dictionary = {
   'platform.planChange.prorationPending': 'El prorrateo de {amount} no se emitió ahora; se volverá a intentar.',
   'plan.change.priceFrom': 'A partir del {date}, tu factura será de {price}.',
   'plan.change.deferred': 'Como tu plan actual vino de una mejora en este período, la reducción solo vale en la renovación siguiente.',
+  'platform.reminders.idLocked': 'Ya guardado: el id ya no cambia — es por él que el sistema sabe que este paso ya se envió. Para otro id, elimine el paso y agregue uno nuevo.',
+  'platform.reminders.restoreWarning': 'Atención: restaurar el predeterminado cambia los pasos por los ids before, due y after. Un paso con otro id que ya se envió para el vencimiento actual puede enviarse de nuevo con el id del predeterminado.',
 }
 
 export default es

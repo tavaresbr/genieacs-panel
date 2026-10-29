@@ -56,13 +56,18 @@ const ROTULO_ERRO = {
 } as const
 type CodigoErro = keyof typeof ROTULO_ERRO
 
-/** O passo na tela: com uma chave estável, porque o id é editável. */
-type Rascunho = ReminderStep & { chave: number }
+/**
+ * O passo na tela: com uma chave estável, porque o id é editável — mas só
+ * até o primeiro salvamento (`fixo`). O id é a chave da deduplicação no
+ * servidor: renomear um passo salvo o faria sair de novo no mesmo prazo.
+ */
+type Rascunho = ReminderStep & { chave: number; fixo: boolean }
 
 let proximaChave = 1
-const comChave = (steps: ReminderStep[]): Rascunho[] => steps.map((s) => ({ ...s, chave: proximaChave++ }))
+const comChave = (steps: ReminderStep[], salvos: ReadonlySet<string> = new Set()): Rascunho[] => steps
+  .map((s) => ({ ...s, chave: proximaChave++, fixo: salvos.has(s.id) }))
 const semChave = (passos: Rascunho[]): ReminderPolicy => ({
-  steps: passos.map(({ chave: _chave, ...passo }) => passo)
+  steps: passos.map(({ chave: _chave, fixo: _fixo, ...passo }) => passo)
 })
 
 /**
@@ -85,7 +90,8 @@ export function PlatformReminderPolicy() {
 
   const aplicar = useCallback((dados: PlatformProfile) => {
     setPerfil(dados)
-    setPassos(comChave(dados.reminderPolicy?.steps ?? []))
+    const steps = dados.reminderPolicy?.steps ?? []
+    setPassos(comChave(steps, new Set(steps.map((s) => s.id))))
   }, [])
 
   useEffect(() => {
@@ -187,8 +193,12 @@ export function PlatformReminderPolicy() {
     }
   }
 
+  // Os ids da padrão que já estão salvos continuam travados; os outros
+  // (passos que a régua salva não tinha) são novos até salvar.
   const restaurar = () => {
-    if (perfil?.reminderPolicyDefault) setPassos(comChave(perfil.reminderPolicyDefault.steps))
+    if (!perfil?.reminderPolicyDefault) return
+    const salvos = new Set((perfil.reminderPolicy?.steps ?? []).map((s) => s.id))
+    setPassos(comChave(perfil.reminderPolicyDefault.steps, salvos))
   }
 
   if (erro) return <p className="alert-error text-sm">{erro}</p>
@@ -275,10 +285,17 @@ export function PlatformReminderPolicy() {
                     maxLength={16}
                     value={passo.id}
                     disabled={!podeSalvar}
+                    readOnly={passo.fixo}
+                    aria-readonly={passo.fixo || undefined}
                     aria-describedby={`${prefixo}-id-hint`}
-                    onChange={(e) => mudar(passo.chave, { id: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })}
+                    onChange={(e) => {
+                      if (passo.fixo) return
+                      mudar(passo.chave, { id: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })
+                    }}
                   />
-                  <p id={`${prefixo}-id-hint`} className="field-hint">{t('platform.reminders.idHint')}</p>
+                  <p id={`${prefixo}-id-hint`} className="field-hint">
+                    {passo.fixo ? t('platform.reminders.idLocked') : t('platform.reminders.idHint')}
+                  </p>
                 </div>
               </div>
 
@@ -392,6 +409,7 @@ export function PlatformReminderPolicy() {
         <span className="field-hint">{t('platform.reminders.max', { n: REMINDER_MAX_STEPS })}</span>
       </div>
       <p className="field-hint">{t('platform.reminders.restoreHint')}</p>
+      <p className="alert-warning text-sm" data-testid="reminders-restore-warning">{t('platform.reminders.restoreWarning')}</p>
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="modern-button" disabled={salvando || !podeSalvar}>
