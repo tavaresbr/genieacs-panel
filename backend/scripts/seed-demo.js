@@ -11,14 +11,19 @@ import 'dotenv/config';
  *
  * - dois planos pagos, com preço mensal e anual (`demo-essencial`,
  *   `demo-profissional`);
- * - três provedores, cada um com um dono que entra com senha conhecida
+ * - quatro provedores, cada um com um dono que entra com senha conhecida
  *   (`DEMO_PROVIDERS` abaixo):
  *   - **Alfa Fibra** em dia, no mensal, com faturas pagas e a do próximo
  *     período em aberto (com id no gateway — é a da "segunda via");
  *   - **Beta Net** vencida há 8 dias, com a renovação vencida no gateway;
  *   - **Gama Telecom** no anual, suspensa por falta de pagamento, com o
  *     cancelamento agendado;
- * - um alerta da plataforma que falhou (o "Reenviar" do histórico).
+ *   - **Delta Link** em dia, no mensal, renovando em 4 dias, cobrada por
+ *     fora (gateway `manual`): a renovação da lista da aba Início, e o
+ *     provedor em que o e2e aplica a troca de plano pelo console sem nenhuma
+ *     chamada ao gateway;
+ * - um alerta da plataforma que falhou (o "Reenviar" do histórico);
+ * - a caixa da plataforma, sem membros (é onde o perfil da plataforma grava).
  *
  * As cobranças com id no gateway pressupõem um Asaas — de verdade não, que
  * isto é dado de mentira: o e2e sobe um gateway falso (`frontend/e2e/support`)
@@ -114,6 +119,13 @@ const DEMO_PROVIDERS = Object.freeze([
     name: 'Gama Telecom',
     owner: { username: 'gama.dono', email: 'dono@gama-telecom.test', password: 'Gama-Demo-2026' },
     taxId: '45723174000110'
+  },
+  {
+    slug: 'delta-link',
+    name: 'Delta Link',
+    owner: { username: 'delta.dono', email: 'dono@delta-link.test', password: 'Delta-Demo-2026' },
+    taxId: '12345678000195',
+    gateway: 'manual'
   }
 ]);
 
@@ -153,8 +165,8 @@ async function garantirProvedor(spec) {
       billing_district: 'Bela Vista',
       billing_city: 'São Paulo',
       billing_state: 'SP',
-      billing_gateway: 'asaas',
-      billing_customer_ref: `cus_demo_${spec.slug.replace(/-/g, '_')}`
+      billing_gateway: spec.gateway ?? 'asaas',
+      billing_customer_ref: spec.gateway ? null : `cus_demo_${spec.slug.replace(/-/g, '_')}`
     });
   }
 
@@ -246,9 +258,24 @@ async function historicoPago(tenantId, { renovaEm, meses, valor, planId, prefixo
   }
 }
 
+/**
+ * A caixa da plataforma (`kind = 'platform'`), como `create-platform-tenant.js`
+ * a cria — sem vincular ninguém: com o admin como membro de dois provedores, o
+ * login perguntaria para onde ir. É nela que o perfil da plataforma (Dados do
+ * SaaS, a régua de cobrança) é gravado; sem ela, as telas são só leitura.
+ */
+async function garantirCaixaDaPlataforma() {
+  if (await Tenant.platform()) return;
+  await getDb().transaction(async (trx) => {
+    const id = await Tenant.create({ slug: 'plataforma', name: 'Plataforma', kind: 'platform' }, trx);
+    await seedDefaults(trx, { tenantIds: [id] });
+  });
+}
+
 async function main() {
   await ensureSchema();
   const db = getDb();
+  await garantirCaixaDaPlataforma();
 
   const planos = [];
   for (const spec of DEMO_PLANS) {
@@ -259,12 +286,13 @@ async function main() {
 
   const provedores = {};
   for (const spec of DEMO_PROVIDERS) {
-    // eslint-disable-next-line no-await-in-loop -- três provedores
+    // eslint-disable-next-line no-await-in-loop -- quatro provedores
     provedores[spec.slug] = await garantirProvedor(spec);
   }
   const alfa = provedores['alfa-fibra'];
   const beta = provedores['beta-net'];
   const gama = provedores['gama-telecom'];
+  const delta = provedores['delta-link'];
 
   // As assinaturas, só na primeira passada: rodar de novo não move as datas.
   const LIMPA = {
@@ -280,6 +308,11 @@ async function main() {
   if (beta.novo) {
     await Subscription.upsertForTenant(beta.tenant.id, {
       ...LIMPA, plan_id: planoProfissional.id, billing_cycle: 'monthly', renews_at: daqui(-8)
+    });
+  }
+  if (delta.novo) {
+    await Subscription.upsertForTenant(delta.tenant.id, {
+      ...LIMPA, plan_id: planoEssencial.id, billing_cycle: 'monthly', renews_at: daqui(4)
     });
   }
   if (gama.novo) {

@@ -37,6 +37,8 @@ export const PROVIDER = {
 /** Os outros dois provedores do seed. */
 export const DELINQUENT_PROVIDER = 'Beta Net'
 export const SUSPENDED_PROVIDER = 'Gama Telecom'
+/** Em dia, renovando em 4 dias, cobrado por fora (`manual`): a troca de plano pelo console é nele. */
+export const RENEWING_PROVIDER = 'Delta Link'
 
 /**
  * Uma captura em `e2e/screenshots/<nome>.png`: a página inteira, ou só a tela
