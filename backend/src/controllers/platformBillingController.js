@@ -5,7 +5,7 @@ import SubscriptionReminderSend from '../models/SubscriptionReminderSend.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import AuditLog from '../models/AuditLog.js';
-import SubscriptionService, { STATUSES, BillingExemptError } from '../services/subscriptionService.js';
+import SubscriptionService, { STATUSES, BillingExemptError, parseBillingCycle } from '../services/subscriptionService.js';
 import { manualBilling } from '../services/billing/manualBillingProvider.js';
 import { ChargeFollowError } from '../services/chargeIssuingService.js';
 import DeviceService from '../services/deviceService.js';
@@ -14,7 +14,7 @@ import { tdb } from '../config/database.js';
 import BillingInvoice from '../models/BillingInvoice.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import CouponService, { couponTrail } from '../services/couponService.js';
-import { SelfBillingError } from '../services/selfBillingService.js';
+import SelfBillingService, { SelfBillingError, PLAN_CHANGE_MODES } from '../services/selfBillingService.js';
 import { translateError } from '../i18n/index.js';
 
 /**
@@ -192,6 +192,88 @@ function presentPlan(plan) {
       ? null
       : Number(plan.price_yearly_cents),
     createdAt: plan.created_at ?? null
+  };
+}
+
+/** A recusa da troca de plano, no idioma de quem pediu e com o código que a tela lê. */
+function selfBillingRefusal(req, res, error) {
+  return res.status(error.status || 409).json({
+    ...createErrorResponse(translateError(req.t ?? ((k) => k), error), error.detail ?? null, error.code),
+    ...(error.extra ?? {})
+  });
+}
+
+/**
+ * Os campos da troca de plano pelo console no corpo do `PUT` — ver
+ * `updateSubscription`. Devolve `{ error, code }` no que não serve.
+ */
+function readPlanChange(body) {
+  const out = { mode: 'auto', prorate: true, skipLimitCheck: false, replacePending: false, reason: '', cycle: null };
+  if (body.cycle !== undefined && body.cycle !== null && body.cycle !== '') {
+    if (!parseBillingCycle(body.cycle)) return { error: 'cycle must be monthly or annual', code: 'invalid_cycle' };
+    out.cycle = parseBillingCycle(body.cycle);
+  }
+  if (body.mode !== undefined && body.mode !== null) {
+    if (!PLAN_CHANGE_MODES.includes(body.mode)) {
+      return { error: `mode must be one of: ${PLAN_CHANGE_MODES.join(', ')}`, code: 'invalid_mode' };
+    }
+    out.mode = body.mode;
+  }
+  for (const key of ['prorate', 'skipLimitCheck', 'replacePending']) {
+    if (body[key] === undefined || body[key] === null) continue;
+    if (typeof body[key] !== 'boolean') return { error: `${key} must be true or false`, code: 'invalid_flag' };
+    out[key] = body[key];
+  }
+  if (body.reason !== undefined && body.reason !== null) {
+    if (typeof body.reason !== 'string') return { error: 'reason must be a string', code: 'invalid_reason' };
+    if (body.reason.trim().length > 255) {
+      return { error: 'reason must be at most 255 characters', code: 'invalid_reason' };
+    }
+    out.reason = body.reason.trim();
+  }
+  return out;
+}
+
+/**
+ * O que a troca de plano pelo console fez, para a resposta e para a trilha:
+ * valeu agora ou foi agendada (e para quando), a pró-rata cobrada ou por que
+ * não, a checagem de limite.
+ */
+function planChangeOutcome(resultado) {
+  const iso = (data) => (data ? new Date(data).toISOString() : null);
+  const prorata = resultado.proration ?? null;
+  let timing = resultado.timing ?? (resultado.scheduled ? 'renewal' : 'now');
+  if (!resultado.changed && !resultado.scheduled) timing = 'none';
+  let proration = null;
+  if (prorata) {
+    proration = {
+      amountCents: prorata.amountCents,
+      remainingDays: prorata.remainingDays ?? null,
+      currency: prorata.currency ?? null,
+      issued: Boolean(prorata.issued),
+      ...(prorata.skipped ? { skipped: prorata.skipped } : {}),
+      ...(prorata.reason ? { reason: prorata.reason } : {}),
+      ...(prorata.charge?.id ? { chargeId: prorata.charge.id } : {})
+    };
+  } else if (resultado.prorationSkipped) {
+    proration = { issued: false, skipped: resultado.prorationSkipped };
+  }
+  return {
+    changed: Boolean(resultado.changed),
+    scheduled: Boolean(resultado.scheduled),
+    effectiveAt: resultado.scheduled ? iso(resultado.effectiveAt) : null,
+    timing,
+    mode: resultado.mode ?? 'auto',
+    forced: Boolean(resultado.forced),
+    billingCycle: resultado.billingCycle ?? null,
+    ...(resultado.cycleFrom ? { cycleFrom: resultado.cycleFrom } : {}),
+    ...(resultado.pendingCanceled ? { pendingCanceled: true, canceledPlanId: resultado.canceledPlanId ?? null } : {}),
+    ...(resultado.replacedPlanId ? { replacedPlanId: resultado.replacedPlanId } : {}),
+    ...(resultado.deferredByUpgrade ? { deferredByUpgrade: true } : {}),
+    limitCheck: resultado.limitCheck ?? 'not_needed',
+    ...(resultado.overLimit ? { overLimit: resultado.overLimit } : {}),
+    openCharge: resultado.charge ?? 'none',
+    proration
   };
 }
 
@@ -475,9 +557,64 @@ class PlatformBillingController {
   }
 
   /**
+   * `GET /tenants/:id/subscription/plan-preview?planId=&cycle=` — o que a
+   * troca para `planId` (no `cycle`, ou no de agora) faria, em cada modo:
+   * ver `SelfBillingService.previewPlanChange`. Só lê; nada no gateway, nada
+   * em trilha. A caixa da plataforma é 404, como no cupom.
+   */
+  static async previewPlanChange(req, res) {
+    try {
+      const planId = parseId(req.query?.planId);
+      if (!planId) return res.status(400).json(createErrorResponse('Invalid plan id'));
+      const cycle = req.query?.cycle ? String(req.query.cycle) : null;
+      if (cycle && !parseBillingCycle(cycle)) {
+        return res.status(400).json(createErrorResponse('cycle must be monthly or annual', null, 'invalid_cycle'));
+      }
+      const tenant = await tenantOr404(req, res);
+      if (!tenant) return undefined;
+      if (tenant.kind === 'platform') return res.status(404).json(createErrorResponse('Provider not found'));
+      try {
+        const preview = await runInTenant(tenant.id, () => SelfBillingService.previewPlanChange({
+          planId, cycle, countDevices: () => DeviceService.countDevicesFromGenieAcs()
+        }));
+        return res.json(createResponse('Plan change preview', { preview }));
+      } catch (error) {
+        if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Plan change preview error:', error);
+      return res.status(500).json(createErrorResponse('Failed to preview the plan change', error.message));
+    }
+  }
+
+  /**
    * `PUT /tenants/:id/subscription` com `planId` e/ou `status` (mais
    * `trialEndsAt`/`renewsAt` quando o status pede). Um pedido pode trazer os
    * dois; cada um vira a sua linha no extrato.
+   *
+   * A troca de plano segue a MESMA regra da troca pelo provedor
+   * (`SelfBillingService.changePlanAsPlatform`): sem `mode`, `auto` — subir
+   * vale na hora (com a pró-rata), descer ou trocar de ciclo com um período
+   * pago correndo fica para a renovação. Até aqui o console trocava sempre na
+   * hora, sem pró-rata, sem limite e apagando a troca agendada; quem só manda
+   * `{ planId }` agora recebe a regra do provedor — o que é imediato continua
+   * imediato (teste, atraso, subida), e a descida no meio do período passa a
+   * ser agendada, com a data em `outcome.effectiveAt`. Forçar agora é
+   * `mode: 'now'` (com `reason`).
+   *
+   * Os campos da troca: `cycle` (`monthly`|`annual`), `mode`
+   * (`auto`|`now`|`renewal`), `prorate` (padrão `true`), `skipLimitCheck`
+   * (com `reason`), `reason` (até 255) e `replacePending`. As recusas são as
+   * da troca, com o código que a tela lê: 409 `pending_change` (há uma troca
+   * agendada e não veio `replacePending: true`), `pending_locked`,
+   * `over_limit`, `no_renewal`, `cycle_unavailable`, `cancel_scheduled`,
+   * `subscription_paused`; 400 `reason_required`, `invalid_mode`,
+   * `invalid_cycle`; 502 `gateway_failed`; 409 `busy`. Com `status` junto,
+   * o status vem antes (ver abaixo) e fica feito mesmo se a troca recusar.
+   *
+   * A resposta traz `outcome`: valeu agora ou foi agendada (e para quando),
+   * a pró-rata cobrada ou por que não, a checagem de limite.
    */
   static async updateSubscription(req, res) {
     try {
@@ -498,6 +635,8 @@ class PlatformBillingController {
       if (planId === undefined && status === undefined) {
         return res.status(400).json(createErrorResponse('Nothing to update'));
       }
+      const troca = planId === undefined ? null : readPlanChange(body);
+      if (troca?.error) return res.status(400).json(createErrorResponse(troca.error, null, troca.code));
       for (const key of ['trialEndsAt', 'renewsAt']) {
         if (body[key] !== undefined && body[key] !== null && Number.isNaN(new Date(body[key]).getTime())) {
           return res.status(400).json(createErrorResponse(`${key} must be a date`));
@@ -506,6 +645,12 @@ class PlatformBillingController {
 
       const before = await Subscription.forTenant(tenant.id);
       const actorUserId = req.user?.userId ?? null;
+      let resultado = null;
+      let statusFeito = false;
+      const trilhaDoStatus = () => recordBoth(req, tenant, {
+        platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_STATUS_CHANGED,
+        detail: { from: before?.status ?? null, to: status, reason: body.reason ?? null }
+      });
       try {
         await runInTenant(tenant.id, async () => {
           // O status (com as datas) ANTES do plano: é ele que pode ser recusado
@@ -521,12 +666,24 @@ class PlatformBillingController {
               trialEndsAt: body.trialEndsAt,
               renewsAt: body.renewsAt
             });
+            statusFeito = true;
           }
           if (planId !== undefined) {
-            await SubscriptionService.changePlan({ planId, actorUserId });
+            resultado = await SelfBillingService.changePlanAsPlatform({
+              planId,
+              ...troca,
+              actorUserId,
+              countDevices: () => DeviceService.countDevicesFromGenieAcs()
+            });
           }
         });
       } catch (error) {
+        if (error instanceof SelfBillingError) {
+          // O status já valeu (ele vem antes); a troca recusada não o desfaz,
+          // e a trilha dele não pode faltar.
+          if (statusFeito) await trilhaDoStatus();
+          return selfBillingRefusal(req, res, error);
+        }
         if (error instanceof ChargeFollowError) {
           return res.status(error.status).json({
             ...createErrorResponse(error.message, null, error.code),
@@ -537,23 +694,33 @@ class PlatformBillingController {
       }
       const after = await Subscription.forTenant(tenant.id);
 
-      if (planId !== undefined) {
+      // A troca que não mudou nada (o mesmo plano, a mesma agendada pedida de
+      // novo — o duplo clique) não vira linha em trilha nenhuma.
+      const outcome = resultado ? planChangeOutcome(resultado) : null;
+      if (resultado && (resultado.changed || resultado.pendingCanceled)) {
+        const detail = {
+          from: resultado.from ?? before?.plan_id ?? null,
+          to: resultado.to,
+          toCode: resultado.plan?.code ?? null,
+          ...outcome,
+          reason: troca.reason || null
+        };
+        // O motivo fica só na trilha da plataforma, como o da isenção: é
+        // anotação interna do console.
+        const { reason: _motivo, ...tenantDetail } = detail;
         await recordBoth(req, tenant, {
           platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_PLAN_CHANGED,
-          detail: { from: before?.plan_id ?? null, to: planId }
+          detail,
+          tenantDetail
         });
       }
-      if (status !== undefined) {
-        await recordBoth(req, tenant, {
-          platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_STATUS_CHANGED,
-          detail: { from: before?.status ?? null, to: status, reason: body.reason ?? null }
-        });
-      }
+      if (status !== undefined) await trilhaDoStatus();
 
       const state = await runInTenant(tenant.id, () => SubscriptionService.current());
       return res.json(createResponse('Subscription updated', {
         subscription: SubscriptionService.present(state, { withExemptReason: true }),
-        planId: after?.plan_id ?? null
+        planId: after?.plan_id ?? null,
+        ...(outcome ? { outcome } : {})
       }));
     } catch (error) {
       console.error('Update subscription error:', error);

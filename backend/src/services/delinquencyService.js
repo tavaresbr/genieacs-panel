@@ -243,7 +243,8 @@ class DelinquencyService {
     const nomes = { suspwarn: 'suspension_warning', suspend: 'suspended' };
     for (const linha of linhas.ultimas) {
       last.set(Number(linha.tenant_id), {
-        step: nomes[linha.step] ?? linha.step,
+        // O passo da régua (0121) pelo id; as etapas de fora dela pelo nome.
+        step: nomes[linha.step] ?? linha.step_key ?? linha.step,
         dueAt: String(linha.due_at).slice(0, 10),
         channels: String(linha.channels ?? '').split(',').filter(Boolean),
         sentAt: isoOf(linha.sent_at)

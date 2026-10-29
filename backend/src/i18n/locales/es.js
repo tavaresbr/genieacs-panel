@@ -1280,5 +1280,11 @@ export default {
   'receipt.chargeId': 'Cobro',
   'receipt.issuedAt': 'Emitido el {date}',
   'receipt.statement': 'Recibimos de {payer} la cantidad de {amount}, correspondiente a {description}.',
-  'receipt.printHint': 'Para guardar en PDF, use Imprimir (Ctrl+P) en el navegador.'
+  'receipt.printHint': 'Para guardar en PDF, use Imprimir (Ctrl+P) en el navegador.',
+  'subscription.reminder.testPrefix': '[Prueba] ',
+
+  'subscription.pendingChange': 'Ya hay un cambio de plan programado para el {date}. Confirma que quieres reemplazarlo.',
+  'subscription.reasonRequired': 'Indica el motivo: es obligatorio para forzar el cambio ahora o para omitir la verificación de límites.',
+  'subscription.noRenewal': 'No hay un período pagado en curso: el cambio no se puede programar para la renovación.',
+  'subscription.invalidMode': 'El modo del cambio debe ser auto, now o renewal.'
 };

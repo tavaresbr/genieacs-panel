@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { platformAPI, type Plan, type PlatformBox, type Tenant } from '@/lib/api'
 import { PlanCatalog } from '@/components/platform/plan-catalog'
 import { PlatformBoxCard } from '@/components/platform/platform-box'
@@ -15,6 +16,7 @@ import { PlatformDelinquency } from '@/components/platform/platform-delinquency'
 import { PlatformRevenue } from '@/components/platform/platform-revenue'
 import { PlatformCoupons } from '@/components/platform/platform-coupons'
 import { PlatformHelp } from '@/components/platform/platform-help'
+import { PlatformOverviewTab, type OverviewTarget } from '@/components/platform/platform-overview'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantGenieAcs } from '@/components/platform/tenant-genieacs'
@@ -24,6 +26,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { exportFileName, formatRelativeTime } from '@/lib/utils'
+import { parsePlatformTab, withPlatformTab, type PlatformTab } from '@/lib/platform-overview'
 
 /**
  * Celular e tablet: a tabela de provedores vira cartões (a coluna de ações
@@ -70,11 +73,29 @@ export default function PlatformPage() {
    *
    * Abas e não quatro telas porque as quatro respondem à mesma pergunta —
    * "como está a plataforma" — e porque o catálogo de planos só faz sentido ao
-   * lado de quem os assina. Provedores é o padrão: é o que se abre para fazer
-   * alguma coisa; as outras três são consulta ou manutenção rara.
+   * lado de quem os assina. Início é o padrão: a foto de agora, com os
+   * cartões que levam às outras.
+   *
+   * A aba mora na URL (`?tab=`), para dar para linkar e recarregar: é lida
+   * dela a cada render (o voltar do navegador também troca a aba), e um valor
+   * desconhecido cai no Início sem mexer na URL.
    */
   const estreito = useEstreito()
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'delinquency' | 'revenue' | 'coupons' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue' | 'help'>('tenants')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const aba = parsePlatformTab(searchParams.get('tab'))
+  const setAba = useCallback((tab: PlatformTab) => {
+    setSearchParams((atual) => withPlatformTab(atual, tab))
+  }, [setSearchParams])
+  // O painel Início abre as Configurações já no histórico de alertas.
+  const [settingsDeep, setSettingsDeep] = useState<'alertHistory' | null>(null)
+  const irPara = useCallback((alvo: OverviewTarget) => {
+    if (alvo === 'alertHistory') {
+      setSettingsDeep('alertHistory')
+      setAba('settings')
+      return
+    }
+    setAba(alvo)
+  }, [setAba])
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -493,6 +514,9 @@ export default function PlatformPage() {
             linhas ocupavam a primeira tela inteira antes do conteúdo. */}
         <nav className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" aria-label={t('platform.title')}>
           {([
+            // Início, primeiro e padrão: os números de agora e o atalho para
+            // a aba de cada um.
+            ['home', 'platform.tabs.home'],
             ['tenants', 'platform.tabs.tenants'],
             ['plans', 'platform.tabs.plans'],
             // Ao lado de Planos: é o catálogo visto do lado de quem paga — quem
@@ -527,7 +551,10 @@ export default function PlatformPage() {
             <button
               key={chave}
               type="button"
-              onClick={() => setAba(chave)}
+              onClick={() => {
+                setSettingsDeep(null)
+                setAba(chave)
+              }}
               aria-current={aba === chave ? 'page' : undefined}
               className={`shrink-0 whitespace-nowrap ${aba === chave ? 'modern-button' : 'modern-button-secondary'}`}
             >
@@ -536,6 +563,7 @@ export default function PlatformPage() {
           ))}
         </nav>
 
+        {aba === 'home' && <PlatformOverviewTab onNavigate={irPara} />}
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
         {aba === 'subscriptions' && <PlatformSubscriptions plans={plans} estreito={estreito} />}
         {aba === 'delinquency' && <PlatformDelinquency />}
@@ -544,7 +572,13 @@ export default function PlatformPage() {
         {aba === 'leads' && <PlatformLeads />}
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}
-        {aba === 'settings' && <PlatformSettings />}
+        {aba === 'settings' && (
+          <PlatformSettings
+            key={settingsDeep ?? 'default'}
+            initialSub={settingsDeep === 'alertHistory' ? 'alerts' : undefined}
+            initialAlertsTab={settingsDeep === 'alertHistory' ? 'history' : undefined}
+          />
+        )}
         {aba === 'deployment' && <DeploymentHealth />}
         {aba === 'catalogue' && <DefaultCatalogueTab />}
         {aba === 'help' && <PlatformHelp />}

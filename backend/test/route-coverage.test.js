@@ -202,7 +202,8 @@ const POR_ID = new Map([
   ['GET /api/platform/tenants/:id/referrals', 'plano de controle; prova em referrals.test.js — inclusive o 404 da caixa da plataforma'],
   ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
   ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404'],
-  ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe']
+  ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe'],
+  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -436,7 +437,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // acima dos provedores — não há linha de provedor para vazar. Mesmo pedágio:
   // uma linha em `DO_CONSOLE` e mais uma aqui; prova em
   // platform-alerts-history.test.js. São 73.
-  const TETO_DE_EXCECOES = 73;
+  //
+  // E a prévia da troca de plano pelo console
+  // (`GET .../subscription/plan-preview`): o que cada modo faria, só leitura,
+  // no provedor da URL. Mesmo pedágio: uma linha em `DO_CONSOLE` e mais uma
+  // aqui; prova em platform-plan-change.test.js. São 74.
+  const TETO_DE_EXCECOES = 74;
 
 
   /**
@@ -494,7 +500,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'GET /api/platform/tenants/:id/referrals',
     'POST /api/platform/tenants/:id/credits',
     'DELETE /api/platform/tenants/:id/subscription/cancellation',
-    'POST /api/platform/alerts/:id/resend'
+    'POST /api/platform/alerts/:id/resend',
+    'GET /api/platform/tenants/:id/subscription/plan-preview'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só
