@@ -1284,5 +1284,10 @@ export default {
   'receipt.issuedAt': '発行日 {date}',
   'receipt.statement': '{payer} 様より、{description} として {amount} を受領いたしました。',
   'receipt.printHint': 'PDF として保存するには、ブラウザーの印刷 (Ctrl+P) を使用してください。',
-  'subscription.reminder.testPrefix': '[テスト] '
+  'subscription.reminder.testPrefix': '[テスト] ',
+
+  'subscription.pendingChange': '{date} にプラン変更がすでに予約されています。置き換えてよいか確認してください。',
+  'subscription.reasonRequired': '理由を入力してください。今すぐ変更を強制する場合や上限チェックをスキップする場合に必須です。',
+  'subscription.noRenewal': '支払い済みの期間がありません。更新時に変更を予約できません。',
+  'subscription.invalidMode': '変更モードは auto、now、renewal のいずれかである必要があります。'
 };

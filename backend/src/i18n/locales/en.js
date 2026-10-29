@@ -1284,5 +1284,10 @@ export default {
   'receipt.issuedAt': 'Issued on {date}',
   'receipt.statement': 'We received from {payer} the amount of {amount}, for {description}.',
   'receipt.printHint': 'To save as PDF, use Print (Ctrl+P) in your browser.',
-  'subscription.reminder.testPrefix': '[Test] '
+  'subscription.reminder.testPrefix': '[Test] ',
+
+  'subscription.pendingChange': 'A plan change is already scheduled for {date}. Confirm that you want to replace it.',
+  'subscription.reasonRequired': 'Enter a reason: it is required to force the change now or to skip the limit check.',
+  'subscription.noRenewal': 'There is no paid period running: the change cannot be scheduled for the renewal.',
+  'subscription.invalidMode': 'The change mode must be auto, now or renewal.'
 };

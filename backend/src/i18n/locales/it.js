@@ -1282,5 +1282,10 @@ export default {
   'receipt.issuedAt': 'Emessa il {date}',
   'receipt.statement': 'Abbiamo ricevuto da {payer} l\'importo di {amount}, relativo a {description}.',
   'receipt.printHint': 'Per salvare in PDF, usa Stampa (Ctrl+P) nel browser.',
-  'subscription.reminder.testPrefix': '[Prova] '
+  'subscription.reminder.testPrefix': '[Prova] ',
+
+  'subscription.pendingChange': 'È già programmato un cambio di piano per il {date}. Conferma di volerlo sostituire.',
+  'subscription.reasonRequired': 'Indica il motivo: è obbligatorio per forzare il cambio adesso o per saltare il controllo dei limiti.',
+  'subscription.noRenewal': 'Non c\'è un periodo pagato in corso: il cambio non può essere programmato al rinnovo.',
+  'subscription.invalidMode': 'La modalità del cambio deve essere auto, now o renewal.'
 };

@@ -456,7 +456,16 @@ describe('who may', () => {
   it('the console counts the target provider\'s seats, not the administrator\'s own', async () => {
     const plans = (await platform('/plans')).body.data.plans;
     const one = await platform('/plans', { method: 'POST', body: { code: 'um', name: 'Um', maxOperators: 1 } });
-    await platform(`/tenants/${beta}/subscription`, { method: 'PUT', body: { planId: one.body.data.plan.id } });
+    // O beta está pago e no meio do período: pela regra do provedor, que o
+    // console agora segue, a descida para o "Um" (de graça) ficaria para a
+    // renovação. Este caso precisa do teto valendo JÁ — o modo `now`, com o
+    // motivo que ele exige.
+    const troca = await platform(`/tenants/${beta}/subscription`, {
+      method: 'PUT', body: { planId: one.body.data.plan.id, mode: 'now', reason: 'teste do teto de assentos' }
+    });
+    assert.equal(troca.status, 200, JSON.stringify(troca.body));
+    assert.equal(troca.body.data.outcome.timing, 'now');
+    assert.equal(troca.body.data.outcome.forced, true);
     const first = await platform(`/tenants/${beta}/members`, { method: 'POST', body: { username: 'comum', role: 'viewer' } });
     assert.equal(first.status, 201);
     const second = await platform(`/tenants/${beta}/members`, { method: 'POST', body: { username: 'owner', role: 'viewer' } });

@@ -22,6 +22,7 @@ import { exemptUntilFromDateInput, todayIso, toIsoDay } from '@/lib/subscription
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { CardBadge } from '@/components/card-badge'
 import { TenantReferrals } from '@/components/platform/tenant-referrals'
+import { ConsolePlanChange } from '@/components/platform/console-plan-change'
 
 interface Props {
   tenant: Tenant
@@ -435,9 +436,8 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
   const [usage, setUsage] = useState<SubscriptionUsage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState<'plan' | 'status' | 'payment' | null>(null)
+  const [saving, setSaving] = useState<'status' | 'payment' | null>(null)
 
-  const [chosenPlan, setChosenPlan] = useState<number | ''>('')
   const [chosenStatus, setChosenStatus] = useState<SubscriptionStatus>('active')
   const [reason, setReason] = useState('')
   const [amount, setAmount] = useState('')
@@ -455,7 +455,6 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
       setSubscription(sub.data.subscription)
       setPlanId(sub.data.planId)
       setEvents(sub.data.events)
-      setChosenPlan(sub.data.planId ?? '')
       setChosenStatus(sub.data.subscription?.storedStatus ?? 'active')
       setError(null)
     } else {
@@ -468,22 +467,6 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
   useEffect(() => {
     void load()
   }, [load])
-
-  const savePlan = async () => {
-    if (chosenPlan === '' || chosenPlan === planId) return
-    setSaving('plan')
-    try {
-      const res = await platformAPI.updateSubscription(tenantId, { planId: Number(chosenPlan) })
-      if (res.success) {
-        await load()
-        onSubscriptionChange()
-      } else {
-        toast.error(res.message || t('platform.saveFailed'))
-      }
-    } finally {
-      setSaving(null)
-    }
-  }
 
   const saveStatus = async () => {
     if (chosenStatus === subscription?.storedStatus) return
@@ -632,26 +615,16 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
         {/* Plano */}
         <div className="rounded-md border border-border bg-card p-3">
           <h4 className="mb-2 text-sm font-semibold text-foreground">{t('platform.subscription.plan')}</h4>
-          <select
-            value={chosenPlan}
-            onChange={(e) => setChosenPlan(e.target.value === '' ? '' : Number(e.target.value))}
-            className="modern-input w-full"
-            aria-label={t('platform.subscription.plan')}
-          >
-            {plans.map((plan) => (
-              <option key={plan.id} value={plan.id} disabled={!plan.active && plan.id !== planId}>
-                {plan.name} ({plan.code}){plan.active ? '' : ` — ${t('platform.plans.inactive')}`}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => void savePlan()}
-            disabled={saving !== null || chosenPlan === '' || chosenPlan === planId}
-            className="modern-button mt-2"
-          >
-            {saving === 'plan' ? t('common.saving') : t('platform.subscription.changePlan')}
-          </button>
+          {/* A mesma regra e a mesma prévia da troca pelo provedor, com o modo e as exceções do console. */}
+          <ConsolePlanChange
+            tenantId={tenantId}
+            plans={plans}
+            currentPlanId={planId}
+            onChanged={async () => {
+              await load()
+              onSubscriptionChange()
+            }}
+          />
           <CouponControl
             tenantId={tenantId}
             coupon={subscription?.coupon}

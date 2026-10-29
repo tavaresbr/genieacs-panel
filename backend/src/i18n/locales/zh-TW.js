@@ -1284,5 +1284,10 @@ export default {
   'receipt.issuedAt': '開立於 {date}',
   'receipt.statement': '我們已收到 {payer} 支付的 {amount}，用於 {description}。',
   'receipt.printHint': '如需儲存為 PDF，請在瀏覽器中使用「列印」(Ctrl+P)。',
-  'subscription.reminder.testPrefix': '[測試] '
+  'subscription.reminder.testPrefix': '[測試] ',
+
+  'subscription.pendingChange': '已有一個方案變更排定在 {date}。請確認要取代它。',
+  'subscription.reasonRequired': '請填寫原因：強制立即變更或略過額度檢查時必須填寫。',
+  'subscription.noRenewal': '目前沒有已付費的週期：無法將變更排定在續約時。',
+  'subscription.invalidMode': '變更模式必須是 auto、now 或 renewal。'
 };

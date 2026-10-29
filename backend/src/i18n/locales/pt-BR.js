@@ -1283,5 +1283,10 @@ export default {
   'receipt.issuedAt': 'Emitido em {date}',
   'receipt.statement': 'Recebemos de {payer} a quantia de {amount}, referente a {description}.',
   'receipt.printHint': 'Para salvar em PDF, use Imprimir (Ctrl+P) no navegador.',
-  'subscription.reminder.testPrefix': '[Teste] '
+  'subscription.reminder.testPrefix': '[Teste] ',
+
+  'subscription.pendingChange': 'Já há uma troca de plano agendada para {date}. Confirme que quer substituí-la.',
+  'subscription.reasonRequired': 'Informe o motivo: ele é obrigatório para forçar a troca agora ou para pular a checagem de limite.',
+  'subscription.noRenewal': 'Não há um período pago correndo: a troca não pode ser agendada para a renovação.',
+  'subscription.invalidMode': 'O modo da troca deve ser auto, now ou renewal.'
 };
