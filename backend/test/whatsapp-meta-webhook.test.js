@@ -137,7 +137,7 @@ describe('registrar o webhook na criação', () => {
     assert.equal(graphCalls.length, 1);
     const [chamada] = graphCalls;
     assert.equal(chamada.url, `https://graph.facebook.com/${META_GRAPH_VERSION}/${WABA}/subscribed_apps`);
-    assert.equal(META_GRAPH_VERSION, 'v21.0');
+    assert.equal(META_GRAPH_VERSION, 'v25.0');
     assert.equal(chamada.init.method, 'POST');
     assert.equal(chamada.init.headers.Authorization, `Bearer ${META_TOKEN}`);
     assert.deepEqual(chamada.body, {
