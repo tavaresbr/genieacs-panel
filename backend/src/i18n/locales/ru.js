@@ -1284,5 +1284,6 @@ export default {
   'receipt.chargeId': 'Счёт',
   'receipt.issuedAt': 'Выдано {date}',
   'receipt.statement': 'Мы получили от {payer} сумму {amount} в счёт: {description}.',
-  'receipt.printHint': 'Чтобы сохранить в PDF, используйте «Печать» (Ctrl+P) в браузере.'
+  'receipt.printHint': 'Чтобы сохранить в PDF, используйте «Печать» (Ctrl+P) в браузере.',
+  'subscription.reminder.testPrefix': '[Тест] '
 };

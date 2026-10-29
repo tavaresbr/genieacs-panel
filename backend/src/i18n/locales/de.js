@@ -1284,5 +1284,6 @@ export default {
   'receipt.chargeId': 'Rechnung',
   'receipt.issuedAt': 'Ausgestellt am {date}',
   'receipt.statement': 'Wir haben von {payer} den Betrag von {amount} für {description} erhalten.',
-  'receipt.printHint': 'Zum Speichern als PDF im Browser Drucken (Strg+P) verwenden.'
+  'receipt.printHint': 'Zum Speichern als PDF im Browser Drucken (Strg+P) verwenden.',
+  'subscription.reminder.testPrefix': '[Test] '
 };

@@ -11,6 +11,7 @@ Tudo o que está aqui fica no **console da plataforma** (o painel do dono do Saa
 | Ligar o Asaas, webhook, multa/juros/desconto, nota fiscal | Configurações → Integrações |
 | Suspensão automática, indicação e retenção | Configurações → Dados do SaaS |
 | Alertas por WhatsApp e e-mail | Configurações → Alertas |
+| Quando e como os lembretes de cobrança saem | Configurações → Régua de cobrança |
 | Criar e editar planos | Planos |
 | Ver e mexer na assinatura e nas cobranças de um provedor | Assinaturas |
 | Ver quem está devendo e agir em vários de uma vez | Inadimplência |
@@ -261,6 +262,8 @@ A plataforma avisa o provedor por **e-mail** (e por **WhatsApp**, se houver tele
 
 Cada lembrete sai **uma vez só** para cada vencimento. Quem tem cartão automático não recebe o "antes do vencimento" (para não pagar duas vezes).
 
+Os três primeiros (antes, no dia e em atraso) são a **régua padrão**, e dá para mudar os dias, os canais e os textos em **Configurações → Régua de cobrança** (veja abaixo). O aviso de suspensão e a suspensão seguem a configuração da suspensão automática.
+
 ### Suspensão automática
 
 Em **Configurações → Dados do SaaS → Suspensão automática**:
@@ -271,6 +274,46 @@ Em **Configurações → Dados do SaaS → Suspensão automática**:
 Enquanto está vencido, o painel do provedor fica **só para leitura**. Depois do prazo, ele é **suspenso por inadimplência**. **Pagar a fatura reativa o painel na hora**, sem você precisar fazer nada.
 
 Provedores **isentos** ou com assinatura **pausada** não são suspensos.
+
+## Régua de cobrança
+
+Em **Configurações → Régua de cobrança** você decide quando os lembretes de cobrança saem, por qual canal e com que texto. Sem mexer em nada, vale a régua padrão: **5 dias antes**, **no vencimento** e **3 dias depois**.
+
+### Os passos
+
+A régua tem até **8 passos**. Cada passo tem:
+
+- **Tipo**: **antes** do vencimento (de 1 a 30 dias antes), **no vencimento** ou **depois** do vencimento (de 1 a 60 dias depois).
+- **Canais**: **WhatsApp**, **e-mail** ou os dois. O WhatsApp vai para o telefone de cobrança do provedor; o e-mail, para o e-mail de cobrança (ou para os donos da conta, se ele não tiver).
+- **Ligado ou desligado**: o passo desligado não sai.
+- **Assunto e texto** próprios, opcionais.
+
+Cada passo vale do dia dele até o dia do próximo passo, por no máximo **7 dias**. Um passo "antes" nunca sai depois do vencimento, e um passo "depois" só sai se o provedor **ainda não pagou**. Se o agendador ficou parado e um passo passou, ele não sai atrasado.
+
+Cada passo sai **uma vez só** por vencimento. Mudar os dias de um passo que já saiu não o manda de novo para o mesmo vencimento; um passo novo (adicionado agora) sai normalmente. Os lembretes mandados antes da régua configurável contam como os passos da régua padrão.
+
+### Textos e variáveis
+
+Deixe o assunto ou o texto em branco para usar a mensagem padrão do sistema (no período de teste, a mensagem do teste). Para escrever a sua, use as variáveis:
+
+| Variável | O que entra |
+| --- | --- |
+| `{empresa}` | O nome do provedor |
+| `{valor}` | O valor da fatura |
+| `{vencimento}` | A data do vencimento |
+| `{link}` | O link para pagar |
+| `{plano}` | O nome do plano |
+
+A mensagem sai só em texto: o e-mail não leva HTML, e as variáveis entram sem quebra de linha e sem os sinais `<` e `>`. A tela mostra uma **prévia** com dados de exemplo enquanto você escreve.
+
+### Testar e restaurar
+
+- **Enviar teste para mim** manda o passo, com os dados de exemplo e o assunto começando com **[Teste]**, para o WhatsApp e o e-mail de avisos de **Dados do SaaS** — pelos canais do passo. Salve antes de testar: o teste usa a régua salva.
+- **Restaurar padrão** volta para a régua de 5 dias antes, no dia e 3 dias depois.
+
+### A fatura sai antes do primeiro lembrete
+
+A fatura Pix/boleto sai **5 dias antes** do vencimento. Se o primeiro passo "antes" for mais cedo que isso, a fatura passa a sair **um dia antes desse passo**, para o lembrete já levar o link de pagar — até **25 dias antes**, no máximo. Um passo mais cedo que isso sai com o endereço do painel no lugar do link. A fatura do cartão automático continua saindo no dia do vencimento.
 
 ## Inadimplência
 

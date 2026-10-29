@@ -1283,5 +1283,6 @@ export default {
   'receipt.chargeId': 'बिल',
   'receipt.issuedAt': '{date} को जारी',
   'receipt.statement': 'हमें {payer} से {description} के लिए {amount} की राशि प्राप्त हुई।',
-  'receipt.printHint': 'PDF के रूप में सहेजने के लिए ब्राउज़र में प्रिंट (Ctrl+P) का उपयोग करें।'
+  'receipt.printHint': 'PDF के रूप में सहेजने के लिए ब्राउज़र में प्रिंट (Ctrl+P) का उपयोग करें।',
+  'subscription.reminder.testPrefix': '[परीक्षण] '
 };

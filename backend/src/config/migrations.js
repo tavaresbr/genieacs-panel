@@ -21,6 +21,7 @@
 import { withWebhookPath } from './waWebhookPath.js';
 import { nextAccountColor } from './waAccountColors.js';
 import { LEGACY_PRODUCT_NAMES, PRODUCT_NAME } from './brand.js';
+import { runUnscoped } from './tenantContext.js';
 
 /** A chave do blob de configuração do Evolution em `app_state`. */
 const EVOLUTION_CONFIG_KEY = 'whatsapp_evolution_config';
@@ -2718,10 +2719,34 @@ const subscriptionReminderSendsTable = (db) => (t) => {
   t.timestamp('claimed_until');
   t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
   t.unique(['tenant_id', 'due_at', 'step'], 'subscription_reminder_sends_step_uq');
+  // O passo da régua configurável (0121) — ver `SUBSCRIPTION_REMINDER_STEP_KEY_COLUMNS`.
+  t.string('step_key', 16);
+  t.unique(['tenant_id', 'due_at', 'step_key'], 'subscription_reminder_sends_step_key_uq');
 };
 
 const SUBSCRIPTION_REMINDER_TABLES = [
   ['subscription_reminder_sends', subscriptionReminderSendsTable]
+];
+
+/**
+ * A régua de cobrança configurável (0121): a etapa passa a ser o PASSO da
+ * régua (o id dele, até 16 caracteres), e não o tipo — `step` tem oito e
+ * não cabe o id. A trava nova é `(tenant_id, due_at, step_key)`.
+ *
+ * Os registros de antes ganham `step_key = step`: o `before`, o `due` e o
+ * `after` mandados são os passos de mesmo id da régua padrão, e não saem de
+ * novo depois da troca; `suspwarn`, `suspend` e `manual` continuam com os
+ * nomes de sempre.
+ *
+ * O índice antigo `(tenant_id, due_at, step)` FICA, até a migração seguinte:
+ * apagar índice único é a operação que menos se parece nos três bancos (no
+ * SQLite o knex recria a tabela inteira), e ele ainda protege uma versão
+ * anterior do painel que rode sobre este banco. Para ele não barrar dois
+ * passos `before` no mesmo prazo, `step` passa a levar um código curto por
+ * passo (`reminderStepColumn`), e não o tipo.
+ */
+const SUBSCRIPTION_REMINDER_STEP_KEY_COLUMNS = [
+  ['step_key', (t) => t.string('step_key', 16).nullable()]
 ];
 
 /**
@@ -6625,6 +6650,33 @@ export const migrations = [
         if (!missing.length) continue;
         await db.schema.alterTable(table, (t) => {
           for (const add of missing) add(t);
+        });
+      }
+    }
+  },
+  {
+    /** A régua de cobrança configurável — ver `SUBSCRIPTION_REMINDER_STEP_KEY_COLUMNS`. */
+    id: '0121_reminder_step_key',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscription_reminder_sends'))) return true;
+      if ((await missingColumns(db, 'subscription_reminder_sends', SUBSCRIPTION_REMINDER_STEP_KEY_COLUMNS)).length) return false;
+      return hasIndex(db, 'subscription_reminder_sends', 'subscription_reminder_sends_step_key_uq');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscription_reminder_sends'))) return;
+      const missing = await missingColumns(db, 'subscription_reminder_sends', SUBSCRIPTION_REMINDER_STEP_KEY_COLUMNS);
+      if (missing.length) {
+        await db.schema.alterTable('subscription_reminder_sends', (t) => {
+          for (const add of missing) add(t);
+        });
+      }
+      // tenant-scope-exempt: migração, todas as linhas de todos os provedores.
+      await runUnscoped('migration 0121 backfills step_key for every provider', () => db('subscription_reminder_sends')
+        .whereNull('step_key')
+        .update({ step_key: db.ref('step') }));
+      if (!(await hasIndex(db, 'subscription_reminder_sends', 'subscription_reminder_sends_step_key_uq'))) {
+        await db.schema.alterTable('subscription_reminder_sends', (t) => {
+          t.unique(['tenant_id', 'due_at', 'step_key'], 'subscription_reminder_sends_step_key_uq');
         });
       }
     }

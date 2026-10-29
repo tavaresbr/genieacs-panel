@@ -146,6 +146,8 @@ export interface ApiResponse<T = any> {
    * so the screen that shows the wall can also show what is behind it.
    */
   subscription?: SubscriptionView | null
+  /** Só no 400 da régua de cobrança (0121): o índice do passo recusado. */
+  index?: number
   /** Only on a 402 for a plan limit: the ceiling and where the provider is. */
   limit?: number
   current?: number
@@ -454,6 +456,8 @@ class ApiClient {
           ...(typeof data.gatewayStatus === 'string' ? { gatewayStatus: data.gatewayStatus } : {}),
           // O 409 de modelo da Meta em uso: a lista das ligações que cairiam.
           ...(Array.isArray(data.metaLinks) ? { metaLinks: data.metaLinks } : {}),
+          // O 400 da régua de cobrança (0121): em qual passo está o erro.
+          ...(typeof data.index === 'number' ? { index: data.index } : {}),
         }
       }
 
@@ -1671,9 +1675,31 @@ export interface PlatformProfile {
   billingDefaults?: PlatformBillingPolicy & PlatformReferralPolicy
   /** Os alertas para quem opera a plataforma (0112). */
   alerts?: PlatformAlertsConfig
+  /** A régua de cobrança (0121): a que vale, e a padrão (a do "Restaurar padrão"). */
+  reminderPolicy?: ReminderPolicy
+  reminderPolicyDefault?: ReminderPolicy
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
+}
+
+/** Um passo da régua de cobrança (0121). Ver `lib/reminder-policy.ts`. */
+export type ReminderStepKind = 'before' | 'due' | 'after'
+export type ReminderChannel = 'whatsapp' | 'email'
+export interface ReminderStep {
+  /** Slug a-z, 0-9, `_`, `-` (até 16), único: a chave da deduplicação. */
+  id: string
+  kind: ReminderStepKind
+  /** before: −30..−1; due: 0; after: 1..60. */
+  offsetDays: number
+  channels: ReminderChannel[]
+  enabled: boolean
+  /** Vazio usa o texto padrão do sistema. */
+  subject: string
+  body: string
+}
+export interface ReminderPolicy {
+  steps: ReminderStep[]
 }
 
 /** Os eventos que avisam quem opera a plataforma (0112). */
@@ -2207,7 +2233,8 @@ export interface BillingEventView {
  * Um lembrete de cobrança que a plataforma mandou ao provedor (0092): a etapa
  * da régua, o prazo a que ela se refere (data ISO) e por onde saiu.
  */
-export type SubscriptionReminderStep = 'before' | 'due' | 'after' | 'suspension_warning' | 'suspended' | 'manual'
+// `string`: o id de um passo personalizado da régua de cobrança (0121).
+export type SubscriptionReminderStep = 'before' | 'due' | 'after' | 'suspension_warning' | 'suspended' | 'manual' | (string & {})
 
 export interface SubscriptionReminderView {
   dueAt: string
@@ -2391,6 +2418,7 @@ export const platformAPI = {
     payload: Partial<Record<PlatformProfileField, string>>
       & Partial<Record<keyof PlatformBillingPolicy | keyof PlatformReferralPolicy, number | null>>
       & { alerts?: PlatformAlertsUpdate }
+      & { reminderPolicy?: ReminderPolicy | null }
   ) =>
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
@@ -2406,6 +2434,16 @@ export const platformAPI = {
   /** Volta ao padrão do sistema. */
   removeBranding: (kind: 'logo' | 'favicon' | 'icon') =>
     apiClient.delete<{ kind: string }>(`/platform/settings/branding/${kind}`),
+
+  /**
+   * Manda o passo `stepId` da régua de cobrança GRAVADA (0121), com dados de
+   * exemplo, para os destinos de avisos de Dados do SaaS. 404
+   * `step_not_found`; 409 `no_destination`; 502 `send_failed`.
+   */
+  testReminderPolicy: (stepId: string) =>
+    apiClient.post<{ channels: Partial<Record<ReminderChannel, boolean | null>> }>(
+      '/platform/settings/reminder-policy/test', { stepId }
+    ),
 
   /**
    * Manda um alerta de teste agora (0112). 409 `no_destination` sem WhatsApp

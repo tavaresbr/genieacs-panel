@@ -1283,5 +1283,6 @@ export default {
   'receipt.chargeId': '請求',
   'receipt.issuedAt': '発行日 {date}',
   'receipt.statement': '{payer} 様より、{description} として {amount} を受領いたしました。',
-  'receipt.printHint': 'PDF として保存するには、ブラウザーの印刷 (Ctrl+P) を使用してください。'
+  'receipt.printHint': 'PDF として保存するには、ブラウザーの印刷 (Ctrl+P) を使用してください。',
+  'subscription.reminder.testPrefix': '[テスト] '
 };

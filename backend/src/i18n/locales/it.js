@@ -1281,5 +1281,6 @@ export default {
   'receipt.chargeId': 'Addebito',
   'receipt.issuedAt': 'Emessa il {date}',
   'receipt.statement': 'Abbiamo ricevuto da {payer} l\'importo di {amount}, relativo a {description}.',
-  'receipt.printHint': 'Per salvare in PDF, usa Stampa (Ctrl+P) nel browser.'
+  'receipt.printHint': 'Per salvare in PDF, usa Stampa (Ctrl+P) nel browser.',
+  'subscription.reminder.testPrefix': '[Prova] '
 };
