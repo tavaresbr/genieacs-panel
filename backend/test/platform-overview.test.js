@@ -121,8 +121,11 @@ describe('painel inicial: a guarda', () => {
 describe('painel inicial: a resposta', () => {
   it('os alertas que falharam: a mesma conta com o instante em número ou em texto', async () => {
     const db = getDb();
-    const iso = (ms) => new Date(segundo(ms)).toISOString();
-    const sql = (ms) => iso(ms).slice(0, 19).replace('T', ' ');
+    // A mistura de formatos só existe no SQLite (texto e número na mesma
+    // coluna); Postgres e MySQL guardam `datetime` e recusam o ISO com `Z`.
+    const servidor = (process.env.TEST_DB_CLIENT || 'sqlite3') !== 'sqlite3';
+    const iso = (ms) => (servidor ? segundo(ms) : new Date(segundo(ms)).toISOString());
+    const sql = (ms) => (servidor ? segundo(ms) : new Date(segundo(ms)).toISOString().slice(0, 19).replace('T', ' '));
     await db('platform_alerts').insert([
       { event: 'charge_failed', dedupe_key: 'fmt-1', status: 'failed', created_at: segundo(Date.now() - 2 * DAY) },
       { event: 'charge_failed', dedupe_key: 'fmt-2', status: 'failed', created_at: iso(Date.now() - 3 * DAY) },
