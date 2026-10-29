@@ -12,10 +12,15 @@
  */
 
 export const GRAPH_BASE = 'https://graph.facebook.com';
-/** A versão da Graph API; `META_GRAPH_VERSION` troca sem novo deploy de código. */
+/**
+ * A versão da Graph API; `META_GRAPH_VERSION` troca sem novo deploy de código.
+ *
+ * A Meta desliga cada versão cerca de dois anos depois de lançá-la, então o
+ * padrão precisa andar de tempos em tempos (era `v21.0`, de out/2024).
+ */
 export const META_GRAPH_VERSION = /^v\d{1,3}\.\d{1,2}$/.test(String(process.env.META_GRAPH_VERSION || '').trim())
   ? String(process.env.META_GRAPH_VERSION).trim()
-  : 'v21.0';
+  : 'v25.0';
 const GRAPH_TIMEOUT_MS = 10_000;
 /** O tamanho das colunas de erro (`meta_webhook_error`, `meta_health_error`, `meta_templates_error`). */
 export const GRAPH_ERROR_LIMIT = 255;
