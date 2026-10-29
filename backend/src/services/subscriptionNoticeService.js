@@ -14,7 +14,8 @@ import SelfBillingService from './selfBillingService.js';
 import Subscription from '../models/Subscription.js';
 import Plan from '../models/Plan.js';
 import { tdb } from '../config/database.js';
-import { autoSuspendConfig } from './platformProfileService.js';
+import { autoSuspendConfig, reminderPolicyConfig } from './platformProfileService.js';
+import { renderReminderTemplate } from './reminderPolicy.js';
 
 /**
  * Os lembretes que chegam ANTES do bloqueio — e depois dele.
@@ -50,7 +51,16 @@ import { autoSuspendConfig } from './platformProfileService.js';
  * mensagem, e isso é registrado — um provedor sem endereço de cobrança é um
  * problema comercial, não um erro de programa.
  *
- * ## O idioma
+ * ## A régua configurável (0121)
+ *
+ * Os passos, os dias, os canais e os textos vêm de Configurações → Régua de
+ * cobrança (`platformProfileService.reminderPolicyConfig`); sem nada gravado,
+ * vale a régua de três etapas de sempre. A memória passou a ser por PASSO
+ * (`step_key`, o id dele): o registro antigo `before` é o passo `before` da
+ * régua padrão, e não sai de novo. O texto vazio de um passo é o do i18n
+ * (o do teste, no teste); o preenchido troca `{empresa}`, `{valor}`,
+ * `{vencimento}`, `{link}` e `{plano}` e sai só em texto — o e-mail não tem
+ * HTML, e o valor de cada variável é limpo (`sanitizeReminderValue`).
  *
  * ## A suspensão automática (0102)
  *
@@ -123,7 +133,8 @@ class SubscriptionNoticeService {
     const temEmail = transporte.name !== 'none';
 
     const { subscription, plan } = await SubscriptionService.current();
-    const pendente = SubscriptionService.pendingReminder(subscription, now, plan);
+    const politica = await reminderPolicyConfig();
+    const pendente = SubscriptionService.pendingReminder(subscription, now, plan, politica);
     if (!pendente) return { sent: false, reason: 'nothing_due' };
 
     // O agendador já tem a linha do provedor na mão (`forEachTenant` a entrega
@@ -154,16 +165,26 @@ class SubscriptionNoticeService {
     // chave da etapa e também o que a mensagem diz. ISO e curta: o idioma do
     // destinatário é desconhecido, e `12/09` é ambíguo.
     const dueAt = ChargeIssuingService.periodKey(pendente.deadline);
-    const resultado = await this.sendStep({
-      tenant, pendente, dueAt, now, plan, subscription, transporte
-    });
+    // Os passos com a janela aberta, o mais tardio primeiro: o que já saiu
+    // é pulado, e sai no máximo um por passada.
+    let resultado = null;
+    let passo = pendente;
+    for (const candidato of pendente.candidates ?? [pendente]) {
+      passo = candidato;
+      // eslint-disable-next-line no-await-in-loop -- um envio por passada
+      resultado = await this.sendStep({
+        tenant, pendente: candidato, dueAt, now, plan, subscription, transporte
+      });
+      if (resultado.sent || resultado.reason !== 'already_sent') break;
+    }
     if (!resultado.sent) return resultado;
     await SubscriptionService.markExpiryWarned(pendente.deadline);
     return {
       sent: true,
-      kind: pendente.kind,
-      step: pendente.step,
-      expired: pendente.expired,
+      kind: passo.kind,
+      step: passo.step,
+      stepId: passo.stepId,
+      expired: passo.expired,
       recipients: resultado.recipients,
       whatsapp: resultado.whatsapp
     };
@@ -177,16 +198,18 @@ class SubscriptionNoticeService {
     tenant, pendente, dueAt, now, plan, subscription, transporte = mailTransport(), charge = null
   }) {
     const temEmail = transporte.name !== 'none';
-    const para = temEmail ? await this.recipients(tenant) : [];
-    const fone = String(tenant.billing_phone ?? '').trim();
+    // Os canais do passo da régua (0121); as etapas de fora dela, os dois.
+    const canaisDoPasso = Array.isArray(pendente.channels) ? pendente.channels : ['email', 'whatsapp'];
+    const para = temEmail && canaisDoPasso.includes('email') ? await this.recipients(tenant) : [];
+    const fone = canaisDoPasso.includes('whatsapp') ? String(tenant.billing_phone ?? '').trim() : '';
     if (!para.length && !fone) {
-      return { sent: false, reason: temEmail ? 'no_recipient' : 'no_transport' };
+      return { sent: false, reason: temEmail || !canaisDoPasso.includes('email') ? 'no_recipient' : 'no_transport' };
     }
 
     const garra = await SubscriptionReminderSend.claim({
-      dueAt, step: pendente.step, until: new Date(now.getTime() + this.CLAIM_MS), now
+      dueAt, step: pendente.step, stepKey: pendente.stepId ?? null, until: new Date(now.getTime() + this.CLAIM_MS), now
     });
-    if (!garra) return { sent: false, reason: 'already_sent', step: pendente.step };
+    if (!garra) return { sent: false, reason: 'already_sent', step: pendente.step, stepId: pendente.stepId };
 
     let canais = [];
     try {
@@ -206,6 +229,7 @@ class SubscriptionNoticeService {
     return {
       sent: true,
       step: pendente.step,
+      stepId: pendente.stepId,
       recipients: para.length,
       whatsapp: canais.includes('whatsapp')
     };
@@ -474,6 +498,56 @@ class SubscriptionNoticeService {
     return { sent: true, channels: canais };
   }
 
+  /** Os dados de exemplo do "enviar teste" e da pré-visualização da tela. */
+  static SAMPLE = Object.freeze({
+    provider: 'Provedor Exemplo', amountCents: 19990, currency: 'BRL', plan: 'Pro', link: 'https://painel.exemplo.com/fatura'
+  });
+
+  /**
+   * O "Enviar teste para mim" da régua (0121): o passo `stepId` da régua
+   * GRAVADA, com os dados de exemplo, para os destinos de avisos da
+   * plataforma (Dados do SaaS) — pelos canais do passo. Não toca em
+   * `subscription_reminder_sends`: o teste não é lembrete de ninguém.
+   *
+   * @returns {Promise<{ status: 'sent'|'failed'|'skipped'|'not_found',
+   *   reason?: string, channels?: Record<string, boolean|null> }>}
+   */
+  static async sendPolicyTest({ stepId, now = new Date() } = {}) {
+    const politica = await reminderPolicyConfig();
+    const passo = politica.steps.find((p) => p.id === stepId);
+    if (!passo) return { status: 'not_found', reason: 'step_not_found' };
+    const { default: PlatformAlertService } = await import('./platformAlertService.js');
+    const destinos = await PlatformAlertService.destinations();
+    const canais = passo.channels.filter((c) => destinos[c]);
+    if (!canais.length) return { status: 'skipped', reason: 'no_destination', channels: {} };
+
+    const prazo = new Date(now.getTime() - passo.offsetDays * 86_400_000);
+    const vars = {
+      provider: this.SAMPLE.provider,
+      date: ChargeIssuingService.periodKey(prazo),
+      days: Math.abs(passo.offsetDays),
+      amount: this.formatAmount(this.SAMPLE.amountCents, this.SAMPLE.currency),
+      link: this.SAMPLE.link
+    };
+    const { assunto, texto } = this.composeMessage({
+      chave: `subscription.reminder.${passo.kind}`, vars, subject: passo.subject, body: passo.body, plano: this.SAMPLE.plan
+    });
+    const titulo = `${translate(DEFAULT_LOCALE, 'subscription.reminder.testPrefix')}${assunto}`;
+    const channels = {};
+    for (const canal of passo.channels) {
+      if (!destinos[canal]) {
+        channels[canal] = null;
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop -- dois canais no máximo
+      channels[canal] = canal === 'email'
+        ? Boolean(await mailTransport().send({ to: destinos.email, subject: titulo, text: texto }).catch(() => false))
+        : Boolean(await PlatformNotifyService.sendWhatsapp(destinos.whatsapp, `*${titulo}*\n\n${texto}`));
+    }
+    const saiu = Object.values(channels).some((v) => v === true);
+    return saiu ? { status: 'sent', channels } : { status: 'failed', reason: 'send_failed', channels };
+  }
+
   /** Manda por e-mail e WhatsApp; devolve os canais por onde saiu. */
   static async send({ para, fone, transporte, assunto, texto }) {
     const enviados = await Promise.all(para.map((endereco) => transporte.send({
@@ -486,6 +560,26 @@ class SubscriptionNoticeService {
     if (enviados.some(Boolean)) canais.push('email');
     if (porWhatsapp) canais.push('whatsapp');
     return canais;
+  }
+
+  /**
+   * O assunto e o texto de um lembrete: o do passo da régua (0121), quando
+   * ele tem um, com as variáveis trocadas e limpas; senão o do i18n (`chave`
+   * + Subject/Body). Cada um dos dois cai no padrão sozinho.
+   */
+  static composeMessage({
+    chave, vars, subject = '', body = '', plano = ''
+  }) {
+    const valores = {
+      empresa: vars.provider, valor: vars.amount, vencimento: vars.date, link: vars.link, plano
+    };
+    const assunto = subject && subject.trim()
+      ? renderReminderTemplate(subject, valores).replace(/\s+/g, ' ').trim().slice(0, 200)
+      : translate(DEFAULT_LOCALE, `${chave}Subject`, vars);
+    const texto = body && body.trim()
+      ? renderReminderTemplate(body, valores)
+      : translate(DEFAULT_LOCALE, `${chave}Body`, vars);
+    return { assunto, texto };
   }
 
   /** Monta e manda a mensagem; devolve os canais por onde ela saiu. */
@@ -502,6 +596,7 @@ class SubscriptionNoticeService {
     // da descida agendada, quando é para ele) com o cupom da assinatura.
     let centavos;
     let moeda;
+    let nomePlano = plan?.name ?? '';
     if (cobranca) {
       centavos = Number(cobranca.amount_cents);
       moeda = cobranca.currency || plan?.currency || 'BRL';
@@ -516,6 +611,7 @@ class SubscriptionNoticeService {
         ? await SubscriptionService.effectivePriceCents(fatura?.plan ? fatura.subscription : subscription, daFatura)
         : SubscriptionService.cyclePriceCents(null, daFatura);
       moeda = daFatura?.currency || plan?.currency || 'BRL';
+      nomePlano = daFatura?.name ?? nomePlano;
     }
 
     const dias = Math.max(0, Math.ceil(Math.abs(pendente.deadline.getTime() - now.getTime()) / 86_400_000));
@@ -534,8 +630,9 @@ class SubscriptionNoticeService {
       ? `subscription.reminder.trial${etapa}`
       : `subscription.reminder.${pendente.step}`;
     if (pendente.messageKey) chave = pendente.messageKey;
-    const assunto = translate(DEFAULT_LOCALE, `${chave}Subject`, vars);
-    const texto = translate(DEFAULT_LOCALE, `${chave}Body`, vars);
+    const { assunto, texto } = this.composeMessage({
+      chave, vars, subject: pendente.subject, body: pendente.body, plano: nomePlano
+    });
 
     const enviados = await Promise.all(para.map((endereco) => transporte.send({
       to: endereco, subject: assunto, text: texto

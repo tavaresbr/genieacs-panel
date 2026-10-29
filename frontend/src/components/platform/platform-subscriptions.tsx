@@ -842,7 +842,12 @@ function ReminderList({ reminders }: { reminders: SubscriptionReminderView[] }) 
             className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
           >
             <span className="flex flex-wrap items-center gap-2">
-              <span className="modern-badge">{t(REMINDER_STEP_KEYS[reminder.step])}</span>
+              {/* O passo personalizado da régua (0121) vem pelo id dele, sem frase própria. */}
+              <span className="modern-badge">
+                {reminder.step in REMINDER_STEP_KEYS
+                  ? t(REMINDER_STEP_KEYS[reminder.step as keyof typeof REMINDER_STEP_KEYS])
+                  : reminder.step}
+              </span>
               <span className="text-muted-foreground">{t('platform.subs.reminders.dueAt', { date: formatDay(reminder.dueAt) })}</span>
               <span className="text-muted-foreground">
                 {reminder.channels

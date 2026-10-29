@@ -1282,5 +1282,6 @@ export default {
   'receipt.chargeId': 'Cobrança',
   'receipt.issuedAt': 'Emitido em {date}',
   'receipt.statement': 'Recebemos de {payer} a quantia de {amount}, referente a {description}.',
-  'receipt.printHint': 'Para salvar em PDF, use Imprimir (Ctrl+P) no navegador.'
+  'receipt.printHint': 'Para salvar em PDF, use Imprimir (Ctrl+P) no navegador.',
+  'subscription.reminder.testPrefix': '[Teste] '
 };

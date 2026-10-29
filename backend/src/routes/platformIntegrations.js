@@ -34,6 +34,8 @@ router.get('/alerts', ...guard, PlatformSettingsController.listAlerts);
 router.post('/alerts/:id/resend', ...guard, PlatformSettingsController.resendAlert);
 // Configurações → E-mail: prova o SMTP do deploy mandando uma mensagem de verdade.
 router.post('/mail/test', ...guard, PlatformSettingsController.testMail);
+// Configurações → Régua de cobrança (0121): a régua vai no perfil; o teste, aqui.
+router.post('/settings/reminder-policy/test', ...guard, PlatformSettingsController.testReminderPolicy);
 
 // O provedor como cliente na conta Asaas da plataforma: cria lá e liga aqui.
 router.post('/tenants/:id/gateway/asaas-customer', ...guard, PlatformIntegrationsController.createAsaasCustomer);

@@ -1286,5 +1286,6 @@ export default {
   'receipt.chargeId': '청구',
   'receipt.issuedAt': '발행일 {date}',
   'receipt.statement': '{payer}(으)로부터 {description} 명목으로 {amount}을(를) 수령했습니다.',
-  'receipt.printHint': 'PDF로 저장하려면 브라우저의 인쇄(Ctrl+P)를 사용하세요.'
+  'receipt.printHint': 'PDF로 저장하려면 브라우저의 인쇄(Ctrl+P)를 사용하세요.',
+  'subscription.reminder.testPrefix': '[테스트] '
 };

@@ -1275,5 +1275,6 @@ export default {
   'receipt.chargeId': 'الفاتورة',
   'receipt.issuedAt': 'صدر في {date}',
   'receipt.statement': 'استلمنا من {payer} مبلغ {amount} مقابل {description}.',
-  'receipt.printHint': 'للحفظ بصيغة PDF، استخدم الطباعة (Ctrl+P) في المتصفح.'
+  'receipt.printHint': 'للحفظ بصيغة PDF، استخدم الطباعة (Ctrl+P) في المتصفح.',
+  'subscription.reminder.testPrefix': '[تجربة] '
 };

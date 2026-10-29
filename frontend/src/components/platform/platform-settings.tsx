@@ -6,16 +6,18 @@ import { PlatformProfileForm } from '@/components/platform/platform-profile'
 import { PlatformAlertsSettings } from '@/components/platform/platform-alerts'
 import { PlatformAlertsPanel } from '@/components/platform/platform-alert-history'
 import { PlatformMailSettings } from '@/components/platform/platform-mail'
+import { PlatformReminderPolicy } from '@/components/platform/platform-reminders'
 import { useTranslation } from '@/contexts/language-context'
 
 /**
  * Configurações do console, com submenu: os dados da empresa que vende o SaaS
  * e as integrações com sistemas de fora (a conta Asaas). E os alertas para
- * quem opera a plataforma (0112), e o e-mail de teste do SMTP do deploy.
+ * quem opera a plataforma (0112), e o e-mail de teste do SMTP do deploy. E a
+ * régua de cobrança (0121).
  */
 export function PlatformSettings() {
   const { t } = useTranslation()
-  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations'>('profile')
+  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders'>('profile')
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
@@ -24,7 +26,8 @@ export function PlatformSettings() {
           ['profile', 'platform.settings.profile'],
           ['alerts', 'platform.settings.alerts'],
           ['mail', 'platform.settings.mail'],
-          ['integrations', 'platform.tabs.integrations']
+          ['integrations', 'platform.tabs.integrations'],
+          ['reminders', 'platform.settings.reminders']
         ] as const).map(([chave, rotulo]) => (
           <button
             key={chave}
@@ -44,6 +47,7 @@ export function PlatformSettings() {
         {sub === 'alerts' && <PlatformAlertsPanel settings={<PlatformAlertsSettings />} />}
         {sub === 'mail' && <PlatformMailSettings />}
         {sub === 'integrations' && <PlatformIntegrations />}
+        {sub === 'reminders' && <PlatformReminderPolicy />}
       </div>
     </div>
   )

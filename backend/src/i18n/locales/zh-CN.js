@@ -1283,5 +1283,6 @@ export default {
   'receipt.chargeId': '账单',
   'receipt.issuedAt': '开具于 {date}',
   'receipt.statement': '我们已收到 {payer} 支付的 {amount}，用于 {description}。',
-  'receipt.printHint': '如需保存为 PDF，请在浏览器中使用“打印”(Ctrl+P)。'
+  'receipt.printHint': '如需保存为 PDF，请在浏览器中使用“打印”(Ctrl+P)。',
+  'subscription.reminder.testPrefix': '[测试] '
 };

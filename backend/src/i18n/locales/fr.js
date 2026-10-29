@@ -1279,5 +1279,6 @@ export default {
   'receipt.chargeId': 'Facture',
   'receipt.issuedAt': 'Émis le {date}',
   'receipt.statement': 'Nous avons reçu de {payer} la somme de {amount}, au titre de {description}.',
-  'receipt.printHint': 'Pour enregistrer en PDF, utilisez Imprimer (Ctrl+P) dans le navigateur.'
+  'receipt.printHint': 'Pour enregistrer en PDF, utilisez Imprimer (Ctrl+P) dans le navigateur.',
+  'subscription.reminder.testPrefix': '[Test] '
 };

@@ -4,6 +4,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import PlatformAlertService, { ALERT_STATUSES, HISTORY_EVENTS } from '../services/platformAlertService.js';
 import { ALERT_CHANNELS } from '../services/platformProfileService.js';
 import { mailTransport } from '../services/mail/index.js';
+import SubscriptionNoticeService from '../services/subscriptionNoticeService.js';
 import { isValidEmail } from '../utils/helpers.js';
 import {
   PlatformBrandingError,
@@ -59,7 +60,12 @@ class PlatformSettingsController {
       return res.json(createResponse('Profile saved', { ...(await readProfile()), changed }));
     } catch (error) {
       if (error instanceof PlatformProfileError) {
-        return res.status(error.status).json({ ...createErrorResponse(error.message), field: error.field });
+        return res.status(error.status).json({
+          ...createErrorResponse(error.message),
+          field: error.field,
+          ...(error.code ? { code: error.code } : {}),
+          ...(Number.isInteger(error.index) ? { index: error.index } : {})
+        });
       }
       console.error('Save platform profile error:', error);
       return res.status(500).json(createErrorResponse('Failed to save the profile', error.message));
@@ -257,6 +263,45 @@ class PlatformSettingsController {
     } catch (error) {
       console.error('Platform mail test error:', error);
       return res.status(500).json(createErrorResponse('Failed to send the test e-mail', error.message));
+    }
+  }
+
+  /**
+   * `POST /api/platform/settings/reminder-policy/test` — manda AGORA o passo
+   * `stepId` da régua de cobrança gravada, com dados de exemplo, para os
+   * destinos de avisos de Dados do SaaS, pelos canais do passo. 200 com o
+   * resultado por canal (`true` saiu, `false` falhou, `null` sem destino);
+   * 400 `invalid_step`; 404 `step_not_found`; 409 `no_destination`; 502
+   * `send_failed`. Auditado.
+   */
+  static async testReminderPolicy(req, res) {
+    try {
+      const stepId = req.body?.stepId;
+      if (typeof stepId !== 'string' || !/^[a-z0-9_-]{1,16}$/.test(stepId)) {
+        return res.status(400).json({ ...createErrorResponse('Invalid stepId'), code: 'invalid_step' });
+      }
+      const resultado = await SubscriptionNoticeService.sendPolicyTest({ stepId });
+      if (resultado.status === 'not_found') {
+        return res.status(404).json({ ...createErrorResponse('No such step in the saved policy'), code: 'step_not_found' });
+      }
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.PLATFORM_REMINDER_TEST,
+        detail: { stepId, status: resultado.status, channels: resultado.channels ?? {} }
+      });
+      if (resultado.reason === 'no_destination') {
+        return res.status(409).json({
+          ...createErrorResponse('No WhatsApp or email to send the test to'), code: 'no_destination'
+        });
+      }
+      if (resultado.status !== 'sent') {
+        return res.status(502).json({
+          ...createErrorResponse('The test reminder could not be sent'), code: 'send_failed', channels: resultado.channels ?? {}
+        });
+      }
+      return res.json(createResponse('Test reminder sent', { channels: resultado.channels }));
+    } catch (error) {
+      console.error('Reminder policy test error:', error);
+      return res.status(500).json(createErrorResponse('Failed to send the test reminder', error.message));
     }
   }
 }

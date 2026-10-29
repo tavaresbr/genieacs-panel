@@ -156,7 +156,7 @@ describe('os manuais embutidos', () => {
   it('o manual da plataforma carrega e cobre as seções do plano', () => {
     expect(PLATFORM_BILLING_MANUAL.length).toBeGreaterThan(1000)
     const secoes = buildToc(parseMarkdown(PLATFORM_BILLING_MANUAL)).filter((e) => e.level === 2).map((e) => e.text)
-    for (const nome of ['Integrações → Asaas', 'Planos', 'Cupons', 'Assinaturas', 'Inadimplência', 'Receita', 'Indicação', 'Retenção', 'Alertas', 'Teste no sandbox', 'Perguntas frequentes']) {
+    for (const nome of ['Integrações → Asaas', 'Planos', 'Cupons', 'Assinaturas', 'Inadimplência', 'Receita', 'Indicação', 'Retenção', 'Alertas', 'Régua de cobrança', 'Teste no sandbox', 'Perguntas frequentes']) {
       expect(secoes, nome).toContain(nome)
     }
     expect(PLATFORM_BILLING_MANUAL).toContain('PAYMENT_CREDIT_CARD_CAPTURE_REFUSED')
