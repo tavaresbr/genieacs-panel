@@ -635,7 +635,7 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
           {!compact && quickReplies !== null && (
             <button
               type="button"
-              className="modern-button-secondary shrink-0 px-3 @4xl:px-4 max-sm:h-9 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
+              className="modern-button-secondary shrink-0 px-3 @4xl:px-4 max-sm:h-10 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
               aria-label={t('whatsapp.quickReplies.button')}
               title={t('whatsapp.quickReplies.button')}
               aria-pressed={pickerOpen}
@@ -657,7 +657,7 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
           {!compact && templates !== null && onPickTemplate && (
             <button
               type="button"
-              className="modern-button-secondary shrink-0 px-3 sm:px-4 max-sm:h-9 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
+              className="modern-button-secondary shrink-0 px-3 sm:px-4 max-sm:h-10 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
               aria-label={t('whatsapp.templatePicker.button')}
               title={t('whatsapp.templatePicker.button')}
               aria-pressed={templatesOpen}
@@ -676,7 +676,7 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
           {!compact && onSuggest && !isNote && (
             <button
               type="button"
-              className="modern-button-secondary shrink-0 px-3 @4xl:px-4 max-sm:h-9 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
+              className="modern-button-secondary shrink-0 px-3 @4xl:px-4 max-sm:h-10 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
               aria-label={t('whatsapp.ai.suggest')}
               title={t('whatsapp.ai.suggest')}
               disabled={busy || suggesting}
@@ -703,7 +703,7 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
           )}
           <button
             type="button"
-            className="modern-button-secondary shrink-0 px-3 @4xl:px-4 max-sm:h-9 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
+            className="modern-button-secondary shrink-0 px-3 @4xl:px-4 max-sm:h-10 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
             aria-label={t('whatsapp.inbox.attach')}
             title={t('whatsapp.inbox.attachHint')}
             disabled={busy || items.length >= MAX_ATTACHMENTS_PER_SEND}
@@ -715,7 +715,7 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
 
           <button
             type="button"
-            className={`${isNote ? 'modern-button-secondary shrink-0 border-[hsl(var(--status-warning))]/70' : 'modern-button shrink-0'} max-sm:min-h-9 max-sm:px-3`}
+            className={`${isNote ? 'modern-button-secondary shrink-0 border-[hsl(var(--status-warning))]/70' : 'modern-button shrink-0'} max-sm:min-h-10 max-sm:px-3`}
             disabled={empty || busy || windowBlocked}
             aria-live="polite"
             onClick={() => void submit()}

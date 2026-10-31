@@ -84,7 +84,7 @@ export function MessageMenu({ message, onReply, onForward, onReact, onDelete }: 
     <div ref={box} className="relative shrink-0 self-start">
       <button
         type="button"
-        className="inline-flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-[hsl(var(--surface-subtle))] hover:text-foreground focus-visible:opacity-100 group-hover/msg:opacity-100 max-lg:opacity-100"
+        className="inline-flex size-6 max-lg:-mx-1 max-lg:size-10 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-[hsl(var(--surface-subtle))] hover:text-foreground focus-visible:opacity-100 group-hover/msg:opacity-100 max-lg:opacity-100"
         aria-label={t('whatsapp.msg.menu')}
         title={t('whatsapp.msg.menu')}
         aria-expanded={open}

@@ -273,6 +273,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   // Read by the pollers, which must not be rebuilt — and their intervals with
   // them — every time a selection or a page size changes.
   const selectedIdRef = useRef<number | null>(null)
+  // Há uma entrada de histórico para a conversa aberta (só no celular).
+  const chatEntry = useRef(false)
   const olderInFlight = useRef(false)
   const threadStampRef = useRef<string | null>(null)
   // The filter belongs in a ref for the same reason: a poll must ask for what
@@ -471,6 +473,30 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     return () => clearInterval(timer)
   }, [loadList])
 
+  // Ao voltar do segundo plano (desbloquear o celular, trocar de app) o
+  // intervalo pode estar a segundos de disparar: atualiza na hora, no máximo
+  // uma vez a cada 5 s, já que `visibilitychange` e `pageshow` chegam juntos.
+  const lastForeground = useRef(0)
+  useEffect(() => {
+    const onForeground = () => {
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - lastForeground.current < 5_000) return
+      lastForeground.current = now
+      listBlockedUntil.current = 0
+      threadBlockedUntil.current = 0
+      void loadList(false)
+      const id = selectedIdRef.current
+      if (id !== null) void loadThreadRef.current(id, true)
+    }
+    document.addEventListener('visibilitychange', onForeground)
+    window.addEventListener('pageshow', onForeground)
+    return () => {
+      document.removeEventListener('visibilitychange', onForeground)
+      window.removeEventListener('pageshow', onForeground)
+    }
+  }, [loadList])
+
   // Selecting a thread, or asking for more of it, loads it visibly.
   useEffect(() => {
     if (selectedId === null) return
@@ -503,6 +529,13 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     setHasOlder(false)
     setReplyTo(null)
     setSelectedId(next.id)
+    // No celular a conversa é "uma tela": o Voltar do sistema tem que fechá-la
+    // e voltar à lista, e não sair do WhatsApp. Uma entrada de histórico para a
+    // conversa aberta (a mesma URL) faz o Voltar desfazê-la.
+    if (!chatEntry.current && window.matchMedia('(max-width: 1023px)').matches) {
+      window.history.pushState({ ...(window.history.state ?? {}), waChat: true }, '')
+      chatEntry.current = true
+    }
   }, [])
 
   /**
@@ -511,7 +544,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
    * Clearing the ref first is what makes a thread poll already in flight drop
    * its answer instead of reopening the conversation behind the operator.
    */
-  const closeThread = useCallback(() => {
+  const resetThread = useCallback(() => {
     selectedIdRef.current = null
     threadStampRef.current = null
     threadFailures.current = 0
@@ -521,6 +554,27 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     setHasOlder(false)
     setSelectedId(null)
   }, [])
+
+  // Fechar pela própria tela (a seta, a aba "Conversas") também desfaz a entrada
+  // de histórico que `select` criou; o `popstate` abaixo ignora esse retorno.
+  const closeThread = useCallback(() => {
+    resetThread()
+    if (chatEntry.current) {
+      chatEntry.current = false
+      window.history.back()
+    }
+  }, [resetThread])
+
+  // O Voltar do sistema: desfaz a entrada e fecha a conversa.
+  useEffect(() => {
+    const onPop = () => {
+      if (!chatEntry.current) return
+      chatEntry.current = false
+      resetThread()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [resetThread])
 
   const backSeen = useRef(backToList)
   useEffect(() => {
