@@ -123,7 +123,7 @@ export function ConversationThread({
     return () => observer.disconnect()
   }, [])
   const withLabels = showActionLabels(headerWidth)
-  const actionClass = `${withLabels ? 'modern-button-secondary' : 'modern-button-secondary px-3'} max-lg:min-h-9 max-lg:px-2.5`
+  const actionClass = `${withLabels ? 'modern-button-secondary' : 'modern-button-secondary px-3'} max-lg:min-h-10 max-lg:px-2.5`
   const labelClass = withLabels ? 'inline' : 'hidden'
 
   // A new thread always opens at its foot: the newest message is the one the

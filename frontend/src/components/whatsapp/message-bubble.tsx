@@ -342,7 +342,7 @@ export function MessageBubble({ message, onResend, resending, onReply, onForward
           </p>
           <div className="text-foreground">{body}</div>
           {attachment}
-          <p className="mt-1.5 font-mono text-[0.62rem] tabular-nums text-muted-foreground">{stamp}</p>
+          <p className="mt-1.5 font-mono text-[0.62rem] max-lg:text-[0.72rem] tabular-nums text-muted-foreground">{stamp}</p>
         </div>
       </li>
     )
@@ -385,10 +385,10 @@ export function MessageBubble({ message, onResend, resending, onReply, onForward
               {t('whatsapp.cloud.sentAsTemplate')}
             </span>
           )}
-          <span className="font-mono text-[0.62rem] tabular-nums text-muted-foreground">{stamp}</span>
+          <span className="font-mono text-[0.62rem] max-lg:text-[0.72rem] tabular-nums text-muted-foreground">{stamp}</span>
           {message.deliveryStatus && (
             <span
-              className={`inline-flex items-center gap-1 text-[0.62rem] font-semibold ${
+              className={`inline-flex items-center gap-1 text-[0.62rem] max-lg:text-[0.72rem] font-semibold ${
                 failed ? 'text-[hsl(var(--status-danger))]' : 'text-muted-foreground'
               }`}
             >
@@ -402,7 +402,7 @@ export function MessageBubble({ message, onResend, resending, onReply, onForward
           )}
           {waiting && (
             <span
-              className="inline-flex items-center gap-1 text-[0.62rem] font-semibold text-muted-foreground"
+              className="inline-flex items-center gap-1 text-[0.62rem] max-lg:text-[0.72rem] font-semibold text-muted-foreground"
               title={clock(due, intlLocale)}
             >
               <Icon name="refresh" size={12} />
