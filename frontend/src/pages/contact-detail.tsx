@@ -450,7 +450,10 @@ export default function ContactDetailPage() {
                   <tbody>
                     {profile.contracts.map((contract) => (
                       <tr key={contract.contract}>
-                        <td className="font-mono">{contract.contract}</td>
+                        <td className="font-mono">
+                          {contract.contract}
+                          {contract.login && <span className="block text-xs text-muted-foreground wrap-anywhere">{contract.login}</span>}
+                        </td>
                         <td>
                           {contract.status || '—'}
                           {contract.statusReason && <span className="block text-xs text-muted-foreground">{contract.statusReason}</span>}
@@ -475,6 +478,7 @@ export default function ContactDetailPage() {
                       <span className="font-mono font-semibold">{contract.contract}</span>
                       <span>{contract.status || '—'}</span>
                     </div>
+                    {contract.login && <p className="font-mono text-xs text-muted-foreground wrap-anywhere">{contract.login}</p>}
                     {contract.statusReason && <p className="text-xs text-muted-foreground">{contract.statusReason}</p>}
                     <p className="wrap-break-word">{contract.plan || '—'}</p>
                     <p className="text-xs text-muted-foreground">
