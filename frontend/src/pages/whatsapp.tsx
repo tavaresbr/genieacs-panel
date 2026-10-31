@@ -43,7 +43,7 @@ import { NotifyToggle } from '@/components/whatsapp/message-notifier'
 import { focusedConversation } from '@/lib/wa-notify'
 import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
-import { cardHeightAboveKeyboard, visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
+import { cardHeightAboveKeyboard, cardOutOfView, visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation, useNavigate } from 'react-router'
@@ -864,6 +864,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   // número de faixas de aviso acima dele.
   const [cardHeight, setCardHeight] = useState<number | null>(null)
   const cardRef = useRef<HTMLElement>(null)
+  // `?wadebug=1` mostra as medidas do teclado numa faixa no topo, para quem testa no aparelho.
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
@@ -886,6 +888,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     lock(true)
     let last: number | null = null
     let lastCard: number | null = null
+    let lastRescue = 0
+    const debug = new URLSearchParams(window.location.search).get('wadebug') === '1'
     const update = () => {
       const next = visibleHeightWithKeyboard({ innerHeight: window.innerHeight, vvHeight: vv.height })
       if (next !== last) {
@@ -897,12 +901,27 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       // aberto, também quando só a área visível (e não a página) se deslocou.
       if (window.scrollY !== 0 || (next !== null && vv.offsetTop > 0)) window.scrollTo(0, 0)
       const card = cardRef.current
-      const height = card
-        ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: card.getBoundingClientRect().top })
+      const rect = card?.getBoundingClientRect() ?? null
+      const height = rect
+        ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: rect.top })
         : null
       if (height !== lastCard) {
         lastCard = height
         setCardHeight(height)
+      }
+      // A rede de segurança da tela escura: com o teclado aberto e o cartão fora
+      // da área visível, traz o cartão de volta. No máximo a cada meio segundo,
+      // para não brigar com o Safari se ele insistir em deslocar.
+      if (card && rect && next !== null && Date.now() - lastRescue > 500
+        && cardOutOfView({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: rect.top, cardBottom: rect.bottom })) {
+        lastRescue = Date.now()
+        card.scrollIntoView({ block: 'nearest' })
+      }
+      if (debug) {
+        setDebugInfo(
+          `inner ${Math.round(window.innerHeight)} vv ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)} `
+          + `scrollY ${Math.round(window.scrollY)} kb ${next ?? '-'} card ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'} h ${height ?? '-'}`
+        )
       }
     }
     update()
@@ -921,6 +940,11 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
 
   return (
     <section className="space-y-5 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+      {debugInfo && (
+        <div className="pointer-events-none fixed inset-x-1 top-1 z-2000 rounded bg-black/85 px-2 py-1 font-mono text-[0.62rem] leading-4 text-green-300" aria-hidden="true">
+          {debugInfo}
+        </div>
+      )}
       <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
         {/* Sem título próprio: a aba ativa já diz "Conversas", e um segundo
             título aqui era uma faixa inteira repetindo o nome dela. O contador

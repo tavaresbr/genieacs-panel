@@ -40,3 +40,20 @@ export function cardHeightAboveKeyboard(
   if (![vvTop, vvHeight, cardTop].every(Number.isFinite) || !(vvHeight > 0)) return null
   return Math.max(Math.round(vvTop + vvHeight - cardTop - margin), min)
 }
+
+/**
+ * O cartão saiu da área visível com o teclado aberto?
+ *
+ * É o estado da tela escura do iPhone: o Safari deslocou a área visível para
+ * mostrar a caixa de escrever e, com o cartão fora dela, só sobra o fundo. Deve
+ * ter ao menos `min` px do cartão à vista; senão a página traz o cartão de volta
+ * (`scrollIntoView`). Só vale com o teclado aberto: sem ele ninguém desloca nada.
+ */
+export function cardOutOfView(
+  { vvTop, vvHeight, cardTop, cardBottom }: { vvTop: number; vvHeight: number; cardTop: number; cardBottom: number },
+  { min = 40 }: { min?: number } = {}
+): boolean {
+  if (![vvTop, vvHeight, cardTop, cardBottom].every(Number.isFinite) || !(vvHeight > 0)) return false
+  const visible = Math.min(cardBottom, vvTop + vvHeight) - Math.max(cardTop, vvTop)
+  return visible < min
+}
