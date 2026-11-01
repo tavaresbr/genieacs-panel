@@ -1,6 +1,7 @@
 import express from 'express';
 import PlatformReportsController from '../controllers/platformReportsController.js';
 import CancellationController from '../controllers/cancellationController.js';
+import PlatformOverviewController from '../controllers/platformOverviewController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -21,5 +22,7 @@ router.get('/reports/cancellations', ...guard, CancellationController.report);
 // As métricas mês a mês (gráficos da Receita) e o "Enviar relatório agora".
 router.get('/metrics/monthly', ...guard, PlatformReportsController.monthlyMetrics);
 router.post('/metrics/monthly-report/send', ...guard, PlatformReportsController.sendMonthlyReport);
+// O painel inicial do console (aba Início): a foto de agora, num pedido só.
+router.get('/overview', ...guard, PlatformOverviewController.overview);
 
 export default router;

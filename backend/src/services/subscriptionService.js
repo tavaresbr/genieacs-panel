@@ -14,6 +14,7 @@ import { IS_SAAS } from '../config/edition.js';
 import { effectiveChargesConfig, earlyDiscountFor } from './billing/asaasSettingsService.js';
 import TenantCredit from '../models/TenantCredit.js';
 import ReferralService from './referralService.js';
+import { defaultReminderPolicy, reminderWindows } from './reminderPolicy.js';
 
 /**
  * O ciclo de vida da assinatura, e o que cada estado deixa fazer.
@@ -663,13 +664,23 @@ class SubscriptionService {
   /**
    * A etapa da régua de lembretes em que o provedor está agora, ou nulo.
    *
-   * Substitui o aviso único de antes (`expiry_warned_for`): três etapas por
-   * prazo, relativas a ele — `renews_at`, ou `trial_ends_at` no teste:
+   * Substitui o aviso único de antes (`expiry_warned_for`): os passos da régua
+   * (`policy`, a de Configurações → Régua de cobrança; sem ela, a padrão),
+   * relativos ao prazo — `renews_at`, ou `trial_ends_at` no teste. A régua
+   * padrão é a de sempre:
    *
    *   before  de `REMINDER_BEFORE_DAYS` dias antes até o prazo;
    *   due     do prazo até `REMINDER_AFTER_DAYS` dias depois;
    *   after   de lá até `REMINDER_AFTER_UNTIL_DAYS` dias depois do prazo, e
    *           só enquanto ninguém pagou (`past_due`).
+   *
+   * Numa régua personalizada, cada passo vale do seu dia até o dia do
+   * próximo passo ligado, com teto de sete dias (`reminderWindows`). Quando
+   * mais de um passo tem a janela aberta agora (dois passos no mesmo dia),
+   * `candidates` traz todos, o mais tardio primeiro: quem manda pula o que já
+   * saiu. `step` é o tipo do passo (before/due/after) — o que decide o texto
+   * padrão e a regra do cartão —, e `stepId` é o passo, a chave da
+   * deduplicação.
    *
    * É só a etapa da janela de AGORA: uma etapa que passou sem sair (o
    * agendador parado, o SMTP fora) não sai atrasada. Mandar "vence em cinco
@@ -687,7 +698,7 @@ class SubscriptionService {
 
   static REMINDER_AFTER_UNTIL_DAYS = 10;
 
-  static pendingReminder(subscription, now = new Date(), plano = null) {
+  static pendingReminder(subscription, now = new Date(), plano = null, policy = null) {
     if (!subscription) return null;
     // Isento de cobrança: não há prazo a lembrar nem fatura a pagar.
     if (subscription.billing_exempt_at) return null;
@@ -706,21 +717,33 @@ class SubscriptionService {
     if (!prazo) return null;
 
     const desde = now.getTime() - prazo.getTime();
-    let step = null;
-    if (desde >= -this.REMINDER_BEFORE_DAYS * DAY_MS && desde < 0) step = 'before';
-    else if (desde >= 0 && desde < this.REMINDER_AFTER_DAYS * DAY_MS) step = 'due';
-    else if (desde >= this.REMINDER_AFTER_DAYS * DAY_MS && desde < this.REMINDER_AFTER_UNTIL_DAYS * DAY_MS) {
-      // "Ainda não pagou": o estado que vale, e não o gravado.
-      if (this.effectiveStatus(subscription, now).status === 'past_due') step = 'after';
-    }
-    if (!step) return null;
+    // "Ainda não pagou": o estado que vale, e não o gravado. Só lido se
+    // algum `after` estiver na janela.
+    let devendo;
+    const abertos = reminderWindows(policy ?? defaultReminderPolicy())
+      .filter(({ step, startMs, endMs }) => {
+        if (!(desde >= startMs && desde < endMs)) return false;
+        if (step.kind !== 'after') return true;
+        devendo ??= this.effectiveStatus(subscription, now).status === 'past_due';
+        return devendo;
+      })
+      .map(({ step }) => step)
+      // O mais tardio primeiro; no mesmo dia, a ordem da régua.
+      .sort((a, b) => b.offsetDays - a.offsetDays);
+    if (!abertos.length) return null;
 
-    return {
-      kind: stored === 'trial' ? 'trial' : 'renewal',
-      step,
+    const kind = stored === 'trial' ? 'trial' : 'renewal';
+    const comoPendente = (passo) => ({
+      kind,
+      step: passo.kind,
+      stepId: passo.id,
+      channels: [...passo.channels],
+      subject: passo.subject || '',
+      body: passo.body || '',
       deadline: prazo,
       expired: desde >= 0
-    };
+    });
+    return { ...comoPendente(abertos[0]), candidates: abertos.map(comoPendente) };
   }
 
   /**

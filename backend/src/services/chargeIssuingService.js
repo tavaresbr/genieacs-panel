@@ -15,6 +15,8 @@ import SubscriptionService, {
 } from './subscriptionService.js';
 import CardAutopayService from './billing/cardAutopayService.js';
 import TenantCredit from '../models/TenantCredit.js';
+import { reminderPolicyConfig } from './platformProfileService.js';
+import { maxBeforeDays } from './reminderPolicy.js';
 
 /**
  * A régua de emissão: quem cobra o provedor, e quando.
@@ -103,6 +105,48 @@ export class ChargeFollowError extends Error {
 class ChargeIssuingService {
   /** Quantos dias antes do vencimento a cobrança sai — a de Pix/boleto; a do cartão salvo sai no dia (`chargesSavedCard`). */
   static LEAD_DAYS = 5;
+
+  /**
+   * O teto da antecedência puxada pela régua (0121). Um `before` a −30 num
+   * plano mensal emitiria a fatura seguinte no dia seguinte ao pagamento da
+   * anterior — duas faturas quase juntas na mão de quem está em dia. Com o
+   * teto, o lembrete mais cedo que ele sai com o endereço do painel em vez
+   * do link da fatura.
+   */
+  static ISSUE_LEAD_MAX_DAYS = 25;
+
+  /**
+   * Quantos dias antes do vencimento a cobrança Pix/boleto sai, pela régua de
+   * cobrança (0121): `LEAD_DAYS`, ou — quando o primeiro `before` ligado é
+   * mais cedo que isso — um dia antes dele, para o link da fatura já existir
+   * no primeiro lembrete (`ISSUE_LEAD_MAX_DAYS` no máximo). A régua padrão
+   * (−5) continua emitindo cinco dias antes: a emissão e o lembrete caem na
+   * mesma passada, e a emissão vem antes (`schedulerService`).
+   *
+   * Emitir mais cedo não muda a chave da cobrança (`period_end`, o prazo):
+   * a idempotência da emissão é a mesma.
+   *
+   * Duas exceções, nas opções:
+   *
+   *   trial       o prazo é o fim do teste (`trial_ends_at`): fica em
+   *               `LEAD_DAYS`. A fatura do primeiro pagamento vinte dias antes
+   *               do fim de um teste de trinta é cobrar quem mal começou a
+   *               testar — e o lembrete do teste tem texto próprio, sem link.
+   *   periodDays  os dias do ciclo pago (`cyclePeriodDays`): a antecedência
+   *               não passa de `periodDays − 1`, para a fatura do período
+   *               seguinte nunca sair antes de o período atual começar (um
+   *               plano de dez dias com um `before` a −20). Nunca menos que
+   *               `LEAD_DAYS`, a regra de antes da régua.
+   */
+  static leadDaysFor(policy, { trial = false, periodDays = null } = {}) {
+    if (trial) return this.LEAD_DAYS;
+    const antes = maxBeforeDays(policy);
+    if (!(antes > this.LEAD_DAYS)) return this.LEAD_DAYS;
+    let dias = Math.min(antes + 1, this.ISSUE_LEAD_MAX_DAYS);
+    const ciclo = Number(periodDays);
+    if (Number.isFinite(ciclo) && ciclo > 0) dias = Math.max(this.LEAD_DAYS, Math.min(dias, ciclo - 1));
+    return dias;
+  }
 
   /**
    * Se a próxima cobrança deste provedor sai no cartão salvo (0100): o
@@ -959,9 +1003,15 @@ class ChargeIssuingService {
     // vencimento (no fuso da cobrança, desde a meia-noite: o pagamento chega
     // antes de o prazo virar `past_due`). O clique (`manual`) não espera.
     if (!manual) {
+      // Sem período pago (`renews_at` nulo), o prazo é o do teste: a régua
+      // não puxa essa emissão (`leadDaysFor`).
+      const antecedencia = this.leadDaysFor(await reminderPolicyConfig(), {
+        trial: !subscription.renews_at,
+        periodDays: SubscriptionService.cyclePeriodDays(subscription, plan)
+      });
       const aindaNao = this.chargesSavedCard(provider, subscription)
         ? periodo > this.isoDate(now)
-        : vencimento.getTime() > now.getTime() + this.LEAD_DAYS * 86_400_000;
+        : vencimento.getTime() > now.getTime() + antecedencia * 86_400_000;
       if (aindaNao) return { issued: false, reason: 'not_due_yet' };
     }
 

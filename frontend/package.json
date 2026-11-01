@@ -8,7 +8,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint src test --ext .ts,.tsx --max-warnings=0",
-    "typecheck": "tsc --noEmit --pretty false"
+    "typecheck": "tsc --noEmit --pretty false",
+    "e2e": "playwright test",
+    "typecheck:e2e": "tsc --noEmit --pretty false -p e2e/tsconfig.json"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.20.2",

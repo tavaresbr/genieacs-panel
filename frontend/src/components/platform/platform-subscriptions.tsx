@@ -17,6 +17,7 @@ import {
 } from '@/components/platform/tenant-plan'
 import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
+import { ConsolePlanChange } from '@/components/platform/console-plan-change'
 import { CardBadge } from '@/components/card-badge'
 import { ChargePricingBreakdown } from '@/components/charge-pricing'
 import { Icon } from '@/components/ui/icon'
@@ -68,13 +69,6 @@ interface Props {
 }
 
 type SubscriptionRow = SubscriptionConsoleRow
-
-/** O recurso que não cabe no plano novo, no 409 `over_limit` da troca. */
-const RESOURCE_KEYS = {
-  operators: 'platform.subscription.operators',
-  subscribers: 'platform.subscription.subscribers',
-  devices: 'platform.subscription.devices'
-} as const
 
 export function PlatformSubscriptions({ plans, estreito }: Props) {
   const { t } = useTranslation()
@@ -568,8 +562,6 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
-  const [chosenPlan, setChosenPlan] = useState<number | ''>(sub?.planId ?? '')
-  const [savingPlan, setSavingPlan] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -592,10 +584,6 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
     void load()
   }, [load])
 
-  useEffect(() => {
-    setChosenPlan(sub?.planId ?? '')
-  }, [sub?.planId])
-
   /** Depois de qualquer ação: a linha (lista) e o painel aberto, os dois. */
   const recarregar = async () => {
     onChanged()
@@ -603,28 +591,6 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
   }
 
   const fechar = useCallback(() => setDialog(null), [])
-
-  const trocarPlano = async () => {
-    if (chosenPlan === '' || chosenPlan === sub?.planId) return
-    setSavingPlan(true)
-    try {
-      const res = await platformAPI.updateSubscription(tenantId, { planId: Number(chosenPlan) })
-      if (res.success) {
-        toast.success(t('platform.subs.planChanged'))
-        await recarregar()
-      } else if (res.code === 'over_limit' && res.resource && typeof res.limit === 'number') {
-        toast.error(t('platform.subs.err.overLimit', {
-          resource: t(RESOURCE_KEYS[res.resource]),
-          used: res.used ?? 0,
-          limit: res.limit
-        }))
-      } else {
-        toast.error(recusa(res))
-      }
-    } finally {
-      setSavingPlan(false)
-    }
-  }
 
   const copiar = async (url: string) => {
     const ok = await copyToClipboard(url)
@@ -643,28 +609,13 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-md border border-border bg-card p-3">
           <h4 className="mb-2 text-sm font-semibold text-foreground">{t('platform.subscription.plan')}</h4>
-          <select
-            value={chosenPlan}
-            onChange={(e) => setChosenPlan(e.target.value === '' ? '' : Number(e.target.value))}
-            className="modern-input w-full"
-            aria-label={t('platform.subscription.plan')}
-          >
-            {chosenPlan === '' && <option value="">—</option>}
-            {plans.map((plan) => (
-              <option key={plan.id} value={plan.id} disabled={!plan.active && plan.id !== sub?.planId}>
-                {plan.name} · {formatMoney(plan.priceCents, plan.currency)}
-                {plan.active ? '' : ` — ${t('platform.plans.inactive')}`}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => void trocarPlano()}
-            disabled={savingPlan || chosenPlan === '' || chosenPlan === sub?.planId}
-            className="modern-button mt-2"
-          >
-            {savingPlan ? t('common.saving') : t('platform.subscription.changePlan')}
-          </button>
+          {/* A mesma regra e a mesma prévia da troca pelo provedor, com o modo e as exceções do console. */}
+          <ConsolePlanChange
+            tenantId={tenantId}
+            plans={plans}
+            currentPlanId={sub?.planId ?? null}
+            onChanged={recarregar}
+          />
           {sub && (
             <CouponControl
               tenantId={tenantId}
@@ -842,7 +793,12 @@ function ReminderList({ reminders }: { reminders: SubscriptionReminderView[] }) 
             className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
           >
             <span className="flex flex-wrap items-center gap-2">
-              <span className="modern-badge">{t(REMINDER_STEP_KEYS[reminder.step])}</span>
+              {/* O passo personalizado da régua (0121) vem pelo id dele, sem frase própria. */}
+              <span className="modern-badge">
+                {reminder.step in REMINDER_STEP_KEYS
+                  ? t(REMINDER_STEP_KEYS[reminder.step as keyof typeof REMINDER_STEP_KEYS])
+                  : reminder.step}
+              </span>
               <span className="text-muted-foreground">{t('platform.subs.reminders.dueAt', { date: formatDay(reminder.dueAt) })}</span>
               <span className="text-muted-foreground">
                 {reminder.channels

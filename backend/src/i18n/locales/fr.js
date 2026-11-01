@@ -1279,5 +1279,11 @@ export default {
   'receipt.chargeId': 'Facture',
   'receipt.issuedAt': 'Émis le {date}',
   'receipt.statement': 'Nous avons reçu de {payer} la somme de {amount}, au titre de {description}.',
-  'receipt.printHint': 'Pour enregistrer en PDF, utilisez Imprimer (Ctrl+P) dans le navigateur.'
+  'receipt.printHint': 'Pour enregistrer en PDF, utilisez Imprimer (Ctrl+P) dans le navigateur.',
+  'subscription.reminder.testPrefix': '[Test] ',
+
+  'subscription.pendingChange': 'Un changement de forfait est déjà programmé pour le {date}. Confirmez que vous voulez le remplacer.',
+  'subscription.reasonRequired': 'Indiquez le motif : il est obligatoire pour forcer le changement maintenant ou pour ignorer la vérification des limites.',
+  'subscription.noRenewal': 'Aucune période payée n\'est en cours : le changement ne peut pas être programmé au renouvellement.',
+  'subscription.invalidMode': 'Le mode du changement doit être auto, now ou renewal.'
 };

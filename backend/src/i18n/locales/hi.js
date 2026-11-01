@@ -1283,5 +1283,11 @@ export default {
   'receipt.chargeId': 'बिल',
   'receipt.issuedAt': '{date} को जारी',
   'receipt.statement': 'हमें {payer} से {description} के लिए {amount} की राशि प्राप्त हुई।',
-  'receipt.printHint': 'PDF के रूप में सहेजने के लिए ब्राउज़र में प्रिंट (Ctrl+P) का उपयोग करें।'
+  'receipt.printHint': 'PDF के रूप में सहेजने के लिए ब्राउज़र में प्रिंट (Ctrl+P) का उपयोग करें।',
+  'subscription.reminder.testPrefix': '[परीक्षण] ',
+
+  'subscription.pendingChange': '{date} के लिए एक प्लान बदलाव पहले से निर्धारित है। पुष्टि करें कि आप उसे बदलना चाहते हैं।',
+  'subscription.reasonRequired': 'कारण दर्ज करें: बदलाव को अभी लागू करने या सीमा जाँच छोड़ने के लिए यह आवश्यक है।',
+  'subscription.noRenewal': 'कोई भुगतान की गई अवधि चल नहीं रही है: बदलाव को नवीनीकरण पर निर्धारित नहीं किया जा सकता।',
+  'subscription.invalidMode': 'बदलाव का मोड auto, now या renewal होना चाहिए।'
 };

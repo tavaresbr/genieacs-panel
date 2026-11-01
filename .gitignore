@@ -19,6 +19,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Testes no navegador (`npm run e2e`): capturas, relatório, artefatos e as
+# sessões de login que o global-setup grava.
+frontend/e2e/screenshots/
+frontend/e2e/report/
+frontend/e2e/test-results/
+frontend/e2e/.auth/
+
 # Build
 dist/
 build/

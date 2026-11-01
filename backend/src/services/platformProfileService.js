@@ -4,6 +4,9 @@ import { runInTenant } from '../config/tenantContext.js';
 import { isValidEmail } from '../utils/helpers.js';
 import { normalizeTaxId, isValidCnpj } from '../utils/taxId.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import {
+  ReminderPolicyError, defaultReminderPolicy, normalizeReminderPolicy, reminderPolicyOf
+} from './reminderPolicy.js';
 
 /**
  * Os dados da empresa que vende o SaaS: o que a página pública mostra no
@@ -229,11 +232,14 @@ export function invalidatePlatformProfile() {
 }
 
 export class PlatformProfileError extends Error {
-  constructor(message, { field = null, status = 400 } = {}) {
+  constructor(message, { field = null, status = 400, code = null, index = null } = {}) {
     super(message);
     this.name = 'PlatformProfileError';
     this.field = field;
     this.status = status;
+    // A régua de cobrança diz também o quê (`code`) e em qual passo (`index`).
+    this.code = code;
+    this.index = index;
   }
 }
 
@@ -284,6 +290,8 @@ export async function readProfile() {
     billing: politicaDe(stored),
     billingDefaults: Object.fromEntries(Object.entries(BILLING_POLICY_FIELDS).map(([c, r]) => [c, r.default])),
     alerts: alertasDe(stored),
+    reminderPolicy: reminderPolicyOf(stored),
+    reminderPolicyDefault: defaultReminderPolicy(),
     canSave: Boolean(platformId),
     updatedAt: stored.updatedAt ?? null
   };
@@ -441,6 +449,20 @@ export async function saveProfile(patch = {}) {
       mudou.push('alerts');
     }
   }
+  // A régua de cobrança: a lista inteira de passos de uma vez; `null` volta
+  // ao padrão.
+  if ('reminderPolicy' in patch && patch.reminderPolicy !== undefined) {
+    const valor = patch.reminderPolicy === null ? null : normalizarRegua(patch.reminderPolicy);
+    if (valor === null) {
+      if (stored.reminderPolicy !== undefined) {
+        delete novo.reminderPolicy;
+        mudou.push('reminderPolicy');
+      }
+    } else if (JSON.stringify(valor) !== JSON.stringify(reminderPolicyOf(stored))) {
+      novo.reminderPolicy = valor;
+      mudou.push('reminderPolicy');
+    }
+  }
   // O aviso tem de cair ANTES da suspensão: com ele igual ou maior, sairia no
   // vencimento (ou antes dele) dizendo "vai ser suspenso" a quem nem atrasou.
   const politica = politicaDe(novo);
@@ -455,7 +477,29 @@ export async function saveProfile(patch = {}) {
   return mudou;
 }
 
+/**
+ * A régua de cobrança (0121) recebida → a gravar; a validação é a de
+ * `reminderPolicy.js`, com o `code` e o índice do passo na resposta.
+ */
+function normalizarRegua(bruto) {
+  try {
+    return normalizeReminderPolicy(bruto);
+  } catch (error) {
+    if (!(error instanceof ReminderPolicyError)) throw error;
+    throw new PlatformProfileError(error.message, { field: 'reminderPolicy', code: error.code, index: error.index });
+  }
+}
+
+/**
+ * A régua de cobrança como o agendador e a emissão a leem: a gravada, ou a
+ * padrão (a de antes da 0121). Nunca lança — com o banco fora, vale a padrão.
+ */
+export async function reminderPolicyConfig() {
+  const { stored } = await lerGuardado().catch(() => ({ stored: {} }));
+  return reminderPolicyOf(stored);
+}
+
 export default {
   readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, referralRewardCents, retentionConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS,
-  alertsConfig, ALERT_EVENTS, ALERT_CHANNELS
+  alertsConfig, ALERT_EVENTS, ALERT_CHANNELS, reminderPolicyConfig
 };

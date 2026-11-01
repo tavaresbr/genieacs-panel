@@ -1286,5 +1286,11 @@ export default {
   'receipt.chargeId': '청구',
   'receipt.issuedAt': '발행일 {date}',
   'receipt.statement': '{payer}(으)로부터 {description} 명목으로 {amount}을(를) 수령했습니다.',
-  'receipt.printHint': 'PDF로 저장하려면 브라우저의 인쇄(Ctrl+P)를 사용하세요.'
+  'receipt.printHint': 'PDF로 저장하려면 브라우저의 인쇄(Ctrl+P)를 사용하세요.',
+  'subscription.reminder.testPrefix': '[테스트] ',
+
+  'subscription.pendingChange': '{date}에 이미 요금제 변경이 예약되어 있습니다. 교체할지 확인해 주세요.',
+  'subscription.reasonRequired': '사유를 입력하세요. 지금 변경을 강제하거나 한도 확인을 건너뛰려면 필수입니다.',
+  'subscription.noRenewal': '진행 중인 결제 기간이 없어 갱신 시점으로 변경을 예약할 수 없습니다.',
+  'subscription.invalidMode': '변경 모드는 auto, now 또는 renewal이어야 합니다.'
 };
