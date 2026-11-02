@@ -61,6 +61,7 @@ const DEFAULTS = Object.freeze({
   apiKey: null,
   importCustomers: true,
   importCharges: true,
+  botLookup: false,
   syncEnabled: false,
   syncIntervalHours: SYNC_INTERVAL_HOURS.default,
   accountName: null,
@@ -130,6 +131,8 @@ class AsaasProviderService {
       apiKey: decrypt(stored.apiKey),
       importCustomers: stored.importCustomers !== false,
       importCharges: stored.importCharges !== false,
+      // Desligado por padrão: ligar muda o que o bot responde aos assinantes.
+      botLookup: stored.botLookup === true,
       syncEnabled: stored.syncEnabled === true,
       syncIntervalHours: clampInterval(stored.syncIntervalHours, SYNC_INTERVAL_HOURS.default),
       accountName: stored.accountName ? String(stored.accountName) : null,
@@ -189,6 +192,7 @@ class AsaasProviderService {
       apiKey: encrypt(apiKey),
       importCustomers: patch.importCustomers === undefined ? current.importCustomers : patch.importCustomers === true,
       importCharges: patch.importCharges === undefined ? current.importCharges : patch.importCharges === true,
+      botLookup: patch.botLookup === undefined ? current.botLookup : patch.botLookup === true,
       syncEnabled: patch.syncEnabled === undefined ? current.syncEnabled : patch.syncEnabled === true,
       syncIntervalHours: patch.syncIntervalHours === undefined
         ? current.syncIntervalHours

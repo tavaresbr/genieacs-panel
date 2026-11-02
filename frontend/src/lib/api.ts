@@ -3791,6 +3791,8 @@ export interface SgpInvoice {
   link: string | null
   pix: string | null
   paid: boolean
+  /** De onde veio: ausente é o SGP. */
+  source?: 'asaas'
 }
 
 export interface ContactAddress {
@@ -4107,6 +4109,10 @@ export const contactsAPI = {
   invoices: (key: string) =>
     apiClient.get<{ contract: string; invoices: SgpInvoice[] }[]>(`/contacts/${encodeURIComponent(key)}/invoices`),
 
+  /** As faturas em aberto do cliente na conta Asaas do provedor, como a última importação as deixou. */
+  asaasInvoices: (key: string) =>
+    apiClient.get<{ enabled: boolean; invoices: SgpInvoice[] }>(`/contacts/${encodeURIComponent(key)}/asaas-invoices`),
+
   /** The suggested WhatsApp text for one open invoice; nothing is sent. */
   invoiceMessage: (key: string, invoiceId: string) =>
     apiClient.get<ContactInvoiceMessage>(
@@ -4284,6 +4290,7 @@ export interface AsaasProviderConfig {
   apiKeyConfigured: boolean
   importCustomers: boolean
   importCharges: boolean
+  botLookup: boolean
   syncEnabled: boolean
   syncIntervalHours: number
   accountName: string | null
@@ -4325,6 +4332,7 @@ export const asaasProviderAPI = {
     apiKey?: string
     importCustomers?: boolean
     importCharges?: boolean
+    botLookup?: boolean
     syncEnabled?: boolean
     syncIntervalHours?: number
   }) =>

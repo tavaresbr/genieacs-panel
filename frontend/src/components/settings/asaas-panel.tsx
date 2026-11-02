@@ -28,6 +28,7 @@ export function AsaasPanel() {
   const [importForm, setImportForm] = useState({
     importCustomers: true,
     importCharges: true,
+    botLookup: false,
     syncEnabled: false,
     syncIntervalHours: 24
   })
@@ -41,6 +42,7 @@ export function AsaasPanel() {
     setImportForm({
       importCustomers: next.importCustomers,
       importCharges: next.importCharges,
+      botLookup: next.botLookup,
       syncEnabled: next.syncEnabled,
       syncIntervalHours: next.syncIntervalHours
     })
@@ -270,6 +272,18 @@ export function AsaasPanel() {
             <span className="text-sm">
               <span className="block font-semibold">{t('settings.asaas.import.charges')}</span>
               <span className="text-muted-foreground">{t('settings.asaas.import.chargesHint')}</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 sm:col-span-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={importForm.botLookup}
+              onChange={(event) => setImportForm((current) => ({ ...current, botLookup: event.target.checked }))}
+            />
+            <span className="text-sm">
+              <span className="block font-semibold">{t('settings.asaas.import.botLookup')}</span>
+              <span className="text-muted-foreground">{t('settings.asaas.import.botLookupHint')}</span>
             </span>
           </label>
           <label className="flex items-start gap-3">

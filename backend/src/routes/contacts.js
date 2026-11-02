@@ -138,6 +138,13 @@ router.get(
   sgpAdminLimiter,
   ContactController.invoices
 );
+// Lê o banco (a última importação do Asaas), não o gateway: sem limitador de SGP.
+router.get(
+  '/:key/asaas-invoices',
+  authenticateToken,
+  requirePermission('contacts.read'),
+  ContactController.asaasInvoices
+);
 // The line's status as the ONTs report it: the ACS is asked, so the same
 // capability as looking at an ONT.
 router.get(

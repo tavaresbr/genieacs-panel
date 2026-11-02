@@ -4,6 +4,9 @@ import SgpContact from '../models/SgpContact.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpService from './sgpService.js';
 import TeiahService from './teiahService.js';
+import AsaasProviderService from './asaasProviderService.js';
+import AsaasInvoiceService from './asaasInvoiceService.js';
+import { normalizeTaxId } from '../utils/taxId.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 
 const CONTACT_KEY = /^c:(\d+)$/;
@@ -445,6 +448,25 @@ class ContactProfileService {
       results.push({ contract: contract.contract, invoices });
     }
     return results;
+  }
+
+  /**
+   * As faturas em aberto deste cliente na conta Asaas do provedor — as que a
+   * importação trouxe, casadas pelo CPF/CNPJ. Lê o banco e não o gateway: não
+   * custa uma ida ao Asaas por abertura de ficha, e a tela diz que é a posição
+   * da última importação.
+   *
+   * `enabled` separa "a integração está desligada" de "o cliente não tem
+   * fatura": a tela só mostra o bloco no segundo caso.
+   */
+  static async asaasInvoices(key) {
+    const profile = await this.get(key);
+    if (!profile) throw new ContactProfileError('contacts.error.notFound', { code: 'not_found', status: 404 });
+    const config = await AsaasProviderService.getConfig();
+    const enabled = AsaasProviderService.isReady(config) && config.importCharges;
+    const document = normalizeTaxId(profile.fields?.document?.value);
+    if (!enabled || !document) return { enabled, invoices: [] };
+    return { enabled, invoices: await AsaasInvoiceService.openByDocument(document) };
   }
 }
 
