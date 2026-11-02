@@ -46,6 +46,7 @@ const ResetPasswordPage = lazy(() => import('@/pages/reset-password'))
 const VerifyEmailPage = lazy(() => import('@/pages/verify-email'))
 const NpsPage = lazy(() => import('@/pages/nps'))
 const ReceiptPage = lazy(() => import('@/pages/receipt'))
+const AffiliatePortalPage = lazy(() => import('@/pages/affiliate-portal'))
 
 function PageFallback() {
   const { t } = useTranslation()
@@ -344,6 +345,9 @@ function ConsoleRoutes() {
       {/* O recibo do link do bot do WhatsApp da plataforma: público, o token
           no fragmento, mandado no corpo de um POST. */}
       <Route path="/receipt" element={<Suspense fallback={<AuthFallback />}><ReceiptPage /></Suspense>} />
+      {/* O portal do afiliado (0124): sessão própria (cookie do portal), nunca
+          a do console guardada neste navegador. */}
+      <Route path="/afiliados" element={<Suspense fallback={<AuthFallback />}><AffiliatePortalPage /></Suspense>} />
       <Route element={<ConsoleShell />}>
         <Route path="/platform" element={<PlatformPage />} />
         <Route path="*" element={<Navigate to="/platform" replace />} />
@@ -395,6 +399,8 @@ function ProviderRoutes() {
                 <Route path="/nps" element={<Suspense fallback={<AuthFallback />}><NpsPage /></Suspense>} />
                 {/* O recibo do link do bot da plataforma, num deploy de endereço único. */}
                 <Route path="/receipt" element={<Suspense fallback={<AuthFallback />}><ReceiptPage /></Suspense>} />
+                {/* O portal do afiliado (0124), num deploy de endereço único. */}
+                <Route path="/afiliados" element={<Suspense fallback={<AuthFallback />}><AffiliatePortalPage /></Suspense>} />
                 <Route element={<ProtectedShell />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />

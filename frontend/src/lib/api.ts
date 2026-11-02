@@ -9,6 +9,7 @@ import { firmwareUploadHeaders, type FirmwareMeta } from '@/lib/firmware'
 import { formatRelativeTime } from '@/lib/utils'
 import { clearSessionScopedStorage } from '@/lib/session-owner'
 import { crossTabTokenAction } from '@/lib/cross-tab-session'
+import type { AffiliateCommissionStatus, AffiliatePayoutStatus, AffiliateStatus, PixKeyType } from '@/lib/affiliates'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -850,6 +851,8 @@ export const authAPI = {
     planCode?: string; taxId?: string; phone?: string; legalName?: string; city?: string; state?: string
     /** O código do link de indicação (`?ref=`); inválido é ignorado pelo servidor. */
     referralCode?: string
+    /** O código do afiliado (`?aff=A-…`, 0124); inválido é ignorado pelo servidor. */
+    affiliateCode?: string
   }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
 
@@ -7407,4 +7410,192 @@ export const receiptAPI = {
     })
     return { ok: response.ok, status: response.status, html: await response.text() }
   },
+}
+
+// ── O programa de afiliados (0124) ──────────────────────────────────────
+
+export interface AffiliateTotals {
+  accruedCents: number
+  inPayoutCents: number
+  paidCents: number
+  reversedCents: number
+}
+
+/** O afiliado como o console o vê. `rateBp`/`months` nulos valem o padrão (`effective*`). */
+export interface AffiliateView {
+  id: number
+  name: string
+  email: string
+  taxId: string | null
+  pixKey: string | null
+  pixKeyType: PixKeyType | null
+  status: AffiliateStatus
+  rateBp: number | null
+  months: number | null
+  effectiveRateBp: number | null
+  effectiveMonths: number | null
+  code: string
+  signupUrl: string | null
+  notes: string | null
+  hasPassword: boolean
+  passwordLinkOpen: boolean
+  approvedAt: string | null
+  createdAt: string | null
+  referredCount: number
+  totals: AffiliateTotals
+}
+
+export interface AffiliateDefaults {
+  rateBp: number
+  months: number
+  payoutMinCents: number
+}
+
+export interface AffiliateCommissionView {
+  id: number
+  tenantId?: number
+  providerName: string | null
+  kind: 'commission' | 'clawback'
+  baseCents: number
+  rateBp: number
+  amountCents: number
+  status: AffiliateCommissionStatus
+  accruedAt: string | null
+  payoutId: number | null
+  paymentRef?: string
+}
+
+export interface AffiliatePayoutView {
+  id: number
+  affiliateId: number
+  affiliateName: string | null
+  affiliateEmail: string | null
+  period: string
+  amountCents: number
+  commissionCount: number
+  status: AffiliatePayoutStatus
+  attempts: number
+  transferId: string | null
+  transferStatus: string | null
+  pixKey: string | null
+  pixKeyType: string | null
+  approvedAt: string | null
+  sentAt: string | null
+  paidAt: string | null
+  paidManually: boolean
+  paidNote: string | null
+  errorCode: string | null
+  error: string | null
+  createdAt: string | null
+}
+
+export interface AffiliateReferralView {
+  tenantId: number
+  name: string
+  slug: string
+  status: string
+  referredAt: string | null
+  windowEndsAt: string | null
+  commissionCents: number
+}
+
+export interface AffiliateDetail {
+  affiliate: AffiliateView
+  referrals: AffiliateReferralView[]
+  commissions: AffiliateCommissionView[]
+  payouts: AffiliatePayoutView[]
+}
+
+/** O formulário do console: ausente mantém; `rateBp`/`months` nulos voltam ao padrão. */
+export interface AffiliateInput {
+  name?: string
+  email?: string
+  taxId?: string
+  pixKey?: string
+  pixKeyType?: PixKeyType | ''
+  rateBp?: number | null
+  months?: number | null
+  notes?: string
+  code?: string
+  status?: AffiliateStatus
+}
+
+export const affiliatesAPI = {
+  list: () => apiClient.get<{ defaults: AffiliateDefaults; affiliates: AffiliateView[] }>('/platform/affiliates'),
+  detail: (id: number) => apiClient.get<AffiliateDetail>(`/platform/affiliates/${id}`),
+  create: (input: AffiliateInput) => apiClient.post<{ affiliate: AffiliateView }>('/platform/affiliates', input),
+  update: (id: number, input: AffiliateInput) => apiClient.patch<{ affiliate: AffiliateView }>(`/platform/affiliates/${id}`, input),
+  /** O token cru vem UMA vez; o link é `/afiliados#senha=<token>` no endereço da plataforma. */
+  passwordLink: (id: number) =>
+    apiClient.post<{ token: string; expiresAt: string; path: string }>(`/platform/affiliates/${id}/password-link`, {}),
+  /** Os padrões do programa moram no perfil da plataforma (`null` volta ao padrão). */
+  saveDefaults: (patch: { affiliateRateBp?: number | null; affiliateMonths?: number | null; affiliatePayoutMinCents?: number | null }) =>
+    apiClient.put<{ changed: string[] }>('/platform/settings/profile', patch),
+  payouts: (filtro: { period?: string; status?: string } = {}) => {
+    const q = new URLSearchParams()
+    if (filtro.period) q.set('period', filtro.period)
+    if (filtro.status) q.set('status', filtro.status)
+    const texto = q.toString()
+    return apiClient.get<{ payouts: AffiliatePayoutView[] }>(`/platform/affiliate-payouts${texto ? `?${texto}` : ''}`)
+  },
+  build: (period?: string) =>
+    apiClient.post<{ period: string; created: number[]; carried: number[]; skipped: number[] }>('/platform/affiliate-payouts/build', period ? { period } : {}),
+  payoutAction: (id: number, acao: 'approve' | 'send' | 'refresh' | 'mark-paid' | 'cancel', body: { confirmNotSent?: boolean; note?: string } = {}) =>
+    apiClient.post<{ payout: AffiliatePayoutView }>(`/platform/affiliate-payouts/${id}/${acao}`, body),
+}
+
+/** O que o portal do afiliado mostra (`GET /api/affiliate/overview`). */
+export interface AffiliatePortalOverview {
+  profile: {
+    name: string
+    email: string
+    code: string
+    signupUrl: string | null
+    rateBp: number
+    months: number
+    pixKeyType: string | null
+    pixKey: string | null
+  }
+  totals: AffiliateTotals
+  payoutMinCents: number
+  referrals: Array<{ name: string; referredAt: string | null; windowEndsAt: string | null; active: boolean; commissionCents: number }>
+  commissions: AffiliateCommissionView[]
+  payouts: Array<{ period: string; amountCents: number; status: AffiliatePayoutStatus; sentAt: string | null; paidAt: string | null }>
+}
+
+/**
+ * O portal do afiliado: sessão no cookie próprio (httpOnly), e SEM o
+ * `apiClient` — que mandaria o token do painel ou do console guardado neste
+ * navegador. O portal não o aceita, e ele não tem por que sair daqui.
+ */
+async function affiliateRequest<T>(caminho: string, init: RequestInit = {}): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/affiliate${caminho}`, {
+      ...init,
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: {
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        'Accept-Language': getActiveLocale(),
+      },
+    })
+    const tipo = response.headers.get('content-type') || ''
+    const corpo = tipo.includes('application/json') ? await response.json() : { success: false }
+    return response.ok ? corpo : { ...corpo, success: false }
+  } catch (error) {
+    return {
+      success: false,
+      message: translate(getActiveLocale(), 'api.networkError'),
+      error: error instanceof Error ? error.message : undefined,
+    }
+  }
+}
+
+export const affiliatePortalAPI = {
+  login: (email: string, password: string) =>
+    affiliateRequest<{ name: string }>('/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  setPassword: (token: string, password: string) =>
+    affiliateRequest<{ active: boolean }>('/password', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  logout: () => affiliateRequest<null>('/logout', { method: 'POST' }),
+  overview: () => affiliateRequest<AffiliatePortalOverview>('/overview'),
 }

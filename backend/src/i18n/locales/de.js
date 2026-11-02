@@ -1385,5 +1385,10 @@ export default {
   'priceChange.cancelNoticeBody': 'Hallo {provider}, die Preisanpassung des Tarifs {plan} ({cycle}) von {old} auf {new}, geplant zum {date}, wurde storniert. Der Preis bleibt bei {old}, und keine Rechnung ändert sich deswegen. Bei Fragen antworten Sie einfach auf diese Nachricht.',
   'whatsapp.platformBot.askTaxIdMulti': 'Hallo! Zu Ihrer Sicherheit geben Sie bitte vor dem Versand von Abrechnungsdaten die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Um fortzufahren, geben Sie die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein. Wenn Sie möchten, schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'Ungültige E-Mail oder ungültiges Passwort',
+  'affiliate.loginSuccess': 'Angemeldet',
+  'affiliate.sessionRequired': 'Melden Sie sich im Partnerportal an',
+  'affiliate.sessionExpired': 'Ihre Partnersitzung ist abgelaufen; melden Sie sich erneut an'
 };

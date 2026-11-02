@@ -1383,5 +1383,10 @@ export default {
   'priceChange.cancelNoticeBody': 'Olá, {provider}. O reajuste do plano {plan} ({cycle}) de {old} para {new}, previsto para {date}, foi cancelado. O valor continua {old}, e nenhuma fatura muda por causa dele. Qualquer dúvida, é só responder esta mensagem.',
   'whatsapp.platformBot.askTaxIdMulti': 'Olá! Para sua segurança, antes de enviar dados de cobrança, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Para continuar, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor. Se preferir, escreva *atendente* para falar com a nossa equipe.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'E-mail ou senha inválidos',
+  'affiliate.loginSuccess': 'Sessão iniciada',
+  'affiliate.sessionRequired': 'Entre no portal do afiliado',
+  'affiliate.sessionExpired': 'Sua sessão de afiliado expirou; entre de novo'
 };

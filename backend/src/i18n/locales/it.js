@@ -1382,5 +1382,10 @@ export default {
   'priceChange.cancelNoticeBody': 'Ciao, {provider}. L’adeguamento del piano {plan} ({cycle}) da {old} a {new}, previsto per il {date}, è stato annullato. Il prezzo resta {old} e nessuna fattura cambia per questo. Per qualsiasi dubbio, rispondi pure a questo messaggio.',
   'whatsapp.platformBot.askTaxIdMulti': 'Ciao! Per la tua sicurezza, prima di inviare dati di fatturazione, indica le ultime 5 cifre del CNPJ o CPF di fatturazione del tuo provider.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Per continuare, indica le ultime 5 cifre del CNPJ o CPF di fatturazione del tuo provider. Se preferisci, scrivi *atendente* per parlare con il nostro team.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Non c’è alcun CNPJ o CPF di fatturazione registrato per i provider di questo numero, quindi non posso confermare la tua identità qui. Inoltrerò la conversazione al nostro team.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Non c’è alcun CNPJ o CPF di fatturazione registrato per i provider di questo numero, quindi non posso confermare la tua identità qui. Inoltrerò la conversazione al nostro team.',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'E-mail o password non validi',
+  'affiliate.loginSuccess': 'Accesso effettuato',
+  'affiliate.sessionRequired': 'Accedi al portale affiliati',
+  'affiliate.sessionExpired': 'La sessione affiliato è scaduta; accedi di nuovo'
 };

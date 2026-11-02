@@ -254,7 +254,13 @@ export const SHARED_TABLES = new Set([
   // pelo agendador da plataforma fora do laço por provedor, como
   // `platform_alerts`; cada provedor só é tocado dentro do próprio escopo.
   'plan_price_changes',
-  'plan_price_change_marks'
+  'plan_price_change_marks',
+  // O programa de afiliados (0124): o afiliado está acima dos provedores, o
+  // lote é dele, e a comissão fala de um afiliado e de um provedor ao mesmo
+  // tempo — cada lado a lê pelo próprio id, sempre nomeado.
+  'affiliates',
+  'affiliate_payouts',
+  'affiliate_commissions'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

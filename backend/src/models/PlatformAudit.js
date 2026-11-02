@@ -193,7 +193,22 @@ class PlatformAudit {
     // provedor já confirmado pelo documento: a segunda via, a situação da
     // assinatura ou o link do recibo. O detalhe diz O QUE saiu (e para qual
     // telefone, mascarado) — nunca o Pix nem a linha digitável.
-    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed'
+    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed',
+    // O programa de afiliados (0124). Nenhuma fala de um provedor — `tenant_id`
+    // sai nulo —, e o detalhe nomeia o afiliado e o lote, nunca a chave Pix.
+    // O dinheiro que sai tem uma linha por passo: quem aprovou, quem mandou,
+    // quem marcou como pago à mão.
+    AFFILIATE_CREATED: 'affiliate.created',
+    AFFILIATE_UPDATED: 'affiliate.updated',
+    AFFILIATE_STATUS_CHANGED: 'affiliate.status_changed',
+    AFFILIATE_PASSWORD_LINK: 'affiliate.password_link',
+    AFFILIATE_PAYOUTS_BUILT: 'affiliate.payouts_built',
+    AFFILIATE_PAYOUT_APPROVED: 'affiliate.payout_approved',
+    AFFILIATE_PAYOUT_SENT: 'affiliate.payout_sent',
+    AFFILIATE_PAYOUT_SEND_FAILED: 'affiliate.payout_send_failed',
+    AFFILIATE_PAYOUT_REFRESHED: 'affiliate.payout_refreshed',
+    AFFILIATE_PAYOUT_PAID: 'affiliate.payout_paid',
+    AFFILIATE_PAYOUT_CANCELED: 'affiliate.payout_canceled'
   });
 
   /**

@@ -1384,5 +1384,10 @@ export default {
   'priceChange.cancelNoticeBody': '{provider} 様。{date} に予定していた {plan} プラン（{cycle}）の {old} から {new} への料金改定はキャンセルされました。料金は {old} のままで、これにより変わる請求書はありません。ご不明な点があれば、このメッセージにご返信ください。',
   'whatsapp.platformBot.askTaxIdMulti': 'こんにちは。安全のため、請求データを送る前に、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '続けるには、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。チームと話したい場合は *atendente* と入力してください。',
-  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。'
+  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'メールアドレスまたはパスワードが正しくありません',
+  'affiliate.loginSuccess': 'サインインしました',
+  'affiliate.sessionRequired': 'アフィリエイトポータルにサインインしてください',
+  'affiliate.sessionExpired': 'アフィリエイトのセッションが期限切れです。もう一度サインインしてください'
 };

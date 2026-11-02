@@ -655,3 +655,15 @@ export const publicNpsLimiter = limiter({
   keyGenerator: ipKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
+
+/**
+ * O portal do afiliado (0124): o login e o link de definir senha. Por
+ * endereço — não há provedor no ápice —, apertado como o login do painel; a
+ * trava por conta (`AccountLockout`) segura quem distribui os palpites.
+ */
+export const affiliateLoginLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.attempts', 'rate_limited_login')
+});

@@ -1384,5 +1384,10 @@ export default {
   'priceChange.cancelNoticeBody': '{provider}，您好。原定於 {date} 生效的 {plan} 方案（{cycle}）從 {old} 調整為 {new} 的調價已取消。價格仍為 {old}，不會因此變更任何帳單。如有疑問，直接回覆此訊息即可。',
   'whatsapp.platformBot.askTaxIdMulti': '您好！為了您的安全，在傳送帳單資料之前，請輸入您所屬服務商的帳單 CNPJ 或 CPF 的後 5 位數字。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '如需繼續，請輸入您所屬服務商的帳單 CNPJ 或 CPF 的後 5 位數字。您也可以輸入 *atendente* 與我們的團隊溝通。',
-  'whatsapp.platformBot.noTaxIdMulti': '此號碼關聯的服務商都沒有登記帳單 CNPJ 或 CPF，因此無法在這裡確認您的身分。我會將對話轉給我們的團隊。'
+  'whatsapp.platformBot.noTaxIdMulti': '此號碼關聯的服務商都沒有登記帳單 CNPJ 或 CPF，因此無法在這裡確認您的身分。我會將對話轉給我們的團隊。',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': '電子郵件或密碼無效',
+  'affiliate.loginSuccess': '已登入',
+  'affiliate.sessionRequired': '請登入推廣夥伴入口',
+  'affiliate.sessionExpired': '您的推廣夥伴工作階段已過期，請重新登入'
 };

@@ -1384,5 +1384,10 @@ export default {
   'priceChange.cancelNoticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का {old} से {new} वाला मूल्य समायोजन, जो {date} से लागू होना था, रद्द कर दिया गया है। कीमत {old} ही रहेगी, और इसकी वजह से कोई इनवॉइस नहीं बदलेगा। कोई सवाल हो तो बस इस संदेश का जवाब दें।',
   'whatsapp.platformBot.askTaxIdMulti': 'नमस्ते! आपकी सुरक्षा के लिए, बिलिंग डेटा भेजने से पहले अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें।',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'जारी रखने के लिए अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें। चाहें तो हमारी टीम से बात करने के लिए *atendente* लिखें।',
-  'whatsapp.platformBot.noTaxIdMulti': 'इस नंबर के प्रदाताओं के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।'
+  'whatsapp.platformBot.noTaxIdMulti': 'इस नंबर के प्रदाताओं के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'ईमेल या पासवर्ड अमान्य है',
+  'affiliate.loginSuccess': 'साइन इन हो गया',
+  'affiliate.sessionRequired': 'एफ़िलिएट पोर्टल में साइन इन करें',
+  'affiliate.sessionExpired': 'आपका एफ़िलिएट सत्र समाप्त हो गया; फिर से साइन इन करें'
 };

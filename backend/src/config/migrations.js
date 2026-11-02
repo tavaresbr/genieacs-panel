@@ -3157,6 +3157,146 @@ const PLATFORM_NPS_TABLES = [
 ];
 
 /**
+ * O programa de afiliados (0124) — ver `services/affiliateService.js` e
+ * `services/affiliatePayoutService.js`.
+ *
+ * `tenants.referred_by_affiliate_id` é o afiliado que trouxe o provedor (o
+ * link `?aff=`), gravado no cadastro, e `referred_at` é o instante em que a
+ * janela da comissão começa a contar. Sem `.references`, pelo motivo de
+ * `referred_by_tenant_id` (0106): acrescentar chave estrangeira a `tenants`
+ * no SQLite é recriá-la.
+ */
+const TENANT_AFFILIATE_COLUMNS = [
+  ['referred_by_affiliate_id', (t) => t.integer('referred_by_affiliate_id').unsigned().nullable()],
+  ['referred_at', (t) => t.timestamp('referred_at').nullable()]
+];
+
+/**
+ * O afiliado: quem divulga o produto sem ser provedor. Identidade própria,
+ * fora de `users` — o login dele é o do portal do afiliado, com cookie e
+ * segredo próprios, e nada do painel nem do console.
+ *
+ *   status       pending (cadastrado, sem aprovação) | active | suspended;
+ *   rate_bp      a taxa própria em pontos-base (1000 = 10%), nula = a padrão;
+ *   months       a janela própria em meses, nula = a padrão;
+ *   code         o código do link (`A-XXXXXXX`), único e distinto do
+ *                código de indicação dos provedores pelo prefixo;
+ *   password_*   o hash bcrypt e o link de definir senha (só o sha256 do
+ *                token; o token cru só existe no link).
+ *
+ * Da PLATAFORMA (compartilhada): está acima dos provedores.
+ */
+const affiliatesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('name', 160).notNullable();
+  t.string('tax_id', 20).nullable();
+  t.string('email', 160).notNullable();
+  t.string('password_hash', 100).nullable();
+  t.timestamp('password_set_at').nullable();
+  t.string('password_token_hash', 64).nullable();
+  t.timestamp('password_token_expires_at').nullable();
+  t.string('pix_key', 140).nullable();
+  t.string('pix_key_type', 8).nullable();
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.integer('rate_bp').nullable();
+  t.integer('months').nullable();
+  t.string('code', 16).notNullable();
+  t.string('notes', 500).nullable();
+  t.integer('approved_by').unsigned().nullable();
+  t.timestamp('approved_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['email'], 'affiliates_email_uq');
+  t.unique(['code'], 'affiliates_code_uq');
+  t.index(['status'], 'affiliates_status_idx');
+};
+
+/**
+ * O lote mensal de um afiliado (0124): um por afiliado e período
+ * (`affiliate_id, period` único — o agendador e o botão do console montam o
+ * mesmo lote uma vez só). Nada sai do gateway sem a aprovação gravada aqui.
+ *
+ *   status           draft | approved | sending | sent | paid | failed | canceled;
+ *   idempotency_key  a chave da transferência, fixa por lote (troca só quando
+ *                    a transferência anterior foi recusada PELO BANCO);
+ *   transfer_*       o id e o estado da transferência Pix no gateway;
+ *   error_code       `uncertain` quando a resposta se perdeu: o reenvio exige
+ *                    a confirmação de quem opera de que nada saiu.
+ */
+const affiliatePayoutsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('affiliate_id').unsigned().notNullable()
+    .references('id').inTable('affiliates');
+  t.string('period', 7).notNullable();
+  t.integer('amount_cents').notNullable().defaultTo(0);
+  t.integer('commission_count').notNullable().defaultTo(0);
+  t.string('status', 16).notNullable().defaultTo('draft');
+  t.string('idempotency_key', 64).nullable();
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.string('transfer_id', 64).nullable();
+  t.string('transfer_status', 32).nullable();
+  t.string('pix_key', 140).nullable();
+  t.string('pix_key_type', 8).nullable();
+  t.integer('approved_by').unsigned().nullable();
+  t.timestamp('approved_at').nullable();
+  t.timestamp('sent_at').nullable();
+  t.timestamp('paid_at').nullable();
+  t.boolean('paid_manually').notNullable().defaultTo(false);
+  t.string('paid_note', 255).nullable();
+  t.timestamp('canceled_at').nullable();
+  t.string('error_code', 32).nullable();
+  t.string('error', 500).nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['affiliate_id', 'period'], 'affiliate_payouts_period_uq');
+  t.unique(['idempotency_key'], 'affiliate_payouts_idem_uq');
+  t.index(['status'], 'affiliate_payouts_status_idx');
+  t.index(['transfer_id'], 'affiliate_payouts_transfer_idx');
+};
+
+/**
+ * A comissão (0124): uma linha por pagamento do provedor indicado
+ * (`payment_ref` único — a referência do pagamento no gateway), gravada NA
+ * TRANSAÇÃO do pagamento. `clawback` é o estorno de uma comissão que já foi
+ * para um lote: valor negativo, `<referência>:refund`, abatido do próximo.
+ *
+ *   status  accrued | reversed | in_payout | paid.
+ *
+ * `tenant_id` é inteiro simples, sem chave estrangeira, como em
+ * `platform_audit`: a comissão já paga é registro de dinheiro que saiu, e não
+ * pode sumir junto com o provedor apagado. Compartilhada: fala do afiliado e
+ * do provedor, e cada lado a lê pelo seu id.
+ */
+const affiliateCommissionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('affiliate_id').unsigned().notNullable()
+    .references('id').inTable('affiliates');
+  t.integer('tenant_id').unsigned().notNullable();
+  t.string('payment_ref', 160).notNullable();
+  t.string('kind', 16).notNullable().defaultTo('commission');
+  t.integer('base_cents').notNullable();
+  t.integer('rate_bp').notNullable();
+  t.integer('amount_cents').notNullable();
+  t.string('status', 16).notNullable().defaultTo('accrued');
+  t.timestamp('accrued_at').notNullable();
+  t.timestamp('reversed_at').nullable();
+  t.integer('payout_id').unsigned().nullable()
+    .references('id').inTable('affiliate_payouts');
+  t.timestamp('paid_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['payment_ref'], 'affiliate_commissions_ref_uq');
+  t.index(['affiliate_id', 'status'], 'affiliate_commissions_affiliate_idx');
+  t.index(['payout_id'], 'affiliate_commissions_payout_idx');
+  t.index(['tenant_id'], 'affiliate_commissions_tenant_idx');
+};
+
+const AFFILIATE_TABLES = [
+  ['affiliates', affiliatesTable],
+  ['affiliate_payouts', affiliatePayoutsTable],
+  ['affiliate_commissions', affiliateCommissionsTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -3201,7 +3341,8 @@ export const SCHEMA_TABLES = [
   ...PLATFORM_ALERT_TABLES,
   ...WA_MARKETING_OPT_OUT_TABLES,
   ...PLAN_PRICE_CHANGE_TABLES,
-  ...PLATFORM_NPS_TABLES
+  ...PLATFORM_NPS_TABLES,
+  ...AFFILIATE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6835,6 +6976,34 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'platform_nps', platformNpsTable(db));
+    }
+  },
+  {
+    /**
+     * O programa de afiliados — ver `TENANT_AFFILIATE_COLUMNS` e
+     * `AFFILIATE_TABLES`.
+     */
+    id: '0124_affiliates',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if ((await missingColumns(db, 'tenants', TENANT_AFFILIATE_COLUMNS)).length) return false;
+      for (const [nome] of AFFILIATE_TABLES) {
+        if (!(await db.schema.hasTable(nome))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltam = await missingColumns(db, 'tenants', TENANT_AFFILIATE_COLUMNS);
+      if (faltam.length) {
+        await db.schema.alterTable('tenants', (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      for (const [nome, construtor] of AFFILIATE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- três tabelas, em ordem
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

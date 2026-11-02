@@ -33,7 +33,9 @@ const GUARDAS_DE_SESSAO = new Set([
   'authenticatePortalCustomer',
   // O coletor de métricas: sem sessão, mas com segredo próprio conferido em
   // tempo constante, e ele mesmo cai no guarda do console quando não há token.
-  'allowMetricsScraper'
+  'allowMetricsScraper',
+  // O portal do afiliado (0124): cookie e segredo próprios.
+  'authenticateAffiliate'
 ]);
 
 /**
@@ -94,7 +96,11 @@ const PUBLICAS = new Map([
   // credencial, vai no CORPO e é conferido pelo hash; token desconhecido é 404
   // sem nada. Prova em platform-nps.test.js.
   ['POST /api/public/nps/lookup', 'a pesquisa do link: o token no corpo é a credencial; devolve só a nota e o nome do produto'],
-  ['POST /api/public/nps/answer', 'a resposta da pesquisa: só grava a nota na linha que o hash do token acha, e só dentro dos prazos']
+  ['POST /api/public/nps/answer', 'a resposta da pesquisa: só grava a nota na linha que o hash do token acha, e só dentro dos prazos'],
+  // O portal do afiliado (0124), no endereço da plataforma (`platformHostOnly`).
+  // Prova em affiliates-portal.test.js.
+  ['POST /api/affiliate/login', 'a porta de entrada do afiliado: limite por endereço e a trava por conta do login do painel; a sessão é um cookie próprio'],
+  ['POST /api/affiliate/password', 'o link de definir senha do console É a credencial: token de uso único no corpo, conferido por hash e prazo']
 ]);
 
 /**
@@ -221,7 +227,17 @@ const POR_ID = new Map([
   // (`plans`, `plan_price_changes`), sem vizinho a alcançar.
   ['GET /api/platform/plans/:id/price-change-preview', 'plano de controle; prova em plan-price-change.test.js — só lê, e plano que não existe é 404'],
   ['POST /api/platform/plans/:id/price-changes', 'plano de controle; prova em plan-price-change.test.js — plano que não existe é 404, e quem não é da plataforma é 403'],
-  ['POST /api/platform/plan-price-changes/:id/cancel', 'plano de controle; prova em plan-price-change.test.js — reajuste que não existe é 404']
+  ['POST /api/platform/plan-price-changes/:id/cancel', 'plano de controle; prova em plan-price-change.test.js — reajuste que não existe é 404'],
+  // O programa de afiliados (0124): ids de `affiliates` e `affiliate_payouts`,
+  // tabelas da plataforma, sem provedor a alcançar.
+  ['GET /api/platform/affiliates/:id', 'plano de controle; prova em affiliates.test.js — afiliado que não existe é 404'],
+  ['PATCH /api/platform/affiliates/:id', 'plano de controle; prova em affiliates.test.js — afiliado que não existe é 404'],
+  ['POST /api/platform/affiliates/:id/password-link', 'plano de controle; prova em affiliates.test.js — afiliado que não existe é 404'],
+  ['POST /api/platform/affiliate-payouts/:id/approve', 'plano de controle; prova em affiliates.test.js — lote que não existe é 404, e só o rascunho se aprova'],
+  ['POST /api/platform/affiliate-payouts/:id/send', 'plano de controle; prova em affiliates.test.js — só o lote aprovado sai, uma vez'],
+  ['POST /api/platform/affiliate-payouts/:id/refresh', 'plano de controle; prova em affiliates.test.js — só o lote enviado é consultado'],
+  ['POST /api/platform/affiliate-payouts/:id/mark-paid', 'plano de controle; prova em affiliates.test.js — só o lote aprovado, falho ou enviado'],
+  ['POST /api/platform/affiliate-payouts/:id/cancel', 'plano de controle; prova em affiliates.test.js — o enviado não se cancela']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -270,6 +286,11 @@ describe('toda rota sem sessão', () => {
       .map(chave)
       .sort();
     assert.deepEqual(escritas, [
+      // O portal do afiliado (0124): o login e o link de definir senha. Só
+      // escrevem em `affiliates` (da plataforma) — a senha do afiliado que o
+      // token nomeia — e na trava por conta.
+      'POST /api/affiliate/login',
+      'POST /api/affiliate/password',
       // A confirmação do endereço: escreve o carimbo em `users`, que é cadastro
       // compartilhado, e só na conta que o bilhete nomeia.
       'POST /api/auth/email/verify/confirm',
@@ -486,7 +507,13 @@ describe('toda rota endereçada por um parâmetro', () => {
   // `plan_price_changes`), como o `PATCH /plans/:id`: não há vizinho a
   // alcançar. Mesmo pedágio, três vezes: três linhas em `DO_CONSOLE` e três
   // aqui; prova em plan-price-change.test.js. São 79.
-  const TETO_DE_EXCECOES = 79;
+  // E as oito do programa de afiliados (0124): o detalhe, a edição e o link
+  // de senha do afiliado, e as cinco ações do lote mensal (aprovar, enviar,
+  // consultar, marcar como pago, cancelar). Ids de tabelas da plataforma
+  // (`affiliates`, `affiliate_payouts`), sem provedor a alcançar. Mesmo
+  // pedágio, oito vezes: oito linhas em `DO_CONSOLE` e oito aqui; prova em
+  // affiliates.test.js. São 87.
+  const TETO_DE_EXCECOES = 87;
 
 
   /**
@@ -549,7 +576,15 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/nps',
     'GET /api/platform/plans/:id/price-change-preview',
     'POST /api/platform/plans/:id/price-changes',
-    'POST /api/platform/plan-price-changes/:id/cancel'
+    'POST /api/platform/plan-price-changes/:id/cancel',
+    'GET /api/platform/affiliates/:id',
+    'PATCH /api/platform/affiliates/:id',
+    'POST /api/platform/affiliates/:id/password-link',
+    'POST /api/platform/affiliate-payouts/:id/approve',
+    'POST /api/platform/affiliate-payouts/:id/send',
+    'POST /api/platform/affiliate-payouts/:id/refresh',
+    'POST /api/platform/affiliate-payouts/:id/mark-paid',
+    'POST /api/platform/affiliate-payouts/:id/cancel'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só
@@ -729,7 +764,9 @@ describe('a allowlist do endereço da plataforma', () => {
     // gravam na trilha DO PROVEDOR, e no ápice não há escopo em que gravar.
     // `/api/public/` é a página pública: catálogo, subdomínio livre, CNPJ e
     // pedido de demonstração — nenhuma grava em trilha de provedor.
-    assert.deepEqual(listaDe('PLATFORM_HOST_PREFIXES'), ['/api/platform/', '/api/public/']);
+    // `/api/affiliate/` é o portal do afiliado (0124): grava só em
+    // `affiliates` e na trava por conta, nunca em trilha de provedor.
+    assert.deepEqual(listaDe('PLATFORM_HOST_PREFIXES'), ['/api/platform/', '/api/public/', '/api/affiliate/']);
   });
 });
 

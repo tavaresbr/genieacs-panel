@@ -1376,5 +1376,10 @@ export default {
   'priceChange.cancelNoticeBody': 'مرحبًا {provider}. تم إلغاء تعديل سعر الخطة {plan} ({cycle}) من {old} إلى {new} الذي كان مقررًا في {date}. يبقى السعر {old}، ولن تتغير أي فاتورة بسببه. لأي استفسار، يكفي الرد على هذه الرسالة.',
   'whatsapp.platformBot.askTaxIdMulti': 'مرحبًا! حفاظًا على أمانك، وقبل إرسال أي بيانات فوترة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'للمتابعة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك. ويمكنك كتابة *atendente* للتحدث مع فريقنا.',
-  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.'
+  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+  'affiliate.loginSuccess': 'تم تسجيل الدخول',
+  'affiliate.sessionRequired': 'سجّل الدخول إلى بوابة الشركاء',
+  'affiliate.sessionExpired': 'انتهت جلسة الشريك؛ سجّل الدخول مرة أخرى'
 };

@@ -1387,5 +1387,10 @@ export default {
   'priceChange.cancelNoticeBody': '안녕하세요, {provider}님. {date}로 예정되었던 {plan} 요금제({cycle})의 {old}에서 {new}로의 가격 조정이 취소되었습니다. 가격은 {old} 그대로이며, 이로 인해 바뀌는 청구서는 없습니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.',
   'whatsapp.platformBot.askTaxIdMulti': '안녕하세요! 보안을 위해 청구 정보를 보내기 전에 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요.',
   'whatsapp.platformBot.askTaxIdMultiAgain': '계속하려면 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요. 원하시면 *atendente*를 입력해 팀과 이야기하세요.',
-  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.'
+  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': '이메일 또는 비밀번호가 올바르지 않습니다',
+  'affiliate.loginSuccess': '로그인되었습니다',
+  'affiliate.sessionRequired': '제휴 포털에 로그인하세요',
+  'affiliate.sessionExpired': '제휴 세션이 만료되었습니다. 다시 로그인하세요'
 };

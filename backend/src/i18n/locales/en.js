@@ -1384,5 +1384,10 @@ export default {
   'priceChange.cancelNoticeBody': 'Hello, {provider}. The price change of the {plan} plan ({cycle}) from {old} to {new}, planned for {date}, has been canceled. The price stays at {old}, and no invoice changes because of it. If you have any questions, just reply to this message.',
   'whatsapp.platformBot.askTaxIdMulti': 'Hello! For your security, before sending any billing data, please enter the last 5 digits of your provider\'s billing CNPJ or CPF.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'To continue, enter the last 5 digits of your provider\'s billing CNPJ or CPF. If you prefer, type *atendente* to talk to our team.',
-  'whatsapp.platformBot.noTaxIdMulti': 'There is no billing CNPJ or CPF registered for the providers of this number, so I cannot confirm your identity here. I will pass your conversation on to our team.'
+  'whatsapp.platformBot.noTaxIdMulti': 'There is no billing CNPJ or CPF registered for the providers of this number, so I cannot confirm your identity here. I will pass your conversation on to our team.',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'Invalid email or password',
+  'affiliate.loginSuccess': 'Signed in',
+  'affiliate.sessionRequired': 'Sign in to the affiliate portal',
+  'affiliate.sessionExpired': 'Your affiliate session has expired; sign in again'
 };

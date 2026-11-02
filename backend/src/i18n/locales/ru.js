@@ -1385,5 +1385,10 @@ export default {
   'priceChange.cancelNoticeBody': 'Здравствуйте, {provider}. Изменение цены тарифа {plan} ({cycle}) с {old} на {new}, запланированное на {date}, отменено. Цена остаётся {old}, и ни один счёт из-за него не меняется. Если есть вопросы, просто ответьте на это сообщение.',
   'whatsapp.platformBot.askTaxIdMulti': 'Здравствуйте! В целях безопасности перед отправкой платёжных данных укажите последние 5 цифр платёжного CNPJ или CPF вашего провайдера.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Чтобы продолжить, укажите последние 5 цифр платёжного CNPJ или CPF вашего провайдера. Если хотите, напишите *atendente*, чтобы связаться с нашей командой.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Для провайдеров этого номера не указан платёжный CNPJ или CPF, поэтому я не могу подтвердить вашу личность здесь. Я передам разговор нашей команде.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Для провайдеров этого номера не указан платёжный CNPJ или CPF, поэтому я не могу подтвердить вашу личность здесь. Я передам разговор нашей команде.',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'Неверный e-mail или пароль',
+  'affiliate.loginSuccess': 'Вход выполнен',
+  'affiliate.sessionRequired': 'Войдите в партнёрский портал',
+  'affiliate.sessionExpired': 'Сессия партнёра истекла; войдите снова'
 };

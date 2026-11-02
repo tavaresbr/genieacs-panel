@@ -28,6 +28,7 @@ import CancellationService from './cancellationService.js';
 import PlatformAlertService from './platformAlertService.js';
 import NpsService from './npsService.js';
 import PlanPriceChangeService from './planPriceChangeService.js';
+import AffiliatePayoutService from './affiliatePayoutService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -225,6 +226,12 @@ class SchedulerService {
       // provedor, como os alertas — o reajuste é do catálogo. Nunca lança.
       .then(() => PlanPriceChangeService.schedulerPass().catch((error) => {
         console.warn(`Could not run the plan price changes: ${error.message}`);
+      }))
+      // Os lotes mensais dos afiliados (0124): nos dias 1 a 3 monta (nunca
+      // aprova nem envia), e acompanha os Pix enviados. Acima dos provedores,
+      // no máximo uma passada por hora. Nunca lança.
+      .then(() => AffiliatePayoutService.schedulerPass().catch((error) => {
+        console.warn(`Could not run the affiliate payouts: ${error.message}`);
       }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))
