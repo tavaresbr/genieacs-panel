@@ -7,6 +7,54 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.20.0] - 2026-11-02
+
+### New
+
+- Novo cliente com contrato pelo pré-cadastro do SGP (`57ea9d29`)
+- Conexão da conta Asaas do provedor (fase 1) (`daa665c7`)
+
+### Maintenance
+
+- Módulo SGP: opção de desvincular a conversa do contrato ou do cadastro (`2b32165b`)
+- Edição de campanhas antigas com lista de contratos e traduções do Indique e ganhe (`dc1541ab`)
+- Indique e ganhe: tira hosts de exemplo das traduções do endereço do link (`adddcfd6`)
+- Histórico de alertas da plataforma, com reenvio (`1d4749b4`)
+- Métricas mês a mês, gráficos e relatório mensal automático (`de2904b1`)
+- Faturas do provedor: filtros, segunda via, recibo e CSV (`da2f1e19`)
+- Qualidade e limite do número oficial na Meta (`84cdc9a6`)
+- Status dos modelos da Meta atualizado sozinho, com o motivo da recusa (`518a474f`)
+- Editar e apagar modelos da Meta pelo painel (`d90bebaa`)
+- Opt-out de marketing ("parar promoções") (`c84b8506`)
+- Teste do rascunho de edição com os campos novos do status do modelo (`4ced92b6`)
+- Alertas, métricas e segunda via: correções da revisão (`fe36e895`)
+- Tira a chave a mais da junção com o main (`9a7b9275`)
+- Botão Abrir TeiaH no cartão da TeiaH, com o endereço do painel configurável (`6720506e`)
+- Dependências: atualiza body-parser, nodemailer e ip-address (npm audit fix, só o lockfile) (`9eb3b0b2`)
+- SEO, AEO e GEO (head, JSON-LD, texto sem JS, llms.txt e robôs de IA) (`80728bb2`)
+- Lista de compartilhamento: schema.org do JSON-LD não é destino de dado (`d04a2cff`)
+- Mensagens com botões, listas e modelos aparecem no balão; tipo desconhecido diz o nome (`5b89a090`)
+- WhatsApp (iPhone): a tela não some ao digitar; a página destrava com o teclado aberto (`c86afa6d`)
+- Graph API da Meta passa a usar v25.0 por padrão (`8b6054c2`)
+- Painel inicial (aba Início) com a visão geral da plataforma (`fc74615b`)
+- Testes no navegador: Playwright, seed de demonstração e Asaas de mentira (`9c4bb9b4`)
+- Régua de cobrança configurável (0121) (`f38b3f6c`)
+- Troca de plano: o console segue a regra do provedor, com prévia (`fec1c4db`)
+- Régua de cobrança: correções da revisão (`73519848`)
+- E2e: Início, troca de plano pelo console e régua de cobrança (`f8a0abfe`)
+- Teste do painel Início: datas aceitas pelo MySQL (`7dfd03a6`)
+- Show contract login in the contacts contract list (`b765a066`)
+- Chat no celular: Voltar do sistema fecha a conversa, atualiza ao voltar ao app, alvos de toque maiores (`88e34e8b`)
+- Chat no celular: rede de segurança contra a tela escura do teclado e modo de diagnóstico (?wadebug=1) (`efb89f80`)
+- Show the contract login in the equipment status card (`e9307de7`)
+- Módulo SGP: buscar pelo número do contrato e mostrar CPF/CNPJ e link do SGP no cadastro sem contrato (`fbe787e1`)
+- Cut a release automatically every time CI passes on main (`39275f03`)
+- Pré-cadastro: importar listas do SGP, vendedor/técnico/CTO, login sem duplicar e plano/vencimento sugeridos (`16d9d80b`)
+- Módulo SGP: ações esperam o vínculo do contrato e o aviso diz o que fazer (`5990549a`)
+- Show the contract login in the devices list (`083e21e3`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/27abbaba882d...188922bed5e1)
+
 ## [1.19.0] - 2026-10-23
 
 ### New
