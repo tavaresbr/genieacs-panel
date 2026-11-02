@@ -421,6 +421,9 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
 
   const { attendance } = panel
   const phone = attendance.phone
+  // O contrato escolhido na lista ainda não é o desta conversa: o servidor só deixa
+  // agir (fatura, liberação, chamado) no contrato vinculado, então os botões esperam.
+  const unbound = Boolean(contract && contract !== attendance.contract)
 
   return (
     <aside className="flex h-full min-h-0 flex-col bg-[hsl(var(--surface-subtle))]" aria-label={t('whatsapp.sgp.title')}>
@@ -464,7 +467,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
             <button
               type="button"
               className="modern-button-secondary mt-2 w-full"
-              disabled={busy !== null}
+              disabled={busy !== null || unbound}
               onClick={() => void savePhone()}
             >
               <Icon name="phone" size={15} />
@@ -645,6 +648,9 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                   {t('whatsapp.sgp.bind', { contract })}
                 </button>
               )}
+              {canAct && unbound && (
+                <p className="mt-1.5 text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.sgp.bindFirst')}</p>
+              )}
             </Card>
 
             <Card icon="wifi" title={t('whatsapp.sgp.router')}>
@@ -731,7 +737,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                 <button
                   type="button"
                   className="modern-button w-full"
-                  disabled={busy !== null}
+                  disabled={busy !== null || unbound}
                   onClick={() => void unlock()}
                 >
                   <Icon name="unlock" size={15} />
@@ -743,7 +749,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                 {panel.ticketEnabled && (
                   <div className="mt-2">
                     {!ticketOpen ? (
-                      <button type="button" className="modern-button-secondary w-full" onClick={() => setTicketOpen(true)}>
+                      <button type="button" className="modern-button-secondary w-full" disabled={unbound} onClick={() => setTicketOpen(true)}>
                         <Icon name="chat" size={15} />
                         {t('detail.sgp.ticket')}
                       </button>
@@ -766,7 +772,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                           <button
                             type="button"
                             className="modern-button"
-                            disabled={busy !== null || !ticketText.trim()}
+                            disabled={busy !== null || unbound || !ticketText.trim()}
                             onClick={() => void openTicket()}
                           >
                             {busy === 'ticket' ? t('detail.sgp.ticketSending') : t('detail.sgp.ticketSend')}
@@ -817,7 +823,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                       <button
                         type="button"
                         className="modern-button-secondary mt-2 min-h-8 px-2 py-1 text-xs"
-                        disabled={busy !== null}
+                        disabled={busy !== null || unbound}
                         onClick={() => void resumeDunning()}
                       >
                         {t('whatsapp.sgp.dunningResume')}
@@ -848,7 +854,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                         <button
                           type="button"
                           className="modern-button mt-2 w-full"
-                          disabled={busy !== null || !templateId}
+                          disabled={busy !== null || unbound || !templateId}
                           onClick={() => void prepareSecondCopy()}
                         >
                           <Icon name="invoice" size={15} />
@@ -915,7 +921,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                               <button
                                 type="button"
                                 className="modern-button min-h-10 px-2 py-1 text-xs lg:min-h-8"
-                                disabled={busy !== null}
+                                disabled={busy !== null || unbound}
                                 onClick={() => void sendInvoice(invoice)}
                               >
                                 <Icon name="chat" size={13} />

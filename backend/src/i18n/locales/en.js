@@ -479,7 +479,7 @@ export default {
   'sgp.error.identifierRequired': 'Enter a document, a contract, or a PPPoE login to query SGP',
   'sgp.error.contractRequired': 'The SGP contract is required',
   'sgp.error.unlockRefused': 'SGP refused the trust unlock for this contract',
-  'sgp.error.contractNotInConversation': 'This contract does not belong to this conversation',
+  'sgp.error.contractNotInConversation': "This contract is not linked to this conversation yet. Link it first.",
   'sgp.error.deviceUnlinked': 'This ONT has no SGP contract linked yet. Link it manually or check the PPPoE login.',
   'sgp.error.loginRequested': 'The ONT has not reported its PPPoE login to GenieACS yet. A read was requested and arrives with the next Inform; try again in a few minutes or link it manually by CPF/contract.',
   'sgp.error.loginNotReported': 'The ONT does not report its PPPoE login over TR-069 (common when the OLT configures the WAN over OMCI). Link it manually by CPF/contract.',

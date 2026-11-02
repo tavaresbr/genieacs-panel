@@ -2663,6 +2663,7 @@ const zhCN: Dictionary = {
   'whatsapp.sgp.documentPlaceholder': "CPF、CNPJ 或合同号",
   'whatsapp.sgp.search': '搜索',
   'whatsapp.sgp.bind': '将合同 {contract} 关联到此对话',
+  'whatsapp.sgp.bindFirst': "此合同尚未关联到该对话。请先关联，才能发送账单、解除限制或创建工单。",
   'whatsapp.sgp.bound': '对话已关联到合同 {contract}',
   'whatsapp.sgp.router': '路由器访问',
   'whatsapp.sgp.routerUnlinked': '此合同未关联任何 ONT。',
