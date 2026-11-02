@@ -68,6 +68,7 @@ export function ServiceStatusCard({ contactKey, hasContracts }: { contactKey: st
             <li key={row.contract} className="py-4 first:pt-0 last:pb-0">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-sm text-muted-foreground">{t('contacts.profile.equipmentContract', { contract: row.contract })}</span>
+                {row.login && <span className="font-mono text-sm wrap-anywhere">{row.login}</span>}
                 {row.available ? (
                   <span className={row.status === 'online' ? 'modern-badge-success' : 'modern-badge-error'}>
                     {t(row.status === 'online' ? 'contacts.profile.statusOnline' : 'contacts.profile.statusOffline')}

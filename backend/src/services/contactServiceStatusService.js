@@ -20,7 +20,7 @@ export default class ContactServiceStatusService {
   }
 
   static async forContract(entry) {
-    const base = { contract: String(entry.contract), deviceId: entry.deviceId ?? null };
+    const base = { contract: String(entry.contract), login: entry.login ?? null, deviceId: entry.deviceId ?? null };
     if (!entry.deviceId) return { ...base, available: false, reason: 'unlinked' };
 
     const [overview, wan] = await Promise.allSettled([

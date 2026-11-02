@@ -4084,6 +4084,7 @@ export interface ContactInvoiceSettled {
 export interface ContactServiceStatus {
   contracts: {
     contract: string
+    login?: string | null
     deviceId: string | null
     available: boolean
     reason?: 'unlinked' | 'unreachable' | 'not_found'
