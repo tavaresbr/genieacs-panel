@@ -1334,5 +1334,24 @@ export default {
   'nps.askSubject': '您使用 {product} 的感受如何？',
   'nps.askBody': '{provider}，您好！\n\n在 0 到 10 分之間，您有多大可能向其他業者的同行推薦 {product}？\n\n一鍵作答（不到一分鐘）：{link}\n\n您的評分與意見會直接送達負責平台的團隊。',
   'nps.askWhatsappHint': '如果方便，也可以直接在這裡回覆 0 到 10 的數字。',
-  'nps.whatsappThanks': '謝謝！我們已收到您的評分 {score}。如想告訴我們原因，請透過問卷連結作答。'
+  'nps.whatsappThanks': '謝謝！我們已收到您的評分 {score}。如想告訴我們原因，請透過問卷連結作答。',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': '找不到方案',
+  'priceChange.notFound': '找不到調價',
+  'priceChange.invalidCycle': '週期必須是 monthly 或 annual。',
+  'priceChange.noCurrentPrice': '此方案在該週期沒有可調整的價格。',
+  'priceChange.invalidPrice': '新價格必須大於零。',
+  'priceChange.samePrice': '新價格與目前價格相同。',
+  'priceChange.invalidNoticeDays': '提前通知天數必須介於 {min} 到 {max} 天之間。',
+  'priceChange.invalidDate': '生效日期必須是有效日期（YYYY-MM-DD）。',
+  'priceChange.tooSoon': '生效日期必須在 {date} 或之後（提前 {days} 天通知）。',
+  'priceChange.tooFar': '生效日期不能晚於今天起兩年。',
+  'priceChange.invalidNotify': '通知必須為開啟或關閉（true 或 false）。',
+  'priceChange.alreadyScheduled': '此方案和週期已在 {date} 排定調價。請先取消，再排定新的調價。',
+  'priceChange.notScheduled': '此調價已不再處於已排定狀態。',
+  'priceChange.cycleMonthly': '按月',
+  'priceChange.cycleAnnual': '按年',
+  'priceChange.noticeSubject': '{plan} 方案調價通知',
+  'priceChange.noticeBody': '{provider}，您好。{plan} 方案（{cycle}）的價格將自 {date} 起由 {old} 調整為 {new}。到期日在該日期或之後的帳單將以新價格開立；之前的帳單維持目前價格。如有疑問，請直接回覆此訊息。'
 };

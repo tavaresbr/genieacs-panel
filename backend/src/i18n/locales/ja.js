@@ -1334,5 +1334,24 @@ export default {
   'nps.askSubject': '{product} の使い心地はいかがですか？',
   'nps.askBody': '{provider} 様\n\n0〜10 の尺度で、{product} を他のプロバイダーの同業者に勧める可能性はどのくらいですか？\n\nワンクリックで回答できます（1 分かかりません）：{link}\n\nいただいたスコアとコメントは、プラットフォームを運営するチームに直接届きます。',
   'nps.askWhatsappHint': 'よろしければ、ここに 0〜10 の数字だけを返信していただいても構いません。',
-  'nps.whatsappThanks': 'ありがとうございます！スコア {score} を受け取りました。理由を教えていただける場合は、アンケートのリンクからご回答ください。'
+  'nps.whatsappThanks': 'ありがとうございます！スコア {score} を受け取りました。理由を教えていただける場合は、アンケートのリンクからご回答ください。',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'プランが見つかりません',
+  'priceChange.notFound': '価格改定が見つかりません',
+  'priceChange.invalidCycle': 'サイクルは monthly または annual である必要があります。',
+  'priceChange.noCurrentPrice': 'このプランには、このサイクルで改定できる価格がありません。',
+  'priceChange.invalidPrice': '新しい価格は 0 より大きくする必要があります。',
+  'priceChange.samePrice': '新しい価格が現在の価格と同じです。',
+  'priceChange.invalidNoticeDays': '事前通知の日数は {min}〜{max} 日の範囲で指定してください。',
+  'priceChange.invalidDate': '適用日は有効な日付 (YYYY-MM-DD) である必要があります。',
+  'priceChange.tooSoon': '適用日は {date} 以降にしてください（{days} 日前の通知）。',
+  'priceChange.tooFar': '適用日は今日から 2 年以内にしてください。',
+  'priceChange.invalidNotify': '通知はオンまたはオフ (true または false) で指定してください。',
+  'priceChange.alreadyScheduled': 'このプランとサイクルには {date} 付の価格改定がすでに予約されています。別の改定を予約する前にキャンセルしてください。',
+  'priceChange.notScheduled': 'この価格改定はもう予約されていません。',
+  'priceChange.cycleMonthly': '月額',
+  'priceChange.cycleAnnual': '年額',
+  'priceChange.noticeSubject': '{plan} プランの価格改定',
+  'priceChange.noticeBody': '{provider} 様。{plan} プラン（{cycle}）の料金は {date} から {old} から {new} に変わります。この日以降に期日を迎える請求書は新しい料金で発行され、それ以前の請求書は現在の料金のままです。ご不明な点があれば、このメッセージにご返信ください。'
 };

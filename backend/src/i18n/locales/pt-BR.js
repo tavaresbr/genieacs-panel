@@ -1333,5 +1333,24 @@ export default {
   'nps.askSubject': 'Como está sendo usar o {product}?',
   'nps.askBody': 'Olá, {provider}!\n\nDe 0 a 10, quanto você recomendaria o {product} a um colega de outro provedor?\n\nResponda em um clique (leva menos de um minuto): {link}\n\nSua nota e seu comentário vão direto para a equipe que cuida da plataforma.',
   'nps.askWhatsappHint': 'Se preferir, responda aqui mesmo só com o número, de 0 a 10.',
-  'nps.whatsappThanks': 'Obrigado! Recebemos sua nota {score}. Se quiser contar o porquê, é só responder pelo link da pesquisa.'
+  'nps.whatsappThanks': 'Obrigado! Recebemos sua nota {score}. Se quiser contar o porquê, é só responder pelo link da pesquisa.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Plano não encontrado',
+  'priceChange.notFound': 'Reajuste não encontrado',
+  'priceChange.invalidCycle': 'O ciclo deve ser monthly ou annual.',
+  'priceChange.noCurrentPrice': 'Este plano não tem preço neste ciclo para reajustar.',
+  'priceChange.invalidPrice': 'O preço novo deve ser um valor maior que zero.',
+  'priceChange.samePrice': 'O preço novo é igual ao de hoje.',
+  'priceChange.invalidNoticeDays': 'A antecedência do aviso deve ser de {min} a {max} dias.',
+  'priceChange.invalidDate': 'A data de vigência deve ser uma data válida (AAAA-MM-DD).',
+  'priceChange.tooSoon': 'A data de vigência deve ser a partir de {date} ({days} dias de aviso).',
+  'priceChange.tooFar': 'A data de vigência não pode passar de dois anos a partir de hoje.',
+  'priceChange.invalidNotify': 'O aviso deve ser ligado ou desligado (verdadeiro ou falso).',
+  'priceChange.alreadyScheduled': 'Já há um reajuste agendado para este plano e ciclo, em {date}. Cancele-o antes de agendar outro.',
+  'priceChange.notScheduled': 'Este reajuste não está mais agendado.',
+  'priceChange.cycleMonthly': 'mensal',
+  'priceChange.cycleAnnual': 'anual',
+  'priceChange.noticeSubject': 'Reajuste do plano {plan}',
+  'priceChange.noticeBody': 'Olá, {provider}. O valor do plano {plan} ({cycle}) passa de {old} para {new} a partir de {date}. As faturas com vencimento nessa data ou depois já virão com o valor novo; as anteriores continuam com o valor atual. Qualquer dúvida, é só responder esta mensagem.'
 };

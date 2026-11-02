@@ -3015,6 +3015,83 @@ const WA_MARKETING_OPT_OUT_TABLES = [
 ];
 
 /**
+ * O reajuste de preço com data de vigência (0122) — ver
+ * `planPriceChangeService.js`.
+ *
+ *   plan_id       o plano reajustado;
+ *   cycle         monthly | annual: qual dos dois preços muda
+ *                 (`price_cents` ou `price_yearly_cents`);
+ *   old_cents     o preço do ciclo no agendamento (o "de" do aviso);
+ *   new_cents     o preço novo;
+ *   effective_at  a DATA de vigência (ISO, no fuso da cobrança), e não o
+ *                 instante — pelo mesmo motivo de `billing_charges.period_end`:
+ *                 é contra a chave do período que se compara, e a cobrança que
+ *                 vence nesta data ou depois já sai pelo preço novo;
+ *   notice_days   com quantos dias de antecedência o provedor é avisado;
+ *   notify        se o aviso sai (e-mail e WhatsApp);
+ *   status        scheduled | applied | canceled.
+ *
+ * Da PLATAFORMA (compartilhada), como `plans`: o catálogo é um só.
+ */
+const planPriceChangesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('plan_id').unsigned().notNullable()
+    .references('id').inTable('plans').onDelete('CASCADE');
+  t.string('cycle', 8).notNullable().defaultTo('monthly');
+  t.integer('old_cents').unsigned().notNullable();
+  t.integer('new_cents').unsigned().notNullable();
+  t.string('effective_at', 10).notNullable();
+  t.integer('notice_days').unsigned().notNullable().defaultTo(30);
+  t.boolean('notify').notNullable().defaultTo(true);
+  t.string('status', 16).notNullable().defaultTo('scheduled');
+  t.string('reason', 255);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('notified_at');
+  t.timestamp('applied_at');
+  t.timestamp('canceled_at');
+  t.integer('canceled_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.index(['plan_id', 'status'], 'plan_price_changes_plan_idx');
+  t.index(['status', 'effective_at'], 'plan_price_changes_due_idx');
+};
+
+/**
+ * A memória do que o reajuste já fez com cada provedor (0122): o aviso
+ * (`mark = 'notice'`) e a reemissão de cada cobrança (`reprice:<id>`, e
+ * `revert:<id>` quando o reajuste é cancelado depois dela). Única por
+ * `(change_id, tenant_id, mark)`: a linha nasce ANTES do envio ou da conversa
+ * com o gateway, e quem perde a corrida não faz de novo.
+ *
+ *   status         claimed | done | failed;
+ *   claimed_until  até quando a passada que tomou a linha é dona dela — vencida
+ *                  (o processo morreu, ou a falha pediu espera), outra a retoma;
+ *   attempts       quantas vezes falhou.
+ *
+ * Compartilhada, como `platform_alerts`: é o agendador da plataforma, fora do
+ * laço por provedor, quem a lê.
+ */
+const planPriceChangeMarksTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('change_id').unsigned().notNullable()
+    .references('id').inTable('plan_price_changes').onDelete('CASCADE');
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('mark', 32).notNullable();
+  t.string('status', 16).notNullable().defaultTo('claimed');
+  t.timestamp('claimed_until');
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.string('detail', 255);
+  t.timestamp('done_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['change_id', 'tenant_id', 'mark'], 'plan_price_change_marks_uq');
+};
+
+const PLAN_PRICE_CHANGE_TABLES = [
+  ['plan_price_changes', planPriceChangesTable],
+  ['plan_price_change_marks', planPriceChangeMarksTable]
+];
+
+/**
  * O que é promoção, para o bloqueio acima poder valer até a hora do envio
  * (0120):
  *
@@ -3123,7 +3200,8 @@ export const SCHEMA_TABLES = [
   ...CANCELLATION_TABLES,
   ...PLATFORM_ALERT_TABLES,
   ...WA_MARKETING_OPT_OUT_TABLES,
-  ...PLATFORM_NPS_TABLES
+  ...PLATFORM_NPS_TABLES,
+  ...PLAN_PRICE_CHANGE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6727,6 +6805,23 @@ export const migrations = [
         await db.schema.alterTable('subscription_reminder_sends', (t) => {
           t.unique(['tenant_id', 'due_at', 'step_key'], 'subscription_reminder_sends_step_key_uq');
         });
+      }
+    }
+  },
+  {
+    /** O reajuste de preço com data de vigência — ver `PLAN_PRICE_CHANGE_TABLES`. */
+    id: '0122_plan_price_changes',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('plans'))) return true;
+      for (const [name] of PLAN_PRICE_CHANGE_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('plans'))) return;
+      for (const [name, builder] of PLAN_PRICE_CHANGE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
       }
     }
   },

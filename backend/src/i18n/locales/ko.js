@@ -1337,5 +1337,24 @@ export default {
   'nps.askSubject': '{product} 사용은 어떠신가요?',
   'nps.askBody': '{provider}님, 안녕하세요!\n\n0점에서 10점 중, 다른 사업자의 동료에게 {product}를 추천할 가능성은 어느 정도인가요?\n\n클릭 한 번으로 답해 주세요(1분도 걸리지 않습니다): {link}\n\n점수와 의견은 플랫폼을 운영하는 팀에 바로 전달됩니다.',
   'nps.askWhatsappHint': '원하시면 여기에 0부터 10까지 숫자만 보내 주셔도 됩니다.',
-  'nps.whatsappThanks': '감사합니다! {score}점을 받았습니다. 이유를 알려 주시려면 설문 링크로 답해 주세요.'
+  'nps.whatsappThanks': '감사합니다! {score}점을 받았습니다. 이유를 알려 주시려면 설문 링크로 답해 주세요.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': '요금제를 찾을 수 없습니다',
+  'priceChange.notFound': '가격 조정을 찾을 수 없습니다',
+  'priceChange.invalidCycle': '주기는 monthly 또는 annual이어야 합니다.',
+  'priceChange.noCurrentPrice': '이 요금제에는 이 주기에서 조정할 가격이 없습니다.',
+  'priceChange.invalidPrice': '새 가격은 0보다 커야 합니다.',
+  'priceChange.samePrice': '새 가격이 현재 가격과 같습니다.',
+  'priceChange.invalidNoticeDays': '사전 안내 기간은 {min}일에서 {max}일 사이여야 합니다.',
+  'priceChange.invalidDate': '적용일은 올바른 날짜(YYYY-MM-DD)여야 합니다.',
+  'priceChange.tooSoon': '적용일은 {date} 이후여야 합니다({days}일 사전 안내).',
+  'priceChange.tooFar': '적용일은 오늘부터 2년을 넘을 수 없습니다.',
+  'priceChange.invalidNotify': '안내는 켜기 또는 끄기(true 또는 false)여야 합니다.',
+  'priceChange.alreadyScheduled': '이 요금제와 주기에는 이미 {date}에 가격 조정이 예약되어 있습니다. 다른 조정을 예약하기 전에 취소하세요.',
+  'priceChange.notScheduled': '이 가격 조정은 더 이상 예약 상태가 아닙니다.',
+  'priceChange.cycleMonthly': '월간',
+  'priceChange.cycleAnnual': '연간',
+  'priceChange.noticeSubject': '{plan} 요금제 가격 조정',
+  'priceChange.noticeBody': '안녕하세요, {provider}님. {plan} 요금제({cycle}) 가격이 {date}부터 {old}에서 {new}(으)로 변경됩니다. 이 날짜 또는 그 이후가 만기인 청구서는 새 가격으로 발행되며, 그 이전 청구서는 현재 가격이 유지됩니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.'
 };

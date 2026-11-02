@@ -213,7 +213,12 @@ const POR_ID = new Map([
   ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe'],
   ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404'],
   ['GET /api/public/receipt/:token', 'o parâmetro é um token assinado que já nomeia provedor e cobrança, aberto em runInTenant do provedor do token; prova em platform-owner-bot.test.js'],
-  ['POST /api/platform/tenants/:id/nps', 'plano de controle; prova em platform-nps.test.js — manda só ao provedor da URL, e a caixa da plataforma e quem não existe respondem 404']
+  ['POST /api/platform/tenants/:id/nps', 'plano de controle; prova em platform-nps.test.js — manda só ao provedor da URL, e a caixa da plataforma e quem não existe respondem 404'],
+  // O reajuste de preço (0122): id de plano e de reajuste, tabelas do catálogo
+  // (`plans`, `plan_price_changes`), sem vizinho a alcançar.
+  ['GET /api/platform/plans/:id/price-change-preview', 'plano de controle; prova em plan-price-change.test.js — só lê, e plano que não existe é 404'],
+  ['POST /api/platform/plans/:id/price-changes', 'plano de controle; prova em plan-price-change.test.js — plano que não existe é 404, e quem não é da plataforma é 403'],
+  ['POST /api/platform/plan-price-changes/:id/cancel', 'plano de controle; prova em plan-price-change.test.js — reajuste que não existe é 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -464,12 +469,18 @@ describe('toda rota endereçada por um parâmetro', () => {
   // token HMAC que já nomeia provedor e cobrança, como o do anexo — o vizinho
   // não alcança a linha de ninguém sem a assinatura. Não é do console, então
   // entra também na conta de fora dele (29 → 30, dentro do teto). Prova em
-  // platform-owner-bot.test.js. 
+  // platform-owner-bot.test.js.
   // E o "Enviar pesquisa" de satisfação pelo console (`POST .../nps`, 0123):
   // grava uma linha em `platform_nps` NO ESCOPO do provedor da URL e manda a
   // pesquisa só aos contatos dele. Mesmo pedágio: uma linha em `DO_CONSOLE` e
-  // mais uma aqui; prova em platform-nps.test.js. São 76.
-  const TETO_DE_EXCECOES = 76;
+  // mais uma aqui; prova em platform-nps.test.js.
+  // E as três do reajuste de preço com data de vigência (0122): a prévia e o
+  // agendamento em `/plans/:id/...` e o cancelamento em
+  // `/plan-price-changes/:id/cancel`. Ids de tabela do catálogo (`plans`,
+  // `plan_price_changes`), como o `PATCH /plans/:id`: não há vizinho a
+  // alcançar. Mesmo pedágio, três vezes: três linhas em `DO_CONSOLE` e três
+  // aqui; prova em plan-price-change.test.js. São 79.
+  const TETO_DE_EXCECOES = 79;
 
 
   /**
@@ -529,7 +540,10 @@ describe('toda rota endereçada por um parâmetro', () => {
     'DELETE /api/platform/tenants/:id/subscription/cancellation',
     'POST /api/platform/alerts/:id/resend',
     'GET /api/platform/tenants/:id/subscription/plan-preview',
-    'POST /api/platform/tenants/:id/nps'
+    'POST /api/platform/tenants/:id/nps',
+    'GET /api/platform/plans/:id/price-change-preview',
+    'POST /api/platform/plans/:id/price-changes',
+    'POST /api/platform/plan-price-changes/:id/cancel'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

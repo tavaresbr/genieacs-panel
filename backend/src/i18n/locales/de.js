@@ -1335,5 +1335,24 @@ export default {
   'nps.askSubject': 'Wie zufrieden sind Sie mit {product}?',
   'nps.askBody': 'Hallo {provider}!\n\nWie wahrscheinlich ist es auf einer Skala von 0 bis 10, dass Sie {product} einem Kollegen bei einem anderen Anbieter empfehlen?\n\nAntworten Sie mit einem Klick (dauert weniger als eine Minute): {link}\n\nIhre Bewertung und Ihr Kommentar gehen direkt an das Team, das die Plattform betreibt.',
   'nps.askWhatsappHint': 'Wenn Sie möchten, antworten Sie hier einfach mit der Zahl von 0 bis 10.',
-  'nps.whatsappThanks': 'Danke! Wir haben Ihre Bewertung {score} erhalten. Wenn Sie uns den Grund nennen möchten, antworten Sie über den Link der Umfrage.'
+  'nps.whatsappThanks': 'Danke! Wir haben Ihre Bewertung {score} erhalten. Wenn Sie uns den Grund nennen möchten, antworten Sie über den Link der Umfrage.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Tarif nicht gefunden',
+  'priceChange.notFound': 'Preisanpassung nicht gefunden',
+  'priceChange.invalidCycle': 'Der Zyklus muss monthly oder annual sein.',
+  'priceChange.noCurrentPrice': 'Dieser Tarif hat in diesem Zyklus keinen Preis, der angepasst werden könnte.',
+  'priceChange.invalidPrice': 'Der neue Preis muss größer als null sein.',
+  'priceChange.samePrice': 'Der neue Preis entspricht dem aktuellen.',
+  'priceChange.invalidNoticeDays': 'Die Vorankündigung muss zwischen {min} und {max} Tagen liegen.',
+  'priceChange.invalidDate': 'Das Gültigkeitsdatum muss ein gültiges Datum sein (JJJJ-MM-TT).',
+  'priceChange.tooSoon': 'Das Gültigkeitsdatum muss am {date} oder später liegen ({days} Tage Vorankündigung).',
+  'priceChange.tooFar': 'Das Gültigkeitsdatum darf nicht mehr als zwei Jahre in der Zukunft liegen.',
+  'priceChange.invalidNotify': 'Die Benachrichtigung muss ein- oder ausgeschaltet sein (true oder false).',
+  'priceChange.alreadyScheduled': 'Für diesen Tarif und Zyklus ist bereits eine Preisanpassung zum {date} geplant. Stornieren Sie sie, bevor Sie eine weitere planen.',
+  'priceChange.notScheduled': 'Diese Preisanpassung ist nicht mehr geplant.',
+  'priceChange.cycleMonthly': 'monatlich',
+  'priceChange.cycleAnnual': 'jährlich',
+  'priceChange.noticeSubject': 'Preisanpassung für den Tarif {plan}',
+  'priceChange.noticeBody': 'Hallo {provider}, der Preis des Tarifs {plan} ({cycle}) ändert sich ab dem {date} von {old} auf {new}. Rechnungen mit Fälligkeit an diesem Datum oder später enthalten den neuen Preis; frühere behalten den aktuellen. Bei Fragen antworten Sie einfach auf diese Nachricht.'
 };

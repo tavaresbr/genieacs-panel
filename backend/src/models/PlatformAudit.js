@@ -90,6 +90,12 @@ class PlatformAudit {
     // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
     PLAN_CREATED: 'plan.created',
     PLAN_UPDATED: 'plan.updated',
+    // O reajuste de preço com data de vigência (0122): agendado e cancelado
+    // pelo console, aplicado ao plano pelo agendador na data. O detalhe diz o
+    // plano, o ciclo, o "de" e o "para", a data e quantos provedores pega.
+    PLAN_PRICE_CHANGE_SCHEDULED: 'plan.price_change_scheduled',
+    PLAN_PRICE_CHANGE_CANCELED: 'plan.price_change_canceled',
+    PLAN_PRICE_CHANGE_APPLIED: 'plan.price_change_applied',
     // Um pedido de demonstração da página pública mudou de etapa.
     LEAD_UPDATED: 'lead.updated',
     SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',

@@ -1334,5 +1334,24 @@ export default {
   'nps.askSubject': 'How is {product} working for you?',
   'nps.askBody': 'Hello, {provider}!\n\nOn a scale from 0 to 10, how likely are you to recommend {product} to a colleague at another provider?\n\nAnswer in one click (it takes less than a minute): {link}\n\nYour score and comment go straight to the team that runs the platform.',
   'nps.askWhatsappHint': 'If you prefer, just reply here with the number, from 0 to 10.',
-  'nps.whatsappThanks': 'Thank you! We received your score of {score}. If you want to tell us why, just answer through the survey link.'
+  'nps.whatsappThanks': 'Thank you! We received your score of {score}. If you want to tell us why, just answer through the survey link.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Plan not found',
+  'priceChange.notFound': 'Price change not found',
+  'priceChange.invalidCycle': 'The cycle must be monthly or annual.',
+  'priceChange.noCurrentPrice': 'This plan has no price in this cycle to change.',
+  'priceChange.invalidPrice': 'The new price must be greater than zero.',
+  'priceChange.samePrice': 'The new price is the same as the current one.',
+  'priceChange.invalidNoticeDays': 'The notice period must be between {min} and {max} days.',
+  'priceChange.invalidDate': 'The effective date must be a valid date (YYYY-MM-DD).',
+  'priceChange.tooSoon': 'The effective date must be {date} or later ({days} days of notice).',
+  'priceChange.tooFar': 'The effective date cannot be more than two years from today.',
+  'priceChange.invalidNotify': 'The notice must be turned on or off (true or false).',
+  'priceChange.alreadyScheduled': 'A price change is already scheduled for this plan and cycle, on {date}. Cancel it before scheduling another.',
+  'priceChange.notScheduled': 'This price change is no longer scheduled.',
+  'priceChange.cycleMonthly': 'monthly',
+  'priceChange.cycleAnnual': 'annual',
+  'priceChange.noticeSubject': 'Price change for the {plan} plan',
+  'priceChange.noticeBody': 'Hello, {provider}. The price of the {plan} plan ({cycle}) changes from {old} to {new} starting {date}. Invoices due on that date or later will carry the new price; earlier ones keep the current price. If you have any questions, just reply to this message.'
 };

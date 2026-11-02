@@ -1334,5 +1334,24 @@ export default {
   'nps.askSubject': '{product} के साथ आपका अनुभव कैसा है?',
   'nps.askBody': 'नमस्ते {provider}!\n\n0 से 10 के पैमाने पर, आप किसी दूसरे प्रोवाइडर के सहकर्मी को {product} की सिफ़ारिश करने की कितनी संभावना रखते हैं?\n\nएक क्लिक में जवाब दें (एक मिनट से कम): {link}\n\nआपका स्कोर और टिप्पणी सीधे प्लेटफ़ॉर्म चलाने वाली टीम तक पहुँचते हैं।',
   'nps.askWhatsappHint': 'चाहें तो यहीं सिर्फ़ 0 से 10 तक की संख्या भेजकर जवाब दें।',
-  'nps.whatsappThanks': 'धन्यवाद! हमें आपका स्कोर {score} मिल गया। अगर आप कारण बताना चाहें, तो सर्वे के लिंक से जवाब दें।'
+  'nps.whatsappThanks': 'धन्यवाद! हमें आपका स्कोर {score} मिल गया। अगर आप कारण बताना चाहें, तो सर्वे के लिंक से जवाब दें।',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'प्लान नहीं मिला',
+  'priceChange.notFound': 'मूल्य परिवर्तन नहीं मिला',
+  'priceChange.invalidCycle': 'चक्र monthly या annual होना चाहिए।',
+  'priceChange.noCurrentPrice': 'इस प्लान का इस चक्र में बदलने के लिए कोई मूल्य नहीं है।',
+  'priceChange.invalidPrice': 'नया मूल्य शून्य से अधिक होना चाहिए।',
+  'priceChange.samePrice': 'नया मूल्य मौजूदा मूल्य के बराबर है।',
+  'priceChange.invalidNoticeDays': 'सूचना की अग्रिम अवधि {min} से {max} दिनों के बीच होनी चाहिए।',
+  'priceChange.invalidDate': 'प्रभावी तिथि एक मान्य तिथि (YYYY-MM-DD) होनी चाहिए।',
+  'priceChange.tooSoon': 'प्रभावी तिथि {date} या उसके बाद की होनी चाहिए ({days} दिन की सूचना)।',
+  'priceChange.tooFar': 'प्रभावी तिथि आज से दो साल से अधिक आगे नहीं हो सकती।',
+  'priceChange.invalidNotify': 'सूचना चालू या बंद होनी चाहिए (true या false)।',
+  'priceChange.alreadyScheduled': 'इस प्लान और चक्र के लिए {date} को पहले से एक मूल्य परिवर्तन निर्धारित है। दूसरा निर्धारित करने से पहले इसे रद्द करें।',
+  'priceChange.notScheduled': 'यह मूल्य परिवर्तन अब निर्धारित नहीं है।',
+  'priceChange.cycleMonthly': 'मासिक',
+  'priceChange.cycleAnnual': 'वार्षिक',
+  'priceChange.noticeSubject': '{plan} प्लान का मूल्य परिवर्तन',
+  'priceChange.noticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का मूल्य {date} से {old} से बदलकर {new} हो रहा है। उस तिथि या उसके बाद देय इनवॉइस नए मूल्य पर आएँगे; पहले वाले मौजूदा मूल्य पर ही रहेंगे। कोई प्रश्न हो तो बस इस संदेश का उत्तर दें।'
 };

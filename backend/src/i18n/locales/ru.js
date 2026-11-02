@@ -1335,5 +1335,24 @@ export default {
   'nps.askSubject': 'Как вам работа с {product}?',
   'nps.askBody': 'Здравствуйте, {provider}!\n\nПо шкале от 0 до 10, насколько вероятно, что вы порекомендуете {product} коллеге из другого провайдера?\n\nОтветьте в один клик (меньше минуты): {link}\n\nВаша оценка и комментарий попадут прямо к команде, которая развивает платформу.',
   'nps.askWhatsappHint': 'Если удобнее, просто ответьте здесь числом от 0 до 10.',
-  'nps.whatsappThanks': 'Спасибо! Мы получили вашу оценку {score}. Если хотите рассказать почему, ответьте по ссылке опроса.'
+  'nps.whatsappThanks': 'Спасибо! Мы получили вашу оценку {score}. Если хотите рассказать почему, ответьте по ссылке опроса.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Тариф не найден',
+  'priceChange.notFound': 'Изменение цены не найдено',
+  'priceChange.invalidCycle': 'Цикл должен быть monthly или annual.',
+  'priceChange.noCurrentPrice': 'У этого тарифа нет цены в этом цикле, которую можно изменить.',
+  'priceChange.invalidPrice': 'Новая цена должна быть больше нуля.',
+  'priceChange.samePrice': 'Новая цена совпадает с текущей.',
+  'priceChange.invalidNoticeDays': 'Срок уведомления должен быть от {min} до {max} дней.',
+  'priceChange.invalidDate': 'Дата вступления в силу должна быть корректной датой (ГГГГ-ММ-ДД).',
+  'priceChange.tooSoon': 'Дата вступления в силу должна быть не раньше {date} ({days} дн. уведомления).',
+  'priceChange.tooFar': 'Дата вступления в силу не может быть позже чем через два года.',
+  'priceChange.invalidNotify': 'Уведомление должно быть включено или выключено (true или false).',
+  'priceChange.alreadyScheduled': 'Для этого тарифа и цикла уже запланировано изменение цены на {date}. Отмените его, прежде чем планировать новое.',
+  'priceChange.notScheduled': 'Это изменение цены больше не запланировано.',
+  'priceChange.cycleMonthly': 'ежемесячно',
+  'priceChange.cycleAnnual': 'ежегодно',
+  'priceChange.noticeSubject': 'Изменение цены тарифа {plan}',
+  'priceChange.noticeBody': 'Здравствуйте, {provider}. Цена тарифа {plan} ({cycle}) меняется с {old} на {new} с {date}. Счета со сроком оплаты в эту дату или позже будут выставлены по новой цене; более ранние сохраняют текущую. Если есть вопросы, просто ответьте на это сообщение.'
 };

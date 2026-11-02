@@ -1332,5 +1332,24 @@ export default {
   'nps.askSubject': 'Come si trova con {product}?',
   'nps.askBody': 'Ciao {provider}!\n\nDa 0 a 10, quanto consiglieresti {product} a un collega di un altro provider?\n\nRispondi con un clic (richiede meno di un minuto): {link}\n\nIl tuo voto e il tuo commento arrivano direttamente al team che gestisce la piattaforma.',
   'nps.askWhatsappHint': 'Se preferisci, rispondi qui solo con il numero, da 0 a 10.',
-  'nps.whatsappThanks': 'Grazie! Abbiamo ricevuto il tuo voto {score}. Se vuoi dirci il perché, rispondi tramite il link del sondaggio.'
+  'nps.whatsappThanks': 'Grazie! Abbiamo ricevuto il tuo voto {score}. Se vuoi dirci il perché, rispondi tramite il link del sondaggio.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Piano non trovato',
+  'priceChange.notFound': 'Adeguamento di prezzo non trovato',
+  'priceChange.invalidCycle': 'Il ciclo deve essere monthly o annual.',
+  'priceChange.noCurrentPrice': 'Questo piano non ha un prezzo in questo ciclo da adeguare.',
+  'priceChange.invalidPrice': 'Il nuovo prezzo deve essere maggiore di zero.',
+  'priceChange.samePrice': 'Il nuovo prezzo è uguale a quello attuale.',
+  'priceChange.invalidNoticeDays': 'Il preavviso deve essere compreso tra {min} e {max} giorni.',
+  'priceChange.invalidDate': 'La data di decorrenza deve essere una data valida (AAAA-MM-GG).',
+  'priceChange.tooSoon': 'La data di decorrenza deve essere dal {date} in poi ({days} giorni di preavviso).',
+  'priceChange.tooFar': 'La data di decorrenza non può superare due anni da oggi.',
+  'priceChange.invalidNotify': 'L\'avviso deve essere attivato o disattivato (vero o falso).',
+  'priceChange.alreadyScheduled': 'C\'è già un adeguamento programmato per questo piano e ciclo, il {date}. Annullalo prima di programmarne un altro.',
+  'priceChange.notScheduled': 'Questo adeguamento non è più programmato.',
+  'priceChange.cycleMonthly': 'mensile',
+  'priceChange.cycleAnnual': 'annuale',
+  'priceChange.noticeSubject': 'Adeguamento del piano {plan}',
+  'priceChange.noticeBody': 'Ciao, {provider}. Il prezzo del piano {plan} ({cycle}) passa da {old} a {new} a partire dal {date}. Le fatture con scadenza in quella data o successiva avranno il nuovo prezzo; quelle precedenti mantengono il prezzo attuale. Per qualsiasi dubbio, rispondi a questo messaggio.'
 };

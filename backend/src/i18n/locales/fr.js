@@ -1330,5 +1330,24 @@ export default {
   'nps.askSubject': 'Comment se passe votre utilisation de {product} ?',
   'nps.askBody': 'Bonjour {provider} !\n\nSur une échelle de 0 à 10, quelle est la probabilité que vous recommandiez {product} à un collègue d’un autre fournisseur ?\n\nRépondez en un clic (moins d’une minute) : {link}\n\nVotre note et votre commentaire vont directement à l’équipe qui gère la plateforme.',
   'nps.askWhatsappHint': 'Si vous préférez, répondez ici simplement avec le chiffre, de 0 à 10.',
-  'nps.whatsappThanks': 'Merci ! Nous avons bien reçu votre note de {score}. Pour nous dire pourquoi, répondez via le lien de l’enquête.'
+  'nps.whatsappThanks': 'Merci ! Nous avons bien reçu votre note de {score}. Pour nous dire pourquoi, répondez via le lien de l’enquête.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Offre introuvable',
+  'priceChange.notFound': 'Révision de prix introuvable',
+  'priceChange.invalidCycle': 'Le cycle doit être monthly ou annual.',
+  'priceChange.noCurrentPrice': 'Cette offre n\'a pas de prix dans ce cycle à réviser.',
+  'priceChange.invalidPrice': 'Le nouveau prix doit être supérieur à zéro.',
+  'priceChange.samePrice': 'Le nouveau prix est identique au prix actuel.',
+  'priceChange.invalidNoticeDays': 'Le préavis doit être compris entre {min} et {max} jours.',
+  'priceChange.invalidDate': 'La date d\'entrée en vigueur doit être une date valide (AAAA-MM-JJ).',
+  'priceChange.tooSoon': 'La date d\'entrée en vigueur doit être le {date} ou plus tard ({days} jours de préavis).',
+  'priceChange.tooFar': 'La date d\'entrée en vigueur ne peut pas dépasser deux ans à partir d\'aujourd\'hui.',
+  'priceChange.invalidNotify': 'L\'avis doit être activé ou désactivé (vrai ou faux).',
+  'priceChange.alreadyScheduled': 'Une révision de prix est déjà programmée pour cette offre et ce cycle, le {date}. Annulez-la avant d\'en programmer une autre.',
+  'priceChange.notScheduled': 'Cette révision de prix n\'est plus programmée.',
+  'priceChange.cycleMonthly': 'mensuel',
+  'priceChange.cycleAnnual': 'annuel',
+  'priceChange.noticeSubject': 'Révision du prix de l\'offre {plan}',
+  'priceChange.noticeBody': 'Bonjour, {provider}. Le prix de l\'offre {plan} ({cycle}) passe de {old} à {new} à partir du {date}. Les factures dont l\'échéance tombe à cette date ou après porteront le nouveau prix ; les précédentes gardent le prix actuel. Pour toute question, répondez simplement à ce message.'
 };
