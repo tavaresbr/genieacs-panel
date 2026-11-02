@@ -35,6 +35,7 @@ import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
 import { SgpPreRegistrationPanel } from '@/components/settings/sgp-preregistration-panel'
 import { TeiahPanel } from '@/components/settings/teiah-panel'
+import { AsaasPanel } from '@/components/settings/asaas-panel'
 import { FocusChatPanel } from '@/components/settings/focuschat-panel'
 import {
   SGP_CONTACTS_ANCHOR,
@@ -100,7 +101,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
-  'provider', 'general', 'virtual-params', 'customer-portal', 'integrations', 'sgp', 'teiah', 'focuschat', 'provisioning',
+  'provider', 'general', 'virtual-params', 'customer-portal', 'integrations', 'sgp', 'asaas', 'teiah', 'focuschat', 'provisioning',
   'whatsapp', 'chatbot', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
@@ -109,7 +110,7 @@ const SETTINGS_TABS = [
  * Continuam abrindo por `?tab=sgp` etc., e a trilha acende "Integrações"
  * enquanto uma delas está aberta.
  */
-const INTEGRATION_TABS = ['sgp', 'teiah', 'focuschat', 'whatsapp', 'chatbot']
+const INTEGRATION_TABS = ['sgp', 'asaas', 'teiah', 'focuschat', 'whatsapp', 'chatbot']
 
 // Botão só de ícone nas listas: 40px de alvo abaixo do desktop, onde o toque
 // precisa; no lg a linha da tabela volta ao tamanho do ícone.
@@ -1836,6 +1837,7 @@ export default function Settings() {
           <IntegrationsHub
             onOpen={setActiveTab}
             canTeiah={can('teiah.read')}
+            canAsaas={can('asaas.config')}
             canFocusChat={can('settings.write')}
             canChatbot={can('whatsapp.config')}
           />
@@ -2588,6 +2590,7 @@ export default function Settings() {
           </div>
         )}
 
+        {activeTab === 'asaas' && can('asaas.config') && <AsaasPanel />}
         {activeTab === 'teiah' && can('teiah.read') && <TeiahPanel />}
         {activeTab === 'focuschat' && can('settings.write') && <FocusChatPanel />}
 

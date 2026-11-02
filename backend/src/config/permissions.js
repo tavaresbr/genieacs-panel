@@ -81,6 +81,8 @@ export const PERMISSIONS = Object.freeze([
   'sgp.read',
   'sgp.act',
   'sgp.config',
+  // A conta Asaas do provedor: a chave da API que cobra os assinantes dele.
+  'asaas.config',
   // A TeiaH Valid. `read` é ver o que foi enviado; `act` é disparar um envio,
   // que manda endereço e dívida de ex-assinantes para fora do painel — por isso
   // fica com quem responde pelo provedor, e não com o plantão; `config` é a
@@ -176,6 +178,7 @@ const ADMIN = [
   'devices.export',
   'catalogue.write',
   'sgp.config',
+  'asaas.config',
   'teiah.act',
   'teiah.config',
   'provisioning.write',

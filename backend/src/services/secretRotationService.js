@@ -182,6 +182,13 @@ const BLOBS = Object.freeze([
     contexto: 'skygenpanel-asaas-gateway-v1'
   },
   {
+    // A conta Asaas DO PROVEDOR (a que cobra os assinantes dele), no `app_state`
+    // dele — outra conta, outra chave e outro contexto que a da plataforma acima.
+    chave: 'asaas_provider_config',
+    caminho: ['apiKey'],
+    contexto: 'skygenpanel-asaas-provider-key-v1'
+  },
+  {
     // A chave da API de IA do atendimento (Claude, OpenAI-compatível…).
     chave: 'wa_bot_config',
     caminho: ['ai', 'apiKey'],

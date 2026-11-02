@@ -8,6 +8,7 @@ interface Props {
   /** Abre a aba da integração (`sgp`, `teiah`, `whatsapp`, `chatbot`). */
   onOpen: (tab: string) => void
   canTeiah: boolean
+  canAsaas: boolean
   canFocusChat: boolean
   canChatbot: boolean
 }
@@ -24,11 +25,14 @@ interface Card {
  * tela de cada um. As telas são as mesmas de antes — só saíram da trilha de
  * abas, que já não cabia numa linha.
  */
-export function IntegrationsHub({ onOpen, canTeiah, canFocusChat, canChatbot }: Props) {
+export function IntegrationsHub({ onOpen, canTeiah, canAsaas, canFocusChat, canChatbot }: Props) {
   const { t } = useTranslation()
 
   const cards: Card[] = [
     { tab: 'sgp', icon: 'invoice', title: 'settings.tab.sgp', description: 'settings.integrations.sgpDesc' },
+    ...(canAsaas
+      ? [{ tab: 'asaas', icon: 'invoice', title: 'settings.tab.asaas', description: 'settings.integrations.asaasDesc' } as Card]
+      : []),
     ...(canTeiah
       ? [{ tab: 'teiah', icon: 'document', title: 'settings.tab.teiah', description: 'settings.integrations.teiahDesc' } as Card]
       : []),
