@@ -1,238 +1,58 @@
 {
-  "version": "1.20.0",
-  "build": 1434,
-  "sourceCommit": "188922bed5e1",
+  "version": "1.21.0",
+  "build": 1449,
+  "sourceCommit": "d83be1c00696",
   "releasedAt": "2026-11-02",
-  "basedOnTag": "v1.19.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/27abbaba882d...188922bed5e1",
+  "basedOnTag": "v1.20.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5111f28ec960...d83be1c00696",
   "changes": [
     {
-      "shortHash": "2b32165b",
-      "date": "2026-10-23",
-      "title": "Módulo SGP: opção de desvincular a conversa do contrato ou do cadastro",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "dc1541ab",
-      "date": "2026-10-23",
-      "title": "Edição de campanhas antigas com lista de contratos e traduções do Indique e ganhe",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "adddcfd6",
-      "date": "2026-10-23",
-      "title": "Indique e ganhe: tira hosts de exemplo das traduções do endereço do link",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "1d4749b4",
-      "date": "2026-10-23",
-      "title": "Histórico de alertas da plataforma, com reenvio",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "de2904b1",
-      "date": "2026-10-23",
-      "title": "Métricas mês a mês, gráficos e relatório mensal automático",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "57ea9d29",
-      "date": "2026-10-23",
-      "title": "Novo cliente com contrato pelo pré-cadastro do SGP",
+      "shortHash": "27aa1c30",
+      "date": "2026-11-02",
+      "title": "Atendimento dos donos de provedor pelo WhatsApp da plataforma",
       "category": "New"
     },
     {
-      "shortHash": "da2f1e19",
-      "date": "2026-10-23",
-      "title": "Faturas do provedor: filtros, segunda via, recibo e CSV",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "84cdc9a6",
-      "date": "2026-10-23",
-      "title": "Qualidade e limite do número oficial na Meta",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "518a474f",
-      "date": "2026-10-23",
-      "title": "Status dos modelos da Meta atualizado sozinho, com o motivo da recusa",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d90bebaa",
-      "date": "2026-10-23",
-      "title": "Editar e apagar modelos da Meta pelo painel",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "c84b8506",
-      "date": "2026-10-23",
-      "title": "Opt-out de marketing (\"parar promoções\")",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "4ced92b6",
-      "date": "2026-10-23",
-      "title": "Teste do rascunho de edição com os campos novos do status do modelo",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "fe36e895",
-      "date": "2026-10-23",
-      "title": "Alertas, métricas e segunda via: correções da revisão",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "9a7b9275",
-      "date": "2026-10-23",
-      "title": "Tira a chave a mais da junção com o main",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "6720506e",
-      "date": "2026-10-24",
-      "title": "Botão Abrir TeiaH no cartão da TeiaH, com o endereço do painel configurável",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "9eb3b0b2",
-      "date": "2026-10-24",
-      "title": "Dependências: atualiza body-parser, nodemailer e ip-address (npm audit fix, só o lockfile)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "80728bb2",
-      "date": "2026-10-28",
-      "title": "SEO, AEO e GEO (head, JSON-LD, texto sem JS, llms.txt e robôs de IA)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d04a2cff",
-      "date": "2026-10-28",
-      "title": "Lista de compartilhamento: schema.org do JSON-LD não é destino de dado",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "5b89a090",
-      "date": "2026-10-28",
-      "title": "Mensagens com botões, listas e modelos aparecem no balão; tipo desconhecido diz o nome",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "c86afa6d",
-      "date": "2026-10-28",
-      "title": "WhatsApp (iPhone): a tela não some ao digitar; a página destrava com o teclado aberto",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "8b6054c2",
-      "date": "2026-10-29",
-      "title": "Graph API da Meta passa a usar v25.0 por padrão",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "fc74615b",
-      "date": "2026-10-29",
-      "title": "Painel inicial (aba Início) com a visão geral da plataforma",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "9c4bb9b4",
-      "date": "2026-10-29",
-      "title": "Testes no navegador: Playwright, seed de demonstração e Asaas de mentira",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f38b3f6c",
-      "date": "2026-10-29",
-      "title": "Régua de cobrança configurável (0121)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "fec1c4db",
-      "date": "2026-10-29",
-      "title": "Troca de plano: o console segue a regra do provedor, com prévia",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "73519848",
-      "date": "2026-10-29",
-      "title": "Régua de cobrança: correções da revisão",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f8a0abfe",
-      "date": "2026-10-29",
-      "title": "E2e: Início, troca de plano pelo console e régua de cobrança",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "7dfd03a6",
-      "date": "2026-10-29",
-      "title": "Teste do painel Início: datas aceitas pelo MySQL",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b765a066",
-      "date": "2026-10-31",
-      "title": "Show contract login in the contacts contract list",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "88e34e8b",
-      "date": "2026-10-31",
-      "title": "Chat no celular: Voltar do sistema fecha a conversa, atualiza ao voltar ao app, alvos de toque maiores",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "efb89f80",
-      "date": "2026-10-31",
-      "title": "Chat no celular: rede de segurança contra a tela escura do teclado e modo de diagnóstico (?wadebug=1)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "e9307de7",
+      "shortHash": "ef4a015c",
       "date": "2026-11-02",
-      "title": "Show the contract login in the equipment status card",
+      "title": "Exportação para a contabilidade (XLSX/CSV, envio mensal ao contador)",
       "category": "Maintenance"
     },
     {
-      "shortHash": "fbe787e1",
+      "shortHash": "33696799",
       "date": "2026-11-02",
-      "title": "Módulo SGP: buscar pelo número do contrato e mostrar CPF/CNPJ e link do SGP no cadastro sem contrato",
+      "title": "Pesquisa de satisfação dos provedores (NPS, 0123)",
       "category": "Maintenance"
     },
     {
-      "shortHash": "39275f03",
+      "shortHash": "752ddbc3",
       "date": "2026-11-02",
-      "title": "Cut a release automatically every time CI passes on main",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "16d9d80b",
-      "date": "2026-11-02",
-      "title": "Pré-cadastro: importar listas do SGP, vendedor/técnico/CTO, login sem duplicar e plano/vencimento sugeridos",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "daa665c7",
-      "date": "2026-11-02",
-      "title": "Conexão da conta Asaas do provedor (fase 1)",
+      "title": "Reajuste de preço do plano com data de vigência (0122)",
       "category": "New"
     },
     {
-      "shortHash": "5990549a",
+      "shortHash": "a5275999",
       "date": "2026-11-02",
-      "title": "Módulo SGP: ações esperam o vínculo do contrato e o aviso diz o que fazer",
+      "title": "Revisão: reajuste, pesquisa pelo WhatsApp, bot e recibo pelo fragmento",
       "category": "Maintenance"
     },
     {
-      "shortHash": "083e21e3",
+      "shortHash": "ec52d62d",
       "date": "2026-11-02",
-      "title": "Show the contract login in the devices list",
+      "title": "E2e: reajuste agendado, exportação contábil, Satisfação, NPS e recibo públicos",
       "category": "Maintenance"
+    },
+    {
+      "shortHash": "ddcfe0e6",
+      "date": "2026-11-02",
+      "title": "Open the \"what's new\" modal with what is new",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "23028592",
+      "date": "2026-11-02",
+      "title": "Avisa a equipe quando a IA registra um interessado em contratar",
+      "category": "New"
     }
   ]
 }
