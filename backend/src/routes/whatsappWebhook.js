@@ -105,7 +105,7 @@ router.post('/', waWebhookLimiter, async (req, res) => {
     },
     {
       urlToken: tokenDaQuery(req.query),
-      credencial: credencialDoPedido(req.headers, body)
+      credencial: credencialDoPedido(req.headers)
     }
   );
   if (!autorizado) {
