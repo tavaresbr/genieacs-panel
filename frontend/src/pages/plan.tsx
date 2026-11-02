@@ -765,7 +765,7 @@ export default function PlanPage() {
             propósito: o bloco tem a própria carga, então um provedor sem
             assinatura — que é um dos que mais precisa pagar — continua vendo o
             que deve. */}
-        {/* Os add-ons pagos (0125), logo depois do plano: o que se soma a ele
+        {/* Os add-ons pagos (0126), logo depois do plano: o que se soma a ele
             na fatura. A ativação cobra a pró-rata — a lista de cobranças abaixo
             recarrega junto. */}
         <div className="mt-6">

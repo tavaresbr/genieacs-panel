@@ -204,7 +204,7 @@ class PlatformController {
       );
     }
     return res.json(createResponse('Deployment retrieved successfully', {
-      // A versão exata: saiu do `/api/health` aberto (0126) e mora aqui, atrás da sessão.
+      // A versão exata: saiu do `/api/health` aberto (0127) e mora aqui, atrás da sessão.
       version: SERVER_VERSION,
       edition: EDITION,
       database: {

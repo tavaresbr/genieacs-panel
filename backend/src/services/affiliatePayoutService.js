@@ -5,7 +5,7 @@ import { createTransfer, getTransfer } from './billing/asaasClient.js';
 import { acquireLease } from './schedulerLease.js';
 
 /**
- * O lote mensal de comissões dos afiliados (0124) e o Pix que o paga.
+ * O lote mensal de comissões dos afiliados (0125) e o Pix que o paga.
  *
  * ## A ordem, e o que cada passo trava
  *

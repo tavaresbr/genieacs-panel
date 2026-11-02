@@ -7,7 +7,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { displayDate } from '@/lib/date-format'
 
 /**
- * Os add-ons de UM provedor, no console (0125): os vivos e o histórico, e os
+ * Os add-ons de UM provedor, no console (0126): os vivos e o histórico, e os
  * dois gestos — dar de graça e revogar na hora —, sempre com motivo; o
  * servidor grava nas duas trilhas.
  */

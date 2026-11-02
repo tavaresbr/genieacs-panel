@@ -322,7 +322,7 @@ class WaBroadcastService {
       // same choice the outbox worker makes: a Settings toggle then takes
       // effect within one pass, with no lifecycle to keep in sync.
       if (!WhatsAppConfigService.isReady(config)) return summary;
-      // Sem o add-on de WhatsApp (0125), quando o catálogo o exige: as
+      // Sem o add-on de WhatsApp (0126), quando o catálogo o exige: as
       // campanhas ficam onde estão — nem as agendadas começam, nem as que
       // rodam andam — e voltam sozinhas quando ele for contratado.
       if (!(await AddonService.allows('whatsapp'))) return summary;

@@ -90,6 +90,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'Telegram 測試過多，請等待一分鐘',
   'rateLimit.platformExport': '匯出過於頻繁，請放慢速度',
   'rateLimit.sgpSync': '設備同步過於頻繁。請稍後重試。',
@@ -884,6 +891,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp 已中斷：號碼 {account} 已中斷 {minutes} 分鐘，傳給客戶的訊息無法送出。請在 設定 › WhatsApp 掃描 QR 碼重新連線{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新連線：號碼 {account} 恢復正常',
   'whatsapp.alerts.metaQualityDropped': "官方號碼 {account} 在 Meta 的狀況變差：{changes}。請查看 設定 › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "品質 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "每日上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "狀態 {to}",
@@ -1389,7 +1398,7 @@ export default {
   'auth.passwordMatchesIdentity': '密碼不能與使用者名稱或電子郵件相同。',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': '面板',
   'status.component.payments': '付款',
   'status.component.whatsapp': 'WhatsApp',
@@ -1403,7 +1412,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] 維護已完成：{title}',
   'status.notice.maintenanceDoneBody': '{provider}，您好。{components} 的計畫維護（{title}）已完成。',
   'status.notice.follow': '請在狀態頁面查看：{link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': '電子郵件或密碼無效',
   'affiliate.loginSuccess': '已登入',
   'affiliate.sessionRequired': '請登入推廣夥伴入口',

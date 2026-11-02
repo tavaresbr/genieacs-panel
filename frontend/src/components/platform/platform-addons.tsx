@@ -8,7 +8,7 @@ import { formatMoney } from '@/lib/money'
 import { EMPTY_ADDON_FORM, addonFormOf, addonPayloadFrom, type AddonForm } from '@/lib/addons'
 
 /**
- * O catálogo de add-ons pagos no console (0125), na aba Planos: criar, mudar
+ * O catálogo de add-ons pagos no console (0126), na aba Planos: criar, mudar
  * o preço e as portas, ligar a exigência (`gated`) e apagar o que nunca foi
  * contratado. Código, tipo, recurso e teto ficam fixos depois de criados.
  *

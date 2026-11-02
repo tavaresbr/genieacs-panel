@@ -14,4 +14,10 @@ router.get('/config', authenticateToken, requirePermission('asaas.config'), Asaa
 router.put('/config', authenticateToken, requirePermission('asaas.config'), AsaasProviderController.updateConfig);
 router.post('/test', authenticateToken, requirePermission('asaas.config'), asaasAdminLimiter, AsaasProviderController.testConnection);
 
+// As rotas da importação ficam com `asaas.config`, como a conexão: ainda não há
+// quem leia estes dados fora da tela de configuração. Quando o bot e a ficha os
+// usarem, `asaas.read` e `asaas.act` entram para o plantão.
+router.get('/import', authenticateToken, requirePermission('asaas.config'), AsaasProviderController.getImport);
+router.post('/import/sync', authenticateToken, requirePermission('asaas.config'), asaasAdminLimiter, AsaasProviderController.startImport);
+
 export default router;

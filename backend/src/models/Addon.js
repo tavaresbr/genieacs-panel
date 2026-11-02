@@ -2,7 +2,7 @@ import { getDb, insertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
 
 /**
- * O catálogo de add-ons pagos (0125) — ver `services/addonService.js`.
+ * O catálogo de add-ons pagos (0126) — ver `services/addonService.js`.
  *
  * Lido fora de `tdb`, pelo motivo de `plans` e `coupons`: não tem `tenant_id`
  * porque é do deploy inteiro — o provedor contrata O add-on `whatsapp`, não
@@ -65,7 +65,7 @@ class Addon {
 
   /**
    * Quantos provedores PERDERIAM o recurso de cada add-on de recurso se a
-   * porta dele fosse ligada agora (0125): os provedores ativos, com
+   * porta dele fosse ligada agora (0126): os provedores ativos, com
    * assinatura viva, que não têm nenhum add-on vivo daquele recurso — fora a
    * caixa da plataforma e os isentos de cobrança (que a porta não fecha), e
    * fora quem está em teste quando o add-on dá acesso no teste. É a conta do

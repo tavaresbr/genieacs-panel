@@ -60,7 +60,7 @@ async function copiar(texto: string) {
 }
 
 /**
- * A aba Afiliados do console (0124): o cadastro e a aprovação de quem divulga
+ * A aba Afiliados do console (0125): o cadastro e a aprovação de quem divulga
  * o produto, os padrões do programa, e o fechamento mensal — o lote que o
  * agendador monta, que alguém daqui revisa e aprova, e só então manda o Pix.
  */

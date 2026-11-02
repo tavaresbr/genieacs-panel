@@ -1,4 +1,5 @@
 import AsaasProviderService, { AsaasProviderError } from '../services/asaasProviderService.js';
+import AsaasImportService from '../services/asaasImportService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -32,7 +33,11 @@ class AsaasProviderController {
         enabled: body.enabled,
         environment: body.environment,
         // Ausente mantém a chave guardada; "" apaga e desliga a integração.
-        apiKey: body.apiKey
+        apiKey: body.apiKey,
+        importCustomers: body.importCustomers,
+        importCharges: body.importCharges,
+        syncEnabled: body.syncEnabled,
+        syncIntervalHours: body.syncIntervalHours
       });
       return res.json(createResponse(req.t('asaas.configSaved'), config));
     } catch (error) {
@@ -53,6 +58,27 @@ class AsaasProviderController {
       return res.json(createResponse(message, result));
     } catch (error) {
       return handleError(req, res, error, 'asaas.connectionTestFailed');
+    }
+  }
+
+  static async getImport(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('asaas.importLoaded'),
+        await AsaasImportService.getStatus()
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'asaas.importLoadFailed');
+    }
+  }
+
+  /** Inicia a importação e responde na hora: ela segue no fundo e a tela pergunta o andamento. */
+  static async startImport(req, res) {
+    try {
+      await AsaasImportService.start();
+      return res.status(202).json(createResponse(req.t('asaas.importStarted'), { started: true }));
+    } catch (error) {
+      return handleError(req, res, error, 'asaas.importStartFailed');
     }
   }
 }

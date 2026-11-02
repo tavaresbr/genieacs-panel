@@ -6,6 +6,8 @@ import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
 import SgpContactSyncService from './sgpContactSyncService.js';
 import TeiahService from './teiahService.js';
+import AsaasProviderService from './asaasProviderService.js';
+import AsaasImportService from './asaasImportService.js';
 import TeiahExportService from './teiahExportService.js';
 import WaDunningService from './waDunningService.js';
 import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
@@ -228,13 +230,13 @@ class SchedulerService {
       .then(() => PlanPriceChangeService.schedulerPass().catch((error) => {
         console.warn(`Could not run the plan price changes: ${error.message}`);
       }))
-      // A página de status (0126): as verificações de minuto em minuto, a
+      // A página de status (0127): as verificações de minuto em minuto, a
       // manutenção vencida encerrada e o aviso aos provedores. Fora do laço
       // por provedor — é do serviço, não de um deles. Nunca lança.
       .then(() => StatusService.schedulerPass().catch((error) => {
         console.warn(`Could not run the status checks: ${error.message}`);
       }))
-      // Os lotes mensais dos afiliados (0124): nos dias 1 a 3 monta (nunca
+      // Os lotes mensais dos afiliados (0125): nos dias 1 a 3 monta (nunca
       // aprova nem envia), e acompanha os Pix enviados. Acima dos provedores,
       // no máximo uma passada por hora. Nunca lança.
       .then(() => AffiliatePayoutService.schedulerPass().catch((error) => {
@@ -445,6 +447,24 @@ class SchedulerService {
     ) {
       summary.provisioning = await ProvisioningService.processDue({});
       await this.writeState({ lastProvisioningAt: new Date().toISOString() });
+    }
+
+    // Os clientes e as cobranças da conta Asaas do provedor. Mesma forma da
+    // sincronização de contatos do SGP: o relógio anda ANTES da passada, que
+    // segue no fundo, e o bloqueio do próprio serviço recusa a sobreposição com
+    // o botão das Configurações.
+    const asaasConfig = await AsaasProviderService.getConfig();
+    if (
+      AsaasProviderService.isReady(asaasConfig)
+      && asaasConfig.syncEnabled
+      && (asaasConfig.importCustomers || asaasConfig.importCharges)
+      && this.due(state.lastAsaasImportAt, asaasConfig.syncIntervalHours * 3_600_000)
+    ) {
+      await this.writeState({ lastAsaasImportAt: new Date().toISOString() });
+      summary.asaasImport = 'started';
+      void AsaasImportService.syncAll().catch((error) => {
+        console.warn(`Asaas import failed: ${error.code || error.message}`);
+      });
     }
 
     const sgpConfig = await SgpService.getConfig();

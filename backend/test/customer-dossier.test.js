@@ -81,6 +81,14 @@ before(async () => {
       client_name: 'Fulana de Tal',
       phone_e164: '5511999990000'
     });
+    // A mesma pessoa na conta Asaas do provedor, casada pelo CPF/CNPJ.
+    await tinsertReturningId('asaas_customers', {
+      asaas_id: 'cus_dossie', document: '52998224725', name: 'Fulana de Tal'
+    });
+    await tinsertReturningId('asaas_charges', {
+      asaas_id: 'pay_dossie', customer_asaas_id: 'cus_dossie', document: '52998224725',
+      status: 'OVERDUE', value_cents: 12000, due_date: '2026-10-01'
+    });
     await tinsertReturningId('customer_wifi_credentials', {
       account_id: conta.id,
       wifi_index: 0,
@@ -98,6 +106,10 @@ before(async () => {
   await runInTenant(vizinho, () => tinsertReturningId('device_samples', {
     device_id: 'ONT-ATUAL', inform_at: new Date(), rx_power: -99.9
   }));
+  // O vizinho tem um cliente Asaas com o MESMO CPF: não pode entrar no meu dossiê.
+  await runInTenant(vizinho, () => tinsertReturningId('asaas_customers', {
+    asaas_id: 'cus_vizinho', document: '52998224725', name: 'Homônimo do vizinho'
+  }));
 });
 
 after(async () => {
@@ -113,6 +125,12 @@ describe('o dossiê reúne o que está espalhado', () => {
     assert.equal(arquivo.data.sgp_links.length, 1);
     assert.equal(arquivo.data.sgp_links[0].contract, 'CONTRATO-1');
     assert.equal(arquivo.data.customer_wifi_credentials.length, 1);
+  });
+
+  it('e o cliente e a cobrança da mesma pessoa na conta Asaas, sem o do vizinho', async () => {
+    const arquivo = await dossie();
+    assert.deepEqual(arquivo.data.asaas_customers.map((c) => c.asaas_id), ['cus_dossie']);
+    assert.deepEqual(arquivo.data.asaas_charges.map((c) => c.asaas_id), ['pay_dossie']);
   });
 
   /**

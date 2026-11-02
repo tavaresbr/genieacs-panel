@@ -4,6 +4,7 @@ import WaBotConfigService, { chaveParaNovoEndereco, mesmoEnderecoIa } from './wa
 import WaConversationService from './waConversationService.js';
 import WaSendService from './waSendService.js';
 import WaTagService from './waTagService.js';
+import WaAlertService from './waAlertService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import WaAiClient from './waAiClient.js';
 import AddonService from './addonService.js';
@@ -215,7 +216,7 @@ class WaAiService {
    * @returns {Promise<{replied: true, intent: string, from?: string}|null>}
    */
   static async atender({ conversation, texto }) {
-    // O add-on de IA (0125), quando o catálogo o exige: sem ele a mensagem
+    // O add-on de IA (0126), quando o catálogo o exige: sem ele a mensagem
     // segue pelo menu, como com a IA desligada.
     if (!(await AddonService.allows('ai'))) return null;
     let ai;
@@ -402,6 +403,8 @@ class WaAiService {
   /** O contrato da conversa, pelo cadastro ou pelo que já foi ligado nela. */
   static async linkDe(conversation) {
     if (conversation.contract) return { contract: conversation.contract, device_id: conversation.device_id ?? null };
+    // Desvinculada à mão pelo atendente: o telefone não a liga de novo.
+    if (conversation.unlinked_at) return null;
     try {
       const { link } = await WaConversationService.resolveSubscriber(conversation.wa_phone_e164);
       if (link) {
@@ -561,6 +564,12 @@ class WaAiService {
       conversationId: conversation.id, body: linhas.join('\n'), isNote: true, userId: null, source: 'bot'
     });
     await WaTagService.tagSales(conversation.id);
+    // Avisa a equipe pelos canais dos alertas (WhatsApp, e-mail, Telegram), se ligados. Não lança.
+    await WaAlertService.notifyEvent({
+      rule: 'wa_lead',
+      subject: conversation.id,
+      vars: { name: nome, plan: plano || '—', area: endereco || '—', phone: conversation.wa_phone_e164 ?? '—' }
+    });
     return { transferir: true, texto: null, intent: 'lead', paraModelo: 'Interesse registrado.' };
   }
 

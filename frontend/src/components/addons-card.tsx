@@ -12,7 +12,7 @@ import {
 } from '@/lib/addons'
 
 /**
- * Os add-ons pagos na tela de Plano (0125): um cartão por add-on, com o
+ * Os add-ons pagos na tela de Plano (0126): um cartão por add-on, com o
  * preço do ciclo de agora, o estado e o botão — ativar (com a prévia do que
  * sai na hora), cancelar na renovação, ou reativar antes dela. A regra é do
  * servidor; a confirmação só diz, antes do clique, o que ele vai cobrar.

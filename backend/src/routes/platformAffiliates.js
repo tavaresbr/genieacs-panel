@@ -3,7 +3,7 @@ import AffiliateController from '../controllers/affiliateController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
- * O programa de afiliados (0124) visto do console: o cadastro, a aprovação e
+ * O programa de afiliados (0125) visto do console: o cadastro, a aprovação e
  * os lotes mensais. Ids de tabelas da plataforma (`affiliates`,
  * `affiliate_payouts`), sem provedor a alcançar.
  */

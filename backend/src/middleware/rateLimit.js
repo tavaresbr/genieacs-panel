@@ -685,7 +685,7 @@ export const usernameChangeLimiter = limiter({
 });
 
 /**
- * O portal do afiliado (0124): o login e o link de definir senha. Por
+ * O portal do afiliado (0125): o login e o link de definir senha. Por
  * endereço — não há provedor no ápice —, apertado como o login do painel; a
  * trava por conta (`AccountLockout`) segura quem distribui os palpites.
  */

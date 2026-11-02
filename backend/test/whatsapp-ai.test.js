@@ -17,6 +17,7 @@ const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount
 const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
 const { default: WaAiService } = await import('../src/services/waAiService.js');
 const { default: WaBotService } = await import('../src/services/waBotService.js');
+const { default: WaAlertService } = await import('../src/services/waAlertService.js');
 
 /**
  * O atendimento por IA: a IA fala dentro das travas do bot, só sabe da conta
@@ -474,6 +475,28 @@ describe('a IA atendendo', () => {
       assert.equal(eventos.length, 1);
     });
 
+    it('avisa a equipe pelos canais dos alertas, e uma falha do aviso não derruba o registro', async () => {
+      const original = WaAlertService.notifyEvent;
+      const avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+      try {
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'Oi!' }];
+        await receber(DESCONHECIDO, 'oi');
+        const conversation = await conversaDe(DESCONHECIDO);
+        const r = await asTenant(() => WaAiService.registrarInteresse({
+          conversation, dados: { nome: 'Carlos', plano: '300 Mega', endereco: 'Aeroporto' }
+        }));
+        assert.equal(r.intent, 'lead');
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_lead');
+        assert.deepEqual(avisos[0].vars, { name: 'Carlos', plan: '300 Mega', area: 'Aeroporto', phone: DESCONHECIDO });
+        const texto = WaAlertService.compose({ rule: 'wa_lead', vars: avisos[0].vars }, false);
+        assert.match(texto, /Carlos/);
+        assert.match(texto, /300 Mega/);
+      } finally { WaAlertService.notifyEvent = original; }
+    });
+
     it('sem nome não registra; registrado uma vez, não repete em 24 h', async () => {
       await limparFio(DESCONHECIDO);
       roteiro = [{ content: 'Oi!' }];
@@ -505,6 +528,32 @@ describe('a IA atendendo', () => {
         await asTenant(() => WaBotConfigService.saveConfig({ ai: { sales: true } }));
       }
     });
+  });
+
+  it('crédito da IA acabou: avisa a equipe uma vez a cada 6 h, e só para essa falha', async () => {
+    const original = WaAlertService.notifyEvent;
+    const avisos = [];
+    WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    try {
+      await asTenant(() => getDb()('app_state').where({ key: 'wa_ai_credit_alert_at' }).del());
+      await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized'));
+      assert.equal(avisos.length, 0, 'outra falha não avisa');
+      await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance', 'HTTP 400'));
+      await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance', 'HTTP 400'));
+      assert.equal(avisos.length, 1, 'repetida dentro de 6 h não avisa de novo');
+      assert.equal(avisos[0].rule, 'wa_ai_no_credit');
+      assert.match(avisos[0].vars.provider, /127\.0\.0\.1|Claude/);
+      const texto = WaAlertService.compose({ rule: 'wa_ai_no_credit', vars: avisos[0].vars }, false);
+      assert.match(texto, /sem crédito/);
+      // Passadas as 6 h, avisa de novo.
+      await asTenant(() => getDb()('app_state').where({ key: 'wa_ai_credit_alert_at' })
+        .update({ value: new Date(Date.now() - 7 * 3600 * 1000).toISOString() }));
+      await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance'));
+      assert.equal(avisos.length, 2);
+    } finally {
+      WaAlertService.notifyEvent = original;
+      await asTenant(() => WaBotConfigService.recordAiError(null));
+    }
   });
 
   it('a fatura: o texto da IA e o PIX literal do SGP', async () => {
@@ -569,6 +618,15 @@ describe('a IA atendendo', () => {
     assert.ok(resposta, 'o cliente não fica sem resposta');
     const lido = await api('/bot-config');
     assert.equal(lido.body.data.ai.lastError.code, 'ai_bad_response');
+  });
+});
+
+describe('a conversa que o atendente desvinculou', () => {
+  it('a IA não a reconhece pelo telefone', async () => {
+    const reconhecida = await asTenant(() => WaAiService.linkDe({ id: 1, wa_phone_e164: ASSINANTE }));
+    assert.ok(reconhecida, 'sem a marca, o telefone do assinante o identifica');
+    const desvinculada = await asTenant(() => WaAiService.linkDe({ id: 1, wa_phone_e164: ASSINANTE, unlinked_at: new Date() }));
+    assert.equal(desvinculada, null);
   });
 });
 

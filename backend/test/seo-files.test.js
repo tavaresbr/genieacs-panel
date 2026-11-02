@@ -169,7 +169,7 @@ describe('o sitemap.xml', () => {
     // sessão; `*` é o redirecionamento. `/nps` é a pesquisa de satisfação dos
     // provedores (0123), aberta só pelo link com token: nada a indexar. E
     // `/receipt` é o recibo do link do bot da plataforma, também só pelo token.
-    // Nenhuma é página. `/afiliados` é o portal do afiliado (0124), atrás do
+    // Nenhuma é página. `/afiliados` é o portal do afiliado (0125), atrás do
     // login próprio dele: nada a indexar.
     const NAO_E_PAGINA = new Set(['/impersonate', '/platform', '/nps', '/receipt', '/afiliados', '*']);
     const naoClassificadas = [...rotasDoConsole()]

@@ -13,7 +13,7 @@ import { settingsAPI, statusAPI, type OnboardingStatus } from '@/lib/api'
 
 /**
  * O que `GET /api/health` responde. Rota pública, fora do envelope `{ success, data }`.
- * Sem a versão desde a página de status (0126): ela vem de `GET /api/version`,
+ * Sem a versão desde a página de status (0127): ela vem de `GET /api/version`,
  * que pede sessão.
  */
 interface Health {

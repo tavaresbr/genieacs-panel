@@ -4,11 +4,13 @@ import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { AI_DEFAULT_BASE_URL, AI_DEFAULT_MODEL, normalizeAiBaseUrl } from './waAiClient.js';
-import { AI_PROVIDERS, AI_PROVIDER_OPENAI, aiProviderOrDefault, isAiProvider } from './waAiAdapters.js';
+import { AI_PROVIDERS, AI_PROVIDER_ANTHROPIC, AI_PROVIDER_OPENAI, aiProviderOrDefault, isAiProvider } from './waAiAdapters.js';
 
 /** A chave da IA, cifrada num contexto só dela. */
 const aiKeyBox = createSecretBox('skygenpanel-wa-ai-key-v1');
 const AI_ERROR_KEY = 'wa_ai_last_error';
+const AI_CREDIT_ALERT_KEY = 'wa_ai_credit_alert_at';
+const AI_CREDIT_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const AI_INSTRUCTIONS_MAX = 4000;
 const AI_MODEL_MAX = 64;
 
@@ -331,6 +333,33 @@ class WaBotConfigService {
       await AppState.upsert(AI_ERROR_KEY, JSON.stringify(valor));
     } catch {
       // A tela perder o último erro é melhor que o bot perder a resposta.
+    }
+    if (code === 'ai_no_balance') await this.alertarSemCredito();
+  }
+
+  /**
+   * Avisa a equipe (canais dos alertas) que o crédito da IA acabou. No máximo
+   * um aviso a cada 6 horas: cada mensagem de cliente repetiria a falha, e a
+   * equipe não precisa de um alerta para cada uma. Nunca lança.
+   */
+  static async alertarSemCredito() {
+    try {
+      const ultimo = Date.parse((await AppState.get(AI_CREDIT_ALERT_KEY)) || '');
+      if (Number.isFinite(ultimo) && Date.now() - ultimo < AI_CREDIT_ALERT_INTERVAL_MS) return;
+      // Antes de enviar: duas falhas ao mesmo tempo não mandam dois avisos.
+      await AppState.upsert(AI_CREDIT_ALERT_KEY, new Date().toISOString());
+      const { ai } = await this.getConfig();
+      const provider = aiProviderOrDefault(ai.provider) === AI_PROVIDER_ANTHROPIC
+        ? 'Claude (Anthropic)'
+        : (() => { try { return new URL(ai.baseUrl).hostname; } catch { return ai.baseUrl; } })();
+      const { default: WaAlertService } = await import('./waAlertService.js');
+      await WaAlertService.notifyEvent({
+        rule: 'wa_ai_no_credit',
+        subject: 'ai',
+        vars: { provider, link: await WaAlertService.chatbotLink().catch(() => '') }
+      });
+    } catch (error) {
+      console.warn(`IA sem crédito: aviso não enviado: ${error?.message || error}`);
     }
   }
 

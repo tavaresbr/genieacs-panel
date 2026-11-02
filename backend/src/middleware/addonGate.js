@@ -2,7 +2,7 @@ import AddonService from '../services/addonService.js';
 import { authenticateToken } from './auth.js';
 
 /**
- * A porta dos add-ons pagos (0125): `requireAddon('whatsapp')` na frente de
+ * A porta dos add-ons pagos (0126): `requireAddon('whatsapp')` na frente de
  * um grupo de rotas recusa com 402 `addon_required` o provedor que não tem o
  * add-on daquele recurso.
  *

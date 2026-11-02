@@ -14,7 +14,7 @@ import { formatMoney } from '@/lib/money'
 const brl = (cents: number) => formatMoney(cents, 'BRL')
 
 /**
- * O portal do afiliado (0124), em `/afiliados` no endereço da plataforma.
+ * O portal do afiliado (0125), em `/afiliados` no endereço da plataforma.
  *
  * Sessão própria — cookie httpOnly do portal, nunca o token do painel ou do
  * console que este navegador tenha guardado (`affiliatePortalAPI`). Três

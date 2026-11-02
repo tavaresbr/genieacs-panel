@@ -81,6 +81,20 @@ class AuditLog {
     // Uma mensagem foi apagada (do painel, ou para todos no WhatsApp) ou recebeu reação.
     // Uma conversa foi desvinculada do contrato ou do cadastro do SGP.
     WHATSAPP_SUBSCRIBER_UNLINKED: 'whatsapp.subscriber_unlinked',
+    // Ações do operador no WhatsApp que mexem com o que o cliente recebe ou com a
+    // conta: quem fez, o quê e em qual objeto. Nunca o texto da mensagem, o
+    // telefone, o token nem a chave (ver cada controlador).
+    WHATSAPP_SUBSCRIBER_BOUND: 'whatsapp.subscriber_bound',
+    WHATSAPP_OPERATOR_UNLOCK: 'whatsapp.operator_unlock',
+    WHATSAPP_TICKET_OPENED: 'whatsapp.ticket_opened',
+    WHATSAPP_CONTRACT_PHONE_SAVED: 'whatsapp.contract_phone_saved',
+    WHATSAPP_DUNNING_RESUMED: 'whatsapp.dunning_resumed',
+    WHATSAPP_DUNNING_RUN: 'whatsapp.dunning_run',
+    WHATSAPP_BROADCAST_STATUS: 'whatsapp.broadcast_status',
+    WHATSAPP_TEMPLATE_CHANGED: 'whatsapp.template_changed',
+    WHATSAPP_META_SETTINGS_SAVED: 'whatsapp.meta_settings_saved',
+    WHATSAPP_CONFIG_SAVED: 'whatsapp.config_saved',
+    WHATSAPP_ACCOUNT_CHANGED: 'whatsapp.account_changed',
     WHATSAPP_MESSAGE_DELETED: 'whatsapp.message_deleted',
     WHATSAPP_MESSAGE_REACTED: 'whatsapp.message_reacted',
     // A Meta decidiu sobre um modelo (aprovou, recusou, pausou, desativou) e a

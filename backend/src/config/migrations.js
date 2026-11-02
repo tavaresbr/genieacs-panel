@@ -2688,6 +2688,94 @@ const INITIAL_TABLES = [
 ];
 
 /**
+ * Os clientes da conta Asaas DO PROVEDOR (0124), importados para o painel.
+ *
+ * Tabela própria, e não linhas em `sgp_contacts`: aquela é chaveada por contrato
+ * e por cliente do SGP, e tudo que a conversa do WhatsApp, a ficha e o vínculo
+ * com a ONT pendura nela depende dessas duas chaves. O Asaas não tem contrato,
+ * então o encontro entre as duas fontes é pelo CPF/CNPJ (`document`, só dígitos)
+ * — e é uma leitura, não uma fusão: nada aqui reescreve o cadastro do SGP.
+ *
+ *   asaas_id            o `cus_…` do gateway; único por provedor.
+ *   document            CPF/CNPJ só com dígitos; nulo quando o cliente não tem.
+ *   phone_e164          o celular (ou o fixo) normalizado, para casar com a conversa.
+ *   deleted             o gateway marca o cliente removido; a linha fica.
+ *   last_seen_at        a última passada que o viu: o que não aparece mais está velho.
+ */
+const asaasCustomersTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('asaas_id', 32).notNullable();
+  t.string('document', 32);
+  t.string('name', 255);
+  t.string('email', 255);
+  t.string('phone', 32);
+  t.string('mobile_phone', 32);
+  t.string('phone_e164', 24);
+  t.string('postal_code', 16);
+  t.string('address', 255);
+  t.string('address_number', 32);
+  t.string('complement', 255);
+  t.string('province', 255);
+  t.string('city', 255);
+  t.string('state', 8);
+  t.string('external_reference', 128);
+  t.boolean('deleted').notNullable().defaultTo(false);
+  t.timestamp('last_seen_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'asaas_id'], 'asaas_customers_asaas_uq');
+  t.index(['tenant_id', 'document'], 'asaas_customers_document_idx');
+  t.index(['tenant_id', 'phone_e164'], 'asaas_customers_phone_idx');
+};
+
+/**
+ * As cobranças da conta Asaas do provedor (0124): as em aberto (`PENDING`,
+ * `OVERDUE`) e o que já foi aberto aqui e depois pago ou cancelado.
+ *
+ * `document` é o CPF/CNPJ do cliente, copiado para a linha: é por ele que o
+ * dossiê do titular e a exclusão alcançam a cobrança, e é por ele que a fatura
+ * do Asaas encontra o assinante do SGP. A linha digitável e o Pix NÃO são
+ * guardados — mudam, expiram e se pedem ao gateway na hora de usar.
+ *
+ *   value_cents   o valor em centavos, o ponto único de conversão das cobranças.
+ *   due_date      o vencimento (`YYYY-MM-DD`).
+ *   last_seen_at  a última passada que a viu aberta.
+ */
+const asaasChargesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('asaas_id', 32).notNullable();
+  t.string('customer_asaas_id', 32);
+  t.string('document', 32);
+  t.string('status', 32);
+  t.string('billing_type', 32);
+  t.bigInteger('value_cents');
+  t.string('due_date', 10);
+  t.string('payment_date', 10);
+  t.string('description', 500);
+  t.string('invoice_url', 512);
+  t.string('bank_slip_url', 512);
+  t.string('invoice_number', 32);
+  t.string('external_reference', 128);
+  t.boolean('deleted').notNullable().defaultTo(false);
+  t.timestamp('last_seen_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'asaas_id'], 'asaas_charges_asaas_uq');
+  t.index(['tenant_id', 'document'], 'asaas_charges_document_idx');
+  t.index(['tenant_id', 'customer_asaas_id'], 'asaas_charges_customer_idx');
+  t.index(['tenant_id', 'status', 'due_date'], 'asaas_charges_status_idx');
+};
+
+const ASAAS_IMPORT_TABLES = [
+  ['asaas_customers', asaasCustomersTable],
+  ['asaas_charges', asaasChargesTable]
+];
+
+/**
  * Os lembretes de cobrança que a plataforma mandou ao provedor — ver
  * `subscriptionNoticeService.js` (migração 0092).
  *
@@ -3157,7 +3245,7 @@ const PLATFORM_NPS_TABLES = [
 ];
 
 /**
- * O programa de afiliados (0124) — ver `services/affiliateService.js` e
+ * O programa de afiliados (0125) — ver `services/affiliateService.js` e
  * `services/affiliatePayoutService.js`.
  *
  * `tenants.referred_by_affiliate_id` é o afiliado que trouxe o provedor (o
@@ -3212,7 +3300,7 @@ const affiliatesTable = (db) => (t) => {
 };
 
 /**
- * O lote mensal de um afiliado (0124): um por afiliado e período
+ * O lote mensal de um afiliado (0125): um por afiliado e período
  * (`affiliate_id, period` único — o agendador e o botão do console montam o
  * mesmo lote uma vez só). Nada sai do gateway sem a aprovação gravada aqui.
  *
@@ -3259,7 +3347,7 @@ const affiliatePayoutsTable = (db) => (t) => {
 };
 
 /**
- * A comissão (0124): uma linha por pagamento do provedor indicado
+ * A comissão (0125): uma linha por pagamento do provedor indicado
  * (`payment_ref` único — a referência do pagamento no gateway), gravada NA
  * TRANSAÇÃO do pagamento. `clawback` é o estorno de uma comissão que já foi
  * para um lote: valor negativo, `<referência>:refund`, abatido do próximo.
@@ -3296,7 +3384,7 @@ const affiliateCommissionsTable = (db) => (t) => {
 };
 
 /**
- * O retrato da chave Pix na aprovação, para a base que já rodou a 0124 antes
+ * O retrato da chave Pix na aprovação, para a base que já rodou a 0125 antes
  * de ele existir (o desenvolvimento): a tabela nova já nasce com ele.
  */
 const AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS = [
@@ -3311,7 +3399,7 @@ const AFFILIATE_TABLES = [
 ];
 
 /**
- * A página de status da plataforma (0126) — ver `services/statusService.js`.
+ * A página de status da plataforma (0127) — ver `services/statusService.js`.
  *
  *   status_checks            uma linha por verificação automática, a cada
  *                            minuto, de cada componente (panel, payments,
@@ -3410,7 +3498,7 @@ const STATUS_PAGE_TABLES = [
 ];
 
 /**
- * Os add-ons pagos (0125) — ver `services/addonService.js`.
+ * Os add-ons pagos (0126) — ver `services/addonService.js`.
  *
  * `addons` é o CATÁLOGO, da plataforma, como `plans` e `coupons`:
  *
@@ -3542,6 +3630,7 @@ export const SCHEMA_TABLES = [
   ...WA_MARKETING_OPT_OUT_TABLES,
   ...PLAN_PRICE_CHANGE_TABLES,
   ...PLATFORM_NPS_TABLES,
+  ...ASAAS_IMPORT_TABLES,
   ...AFFILIATE_TABLES,
   ...ADDON_TABLES,
   ...STATUS_PAGE_TABLES
@@ -7182,10 +7271,26 @@ export const migrations = [
   },
   {
     /**
+     * Os clientes e as cobranças da conta Asaas do provedor — ver
+     * `asaasCustomersTable` e `asaasChargesTable`.
+     */
+    id: '0124_asaas_import',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return (await db.schema.hasTable('asaas_customers')) && (await db.schema.hasTable('asaas_charges'));
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'asaas_customers', asaasCustomersTable(db));
+      await createTableIfMissing(db, 'asaas_charges', asaasChargesTable(db));
+    }
+  },
+  {
+    /**
      * O programa de afiliados — ver `TENANT_AFFILIATE_COLUMNS` e
      * `AFFILIATE_TABLES`.
      */
-    id: '0124_affiliates',
+    id: '0126_affiliates',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       if ((await missingColumns(db, 'tenants', TENANT_AFFILIATE_COLUMNS)).length) return false;
@@ -7217,7 +7322,7 @@ export const migrations = [
   },
   {
     /** Os add-ons pagos — ver `ADDON_TABLES`. */
-    id: '0125_addons',
+    id: '0127_addons',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       for (const [name] of ADDON_TABLES) {
@@ -7234,7 +7339,7 @@ export const migrations = [
   },
   {
     /** A página de status da plataforma — ver `STATUS_PAGE_TABLES`. */
-    id: '0126_status_page',
+    id: '0127_status_page',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       for (const [name] of STATUS_PAGE_TABLES) {

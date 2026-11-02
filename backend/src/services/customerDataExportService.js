@@ -224,6 +224,17 @@ export async function alcanceDoAssinante(account) {
       .orderBy('id')
     : [];
 
+  // O mesmo CPF/CNPJ na conta Asaas do provedor: o cliente e as cobranças dele.
+  // Casam pelo documento — o Asaas não tem contrato —, e a cobrança leva o
+  // documento copiado para a linha justamente para este alcance.
+  const documentosDaPessoa = [...new Set([...documentosCliente, ...clientes.map((c) => c.document)].filter(Boolean))];
+  const asaasClientes = documentosDaPessoa.length
+    ? await tdb('asaas_customers').whereIn('document', documentosDaPessoa).orderBy('id')
+    : [];
+  const asaasCobrancas = documentosDaPessoa.length
+    ? await tdb('asaas_charges').whereIn('document', documentosDaPessoa).orderBy('id')
+    : [];
+
   return {
     deviceIds,
     posses,
@@ -236,7 +247,9 @@ export async function alcanceDoAssinante(account) {
     clientes,
     // Os documentos da pessoa, também pelo cadastro: o que a TeiaH respondeu
     // sobre eles (`teiah_consultations`) é dela.
-    documentos: [...new Set([...documentosCliente, ...clientes.map((c) => c.document)].filter(Boolean))],
+    documentos: documentosDaPessoa,
+    asaasClientes,
+    asaasCobrancas,
     conversas,
     conversaIds: conversas.map((c) => c.id),
     eventos,
@@ -378,7 +391,7 @@ class CustomerDataExportService {
 
     const {
       deviceIds, naPosse, emPosseAgora, contratos, telefones: todosTelefones, vinculos, contatos,
-      clientes, documentos, conversas, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
+      clientes, documentos, asaasClientes, asaasCobrancas, conversas, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
     } = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -406,6 +419,9 @@ class CustomerDataExportService {
     guardar('teiah_consultations', documentos.length
       ? await tdb('teiah_consultations').whereIn('document', documentos).orderBy('id')
       : []);
+    // O cliente e as cobranças da mesma pessoa na conta Asaas do provedor.
+    guardar('asaas_customers', asaasClientes);
+    guardar('asaas_charges', asaasCobrancas);
     guardar('device_swaps', trocas);
 
     // O perfil é a data de instalação do aparelho, não um dado do período.

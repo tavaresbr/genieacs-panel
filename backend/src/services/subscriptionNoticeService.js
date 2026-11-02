@@ -260,7 +260,7 @@ class SubscriptionNoticeService {
   /** A fatura de pró-rata vencida mais antiga, emitida no gateway — ou nada. */
   static async overdueProration() {
     const linha = await tdb('billing_charges')
-      // A pró-rata da ativação de um add-on (0125) também.
+      // A pró-rata da ativação de um add-on (0126) também.
       .whereIn('kind', ['proration', 'addon'])
       .whereIn('status', OPEN_CHARGE_STATUSES)
       .whereNotNull('gateway_charge_id')

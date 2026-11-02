@@ -17,7 +17,7 @@ router.put('/config', authenticateToken, requirePermission('whatsapp.config'), W
 // A aba Chatbot: o que o atendimento automático diz e quando.
 router.get('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getBotConfig);
 router.put('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateBotConfig);
-// A IA (0125): atrás do add-on `ai` quando o catálogo o exige.
+// A IA (0126): atrás do add-on `ai` quando o catálogo o exige.
 router.post('/bot-config/ai-test', authenticateToken, requirePermission('whatsapp.config'), requireAddon('ai'), WhatsAppController.testBotAi);
 router.post('/bot-config/ai-improve-message', authenticateToken, requirePermission('whatsapp.config'), requireAddon('ai'), WhatsAppController.improveBotMessage);
 // "Parar promoções": as palavras que o cliente manda e o que o painel responde.

@@ -851,7 +851,7 @@ export const authAPI = {
     planCode?: string; taxId?: string; phone?: string; legalName?: string; city?: string; state?: string
     /** O código do link de indicação (`?ref=`); inválido é ignorado pelo servidor. */
     referralCode?: string
-    /** O código do afiliado (`?aff=A-…`, 0124); inválido é ignorado pelo servidor. */
+    /** O código do afiliado (`?aff=A-…`, 0125); inválido é ignorado pelo servidor. */
     affiliateCode?: string
   }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
@@ -1407,7 +1407,7 @@ export interface CatalogueTenant {
 }
 
 export interface DeploymentInfo {
-  /** A versão do servidor (saiu do `/api/health` aberto na 0126). */
+  /** A versão do servidor (saiu do `/api/health` aberto na 0127). */
   version?: string
   edition: 'saas' | 'selfhosted'
   database: {
@@ -1611,7 +1611,7 @@ export interface ChargePricing {
   overage: OverageItem[]
   overageCents: number
   creditCents: number
-  /** Os add-ons (0125) cobrados nela. Opcional: servidores antigos não mandam. */
+  /** Os add-ons (0126) cobrados nela. Opcional: servidores antigos não mandam. */
   addons?: ChargeAddonItem[]
   addonCents?: number
 }
@@ -4296,18 +4296,59 @@ export interface AsaasProviderConfig {
   enabled: boolean
   environment: AsaasEnvironment
   apiKeyConfigured: boolean
+  importCustomers: boolean
+  importCharges: boolean
+  syncEnabled: boolean
+  syncIntervalHours: number
   accountName: string | null
   lastTestAt: string | null
   updatedAt: string | null
   ready: boolean
 }
 
+/** O que a última importação fez, e o que o painel tem agora. */
+export interface AsaasImportStatus {
+  lastRun: {
+    startedAt: string
+    finishedAt: string
+    durationMs: number
+    pages: number
+    partial?: boolean
+    customers: { total: number; created: number; updated: number }
+    charges: { total: number; created: number; updated: number; withoutCustomer: number; reconciled: number; gone: number }
+  } | null
+  running: boolean
+  lastError: { at: string; code: string; translationKey: string | null; message: string | null } | null
+  totals: {
+    customers: number
+    openCharges: number
+    overdueCharges: number
+    withoutDocument: number
+    duplicateDocuments: number
+    matchingSgp: number
+  }
+}
+
 export const asaasProviderAPI = {
   getConfig: () =>
     apiClient.get<AsaasProviderConfig>('/asaas/config'),
 
-  updateConfig: (config: { enabled?: boolean; environment?: AsaasEnvironment; apiKey?: string }) =>
+  updateConfig: (config: {
+    enabled?: boolean
+    environment?: AsaasEnvironment
+    apiKey?: string
+    importCustomers?: boolean
+    importCharges?: boolean
+    syncEnabled?: boolean
+    syncIntervalHours?: number
+  }) =>
     apiClient.put<AsaasProviderConfig>('/asaas/config', config),
+
+  getImport: () =>
+    apiClient.get<AsaasImportStatus>('/asaas/import'),
+
+  startImport: () =>
+    apiClient.post<{ started: boolean }>('/asaas/import/sync', {}),
 
   test: (payload: { environment?: AsaasEnvironment; apiKey?: string }) =>
     apiClient.post<{ accountName: string | null; environment: AsaasEnvironment }>('/asaas/test', payload)
@@ -6815,7 +6856,7 @@ export interface RevenueReport {
   from: string
   to: string
   mrrCents: number
-  /** O MRR dos add-ons pagos (0125), fora do `mrrCents` dos planos. Opcional: servidores antigos não mandam. */
+  /** O MRR dos add-ons pagos (0126), fora do `mrrCents` dos planos. Opcional: servidores antigos não mandam. */
   addonMrrCents?: number
   activeCount: number
   receivedCents: number
@@ -7427,7 +7468,7 @@ export const receiptAPI = {
   },
 }
 
-// ── A página de status (0126) ────────────────────────────────────────────
+// ── A página de status (0127) ────────────────────────────────────────────
 
 export type StatusComponentCode = 'panel' | 'payments' | 'whatsapp' | 'genieacs'
 export type StatusComponentState = 'operational' | 'maintenance' | 'degraded' | 'partial_outage' | 'major_outage' | 'unknown'
@@ -7532,7 +7573,7 @@ export const statusAPI = {
   serverVersion: () => apiClient.get<{ version: string }>('/version'),
 }
 
-// ── O programa de afiliados (0124) ──────────────────────────────────────
+// ── O programa de afiliados (0125) ──────────────────────────────────────
 
 export interface AffiliateTotals {
   accruedCents: number
@@ -7727,7 +7768,7 @@ export const affiliatePortalAPI = {
   overview: () => affiliateRequest<AffiliatePortalOverview>('/overview'),
 }
 
-// ── Os add-ons pagos (0125) ─────────────────────────────────────────────
+// ── Os add-ons pagos (0126) ─────────────────────────────────────────────
 
 export type AddonKind = 'feature' | 'limit'
 export type AddonLimitResource = 'operators' | 'subscribers' | 'devices'

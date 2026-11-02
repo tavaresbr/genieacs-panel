@@ -46,10 +46,23 @@ export class AsaasProviderError extends Error {
   }
 }
 
+/** De quanto em quanto tempo a importação roda sozinha, em horas. */
+export const SYNC_INTERVAL_HOURS = Object.freeze({ min: 1, max: 168, default: 24 });
+
+function clampInterval(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(SYNC_INTERVAL_HOURS.max, Math.max(SYNC_INTERVAL_HOURS.min, Math.round(n)));
+}
+
 const DEFAULTS = Object.freeze({
   enabled: false,
   environment: 'sandbox',
   apiKey: null,
+  importCustomers: true,
+  importCharges: true,
+  syncEnabled: false,
+  syncIntervalHours: SYNC_INTERVAL_HOURS.default,
   accountName: null,
   lastTestAt: null,
   updatedAt: null
@@ -115,6 +128,10 @@ class AsaasProviderService {
       enabled: stored.enabled === true,
       environment: ENVIRONMENTS.includes(stored.environment) ? stored.environment : DEFAULTS.environment,
       apiKey: decrypt(stored.apiKey),
+      importCustomers: stored.importCustomers !== false,
+      importCharges: stored.importCharges !== false,
+      syncEnabled: stored.syncEnabled === true,
+      syncIntervalHours: clampInterval(stored.syncIntervalHours, SYNC_INTERVAL_HOURS.default),
       accountName: stored.accountName ? String(stored.accountName) : null,
       lastTestAt: stored.lastTestAt || null,
       updatedAt: stored.updatedAt || null
@@ -170,6 +187,12 @@ class AsaasProviderService {
       enabled,
       environment,
       apiKey: encrypt(apiKey),
+      importCustomers: patch.importCustomers === undefined ? current.importCustomers : patch.importCustomers === true,
+      importCharges: patch.importCharges === undefined ? current.importCharges : patch.importCharges === true,
+      syncEnabled: patch.syncEnabled === undefined ? current.syncEnabled : patch.syncEnabled === true,
+      syncIntervalHours: patch.syncIntervalHours === undefined
+        ? current.syncIntervalHours
+        : clampInterval(patch.syncIntervalHours, current.syncIntervalHours),
       // O nome da conta é o do ÚLTIMO teste com esta chave; outra chave, outro nome.
       accountName: keyChanged ? null : current.accountName,
       lastTestAt: keyChanged ? null : current.lastTestAt,

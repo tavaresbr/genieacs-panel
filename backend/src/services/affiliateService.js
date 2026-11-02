@@ -10,7 +10,7 @@ import { PIX_KEY_TYPES } from './billing/asaasClient.js';
 import { newPasswordProblem } from '../utils/passwordPolicy.js';
 
 /**
- * O programa de afiliados (0124): quem divulga o produto sem ser provedor.
+ * O programa de afiliados (0125): quem divulga o produto sem ser provedor.
  *
  * O afiliado tem um código (`A-XXXXXXX`) e um link `…/signup?aff=CÓDIGO`. O
  * provedor que se cadastra por esse link nasce com `referred_by_affiliate_id`
@@ -39,7 +39,7 @@ import { newPasswordProblem } from '../utils/passwordPolicy.js';
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const TAMANHO_DO_CODIGO = 7;
 export const AFFILIATE_STATUSES = Object.freeze(['pending', 'active', 'suspended']);
-// `held` (0124): a comissão de um afiliado SUSPENSO — fica guardada e volta a
+// `held` (0125): a comissão de um afiliado SUSPENSO — fica guardada e volta a
 // `accrued` quando ele é reativado ainda dentro da janela da indicação.
 export const COMMISSION_STATUSES = Object.freeze(['accrued', 'reversed', 'in_payout', 'paid', 'held']);
 /** Quanto vale o link de definir senha. */

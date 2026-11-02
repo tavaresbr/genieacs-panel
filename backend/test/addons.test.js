@@ -25,7 +25,7 @@ const { resolveTenant } = await import('../src/middleware/tenantResolver.js');
 const { default: platformBillingRoutes } = await import('../src/routes/platformBilling.js');
 
 /**
- * Os add-ons pagos (0125).
+ * Os add-ons pagos (0126).
  *
  * A montagem de `platform-coupons.test.js`: o painel de verdade (self-hosted),
  * o roteador do console num app mínimo e um gateway de mentira em

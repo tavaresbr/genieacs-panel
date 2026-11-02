@@ -251,6 +251,8 @@ export const SEM_PRAZO = Object.freeze({
   maintenance_window_devices: 'que aparelhos foram avisados de uma manutenção; nenhuma rotina o apaga',
   // Exportação
   teiah_exports: 'o registro do que já saiu do painel sobre o assinante; sai só pela exclusão do art. 18',
+  asaas_customers: 'o cliente da conta Asaas do provedor, importado (nome, CPF/CNPJ, telefone, e-mail, endereço); é reescrito a cada importação, fica marcado como removido quando o Asaas o remove e sai só pela exclusão do art. 18',
+  asaas_charges: 'a cobrança da conta Asaas do provedor, importada (valor, vencimento, situação); a paga ou cancelada fica como histórico e a exclusão do art. 18 a apaga',
   teiah_consultations: 'a resposta da TeiaH sobre um CPF/CNPJ, guardada 30 dias para não consultar de novo; as vencidas saem a cada nova consulta e tudo sai pela exclusão do art. 18'
 });
 
@@ -266,7 +268,7 @@ export const GLOBAIS_SEM_PRAZO = Object.freeze({
   platform_audit: 'a trilha do console sobre os provedores; nenhuma rotina a poda',
   platform_alerts: 'a fila dos avisos do console; o `payload` é texto sobre fatos de provedores e seu conteúdo não foi auditado campo a campo; nenhuma rotina a poda',
   tenants: 'nas colunas `billing_*`, o cadastro fiscal do provedor (razão social, CNPJ/CPF, endereço, e-mail, telefone); fica enquanto o provedor existir',
-  affiliates: 'o cadastro do afiliado (nome, CPF/CNPJ, e-mail, chave Pix) e o hash da senha do portal (0124); fica enquanto o programa precisar pagá-lo e prestar contas, e nenhuma rotina o apaga',
-  affiliate_commissions: 'as comissões dos afiliados por pagamento de provedor indicado (0124); registro de dinheiro, nenhuma rotina o poda',
-  affiliate_payouts: 'os lotes mensais pagos aos afiliados, com a chave Pix usada em cada um (0124); registro de dinheiro, nenhuma rotina o poda'
+  affiliates: 'o cadastro do afiliado (nome, CPF/CNPJ, e-mail, chave Pix) e o hash da senha do portal (0125); fica enquanto o programa precisar pagá-lo e prestar contas, e nenhuma rotina o apaga',
+  affiliate_commissions: 'as comissões dos afiliados por pagamento de provedor indicado (0125); registro de dinheiro, nenhuma rotina o poda',
+  affiliate_payouts: 'os lotes mensais pagos aos afiliados, com a chave Pix usada em cada um (0125); registro de dinheiro, nenhuma rotina o poda'
 });

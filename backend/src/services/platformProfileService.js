@@ -62,7 +62,7 @@ export const BILLING_POLICY_FIELDS = Object.freeze({
   retentionDiscountPercent: { default: 20, min: 0, max: 90 },
   retentionDiscountMonths: { default: 3, min: 0, max: 24 },
   retentionPauseMaxMonths: { default: 2, min: 0, max: 12 },
-  // O programa de afiliados (0124): a taxa padrão da comissão em pontos-base
+  // O programa de afiliados (0125): a taxa padrão da comissão em pontos-base
   // (1000 = 10%), por quantos meses depois do cadastro do indicado ela vale,
   // e o mínimo do lote mensal — abaixo dele, o saldo fica para o mês seguinte.
   affiliateRateBp: { default: 1000, min: 0, max: 10000 },
@@ -576,7 +576,7 @@ export async function accountingConfig() {
 }
 
 /**
- * O programa de afiliados como a comissão e o lote o leem (0124):
+ * O programa de afiliados como a comissão e o lote o leem (0125):
  * `{ rateBp, months, payoutMinCents }`. Sem cache, como `referralRewardCents`
  * — é dinheiro. Nunca lança: sem caixa ou com o banco fora, vale o padrão.
  */

@@ -90,6 +90,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'Telegram 测试过多，请等待一分钟',
   'rateLimit.platformExport': '导出过于频繁，请放慢速度',
   'rateLimit.sgpSync': '设备同步过于频繁。请稍后重试。',
@@ -885,6 +892,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp 已断开：号码 {account} 已中断 {minutes} 分钟，发给客户的消息无法发送。请在 设置 › WhatsApp 中扫描二维码重新连接{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新连接：号码 {account} 恢复正常',
   'whatsapp.alerts.metaQualityDropped': "官方号码 {account} 在 Meta 的状况变差：{changes}。请查看 设置 › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "质量 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "每日上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "状态 {to}",
@@ -1389,7 +1398,7 @@ export default {
   'auth.passwordMatchesIdentity': '密码不能与用户名或电子邮件相同。',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': '面板',
   'status.component.payments': '支付',
   'status.component.whatsapp': 'WhatsApp',
@@ -1403,7 +1412,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] 维护已完成：{title}',
   'status.notice.maintenanceDoneBody': '{provider}，您好。{components} 的计划维护（{title}）已完成。',
   'status.notice.follow': '请在状态页面查看：{link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': '邮箱或密码无效',
   'affiliate.loginSuccess': '已登录',
   'affiliate.sessionRequired': '请登录推广伙伴门户',

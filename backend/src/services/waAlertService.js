@@ -94,7 +94,12 @@ const RULE_KEYS = Object.freeze({
   // oficial piorou na Meta (`MetaNumberHealthService`). Fica fora de
   // `ALERT_RULES` — não tem limite nem cooldown para configurar —, mas sai
   // pelos mesmos canais e pelo mesmo resumo.
-  wa_meta_quality: { firing: 'whatsapp.alerts.metaQualityDropped', cleared: null }
+  wa_meta_quality: { firing: 'whatsapp.alerts.metaQualityDropped', cleared: null },
+  // Alguém quer contratar: a IA registrou o interesse (`WaAiService.registrarInteresse`).
+  // Avulso como o de cima — sem limite nem cooldown, e sem "recuperação".
+  wa_lead: { firing: 'whatsapp.alerts.lead', cleared: null },
+  // O crédito da IA acabou (`WaBotConfigService.alertarSemCredito`).
+  wa_ai_no_credit: { firing: 'whatsapp.alerts.aiNoCredit', cleared: null }
 });
 
 /**
@@ -682,7 +687,7 @@ class WaAlertService {
       if (!WhatsAppConfigService.isReady(config)) {
         reason = 'not_configured';
       } else if (!(await AddonService.allows('whatsapp'))) {
-        // Sem o add-on de WhatsApp (0125), quando o catálogo o exige: o
+        // Sem o add-on de WhatsApp (0126), quando o catálogo o exige: o
         // alerta sai pelo e-mail e pelo Telegram, que não dependem dele.
         reason = 'addon_required';
       } else {
@@ -939,6 +944,12 @@ class WaAlertService {
    * Onde reconectar: o endereço da aba de WhatsApp das Configurações quando o
    * painel sabe o próprio endereço, ou só o caminho na tela.
    */
+  static async chatbotLink() {
+    const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
+    const base = panelUrlFor(tenant);
+    return base ? `: ${base}/settings?tab=chatbot` : '';
+  }
+
   static async reconnectLink() {
     const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
     const base = panelUrlFor(tenant);

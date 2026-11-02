@@ -761,7 +761,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
       {/* A indicação e os créditos do provedor (0106), com o ajuste manual. */}
       <TenantReferrals tenantId={tenantId} />
 
-      {/* Os add-ons pagos do provedor (0125): dar de graça e revogar, com motivo. */}
+      {/* Os add-ons pagos do provedor (0126): dar de graça e revogar, com motivo. */}
       <TenantAddons tenantId={tenantId} />
 
       {/* Extrato */}

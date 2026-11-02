@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+#
+# skygenpanel-autoupdate — keep the panel on the newest published release.
+#
+#   skygenpanel-autoupdate check     say what would happen now, changing nothing
+#   skygenpanel-autoupdate run       do it (what skygenpanel-autoupdate.timer runs)
+#   skygenpanel-autoupdate enable    start checking every 15 minutes
+#   skygenpanel-autoupdate disable   stop
+#   skygenpanel-autoupdate status    installed version, newest release, timer state
+#
+# It only ever moves to a published release — a `vX.Y.Z` tag, which the
+# Release workflow cuts only after CI passed — and never to whatever `main`
+# happens to be. It never moves backwards: an install ahead of the newest tag,
+# because someone ran `skygenpanel update` by hand, is left where it is.
+#
+# Before updating it takes a backup, and it does not update without one. After
+# updating, `skygenpanel update` waits for the panel to answer its health check;
+# if it does not, this puts the previous version back and skips the release
+# that failed until a newer one is published, rather than retrying it every
+# fifteen minutes.
+#
+# Optional, in backend/.env:
+#   AUTO_UPDATE_WINDOW=3-6    only update between 03:00 and 05:59 (server time).
+#                             Wraps past midnight: 22-4 is 22:00 to 03:59.
+#
+set -euo pipefail
+
+INSTALL_DIR="${SKYGP_DIR:-/opt/skygenpanel}"
+ENV_FILE="${INSTALL_DIR}/backend/.env"
+CLI_PATH="${SKYGP_CLI_PATH:-/usr/local/bin/skygenpanel}"
+BACKUP_CLI_PATH="${SKYGP_BACKUP_CLI_PATH:-/usr/local/bin/skygenpanel-backup}"
+LOCK_FILE="${SKYGP_UPDATE_LOCK:-/run/skygenpanel-update.lock}"
+TIMER="skygenpanel-autoupdate.timer"
+
+log()  { printf '[skygp-autoupdate] %s\n' "$*"; }
+warn() { printf '[skygp-autoupdate] %s\n' "$*" >&2; }
+die()  { printf '[skygp-autoupdate] %s\n' "$*" >&2; exit 1; }
+
+# The tests run as an ordinary user against a fake install; nothing else sets this.
+need_root() {
+  [ -n "${SKYGP_SKIP_ROOT_CHECK:-}" ] || [ "$(id -u)" -eq 0 ] || die "This command needs root (use sudo)."
+}
+
+env_value() {
+  grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true
+}
+
+data_dir() {
+  local d
+  d="$(env_value DATA_DIR)"
+  echo "${d:-/var/lib/skygenpanel}"
+}
+
+skip_file() { echo "$(data_dir)/auto-update.skip"; }
+
+installed_version() {
+  sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([0-9][0-9.]*\)".*/\1/p' "$INSTALL_DIR/package.json" | head -1
+}
+
+# The highest `vX.Y.Z` tag on the remote. Anything else — a pre-release, a
+# typo — is not a release and is never picked.
+latest_release() {
+  git -C "$INSTALL_DIR" ls-remote --tags --refs origin 'v*' \
+    | sed -n 's|.*refs/tags/\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$|\1|p' \
+    | sort -V | tail -1
+}
+
+# version_gt A B: A is strictly newer than B (both without the leading v).
+version_gt() {
+  [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]
+}
+
+# Exit 0 inside the window (or with no window set), 1 outside it, and die on a
+# window that does not parse: a typo there would otherwise mean the panel
+# quietly never updates again.
+in_window() {
+  local window start end hour
+  window="$(env_value AUTO_UPDATE_WINDOW)"
+  [ -n "$window" ] || return 0
+  [[ "$window" =~ ^([0-9]{1,2})-([0-9]{1,2})$ ]] \
+    || die "AUTO_UPDATE_WINDOW must look like 3-6 (hours), not '$window'."
+  start=$((10#${BASH_REMATCH[1]})); end=$((10#${BASH_REMATCH[2]}))
+  [ "$start" -le 23 ] && [ "$end" -le 24 ] && [ "$start" -ne "$end" ] \
+    || die "AUTO_UPDATE_WINDOW hours must be 0-23 and different, not '$window'."
+  hour=$((10#${SKYGP_HOUR:-$(date +%H)}))
+  if [ "$start" -lt "$end" ]; then
+    [ "$hour" -ge "$start" ] && [ "$hour" -lt "$end" ]
+  else
+    [ "$hour" -ge "$start" ] || [ "$hour" -lt "$end" ]
+  fi
+}
+
+# Sets DECISION (update | none | wait), TARGET and REASON.
+decide() {
+  local latest installed skipped
+  [ -d "$INSTALL_DIR/.git" ] || die "Not a git checkout: $INSTALL_DIR"
+  installed="$(installed_version)"
+  [ -n "$installed" ] || die "Could not read the installed version from $INSTALL_DIR/package.json."
+  latest="$(latest_release)"
+  INSTALLED="v$installed"; TARGET="$latest"
+  if [ -z "$latest" ]; then
+    DECISION=none; REASON="no published release (vX.Y.Z tag) found on the remote"; return
+  fi
+  if ! version_gt "${latest#v}" "$installed"; then
+    DECISION=none; REASON="up to date: installed v$installed, newest release $latest"; return
+  fi
+  skipped="$(cat "$(skip_file)" 2>/dev/null || true)"
+  if [ "$skipped" = "$latest" ]; then
+    DECISION=none; REASON="$latest failed its health check before and is skipped until a newer release"; return
+  fi
+  if ! in_window; then
+    DECISION=wait; REASON="$latest is available, outside AUTO_UPDATE_WINDOW=$(env_value AUTO_UPDATE_WINDOW)"; return
+  fi
+  DECISION=update; REASON="v$installed -> $latest"
+}
+
+cmd_check() {
+  decide
+  printf 'decision=%s\ninstalled=%s\ntarget=%s\nreason=%s\n' "$DECISION" "$INSTALLED" "$TARGET" "$REASON"
+}
+
+cmd_run() {
+  local previous
+  need_root
+  # One update at a time, the manual `skygenpanel update` included: it takes
+  # the same lock. Another one running is not an error, only a turn skipped.
+  exec 9>"$LOCK_FILE"
+  if ! flock -n 9; then
+    log "Another update is running; skipping this check."
+    return 0
+  fi
+
+  decide
+  if [ "$DECISION" != update ]; then
+    log "Nothing to do: $REASON."
+    return 0
+  fi
+
+  previous="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
+  log "Updating: $REASON."
+
+  [ -x "$BACKUP_CLI_PATH" ] \
+    || die "Backup script not found at $BACKUP_CLI_PATH; not updating without a backup. Run 'skygenpanel update' by hand once."
+  "$BACKUP_CLI_PATH" run || die "The backup failed; not updating to $TARGET."
+
+  if SKYGP_UPDATE_LOCK_HELD=1 "$CLI_PATH" update "$TARGET"; then
+    rm -f -- "$(skip_file)"
+    log "Updated to $TARGET."
+    return 0
+  fi
+
+  warn "The update to $TARGET failed; putting ${previous:0:12} back."
+  printf '%s\n' "$TARGET" > "$(skip_file)"
+  if SKYGP_UPDATE_LOCK_HELD=1 "$CLI_PATH" update "$previous"; then
+    die "Rolled back to ${previous:0:12}. $TARGET is skipped until a newer release is published."
+  fi
+  die "ROLLBACK FAILED: the panel may be down. Check 'skygenpanel status' and restore the backup taken just before."
+}
+
+cmd_enable() {
+  need_root
+  systemctl enable --now "$TIMER" >/dev/null \
+    || die "Could not enable $TIMER. Run 'skygenpanel update' once so the unit is installed."
+  log "Automatic updates on: the panel checks for a new release every 15 minutes."
+  cmd_check
+}
+
+cmd_disable() {
+  need_root
+  systemctl disable --now "$TIMER" >/dev/null || true
+  log "Automatic updates off."
+}
+
+cmd_status() {
+  cmd_check
+  printf 'timer=%s\n' "$(systemctl is-enabled "$TIMER" 2>/dev/null || echo not-installed)"
+  journalctl -u skygenpanel-autoupdate.service -n 5 --no-pager 2>/dev/null || true
+}
+
+usage() {
+  cat <<USAGE
+skygenpanel-autoupdate — keep the panel on the newest published release
+
+  check     say what would happen now, changing nothing
+  run       update if a newer release exists (what the timer runs)
+  enable    start checking every 15 minutes
+  disable   stop
+  status    installed version, newest release, timer state
+USAGE
+}
+
+main() {
+  case "${1:-help}" in
+    check)          cmd_check ;;
+    run)            cmd_run ;;
+    enable)         cmd_enable ;;
+    disable)        cmd_disable ;;
+    status)         cmd_status ;;
+    help|-h|--help) usage ;;
+    *)              warn "Unknown command: $1"; usage; exit 1 ;;
+  esac
+}
+
+# Everything above is only definitions, and bash reads a function whole before
+# running it. `skygenpanel update` replaces this very file mid-run; ending on a
+# single call keeps the running copy from reading the new one half-way.
+main "$@"; exit

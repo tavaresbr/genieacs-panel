@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * A versão do servidor, lida do `package.json` uma vez. Fora do `/api/health`
- * desde a página de status (0126): só quem tem sessão a lê (`/api/version` e
+ * desde a página de status (0127): só quem tem sessão a lê (`/api/version` e
  * `/api/platform/deployment`).
  */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

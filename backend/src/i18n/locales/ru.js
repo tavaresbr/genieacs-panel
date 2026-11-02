@@ -90,6 +90,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'Слишком много проверок Telegram, подождите минуту',
   'rateLimit.platformExport': 'Слишком много выгрузок, снизьте частоту обращений',
   'rateLimit.sgpSync': 'Слишком много запросов полной синхронизации. Повторите попытку позже.',
@@ -886,6 +893,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp отключён: номер {account} не работает уже {minutes} мин, сообщения клиентам не отправляются. Переподключите его по QR-коду в Настройки › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp снова подключён: номер {account} снова работает',
   'whatsapp.alerts.metaQualityDropped': "Официальный номер {account} ухудшился в Meta: {changes}. См. Настройки › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "качество {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "дневной лимит {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "статус {to}",
@@ -1390,7 +1399,7 @@ export default {
   'auth.passwordMatchesIdentity': 'Пароль не может совпадать с вашим именем пользователя или адресом электронной почты.',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': 'Панель',
   'status.component.payments': 'Платежи',
   'status.component.whatsapp': 'WhatsApp',
@@ -1404,7 +1413,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Обслуживание завершено: {title}',
   'status.notice.maintenanceDoneBody': 'Здравствуйте, {provider}. Плановое обслуживание {components} ({title}) завершено.',
   'status.notice.follow': 'Следите на странице статуса: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': 'Неверный e-mail или пароль',
   'affiliate.loginSuccess': 'Вход выполнен',
   'affiliate.sessionRequired': 'Войдите в партнёрский портал',

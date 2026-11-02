@@ -546,7 +546,7 @@ export default function PlatformPage() {
             // fabricante, abre-se quando alguma coisa não chegou ou um
             // provedor não está reconhecendo os aparelhos dele.
             ['deployment', 'platform.tabs.deployment'],
-            // A página de status (0126): as verificações automáticas e os
+            // A página de status (0127): as verificações automáticas e os
             // incidentes e manutenções que a página pública mostra. Ao lado
             // do deploy, que é a outra tela de "o que está no ar".
             ['status', 'platform.tabs.status'],
@@ -554,7 +554,7 @@ export default function PlatformPage() {
             // O manual de cobrança, por último: é o que se abre quando não se
             // sabe em qual das outras abas está a resposta.
             ['help', 'platform.tabs.help'],
-            // O programa de afiliados (0124): cadastro, aprovação e o lote mensal.
+            // O programa de afiliados (0125): cadastro, aprovação e o lote mensal.
             ['affiliates', 'platform.tabs.affiliates']
           ] as const).map(([chave, rotulo]) => (
             <button

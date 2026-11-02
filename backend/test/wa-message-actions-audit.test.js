@@ -87,3 +87,39 @@ describe('apagar uma mensagem fica na trilha de auditoria', () => {
     assert.equal(Number(depois.n), Number(antes.n));
   });
 });
+
+describe('ações de configuração e régua ficam na trilha', () => {
+  const ultima = async (action) => {
+    const row = await getDb()('audit_log').where({ action }).orderBy('id', 'desc').first();
+    return row ? { row, detail: typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail } : null;
+  };
+
+  it('salvar o robô registra só os NOMES dos campos', async () => {
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/bot-config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { enabled: true, messages: { greeting: 'texto-secreto-do-provedor' } }
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    const t = await ultima('whatsapp.config_saved');
+    assert.ok(t, 'salvar o robô não foi para a trilha');
+    assert.equal(t.row.actor_username, 'operator');
+    assert.equal(t.detail.kind, 'bot');
+    assert.deepEqual(t.detail.fields.sort(), ['enabled', 'messages']);
+    assert.ok(!JSON.stringify(t.row).includes('texto-secreto'), 'o conteúdo foi para a trilha');
+  });
+
+  it('rodar a régua à mão registra quem rodou', async () => {
+    const { status } = await call(`${panelUrl}/api/whatsapp/dunning/run`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: {}
+    });
+    // A rota pode recusar por falta de régua configurada; só a recusa não gera linha.
+    if (status < 300) {
+      const t = await ultima('whatsapp.dunning_run');
+      assert.ok(t, 'rodar a régua não foi para a trilha');
+      assert.equal(t.row.actor_username, 'operator');
+    }
+  });
+});

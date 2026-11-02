@@ -57,6 +57,12 @@ class WhatsAppSubscriberController {
         contract: req.body?.contract,
         document: req.body?.document || null
       });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_SUBSCRIBER_BOUND,
+        subjectType: 'wa_conversation',
+        subjectId: req.params?.id,
+        detail: { contract: String(req.body?.contract ?? '') || null, byDocument: Boolean(req.body?.document) }
+      });
       return res.json(createResponse(req.t('sgp.contractLinked'), present(req, panel)));
     } catch (error) {
       return handleError(req, res, error, 'sgp.linkFailed');
@@ -84,6 +90,12 @@ class WhatsAppSubscriberController {
   static async unlock(req, res) {
     try {
       const result = await WaSubscriberPanelService.unlock(req.params?.id, { contract: req.body?.contract });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_OPERATOR_UNLOCK,
+        subjectType: 'wa_conversation',
+        subjectId: req.params?.id,
+        detail: { contract: result.contract }
+      });
       return res.json(createResponse(result.message, { contract: result.contract }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.unlockFailed');
@@ -94,6 +106,12 @@ class WhatsAppSubscriberController {
   static async resumeDunning(req, res) {
     try {
       const result = await WaSubscriberPanelService.resumeDunning(req.params?.id, { contract: req.body?.contract });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_DUNNING_RESUMED,
+        subjectType: 'wa_conversation',
+        subjectId: req.params?.id,
+        detail: { contract: result.contract }
+      });
       return res.json(createResponse(req.t('whatsapp.dunning.resumed'), result));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.dunning.resumeFailed');
@@ -127,6 +145,13 @@ class WhatsAppSubscriberController {
   static async savePhone(req, res) {
     try {
       const panel = await WaSubscriberPanelService.savePhone(req.params?.id, { contract: req.body?.contract });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CONTRACT_PHONE_SAVED,
+        subjectType: 'wa_conversation',
+        subjectId: req.params?.id,
+        // O contrato, nunca o número.
+        detail: { contract: String(req.body?.contract ?? '') || null }
+      });
       return res.json(createResponse(req.t('whatsapp.phoneSaved'), present(req, panel)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.phoneSaveFailed');
@@ -140,6 +165,13 @@ class WhatsAppSubscriberController {
         contract: body.contract,
         content: body.content,
         note: body.note
+      });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_TICKET_OPENED,
+        subjectType: 'wa_conversation',
+        subjectId: req.params?.id,
+        // Só o contrato e se foi nota; o texto do chamado é do cliente.
+        detail: { contract: String(body.contract ?? '') || null, note: Boolean(body.note) }
       });
       return res.json(createResponse(result.message || req.t('sgp.ticketOpened'), result));
     } catch (error) {

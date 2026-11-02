@@ -90,6 +90,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': '텔레그램 테스트가 너무 많습니다. 1분 기다리세요',
   'rateLimit.platformExport': '내보내기 요청이 너무 많습니다. 잠시 후 다시 시도하십시오',
   'rateLimit.sgpSync': '전체 동기화 요청이 너무 많습니다. 나중에 다시 시도하십시오.',
@@ -883,6 +890,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp 연결 끊김: 번호 {account}이(가) {minutes}분 전부터 중단되어 고객 메시지가 발송되지 않습니다. 설정 › WhatsApp에서 QR로 다시 연결하세요{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 재연결: 번호 {account}이(가) 다시 작동합니다',
   'whatsapp.alerts.metaQualityDropped': "공식 번호 {account}의 Meta 상태가 나빠졌습니다: {changes}. 설정 › WhatsApp에서 확인하세요{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "품질 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "일일 한도 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "상태 {to}",
@@ -1392,7 +1401,7 @@ export default {
   'auth.passwordMatchesIdentity': '비밀번호는 사용자 이름이나 이메일과 같을 수 없습니다.',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': '패널',
   'status.component.payments': '결제',
   'status.component.whatsapp': 'WhatsApp',
@@ -1406,7 +1415,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] 점검 완료: {title}',
   'status.notice.maintenanceDoneBody': '안녕하세요, {provider}님. {components} 예정된 점검({title})이 완료되었습니다.',
   'status.notice.follow': '상태 페이지에서 확인하세요: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': '이메일 또는 비밀번호가 올바르지 않습니다',
   'affiliate.loginSuccess': '로그인되었습니다',
   'affiliate.sessionRequired': '제휴 포털에 로그인하세요',

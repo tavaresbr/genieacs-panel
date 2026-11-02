@@ -29,7 +29,7 @@ router.get('/receipt/:token', publicReceiptLimiter, PublicReceiptController.rece
 // CORPO, nunca no caminho: o log de acesso grava o caminho inteiro.
 router.post('/nps/lookup', publicNpsLimiter, NpsController.lookup);
 router.post('/nps/answer', publicNpsLimiter, NpsController.answer);
-// A página de status (0126): só leitura, guardada por 30 s, sem nada de dentro
+// A página de status (0127): só leitura, guardada por 30 s, sem nada de dentro
 // (nem erro, nem versão, nem provedor).
 router.get('/status', publicReadLimiter, StatusController.publicStatus);
 

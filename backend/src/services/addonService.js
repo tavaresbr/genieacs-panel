@@ -11,7 +11,7 @@ import { TranslatableError } from '../i18n/index.js';
 import SubscriptionService, { isBillableStatus } from './subscriptionService.js';
 
 /**
- * Os add-ons pagos (0125): recursos (WhatsApp, IA) e aumentos de teto que o
+ * Os add-ons pagos (0126): recursos (WhatsApp, IA) e aumentos de teto que o
  * provedor contrata por cima do plano.
  *
  * ## O que este arquivo decide

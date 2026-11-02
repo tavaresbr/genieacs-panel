@@ -90,6 +90,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'Too many Telegram tests, wait a minute',
   'rateLimit.platformExport': 'Too many exports, please slow down',
   'rateLimit.sgpSync': 'Too many fleet synchronizations. Try again later.',
@@ -885,6 +892,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp disconnected: number {account} went down {minutes} min ago and messages to customers are not going out. Reconnect with the QR code in Settings › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp reconnected: number {account} is working again',
   'whatsapp.alerts.metaQualityDropped': "Official number {account} got worse at Meta: {changes}. See Settings › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "quality {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "daily limit {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "status {to}",
@@ -1389,7 +1398,7 @@ export default {
   'auth.passwordMatchesIdentity': 'The password cannot be the same as your username or e-mail.',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': 'Panel',
   'status.component.payments': 'Payments',
   'status.component.whatsapp': 'WhatsApp',
@@ -1403,7 +1412,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Maintenance completed: {title}',
   'status.notice.maintenanceDoneBody': 'Hello, {provider}. The scheduled maintenance on {components} ({title}) has been completed.',
   'status.notice.follow': 'Follow it on the status page: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': 'Invalid email or password',
   'affiliate.loginSuccess': 'Signed in',
   'affiliate.sessionRequired': 'Sign in to the affiliate portal',

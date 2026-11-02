@@ -351,7 +351,7 @@ class BillingWebhookController {
       return res.json({ success: true, code });
     }
 
-    // As transferências Pix do programa de afiliados (0124): eventos
+    // As transferências Pix do programa de afiliados (0125): eventos
     // `TRANSFER_*`, com a transferência no corpo. Só mudam o lote cujo
     // `transfer_id` é o da entrega; a desconhecida é ignorada — 200 sempre.
     // Inclusive na falha: um 500 faria a Asaas reenviar e, depois de algumas

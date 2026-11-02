@@ -1,7 +1,7 @@
 import type { TranslationKey } from '@/lib/i18n'
 
 /**
- * O programa de afiliados na tela (0124): o código do link, a taxa em
+ * O programa de afiliados na tela (0125): o código do link, a taxa em
  * pontos-base, os selos e quais ações cada lote admite.
  *
  * Quem decide o dinheiro é o servidor — a comissão, a janela, o lote e o Pix.

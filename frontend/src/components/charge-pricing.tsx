@@ -10,7 +10,7 @@ import { resourceLabelKey } from '@/lib/plan-options'
  * A conta do valor de uma cobrança (0105): o plano (já com o cupom) e cada
  * parcela do excedente — "Excedente (Operadores): 3 × R$ 10,00 = R$ 30,00".
  *
- * Só aparece quando há excedente (ou add-on, 0125): a cobrança que é só o plano não precisa de
+ * Só aparece quando há excedente (ou add-on, 0126): a cobrança que é só o plano não precisa de
  * conta, o valor dela já diz tudo. A mesma linha no extrato do provedor e no
  * histórico do console, para os dois lerem a fatura do mesmo jeito.
  */
@@ -18,7 +18,7 @@ export function ChargePricingBreakdown({
   pricing, currency, className = 'text-xs text-muted-foreground'
 }: { pricing?: ChargePricing | null; currency: string; className?: string }) {
   const { t } = useTranslation()
-  // E os add-ons (0125), que também somam ao plano.
+  // E os add-ons (0126), que também somam ao plano.
   const adicionais = pricing?.addons ?? []
   if (!pricing || (!pricing.overage?.length && !adicionais.length)) return null
   return (

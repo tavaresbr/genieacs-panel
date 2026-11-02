@@ -39,7 +39,7 @@ const ERRO_KEYS = {
 } as const
 
 /**
- * A aba Status do console (0126): as verificações automáticas de cada
+ * A aba Status do console (0127): as verificações automáticas de cada
  * componente, com o detalhe que a página pública não mostra, e os incidentes e
  * manutenções — abrir, publicar atualização, resolver, ligar o aviso aos
  * provedores. Cada gesto vai para a trilha da plataforma no servidor.

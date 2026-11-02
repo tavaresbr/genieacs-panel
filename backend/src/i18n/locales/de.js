@@ -90,6 +90,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'Zu viele Telegram-Tests, warten Sie eine Minute',
   'rateLimit.platformExport': 'Zu viele Exporte, bitte langsamer',
   'rateLimit.sgpSync': 'Zu viele Flottensynchronisierungen. Versuchen Sie es später erneut.',
@@ -886,6 +893,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp getrennt: Die Nummer {account} ist seit {minutes} Min. ausgefallen, Nachrichten an Kunden werden nicht gesendet. Per QR-Code unter Einstellungen › WhatsApp neu verbinden{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp wieder verbunden: Die Nummer {account} funktioniert wieder',
   'whatsapp.alerts.metaQualityDropped': "Die offizielle Nummer {account} hat sich bei Meta verschlechtert: {changes}. Siehe Einstellungen › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "Qualität {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "Tageslimit {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "Status {to}",
@@ -1390,7 +1399,7 @@ export default {
   'auth.passwordMatchesIdentity': 'Das Passwort darf nicht mit Ihrem Benutzernamen oder Ihrer E-Mail-Adresse übereinstimmen.',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': 'Panel',
   'status.component.payments': 'Zahlungen',
   'status.component.whatsapp': 'WhatsApp',
@@ -1404,7 +1413,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Wartung abgeschlossen: {title}',
   'status.notice.maintenanceDoneBody': 'Hallo {provider}, die geplante Wartung an {components} ({title}) ist abgeschlossen.',
   'status.notice.follow': 'Verfolgen Sie es auf der Statusseite: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': 'Ungültige E-Mail oder ungültiges Passwort',
   'affiliate.loginSuccess': 'Angemeldet',
   'affiliate.sessionRequired': 'Melden Sie sich im Partnerportal an',

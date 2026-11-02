@@ -87,6 +87,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'Troppi test di Telegram, attendi un minuto',
   'rateLimit.platformExport': 'Troppe esportazioni, rallenta',
   'rateLimit.sgpSync': 'Troppe sincronizzazioni della rete. Riprova più tardi.',
@@ -883,6 +890,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp disconnesso: il numero {account} è caduto da {minutes} min e i messaggi ai clienti non partono. Ricollegalo con il QR in Impostazioni › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp ricollegato: il numero {account} funziona di nuovo',
   'whatsapp.alerts.metaQualityDropped': "Il numero ufficiale {account} è peggiorato su Meta: {changes}. Vedi Impostazioni › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "qualità {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "limite giornaliero {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "stato {to}",
@@ -1387,7 +1396,7 @@ export default {
   'auth.passwordMatchesIdentity': 'La password non può essere uguale al tuo nome utente o alla tua e-mail.',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': 'Pannello',
   'status.component.payments': 'Pagamenti',
   'status.component.whatsapp': 'WhatsApp',
@@ -1401,7 +1410,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Manutenzione completata: {title}',
   'status.notice.maintenanceDoneBody': 'Ciao, {provider}. La manutenzione programmata su {components} ({title}) è stata completata.',
   'status.notice.follow': 'Seguila sulla pagina di stato: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': 'E-mail o password non validi',
   'affiliate.loginSuccess': 'Accesso effettuato',
   'affiliate.sessionRequired': 'Accedi al portale affiliati',

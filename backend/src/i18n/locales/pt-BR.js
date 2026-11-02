@@ -87,6 +87,13 @@ export default {
   'asaas.error.unreachable': 'Não foi possível falar com o Asaas. Tente de novo em instantes',
   'asaas.error.gatewayDown': 'O Asaas está indisponível no momento. Tente de novo em instantes',
   'asaas.error.refused': 'O Asaas recusou o pedido',
+  'asaas.importLoaded': 'Situação da importação do Asaas carregada',
+  'asaas.importLoadFailed': 'Falha ao carregar a situação da importação do Asaas',
+  'asaas.importStarted': 'Importação do Asaas iniciada',
+  'asaas.importStartFailed': 'Falha ao iniciar a importação do Asaas',
+  'asaas.error.notConfigured': 'Conecte e ligue a integração com o Asaas primeiro',
+  'asaas.error.nothingToImport': 'Ligue pelo menos uma das opções: importar clientes, importar faturas',
+  'asaas.error.importRunning': 'Já há uma importação do Asaas em andamento',
   'rateLimit.telegramTest': 'Muitos testes do Telegram, aguarde um minuto',
   'rateLimit.platformExport': 'Muitas exportações, reduza o ritmo',
   'rateLimit.sgpSync': 'Muitas sincronizações da rede. Tente novamente mais tarde.',
@@ -882,6 +889,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp desconectado: o número {account} caiu há {minutes} min e as mensagens para os clientes não estão saindo. Reconecte pelo QR em Configurações › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp reconectado: o número {account} voltou a funcionar',
   'whatsapp.alerts.metaQualityDropped': "Número oficial {account} piorou na Meta: {changes}. Veja em Configurações › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'Novo interesse em contratar (IA): {name} — plano: {plan}, bairro: {area}, WhatsApp {phone}. A conversa está com a etiqueta Venda.',
+  'whatsapp.alerts.aiNoCredit': 'A IA do atendimento ficou sem crédito em {provider}: os clientes estão caindo no menu. Recarregue no site do provedor de IA e confira em Configurações › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "qualidade {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "limite diário {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "status {to}",
@@ -1388,7 +1397,7 @@ export default {
   'auth.passwordMatchesIdentity': 'A senha não pode ser igual ao seu usuário ou e-mail.',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': 'Painel',
   'status.component.payments': 'Pagamentos',
   'status.component.whatsapp': 'WhatsApp',
@@ -1402,7 +1411,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Manutenção concluída: {title}',
   'status.notice.maintenanceDoneBody': 'Olá, {provider}. A manutenção programada em {components} ({title}) foi concluída.',
   'status.notice.follow': 'Acompanhe pela página de status: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': 'E-mail ou senha inválidos',
   'affiliate.loginSuccess': 'Sessão iniciada',
   'affiliate.sessionRequired': 'Entre no portal do afiliado',

@@ -88,6 +88,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'बहुत सारे Telegram परीक्षण, एक मिनट रुकें',
   'rateLimit.platformExport': 'बहुत अधिक निर्यात, कृपया धीरे चलें',
   'rateLimit.sgpSync': 'बहुत अधिक पूर्ण समन्वयन। बाद में फिर कोशिश करें।',
@@ -886,6 +893,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp डिस्कनेक्ट: नंबर {account} {minutes} मिनट से बंद है और ग्राहकों को संदेश नहीं जा रहे। सेटिंग्स › WhatsApp में QR से फिर से जोड़ें{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp फिर से जुड़ा: नंबर {account} फिर से काम कर रहा है',
   'whatsapp.alerts.metaQualityDropped': "आधिकारिक नंबर {account} की स्थिति Meta पर खराब हुई: {changes}. सेटिंग्स › WhatsApp देखें{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "गुणवत्ता {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "दैनिक सीमा {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "स्थिति {to}",
@@ -1389,7 +1398,7 @@ export default {
   'auth.passwordMatchesIdentity': 'पासवर्ड आपके उपयोगकर्ता नाम या ईमेल के समान नहीं हो सकता।',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': 'पैनल',
   'status.component.payments': 'भुगतान',
   'status.component.whatsapp': 'WhatsApp',
@@ -1403,7 +1412,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] रखरखाव पूरा हुआ: {title}',
   'status.notice.maintenanceDoneBody': 'नमस्ते, {provider}। {components} पर निर्धारित रखरखाव ({title}) पूरा हो गया है।',
   'status.notice.follow': 'स्थिति पृष्ठ पर देखें: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': 'ईमेल या पासवर्ड अमान्य है',
   'affiliate.loginSuccess': 'साइन इन हो गया',
   'affiliate.sessionRequired': 'एफ़िलिएट पोर्टल में साइन इन करें',

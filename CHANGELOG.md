@@ -7,6 +7,41 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.22.0] - 2026-11-02
+
+### New
+
+- Importação de clientes e cobranças do Asaas (fase 2) (`103732d7`)
+- Avisa a equipe quando o crédito da IA acaba (`a289cece`)
+
+### Fixed
+
+- Conferir cobranças sumidas pelos ids vistos, não por timestamp (`b9e35a86`)
+
+### Maintenance
+
+- Segurança: o robô e a IA respeitam a conversa que o atendente desvinculou (`7ed3b694`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/148a0376ec7b...5dc0f292f97f)
+
+## [1.21.0] - 2026-11-02
+
+### New
+
+- Atendimento dos donos de provedor pelo WhatsApp da plataforma (`27aa1c30`)
+- Reajuste de preço do plano com data de vigência (0122) (`752ddbc3`)
+- Avisa a equipe quando a IA registra um interessado em contratar (`23028592`)
+
+### Maintenance
+
+- Exportação para a contabilidade (XLSX/CSV, envio mensal ao contador) (`ef4a015c`)
+- Pesquisa de satisfação dos provedores (NPS, 0123) (`33696799`)
+- Revisão: reajuste, pesquisa pelo WhatsApp, bot e recibo pelo fragmento (`a5275999`)
+- E2e: reajuste agendado, exportação contábil, Satisfação, NPS e recibo públicos (`ec52d62d`)
+- Open the "what's new" modal with what is new (`ddcfe0e6`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/5111f28ec960...d83be1c00696)
+
 ## [1.20.0] - 2026-11-02
 
 ### New

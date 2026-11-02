@@ -92,7 +92,7 @@ export function overageDescription(parcelas) {
 }
 
 /**
- * O resumo dos add-ons que vai na descrição da fatura (0125):
+ * O resumo dos add-ons que vai na descrição da fatura (0126):
  * " + add-ons R$ 78,00 (WhatsApp R$ 49,00; IA R$ 29,00)". Vazio sem nenhum.
  */
 export function addonDescription(itens) {
@@ -1126,7 +1126,7 @@ class ChargeIssuingService {
     const excedente = await this.overageForPeriod({ subscription, plan, periodo, existente });
     const precoDoPlano = preco;
     preco += excedente.reduce((soma, item) => soma + item.cents, 0);
-    // Os add-ons do período que esta fatura paga (0125), recorrentes, também
+    // Os add-ons do período que esta fatura paga (0126), recorrentes, também
     // DEPOIS do cupom — ele vale só sobre o plano. No ciclo da fatura (o
     // anual cobra o preço anual do add-on). Lidos agora, como o preço do plano.
     const adicionais = await AddonService.renewalItems({
@@ -1377,7 +1377,7 @@ class ChargeIssuingService {
         // valor a mais. A de valor mudado à mão (0078) não leva — o valor dela
         // não é a conta.
         + (existente?.amount_overridden_at ? '' : overageDescription(excedente))
-        // E os add-ons (0125), pelo mesmo motivo.
+        // E os add-ons (0126), pelo mesmo motivo.
         + (existente?.amount_overridden_at ? '' : addonDescription(adicionais)),
       // O formato que o webhook espera de volta, com o período junto: é por
       // ele que a entrega acha o provedor sem depender do cadastro do cliente
@@ -1582,7 +1582,7 @@ class ChargeIssuingService {
   }
 
   /**
-   * Abre e emite a pró-rata da ATIVAÇÃO de um add-on (0125) que JÁ foi
+   * Abre e emite a pró-rata da ATIVAÇÃO de um add-on (0126) que JÁ foi
    * gravada — o mesmo desenho de `createProration`, com a chave do add-on
    * (`BillingCharge.addonProrationKey`): o índice único deduplica o segundo
    * clique, e a ativação repetida no mesmo período depois de a primeira
@@ -1705,7 +1705,7 @@ class ChargeIssuingService {
 
     const detalhe = BillingCharge.prorationDetailOf(linha);
     const doExcedente = isOverageCharge(linha);
-    // A pró-rata da ativação de um add-on (0125): referência e descrição próprias.
+    // A pró-rata da ativação de um add-on (0126): referência e descrição próprias.
     const doAddon = isAddonCharge(linha);
     const planoId = doExcedente || doAddon ? linha.plan_id : detalhe?.toPlanId;
     const plano = planoId ? await Plan.findById(planoId) : null;

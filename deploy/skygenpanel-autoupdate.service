@@ -1,0 +1,19 @@
+[Unit]
+Description=TR69 Controle automatic update (newest published release)
+After=network-online.target skygenpanel.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# root, as `skygenpanel update` itself needs: it rewrites /opt/skygenpanel,
+# runs npm there and restarts the panel unit.
+User=root
+ExecStart=/usr/local/bin/skygenpanel-autoupdate run
+# A backup, `npm ci` twice and a frontend build, and possibly the same again
+# for a rollback. The 90-second default would kill it in the middle of npm.
+TimeoutStartSec=45min
+# Lighter hardening than the backup unit, on purpose: an update writes the
+# install, /root/.npm and /usr/local/bin, and talks to systemd. Anything
+# stricter breaks it, and a broken updater is found the day a fix is urgent.
+NoNewPrivileges=true
+PrivateTmp=true

@@ -2,7 +2,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 /**
- * A página de status (0126).
+ * A página de status (0127).
  *
  * 1. A conta: a disponibilidade do dia e dos 90 dias, o estado de cada
  *    componente pelas verificações e pelos incidentes abertos.

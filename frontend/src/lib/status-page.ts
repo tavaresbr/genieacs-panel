@@ -4,7 +4,7 @@ import type {
 import type { TranslationKey } from '@/lib/i18n'
 
 /**
- * As peças puras da página de status (0126): a página pública `/status` e a
+ * As peças puras da página de status (0127): a página pública `/status` e a
  * aba Status do console. Fora dos componentes para os testes fixarem sem React.
  */
 

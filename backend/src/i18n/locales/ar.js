@@ -88,6 +88,13 @@ export default {
   'asaas.error.unreachable': 'Could not reach Asaas. Try again in a moment',
   'asaas.error.gatewayDown': 'Asaas is unavailable right now. Try again in a moment',
   'asaas.error.refused': 'Asaas refused the request',
+  'asaas.importLoaded': 'Asaas import status loaded',
+  'asaas.importLoadFailed': 'Failed to load the Asaas import status',
+  'asaas.importStarted': 'Asaas import started',
+  'asaas.importStartFailed': 'Failed to start the Asaas import',
+  'asaas.error.notConfigured': 'Connect and enable the Asaas integration first',
+  'asaas.error.nothingToImport': 'Turn on at least one of: import clients, import invoices',
+  'asaas.error.importRunning': 'An Asaas import is already running',
   'rateLimit.telegramTest': 'اختبارات تيليجرام كثيرة، انتظر دقيقة',
   'rateLimit.platformExport': 'عمليات تصدير كثيرة جدًا، يُرجى التمهّل',
   'rateLimit.sgpSync': 'عمليات مزامنة شاملة كثيرة جدًا. أعد المحاولة لاحقًا.',
@@ -882,6 +889,8 @@ export default {
   'whatsapp.alerts.waDisconnected': 'واتساب غير متصل: الرقم {account} متوقف منذ {minutes} دقيقة ولا تُرسل الرسائل إلى العملاء. أعد ربطه برمز QR من الإعدادات › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'تمت إعادة اتصال واتساب: الرقم {account} يعمل مجددًا',
   'whatsapp.alerts.metaQualityDropped': "تراجع الرقم الرسمي {account} لدى Meta: {changes}. راجع الإعدادات › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "الجودة {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "الحد اليومي {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "الحالة {to}",
@@ -1381,7 +1390,7 @@ export default {
   'auth.passwordMatchesIdentity': 'لا يمكن أن تكون كلمة المرور مطابقة لاسم المستخدم أو البريد الإلكتروني.',
 
 
-  // A página de status (0126): os componentes e o aviso aos provedores.
+  // A página de status (0127): os componentes e o aviso aos provedores.
   'status.component.panel': 'اللوحة',
   'status.component.payments': 'المدفوعات',
   'status.component.whatsapp': 'WhatsApp',
@@ -1395,7 +1404,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] اكتملت الصيانة: {title}',
   'status.notice.maintenanceDoneBody': 'مرحبًا {provider}. اكتملت الصيانة المجدولة على {components} ({title}).',
   'status.notice.follow': 'تابعها عبر صفحة الحالة: {link}',
-  // O portal do afiliado (0124).
+  // O portal do afiliado (0125).
   'affiliate.invalidCredentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
   'affiliate.loginSuccess': 'تم تسجيل الدخول',
   'affiliate.sessionRequired': 'سجّل الدخول إلى بوابة الشركاء',

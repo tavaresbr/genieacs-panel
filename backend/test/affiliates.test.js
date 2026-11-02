@@ -23,7 +23,7 @@ const { default: affiliatePortalRoutes } = await import('../src/routes/affiliate
 const { DEVELOPMENT_FALLBACK } = await import('../src/config/runtimeEnv.js');
 
 /**
- * O programa de afiliados (0124) — o dinheiro. O cadastro com `?aff=` está em
+ * O programa de afiliados (0125) — o dinheiro. O cadastro com `?aff=` está em
  * `affiliates-signup.test.js`, que precisa do SaaS.
  *
  * A montagem de `referrals.test.js`: o roteador do console e o do portal de
