@@ -402,6 +402,8 @@ function ProviderRoutes() {
                 <Route path="/nps" element={<Suspense fallback={<AuthFallback />}><NpsPage /></Suspense>} />
                 {/* O recibo do link do bot da plataforma, num deploy de endereço único. */}
                 <Route path="/receipt" element={<Suspense fallback={<AuthFallback />}><ReceiptPage /></Suspense>} />
+                {/* A página de status (0127), num deploy de endereço único. */}
+                <Route path="/status" element={<Suspense fallback={<AuthFallback />}><StatusPage /></Suspense>} />
                 {/* O portal do afiliado (0125), num deploy de endereço único. */}
                 <Route path="/afiliados" element={<Suspense fallback={<AuthFallback />}><AffiliatePortalPage /></Suspense>} />
                 <Route element={<ProtectedShell />}>

@@ -29,6 +29,9 @@ import 'dotenv/config';
  *   da Alfa com um token cru conhecido (`E2E_NPS_TOKEN`), que o e2e abre em
  *   `/nps#<token>`. Num banco de desenvolvimento o token conhecido não entra:
  *   quem o lesse aqui responderia a pesquisa;
+ * - uma afiliada (0125), **Carla Indica**, com senha conhecida (o portal
+ *   `/afiliados`), que indicou a Delta Link, com duas comissões do mês
+ *   anterior — o lote que o console monta, aprova e paga no e2e;
  * - a caixa da plataforma, sem membros (é onde o perfil da plataforma grava).
  *
  * As cobranças com id no gateway pressupõem um Asaas — de verdade não, que
@@ -307,6 +310,69 @@ async function garantirCaixaDaPlataforma() {
   });
 }
 
+/** A afiliada do e2e; a senha é pública como a dos donos (ver o cabeçalho). */
+const DEMO_AFFILIATE = Object.freeze({
+  name: 'Carla Indica',
+  email: 'carla@afiliados-demo.test',
+  password: 'Carla-Afiliada-2026',
+  code: 'A-CARDEMO',
+  pixKey: 'carla@pix-demo.test'
+});
+
+/**
+ * A afiliada, a indicação da Delta e duas comissões do mês ANTERIOR (no fuso
+ * de Brasília), soltas — o "Montar mês anterior" do console as junta num lote.
+ * Procurada pelo e-mail e pela referência do pagamento: rodar de novo não
+ * duplica nada.
+ */
+async function garantirAfiliada(delta) {
+  const db = getDb();
+  const { periodEnd, previousPeriod } = await import('../src/services/affiliatePayoutService.js');
+  // tenant-scope-exempt: `affiliates` é da plataforma, acima dos provedores.
+  let afiliada = await db('affiliates').where({ email: DEMO_AFFILIATE.email }).first();
+  if (!afiliada) {
+    const agora = aoSegundo(Date.now());
+    await db('affiliates').insert({
+      name: DEMO_AFFILIATE.name,
+      email: DEMO_AFFILIATE.email,
+      password_hash: await bcrypt.hash(DEMO_AFFILIATE.password, 10),
+      password_set_at: agora,
+      pix_key: DEMO_AFFILIATE.pixKey,
+      pix_key_type: 'EMAIL',
+      status: 'active',
+      code: DEMO_AFFILIATE.code,
+      approved_at: agora,
+      created_at: agora,
+      updated_at: agora
+    });
+    afiliada = await db('affiliates').where({ email: DEMO_AFFILIATE.email }).first();
+  }
+  // A indicação: a Delta veio pelo link dela há 60 dias.
+  // tenant-scope-exempt: a coluna da indicação é da linha do provedor, por id.
+  await db('tenants').where({ id: delta.tenant.id }).whereNull('referred_by_affiliate_id')
+    .update({ referred_by_affiliate_id: afiliada.id, referred_at: daqui(-60) });
+  const fimDoMes = periodEnd(previousPeriod(new Date()));
+  for (const [n, dias] of [[1, 20], [2, 8]]) {
+    const ref = `seed-demo:affiliate:delta:${n}`;
+    // tenant-scope-exempt: a comissão é da plataforma, lida pela referência única.
+    // eslint-disable-next-line no-await-in-loop -- duas linhas
+    if (await db('affiliate_commissions').where({ payment_ref: ref }).first()) continue;
+    // eslint-disable-next-line no-await-in-loop
+    await db('affiliate_commissions').insert({
+      affiliate_id: afiliada.id,
+      tenant_id: delta.tenant.id,
+      payment_ref: ref,
+      kind: 'commission',
+      base_cents: 39900,
+      rate_bp: 1000,
+      amount_cents: 3990,
+      status: 'accrued',
+      accrued_at: aoSegundo(fimDoMes.getTime() - dias * DIA),
+      created_at: aoSegundo(fimDoMes.getTime() - dias * DIA)
+    });
+  }
+}
+
 async function main() {
   await ensureSchema();
   const db = getDb();
@@ -468,11 +534,14 @@ async function main() {
     await garantirPesquisa(alfa.tenant.id, { raw: E2E_NPS_TOKEN, status: 'pending', asked_at: daqui(-1) });
   }
 
+  await garantirAfiliada(delta);
+
   console.log('Demo data ready:');
   for (const spec of DEMO_PROVIDERS) {
     const { tenant, novo } = provedores[spec.slug];
     console.log(`  ${tenant.name} (${tenant.slug}, id ${tenant.id})${novo ? '' : ' — already there'}: login ${spec.owner.email}`);
   }
+  console.log(`  Affiliate ${DEMO_AFFILIATE.name}: /afiliados with ${DEMO_AFFILIATE.email}`);
 }
 
 try {

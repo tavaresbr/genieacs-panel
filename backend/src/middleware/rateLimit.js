@@ -84,8 +84,20 @@ function accountKey(req) {
     : `ip:${tenantIpKey(req)}`;
 }
 
+/**
+ * O fator dos tetos SÓ no banco de teste (`APP_ENV=test`): os testes no
+ * navegador (`frontend/e2e`) rodam dezenas de telas do mesmo endereço, no
+ * mesmo minuto, e o balde de `/api` de uma pessoa só não é o que eles medem.
+ * Fora do teste a variável é ignorada — nenhum deploy afrouxa um limite por
+ * engano de configuração.
+ */
+const ESCALA = process.env.APP_ENV === 'test' && Number(process.env.RATE_LIMIT_SCALE) > 1
+  ? Math.floor(Number(process.env.RATE_LIMIT_SCALE))
+  : 1;
+
 function limiter(options) {
-  return rateLimit({ ...JSON_HEADERS, ...options });
+  const max = typeof options.max === 'number' ? options.max * ESCALA : options.max;
+  return rateLimit({ ...JSON_HEADERS, ...options, max });
 }
 
 export const apiLimiter = limiter({

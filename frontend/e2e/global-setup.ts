@@ -152,6 +152,10 @@ export default async function globalSetup(_config: FullConfig) {
     PUBLIC_BASE_URL: baseURL,
     ASAAS_BASE_URL: asaas.url,
     ASAAS_API_KEY: asaasKey,
+    // Os tetos de requisição × 10 (só vale com `APP_ENV=test`): a suíte
+    // inteira sai do mesmo endereço, e o balde de `/api` de uma pessoa
+    // esvaziava no meio dela.
+    RATE_LIMIT_SCALE: '10',
     // Nada de e-mail de verdade a partir de um `.env` de desenvolvimento.
     SMTP_URL: '',
     MAIL_FROM: ''
