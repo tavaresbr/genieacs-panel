@@ -1290,5 +1290,24 @@ export default {
   'subscription.pendingChange': 'Смена тарифа уже запланирована на {date}. Подтвердите, что хотите её заменить.',
   'subscription.reasonRequired': 'Укажите причину: она обязательна, чтобы применить смену сейчас или пропустить проверку лимитов.',
   'subscription.noRenewal': 'Нет текущего оплаченного периода: смену нельзя запланировать на продление.',
-  'subscription.invalidMode': 'Режим смены должен быть auto, now или renewal.'
+  'subscription.invalidMode': 'Режим смены должен быть auto, now или renewal.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Тариф не найден',
+  'priceChange.notFound': 'Изменение цены не найдено',
+  'priceChange.invalidCycle': 'Цикл должен быть monthly или annual.',
+  'priceChange.noCurrentPrice': 'У этого тарифа нет цены в этом цикле, которую можно изменить.',
+  'priceChange.invalidPrice': 'Новая цена должна быть больше нуля.',
+  'priceChange.samePrice': 'Новая цена совпадает с текущей.',
+  'priceChange.invalidNoticeDays': 'Срок уведомления должен быть от {min} до {max} дней.',
+  'priceChange.invalidDate': 'Дата вступления в силу должна быть корректной датой (ГГГГ-ММ-ДД).',
+  'priceChange.tooSoon': 'Дата вступления в силу должна быть не раньше {date} ({days} дн. уведомления).',
+  'priceChange.tooFar': 'Дата вступления в силу не может быть позже чем через два года.',
+  'priceChange.invalidNotify': 'Уведомление должно быть включено или выключено (true или false).',
+  'priceChange.alreadyScheduled': 'Для этого тарифа и цикла уже запланировано изменение цены на {date}. Отмените его, прежде чем планировать новое.',
+  'priceChange.notScheduled': 'Это изменение цены больше не запланировано.',
+  'priceChange.cycleMonthly': 'ежемесячно',
+  'priceChange.cycleAnnual': 'ежегодно',
+  'priceChange.noticeSubject': 'Изменение цены тарифа {plan}',
+  'priceChange.noticeBody': 'Здравствуйте, {provider}. Цена тарифа {plan} ({cycle}) меняется с {old} на {new} с {date}. Счета со сроком оплаты в эту дату или позже будут выставлены по новой цене; более ранние сохраняют текущую. Если есть вопросы, просто ответьте на это сообщение.'
 };

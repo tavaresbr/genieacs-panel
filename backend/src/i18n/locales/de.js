@@ -1290,5 +1290,24 @@ export default {
   'subscription.pendingChange': 'Für den {date} ist bereits ein Tarifwechsel geplant. Bestätigen Sie, dass Sie ihn ersetzen möchten.',
   'subscription.reasonRequired': 'Geben Sie einen Grund an: Er ist erforderlich, um den Wechsel sofort zu erzwingen oder die Limitprüfung zu überspringen.',
   'subscription.noRenewal': 'Es läuft kein bezahlter Zeitraum: Der Wechsel kann nicht zur Verlängerung geplant werden.',
-  'subscription.invalidMode': 'Der Wechselmodus muss auto, now oder renewal sein.'
+  'subscription.invalidMode': 'Der Wechselmodus muss auto, now oder renewal sein.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Tarif nicht gefunden',
+  'priceChange.notFound': 'Preisanpassung nicht gefunden',
+  'priceChange.invalidCycle': 'Der Zyklus muss monthly oder annual sein.',
+  'priceChange.noCurrentPrice': 'Dieser Tarif hat in diesem Zyklus keinen Preis, der angepasst werden könnte.',
+  'priceChange.invalidPrice': 'Der neue Preis muss größer als null sein.',
+  'priceChange.samePrice': 'Der neue Preis entspricht dem aktuellen.',
+  'priceChange.invalidNoticeDays': 'Die Vorankündigung muss zwischen {min} und {max} Tagen liegen.',
+  'priceChange.invalidDate': 'Das Gültigkeitsdatum muss ein gültiges Datum sein (JJJJ-MM-TT).',
+  'priceChange.tooSoon': 'Das Gültigkeitsdatum muss am {date} oder später liegen ({days} Tage Vorankündigung).',
+  'priceChange.tooFar': 'Das Gültigkeitsdatum darf nicht mehr als zwei Jahre in der Zukunft liegen.',
+  'priceChange.invalidNotify': 'Die Benachrichtigung muss ein- oder ausgeschaltet sein (true oder false).',
+  'priceChange.alreadyScheduled': 'Für diesen Tarif und Zyklus ist bereits eine Preisanpassung zum {date} geplant. Stornieren Sie sie, bevor Sie eine weitere planen.',
+  'priceChange.notScheduled': 'Diese Preisanpassung ist nicht mehr geplant.',
+  'priceChange.cycleMonthly': 'monatlich',
+  'priceChange.cycleAnnual': 'jährlich',
+  'priceChange.noticeSubject': 'Preisanpassung für den Tarif {plan}',
+  'priceChange.noticeBody': 'Hallo {provider}, der Preis des Tarifs {plan} ({cycle}) ändert sich ab dem {date} von {old} auf {new}. Rechnungen mit Fälligkeit an diesem Datum oder später enthalten den neuen Preis; frühere behalten den aktuellen. Bei Fragen antworten Sie einfach auf diese Nachricht.'
 };

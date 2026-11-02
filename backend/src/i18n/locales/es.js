@@ -1286,5 +1286,24 @@ export default {
   'subscription.pendingChange': 'Ya hay un cambio de plan programado para el {date}. Confirma que quieres reemplazarlo.',
   'subscription.reasonRequired': 'Indica el motivo: es obligatorio para forzar el cambio ahora o para omitir la verificación de límites.',
   'subscription.noRenewal': 'No hay un período pagado en curso: el cambio no se puede programar para la renovación.',
-  'subscription.invalidMode': 'El modo del cambio debe ser auto, now o renewal.'
+  'subscription.invalidMode': 'El modo del cambio debe ser auto, now o renewal.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Plan no encontrado',
+  'priceChange.notFound': 'Reajuste no encontrado',
+  'priceChange.invalidCycle': 'El ciclo debe ser monthly o annual.',
+  'priceChange.noCurrentPrice': 'Este plan no tiene precio en este ciclo para reajustar.',
+  'priceChange.invalidPrice': 'El precio nuevo debe ser mayor que cero.',
+  'priceChange.samePrice': 'El precio nuevo es igual al actual.',
+  'priceChange.invalidNoticeDays': 'La antelación del aviso debe ser de {min} a {max} días.',
+  'priceChange.invalidDate': 'La fecha de vigencia debe ser una fecha válida (AAAA-MM-DD).',
+  'priceChange.tooSoon': 'La fecha de vigencia debe ser a partir del {date} ({days} días de aviso).',
+  'priceChange.tooFar': 'La fecha de vigencia no puede superar dos años a partir de hoy.',
+  'priceChange.invalidNotify': 'El aviso debe estar activado o desactivado (verdadero o falso).',
+  'priceChange.alreadyScheduled': 'Ya hay un reajuste programado para este plan y ciclo, el {date}. Cancélelo antes de programar otro.',
+  'priceChange.notScheduled': 'Este reajuste ya no está programado.',
+  'priceChange.cycleMonthly': 'mensual',
+  'priceChange.cycleAnnual': 'anual',
+  'priceChange.noticeSubject': 'Reajuste del plan {plan}',
+  'priceChange.noticeBody': 'Hola, {provider}. El valor del plan {plan} ({cycle}) pasa de {old} a {new} a partir del {date}. Las facturas con vencimiento en esa fecha o después ya llegarán con el valor nuevo; las anteriores mantienen el valor actual. Ante cualquier duda, responda este mensaje.'
 };

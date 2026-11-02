@@ -1289,5 +1289,24 @@ export default {
   'subscription.pendingChange': '已有一个计划变更安排在 {date}。请确认要替换它。',
   'subscription.reasonRequired': '请填写原因：强制立即变更或跳过限额检查时必须填写。',
   'subscription.noRenewal': '当前没有已付费的周期：无法将变更安排在续订时。',
-  'subscription.invalidMode': '变更模式必须是 auto、now 或 renewal。'
+  'subscription.invalidMode': '变更模式必须是 auto、now 或 renewal。',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': '未找到套餐',
+  'priceChange.notFound': '未找到调价',
+  'priceChange.invalidCycle': '周期必须是 monthly 或 annual。',
+  'priceChange.noCurrentPrice': '此套餐在该周期没有可调整的价格。',
+  'priceChange.invalidPrice': '新价格必须大于零。',
+  'priceChange.samePrice': '新价格与当前价格相同。',
+  'priceChange.invalidNoticeDays': '提前通知天数必须在 {min} 到 {max} 天之间。',
+  'priceChange.invalidDate': '生效日期必须是有效日期（YYYY-MM-DD）。',
+  'priceChange.tooSoon': '生效日期必须在 {date} 或之后（提前 {days} 天通知）。',
+  'priceChange.tooFar': '生效日期不能晚于今天起两年。',
+  'priceChange.invalidNotify': '通知必须为开启或关闭（true 或 false）。',
+  'priceChange.alreadyScheduled': '此套餐和周期已在 {date} 安排了调价。请先取消，再安排新的调价。',
+  'priceChange.notScheduled': '此调价已不再处于已安排状态。',
+  'priceChange.cycleMonthly': '按月',
+  'priceChange.cycleAnnual': '按年',
+  'priceChange.noticeSubject': '{plan} 套餐调价通知',
+  'priceChange.noticeBody': '{provider}，您好。{plan} 套餐（{cycle}）的价格将从 {date} 起由 {old} 调整为 {new}。到期日在该日期或之后的账单将按新价格开具；之前的账单保持当前价格。如有疑问，请直接回复此消息。'
 };

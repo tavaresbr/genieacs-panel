@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { platformAPI, type Plan } from '@/lib/api'
+import { planPriceChangeAPI, platformAPI, type Plan } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { parseAmountToCents } from '@/lib/utils'
 import { overagePriceFromInput } from '@/lib/overage'
+import { PlanPriceChanges } from '@/components/platform/plan-price-changes'
+import { directPriceEdits } from '@/lib/price-change'
 
 interface Props {
   plans: Plan[]
@@ -226,6 +228,21 @@ export function PlanCatalog({ plans, onChange }: Props) {
       description: rascunho.pitch.trim() || null,
       features: rascunho.features.split('\n').map((linha) => linha.trim()).filter(Boolean),
       priceYearlyCents: anualCentavos
+    }
+
+    // A edição direta do preço (0122) muda o preço de quem já assina a partir
+    // da próxima fatura ainda não emitida, sem aviso. Continua existindo, mas
+    // pede confirmação com quantos provedores ela pega — e aponta para o
+    // reajuste agendado, que avisa antes e escolhe a data.
+    const atual = !criando ? plans.find((p) => p.id === editandoId) : undefined
+    if (atual) {
+      for (const [ciclo, centavos] of directPriceEdits(atual, precoCentavos, anualCentavos)) {
+        const previa = await planPriceChangeAPI.preview(atual.id, ciclo, centavos)
+        const afetados = previa.success && previa.data ? previa.data.preview.affected : (atual.subscribers ?? 0)
+        if (afetados > 0 && !window.confirm(t('platform.plans.priceEditConfirm', {
+          count: afetados, price: dinheiro(centavos, rascunho.currency.trim().toUpperCase() || atual.currency)
+        }))) return
+      }
     }
 
     setSalvando(true)
@@ -564,6 +581,8 @@ export function PlanCatalog({ plans, onChange }: Props) {
               </div>
             </div>
             {editandoEste(plan) && formulario}
+            {/* O reajuste de preço com data de vigência (0122). */}
+            <PlanPriceChanges plan={plan} onChange={onChange} />
           </div>
         ))}
       </div>

@@ -1289,5 +1289,24 @@ export default {
   'subscription.pendingChange': 'A plan change is already scheduled for {date}. Confirm that you want to replace it.',
   'subscription.reasonRequired': 'Enter a reason: it is required to force the change now or to skip the limit check.',
   'subscription.noRenewal': 'There is no paid period running: the change cannot be scheduled for the renewal.',
-  'subscription.invalidMode': 'The change mode must be auto, now or renewal.'
+  'subscription.invalidMode': 'The change mode must be auto, now or renewal.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Plan not found',
+  'priceChange.notFound': 'Price change not found',
+  'priceChange.invalidCycle': 'The cycle must be monthly or annual.',
+  'priceChange.noCurrentPrice': 'This plan has no price in this cycle to change.',
+  'priceChange.invalidPrice': 'The new price must be greater than zero.',
+  'priceChange.samePrice': 'The new price is the same as the current one.',
+  'priceChange.invalidNoticeDays': 'The notice period must be between {min} and {max} days.',
+  'priceChange.invalidDate': 'The effective date must be a valid date (YYYY-MM-DD).',
+  'priceChange.tooSoon': 'The effective date must be {date} or later ({days} days of notice).',
+  'priceChange.tooFar': 'The effective date cannot be more than two years from today.',
+  'priceChange.invalidNotify': 'The notice must be turned on or off (true or false).',
+  'priceChange.alreadyScheduled': 'A price change is already scheduled for this plan and cycle, on {date}. Cancel it before scheduling another.',
+  'priceChange.notScheduled': 'This price change is no longer scheduled.',
+  'priceChange.cycleMonthly': 'monthly',
+  'priceChange.cycleAnnual': 'annual',
+  'priceChange.noticeSubject': 'Price change for the {plan} plan',
+  'priceChange.noticeBody': 'Hello, {provider}. The price of the {plan} plan ({cycle}) changes from {old} to {new} starting {date}. Invoices due on that date or later will carry the new price; earlier ones keep the current price. If you have any questions, just reply to this message.'
 };

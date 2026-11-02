@@ -203,7 +203,12 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
   ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404'],
   ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe'],
-  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404']
+  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404'],
+  // O reajuste de preço (0122): id de plano e de reajuste, tabelas do catálogo
+  // (`plans`, `plan_price_changes`), sem vizinho a alcançar.
+  ['GET /api/platform/plans/:id/price-change-preview', 'plano de controle; prova em plan-price-change.test.js — só lê, e plano que não existe é 404'],
+  ['POST /api/platform/plans/:id/price-changes', 'plano de controle; prova em plan-price-change.test.js — plano que não existe é 404, e quem não é da plataforma é 403'],
+  ['POST /api/platform/plan-price-changes/:id/cancel', 'plano de controle; prova em plan-price-change.test.js — reajuste que não existe é 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -442,7 +447,14 @@ describe('toda rota endereçada por um parâmetro', () => {
   // (`GET .../subscription/plan-preview`): o que cada modo faria, só leitura,
   // no provedor da URL. Mesmo pedágio: uma linha em `DO_CONSOLE` e mais uma
   // aqui; prova em platform-plan-change.test.js. São 74.
-  const TETO_DE_EXCECOES = 74;
+  //
+  // E as três do reajuste de preço com data de vigência (0122): a prévia e o
+  // agendamento em `/plans/:id/...` e o cancelamento em
+  // `/plan-price-changes/:id/cancel`. Ids de tabela do catálogo (`plans`,
+  // `plan_price_changes`), como o `PATCH /plans/:id`: não há vizinho a
+  // alcançar. Mesmo pedágio, três vezes: três linhas em `DO_CONSOLE` e três
+  // aqui; prova em plan-price-change.test.js. São 77.
+  const TETO_DE_EXCECOES = 77;
 
 
   /**
@@ -501,7 +513,10 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/credits',
     'DELETE /api/platform/tenants/:id/subscription/cancellation',
     'POST /api/platform/alerts/:id/resend',
-    'GET /api/platform/tenants/:id/subscription/plan-preview'
+    'GET /api/platform/tenants/:id/subscription/plan-preview',
+    'GET /api/platform/plans/:id/price-change-preview',
+    'POST /api/platform/plans/:id/price-changes',
+    'POST /api/platform/plan-price-changes/:id/cancel'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

@@ -1288,5 +1288,24 @@ export default {
   'subscription.pendingChange': 'Já há uma troca de plano agendada para {date}. Confirme que quer substituí-la.',
   'subscription.reasonRequired': 'Informe o motivo: ele é obrigatório para forçar a troca agora ou para pular a checagem de limite.',
   'subscription.noRenewal': 'Não há um período pago correndo: a troca não pode ser agendada para a renovação.',
-  'subscription.invalidMode': 'O modo da troca deve ser auto, now ou renewal.'
+  'subscription.invalidMode': 'O modo da troca deve ser auto, now ou renewal.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Plano não encontrado',
+  'priceChange.notFound': 'Reajuste não encontrado',
+  'priceChange.invalidCycle': 'O ciclo deve ser monthly ou annual.',
+  'priceChange.noCurrentPrice': 'Este plano não tem preço neste ciclo para reajustar.',
+  'priceChange.invalidPrice': 'O preço novo deve ser um valor maior que zero.',
+  'priceChange.samePrice': 'O preço novo é igual ao de hoje.',
+  'priceChange.invalidNoticeDays': 'A antecedência do aviso deve ser de {min} a {max} dias.',
+  'priceChange.invalidDate': 'A data de vigência deve ser uma data válida (AAAA-MM-DD).',
+  'priceChange.tooSoon': 'A data de vigência deve ser a partir de {date} ({days} dias de aviso).',
+  'priceChange.tooFar': 'A data de vigência não pode passar de dois anos a partir de hoje.',
+  'priceChange.invalidNotify': 'O aviso deve ser ligado ou desligado (verdadeiro ou falso).',
+  'priceChange.alreadyScheduled': 'Já há um reajuste agendado para este plano e ciclo, em {date}. Cancele-o antes de agendar outro.',
+  'priceChange.notScheduled': 'Este reajuste não está mais agendado.',
+  'priceChange.cycleMonthly': 'mensal',
+  'priceChange.cycleAnnual': 'anual',
+  'priceChange.noticeSubject': 'Reajuste do plano {plan}',
+  'priceChange.noticeBody': 'Olá, {provider}. O valor do plano {plan} ({cycle}) passa de {old} para {new} a partir de {date}. As faturas com vencimento nessa data ou depois já virão com o valor novo; as anteriores continuam com o valor atual. Qualquer dúvida, é só responder esta mensagem.'
 };

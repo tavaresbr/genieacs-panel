@@ -1285,5 +1285,24 @@ export default {
   'subscription.pendingChange': 'Un changement de forfait est déjà programmé pour le {date}. Confirmez que vous voulez le remplacer.',
   'subscription.reasonRequired': 'Indiquez le motif : il est obligatoire pour forcer le changement maintenant ou pour ignorer la vérification des limites.',
   'subscription.noRenewal': 'Aucune période payée n\'est en cours : le changement ne peut pas être programmé au renouvellement.',
-  'subscription.invalidMode': 'Le mode du changement doit être auto, now ou renewal.'
+  'subscription.invalidMode': 'Le mode du changement doit être auto, now ou renewal.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Offre introuvable',
+  'priceChange.notFound': 'Révision de prix introuvable',
+  'priceChange.invalidCycle': 'Le cycle doit être monthly ou annual.',
+  'priceChange.noCurrentPrice': 'Cette offre n\'a pas de prix dans ce cycle à réviser.',
+  'priceChange.invalidPrice': 'Le nouveau prix doit être supérieur à zéro.',
+  'priceChange.samePrice': 'Le nouveau prix est identique au prix actuel.',
+  'priceChange.invalidNoticeDays': 'Le préavis doit être compris entre {min} et {max} jours.',
+  'priceChange.invalidDate': 'La date d\'entrée en vigueur doit être une date valide (AAAA-MM-JJ).',
+  'priceChange.tooSoon': 'La date d\'entrée en vigueur doit être le {date} ou plus tard ({days} jours de préavis).',
+  'priceChange.tooFar': 'La date d\'entrée en vigueur ne peut pas dépasser deux ans à partir d\'aujourd\'hui.',
+  'priceChange.invalidNotify': 'L\'avis doit être activé ou désactivé (vrai ou faux).',
+  'priceChange.alreadyScheduled': 'Une révision de prix est déjà programmée pour cette offre et ce cycle, le {date}. Annulez-la avant d\'en programmer une autre.',
+  'priceChange.notScheduled': 'Cette révision de prix n\'est plus programmée.',
+  'priceChange.cycleMonthly': 'mensuel',
+  'priceChange.cycleAnnual': 'annuel',
+  'priceChange.noticeSubject': 'Révision du prix de l\'offre {plan}',
+  'priceChange.noticeBody': 'Bonjour, {provider}. Le prix de l\'offre {plan} ({cycle}) passe de {old} à {new} à partir du {date}. Les factures dont l\'échéance tombe à cette date ou après porteront le nouveau prix ; les précédentes gardent le prix actuel. Pour toute question, répondez simplement à ce message.'
 };

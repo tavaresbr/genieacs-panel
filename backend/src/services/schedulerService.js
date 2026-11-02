@@ -26,6 +26,7 @@ import BillingInvoiceService from './billing/billingInvoiceService.js';
 import CardAutopayService from './billing/cardAutopayService.js';
 import CancellationService from './cancellationService.js';
 import PlatformAlertService from './platformAlertService.js';
+import PlanPriceChangeService from './planPriceChangeService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -212,6 +213,12 @@ class SchedulerService {
       // vez por provedor. Nunca lança.
       .then(() => PlatformAlertService.schedulerPass().catch((error) => {
         console.warn(`Could not send the platform alerts: ${error.message}`);
+      }))
+      // O reajuste de preço agendado (0122): o aviso, a reemissão do que já
+      // saiu com o preço velho e a aplicação na data. Fora do laço por
+      // provedor, como os alertas — o reajuste é do catálogo. Nunca lança.
+      .then(() => PlanPriceChangeService.schedulerPass().catch((error) => {
+        console.warn(`Could not run the plan price changes: ${error.message}`);
       }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))

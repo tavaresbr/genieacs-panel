@@ -1289,5 +1289,24 @@ export default {
   'subscription.pendingChange': '{date} के लिए एक प्लान बदलाव पहले से निर्धारित है। पुष्टि करें कि आप उसे बदलना चाहते हैं।',
   'subscription.reasonRequired': 'कारण दर्ज करें: बदलाव को अभी लागू करने या सीमा जाँच छोड़ने के लिए यह आवश्यक है।',
   'subscription.noRenewal': 'कोई भुगतान की गई अवधि चल नहीं रही है: बदलाव को नवीनीकरण पर निर्धारित नहीं किया जा सकता।',
-  'subscription.invalidMode': 'बदलाव का मोड auto, now या renewal होना चाहिए।'
+  'subscription.invalidMode': 'बदलाव का मोड auto, now या renewal होना चाहिए।',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'प्लान नहीं मिला',
+  'priceChange.notFound': 'मूल्य परिवर्तन नहीं मिला',
+  'priceChange.invalidCycle': 'चक्र monthly या annual होना चाहिए।',
+  'priceChange.noCurrentPrice': 'इस प्लान का इस चक्र में बदलने के लिए कोई मूल्य नहीं है।',
+  'priceChange.invalidPrice': 'नया मूल्य शून्य से अधिक होना चाहिए।',
+  'priceChange.samePrice': 'नया मूल्य मौजूदा मूल्य के बराबर है।',
+  'priceChange.invalidNoticeDays': 'सूचना की अग्रिम अवधि {min} से {max} दिनों के बीच होनी चाहिए।',
+  'priceChange.invalidDate': 'प्रभावी तिथि एक मान्य तिथि (YYYY-MM-DD) होनी चाहिए।',
+  'priceChange.tooSoon': 'प्रभावी तिथि {date} या उसके बाद की होनी चाहिए ({days} दिन की सूचना)।',
+  'priceChange.tooFar': 'प्रभावी तिथि आज से दो साल से अधिक आगे नहीं हो सकती।',
+  'priceChange.invalidNotify': 'सूचना चालू या बंद होनी चाहिए (true या false)।',
+  'priceChange.alreadyScheduled': 'इस प्लान और चक्र के लिए {date} को पहले से एक मूल्य परिवर्तन निर्धारित है। दूसरा निर्धारित करने से पहले इसे रद्द करें।',
+  'priceChange.notScheduled': 'यह मूल्य परिवर्तन अब निर्धारित नहीं है।',
+  'priceChange.cycleMonthly': 'मासिक',
+  'priceChange.cycleAnnual': 'वार्षिक',
+  'priceChange.noticeSubject': '{plan} प्लान का मूल्य परिवर्तन',
+  'priceChange.noticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का मूल्य {date} से {old} से बदलकर {new} हो रहा है। उस तिथि या उसके बाद देय इनवॉइस नए मूल्य पर आएँगे; पहले वाले मौजूदा मूल्य पर ही रहेंगे। कोई प्रश्न हो तो बस इस संदेश का उत्तर दें।'
 };

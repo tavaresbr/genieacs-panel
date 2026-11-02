@@ -1640,6 +1640,8 @@ export interface Plan {
   createdAt: string | null
   /** How many providers are on it — only from the console's list. */
   subscribers?: number
+  /** Os reajustes do plano (0122): os agendados e o histórico recente. Só na lista do console. */
+  priceChanges?: PlanPriceChange[]
 }
 
 /** O plano como a página pública o mostra. */
@@ -1967,6 +1969,11 @@ export interface SubscriptionUsage {
  * assina hoje. Limite nulo é ilimitado.
  */
 export interface TenantPlanOption {
+  /**
+   * Só no plano atual (`current`): o reajuste agendado que pega esta
+   * assinatura (0122), ou nulo. Opcional: servidores antigos não mandam.
+   */
+  priceChange?: UpcomingPriceChange | null
   id: number
   code: string
   name: string
@@ -7124,4 +7131,67 @@ export interface ConsolePlanChangeOutcome {
     reason?: string
     chargeId?: number
   } | null
+}
+
+// ── O reajuste de preço com data de vigência (0122) ─────────────────────
+
+/** Um reajuste do catálogo: o preço de um ciclo de um plano muda numa data. */
+export interface PlanPriceChange {
+  id: number
+  planId: number
+  cycle: BillingCycle
+  oldCents: number
+  newCents: number
+  /** A data de vigência, `YYYY-MM-DD` no fuso da cobrança. */
+  effectiveAt: string
+  noticeDays: number
+  notify: boolean
+  status: 'scheduled' | 'applied' | 'canceled'
+  reason: string | null
+  createdAt: string | null
+  notifiedAt: string | null
+  appliedAt: string | null
+  canceledAt: string | null
+}
+
+/** A prévia: quantos o preço novo pega e a soma das faturas de um ciclo, antes e depois. */
+export interface PlanPriceChangePreview {
+  planId: number
+  cycle: BillingCycle
+  currency: string
+  currentCents: number | null
+  newCents: number | null
+  affected: number
+  /** Os isentos no mesmo plano e ciclo: não pagam, e não mudam. */
+  exempt: number
+  revenueBeforeCents: number
+  revenueAfterCents: number
+  deltaCents: number
+}
+
+/** O reajuste agendado que pega a assinatura do provedor — o aviso da tela de Plano. */
+export interface UpcomingPriceChange {
+  cycle: BillingCycle
+  oldCents: number
+  newCents: number
+  effectiveAt: string
+  currency: string
+}
+
+export const planPriceChangeAPI = {
+  preview: (planId: number, cycle: BillingCycle, newCents?: number | null) => {
+    const params = new URLSearchParams({ cycle })
+    if (newCents !== undefined && newCents !== null) params.set('newCents', String(newCents))
+    return apiClient.get<{ preview: PlanPriceChangePreview }>(`/platform/plans/${planId}/price-change-preview?${params.toString()}`)
+  },
+
+  schedule: (planId: number, payload: {
+    cycle: BillingCycle; newCents: number; effectiveAt: string; noticeDays: number; notify: boolean; reason?: string | null
+  }) =>
+    apiClient.post<{ priceChange: PlanPriceChange; preview: PlanPriceChangePreview | null }>(
+      `/platform/plans/${planId}/price-changes`, payload
+    ),
+
+  cancel: (id: number) =>
+    apiClient.post<{ priceChange: PlanPriceChange }>(`/platform/plan-price-changes/${id}/cancel`, {})
 }

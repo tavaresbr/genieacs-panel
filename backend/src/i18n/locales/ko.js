@@ -1292,5 +1292,24 @@ export default {
   'subscription.pendingChange': '{date}에 이미 요금제 변경이 예약되어 있습니다. 교체할지 확인해 주세요.',
   'subscription.reasonRequired': '사유를 입력하세요. 지금 변경을 강제하거나 한도 확인을 건너뛰려면 필수입니다.',
   'subscription.noRenewal': '진행 중인 결제 기간이 없어 갱신 시점으로 변경을 예약할 수 없습니다.',
-  'subscription.invalidMode': '변경 모드는 auto, now 또는 renewal이어야 합니다.'
+  'subscription.invalidMode': '변경 모드는 auto, now 또는 renewal이어야 합니다.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': '요금제를 찾을 수 없습니다',
+  'priceChange.notFound': '가격 조정을 찾을 수 없습니다',
+  'priceChange.invalidCycle': '주기는 monthly 또는 annual이어야 합니다.',
+  'priceChange.noCurrentPrice': '이 요금제에는 이 주기에서 조정할 가격이 없습니다.',
+  'priceChange.invalidPrice': '새 가격은 0보다 커야 합니다.',
+  'priceChange.samePrice': '새 가격이 현재 가격과 같습니다.',
+  'priceChange.invalidNoticeDays': '사전 안내 기간은 {min}일에서 {max}일 사이여야 합니다.',
+  'priceChange.invalidDate': '적용일은 올바른 날짜(YYYY-MM-DD)여야 합니다.',
+  'priceChange.tooSoon': '적용일은 {date} 이후여야 합니다({days}일 사전 안내).',
+  'priceChange.tooFar': '적용일은 오늘부터 2년을 넘을 수 없습니다.',
+  'priceChange.invalidNotify': '안내는 켜기 또는 끄기(true 또는 false)여야 합니다.',
+  'priceChange.alreadyScheduled': '이 요금제와 주기에는 이미 {date}에 가격 조정이 예약되어 있습니다. 다른 조정을 예약하기 전에 취소하세요.',
+  'priceChange.notScheduled': '이 가격 조정은 더 이상 예약 상태가 아닙니다.',
+  'priceChange.cycleMonthly': '월간',
+  'priceChange.cycleAnnual': '연간',
+  'priceChange.noticeSubject': '{plan} 요금제 가격 조정',
+  'priceChange.noticeBody': '안녕하세요, {provider}님. {plan} 요금제({cycle}) 가격이 {date}부터 {old}에서 {new}(으)로 변경됩니다. 이 날짜 또는 그 이후가 만기인 청구서는 새 가격으로 발행되며, 그 이전 청구서는 현재 가격이 유지됩니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.'
 };

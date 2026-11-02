@@ -1287,5 +1287,24 @@ export default {
   'subscription.pendingChange': 'È già programmato un cambio di piano per il {date}. Conferma di volerlo sostituire.',
   'subscription.reasonRequired': 'Indica il motivo: è obbligatorio per forzare il cambio adesso o per saltare il controllo dei limiti.',
   'subscription.noRenewal': 'Non c\'è un periodo pagato in corso: il cambio non può essere programmato al rinnovo.',
-  'subscription.invalidMode': 'La modalità del cambio deve essere auto, now o renewal.'
+  'subscription.invalidMode': 'La modalità del cambio deve essere auto, now o renewal.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'Piano non trovato',
+  'priceChange.notFound': 'Adeguamento di prezzo non trovato',
+  'priceChange.invalidCycle': 'Il ciclo deve essere monthly o annual.',
+  'priceChange.noCurrentPrice': 'Questo piano non ha un prezzo in questo ciclo da adeguare.',
+  'priceChange.invalidPrice': 'Il nuovo prezzo deve essere maggiore di zero.',
+  'priceChange.samePrice': 'Il nuovo prezzo è uguale a quello attuale.',
+  'priceChange.invalidNoticeDays': 'Il preavviso deve essere compreso tra {min} e {max} giorni.',
+  'priceChange.invalidDate': 'La data di decorrenza deve essere una data valida (AAAA-MM-GG).',
+  'priceChange.tooSoon': 'La data di decorrenza deve essere dal {date} in poi ({days} giorni di preavviso).',
+  'priceChange.tooFar': 'La data di decorrenza non può superare due anni da oggi.',
+  'priceChange.invalidNotify': 'L\'avviso deve essere attivato o disattivato (vero o falso).',
+  'priceChange.alreadyScheduled': 'C\'è già un adeguamento programmato per questo piano e ciclo, il {date}. Annullalo prima di programmarne un altro.',
+  'priceChange.notScheduled': 'Questo adeguamento non è più programmato.',
+  'priceChange.cycleMonthly': 'mensile',
+  'priceChange.cycleAnnual': 'annuale',
+  'priceChange.noticeSubject': 'Adeguamento del piano {plan}',
+  'priceChange.noticeBody': 'Ciao, {provider}. Il prezzo del piano {plan} ({cycle}) passa da {old} a {new} a partire dal {date}. Le fatture con scadenza in quella data o successiva avranno il nuovo prezzo; quelle precedenti mantengono il prezzo attuale. Per qualsiasi dubbio, rispondi a questo messaggio.'
 };

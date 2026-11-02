@@ -1281,5 +1281,24 @@ export default {
   'subscription.pendingChange': 'يوجد بالفعل تغيير خطة مجدول في {date}. أكّد أنك تريد استبداله.',
   'subscription.reasonRequired': 'أدخل السبب: إنه مطلوب لفرض التغيير الآن أو لتخطي التحقق من الحدود.',
   'subscription.noRenewal': 'لا توجد فترة مدفوعة جارية: لا يمكن جدولة التغيير عند التجديد.',
-  'subscription.invalidMode': 'يجب أن يكون وضع التغيير auto أو now أو renewal.'
+  'subscription.invalidMode': 'يجب أن يكون وضع التغيير auto أو now أو renewal.',
+
+  // O reajuste de preço com data de vigência (0122)
+  'priceChange.planNotFound': 'الخطة غير موجودة',
+  'priceChange.notFound': 'تعديل السعر غير موجود',
+  'priceChange.invalidCycle': 'يجب أن تكون الدورة monthly أو annual.',
+  'priceChange.noCurrentPrice': 'لا يوجد لهذه الخطة سعر في هذه الدورة لتعديله.',
+  'priceChange.invalidPrice': 'يجب أن يكون السعر الجديد أكبر من صفر.',
+  'priceChange.samePrice': 'السعر الجديد مساوٍ للسعر الحالي.',
+  'priceChange.invalidNoticeDays': 'يجب أن تكون مدة الإشعار المسبق بين {min} و{max} يومًا.',
+  'priceChange.invalidDate': 'يجب أن يكون تاريخ السريان تاريخًا صالحًا (YYYY-MM-DD).',
+  'priceChange.tooSoon': 'يجب أن يكون تاريخ السريان في {date} أو بعده ({days} يومًا من الإشعار).',
+  'priceChange.tooFar': 'لا يمكن أن يتجاوز تاريخ السريان عامين من اليوم.',
+  'priceChange.invalidNotify': 'يجب تشغيل الإشعار أو إيقافه (true أو false).',
+  'priceChange.alreadyScheduled': 'يوجد بالفعل تعديل سعر مجدول لهذه الخطة والدورة في {date}. ألغه قبل جدولة تعديل آخر.',
+  'priceChange.notScheduled': 'لم يعد تعديل السعر هذا مجدولًا.',
+  'priceChange.cycleMonthly': 'شهري',
+  'priceChange.cycleAnnual': 'سنوي',
+  'priceChange.noticeSubject': 'تعديل سعر الخطة {plan}',
+  'priceChange.noticeBody': 'مرحبًا {provider}. يتغير سعر الخطة {plan} ({cycle}) من {old} إلى {new} اعتبارًا من {date}. الفواتير المستحقة في هذا التاريخ أو بعده ستصدر بالسعر الجديد، أما السابقة فتبقى بالسعر الحالي. لأي استفسار، يكفي الرد على هذه الرسالة.'
 };
