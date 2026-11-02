@@ -883,6 +883,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp disconnesso: il numero {account} è caduto da {minutes} min e i messaggi ai clienti non partono. Ricollegalo con il QR in Impostazioni › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp ricollegato: il numero {account} funziona di nuovo',
   'whatsapp.alerts.metaQualityDropped': "Il numero ufficiale {account} è peggiorato su Meta: {changes}. Vedi Impostazioni › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "qualità {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "limite giornaliero {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "stato {to}",

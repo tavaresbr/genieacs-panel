@@ -884,6 +884,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp 已中斷：號碼 {account} 已中斷 {minutes} 分鐘，傳給客戶的訊息無法送出。請在 設定 › WhatsApp 掃描 QR 碼重新連線{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新連線：號碼 {account} 恢復正常',
   'whatsapp.alerts.metaQualityDropped': "官方號碼 {account} 在 Meta 的狀況變差：{changes}。請查看 設定 › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "品質 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "每日上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "狀態 {to}",

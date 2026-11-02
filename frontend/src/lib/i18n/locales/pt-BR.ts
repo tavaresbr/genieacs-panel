@@ -1134,7 +1134,7 @@ const ptBR: Dictionary = {
   'settings.chatbot.aiSuggest': 'Sugerir respostas aos atendentes',
   'settings.chatbot.aiSuggestHint': 'Botão "Sugerir (IA)" na conversa: a IA escreve um rascunho, o atendente revisa e envia.',
   'settings.chatbot.aiSales': 'Encaminhar interessados em contratar',
-  'settings.chatbot.aiSalesHint': 'Quando alguém quer contratar, a IA registra o nome (e o bairro) numa nota interna, marca a conversa com a etiqueta “Venda” e passa para um atendente. Ela só usa o que estiver nas instruções da empresa.',
+  'settings.chatbot.aiSalesHint': 'Quando alguém quer contratar, a IA registra o nome (e o bairro) numa nota interna, marca a conversa com a etiqueta “Venda” e passa para um atendente. Ela só usa o que estiver nas instruções da empresa. Com os alertas ligados, a equipe também é avisada por WhatsApp, e-mail ou Telegram.',
   'settings.chatbot.aiBaseUrl': 'Endereço da API',
   'settings.chatbot.aiBaseUrlHint': 'Chave comum da z.ai: api.z.ai/api/paas/v4. GLM Coding Plan: api.z.ai/api/coding/paas/v4. Chave do bigmodel.cn: open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Endereço fixo da Anthropic; só mude se usar um proxy próprio.',

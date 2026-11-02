@@ -1134,7 +1134,7 @@ const fr: Dictionary = {
   'settings.chatbot.aiSuggest': 'Suggérer des réponses aux agents',
   'settings.chatbot.aiSuggestHint': 'Bouton « Suggérer (IA) » dans la conversation : l’IA rédige un brouillon, l’agent le relit et l’envoie.',
   'settings.chatbot.aiSales': 'Hand off people who want to sign up',
-  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions.',
+  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions. With alerts turned on, the team is also notified by WhatsApp, email or Telegram.',
   'settings.chatbot.aiBaseUrl': 'Adresse de l’API',
   'settings.chatbot.aiBaseUrlHint': 'Clé z.ai standard : api.z.ai/api/paas/v4. GLM Coding Plan : api.z.ai/api/coding/paas/v4. Clé bigmodel.cn : open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Fixed Anthropic address; change it only if you use your own proxy.',

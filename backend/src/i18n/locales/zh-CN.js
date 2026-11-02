@@ -885,6 +885,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp 已断开：号码 {account} 已中断 {minutes} 分钟，发给客户的消息无法发送。请在 设置 › WhatsApp 中扫描二维码重新连接{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新连接：号码 {account} 恢复正常',
   'whatsapp.alerts.metaQualityDropped': "官方号码 {account} 在 Meta 的状况变差：{changes}。请查看 设置 › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "质量 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "每日上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "状态 {to}",

@@ -886,6 +886,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp डिस्कनेक्ट: नंबर {account} {minutes} मिनट से बंद है और ग्राहकों को संदेश नहीं जा रहे। सेटिंग्स › WhatsApp में QR से फिर से जोड़ें{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp फिर से जुड़ा: नंबर {account} फिर से काम कर रहा है',
   'whatsapp.alerts.metaQualityDropped': "आधिकारिक नंबर {account} की स्थिति Meta पर खराब हुई: {changes}. सेटिंग्स › WhatsApp देखें{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "गुणवत्ता {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "दैनिक सीमा {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "स्थिति {to}",
