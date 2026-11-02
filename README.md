@@ -411,13 +411,20 @@ is deleted with the client.
 
 ### Pre-registration with a contract
 
-**Settings → SGP → Pre-registration with contract** holds the SGP ids that a client with a contract needs. The URA API has no call that lists them, so the admin types them once:
+**Settings → SGP → Pre-registration with contract** holds the SGP ids that a client with a contract needs:
 
 - the plans and due days, each with an id and a name, which the form shows as lists;
-- the POP, carrier and seller ids, sent with every pre-registration;
+- the sellers, technicians, POPs, carriers and splitters (CTOs) lists;
+- the default POP, carrier and seller, sent with every pre-registration;
 - whether to create an installation work order by default, and whether to convert the pre-registration into a definitive client right away.
 
-With plans configured, **New client** offers **Client with contract**. The panel then sends `POST /api/precadastro/F` or `/J` with the plan, due day, PPPoE login and password. The password is generated and can be edited.
+**Import from SGP** tries the list route for each catalogue — `/api/precadastro/{kind}/list` by default, with `{kind}` = `plano`, `vencimento`, `pop`, `portador`, `vendedor`, `tecnico` and `splitter`. These routes are not in the URA documentation, so the route is editable and each list reports whether it answered. What comes back fills the screen (the SGP's name wins for an id it knows; rows typed by hand stay), and nothing is saved until the admin clicks Save. Splitters keep their coordinates and port count when the SGP sends them.
+
+With plans configured, **New client** offers **Client with contract**. The panel then sends `POST /api/precadastro/F` or `/J` with the plan, due day, PPPoE login and password. The password is generated and can be edited. The form also:
+
+- pre-selects the plan and due day most active contracts already have;
+- picks the seller (default: the configured one), the work-order technician, and the splitter and port (`tecnico_id`, `splitter_id`, `splitter_porta`). Splitters are listed nearest to the client's address first when both have coordinates;
+- checks the PPPoE login against the synced SGP contracts and the panel's accounts. A login in use is refused, and the form suggests the next free variation (`maria.souza2`).
 
 If the SGP answers without a client id (a pre-registration not converted yet), the client is kept in the panel with a note, and the contacts sync joins it later.
 

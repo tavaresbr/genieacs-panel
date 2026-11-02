@@ -65,9 +65,36 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   // Pre-registration with a contract: `F`/`J` appended, flat body (plan, due
   // day, POP, carrier, PPPoE login). Optionally converted into a client at once.
   preRegistration: '/api/precadastro/',
+  // Where the pre-registration catalogues are listed (plans, due days, POPs,
+  // carriers, sellers, technicians, splitters): `{kind}` becomes one of the
+  // fixed names in PRE_REG_CATALOG_KINDS. Not in the URA docs — the probable
+  // route, editable for installs that publish it elsewhere.
+  preRegistrationList: '/api/precadastro/{kind}/list',
   // The settlement of one invoice ("baixa"), from the SGP's banking API: the
   // invoice's own SGP id goes where `{id}` is.
   invoiceSettle: '/api/banco/titulo/{id}/baixar/'
+});
+
+/** The catalogues the pre-registration picks from, by the name `{kind}` takes. */
+export const PRE_REG_CATALOG_KINDS = Object.freeze(['plano', 'vencimento', 'pop', 'portador', 'vendedor', 'tecnico', 'splitter']);
+/** The config list each catalogue fills. */
+export const PRE_REG_CATALOG_FIELDS = Object.freeze({
+  plano: 'preRegPlans',
+  vencimento: 'preRegDueDays',
+  pop: 'preRegPops',
+  portador: 'preRegPortadores',
+  vendedor: 'preRegSellers',
+  tecnico: 'preRegTechnicians',
+  splitter: 'preRegSplitters'
+});
+const PRE_REG_CATALOG_NAMES = Object.freeze({
+  plano: ['planos', 'plano', 'plans'],
+  vencimento: ['vencimentos', 'vencimento'],
+  pop: ['pops', 'pop'],
+  portador: ['portadores', 'portador'],
+  vendedor: ['vendedores', 'vendedor'],
+  tecnico: ['tecnicos', 'tecnico'],
+  splitter: ['splitters', 'splitter', 'caixas', 'ctos']
 });
 
 /** What `forma_pagamento` carries when the operator has not listed the install's own. */
@@ -841,6 +868,11 @@ const DEFAULT_CONFIG = Object.freeze({
   preRegPopId: null,
   preRegPortadorId: null,
   preRegVendedorId: null,
+  preRegPops: [],
+  preRegPortadores: [],
+  preRegSellers: [],
+  preRegTechnicians: [],
+  preRegSplitters: [],
   preRegInstallOs: true,
   preRegActivate: false
 });
@@ -1041,6 +1073,16 @@ class SgpService {
     }
   }
 
+  /** The catalogue route: a plain endpoint that must say where `{kind}` goes. */
+  static normalizeCatalogEndpoint(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return DEFAULT_ENDPOINTS.preRegistrationList;
+    if (!raw.includes('{kind}')) {
+      throw new SgpError('sgp.error.catalogPathKind', { code: 'invalid_endpoint', status: 400 });
+    }
+    return this.normalizeEndpoint(raw, DEFAULT_ENDPOINTS.preRegistrationList);
+  }
+
   static normalizeEndpoint(value, fallback) {
     const text = stripLeadingPlaceholders(String(value ?? '').trim());
     if (!text) return fallback;
@@ -1181,9 +1223,35 @@ class SgpService {
       return items;
     };
     const flag = (value, fallbackValue) => (value === undefined ? fallbackValue === true : value === true);
+    const coordinate = (value, limit) => {
+      if (value === null || value === undefined || value === '') return null;
+      const parsed = Number(String(value).replace(',', '.'));
+      return Number.isFinite(parsed) && Math.abs(parsed) <= limit && parsed !== 0 ? parsed : null;
+    };
+    const splitters = (value, fallbackValue) => {
+      if (!Array.isArray(value)) return Array.isArray(fallbackValue) ? fallbackValue : [];
+      const base = list(value, [], 'label', 500);
+      const byId = new Map(value.map((entry) => [Number.parseInt(String(entry?.id ?? ''), 10), entry]));
+      return base.map((item) => {
+        const entry = byId.get(item.id) || {};
+        const lat = coordinate(entry.lat, 90);
+        const lng = coordinate(entry.lng, 180);
+        const ports = Number.parseInt(String(entry.ports ?? ''), 10);
+        return {
+          ...item,
+          ...(lat !== null && lng !== null ? { lat, lng } : {}),
+          ...(Number.isInteger(ports) && ports >= 1 && ports <= 128 ? { ports } : {})
+        };
+      });
+    };
     return {
       preRegPlans: list(source.preRegPlans, fallback.preRegPlans, 'name', 50),
       preRegDueDays: list(source.preRegDueDays, fallback.preRegDueDays, 'label', 31),
+      preRegPops: list(source.preRegPops, fallback.preRegPops, 'label', 200),
+      preRegPortadores: list(source.preRegPortadores, fallback.preRegPortadores, 'label', 200),
+      preRegSellers: list(source.preRegSellers, fallback.preRegSellers, 'label', 200),
+      preRegTechnicians: list(source.preRegTechnicians, fallback.preRegTechnicians, 'label', 200),
+      preRegSplitters: splitters(source.preRegSplitters, fallback.preRegSplitters),
       preRegPopId: optionalId(source.preRegPopId, fallback.preRegPopId),
       preRegPortadorId: optionalId(source.preRegPortadorId, fallback.preRegPortadorId),
       preRegVendedorId: optionalId(source.preRegVendedorId, fallback.preRegVendedorId),
@@ -1316,6 +1384,9 @@ class SgpService {
         preRegistration: this.normalizeEndpoint(
           patch.endpoints?.preRegistration ?? current.endpoints.preRegistration, DEFAULT_ENDPOINTS.preRegistration
         ),
+        preRegistrationList: this.normalizeCatalogEndpoint(
+          patch.endpoints?.preRegistrationList ?? current.endpoints.preRegistrationList
+        ),
         invoiceSettle: this.normalizeSettleEndpoint(
           patch.endpoints?.invoiceSettle ?? current.endpoints.invoiceSettle
         )
@@ -1415,10 +1486,17 @@ class SgpService {
    * @param {object} [limits] - `listing: true` for the client listing: its own
    *   deadline and body ceiling, and errors that say it was the listing.
    */
-  static async request(endpointKey, payload = {}, configOverride = null, { listing = false, pathSuffix = '', pathId = null, acceptText = false } = {}) {
+  static async request(endpointKey, payload = {}, configOverride = null, { listing = false, pathSuffix = '', pathId = null, pathKind = null, acceptText = false } = {}) {
     const config = this.requireReady(configOverride || await this.getConfig());
 
     let endpoint = config.endpoints[endpointKey] || DEFAULT_ENDPOINTS[endpointKey];
+    if (endpoint.includes('{kind}')) {
+      // A catalogue name from the fixed list, never input.
+      if (!PRE_REG_CATALOG_KINDS.includes(pathKind)) {
+        throw new SgpError('sgp.error.invalidResponse', { code: 'invalid_catalog', status: 400 });
+      }
+      endpoint = endpoint.replace('{kind}', pathKind);
+    }
     if (endpoint.includes('{id}')) {
       // Only an id the SGP itself sent, and only digits: nothing an operator
       // typed reaches the path.
@@ -2030,6 +2108,9 @@ class SgpService {
       pop_id: input.popId,
       portador_id: input.portadorId,
       vendedor_id: input.vendedorId,
+      tecnico_id: input.technicianId,
+      splitter_id: input.splitterId,
+      splitter_porta: input.splitterId ? input.splitterPort : '',
       login: input.login,
       senha: input.password,
       os_instalacao: input.installOs ? 1 : '',
@@ -2037,6 +2118,69 @@ class SgpService {
       servicodesc: input.serviceDescription,
       observacao: input.notes
     });
+  }
+
+  /**
+   * One pre-registration catalogue from the SGP — plans, due days, POPs… —
+   * as `{ id, label }` (splitters also `lat`/`lng`/`ports` when sent).
+   * The route is not in the URA docs, so the answer is read tolerantly: a bare
+   * array, or the first array under the usual names.
+   */
+  static async listPreRegistrationCatalog(kind, configOverride = null) {
+    const data = await this.request('preRegistrationList', {}, configOverride, { listing: true, pathKind: kind });
+    const rows = Array.isArray(data)
+      ? data
+      : firstArray(data, [...PRE_REG_CATALOG_NAMES[kind], 'result', 'results', 'dados', 'data', 'items', 'lista']);
+    const items = [];
+    const seen = new Set();
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      const id = Number.parseInt(String(pick(row, ['id', `${kind}_id`, `id_${kind}`, 'codigo']) ?? ''), 10);
+      if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+      const rawLabel = pick(row, ['nome', 'descricao', 'description', 'titulo', 'ident', 'name', 'label', 'dia', 'vencimento']);
+      const label = asText(rawLabel) ?? String(id);
+      seen.add(id);
+      const item = { id, label: (kind === 'vencimento' && /^\d{1,2}$/.test(label) ? `Dia ${label}` : label).slice(0, 120) };
+      if (kind === 'splitter') {
+        item.lat = pick(row, ['latitude', 'lat']);
+        item.lng = pick(row, ['longitude', 'lng', 'lon']);
+        const ll = asText(pick(row, ['map_ll', 'latlng', 'coordenadas']));
+        if ((item.lat === null || item.lng === null) && ll && ll.includes(',')) {
+          [item.lat, item.lng] = ll.split(',').map((part) => part.trim());
+        }
+        item.ports = pick(row, ['portas', 'qtd_portas', 'quantidade_portas', 'ports']);
+      }
+      items.push(item);
+    }
+    return items;
+  }
+
+  /**
+   * Tries every catalogue, one after the other, and answers each one's outcome
+   * — a list that is not there costs nothing but its own line. Nothing is saved
+   * here: the admin sees the result and saves.
+   */
+  static async importPreRegistrationCatalogs() {
+    const config = this.requireReady(await this.getConfig());
+    const results = {};
+    for (const kind of PRE_REG_CATALOG_KINDS) {
+      try {
+        const items = await this.listPreRegistrationCatalog(kind, config);
+        const normalized = this.readPreRegistration({ [PRE_REG_CATALOG_FIELDS[kind]]: items.map((item) => (
+          kind === 'plano' ? { id: item.id, name: item.label } : item
+        )) });
+        const list = normalized[PRE_REG_CATALOG_FIELDS[kind]];
+        results[kind] = { ok: true, count: list.length, items: list };
+      } catch (error) {
+        results[kind] = {
+          ok: false,
+          count: 0,
+          items: [],
+          error: error instanceof SgpError ? (error.code === 'http_error' ? `http_${error.translationVars?.status ?? ''}` : error.code) : 'unreachable'
+        };
+      }
+    }
+    return { endpoint: config.endpoints.preRegistrationList, results };
   }
 
   /**

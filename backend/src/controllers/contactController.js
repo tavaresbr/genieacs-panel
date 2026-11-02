@@ -308,13 +308,16 @@ class ContactController {
   /** `GET /api/contacts/sgp/precadastro/options` — the lists the form offers. */
   static async preRegistrationOptions(req, res) {
     try {
-      const config = await SgpService.getConfig();
-      return res.json(createResponse(null, {
-        ready: SgpService.isReady(config),
-        plans: config.preRegPlans,
-        dueDays: config.preRegDueDays,
-        installOs: config.preRegInstallOs
-      }));
+      return res.json(createResponse(null, await ContactOnboardingService.preRegistrationOptions()));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.lookupFailed');
+    }
+  }
+
+  /** `GET /api/contacts/sgp/precadastro/login?login=` — whether a PPPoE login is free, and a free variation. */
+  static async checkPreRegistrationLogin(req, res) {
+    try {
+      return res.json(createResponse(null, await ContactOnboardingService.checkLogin(req.query.login)));
     } catch (error) {
       return handleError(req, res, error, 'contacts.lookupFailed');
     }

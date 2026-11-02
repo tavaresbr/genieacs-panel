@@ -5,6 +5,7 @@ import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers }
 
 const { default: SgpService } = await import('../src/services/sgpService.js');
 const { default: TeiahService, normalizeConsult } = await import('../src/services/teiahService.js');
+const { default: SgpContact } = await import('../src/models/SgpContact.js');
 
 /**
  * "Novo cliente": o CPF/CNPJ primeiro, depois o cadastro, e — quando o
@@ -47,6 +48,19 @@ function startSgpStub() {
       };
       if (payload.app !== APP || payload.token !== TOKEN) return send({ status: 0, msg: 'Token inválido' });
       const doc = String(payload.cpfcnpj ?? '').replace(/\D/g, '');
+      // As listas do pré-cadastro: cada uma num formato, e algumas faltando.
+      if (req.url === '/api/precadastro/plano/list') {
+        return send([{ id: 7, descricao: 'Fibra 300' }, { id: 9, descricao: 'Fibra 600' }, { id: 'x', descricao: 'sem id' }]);
+      }
+      if (req.url === '/api/precadastro/vencimento/list') return send({ vencimentos: [{ id: 10, dia: 10 }, { id: 15, dia: 15 }] });
+      if (req.url === '/api/precadastro/vendedor/list') return send({ status: 1, vendedores: [{ id: 3, nome: 'Ana Vendas' }] });
+      if (req.url === '/api/precadastro/splitter/list') {
+        return send({ splitters: [
+          { id: 21, ident: 'CTO-01', latitude: '-3.7240', longitude: '-38.4930', portas: 8 },
+          { id: 22, ident: 'CTO-02', map_ll: '-3.80,-38.60', portas: '16' }
+        ] });
+      }
+      if (/^\/api\/precadastro\/\w+\/list$/.test(req.url)) return send({ detail: 'Not found' }, 404);
       if (req.url.startsWith('/api/precadastro/')) {
         criados.push({ path: req.url, body: payload });
         if (modoCriacao === 'recusa') return send({ status: 0, msg: 'Login já existe' });
@@ -598,5 +612,138 @@ describe('pré-cadastro com contrato', () => {
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(res.body.data.filed, 'panel');
     assert.match(res.body.data.notes ?? '', /Pré-cadastro enviado ao SGP/);
+  });
+});
+
+describe('listas do SGP, login livre e sugestões', () => {
+  const importar = () => call(`${panelUrl}/api/sgp/precadastro/import`, { method: 'POST', ...auth() });
+
+  it('importa o que cada rota respondeu e diz qual não respondeu, sem salvar nada', async () => {
+    const res = await importar();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const { results, endpoint } = res.body.data;
+    assert.equal(endpoint, '/api/precadastro/{kind}/list');
+    assert.deepEqual(results.plano.items, [{ id: 7, name: 'Fibra 300' }, { id: 9, name: 'Fibra 600' }]);
+    assert.deepEqual(results.vencimento.items, [{ id: 10, label: 'Dia 10' }, { id: 15, label: 'Dia 15' }]);
+    assert.deepEqual(results.vendedor.items, [{ id: 3, label: 'Ana Vendas' }]);
+    assert.deepEqual(results.splitter.items, [
+      { id: 21, label: 'CTO-01', lat: -3.724, lng: -38.493, ports: 8 },
+      { id: 22, label: 'CTO-02', lat: -3.8, lng: -38.6, ports: 16 }
+    ]);
+    assert.equal(results.pop.ok, false);
+    assert.equal(results.pop.error, 'http_404');
+    assert.equal(results.tecnico.ok, false);
+    const config = await call(`${panelUrl}/api/sgp/config`, auth());
+    assert.deepEqual(config.body.data.preRegSellers, [], 'a importação salvou sem o admin pedir');
+  });
+
+  it('a rota das listas é editável, mas precisa do {kind}', async () => {
+    const bad = await call(`${panelUrl}/api/sgp/config`, { method: 'PUT', ...auth(), body: { endpoints: { preRegistrationList: '/api/precadastro/list' } } });
+    assert.equal(bad.status, 400);
+    const ok = await call(`${panelUrl}/api/sgp/config`, { method: 'PUT', ...auth(), body: { endpoints: { preRegistrationList: 'api/v2/{kind}/list' } } });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.data.endpoints.preRegistrationList, '/api/v2/{kind}/list');
+    await call(`${panelUrl}/api/sgp/config`, { method: 'PUT', ...auth(), body: { endpoints: { preRegistrationList: '' } } });
+  });
+
+  it('só quem configura o SGP importa as listas', async () => {
+    const created = await call(`${panelUrl}/api/users`, {
+      method: 'POST', ...auth(),
+      body: { username: 'vendas-import', password: 'Senha-forte-123', email: 'vendas-import@exemplo.test', role: 'tech' }
+    });
+    assert.ok([200, 201].includes(created.status), JSON.stringify(created.body));
+    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { username: 'vendas-import', password: 'Senha-forte-123' } });
+    const res = await call(`${panelUrl}/api/sgp/precadastro/import`, { method: 'POST', headers: authHeaders(login.body.data.token) });
+    assert.equal(res.status, 403);
+  });
+
+  describe('com as listas salvas', () => {
+    const COM_CTO = (extra = {}) => ({
+      ...PESSOA,
+      document: '390.533.447-05',
+      planId: 9,
+      dueDayId: 15,
+      login: 'nova.cliente',
+      password: 'senha-123',
+      ...extra
+    });
+    const preCadastrar = (body) => call(`${panelUrl}/api/contacts/sgp/precadastro`, { method: 'POST', ...auth(), body });
+
+    before(async () => {
+      const imported = (await importar()).body.data.results;
+      const res = await call(`${panelUrl}/api/sgp/config`, {
+        method: 'PUT', ...auth(),
+        body: {
+          preRegPlans: imported.plano.items,
+          preRegDueDays: imported.vencimento.items,
+          preRegSellers: imported.vendedor.items,
+          preRegTechnicians: [{ id: 5, label: 'Carlos Técnico' }],
+          preRegSplitters: imported.splitter.items,
+          preRegVendedorId: 3
+        }
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.body.data.preRegSplitters[0].ports, 8);
+      await asTenant(async () => {
+        const contrato = (n, plan, dueDay, login, state = 'active') => SgpContact.upsertFromSgp({
+          contract: `LST-${n}`, document: '52998224725', client_name: `Cliente ${n}`, state, plan, due_day: dueDay, login
+        });
+        await contrato(1, 'FIBRA  600', '15', 'maria.souza');
+        await contrato(2, 'Fibra 600', 'Dia 15', 'maria.souza2');
+        await contrato(3, 'Fibra 300', '10', 'joao');
+        await contrato(4, 'Fibra 300', '10', 'jose', 'cancelled');
+        await contrato(5, 'Fibra 300', '10', 'ana', 'cancelled');
+      });
+    });
+
+    it('sugere o plano e o vencimento que mais contratos ativos têm', async () => {
+      const res = await call(`${panelUrl}/api/contacts/sgp/precadastro/options`, auth());
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.body.data.suggestedPlanId, 9);
+      assert.equal(res.body.data.suggestedDueDayId, 15);
+      assert.equal(res.body.data.defaultSellerId, 3);
+      assert.deepEqual(res.body.data.technicians, [{ id: 5, label: 'Carlos Técnico' }]);
+      assert.equal(res.body.data.splitters.length, 2);
+    });
+
+    it('avisa do login em uso e sugere a próxima variação livre', async () => {
+      const taken = await call(`${panelUrl}/api/contacts/sgp/precadastro/login?login=Maria.Souza`, auth());
+      assert.equal(taken.status, 200, JSON.stringify(taken.body));
+      assert.equal(taken.body.data.taken, true);
+      assert.equal(taken.body.data.suggestion, 'maria.souza3');
+      const free = await call(`${panelUrl}/api/contacts/sgp/precadastro/login?login=pedro.lima`, auth());
+      assert.equal(free.body.data.taken, false);
+      const bad = await call(`${panelUrl}/api/contacts/sgp/precadastro/login?login=com%20espaco`, auth());
+      assert.equal(bad.status, 400);
+    });
+
+    it('não pré-cadastra com login em uso', async () => {
+      criados.length = 0;
+      const res = await preCadastrar(COM_CTO({ login: 'joao' }));
+      assert.equal(res.status, 409);
+      assert.match(res.body.message, /joao2/);
+      assert.deepEqual(criados, []);
+    });
+
+    it('manda vendedor, técnico, CTO e porta escolhidos das listas', async () => {
+      criados.length = 0;
+      modoCriacao = 'ok';
+      const res = await preCadastrar(COM_CTO({ technicianId: 5, splitterId: 21, splitterPort: 4 }));
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      const [{ body }] = criados;
+      assert.equal(body.vendedor_id, 3, 'sem escolha vai o vendedor padrão');
+      assert.equal(body.tecnico_id, 5);
+      assert.equal(body.splitter_id, 21);
+      assert.equal(body.splitter_porta, 4);
+    });
+
+    it('recusa vendedor, técnico, CTO ou porta fora das listas', async () => {
+      criados.length = 0;
+      for (const extra of [{ sellerId: 99 }, { technicianId: 99 }, { splitterId: 99 }, { splitterId: 21, splitterPort: 9 }]) {
+        const res = await preCadastrar(COM_CTO({ document: '813.735.630-44', login: 'outra.pessoa', ...extra }));
+        assert.equal(res.status, 400, `${JSON.stringify(extra)} → ${JSON.stringify(res.body)}`);
+      }
+      assert.deepEqual(criados, []);
+    });
   });
 });

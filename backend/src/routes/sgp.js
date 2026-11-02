@@ -38,6 +38,7 @@ router.post('/sync', authenticateToken, requirePermission('sgp.act'), sgpSyncLim
 // `sgp.config` like the connection test next to it.
 router.get('/contacts/sync', authenticateToken, requirePermission('sgp.read'), SgpController.getContactsSync);
 router.post('/contacts/sync', authenticateToken, requirePermission('sgp.act'), sgpSyncLimiter, SgpController.syncContacts);
+router.post('/precadastro/import', authenticateToken, requirePermission('sgp.config'), sgpAdminLimiter, SgpController.importPreRegistration);
 router.post('/contacts/test', authenticateToken, requirePermission('sgp.config'), sgpAdminLimiter, SgpController.testContacts);
 router.get('/devices/:deviceId', authenticateToken, requirePermission('sgp.read'), sgpAdminLimiter, SgpController.getDeviceIntegration);
 router.post('/devices/:deviceId/link', authenticateToken, requirePermission('sgp.act'), sgpAdminLimiter, SgpController.linkDevice);

@@ -67,6 +67,14 @@ router.get(
   requirePermission('sgp.act'),
   ContactController.preRegistrationOptions
 );
+// Whether a PPPoE login is already in use, and a free variation.
+router.get(
+  '/sgp/precadastro/login',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('sgp.act'),
+  ContactController.checkPreRegistrationLogin
+);
 // The same, with a contract (SGP pre-registration): plan, due day, login.
 router.post(
   '/sgp/precadastro',
