@@ -112,7 +112,9 @@ Both listeners bind to `127.0.0.1` by default. This is suitable for a reverse pr
 
 | Command | Description |
 | --- | --- |
-| `skygenpanel update` | Fetch the latest source, rebuild the application, and restart the service |
+| `skygenpanel update [vX.Y.Z]` | Fetch the latest source (or that published release), rebuild, restart, and wait for the panel to answer its health check |
+| `skygenpanel auto-update enable` | Follow new releases on their own: every 15 minutes, back up and update to the newest published release, rolling back if it does not come up healthy. Off until enabled |
+| `skygenpanel auto-update status` | Installed version, newest release, and whether automatic updates are on (`check`, `run`, `disable` also available) |
 | `skygenpanel expose` | Bind the panel and customer portal to `0.0.0.0` |
 | `skygenpanel unexpose` | Return both listeners to `127.0.0.1` |
 | `skygenpanel restart` | Restart the system service |

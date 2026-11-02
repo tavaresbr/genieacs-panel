@@ -372,6 +372,13 @@ install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup.timer" /etc/systemd/syst
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
+# --- automatic updates (installed, off) -------------------------------------
+# Following new releases on its own is a decision about production, so it is
+# never on by default: `skygenpanel auto-update enable` turns it on.
+install -m 0755 "$INSTALL_DIR/deploy/skygenpanel-autoupdate" /usr/local/bin/skygenpanel-autoupdate
+install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-autoupdate.service" /etc/systemd/system/
+install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-autoupdate.timer" /etc/systemd/system/
+
 # --- start ------------------------------------------------------------------
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
