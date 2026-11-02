@@ -384,7 +384,8 @@ class AffiliatePayoutService {
         error: String(error?.message ?? 'transfer failed').slice(0, 500),
         updated_at: now
       });
-      console.error(`Affiliate payout ${lote.id}: the transfer failed (${error?.code ?? 'error'}): ${error?.message}`);
+      console.error(`Affiliate payout ${lote.id}: the transfer failed (${String(error?.code ?? 'error').replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 32)}): `
+        + `${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
     }
     return AffiliatePayoutService.findById(lote.id);
   }

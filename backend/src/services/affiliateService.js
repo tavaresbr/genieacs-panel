@@ -175,6 +175,12 @@ function inteiroOuNulo(bruto, { min, max, campo }) {
 
 const tabela = () => getDb()('affiliates');
 
+/**
+ * A versão das sessões do portal, subida na própria atualização (atômica, no
+ * banco): o cookie emitido antes dela deixa de valer — ver `affiliateAuth.js`.
+ */
+const bumpSessionVersion = () => getDb().raw('session_version + 1');
+
 class AffiliateService {
   static async findById(id, trx = null) {
     const numero = Number(id);
@@ -289,12 +295,14 @@ class AffiliateService {
     const patch = Object.fromEntries(changed.map((coluna) => [coluna, linha[coluna]]));
     // Trocar o e-mail encerra a sessão e o link de senha abertos: a senha é
     // da pessoa daquele endereço.
+    const extra = {};
     if (patch.email) {
       patch.password_token_hash = null;
       patch.password_token_expires_at = null;
+      extra.session_version = bumpSessionVersion();
     }
     try {
-      await tabela().where({ id: antes.id }).update({ ...patch, updated_at: now });
+      await tabela().where({ id: antes.id }).update({ ...patch, ...extra, updated_at: now });
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
       if (patch.email) throw new AffiliateError('An affiliate with this email already exists', { code: 'email_taken', field: 'email', status: 409 });
@@ -312,6 +320,9 @@ class AffiliateService {
     if (!antes) throw new AffiliateError('Affiliate not found', { code: 'not_found', status: 404 });
     if (antes.status === status) return { affiliate: antes, from: antes.status, changed: false };
     const patch = { status, updated_at: now };
+    // Suspender encerra as sessões abertas já no banco, além da conferência do
+    // status a cada requisição: reativar não ressuscita o cookie antigo.
+    if (status === 'suspended') patch.session_version = bumpSessionVersion();
     if (status === 'active' && !antes.approved_at) {
       patch.approved_at = now;
       patch.approved_by = actorUserId;
@@ -400,6 +411,7 @@ class AffiliateService {
       password_set_at: now,
       password_token_hash: null,
       password_token_expires_at: null,
+      session_version: bumpSessionVersion(),
       updated_at: now
     });
     if (!mudou) return { error: 'invalid_token' };

@@ -552,7 +552,7 @@ class WaAlertService {
       // `tick` swallows its own failures; this catch exists only so a bug in
       // that promise chain cannot become an unhandled rejection.
       void this.tick().catch((error) => {
-        console.warn(`WhatsApp alert tick failed: ${error.message}`);
+        console.warn(`WhatsApp alert tick failed: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
       });
     }, TICK_INTERVAL_MS);
     this.timer.unref();
@@ -590,7 +590,7 @@ class WaAlertService {
     if (!settings || !settings.enabled) return { skipped: 'disabled' };
     // O resumo tem relógio próprio: sai no horário mesmo entre duas varreduras.
     await this.flushDigest(settings).catch((error) => {
-      console.warn(`WhatsApp alert digest failed: ${error.message}`);
+      console.warn(`WhatsApp alert digest failed: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
     });
     await this.aiDailySummary();
     const lastScanAt = await this.readLastScanAt();
@@ -682,13 +682,13 @@ class WaAlertService {
       // À parte e calado: um incidente que não abre não derruba o alerta da
       // equipe, que já saiu.
       await OutageIncidentService.syncFromScan({ firing, unknown }).catch((error) => {
-        console.warn(`Outage incident sync failed: ${error.message}`);
+        console.warn(`Outage incident sync failed: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
       });
     } catch (error) {
       // Reported, not thrown — see the method comment.
       summary.error = error.message;
       summary.skipped = summary.skipped || 'error';
-      console.warn(`WhatsApp alert scan failed: ${error.message}`);
+      console.warn(`WhatsApp alert scan failed: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
     }
     return summary;
   }
@@ -846,7 +846,7 @@ class WaAlertService {
     try {
       manutencao = await MaintenanceService.activeScope({ now });
     } catch (error) {
-      console.warn(`WhatsApp alerts: maintenance scope unavailable: ${error.message}`);
+      console.warn(`WhatsApp alerts: maintenance scope unavailable: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
     }
     const emManutencao = manutencao?.deviceIds ?? new Set();
     if (emManutencao.size) {
@@ -1201,7 +1201,7 @@ class WaAlertService {
       if (!channels.whatsapp && !channels.email && !channels.telegram) return 0;
       return await this.notify({ channels, condition: { rule, subject: String(subject), vars }, cleared: false });
     } catch (error) {
-      console.warn(`WhatsApp alert event not sent: ${error.message}`);
+      console.warn(`WhatsApp alert event not sent: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
       return 0;
     }
   }
@@ -1255,7 +1255,7 @@ class WaAlertService {
         vars: { count, minutes: OUTBOX_STUCK_MINUTES, link: await this.settingsLink('whatsapp').catch(() => '') }
       });
     } catch (error) {
-      console.warn(`WhatsApp outbox check failed: ${error?.message || error}`);
+      console.warn(`WhatsApp outbox check failed: ${String(error?.message || error).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
       return 0;
     }
   }
@@ -1279,7 +1279,7 @@ class WaAlertService {
       }
       return liberado ? await this.notifyEvent({ rule, subject, vars }) : 0;
     } catch (error) {
-      console.warn(`WhatsApp alert ${rule} not sent: ${error?.message || error}`);
+      console.warn(`WhatsApp alert ${rule} not sent: ${String(error?.message || error).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
       return 0;
     }
   }
@@ -1320,7 +1320,7 @@ class WaAlertService {
         }
       });
     } catch (error) {
-      console.warn(`WhatsApp AI daily summary failed: ${error?.message || error}`);
+      console.warn(`WhatsApp AI daily summary failed: ${String(error?.message || error).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
       return 0;
     }
   }
@@ -1440,7 +1440,7 @@ class WaAlertService {
         await WaSendService.enqueue({ conversationId: conversation.id, body, source: 'alert', metaTemplate });
         sent += 1;
       } catch (error) {
-        console.warn(`WhatsApp alert to ${number} not enqueued: ${error.message}`);
+        console.warn(`WhatsApp alert to ${String(number).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 40)} not enqueued: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
       }
     }
     return sent;
@@ -1468,7 +1468,7 @@ class WaAlertService {
   static async notifyTelegram({ token, chatId }, body) {
     const resultado = await sendTelegramMessage({ token, chatId, text: body });
     if (resultado.ok) return 1;
-    console.warn(`Telegram alert not sent: ${resultado.code}`);
+    console.warn(`Telegram alert not sent: ${String(resultado.code).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 64)}`);
     return 0;
   }
 

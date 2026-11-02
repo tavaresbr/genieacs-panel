@@ -3279,7 +3279,11 @@ const TENANT_AFFILIATE_COLUMNS = [
  *   code         o código do link (`A-XXXXXXX`), único e distinto do
  *                código de indicação dos provedores pelo prefixo;
  *   password_*   o hash bcrypt e o link de definir senha (só o sha256 do
- *                token; o token cru só existe no link).
+ *                token; o token cru só existe no link);
+ *   session_version  a versão das sessões do portal: sobe (atômica) quando a
+ *                senha é definida ou trocada, o e-mail muda ou o afiliado é
+ *                suspenso — o cookie leva a versão em que nasceu e deixa de
+ *                valer quando ela não bate mais.
  *
  * Da PLATAFORMA (compartilhada): está acima dos provedores.
  */
@@ -3292,6 +3296,7 @@ const affiliatesTable = (db) => (t) => {
   t.timestamp('password_set_at').nullable();
   t.string('password_token_hash', 64).nullable();
   t.timestamp('password_token_expires_at').nullable();
+  t.integer('session_version').notNullable().defaultTo(0);
   t.string('pix_key', 140).nullable();
   t.string('pix_key_type', 8).nullable();
   t.string('status', 16).notNullable().defaultTo('pending');
@@ -3399,6 +3404,14 @@ const affiliateCommissionsTable = (db) => (t) => {
 const AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS = [
   ['approved_pix_key', (t) => t.string('approved_pix_key', 140).nullable()],
   ['approved_pix_key_type', (t) => t.string('approved_pix_key_type', 8).nullable()]
+];
+
+/**
+ * A versão das sessões do afiliado, para a base que já rodou a 0126 antes de
+ * ela existir (o desenvolvimento): a tabela nova já nasce com ela.
+ */
+const AFFILIATE_SESSION_VERSION_COLUMNS = [
+  ['session_version', (t) => t.integer('session_version').notNullable().defaultTo(0)]
 ];
 
 const AFFILIATE_TABLES = [
@@ -7323,6 +7336,7 @@ export const migrations = [
         if (!(await db.schema.hasTable(nome))) return false;
       }
       if ((await missingColumns(db, 'affiliate_payouts', AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS)).length) return false;
+      if ((await missingColumns(db, 'affiliates', AFFILIATE_SESSION_VERSION_COLUMNS)).length) return false;
       return true;
     },
     async up(db) {
@@ -7341,6 +7355,12 @@ export const migrations = [
       if (semRetrato.length) {
         await db.schema.alterTable('affiliate_payouts', (t) => {
           for (const add of semRetrato) add(t);
+        });
+      }
+      const semVersao = await missingColumns(db, 'affiliates', AFFILIATE_SESSION_VERSION_COLUMNS);
+      if (semVersao.length) {
+        await db.schema.alterTable('affiliates', (t) => {
+          for (const add of semVersao) add(t);
         });
       }
     }

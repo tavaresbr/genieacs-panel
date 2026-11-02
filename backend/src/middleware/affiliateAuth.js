@@ -18,10 +18,10 @@ import AffiliateService from '../services/affiliateService.js';
  *    vale nada nestas rotas.
  * 3. **Audiência e tipo próprios** no payload, conferidos.
  *
- * O afiliado é relido a cada requisição: suspenso, com a senha trocada (a
- * impressão do hash no cookie, como no portal do assinante) ou com o e-mail
- * trocado pelo console (a impressão do e-mail, idem), está fora — a senha é
- * da pessoa daquele endereço. O algoritmo é fixo em HS256 na verificação.
+ * O afiliado é relido a cada requisição: suspenso, com a senha trocada ou com
+ * o e-mail trocado pelo console está fora — cada uma dessas mudanças sobe a
+ * `session_version` dele, e o cookie que leva a versão antiga (`sv`) deixa de
+ * valer. O algoritmo é fixo em HS256 na verificação.
  */
 export const AFFILIATE_COOKIE_NAME = 'skygp_affiliate_session';
 const AFFILIATE_SESSION_TTL_SECONDS = 60 * 60;
@@ -59,40 +59,21 @@ export function readCookie(header, name) {
 }
 
 /**
- * A impressão da sessão: um HMAC com o segredo desta sessão sobre um dado já
- * guardado no banco, cortado. Não é hash de senha — a senha em claro nunca
- * passa por aqui; o que entra é o hash bcrypt já gravado (ou o e-mail), e o
- * resultado só serve para notar que ele mudou desde que o cookie foi emitido.
- * Com chave, a impressão no cookie (que o cliente lê, é um JWT) não deixa
- * conferir palpites contra o hash guardado.
+ * A versão das sessões gravada no afiliado (`session_version`, 0126): sobe,
+ * atômica, quando a senha é definida ou trocada, o e-mail muda ou o afiliado
+ * é suspenso. O cookie leva a versão em que nasceu (`sv`) — nenhum dado da
+ * senha nem do e-mail entra nele.
  */
-function sessionBinding(label, storedValue, size) {
-  return crypto.createHmac('sha256', affiliateSecret)
-    .update(`${label}\0${storedValue}`)
-    .digest('base64url')
-    .slice(0, size);
-}
-
-/** A impressão do hash bcrypt guardado: trocar a senha encerra as sessões abertas. */
-function storedHashBinding(affiliate) {
-  const storedBcryptHash = affiliate?.password_hash;
-  if (!storedBcryptHash) return null;
-  return sessionBinding('pwd-hash', String(storedBcryptHash), 22);
-}
-
-/** A impressão do e-mail: trocá-lo no console encerra as sessões abertas. */
-function emailBinding(affiliate) {
-  const email = String(affiliate?.email ?? '').trim().toLowerCase();
-  if (!email) return null;
-  return sessionBinding('email', email, 16);
+function sessionVersion(affiliate) {
+  const versao = Number(affiliate?.session_version ?? 0);
+  return Number.isInteger(versao) ? versao : null;
 }
 
 export function signAffiliateSession(affiliate) {
   return jwt.sign(
     {
       affiliateId: Number(affiliate.id),
-      pwd: storedHashBinding(affiliate),
-      em: emailBinding(affiliate),
+      sv: sessionVersion(affiliate),
       tokenType: 'affiliate'
     },
     affiliateSecret,
@@ -138,15 +119,14 @@ export async function authenticateAffiliate(req, res, next) {
       return recusar(req, res, 'affiliate_session_invalid');
     }
     const affiliate = await AffiliateService.findById(decoded.affiliateId);
-    const atual = storedHashBinding(affiliate);
-    if (!affiliate || affiliate.status !== 'active' || !atual || decoded.pwd !== atual
-      || decoded.em !== emailBinding(affiliate)) {
+    if (!affiliate || affiliate.status !== 'active' || !affiliate.password_hash
+      || !Number.isInteger(decoded.sv) || decoded.sv !== sessionVersion(affiliate)) {
       return recusar(req, res, 'affiliate_session_invalid');
     }
     req.affiliate = affiliate;
     return next();
   } catch (error) {
-    console.error('Affiliate session check failed:', error.message);
+    console.error('Affiliate session check failed:', String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300));
     return res.status(500).json({ success: false, code: 'affiliate_session_failed' });
   }
 }

@@ -344,7 +344,7 @@ class AuthController {
                 trx: sp, tenantId, code: body.affiliateCode, email, taxId
               }));
             } catch (error) {
-              console.warn(`Signup: the affiliate code was ignored: ${error.message}`);
+              console.warn(`Signup: the affiliate code was ignored: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
               affiliateId = null;
             }
           }

@@ -865,17 +865,67 @@ describe('o portal do afiliado', () => {
     assert.equal((await noPortal('/overview', { cookie: '__proto__=polluted' })).status, 401);
   });
 
-  it('a impressão no cookie é um HMAC com chave, não o sha256 do hash guardado', async () => {
+  it('a sessão leva só a versão (`sv`): nada da senha nem do e-mail, e a versão antiga não entra', async () => {
     const af = await afiliado();
-    const cookie = await entrarComo(af, 'senha-da-impressao-1');
-    const { pwd, em } = jwt.decode(decodeURIComponent(cookie.split('=')[1]));
-    const guardado = await getDb()('affiliates').where({ id: af.id }).first('password_hash');
-    const semChave = crypto.createHash('sha256').update(String(guardado.password_hash)).digest('base64url').slice(0, 22);
-    assert.equal(typeof pwd, 'string');
-    assert.equal(pwd.length, 22);
-    assert.notEqual(pwd, semChave);
-    assert.equal(typeof em, 'string');
-    assert.equal(em.length, 16);
+    const cookie = await entrarComo(af, 'senha-da-versao-1');
+    const token = decodeURIComponent(cookie.split('=')[1]);
+    const segredo = process.env.AFFILIATE_JWT_SECRET || crypto
+      .createHmac('sha256', process.env.JWT_SECRET || DEVELOPMENT_FALLBACK)
+      .update('skygenpanel-affiliate-portal-v1')
+      .digest('hex');
+    const { iat, exp, ...payload } = jwt.verify(token, segredo, { algorithms: ['HS256'] });
+    assert.ok(iat && exp);
+    assert.equal(payload.pwd, undefined);
+    assert.equal(payload.em, undefined);
+    const guardado = await getDb()('affiliates').where({ id: af.id }).first('session_version');
+    // Definir a senha pelo link já subiu a versão (0 → 1).
+    assert.equal(Number(guardado.session_version), 1);
+    assert.equal(payload.sv, 1);
+
+    const assinar = (extra) => `skygp_affiliate_session=${jwt.sign({ ...payload, ...extra }, segredo, { algorithm: 'HS256', expiresIn: 600 })}`;
+    assert.equal((await noPortal('/overview', { cookie: assinar({}) })).status, 200);
+    // O cookie antigo, de antes da versão, e o de uma versão anterior não entram.
+    const { sv, ...semVersao } = payload;
+    assert.equal(sv, 1);
+    const legado = `skygp_affiliate_session=${jwt.sign(semVersao, segredo, { algorithm: 'HS256', expiresIn: 600 })}`;
+    assert.equal((await noPortal('/overview', { cookie: legado })).status, 401);
+    assert.equal((await noPortal('/overview', { cookie: assinar({ sv: 0 }) })).status, 401);
+    assert.equal((await noPortal('/overview', { cookie: assinar({ sv: '1' }) })).status, 401);
+
+    // Suspender sobe a versão: reativar não ressuscita o cookie de antes.
+    await AffiliateService.setStatus(af.id, 'suspended');
+    await AffiliateService.setStatus(af.id, 'active');
+    assert.equal((await noPortal('/overview', { cookie })).status, 401);
+    const depois = await getDb()('affiliates').where({ id: af.id }).first('session_version');
+    assert.equal(Number(depois.session_version), 2);
+    // A sessão emitida agora (o que o login faz) leva a versão nova e entra.
+    const { signAffiliateSession } = await import('../src/middleware/affiliateAuth.js');
+    const nova = `skygp_affiliate_session=${signAffiliateSession(await AffiliateService.findById(af.id))}`;
+    assert.equal(jwt.decode(signAffiliateSession(await AffiliateService.findById(af.id))).sv, 2);
+    assert.equal((await noPortal('/overview', { cookie: nova })).status, 200);
+
+    // Editar outro campo que não o e-mail não encerra a sessão; o e-mail, sim.
+    await AffiliateService.update(af.id, { notes: 'só uma nota' });
+    assert.equal((await noPortal('/overview', { cookie: nova })).status, 200);
+    await AffiliateService.update(af.id, { email: `versao-${af.id}@afiliados.test` });
+    assert.equal((await noPortal('/overview', { cookie: nova })).status, 401);
+  });
+
+  it('a 0126 acrescenta `session_version` à base de desenvolvimento que já a tinha rodado sem ela', async () => {
+    const { migrations } = await import('../src/config/migrations.js');
+    const m0126 = migrations.find((m) => m.id === '0126_affiliates');
+    const db = getDb();
+    assert.equal(await m0126.isApplied(db), true);
+    await db.schema.alterTable('affiliates', (t) => t.dropColumn('session_version'));
+    try {
+      assert.equal(await m0126.isApplied(db), false);
+    } finally {
+      await m0126.up(db);
+    }
+    assert.equal(await m0126.isApplied(db), true);
+    assert.equal(await db.schema.hasColumn('affiliates', 'session_version'), true);
+    const af = await afiliado();
+    assert.equal(Number((await db('affiliates').where({ id: af.id }).first('session_version')).session_version), 0);
   });
 
   it('o código do afiliado sai do alfabeto, com o prefixo e o tamanho certos', async () => {
