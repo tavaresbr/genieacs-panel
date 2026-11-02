@@ -3,7 +3,7 @@ import { getDb, isUniqueViolation } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import { log } from '../utils/logger.js';
-import { ALERT_CHANNELS, ALERT_EVENTS, alertsConfig, readProfile } from './platformProfileService.js';
+import { ALERT_CHANNELS, ALERT_EVENTS, accountingConfig, alertsConfig, readProfile } from './platformProfileService.js';
 
 /**
  * Os alertas para quem opera a plataforma (0112): WhatsApp e e-mail nos
@@ -65,7 +65,13 @@ export const MONTHLY_EVENT = 'monthly_report';
 /** Até que dia do mês o relatório do mês anterior ainda sai, se o 1º passou sem ele. */
 const MONTHLY_CATCHUP_DAYS = 3;
 /** Os eventos que a passada um a um e o resumo diário não tocam. */
-const FORA_DA_FILA = Object.freeze([DIGEST_EVENT, TEST_EVENT, MONTHLY_EVENT]);
+/**
+ * A exportação para a contabilidade (`accountingExportService`): fora de
+ * `ALERT_EVENTS` e do resumo diário, como o relatório mensal — sai sozinha,
+ * por e-mail, com os anexos, para o e-mail do contador.
+ */
+export const ACCOUNTING_EVENT = 'accounting_export';
+const FORA_DA_FILA = Object.freeze([DIGEST_EVENT, TEST_EVENT, MONTHLY_EVENT, ACCOUNTING_EVENT]);
 /** As cobranças que contam no `big_overdue`: só as que estão no gateway, à espera. */
 const BIG_OVERDUE_STATUSES = Object.freeze(['pending', 'overdue']);
 
@@ -201,7 +207,7 @@ export const ALERT_STATUSES = Object.freeze(['pending', 'sent', 'failed', 'skipp
  */
 export const RESENDABLE = Object.freeze(['failed', 'skipped']);
 /** Os eventos que aparecem no histórico: os configuráveis, o resumo e o teste. */
-export const HISTORY_EVENTS = Object.freeze([...ALERT_EVENTS, DIGEST_EVENT, TEST_EVENT, MONTHLY_EVENT]);
+export const HISTORY_EVENTS = Object.freeze([...ALERT_EVENTS, DIGEST_EVENT, TEST_EVENT, MONTHLY_EVENT, ACCOUNTING_EVENT]);
 const SUMMARY_MAX = 200;
 
 /**
@@ -215,7 +221,7 @@ export function summarizeAlert(linha, locale = DEFAULT_LOCALE) {
   const payload = lerPayload(linha);
   let vars;
   if (evento === DIGEST_EVENT) vars = { count: payload.count ?? '-', date: dataBr(payload.day) };
-  else if (evento === MONTHLY_EVENT) vars = { month: payload.month ? rotuloDoMes(payload.month, locale) : '-' };
+  else if (evento === MONTHLY_EVENT || evento === ACCOUNTING_EVENT) vars = { month: payload.month ? rotuloDoMes(payload.month, locale) : '-' };
   else vars = variaveis(payload);
   return translate(locale, `platformAlert.${evento}.subject`, vars).slice(0, SUMMARY_MAX);
 }
@@ -309,10 +315,11 @@ class PlatformAlertService {
       const { default: PlatformNotifyService } = await import('./platformNotifyService.js');
       return PlatformNotifyService.sendWhatsapp(to, `*${subject}*\n\n${text}`);
     },
-    email: async (to, { subject, text, html }) => {
+    email: async (to, { subject, text, html, attachments }) => {
       const { mailTransport } = await import('./mail/index.js');
       // `html` só no relatório mensal; os outros alertas são texto puro.
-      return mailTransport().send({ to, subject, text, ...(html ? { html } : {}) });
+      // Os anexos só na exportação contábil.
+      return mailTransport().send({ to, subject, text, ...(html ? { html } : {}), ...(attachments ? { attachments } : {}) });
     }
   };
 
@@ -473,6 +480,9 @@ class PlatformAlertService {
       // O relatório mensal sai sozinho, antes e fora do resumo diário.
       const mensal = await this.processMonthly({ now, config });
       if (mensal) resumo.monthly = mensal;
+      // A exportação contábil também, pelo mesmo motivo.
+      const contabil = await this.processAccounting({ now, config });
+      if (contabil) resumo.accounting = contabil;
       if (config.dailyDigest.enabled) return { ...resumo, digest: await this.processDigest({ now, config }) };
       const db = getDb();
       // Com o resumo desligado, nenhuma linha de resumo sai mais (a passada um
@@ -861,7 +871,7 @@ class PlatformAlertService {
           await trx('platform_alerts').where({ id })
             .update({ status: 'skipped', last_error: 'disabled', next_attempt_at: null });
         }
-      } else if (antes.event === MONTHLY_EVENT) {
+      } else if (antes.event === MONTHLY_EVENT || antes.event === ACCOUNTING_EVENT) {
         const payload = lerPayload(antes);
         if (payload.manual) {
           await trx('platform_alerts').where({ id })
@@ -1067,6 +1077,196 @@ class PlatformAlertService {
     return { ...r, month };
   }
 
+  // ── A exportação para a contabilidade ─────────────────────────────────
+
+  /**
+   * O envio mensal ao contador: no dia 1º, a partir da hora do relatório
+   * mensal (Brasília) — ou nos dias 2 e 3, se o 1º passou sem ele —, UMA
+   * linha na fila com `dedupe_key` `accounting:AAAA-MM` do mês que acabou. A
+   * chave única é a garra, como no relatório mensal. O envio é o da passada
+   * (`processAccounting`). Nunca lança.
+   */
+  static async checkAccountingExport({ now = new Date(), config = null, accounting = null } = {}) {
+    try {
+      const conta = accounting ?? await accountingConfig();
+      if (!conta.enabled || !conta.email) return { checked: false, reason: 'disabled' };
+      const regras = config ?? await alertsConfig();
+      const { day, hour } = saoPauloClock(now);
+      const dia = Number(day.slice(8, 10));
+      if (dia > MONTHLY_CATCHUP_DAYS) return { checked: true, enqueued: false, reason: 'outside_window' };
+      if (dia === 1 && hour < regras.monthlyReport.hour) return { checked: true, enqueued: false, reason: 'waiting' };
+      const month = mesAnteriorDe(day);
+      const chave = `accounting:${month}`;
+      const db = getDb();
+      if (await db('platform_alerts').where({ dedupe_key: chave }).first('id')) {
+        return { checked: true, enqueued: false, reason: 'duplicate', month };
+      }
+      try {
+        await db('platform_alerts').insert({
+          event: ACCOUNTING_EVENT,
+          tenant_id: null,
+          payload: JSON.stringify({ month }),
+          dedupe_key: chave,
+          status: 'pending',
+          attempts: 0,
+          next_attempt_at: null,
+          created_at: aoSegundo(now)
+        });
+      } catch (error) {
+        if (isUniqueViolation(error)) return { checked: true, enqueued: false, reason: 'duplicate', month };
+        throw error;
+      }
+      return { checked: true, enqueued: true, month };
+    } catch (error) {
+      log.warn('accounting export check failed', { err: error });
+      return { checked: false, reason: 'error' };
+    }
+  }
+
+  /**
+   * A mensagem ao contador: o texto e os anexos do mês `month` (`AAAA-MM`),
+   * no formato escolhido. Os números são lidos na hora do envio.
+   */
+  static async renderAccountingExport(month, { format = 'xlsx', now = new Date() } = {}) {
+    const {
+      build, parseAccountingRange, accountingAttachments
+    } = await import('./accountingExportService.js');
+    const exportacao = await build(parseAccountingRange({ month }), { now });
+    const t = (chave, vars = {}) => translate(DEFAULT_LOCALE, `platformAlert.accounting_export.${chave}`, vars);
+    const rotulo = rotuloDoMes(month);
+    const { totals } = exportacao;
+    const subject = t('subject', { month: rotulo });
+    const text = t('body', {
+      month: rotulo,
+      format: format === 'csv' ? 'CSV' : 'XLSX',
+      count: totals.chargesCount,
+      net: formatBrl(totals.netCents),
+      received: formatBrl(totals.receivedCents),
+      refunded: formatBrl(totals.refundedCents)
+    });
+    return { subject, text, attachments: await accountingAttachments(exportacao, format) };
+  }
+
+  /**
+   * Manda UMA linha da exportação já tomada, por e-mail. `sent` se saiu,
+   * `skipped` desligada ou sem e-mail, nova tentativa se o envio falhou. A do
+   * "Enviar agora" reenviada pelo histórico (`manual`) sai mesmo com o envio
+   * mensal desligado — basta haver e-mail.
+   */
+  static async sendAccountingOne(linha, { now = new Date(), accounting }) {
+    const db = getDb();
+    const payload = lerPayload(linha);
+    if (!payload.manual && !accounting.enabled) {
+      await db('platform_alerts').where({ id: linha.id }).update({ status: 'skipped', last_error: 'disabled', next_attempt_at: null });
+      return { status: 'skipped', reason: 'disabled' };
+    }
+    if (!accounting.email) {
+      await db('platform_alerts').where({ id: linha.id }).update({ status: 'skipped', last_error: 'no_destination', next_attempt_at: null });
+      return { status: 'skipped', reason: 'no_destination' };
+    }
+    const mensagem = await this.renderAccountingExport(payload.month, { format: accounting.format, now });
+    let ok = false;
+    try {
+      ok = Boolean(await this.senders.email(accounting.email, mensagem));
+    } catch {
+      ok = false;
+    }
+    if (ok) {
+      await db('platform_alerts').where({ id: linha.id }).update({
+        status: 'sent', sent_at: aoSegundo(now), next_attempt_at: null, last_error: null
+      });
+      return { status: 'sent', channels: { email: true } };
+    }
+    const fim = await this.falhou(linha, 'send_failed', now);
+    return { status: fim === 'failed' ? 'failed' : 'pending', reason: 'send_failed', channels: { email: false } };
+  }
+
+  /**
+   * Manda as exportações pendentes e vencidas, uma a uma — com garra e novas
+   * tentativas. A do "Enviar agora" largada no meio vira `failed`/`interrupted`
+   * (ver `processMonthly`). Devolve o resumo, ou nulo sem nada.
+   */
+  static async processAccounting({ now = new Date() } = {}) {
+    const db = getDb();
+    const vencidas = await db('platform_alerts')
+      .where({ status: 'pending', event: ACCOUNTING_EVENT })
+      .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
+      .orderBy('id')
+      .limit(20);
+    if (!vencidas.length) return null;
+    const interrompidas = [];
+    const linhas = [];
+    for (const linha of vencidas) {
+      const payload = lerPayload(linha);
+      if (payload.manual && !payload.resent) interrompidas.push(linha.id);
+      else linhas.push(linha);
+    }
+    if (interrompidas.length) {
+      await db('platform_alerts').whereIn('id', interrompidas).where({ status: 'pending' })
+        .update({ status: 'failed', last_error: 'interrupted', next_attempt_at: null });
+    }
+    const resumo = { sent: 0, failed: interrompidas.length, skipped: 0, retry: 0 };
+    if (!linhas.length) return resumo;
+    const accounting = await accountingConfig();
+    for (const linha of linhas.slice(0, 3)) {
+      // eslint-disable-next-line no-await-in-loop -- uma exportação por mês
+      if (!(await this.claim(linha, now))) continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await this.sendAccountingOne(linha, { now, accounting });
+        if (r.status === 'sent') resumo.sent += 1;
+        else if (r.status === 'skipped') resumo.skipped += 1;
+        else if (r.status === 'failed') resumo.failed += 1;
+        else resumo.retry += 1;
+      } catch (error) {
+        log.warn('accounting export send failed', { id: linha.id, err: error });
+        // eslint-disable-next-line no-await-in-loop
+        await this.falhou(linha, 'error', now).catch(() => {});
+        resumo.retry += 1;
+      }
+    }
+    return resumo;
+  }
+
+  /**
+   * O "Enviar agora" da contabilidade: a exportação de `month` (padrão: o mês
+   * anterior, em Brasília) AGORA, fora da deduplicação do agendador, para o
+   * e-mail do contador — mesmo com o envio mensal desligado. Devolve
+   * `{ status, reason?, month, format }`; `no_destination` sem e-mail.
+   */
+  static async sendAccountingNow({ month = null, now = new Date() } = {}) {
+    const accounting = await accountingConfig();
+    const mes = month ?? mesAnteriorDe(saoPauloClock(now).day);
+    if (!accounting.email) return { status: 'skipped', reason: 'no_destination', month: mes, format: accounting.format };
+    const chave = `accounting:${mes}:manual:${now.getTime()}:${crypto.randomUUID()}`;
+    const db = getDb();
+    await db('platform_alerts').insert({
+      event: ACCOUNTING_EVENT,
+      tenant_id: null,
+      payload: JSON.stringify({ month: mes, manual: true }),
+      dedupe_key: chave,
+      status: 'pending',
+      attempts: 0,
+      // Já tomada: a passada do agendador não a manda de novo no meio.
+      next_attempt_at: aoSegundo(new Date(now.getTime() + CLAIM_MS)),
+      created_at: aoSegundo(now)
+    });
+    const linha = await db('platform_alerts').where({ dedupe_key: chave }).first();
+    let r;
+    try {
+      r = await this.sendAccountingOne(linha, { now, accounting });
+    } catch (error) {
+      await db('platform_alerts').where({ id: linha.id })
+        .update({ status: 'failed', last_error: 'error', next_attempt_at: null });
+      throw error;
+    }
+    if (r.status !== 'sent') {
+      // Quem apertou o botão vê o resultado, e nada tenta sozinho.
+      await db('platform_alerts').where({ id: linha.id }).update({ status: 'failed', next_attempt_at: null });
+    }
+    return { ...r, month: mes, format: accounting.format };
+  }
+
   /** O passo da plataforma no agendador: o atraso grande, depois o envio. Nunca lança. */
   static lastOverdueCheckAt = 0;
   static OVERDUE_CHECK_MS = 15 * 60_000;
@@ -1078,6 +1278,7 @@ class PlatformAlertService {
       resumo.bigOverdue = await this.checkBigOverdue({ now });
     }
     resumo.monthlyReport = await this.checkMonthlyReport({ now });
+    resumo.accounting = await this.checkAccountingExport({ now });
     resumo.send = await this.processDue({ now });
     return resumo;
   }

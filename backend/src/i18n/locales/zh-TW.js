@@ -1325,5 +1325,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': '已取消',
   'whatsapp.platformBot.statusLabel.paused': '已暫停',
   'whatsapp.platformBot.noReceipt': '*{name}* 尚無付款紀錄。',
-  'whatsapp.platformBot.receipt': '{amount} 付款收據（{date}）：{link}\n連結有效期為 7 天。'
+  'whatsapp.platformBot.receipt': '{amount} 付款收據（{date}）：{link}\n連結有效期為 7 天。',
+
+  'platformAlert.accounting_export.subject': "會計匯出：{month}",
+  'platformAlert.accounting_export.body': "附件為 {month} 的會計匯出（{format}）：帳單、收款、退款、抵扣額、NFS-e 發票與彙總。\n\n帳單：{count} 筆 · 淨額：{net}\n收款：{received} · 退款：{refunded}\n\n日期為巴西利亞時間，金額單位為雷亞爾。"
 };

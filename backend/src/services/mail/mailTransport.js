@@ -15,7 +15,11 @@
 export class MailTransport {
   /**
    * Manda uma mensagem. `html` é opcional: quando vem, vai junto do `text`.
-   * @param {{to: string, subject: string, text: string, html?: string}} _message
+   * `attachments` também (a exportação para a contabilidade): cada um com
+   * `filename`, `content` (Buffer ou texto) e `contentType` — só isso passa
+   * adiante (ver `mailAttachments`).
+   * @param {{to: string, subject: string, text: string, html?: string,
+   *   attachments?: Array<{filename: string, content: Buffer|string, contentType?: string}>}} _message
    * @returns {Promise<boolean>} entregue ao servidor de e-mail, ou não
    */
   async send(_message) {
@@ -40,6 +44,35 @@ export class MailTransport {
   get name() {
     return 'none';
   }
+}
+
+/** O teto de um anexo: o SMTP comum recusa mensagens bem menores que isto. */
+export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+
+/**
+ * Os anexos de uma mensagem como podem ir ao servidor de e-mail: só nome,
+ * conteúdo em memória e tipo. As outras chaves que o nodemailer entende
+ * (`path`, `href`, `raw`) leriam um arquivo do disco ou uma URL — e um anexo
+ * nunca é isso aqui. Anexo sem nome, sem conteúdo ou grande demais fica de
+ * fora. Sem anexo nenhum, uma lista vazia.
+ */
+export function mailAttachments(lista) {
+  if (!Array.isArray(lista)) return [];
+  const aceitos = [];
+  for (const item of lista) {
+    if (!item || typeof item !== 'object') continue;
+    const filename = typeof item.filename === 'string'
+      ? item.filename.replace(/[\\/\r\n"]/g, '_').slice(0, 120).trim() : '';
+    const content = Buffer.isBuffer(item.content) || typeof item.content === 'string' ? item.content : null;
+    if (!filename || content === null) continue;
+    if (Buffer.byteLength(content) > MAX_ATTACHMENT_BYTES) continue;
+    aceitos.push({
+      filename,
+      content,
+      ...(typeof item.contentType === 'string' && item.contentType ? { contentType: item.contentType.slice(0, 120) } : {})
+    });
+  }
+  return aceitos;
 }
 
 /**

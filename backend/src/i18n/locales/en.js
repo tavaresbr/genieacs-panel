@@ -1325,5 +1325,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': 'Canceled',
   'whatsapp.platformBot.statusLabel.paused': 'Paused',
   'whatsapp.platformBot.noReceipt': 'There is no payment recorded for *{name}* yet.',
-  'whatsapp.platformBot.receipt': 'Receipt for the payment of {amount} ({date}): {link}\nThe link is valid for 7 days.'
+  'whatsapp.platformBot.receipt': 'Receipt for the payment of {amount} ({date}): {link}\nThe link is valid for 7 days.',
+
+  'platformAlert.accounting_export.subject': "Accounting export: {month}",
+  'platformAlert.accounting_export.body': "Attached is the accounting export for {month} ({format}): charges, payments, refunds, credits, service invoices (NFS-e) and the summary.\n\nCharges: {count} · Net amount: {net}\nReceived: {received} · Refunded: {refunded}\n\nDates in Brasília time and amounts in reais."
 };

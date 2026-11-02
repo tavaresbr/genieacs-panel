@@ -1326,5 +1326,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': 'Gekündigt',
   'whatsapp.platformBot.statusLabel.paused': 'Pausiert',
   'whatsapp.platformBot.noReceipt': 'Für *{name}* ist noch keine Zahlung erfasst.',
-  'whatsapp.platformBot.receipt': 'Beleg der Zahlung über {amount} ({date}): {link}\nDer Link ist 7 Tage gültig.'
+  'whatsapp.platformBot.receipt': 'Beleg der Zahlung über {amount} ({date}): {link}\nDer Link ist 7 Tage gültig.',
+
+  'platformAlert.accounting_export.subject': "Buchhaltungsexport: {month}",
+  'platformAlert.accounting_export.body': "Anbei der Buchhaltungsexport für {month} ({format}): Rechnungen, Zahlungen, Erstattungen, Gutschriften, NFS-e und die Zusammenfassung.\n\nRechnungen: {count} · Nettobetrag: {net}\nEingegangen: {received} · Erstattet: {refunded}\n\nDaten in Brasília-Zeit und Beträge in Real."
 };

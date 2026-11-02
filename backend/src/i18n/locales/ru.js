@@ -1326,5 +1326,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': 'Отменена',
   'whatsapp.platformBot.statusLabel.paused': 'На паузе',
   'whatsapp.platformBot.noReceipt': 'Для *{name}* пока нет зарегистрированных платежей.',
-  'whatsapp.platformBot.receipt': 'Квитанция о платеже {amount} ({date}): {link}\nСсылка действует 7 дней.'
+  'whatsapp.platformBot.receipt': 'Квитанция о платеже {amount} ({date}): {link}\nСсылка действует 7 дней.',
+
+  'platformAlert.accounting_export.subject': "Бухгалтерская выгрузка: {month}",
+  'platformAlert.accounting_export.body': "Во вложении бухгалтерская выгрузка за {month} ({format}): счета, платежи, возвраты, кредиты, NFS-e и сводка.\n\nСчетов: {count} · Сумма нетто: {net}\nПолучено: {received} · Возвращено: {refunded}\n\nДаты по времени Бразилиа, суммы в реалах."
 };

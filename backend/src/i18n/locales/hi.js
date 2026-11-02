@@ -1325,5 +1325,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': 'रद्द',
   'whatsapp.platformBot.statusLabel.paused': 'रुकी हुई',
   'whatsapp.platformBot.noReceipt': '*{name}* के लिए अभी तक कोई भुगतान दर्ज नहीं है।',
-  'whatsapp.platformBot.receipt': '{amount} के भुगतान की रसीद ({date}): {link}\nलिंक 7 दिनों तक मान्य है।'
+  'whatsapp.platformBot.receipt': '{amount} के भुगतान की रसीद ({date}): {link}\nलिंक 7 दिनों तक मान्य है।',
+
+  'platformAlert.accounting_export.subject': "लेखा निर्यात: {month}",
+  'platformAlert.accounting_export.body': "{month} का लेखा निर्यात ({format}) संलग्न है: बिल, भुगतान, रिफंड, क्रेडिट, NFS-e और सारांश।\n\nबिल: {count} · शुद्ध राशि: {net}\nप्राप्त: {received} · रिफंड: {refunded}\n\nतिथियाँ ब्रासीलिया समय में और राशियाँ रियाल में।"
 };

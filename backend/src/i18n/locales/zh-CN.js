@@ -1325,5 +1325,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': '已取消',
   'whatsapp.platformBot.statusLabel.paused': '已暂停',
   'whatsapp.platformBot.noReceipt': '*{name}* 还没有付款记录。',
-  'whatsapp.platformBot.receipt': '{amount} 付款收据（{date}）：{link}\n链接有效期为 7 天。'
+  'whatsapp.platformBot.receipt': '{amount} 付款收据（{date}）：{link}\n链接有效期为 7 天。',
+
+  'platformAlert.accounting_export.subject': "会计导出：{month}",
+  'platformAlert.accounting_export.body': "附件为 {month} 的会计导出（{format}）：账单、收款、退款、抵扣额、NFS-e 发票和汇总。\n\n账单：{count} 笔 · 净额：{net}\n收款：{received} · 退款：{refunded}\n\n日期为巴西利亚时间，金额单位为雷亚尔。"
 };

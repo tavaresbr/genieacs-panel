@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
 import { PlatformCancellations } from '@/components/platform/platform-cancellations'
+import { AccountingExportCard } from '@/components/platform/platform-accounting'
 import { PlatformRevenueCharts } from '@/components/platform/platform-revenue-charts'
 import {
   lastTwelveMonths,
@@ -243,6 +244,9 @@ export function PlatformRevenue() {
       {!report && loading && (
         <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
       )}
+
+      {/* A exportação para a contabilidade: um mês, em XLSX ou CSV. */}
+      <AccountingExportCard />
 
       {/* Os pedidos de cancelamento (0107), desde o início do período da aba. */}
       <PlatformCancellations from={range.from} />

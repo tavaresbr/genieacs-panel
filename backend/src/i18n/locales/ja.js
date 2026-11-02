@@ -1325,5 +1325,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': '解約済み',
   'whatsapp.platformBot.statusLabel.paused': '一時停止中',
   'whatsapp.platformBot.noReceipt': '*{name}* の支払いはまだ記録されていません。',
-  'whatsapp.platformBot.receipt': '{amount} の支払いの領収書 ({date}): {link}\nリンクの有効期限は 7 日間です。'
+  'whatsapp.platformBot.receipt': '{amount} の支払いの領収書 ({date}): {link}\nリンクの有効期限は 7 日間です。',
+
+  'platformAlert.accounting_export.subject': "会計エクスポート: {month}",
+  'platformAlert.accounting_export.body': "{month} の会計エクスポート ({format}) を添付します: 請求、入金、返金、クレジット、NFS-e、サマリー。\n\n請求: {count} 件 · 純額: {net}\n入金: {received} · 返金: {refunded}\n\n日時はブラジリア時間、金額はレアルです。"
 };

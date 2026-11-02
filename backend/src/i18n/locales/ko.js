@@ -1328,5 +1328,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': '해지됨',
   'whatsapp.platformBot.statusLabel.paused': '일시 중지됨',
   'whatsapp.platformBot.noReceipt': '*{name}*의 결제 기록이 아직 없습니다.',
-  'whatsapp.platformBot.receipt': '{amount} 결제 영수증 ({date}): {link}\n링크는 7일 동안 유효합니다.'
+  'whatsapp.platformBot.receipt': '{amount} 결제 영수증 ({date}): {link}\n링크는 7일 동안 유효합니다.',
+
+  'platformAlert.accounting_export.subject': "회계 내보내기: {month}",
+  'platformAlert.accounting_export.body': "{month} 회계 내보내기({format})를 첨부합니다: 청구, 입금, 환불, 크레딧, NFS-e 및 요약.\n\n청구: {count}건 · 순액: {net}\n입금: {received} · 환불: {refunded}\n\n날짜는 브라질리아 시간, 금액은 헤알입니다."
 };

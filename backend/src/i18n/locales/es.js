@@ -1322,5 +1322,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': 'Cancelada',
   'whatsapp.platformBot.statusLabel.paused': 'En pausa',
   'whatsapp.platformBot.noReceipt': 'Todavía no hay ningún pago registrado para *{name}*.',
-  'whatsapp.platformBot.receipt': 'Recibo del pago de {amount} ({date}): {link}\nEl enlace es válido durante 7 días.'
+  'whatsapp.platformBot.receipt': 'Recibo del pago de {amount} ({date}): {link}\nEl enlace es válido durante 7 días.',
+
+  'platformAlert.accounting_export.subject': "Exportación contable: {month}",
+  'platformAlert.accounting_export.body': "Adjuntamos la exportación contable de {month} ({format}): cobros, pagos, reembolsos, créditos, NFS-e y el resumen.\n\nCobros: {count} · Valor neto: {net}\nRecibido: {received} · Reembolsado: {refunded}\n\nFechas en horario de Brasilia y valores en reales."
 };

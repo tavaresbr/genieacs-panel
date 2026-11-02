@@ -1317,5 +1317,8 @@ export default {
   'whatsapp.platformBot.statusLabel.canceled': 'ملغى',
   'whatsapp.platformBot.statusLabel.paused': 'متوقف مؤقتًا',
   'whatsapp.platformBot.noReceipt': 'لا توجد دفعات مسجلة لـ *{name}* بعد.',
-  'whatsapp.platformBot.receipt': 'إيصال دفعة بقيمة {amount} ({date}): {link}\nالرابط صالح لمدة 7 أيام.'
+  'whatsapp.platformBot.receipt': 'إيصال دفعة بقيمة {amount} ({date}): {link}\nالرابط صالح لمدة 7 أيام.',
+
+  'platformAlert.accounting_export.subject': "تصدير محاسبي: {month}",
+  'platformAlert.accounting_export.body': "مرفق التصدير المحاسبي لشهر {month} ({format}): الفواتير والمدفوعات والمبالغ المستردة والأرصدة وفواتير الخدمة NFS-e والملخص.\n\nالفواتير: {count} · المبلغ الصافي: {net}\nالمستلم: {received} · المسترد: {refunded}\n\nالتواريخ بتوقيت برازيليا والمبالغ بالريال."
 };
