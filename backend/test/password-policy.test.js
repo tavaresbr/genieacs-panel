@@ -96,7 +96,7 @@ describe('as rotas que escolhem senha', () => {
     const criada = await call(`${panelUrl}/api/users`, {
       method: 'POST',
       headers: authHeaders(donaToken),
-      body: { username: 'antiga', password: 'senha-provisoria-1', email: 'antiga@exemplo.test', role: 'tech' }
+      body: { username: 'antiga', password: 'senha-provisoria-1', email: 'antiga@exemplo.test', role: 'tech' } // gitleaks:allow — senha de teste, não é segredo
     });
     assert.equal(criada.status, 201, JSON.stringify(criada.body));
     await getDb()('users').where({ username: 'antiga' }).update({ password: await bcrypt.hash('oito1234', 4) });
