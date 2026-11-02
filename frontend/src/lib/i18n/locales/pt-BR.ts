@@ -5467,6 +5467,13 @@ const ptBR: Dictionary = {
   'platform.plans.priceEditConfirm': 'O preço muda na hora para {count} provedor(es): as próximas faturas ainda não emitidas saem com {price}. Para avisar antes e escolher a data, use "Agendar reajuste". Salvar mesmo assim?',
   'plan.priceChangeBanner': 'O valor do seu plano muda para {price} em {date}.',
   'plan.priceChangeBannerHint': 'As faturas com vencimento a partir dessa data já vêm com o valor novo.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'Há um reajuste agendado para o preço ({cycle}) deste plano em {date}. Para mudar esse preço à mão, cancele antes o reajuste agendado ("Cancelar reajuste", no cartão do plano).',
+  'receiptPage.title': 'Recibo de pagamento',
+  'receiptPage.invalid': 'Este link de recibo não vale mais. Peça um novo pelo WhatsApp.',
+  'receiptPage.failed': 'Não foi possível abrir o recibo agora. Tente de novo em instantes.',
+  'receiptPage.openTab': 'Abrir em nova aba',
+  'receiptPage.frameTitle': 'Recibo',
 }
 
 export default ptBR

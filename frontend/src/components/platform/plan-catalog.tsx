@@ -8,7 +8,8 @@ import { useTranslation } from '@/contexts/language-context'
 import { parseAmountToCents } from '@/lib/utils'
 import { overagePriceFromInput } from '@/lib/overage'
 import { PlanPriceChanges } from '@/components/platform/plan-price-changes'
-import { directPriceEdits } from '@/lib/price-change'
+import { directPriceEdits, scheduledChangeFor } from '@/lib/price-change'
+import { displayDate } from '@/lib/date-format'
 
 interface Props {
   plans: Plan[]
@@ -235,7 +236,17 @@ export function PlanCatalog({ plans, onChange }: Props) {
     // pede confirmação com quantos provedores ela pega — e aponta para o
     // reajuste agendado, que avisa antes e escolhe a data.
     const atual = !criando ? plans.find((p) => p.id === editandoId) : undefined
+    // Com um reajuste agendado para o ciclo, o preço dele não muda à mão (o
+    // servidor recusa com 409): a tela diz por quê antes, e o que fazer.
+    const avisarAgendado = (ciclo: 'monthly' | 'annual', data: string) => toast.error(t('platform.plans.priceChange.directEditBlocked', {
+      cycle: t(ciclo === 'annual' ? 'platform.plans.priceChange.cycleAnnual' : 'platform.plans.priceChange.cycleMonthly').toLowerCase(),
+      date: displayDate(data) ?? data
+    }))
     if (atual) {
+      for (const [ciclo] of directPriceEdits(atual, precoCentavos, anualCentavos)) {
+        const agendado = scheduledChangeFor(atual, ciclo)
+        if (agendado) { avisarAgendado(ciclo, agendado.effectiveAt); return }
+      }
       for (const [ciclo, centavos] of directPriceEdits(atual, precoCentavos, anualCentavos)) {
         const previa = await planPriceChangeAPI.preview(atual.id, ciclo, centavos)
         const afetados = previa.success && previa.data ? previa.data.preview.affected : (atual.subscribers ?? 0)
@@ -254,6 +265,13 @@ export function PlanCatalog({ plans, onChange }: Props) {
         // 409 quando o código já existe, 400 quando um número não serve: o
         // backend diz qual, e isso ajuda mais do que uma frase genérica. O
         // preço anual em uso (0104) tem frase própria, traduzida.
+        if (res.code === 'price_change_scheduled' && atual) {
+          // Agendado por outra aba depois que esta abriu: a mesma frase.
+          const agendado = scheduledChangeFor(atual, 'monthly') ?? scheduledChangeFor(atual, 'annual')
+          if (agendado) { avisarAgendado(agendado.cycle, agendado.effectiveAt); return }
+          toast.error(res.message || t('platform.plans.saveFailed'))
+          return
+        }
         toast.error(res.code === 'plan_has_annual_subscriptions'
           ? t('platform.plans.annualInUse')
           : res.message || t('platform.plans.saveFailed'))

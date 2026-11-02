@@ -5475,6 +5475,13 @@ const ru: Dictionary = {
   'platform.plans.priceEditConfirm': 'Цена изменится сразу для {count} провайдер(ов): их следующие ещё не выставленные счета будут на {price}. Чтобы предупредить заранее и выбрать дату, используйте «Запланировать изменение цены». Всё равно сохранить?',
   'plan.priceChangeBanner': 'Цена вашего тарифа изменится на {price} с {date}.',
   'plan.priceChangeBannerHint': 'Счета со сроком оплаты с этой даты будут выставлены по новой цене.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'Для цены ({cycle}) этого тарифа на {date} запланировано изменение. Чтобы изменить эту цену вручную, сначала отмените запланированное изменение («Отменить изменение цены» на карточке тарифа).',
+  'receiptPage.title': 'Квитанция об оплате',
+  'receiptPage.invalid': 'Эта ссылка на квитанцию больше не действует. Запросите новую в WhatsApp.',
+  'receiptPage.failed': 'Сейчас не удалось открыть квитанцию. Попробуйте ещё раз через минуту.',
+  'receiptPage.openTab': 'Открыть в новой вкладке',
+  'receiptPage.frameTitle': 'Квитанция',
 }
 
 export default ru

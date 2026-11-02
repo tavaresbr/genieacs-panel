@@ -87,6 +87,9 @@ const PUBLICAS = new Map([
   // O recibo pelo link do bot do WhatsApp da plataforma: o token assinado é a
   // credencial; prova em platform-owner-bot.test.js.
   ['GET /api/public/receipt/:token', 'recibo de cobrança PAGA por token HMAC de 7 dias que nomeia provedor e cobrança; toda recusa é o mesmo 404'],
+  // O mesmo recibo com o token no CORPO — o que a página `/receipt#<token>`
+  // chama; o GET acima fica para os links já mandados.
+  ['POST /api/public/receipt', 'o mesmo recibo, com o token HMAC no corpo em vez do caminho; só lê, e toda recusa é o mesmo 404'],
   // A pesquisa de satisfação dos provedores (0123). O token do link é a
   // credencial, vai no CORPO e é conferido pelo hash; token desconhecido é 404
   // sem nada. Prova em platform-nps.test.js.
@@ -313,6 +316,9 @@ describe('toda rota sem sessão', () => {
       // convite, o token fora do caminho.
       'POST /api/public/nps/answer',
       'POST /api/public/nps/lookup',
+      // O recibo pelo token no corpo: não escreve nada — é POST pelo mesmo
+      // motivo da prévia do convite, o token fora do caminho.
+      'POST /api/public/receipt',
       'POST /api/sgp/events/webhook',
       'POST /api/whatsapp-webhook'
     ]);

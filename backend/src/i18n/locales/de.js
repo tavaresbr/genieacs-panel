@@ -1297,8 +1297,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': 'Hallo! Wir haben keinen Anbieter mit dieser WhatsApp-Nummer gefunden. Ich leite Ihre Nachricht an unser Team weiter, das sich in Kürze meldet.',
   'whatsapp.platformBot.chooseProvider': 'Diese Nummer ist mit mehr als einem Anbieter verknüpft. Antworten Sie mit der Nummer des Anbieters, für den Sie Hilfe benötigen:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': 'Hallo! Wir haben das Konto von *{name}* gefunden. Zu Ihrer Sicherheit geben Sie bitte vor dem Versand von Abrechnungsdaten die ersten 5 Ziffern der Abrechnungs-CNPJ oder -CPF ein.',
-  'whatsapp.platformBot.askTaxIdAgain': 'Um fortzufahren, geben Sie die ersten 5 Ziffern der Abrechnungs-CNPJ oder -CPF von *{name}* ein. Wenn Sie möchten, schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
+  'whatsapp.platformBot.askTaxId': 'Hallo! Wir haben das Konto von *{name}* gefunden. Zu Ihrer Sicherheit geben Sie bitte vor dem Versand von Abrechnungsdaten die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF ein.',
+  'whatsapp.platformBot.askTaxIdAgain': 'Um fortzufahren, geben Sie die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF von *{name}* ein. Wenn Sie möchten, schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
   'whatsapp.platformBot.wrongTaxId': 'Die Ziffern stimmen nicht überein. Verbleibende Versuche: {remaining}.',
   'whatsapp.platformBot.locked': 'Aus Sicherheitsgründen ist die Bestätigung nach mehreren Fehlversuchen für 1 Stunde gesperrt. Versuchen Sie es später erneut oder schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
   'whatsapp.platformBot.noTaxId': 'Für *{name}* ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.',
@@ -1354,5 +1354,14 @@ export default {
   'priceChange.cycleMonthly': 'monatlich',
   'priceChange.cycleAnnual': 'jährlich',
   'priceChange.noticeSubject': 'Preisanpassung für den Tarif {plan}',
-  'priceChange.noticeBody': 'Hallo {provider}, der Preis des Tarifs {plan} ({cycle}) ändert sich ab dem {date} von {old} auf {new}. Rechnungen mit Fälligkeit an diesem Datum oder später enthalten den neuen Preis; frühere behalten den aktuellen. Bei Fragen antworten Sie einfach auf diese Nachricht.'
+  'priceChange.noticeBody': 'Hallo {provider}, der Preis des Tarifs {plan} ({cycle}) ändert sich ab dem {date} von {old} auf {new}. Rechnungen mit Fälligkeit an diesem Datum oder später enthalten den neuen Preis; frühere behalten den aktuellen. Bei Fragen antworten Sie einfach auf diese Nachricht.',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': 'Für diesen Tarif ist für diesen Zyklus eine Preisanpassung zum {date} geplant. Stornieren Sie die geplante Anpassung, bevor Sie den Preis direkt ändern.',
+  'priceChange.cancelNoticeSubject': 'Preisanpassung des Tarifs {plan} storniert',
+  'priceChange.cancelNoticeBody': 'Hallo {provider}, die Preisanpassung des Tarifs {plan} ({cycle}) von {old} auf {new}, geplant zum {date}, wurde storniert. Der Preis bleibt bei {old}, und keine Rechnung ändert sich deswegen. Bei Fragen antworten Sie einfach auf diese Nachricht.',
+  'whatsapp.platformBot.askTaxIdMulti': 'Hallo! Zu Ihrer Sicherheit geben Sie bitte vor dem Versand von Abrechnungsdaten die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein.',
+  'whatsapp.platformBot.askTaxIdMultiAgain': 'Um fortzufahren, geben Sie die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein. Wenn Sie möchten, schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
+  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.'
 };

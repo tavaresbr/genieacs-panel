@@ -5475,6 +5475,13 @@ const hi: Dictionary = {
   'platform.plans.priceEditConfirm': '{count} प्रदाताओं के लिए मूल्य तुरंत बदल जाएगा: उनके अगले, अभी जारी न हुए इनवॉइस {price} के होंगे। पहले सूचित करने और तिथि चुनने के लिए "मूल्य परिवर्तन निर्धारित करें" का उपयोग करें। फिर भी सहेजें?',
   'plan.priceChangeBanner': 'आपके प्लान का मूल्य {date} को {price} हो जाएगा।',
   'plan.priceChangeBannerHint': 'उस तिथि से देय इनवॉइस नए मूल्य पर आएँगे।',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'इस प्लान की ({cycle}) कीमत के लिए {date} को मूल्य परिवर्तन निर्धारित है। यह कीमत हाथ से बदलने के लिए पहले निर्धारित परिवर्तन रद्द करें (प्लान कार्ड पर "मूल्य परिवर्तन रद्द करें")।',
+  'receiptPage.title': 'भुगतान रसीद',
+  'receiptPage.invalid': 'यह रसीद लिंक अब मान्य नहीं है। WhatsApp पर नया लिंक माँगें।',
+  'receiptPage.failed': 'अभी रसीद नहीं खुल सकी। कुछ देर बाद फिर कोशिश करें।',
+  'receiptPage.openTab': 'नए टैब में खोलें',
+  'receiptPage.frameTitle': 'रसीद',
 }
 
 export default hi

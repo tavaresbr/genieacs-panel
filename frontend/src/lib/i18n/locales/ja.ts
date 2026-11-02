@@ -5467,6 +5467,13 @@ const ja: Dictionary = {
   'platform.plans.priceEditConfirm': '{count} 社のプロバイダーの価格がすぐに変わります。まだ発行されていない次回の請求書は {price} になります。事前に通知して日付を選ぶには「価格改定を予約」を使ってください。このまま保存しますか？',
   'plan.priceChangeBanner': 'ご利用プランの料金は {date} から {price} に変わります。',
   'plan.priceChangeBannerHint': 'この日以降に期日を迎える請求書は新しい料金になります。',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'このプランの料金（{cycle}）には {date} に価格改定が予定されています。この料金を手動で変更するには、先に予定された改定をキャンセルしてください（プランカードの「価格改定をキャンセル」）。',
+  'receiptPage.title': 'お支払いの領収書',
+  'receiptPage.invalid': 'この領収書リンクは無効になりました。WhatsApp で新しいリンクをご依頼ください。',
+  'receiptPage.failed': '現在、領収書を開けませんでした。しばらくしてからもう一度お試しください。',
+  'receiptPage.openTab': '新しいタブで開く',
+  'receiptPage.frameTitle': '領収書',
 }
 
 export default ja

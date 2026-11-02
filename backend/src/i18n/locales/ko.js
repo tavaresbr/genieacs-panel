@@ -1299,8 +1299,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': '안녕하세요! 이 WhatsApp 번호로 등록된 제공업체를 찾지 못했습니다. 메시지를 저희 팀에 전달하겠습니다. 곧 답변드리겠습니다.',
   'whatsapp.platformBot.chooseProvider': '이 번호는 여러 제공업체에 연결되어 있습니다. 도움이 필요한 업체의 번호로 답장해 주세요:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': '안녕하세요! *{name}*의 계정을 찾았습니다. 보안을 위해 청구 정보를 보내기 전에 청구용 CNPJ 또는 CPF의 앞 5자리를 입력해 주세요.',
-  'whatsapp.platformBot.askTaxIdAgain': '계속하려면 *{name}*의 청구용 CNPJ 또는 CPF 앞 5자리를 입력해 주세요. 원하시면 *atendente*를 입력해 팀과 이야기하세요.',
+  'whatsapp.platformBot.askTaxId': '안녕하세요! *{name}*의 계정을 찾았습니다. 보안을 위해 청구 정보를 보내기 전에 청구용 CNPJ 또는 CPF의 마지막 5자리를 입력해 주세요.',
+  'whatsapp.platformBot.askTaxIdAgain': '계속하려면 *{name}*의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요. 원하시면 *atendente*를 입력해 팀과 이야기하세요.',
   'whatsapp.platformBot.wrongTaxId': '숫자가 일치하지 않습니다. 남은 시도 횟수: {remaining}.',
   'whatsapp.platformBot.locked': '보안을 위해 여러 번 잘못 입력하여 확인이 1시간 동안 잠겼습니다. 나중에 다시 시도하거나 *atendente*를 입력해 팀과 이야기하세요.',
   'whatsapp.platformBot.noTaxId': '*{name}*에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.',
@@ -1356,5 +1356,14 @@ export default {
   'priceChange.cycleMonthly': '월간',
   'priceChange.cycleAnnual': '연간',
   'priceChange.noticeSubject': '{plan} 요금제 가격 조정',
-  'priceChange.noticeBody': '안녕하세요, {provider}님. {plan} 요금제({cycle}) 가격이 {date}부터 {old}에서 {new}(으)로 변경됩니다. 이 날짜 또는 그 이후가 만기인 청구서는 새 가격으로 발행되며, 그 이전 청구서는 현재 가격이 유지됩니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.'
+  'priceChange.noticeBody': '안녕하세요, {provider}님. {plan} 요금제({cycle}) 가격이 {date}부터 {old}에서 {new}(으)로 변경됩니다. 이 날짜 또는 그 이후가 만기인 청구서는 새 가격으로 발행되며, 그 이전 청구서는 현재 가격이 유지됩니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': '이 요금제의 이 주기에는 {date}에 가격 조정이 예정되어 있습니다. 가격을 직접 바꾸기 전에 예정된 조정을 취소하세요.',
+  'priceChange.cancelNoticeSubject': '{plan} 요금제 가격 조정 취소',
+  'priceChange.cancelNoticeBody': '안녕하세요, {provider}님. {date}로 예정되었던 {plan} 요금제({cycle})의 {old}에서 {new}로의 가격 조정이 취소되었습니다. 가격은 {old} 그대로이며, 이로 인해 바뀌는 청구서는 없습니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.',
+  'whatsapp.platformBot.askTaxIdMulti': '안녕하세요! 보안을 위해 청구 정보를 보내기 전에 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요.',
+  'whatsapp.platformBot.askTaxIdMultiAgain': '계속하려면 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요. 원하시면 *atendente*를 입력해 팀과 이야기하세요.',
+  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.'
 };

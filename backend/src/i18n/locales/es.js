@@ -1293,8 +1293,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': '¡Hola! No encontramos un proveedor registrado con este número de WhatsApp. Pasaré tu mensaje a nuestro equipo, que responderá en breve.',
   'whatsapp.platformBot.chooseProvider': 'Este número está vinculado a más de un proveedor. Responde con el número del que necesitas atención:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': '¡Hola! Encontramos el registro de *{name}*. Por tu seguridad, antes de enviar datos de facturación, indica los 5 primeros dígitos del CNPJ o CPF de facturación.',
-  'whatsapp.platformBot.askTaxIdAgain': 'Para continuar, indica los 5 primeros dígitos del CNPJ o CPF de facturación de *{name}*. Si prefieres, escribe *atendente* para hablar con nuestro equipo.',
+  'whatsapp.platformBot.askTaxId': '¡Hola! Encontramos el registro de *{name}*. Por tu seguridad, antes de enviar datos de facturación, indica los 5 últimos dígitos del CNPJ o CPF de facturación.',
+  'whatsapp.platformBot.askTaxIdAgain': 'Para continuar, indica los 5 últimos dígitos del CNPJ o CPF de facturación de *{name}*. Si prefieres, escribe *atendente* para hablar con nuestro equipo.',
   'whatsapp.platformBot.wrongTaxId': 'Los dígitos no coinciden. Intentos restantes: {remaining}.',
   'whatsapp.platformBot.locked': 'Por seguridad, la confirmación quedó bloqueada durante 1 hora tras varios intentos fallidos. Inténtalo más tarde o escribe *atendente* para hablar con nuestro equipo.',
   'whatsapp.platformBot.noTaxId': 'No hay CNPJ ni CPF de facturación registrado para *{name}*, así que no puedo confirmar tu identidad por aquí. Pasaré tu conversación a nuestro equipo.',
@@ -1350,5 +1350,14 @@ export default {
   'priceChange.cycleMonthly': 'mensual',
   'priceChange.cycleAnnual': 'anual',
   'priceChange.noticeSubject': 'Reajuste del plan {plan}',
-  'priceChange.noticeBody': 'Hola, {provider}. El valor del plan {plan} ({cycle}) pasa de {old} a {new} a partir del {date}. Las facturas con vencimiento en esa fecha o después ya llegarán con el valor nuevo; las anteriores mantienen el valor actual. Ante cualquier duda, responda este mensaje.'
+  'priceChange.noticeBody': 'Hola, {provider}. El valor del plan {plan} ({cycle}) pasa de {old} a {new} a partir del {date}. Las facturas con vencimiento en esa fecha o después ya llegarán con el valor nuevo; las anteriores mantienen el valor actual. Ante cualquier duda, responda este mensaje.',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': 'Este plan tiene un reajuste programado para este ciclo el {date}. Cancela el reajuste programado antes de cambiar el precio a mano.',
+  'priceChange.cancelNoticeSubject': 'Reajuste del plan {plan} cancelado',
+  'priceChange.cancelNoticeBody': 'Hola, {provider}. El reajuste del plan {plan} ({cycle}) de {old} a {new}, previsto para el {date}, fue cancelado. El valor sigue siendo {old} y ninguna factura cambia por él. Si tienes dudas, solo responde este mensaje.',
+  'whatsapp.platformBot.askTaxIdMulti': '¡Hola! Por tu seguridad, antes de enviar datos de facturación, indica los 5 últimos dígitos del CNPJ o CPF de facturación de tu proveedor.',
+  'whatsapp.platformBot.askTaxIdMultiAgain': 'Para continuar, indica los 5 últimos dígitos del CNPJ o CPF de facturación de tu proveedor. Si prefieres, escribe *atendente* para hablar con nuestro equipo.',
+  'whatsapp.platformBot.noTaxIdMulti': 'No hay CNPJ ni CPF de facturación registrado para los proveedores de este número, así que no puedo confirmar tu identidad por aquí. Pasaré tu conversación a nuestro equipo.'
 };

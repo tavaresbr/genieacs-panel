@@ -23,7 +23,7 @@ const { runUnscoped } = await import('../src/config/tenantContext.js');
 const { tinsert } = await import('../src/config/database.js');
 const {
   default: NpsService, computeNps, lerNotaNps, dueWave, riskSignals, isAtRisk, autoSkipReason,
-  hashToken, paidStartOf, EDIT_WINDOW_DAYS, EXPIRE_DAYS
+  hashToken, paidStartOf, EDIT_WINDOW_DAYS, EXPIRE_DAYS, MAX_SEND_ATTEMPTS
 } = await import('../src/services/npsService.js');
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: Plan } = await import('../src/models/Plan.js');
@@ -276,20 +276,105 @@ describe('o agendador', () => {
     assert.deepEqual(r.sent, []);
   });
 
-  it('nada saiu: a linha some e a etapa fica livre para a próxima passada', async () => {
+  it('nada saiu: a linha fica marcada, e a etapa tenta de novo só um dia depois, até 3 vezes', async () => {
     await assinatura(ids.beta, { status: 'active', renews_at: aoSegundo(Date.now() + 20 * DIA) });
     await pagou(ids.beta, 31, 'p-beta2');
     const ok = NpsService.senders;
-    NpsService.senders = { email: async () => false, whatsapp: async () => { throw new Error('fora'); } };
+    let tentativas = 0;
+    // O WhatsApp que diz "não foi" (e pode ter ido): nunca mais de um por dia.
+    NpsService.senders = {
+      email: async () => false,
+      whatsapp: async () => { tentativas += 1; return false; }
+    };
     try {
       const r = await NpsService.schedulerPass({ force: true });
       assert.deepEqual(r.sent, []);
-      assert.equal((await linhas()).length, 0);
+      let [linha] = await linhas();
+      assert.equal(linha.status, 'pending');
+      assert.equal(linha.channel, 'failed:1');
+      assert.equal(tentativas, 1);
+
+      // A passada da hora seguinte não manda de novo.
+      await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 60 * 60 * 1000) });
+      await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 23 * 60 * 60 * 1000) });
+      assert.equal(tentativas, 1, 'nenhum envio a mais no mesmo dia');
+      assert.equal((await linhas()).length, 1);
+
+      // Um dia depois: a segunda tentativa, na mesma linha, com token novo.
+      const hashAntes = linha.token_hash;
+      await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 25 * 60 * 60 * 1000) });
+      assert.equal(tentativas, 2);
+      [linha] = await linhas();
+      assert.equal(linha.channel, 'failed:2');
+      assert.notEqual(linha.token_hash, hashAntes);
+
+      // A terceira, e então desiste.
+      await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 50 * 60 * 60 * 1000) });
+      assert.equal(tentativas, MAX_SEND_ATTEMPTS);
+      await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 75 * 60 * 60 * 1000) });
+      assert.equal(tentativas, MAX_SEND_ATTEMPTS, 'três tentativas no total');
+      assert.equal((await linhas())[0].channel, `failed:${MAX_SEND_ATTEMPTS}`);
+
+      // A que não saiu não conta como enviada no relatório.
+      const rel = await NpsService.report();
+      assert.equal(rel.summary.sent, 0);
     } finally {
       NpsService.senders = ok;
     }
-    const r = await NpsService.schedulerPass({ force: true });
+  });
+
+  it('a nova tentativa que sai grava os canais e conta como enviada', async () => {
+    await assinatura(ids.beta, { status: 'active', renews_at: aoSegundo(Date.now() + 20 * DIA) });
+    await pagou(ids.beta, 31, 'p-beta4');
+    const ok = NpsService.senders;
+    NpsService.senders = { email: async () => false, whatsapp: async () => false };
+    try {
+      await NpsService.schedulerPass({ force: true });
+    } finally {
+      NpsService.senders = ok;
+    }
+    assert.equal((await linhas())[0].channel, 'failed:1');
+    const r = await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 25 * 60 * 60 * 1000) });
     assert.deepEqual(r.sent, [{ tenantId: ids.beta, wave: 'd30' }]);
+    const [linha] = await linhas();
+    assert.equal(linha.channel, 'email,whatsapp');
+    // O link que saiu é o do token novo, e é ele que a linha guarda.
+    const link = enviados.find((e) => e.canal === 'email').text.match(/nps#([A-Za-z0-9_-]+)/);
+    assert.equal(linha.token_hash, hashToken(link[1]));
+    // E não sai de novo.
+    enviados = [];
+    await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 60 * 60 * 60 * 1000) });
+    assert.equal(enviados.length, 0);
+  });
+
+  it('o e-mail saiu e o WhatsApp não: a linha fica com o que saiu, e não reenvia', async () => {
+    await assinatura(ids.beta, { status: 'active', renews_at: aoSegundo(Date.now() + 20 * DIA) });
+    await pagou(ids.beta, 31, 'p-beta5');
+    const ok = NpsService.senders;
+    let zap = 0;
+    NpsService.senders = { email: async () => true, whatsapp: async () => { zap += 1; return false; } };
+    try {
+      await NpsService.schedulerPass({ force: true });
+      await NpsService.schedulerPass({ force: true, now: aoSegundo(Date.now() + 30 * 60 * 60 * 1000) });
+    } finally {
+      NpsService.senders = ok;
+    }
+    const [linha] = await linhas();
+    assert.equal(linha.channel, 'email');
+    assert.equal(linha.status, 'pending');
+    assert.equal(zap, 1);
+  });
+
+  it('a manual que não saiu some: quem clicou vê a falha', async () => {
+    const tenant = await getDb()('tenants').where({ id: ids.beta }).first();
+    const ok = NpsService.senders;
+    NpsService.senders = { email: async () => false, whatsapp: async () => false };
+    try {
+      assert.deepEqual(await NpsService.ask(tenant, { wave: 'manual' }), { sent: false, reason: 'send_failed' });
+    } finally {
+      NpsService.senders = ok;
+    }
+    assert.equal((await linhas()).length, 0);
   });
 
   it('não pergunta de novo a quem recebeu outra pesquisa há menos de 30 dias', async () => {
@@ -408,6 +493,53 @@ describe('a resposta pelo WhatsApp (tryCaptureWhatsappReply)', () => {
     assert.deepEqual(await NpsService.tryCaptureWhatsappReply({ tenantId: null, text: '8' }), { captured: false });
     const [beta] = await linhas();
     assert.equal(beta.status, 'pending');
+  });
+});
+
+describe('a resposta pelo telefone (captureForPhone, o gancho do bot)', () => {
+  /** Uma pendente com o canal dado. */
+  async function pendentePor(tenantId, raw, channel) {
+    await pesquisa(tenantId, { raw });
+    await runInTenant(tenantId, () => getDb()('platform_nps').where({ token_hash: hashToken(raw) }).update({ channel }));
+  }
+  const FONE = '5593991935695';
+
+  it('só um provedor com o telefone de cobrança e pesquisa pendente pelo WhatsApp: captura', async () => {
+    await getDb()('tenants').where({ id: ids.gama }).update({ billing_phone: '(93) 99999-0000' });
+    try {
+      await pendentePor(ids.beta, TOKEN('p'), 'email,whatsapp');
+      await pendentePor(ids.gama, TOKEN('q'), 'whatsapp');
+      const r = await NpsService.captureForPhone({ tenantIds: [ids.beta, ids.gama], phone: FONE, text: '10' });
+      assert.equal(r.captured, true);
+      assert.equal(r.tenantId, ids.beta);
+      assert.equal(r.score, 10);
+      const [beta, gama] = await linhas();
+      assert.equal(beta.status, 'answered');
+      assert.equal(gama.status, 'pending', 'a do telefone de outro não é tocada');
+    } finally {
+      await getDb()('tenants').where({ id: ids.gama }).update({ billing_phone: '93991935695' });
+    }
+  });
+
+  it('o telefone de cobrança em dois provedores com pendente: não captura nenhuma', async () => {
+    await pendentePor(ids.beta, TOKEN('r'), 'whatsapp');
+    await pendentePor(ids.gama, TOKEN('s'), 'whatsapp');
+    const r = await NpsService.captureForPhone({ tenantIds: [ids.beta, ids.gama], phone: FONE, text: '8' });
+    assert.deepEqual(r, { captured: false });
+    assert.ok((await linhas()).every((l) => l.status === 'pending'));
+  });
+
+  it('não captura a mandada só por e-mail, a vencida, a que falhou, nem o que não é nota', async () => {
+    await pendentePor(ids.beta, TOKEN('t'), 'email');
+    await pendentePor(ids.gama, TOKEN('u'), 'failed:1');
+    await pesquisa(ids.delta, { raw: TOKEN('x'), askedDaysAgo: EXPIRE_DAYS + 1 });
+    await runInTenant(ids.delta, () => getDb()('platform_nps').where({ token_hash: hashToken(TOKEN('x')) }).update({ channel: 'whatsapp' }));
+    const todos = [ids.beta, ids.gama, ids.delta];
+    assert.deepEqual(await NpsService.captureForPhone({ tenantIds: todos, phone: FONE, text: '8' }), { captured: false });
+    await pendentePor(ids.alfa, TOKEN('y'), 'whatsapp');
+    assert.deepEqual(await NpsService.captureForPhone({ tenantIds: [ids.alfa], phone: FONE, text: 'segunda via' }), { captured: false });
+    assert.deepEqual(await NpsService.captureForPhone({ tenantIds: [ids.alfa], phone: '5511988887777', text: '8' }), { captured: false });
+    assert.equal((await NpsService.captureForPhone({ tenantIds: [ids.alfa], phone: FONE, text: '8' })).captured, true);
   });
 });
 

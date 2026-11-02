@@ -67,8 +67,14 @@ import { FIRMWARE_REASSIGN_PATH, FIRMWARE_UPLOAD_PATH, firmwareRawBody } from '.
 import provisioningRoutes from './routes/provisioning.js';
 import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
+import { wireNpsWhatsappReply } from './services/npsWhatsappReply.js';
 
 dotenv.config();
+
+// A nota da pesquisa de satisfação pelo WhatsApp da plataforma (0123): o
+// gancho numérico do bot, ligado aqui no arranque para não haver ciclo entre
+// os dois serviços.
+wireNpsWhatsappReply();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

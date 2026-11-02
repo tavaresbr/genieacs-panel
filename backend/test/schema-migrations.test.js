@@ -481,7 +481,9 @@ describe('the schema table list', () => {
       // so the foreign key added by 0015 is only satisfiable because `tenants`
       // precedes both of these.
       ['settings', 'tenants'],
-      ['app_state', 'tenants']
+      ['app_state', 'tenants'],
+      // A ordem das migrações (0122 antes de 0123): a lista anda como elas.
+      ['platform_nps', 'plan_price_change_marks']
     ]) {
       assert.ok(
         position(parent) < position(child),

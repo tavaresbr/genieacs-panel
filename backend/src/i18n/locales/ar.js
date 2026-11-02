@@ -1288,8 +1288,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': 'مرحبًا! لم نعثر على مزود مسجل بهذا الرقم على WhatsApp. سأحوّل رسالتك إلى فريقنا وسيرد قريبًا.',
   'whatsapp.platformBot.chooseProvider': 'هذا الرقم مرتبط بأكثر من مزود. أرسل رقم المزود الذي تحتاج المساعدة بشأنه:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': 'مرحبًا! وجدنا حساب *{name}*. حفاظًا على أمانك، وقبل إرسال أي بيانات فوترة، أدخل أول 5 أرقام من رقم CNPJ أو CPF الخاص بالفوترة.',
-  'whatsapp.platformBot.askTaxIdAgain': 'للمتابعة، أدخل أول 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة *{name}*. ويمكنك كتابة *atendente* للتحدث مع فريقنا.',
+  'whatsapp.platformBot.askTaxId': 'مرحبًا! وجدنا حساب *{name}*. حفاظًا على أمانك، وقبل إرسال أي بيانات فوترة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بالفوترة.',
+  'whatsapp.platformBot.askTaxIdAgain': 'للمتابعة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة *{name}*. ويمكنك كتابة *atendente* للتحدث مع فريقنا.',
   'whatsapp.platformBot.wrongTaxId': 'الأرقام غير مطابقة. المحاولات المتبقية: {remaining}.',
   'whatsapp.platformBot.locked': 'لدواعٍ أمنية، تم قفل التأكيد لمدة ساعة واحدة بعد عدة محاولات خاطئة. حاول لاحقًا أو اكتب *atendente* للتحدث مع فريقنا.',
   'whatsapp.platformBot.noTaxId': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لـ *{name}*، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.',
@@ -1345,5 +1345,14 @@ export default {
   'priceChange.cycleMonthly': 'شهري',
   'priceChange.cycleAnnual': 'سنوي',
   'priceChange.noticeSubject': 'تعديل سعر الخطة {plan}',
-  'priceChange.noticeBody': 'مرحبًا {provider}. يتغير سعر الخطة {plan} ({cycle}) من {old} إلى {new} اعتبارًا من {date}. الفواتير المستحقة في هذا التاريخ أو بعده ستصدر بالسعر الجديد، أما السابقة فتبقى بالسعر الحالي. لأي استفسار، يكفي الرد على هذه الرسالة.'
+  'priceChange.noticeBody': 'مرحبًا {provider}. يتغير سعر الخطة {plan} ({cycle}) من {old} إلى {new} اعتبارًا من {date}. الفواتير المستحقة في هذا التاريخ أو بعده ستصدر بالسعر الجديد، أما السابقة فتبقى بالسعر الحالي. لأي استفسار، يكفي الرد على هذه الرسالة.',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': 'لهذه الخطة تعديل سعر مجدول لهذه الدورة في {date}. ألغِ التعديل المجدول قبل تغيير السعر يدويًا.',
+  'priceChange.cancelNoticeSubject': 'تم إلغاء تعديل سعر الخطة {plan}',
+  'priceChange.cancelNoticeBody': 'مرحبًا {provider}. تم إلغاء تعديل سعر الخطة {plan} ({cycle}) من {old} إلى {new} الذي كان مقررًا في {date}. يبقى السعر {old}، ولن تتغير أي فاتورة بسببه. لأي استفسار، يكفي الرد على هذه الرسالة.',
+  'whatsapp.platformBot.askTaxIdMulti': 'مرحبًا! حفاظًا على أمانك، وقبل إرسال أي بيانات فوترة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك.',
+  'whatsapp.platformBot.askTaxIdMultiAgain': 'للمتابعة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك. ويمكنك كتابة *atendente* للتحدث مع فريقنا.',
+  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.'
 };

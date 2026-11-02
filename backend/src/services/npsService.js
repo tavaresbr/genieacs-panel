@@ -16,6 +16,7 @@ import { panelBaseDomain, platformExtraHosts } from '../middleware/tenantResolve
 import { mesesAte } from './platformMetricsService.js';
 import { instanteMs } from './revenueReportService.js';
 import { log } from '../utils/logger.js';
+import { variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
 /**
  * A pesquisa de satisfação dos provedores (0123): o NPS que a PLATAFORMA pede
@@ -42,8 +43,13 @@ import { log } from '../utils/logger.js';
  *
  * A linha nasce ANTES do envio, e é o índice único `(tenant_id, wave_key)` que
  * decide quem manda: duas passadas ao mesmo tempo não mandam duas vezes. Se
- * nada sai (sem e-mail nem telefone, SMTP fora), a linha é apagada e a
- * próxima passada (no máximo uma por hora) tenta de novo, dentro da janela.
+ * nada sai (SMTP fora, o WhatsApp dizendo que não foi), a linha da etapa
+ * automática FICA, pendente, com `channel = 'failed:<n>'` — n tentativas — e
+ * a passada tenta de novo só depois de `RETRY_AFTER_HOURS` horas, até
+ * `MAX_SEND_ATTEMPTS` tentativas na etapa. Apagá-la para a próxima passada
+ * (de hora em hora) recomeçar faria um WhatsApp que respondeu "não" mas
+ * entregou chegar de novo a cada hora. A manual, que é um clique de gente,
+ * some se nada sai: quem clicou vê a falha e decide.
  *
  * ## O link
  *
@@ -82,6 +88,12 @@ export const QUIET_DAYS = 30;
 /** O envio manual recusa outro para o mesmo provedor dentro disto. */
 export const MANUAL_COOLDOWN_DAYS = 7;
 export const COMMENT_MAX = 1000;
+/** Tentativas de envio por etapa automática, contando a primeira. */
+export const MAX_SEND_ATTEMPTS = 3;
+/** Entre uma tentativa e a próxima da mesma etapa: nunca mais de um envio por dia. */
+export const RETRY_AFTER_HOURS = 24;
+/** O prefixo de `channel` da linha cujo envio não saiu: `failed:<tentativas>`. */
+const FALHOU = 'failed:';
 export const NPS_STATUSES = Object.freeze(['pending', 'answered', 'expired']);
 /** Os sinais de risco de um detrator. */
 export const RISK_SIGNALS = Object.freeze(['overdue', 'card_refused', 'cancellation', 'paused']);
@@ -232,6 +244,19 @@ function isoOuNulo(valor) {
   return ms === null ? null : new Date(ms).toISOString();
 }
 
+/** Quantas tentativas sem sucesso a linha tem (`failed:<n>`); 0 se saiu por algum canal. */
+export function failedAttempts(linha) {
+  const canal = String(linha?.channel ?? '');
+  if (!canal.startsWith(FALHOU)) return 0;
+  const n = Number(canal.slice(FALHOU.length));
+  return Number.isInteger(n) && n > 0 ? n : MAX_SEND_ATTEMPTS;
+}
+
+/** A pergunta chegou a sair por algum canal. */
+function entregue(linha) {
+  return Boolean(linha?.channel) && failedAttempts(linha) === 0;
+}
+
 function tenantRef(tenant, id) {
   return { id: Number(id), name: tenant?.name ?? null, slug: tenant?.slug ?? null };
 }
@@ -326,6 +351,24 @@ class NpsService {
       throw error;
     }
 
+    const channels = await this.deliver(tenant, { link, para, fone });
+    await runInTenant(tenant.id, async () => {
+      if (channels.length) {
+        await tdb('platform_nps').where({ id }).update({ channel: channels.join(',') });
+      } else if (wave === 'manual') {
+        // A manual que não saiu some: quem clicou vê a falha e tenta de novo.
+        await tdb('platform_nps').where({ id }).del();
+      } else {
+        // A automática fica, marcada: a próxima tentativa só daqui a um dia.
+        await tdb('platform_nps').where({ id }).update({ channel: `${FALHOU}1` });
+      }
+    });
+    if (!channels.length) return { sent: false, reason: 'send_failed' };
+    return { sent: true, id, channels };
+  }
+
+  /** Manda a pergunta por e-mail e WhatsApp; devolve os canais que saíram. Não lança. */
+  static async deliver(tenant, { link, para, fone }) {
     const vars = { provider: tenant.name || tenant.slug || '', product: PRODUCT_NAME, link };
     const subject = translate(DEFAULT_LOCALE, 'nps.askSubject', vars);
     const text = translate(DEFAULT_LOCALE, 'nps.askBody', vars);
@@ -341,17 +384,43 @@ class NpsService {
         .catch(() => false);
       if (foi) channels.push('whatsapp');
     }
+    return channels;
+  }
 
-    await runInTenant(tenant.id, async () => {
-      if (channels.length) {
-        await tdb('platform_nps').where({ id }).update({ channel: channels.join(',') });
-      } else {
-        // Nada saiu: sem linha, a etapa fica livre para a próxima passada.
-        await tdb('platform_nps').where({ id }).del();
-      }
-    });
-    if (!channels.length) return { sent: false, reason: 'send_failed' };
-    return { sent: true, id, channels };
+  /**
+   * A nova tentativa da etapa automática cujo envio não saiu (`failed:<n>`):
+   * a mesma linha, com um token novo (o velho nunca chegou a ninguém) e o
+   * `asked_at` de agora. Condicional ao `channel` lido — de duas passadas, uma
+   * tenta. Só depois de `RETRY_AFTER_HOURS` horas da anterior, e até
+   * `MAX_SEND_ATTEMPTS` no total.
+   *
+   * @returns {Promise<{ sent: boolean, reason?: string, id?: number, channels?: string[] }>}
+   */
+  static async retry(tenant, linha, { now = new Date() } = {}) {
+    const feitas = failedAttempts(linha);
+    if (!feitas) return { sent: false, reason: 'already_sent' };
+    if (feitas >= MAX_SEND_ATTEMPTS) return { sent: false, reason: 'gave_up' };
+    const ultima = instanteMs(linha.asked_at);
+    if (ultima !== null && now.getTime() - ultima < RETRY_AFTER_HOURS * 60 * 60 * 1000) {
+      return { sent: false, reason: 'too_soon' };
+    }
+    const token = newToken();
+    const link = npsUrlFor(token);
+    if (!link) return { sent: false, reason: 'no_link' };
+    const para = await SubscriptionNoticeService.recipients(tenant).catch(() => []);
+    const fone = String(tenant.billing_phone ?? '').trim();
+    if (!para.length && !fone) return { sent: false, reason: 'no_destination' };
+    const tentativa = `${FALHOU}${feitas + 1}`;
+    const minha = await runInTenant(tenant.id, () => tdb('platform_nps')
+      .where({ id: linha.id, status: 'pending', channel: linha.channel })
+      .update({ token_hash: hashToken(token), asked_at: aoSegundo(now.getTime()), channel: tentativa }));
+    if (!Number(minha)) return { sent: false, reason: 'busy' };
+    const channels = await this.deliver(tenant, { link, para, fone });
+    if (channels.length) {
+      await runInTenant(tenant.id, () => tdb('platform_nps').where({ id: linha.id }).update({ channel: channels.join(',') }));
+      return { sent: true, id: Number(linha.id), channels };
+    }
+    return { sent: false, reason: 'send_failed' };
   }
 
   /** As pendentes há mais de `EXPIRE_DAYS` dias viram `expired`. Devolve quantas. */
@@ -407,15 +476,18 @@ class NpsService {
         const wave = dueWave({ startMs: paidStartOf({ subscription: sub, firstPaymentAt: primeiro.get(id) ?? null }), now });
         if (!wave) continue;
         const dele = porProvedor.get(id) ?? [];
-        if (dele.some((l) => l.wave === wave)) continue;
+        const daEtapa = dele.find((l) => l.wave === wave) ?? null;
+        // A etapa já saiu, ou desistiu: nada. A que falhou tenta de novo (`retry`).
+        if (daEtapa && (daEtapa.status !== 'pending' || !failedAttempts(daEtapa))) continue;
         const recente = dele.some((l) => {
+          if (l === daEtapa || !entregue(l)) return false;
           const ms = instanteMs(l.asked_at);
           return ms !== null && now.getTime() - ms < QUIET_DAYS * DAY_MS;
         });
         if (recente) { resultado.skipped += 1; continue; }
         try {
           // eslint-disable-next-line no-await-in-loop -- um provedor por vez: SMTP e WhatsApp
-          const feito = await this.ask(tenant, { wave, now });
+          const feito = daEtapa ? await this.retry(tenant, daEtapa, { now }) : await this.ask(tenant, { wave, now });
           if (feito.sent) resultado.sent.push({ tenantId: id, wave });
         } catch (error) {
           log.warn('nps survey not sent', { err: error, tenantId: id, wave });
@@ -508,7 +580,8 @@ class NpsService {
       const nota = lerNotaNps(text);
       if (nota === null) return nada;
       return await runInTenant(id, async () => {
-        const linha = await tdb('platform_nps').where({ status: 'pending' }).orderBy('id', 'desc').first();
+        const linha = (await tdb('platform_nps').where({ status: 'pending' }).orderBy('id', 'desc'))
+          .find(entregue);
         if (!linha || vencida(linha, now)) return nada;
         const n = await tdb('platform_nps').where({ id: linha.id, status: 'pending' }).update({
           status: 'answered', score: nota, answered_at: aoSegundo(now.getTime()), answer_channel: 'whatsapp'
@@ -516,6 +589,63 @@ class NpsService {
         if (!n) return nada;
         return { captured: true, score: nota, reply: translate(DEFAULT_LOCALE, 'nps.whatsappThanks', { score: nota }) };
       });
+    } catch (error) {
+      log.warn('nps whatsapp reply not handled', { err: error });
+      return nada;
+    }
+  }
+
+  /**
+   * A nota pelo WhatsApp da plataforma, pelo TELEFONE — o gancho numérico do
+   * `PlatformOwnerBotService` (registrado em `npsWhatsappReply.js`).
+   *
+   * O telefone não autentica; ele só pode responder a pergunta que foi feita a
+   * ELE. Por isso só conta a pesquisa que:
+   *
+   *   - está pendente e no prazo;
+   *   - saiu pelo WhatsApp (`channel` com `whatsapp`) — a mandada só por
+   *     e-mail não foi feita a este número;
+   *   - é de um provedor cujo `billing_phone` é este número (em qualquer das
+   *     grafias). O telefone de um dono (`users.phone`) nomeia o provedor para
+   *     o bot, mas não recebeu a pergunta.
+   *
+   * E só reclama quando EXATAMENTE um provedor passa: com dois (o mesmo
+   * telefone de cobrança em dois provedores), não há como saber de qual é a
+   * nota, e o número segue o fluxo do bot. Nunca lança.
+   *
+   * @param {{ tenantIds: number[], phone: string, text: string, now?: Date }} entrada
+   * @returns {Promise<{ captured: boolean, tenantId?: number, score?: number, reply?: string }>}
+   */
+  static async captureForPhone({ tenantIds = [], phone = null, text = '', now = new Date() } = {}) {
+    const nada = { captured: false };
+    try {
+      const nota = lerNotaNps(text);
+      if (nota === null) return nada;
+      const minhas = new Set(variantesTelefoneBr(phone));
+      if (!minhas.size) return nada;
+      const ids = [...new Set((tenantIds ?? []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+      const qualificadas = [];
+      for (const id of ids) {
+        // eslint-disable-next-line no-await-in-loop -- são os poucos provedores de um telefone
+        const tenant = await Tenant.findById(id);
+        if (!tenant || tenant.kind === 'platform') continue;
+        if (!variantesTelefoneBr(tenant.billing_phone).some((g) => minhas.has(g))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const linha = await runInTenant(id, async () => (await tdb('platform_nps')
+          .where({ status: 'pending' })
+          .orderBy('id', 'desc'))
+          .find((l) => String(l.channel ?? '').split(',').includes('whatsapp') && !vencida(l, now)));
+        if (linha) qualificadas.push({ tenantId: id, linha });
+      }
+      if (qualificadas.length !== 1) return nada;
+      const [{ tenantId, linha }] = qualificadas;
+      const n = await runInTenant(tenantId, () => tdb('platform_nps').where({ id: linha.id, status: 'pending' }).update({
+        status: 'answered', score: nota, answered_at: aoSegundo(now.getTime()), answer_channel: 'whatsapp'
+      }));
+      if (!Number(n)) return nada;
+      return {
+        captured: true, tenantId, score: nota, reply: translate(DEFAULT_LOCALE, 'nps.whatsappThanks', { score: nota })
+      };
     } catch (error) {
       log.warn('nps whatsapp reply not handled', { err: error });
       return nada;
@@ -607,7 +737,8 @@ class NpsService {
       return ms !== null && (desde === null || ms >= desde);
     };
     const respondidas = linhas.filter((l) => l.status === 'answered' && l.score !== null && noPeriodo(l.answered_at));
-    const enviadas = linhas.filter((l) => noPeriodo(l.asked_at));
+    // A que não saiu por canal nenhum (`failed:<n>`) não foi pergunta feita.
+    const enviadas = linhas.filter((l) => entregue(l) && noPeriodo(l.asked_at));
     const resumo = computeNps(respondidas.map((l) => l.score));
 
     const trend = mesesAte(now, TREND_MONTHS).map((mes) => {
@@ -639,6 +770,7 @@ class NpsService {
 
     const ultimaPergunta = new Map();
     for (const l of linhas) {
+      if (!entregue(l)) continue;
       const ms = instanteMs(l.asked_at);
       const id = Number(l.tenant_id);
       if (ms !== null && (!ultimaPergunta.has(id) || ms > ultimaPergunta.get(id))) ultimaPergunta.set(id, ms);

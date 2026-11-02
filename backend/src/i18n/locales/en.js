@@ -1296,8 +1296,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': 'Hello! We could not find a provider registered with this WhatsApp number. I will pass your message on to our team, who will reply shortly.',
   'whatsapp.platformBot.chooseProvider': 'This number is linked to more than one provider. Reply with the number of the one you need help with:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': 'Hello! We found the account of *{name}*. For your security, before sending any billing data, please enter the first 5 digits of the billing CNPJ or CPF.',
-  'whatsapp.platformBot.askTaxIdAgain': 'To continue, enter the first 5 digits of the billing CNPJ or CPF of *{name}*. If you prefer, type *atendente* to talk to our team.',
+  'whatsapp.platformBot.askTaxId': 'Hello! We found the account of *{name}*. For your security, before sending any billing data, please enter the last 5 digits of the billing CNPJ or CPF.',
+  'whatsapp.platformBot.askTaxIdAgain': 'To continue, enter the last 5 digits of the billing CNPJ or CPF of *{name}*. If you prefer, type *atendente* to talk to our team.',
   'whatsapp.platformBot.wrongTaxId': 'The digits do not match. Attempts left: {remaining}.',
   'whatsapp.platformBot.locked': 'For security, confirmation has been locked for 1 hour after several wrong attempts. Try again later or type *atendente* to talk to our team.',
   'whatsapp.platformBot.noTaxId': 'There is no billing CNPJ or CPF registered for *{name}*, so I cannot confirm your identity here. I will pass your conversation on to our team.',
@@ -1353,5 +1353,14 @@ export default {
   'priceChange.cycleMonthly': 'monthly',
   'priceChange.cycleAnnual': 'annual',
   'priceChange.noticeSubject': 'Price change for the {plan} plan',
-  'priceChange.noticeBody': 'Hello, {provider}. The price of the {plan} plan ({cycle}) changes from {old} to {new} starting {date}. Invoices due on that date or later will carry the new price; earlier ones keep the current price. If you have any questions, just reply to this message.'
+  'priceChange.noticeBody': 'Hello, {provider}. The price of the {plan} plan ({cycle}) changes from {old} to {new} starting {date}. Invoices due on that date or later will carry the new price; earlier ones keep the current price. If you have any questions, just reply to this message.',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': 'This plan has a price change scheduled for this cycle on {date}. Cancel the scheduled change before editing the price directly.',
+  'priceChange.cancelNoticeSubject': 'Price change for the {plan} plan canceled',
+  'priceChange.cancelNoticeBody': 'Hello, {provider}. The price change of the {plan} plan ({cycle}) from {old} to {new}, planned for {date}, has been canceled. The price stays at {old}, and no invoice changes because of it. If you have any questions, just reply to this message.',
+  'whatsapp.platformBot.askTaxIdMulti': 'Hello! For your security, before sending any billing data, please enter the last 5 digits of your provider\'s billing CNPJ or CPF.',
+  'whatsapp.platformBot.askTaxIdMultiAgain': 'To continue, enter the last 5 digits of your provider\'s billing CNPJ or CPF. If you prefer, type *atendente* to talk to our team.',
+  'whatsapp.platformBot.noTaxIdMulti': 'There is no billing CNPJ or CPF registered for the providers of this number, so I cannot confirm your identity here. I will pass your conversation on to our team.'
 };

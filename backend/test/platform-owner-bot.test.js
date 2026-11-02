@@ -12,9 +12,10 @@ import assert from 'node:assert/strict';
  * O que não pode dar errado:
  *
  * 1. **Dado de cobrança antes do documento.** O telefone só diz de quem PODE
- *    ser a conversa; nada sai antes dos 5 dígitos do CNPJ/CPF de cobrança.
- * 2. **Um provedor receber o dado de outro.** Mesmo com o telefone ambíguo, e
- *    mesmo com os dígitos de um digitados para o outro.
+ *    ser a conversa; nada sai antes dos 5 ÚLTIMOS dígitos do CNPJ/CPF de
+ *    cobrança (os primeiros são a raiz do CNPJ, pública).
+ * 2. **Um provedor receber o dado de outro.** Mesmo com o telefone ambíguo —
+ *    que nem ouve o nome dos provedores antes dos dígitos.
  * 3. **O link do recibo abrir o que não devia.** Adulterado, vencido, de
  *    cobrança não paga ou trocado de provedor: o mesmo 404, sem nome nenhum.
  * 4. **O bot falar por cima de gente.** Humano na conversa cala o bot.
@@ -37,6 +38,8 @@ const { default: WaBotConfigService } = await import('../src/services/waBotConfi
 const { default: PlatformOwnerBotService } = await import('../src/services/platformOwnerBotService.js');
 const { signReceiptToken, verifyReceiptToken } = await import('../src/utils/receiptLinkToken.js');
 const { translate } = await import('../src/i18n/index.js');
+const { default: NpsService, hashToken } = await import('../src/services/npsService.js');
+const { runUnscoped } = await import('../src/config/tenantContext.js');
 
 const t = (chave, vars) => translate('pt-BR', chave, vars);
 
@@ -249,7 +252,7 @@ async function confirmarAlfa(telefone = FONE_ALFA) {
   await apagarConversa(telefone);
   const [pedido] = await trocar(telefone, 'oi');
   assert.equal(pedido, t('whatsapp.platformBot.askTaxId', { name: 'Provedor Alfa' }));
-  const [menu] = await trocar(telefone, '12345');
+  const [menu] = await trocar(telefone, DOC_ALFA.slice(-5));
   assert.equal(menu, t('whatsapp.platformBot.menu', { name: 'Provedor Alfa' }));
 }
 
@@ -261,7 +264,7 @@ describe('identificação pelo telefone', () => {
     assert.ok(new Date(c.bot_paused_until).getTime() > Date.now(), 'a conversa fica com a equipe');
   });
 
-  it('o telefone de cobrança acha o provedor e pede os 5 dígitos antes de qualquer dado', async () => {
+  it('o telefone de cobrança acha o provedor e pede os 5 últimos dígitos antes de qualquer dado', async () => {
     await apagarConversa(FONE_ALFA);
     // Pedir a fatura logo de cara não adianta: primeiro o documento.
     const [pedido] = await trocar(FONE_ALFA, '1');
@@ -273,8 +276,16 @@ describe('identificação pelo telefone', () => {
     const tudo = await respostas(FONE_ALFA);
     assert.ok(tudo.every((m) => !m.includes('pay_alfa')), 'nada de cobrança antes do documento');
 
-    const [menu] = await trocar(FONE_ALFA, '12.345');
+    // Os 5 PRIMEIROS (a raiz do CNPJ, pública) não servem mais: é tentativa errada.
+    const [raiz] = await trocar(FONE_ALFA, '12.345');
+    assert.equal(raiz, t('whatsapp.platformBot.wrongTaxId', { remaining: 2 }));
+    // Os 5 últimos, com a pontuação do CNPJ, conferem.
+    const [menu] = await trocar(FONE_ALFA, '001-95');
     assert.equal(menu, t('whatsapp.platformBot.menu', { name: 'Provedor Alfa' }));
+    // O documento inteiro também passa: o fim dele é o fim do documento.
+    await apagarConversa(FONE_ALFA);
+    await trocar(FONE_ALFA, 'oi');
+    assert.deepEqual(await trocar(FONE_ALFA, '12.345.678/0001-95'), [t('whatsapp.platformBot.menu', { name: 'Provedor Alfa' })]);
   });
 
   it('a grafia antiga do celular (sem o nono dígito) acha o mesmo provedor', async () => {
@@ -293,26 +304,46 @@ describe('identificação pelo telefone', () => {
     assert.equal(pedido, t('whatsapp.platformBot.askTaxId', { name: 'Provedor Beta' }));
   });
 
-  it('com dois provedores no mesmo telefone, pergunta qual — e os dígitos de um não abrem o outro', async () => {
+  it('com dois provedores no mesmo telefone, pede os dígitos sem nomear nenhum — e os dígitos escolhem', async () => {
     await apagarConversa(FONE_AMBIGUO);
-    const [lista] = await trocar(FONE_AMBIGUO, 'oi');
-    assert.equal(lista, [
-      t('whatsapp.platformBot.chooseProvider'),
-      t('whatsapp.platformBot.providerOption', { n: 1, name: 'Provedor Alfa' }),
-      t('whatsapp.platformBot.providerOption', { n: 2, name: 'Provedor Gama' })
-    ].join('\n'));
-
-    const [pedido] = await trocar(FONE_AMBIGUO, '2');
-    assert.equal(pedido, t('whatsapp.platformBot.askTaxId', { name: 'Provedor Gama' }));
-    // Os dígitos da ALFA, digitados para a GAMA: erro, e nada da Alfa sai.
-    const [erro] = await trocar(FONE_AMBIGUO, DOC_ALFA.slice(0, 5));
+    const [pedido] = await trocar(FONE_AMBIGUO, 'oi');
+    assert.equal(pedido, t('whatsapp.platformBot.askTaxIdMulti'));
+    assert.ok(!/Provedor (Alfa|Gama)/.test(pedido), 'nenhum nome antes da confirmação');
+    // Um número curto (o "2" de quem esperava uma lista) não é tentativa.
+    assert.deepEqual(await trocar(FONE_AMBIGUO, '2'), [t('whatsapp.platformBot.askTaxIdMultiAgain')]);
+    assert.equal(Number((await conversa(FONE_AMBIGUO)).bot_doc_attempts), 0);
+    // Dígitos que não são de nenhum dos dois: tentativa errada, e nada sai.
+    const [erro] = await trocar(FONE_AMBIGUO, '99999');
     assert.equal(erro, t('whatsapp.platformBot.wrongTaxId', { remaining: 2 }));
+    // A raiz do CNPJ da Gama não é o que se pede.
+    assert.deepEqual(await trocar(FONE_AMBIGUO, DOC_GAMA.slice(0, 5)), [t('whatsapp.platformBot.wrongTaxId', { remaining: 1 })]);
 
-    const [menu] = await trocar(FONE_AMBIGUO, DOC_GAMA.slice(0, 5));
+    const [menu] = await trocar(FONE_AMBIGUO, DOC_GAMA.slice(-5));
     assert.equal(menu, t('whatsapp.platformBot.menu', { name: 'Provedor Gama' }));
+    assert.equal(Number((await conversa(FONE_AMBIGUO)).bot_doc_attempts), 0, 'a confirmação zera os erros');
     // A Gama não tem cobrança: a resposta é dela, e não a da Alfa.
     const saidas = await trocar(FONE_AMBIGUO, '1');
     assert.deepEqual(saidas, [t('whatsapp.platformBot.noOpenInvoice', { name: 'Provedor Gama' })]);
+  });
+
+  it('o mesmo final em dois provedores: só então a lista — dos que conferiram, já confirmados', async () => {
+    // A Gama com um documento que termina como o da Alfa.
+    await getDb()('tenants').where({ id: gama }).update({ billing_tax_id: '55555555000195' });
+    try {
+      await apagarConversa(FONE_AMBIGUO);
+      assert.deepEqual(await trocar(FONE_AMBIGUO, 'oi'), [t('whatsapp.platformBot.askTaxIdMulti')]);
+      const [lista] = await trocar(FONE_AMBIGUO, '00195');
+      assert.equal(lista, [
+        t('whatsapp.platformBot.chooseProvider'),
+        t('whatsapp.platformBot.providerOption', { n: 1, name: 'Provedor Alfa' }),
+        t('whatsapp.platformBot.providerOption', { n: 2, name: 'Provedor Gama' })
+      ].join('\n'));
+      // Escolher é confirmar: os dígitos já conferiram com os dois.
+      assert.deepEqual(await trocar(FONE_AMBIGUO, '2'), [t('whatsapp.platformBot.menu', { name: 'Provedor Gama' })]);
+      assert.deepEqual(await trocar(FONE_AMBIGUO, '1'), [t('whatsapp.platformBot.noOpenInvoice', { name: 'Provedor Gama' })]);
+    } finally {
+      await getDb()('tenants').where({ id: gama }).update({ billing_tax_id: DOC_GAMA });
+    }
   });
 
   it('o cadastro que muda vale na hora para tirar acesso, mesmo com o índice em cache', async () => {
@@ -335,16 +366,16 @@ describe('o documento errado e o bloqueio', () => {
     assert.deepEqual(await trocar(FONE_BETA, '11111'), [t('whatsapp.platformBot.wrongTaxId', { remaining: 2 })]);
     assert.deepEqual(await trocar(FONE_BETA, '22222'), [t('whatsapp.platformBot.wrongTaxId', { remaining: 1 })]);
     assert.deepEqual(await trocar(FONE_BETA, '33333'), [t('whatsapp.platformBot.locked')]);
-    assert.deepEqual(await trocar(FONE_BETA, DOC_BETA.slice(0, 5)), [t('whatsapp.platformBot.locked')]);
+    assert.deepEqual(await trocar(FONE_BETA, DOC_BETA.slice(-5)), [t('whatsapp.platformBot.locked')]);
     assert.deepEqual(await trocar(FONE_BETA, '1'), [t('whatsapp.platformBot.locked')]);
     assert.equal((await conversa(FONE_BETA)).bot_step, PlatformOwnerBotService.PASSO_BLOQUEIO);
 
     // Uma hora e pouco depois: recomeça do pedido do documento.
     const depois = Date.now() + PlatformOwnerBotService.BLOQUEIO_MS + 60_000;
     PlatformOwnerBotService.setDepsForTests({ paymentInfo: segundaViaFalsa, now: () => depois });
-    assert.deepEqual(await trocar(FONE_BETA, DOC_BETA.slice(0, 5)),
+    assert.deepEqual(await trocar(FONE_BETA, DOC_BETA.slice(-5)),
       [t('whatsapp.platformBot.askTaxId', { name: 'Provedor Beta' })]);
-    assert.deepEqual(await trocar(FONE_BETA, DOC_BETA.slice(0, 5)),
+    assert.deepEqual(await trocar(FONE_BETA, DOC_BETA.slice(-5)),
       [t('whatsapp.platformBot.menu', { name: 'Provedor Beta' })]);
   });
 
@@ -402,7 +433,7 @@ describe('o menu de quem confirmou', () => {
   it('um provedor nunca recebe o dado de outro', async () => {
     await apagarConversa(FONE_BETA);
     await trocar(FONE_BETA, 'oi');
-    await trocar(FONE_BETA, DOC_BETA.slice(0, 5));
+    await trocar(FONE_BETA, DOC_BETA.slice(-5));
     const beta1 = await trocar(FONE_BETA, '1');
     assert.equal(beta1[1], 'PIX-pay_beta_aberta');
     assert.match(beta1[0], /R\$ 299,00/);
@@ -437,12 +468,17 @@ describe('o menu de quem confirmou', () => {
   it('3 — o recibo do último pagamento, por um link que abre sem login', async () => {
     await confirmarAlfa();
     const [mensagem] = await trocar(FONE_ALFA, '3');
-    const achado = /https:\/\/plataforma\.exemplo\.test\/api\/public\/receipt\/([A-Za-z0-9_.-]+)/.exec(mensagem);
+    // O token no FRAGMENTO da página pública, nunca no caminho da API.
+    const achado = /https:\/\/plataforma\.exemplo\.test\/receipt#([A-Za-z0-9_.-]+)/.exec(mensagem);
     assert.ok(achado, mensagem);
+    assert.ok(!mensagem.includes('/api/public/receipt/'), 'o link novo não leva o token no caminho');
     const alvo = verifyReceiptToken(achado[1]);
     assert.deepEqual([alvo.tenantId, alvo.chargeId], [alfa, pagaAlfa]);
 
-    const resposta = await fetch(`${panelUrl}/api/public/receipt/${achado[1]}`);
+    // A página manda o token no corpo.
+    const resposta = await fetch(`${panelUrl}/api/public/receipt`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: achado[1] })
+    });
     assert.equal(resposta.status, 200);
     assert.match(resposta.headers.get('content-security-policy'), /default-src 'none'/);
     assert.equal(resposta.headers.get('cache-control'), 'no-store');
@@ -491,6 +527,54 @@ describe('o menu de quem confirmou', () => {
 
 describe('o link público do recibo', () => {
   const abrir = (token) => fetch(`${panelUrl}/api/public/receipt/${token}`);
+  const abrirPeloCorpo = (token) => fetch(`${panelUrl}/api/public/receipt`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(token === undefined ? {} : { token })
+  });
+
+  it('pelo corpo: as mesmas recusas, o mesmo 404; o válido abre', async () => {
+    const valido = signReceiptToken({ tenantId: alfa, chargeId: pagaAlfa });
+    const recusas = [
+      undefined,
+      'nao-e-um-token',
+      signReceiptToken({ tenantId: alfa, chargeId: abertaAlfa }),
+      signReceiptToken({ tenantId: beta, chargeId: pagaAlfa })
+    ];
+    const corpos = new Set();
+    for (const token of recusas) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await abrirPeloCorpo(token);
+      assert.equal(r.status, 404, String(token));
+      // eslint-disable-next-line no-await-in-loop
+      corpos.add(await r.text());
+    }
+    assert.equal(corpos.size, 1);
+    const ok = await abrirPeloCorpo(valido);
+    assert.equal(ok.status, 200);
+    assert.match(ok.headers.get('content-security-policy'), /default-src 'none'/);
+    assert.equal(ok.headers.get('cache-control'), 'no-store');
+    assert.match(await ok.text(), /Provedor Alfa/);
+  });
+
+  it('o link antigo, com o token no caminho, sai do log de acesso mascarado', async () => {
+    const { redactPath, setLogSink } = await import('../src/utils/logger.js');
+    const valido = signReceiptToken({ tenantId: alfa, chargeId: pagaAlfa });
+    assert.equal(redactPath(`/api/public/receipt/${valido}`), '/api/public/receipt/:token');
+    assert.equal(redactPath('/api/public/receipt'), '/api/public/receipt');
+    assert.equal(redactPath('/api/public/plans'), '/api/public/plans');
+
+    // E na linha de verdade: o middleware grava o caminho mascarado.
+    const linhas = [];
+    setLogSink((linha) => { linhas.push(String(linha)); });
+    try {
+      assert.equal((await abrir(valido)).status, 200);
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      setLogSink(null);
+    }
+    const doRecibo = linhas.filter((l) => l.includes('/api/public/receipt'));
+    assert.ok(doRecibo.length >= 1, 'a linha de acesso existe');
+    assert.ok(doRecibo.every((l) => !l.includes(valido)), 'o token não vai para o log');
+  });
 
   it('adulterado, vencido, não pago ou trocado de provedor: o mesmo 404, sem nome nenhum', async () => {
     const valido = signReceiptToken({ tenantId: alfa, chargeId: pagaAlfa });
@@ -554,6 +638,80 @@ describe('o gancho numérico (para a pesquisa)', () => {
       assert.equal(vistos.length, antes);
     } finally {
       desfazer();
+    }
+  });
+});
+
+describe('a nota da pesquisa pelo WhatsApp (o gancho ligado no arranque)', () => {
+  let sequencia = 0;
+  /** Uma pesquisa pendente do provedor, mandada pelos canais dados. */
+  async function pendente(tenantId, channel = 'email,whatsapp') {
+    sequencia += 1;
+    await runInTenant(tenantId, () => tinsertReturningId('platform_nps', {
+      wave: 'manual',
+      wave_key: null,
+      token_hash: hashToken(`token-da-pesquisa-${tenantId}-${sequencia}`.padEnd(43, 'x')),
+      status: 'pending',
+      channel,
+      asked_at: new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000)
+    }));
+  }
+  const linhasNps = (tenantId) => runUnscoped('test reads the NPS rows', () => getDb()('platform_nps')
+    .where({ tenant_id: tenantId }).orderBy('id'));
+  const limparNps = () => runUnscoped('test clears the NPS rows', () => getDb()('platform_nps').del());
+
+  afterEach(limparNps);
+
+  it('está ligado: a pergunta convida a responder pelo WhatsApp', () => {
+    assert.equal(NpsService.whatsappReplyEnabled, true);
+  });
+
+  it('o telefone de cobrança, ainda sem confirmar, responde a nota da pesquisa pendente', async () => {
+    await pendente(alfa);
+    await apagarConversa(FONE_ALFA);
+    assert.deepEqual(await trocar(FONE_ALFA, '9'), [translate('pt-BR', 'nps.whatsappThanks', { score: 9 })]);
+    const [linha] = await linhasNps(alfa);
+    assert.equal(linha.status, 'answered');
+    assert.equal(Number(linha.score), 9);
+    assert.equal(linha.answer_channel, 'whatsapp');
+  });
+
+  it('com o menu confirmado, "1" é a segunda via, e não uma nota', async () => {
+    await confirmarAlfa();
+    await pendente(alfa);
+    const saidas = await trocar(FONE_ALFA, '1');
+    assert.equal(saidas.length, 3, JSON.stringify(saidas));
+    assert.match(saidas[0], /Provedor Alfa/);
+    assert.equal((await linhasNps(alfa))[0].status, 'pending');
+  });
+
+  it('a pesquisa mandada só por e-mail não é respondida pelo WhatsApp', async () => {
+    await pendente(alfa, 'email');
+    await apagarConversa(FONE_ALFA);
+    assert.deepEqual(await trocar(FONE_ALFA, '9'), [t('whatsapp.platformBot.askTaxId', { name: 'Provedor Alfa' })]);
+    assert.equal((await linhasNps(alfa))[0].status, 'pending');
+  });
+
+  it('o telefone só do DONO (não o de cobrança) não responde', async () => {
+    await pendente(beta);
+    await apagarConversa(FONE_BETA);
+    assert.deepEqual(await trocar(FONE_BETA, '9'), [t('whatsapp.platformBot.askTaxId', { name: 'Provedor Beta' })]);
+    assert.equal((await linhasNps(beta))[0].status, 'pending');
+  });
+
+  it('o telefone de cobrança de dois provedores com pesquisa pendente não responde nenhuma', async () => {
+    await getDb()('tenants').where({ id: beta }).update({ billing_phone: '93 98111-0001' });
+    PlatformOwnerBotService.clearCache();
+    try {
+      await pendente(alfa);
+      await pendente(beta);
+      await apagarConversa(FONE_ALFA);
+      assert.deepEqual(await trocar(FONE_ALFA, '9'), [t('whatsapp.platformBot.askTaxIdMulti')]);
+      assert.equal((await linhasNps(alfa))[0].status, 'pending');
+      assert.equal((await linhasNps(beta))[0].status, 'pending');
+    } finally {
+      await getDb()('tenants').where({ id: beta }).update({ billing_phone: null });
+      PlatformOwnerBotService.clearCache();
     }
   });
 });

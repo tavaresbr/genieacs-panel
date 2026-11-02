@@ -1,4 +1,4 @@
-import type { BillingCycle, Plan } from '@/lib/api'
+import type { BillingCycle, Plan, PlanPriceChange } from '@/lib/api'
 
 /**
  * As contas puras do reajuste de preço com data de vigência (0122), fora do
@@ -35,4 +35,16 @@ export function directPriceEdits(
   if (monthlyCents > 0 && monthlyCents !== plan.priceCents) mudancas.push(['monthly', monthlyCents])
   if (annualCents !== null && annualCents > 0 && annualCents !== plan.priceYearlyCents) mudancas.push(['annual', annualCents])
   return mudancas
+}
+
+/**
+ * O reajuste AGENDADO de um ciclo do plano, se há. Com ele, o servidor recusa
+ * mudar o preço desse ciclo à mão (409 `price_change_scheduled`): a tela
+ * avisa antes de mandar, e aponta o "Cancelar reajuste".
+ */
+export function scheduledChangeFor(
+  plan: Pick<Plan, 'priceChanges'>,
+  cycle: BillingCycle
+): PlanPriceChange | null {
+  return (plan.priceChanges ?? []).find((c) => c.status === 'scheduled' && c.cycle === cycle) ?? null
 }

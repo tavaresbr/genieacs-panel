@@ -5467,6 +5467,13 @@ const zhCN: Dictionary = {
   'platform.plans.priceEditConfirm': '{count} 个服务商的价格将立即变更：他们尚未开具的下一张账单将为 {price}。如需提前通知并选择日期，请使用“安排调价”。仍要保存吗？',
   'plan.priceChangeBanner': '您的套餐价格将于 {date} 调整为 {price}。',
   'plan.priceChangeBannerHint': '到期日在该日期或之后的账单将按新价格开具。',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': '此套餐的（{cycle}）价格已安排于 {date} 调价。如需手动修改该价格，请先取消已安排的调价（套餐卡片上的“取消调价”）。',
+  'receiptPage.title': '付款收据',
+  'receiptPage.invalid': '此收据链接已失效。请通过 WhatsApp 重新索取。',
+  'receiptPage.failed': '暂时无法打开收据，请稍后再试。',
+  'receiptPage.openTab': '在新标签页中打开',
+  'receiptPage.frameTitle': '收据',
 }
 
 export default zhCN

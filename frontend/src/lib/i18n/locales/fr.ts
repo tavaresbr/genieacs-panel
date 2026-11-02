@@ -5467,6 +5467,13 @@ const fr: Dictionary = {
   'platform.plans.priceEditConfirm': 'Le prix change immédiatement pour {count} fournisseur(s) : leurs prochaines factures non encore émises seront de {price}. Pour prévenir à l\'avance et choisir la date, utilisez « Programmer une révision ». Enregistrer quand même ?',
   'plan.priceChangeBanner': 'Le prix de votre offre passe à {price} le {date}.',
   'plan.priceChangeBannerHint': 'Les factures dont l\'échéance tombe à partir de cette date porteront le nouveau prix.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'Une révision est programmée pour le prix ({cycle}) de ce plan le {date}. Pour modifier ce prix à la main, annulez d’abord la révision programmée (« Annuler la révision », sur la carte du plan).',
+  'receiptPage.title': 'Reçu de paiement',
+  'receiptPage.invalid': 'Ce lien de reçu n’est plus valide. Demandez-en un nouveau sur WhatsApp.',
+  'receiptPage.failed': 'Impossible d’ouvrir le reçu pour le moment. Réessayez dans un instant.',
+  'receiptPage.openTab': 'Ouvrir dans un nouvel onglet',
+  'receiptPage.frameTitle': 'Reçu',
 }
 
 export default fr

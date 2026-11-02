@@ -20,6 +20,9 @@ router.get('/cnpj', publicCnpjLimiter, PublicController.cnpj);
 router.post('/leads', publicLeadLimiter, PublicController.createLead);
 // O recibo pelo link assinado que o bot do WhatsApp da plataforma manda ao
 // dono do provedor: o token é a credencial (ver `receiptLinkToken.js`).
+// O token no CORPO (`/receipt#<token>` → POST); o GET com ele no caminho é o
+// link antigo, que ainda abre — e que o log de acesso mascara.
+router.post('/receipt', publicReceiptLimiter, PublicReceiptController.receiptByBody);
 router.get('/receipt/:token', publicReceiptLimiter, PublicReceiptController.receipt);
 // A pesquisa de satisfação dos provedores (0123). O token do link vai no
 // CORPO, nunca no caminho: o log de acesso grava o caminho inteiro.

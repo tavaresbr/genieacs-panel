@@ -35,7 +35,8 @@ import { log } from '../utils/logger.js';
  *      cancelada no gateway e reemitida com o novo, uma vez por cobrança e por
  *      reajuste (`reprice:<id>`) — a de valor mudado à mão pelo console e a de
  *      quem está isento não são tocadas. Cancelado o reajuste, a que foi
- *      reemitida volta ao preço de antes (`revert:<id>`).
+ *      reemitida volta ao preço de antes (`revert:<id>`), e quem já tinha sido
+ *      avisado ouve que o reajuste não vale mais (`cancel_notice`).
  *
  * Na data, o preço novo é gravado no plano (`applied`), e a partir daí o
  * catálogo diz o preço novo para todo mundo.
@@ -118,15 +119,24 @@ class PlanPriceChangeService {
    * preço novo: cobráveis (`isBillableStatus`), sem isenção e sem
    * cancelamento agendado. `exempt` conta à parte as isentas do mesmo plano e
    * ciclo — a tela diz que existem e que não mudam.
+   *
+   * Entra também quem VAI estar no plano: a troca agendada para ele
+   * (`pending_plan_id`), no ciclo agendado (`pending_billing_cycle`, nulo é o
+   * de agora). A renovação dessa assinatura já sai pelo plano novo — é a
+   * fatura que o reajuste muda —, então ela recebe o aviso e entra na prévia,
+   * vista pelo ciclo agendado (`scheduledView`).
    */
   static async affectedSubscriptions(plan, cycle) {
     // tenant-scope-exempt: o console perguntando quem está neste plano, acima dos provedores.
     const linhas = await runUnscoped('the console lists the providers a price change reaches', () => getDb()('subscriptions')
       .join('tenants', 'tenants.id', 'subscriptions.tenant_id')
-      .where('subscriptions.plan_id', plan.id)
+      .where((q) => q.where('subscriptions.plan_id', plan.id).orWhere('subscriptions.pending_plan_id', plan.id))
       .where((q) => q.whereNull('tenants.kind').orWhereNot('tenants.kind', 'platform'))
       .select('subscriptions.*'));
-    const noCiclo = linhas.filter((sub) => SubscriptionService.cycleOf(sub, plan) === cycle);
+    const vistas = linhas.map((sub) => (Number(sub.pending_plan_id) === Number(plan.id)
+      ? SubscriptionService.scheduledView(sub)
+      : sub));
+    const noCiclo = vistas.filter((sub) => SubscriptionService.cycleOf(sub, plan) === cycle);
     const affected = [];
     let exempt = 0;
     for (const sub of noCiclo) {
@@ -326,7 +336,7 @@ class PlanPriceChangeService {
       .orWhere((q) => q.where({ status: 'canceled' }).where('canceled_at', '>=', new Date(now.getTime() - REVISIT_DAYS * DIA)))
       .orderBy('id', 'asc')
       .select('id');
-    const resumo = { notified: 0, repriced: 0, reverted: 0, applied: 0, failed: 0 };
+    const resumo = { notified: 0, repriced: 0, reverted: 0, applied: 0, canceledNotices: 0, failed: 0 };
     for (const linha of vivos) {
       // eslint-disable-next-line no-await-in-loop -- um reajuste de cada vez, e são poucos
       const change = await PlanPriceChange.findById(linha.id);
@@ -337,6 +347,10 @@ class PlanPriceChangeService {
           const r = await this.revertCharges(change, { now });
           resumo.reverted += r.reverted;
           resumo.failed += r.failed;
+          // eslint-disable-next-line no-await-in-loop
+          const c = await this.notifyCanceled(change, { now });
+          resumo.canceledNotices += c.sent;
+          resumo.failed += c.failed;
           continue;
         }
         if (change.status === 'scheduled' && change.notify && hoje >= addDaysIso(change.effective_at, -change.notice_days)) {
@@ -437,8 +451,61 @@ class PlanPriceChangeService {
     return { sent, failed };
   }
 
-  /** A mensagem do aviso para o provedor em escopo; `{ sent, channels?, reason? }`. Não lança. */
-  static async notifyTenant({ change, plan, tenantId }) {
+  /**
+   * O reajuste cancelado depois de o aviso ter saído: quem foi avisado (a
+   * marca `notice` feita, por algum canal) ouve, uma vez, que o preço não
+   * muda mais (`cancel_notice`). Quem não chegou a ser avisado não ouve nada
+   * — para ele o reajuste nunca existiu.
+   */
+  static async notifyCanceled(change, { now = new Date() } = {}) {
+    if (change.status !== 'canceled') return { sent: 0, failed: 0 };
+    const avisados = (await PlanPriceChange.marksOf(change.id, { prefix: 'notice', status: 'done' }))
+      .filter((m) => m.mark === 'notice' && m.detail && m.detail !== 'no_recipient');
+    if (!avisados.length) return { sent: 0, failed: 0 };
+    const plan = await Plan.findById(change.plan_id);
+    if (!plan) return { sent: 0, failed: 0 };
+    let sent = 0;
+    let failed = 0;
+    for (const marca of avisados) {
+      const tenantId = Number(marca.tenant_id);
+      // eslint-disable-next-line no-await-in-loop -- um provedor por vez: SMTP e WhatsApp não aguentam rajada
+      const minha = await PlanPriceChange.claimMark({
+        changeId: change.id, tenantId, mark: 'cancel_notice', now, until: new Date(now.getTime() + CLAIM_MS), maxAttempts: 5
+      });
+      if (!minha) continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const resultado = await runInTenant(tenantId, () => this.notifyTenant({ change, plan, tenantId, canceled: true }));
+        if (resultado.sent || resultado.reason === 'no_recipient') {
+          // eslint-disable-next-line no-await-in-loop
+          await PlanPriceChange.finishMark({
+            changeId: change.id, tenantId, mark: 'cancel_notice', now,
+            detail: resultado.sent ? resultado.channels.join(',') : resultado.reason
+          });
+          if (resultado.sent) sent += 1;
+        } else {
+          failed += 1;
+          // eslint-disable-next-line no-await-in-loop
+          await PlanPriceChange.failMark({
+            changeId: change.id, tenantId, mark: 'cancel_notice', detail: resultado.reason, retryAt: new Date(now.getTime() + RETRY_MS)
+          });
+        }
+      } catch (error) {
+        failed += 1;
+        // eslint-disable-next-line no-await-in-loop
+        await PlanPriceChange.failMark({
+          changeId: change.id, tenantId, mark: 'cancel_notice', detail: error.message, retryAt: new Date(now.getTime() + RETRY_MS)
+        });
+      }
+    }
+    return { sent, failed };
+  }
+
+  /**
+   * A mensagem do aviso para o provedor em escopo — ou, com `canceled`, a de
+   * que o reajuste avisado foi cancelado; `{ sent, channels?, reason? }`. Não lança.
+   */
+  static async notifyTenant({ change, plan, tenantId, canceled = false }) {
     const tenant = await Tenant.findById(tenantId);
     if (!tenant || tenant.kind === 'platform') return { sent: false, reason: 'no_recipient' };
     const transporte = mailTransport();
@@ -456,8 +523,8 @@ class PlanPriceChangeService {
       new: SubscriptionNoticeService.formatAmount(change.new_cents, moeda),
       date: `${dia}/${mes}/${ano}`
     };
-    const assunto = translate(DEFAULT_LOCALE, 'priceChange.noticeSubject', vars);
-    const texto = translate(DEFAULT_LOCALE, 'priceChange.noticeBody', vars);
+    const assunto = translate(DEFAULT_LOCALE, canceled ? 'priceChange.cancelNoticeSubject' : 'priceChange.noticeSubject', vars);
+    const texto = translate(DEFAULT_LOCALE, canceled ? 'priceChange.cancelNoticeBody' : 'priceChange.noticeBody', vars);
     const canais = await SubscriptionNoticeService.send({ para, fone, transporte, assunto, texto });
     if (!canais.length) return { sent: false, reason: 'send_failed' };
     await AuditLog.record({
@@ -466,7 +533,7 @@ class PlanPriceChangeService {
       subjectType: 'subscription',
       subjectId: tenantId,
       detail: {
-        platformAction: 'plan.price_change_notified', changeId: change.id, cycle: change.cycle,
+        platformAction: canceled ? 'plan.price_change_cancel_notified' : 'plan.price_change_notified', changeId: change.id, cycle: change.cycle,
         oldCents: change.old_cents, newCents: change.new_cents, effectiveAt: change.effective_at, channels: canais
       }
     });
@@ -544,10 +611,21 @@ class PlanPriceChangeService {
         ? await runInTenant(tenantId, () => SelfBillingService.repriceForPriceChange({
           tenant, planId: change.plan_id, cycle: change.cycle
         }))
-        : { charge: 'skipped', reason: 'tenant_gone' };
-      await PlanPriceChange.finishMark({
-        changeId: change.id, tenantId, mark, now, detail: resultado.charge === 'skipped' ? `skipped:${resultado.reason}` : resultado.charge
-      });
+        : { charge: 'skipped', reason: 'tenant_gone', chargeId: null };
+      // A marca é da COBRANÇA (`reprice:<id>`), e a reprecificação só olha a
+      // do prazo vivo. Se a candidata é outra (uma em aberto de outro prazo,
+      // ou a viva mudou de linha no meio), nada foi decidido sobre ELA:
+      // marcá-la como feita a tiraria de toda passada seguinte, inclusive da
+      // em que ela for a viva. Fica sem marca, e a próxima passada a revê.
+      const daCandidata = resultado.chargeId !== null && resultado.chargeId !== undefined
+        && Number(resultado.chargeId) === Number(linha.id);
+      if (daCandidata) {
+        await PlanPriceChange.finishMark({
+          changeId: change.id, tenantId, mark, now, detail: resultado.charge === 'skipped' ? `skipped:${resultado.reason}` : resultado.charge
+        });
+      } else {
+        await PlanPriceChange.releaseMark({ changeId: change.id, tenantId, mark });
+      }
       if (resultado.charge === 'reissued') {
         await runInTenant(tenantId, () => AuditLog.record({
           action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
@@ -557,12 +635,13 @@ class PlanPriceChangeService {
           detail: {
             platformAction: mark.startsWith('revert:') ? 'plan.price_change_reverted' : 'plan.price_change_repriced',
             changeId: change.id,
-            chargeId: Number(linha.id),
-            fromCents: Number(linha.amount_cents),
+            chargeId: Number(resultado.chargeId ?? linha.id),
+            fromCents: daCandidata ? Number(linha.amount_cents) : null,
             issued: Boolean(resultado.reissue?.issued)
           }
         }));
       }
+      if (!daCandidata && resultado.charge !== 'reissued') return 'busy';
       return resultado.charge;
     } catch (error) {
       await PlanPriceChange.failMark({

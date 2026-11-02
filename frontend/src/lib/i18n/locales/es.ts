@@ -5467,6 +5467,13 @@ const es: Dictionary = {
   'platform.plans.priceEditConfirm': 'El precio cambia de inmediato para {count} proveedor(es): sus próximas facturas aún no emitidas saldrán con {price}. Para avisar antes y elegir la fecha, use "Programar reajuste". ¿Guardar de todos modos?',
   'plan.priceChangeBanner': 'El valor de su plan cambia a {price} el {date}.',
   'plan.priceChangeBannerHint': 'Las facturas con vencimiento a partir de esa fecha ya llegan con el valor nuevo.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'Hay un reajuste programado para el precio ({cycle}) de este plan el {date}. Para cambiar ese precio a mano, cancela antes el reajuste programado ("Cancelar reajuste", en la tarjeta del plan).',
+  'receiptPage.title': 'Recibo de pago',
+  'receiptPage.invalid': 'Este enlace de recibo ya no es válido. Pide uno nuevo por WhatsApp.',
+  'receiptPage.failed': 'No se pudo abrir el recibo ahora. Inténtalo de nuevo en unos instantes.',
+  'receiptPage.openTab': 'Abrir en una pestaña nueva',
+  'receiptPage.frameTitle': 'Recibo',
 }
 
 export default es

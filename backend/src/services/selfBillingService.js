@@ -1366,21 +1366,28 @@ class SelfBillingService {
    * isento ou parado por gente. Lança `SelfBillingError` quando o gateway
    * recusa cancelar — quem chama tenta de novo depois.
    *
-   * @returns {Promise<{ charge: 'none'|'reissued'|'skipped', reason?: string, reissue?: object }>}
+   * `chargeId` é a cobrança que esta chamada olhou — a em aberto do prazo
+   * vivo, a única que ela pode tocar —, ou nulo quando não há uma. É por ele
+   * que quem chama sabe se a decisão foi sobre a cobrança que ele tinha em
+   * mãos ou sobre outra.
+   *
+   * @returns {Promise<{ charge: 'none'|'reissued'|'skipped', chargeId: number|null, reason?: string, reissue?: object }>}
    */
   static async repriceForPriceChange({ tenant, planId, cycle }) {
     const subscription = await Subscription.forTenant(tenant.id);
-    if (!subscription) return { charge: 'skipped', reason: 'no_subscription' };
-    if (subscription.billing_exempt_at) return { charge: 'skipped', reason: 'billing_exempt' };
-    if (!ESTADOS_VIVOS.has(subscription.status)) return { charge: 'skipped', reason: 'not_billable' };
+    if (!subscription) return { charge: 'skipped', reason: 'no_subscription', chargeId: null };
+    const viva = await cobrancaEmAberto(subscription);
+    const chargeId = viva ? Number(viva.id) : null;
+    if (subscription.billing_exempt_at) return { charge: 'skipped', reason: 'billing_exempt', chargeId };
+    if (!ESTADOS_VIVOS.has(subscription.status)) return { charge: 'skipped', reason: 'not_billable', chargeId };
     const { plano, assinatura, bloqueio } = await planoDaFatura(subscription);
     if (!plano || Number(plano.id) !== Number(planId)
       || SubscriptionService.cycleOf(assinatura, plano) !== cycle) {
-      return { charge: 'skipped', reason: 'other_plan' };
+      return { charge: 'skipped', reason: 'other_plan', chargeId };
     }
     const cobranca = await reprecificarCobranca(assinatura, plano, { keepOverride: true });
     const reissue = await reemitir(cobranca, tenant, { pendingBlockedBy: bloqueio });
-    return { charge: cobranca.acao, ...(reissue ? { reissue } : {}) };
+    return { charge: cobranca.acao, chargeId, ...(reissue ? { reissue } : {}) };
   }
 
   /**

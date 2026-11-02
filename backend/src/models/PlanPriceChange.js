@@ -30,6 +30,13 @@ function normalizar(row) {
   };
 }
 
+/** Um instante em ms (Date, texto ou número), ou nulo. */
+function instante(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  const ms = valor instanceof Date ? valor.getTime() : new Date(/^\d+$/.test(String(valor)) ? Number(valor) : valor).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
 class PlanPriceChange {
   static async findById(id, db = getDb()) {
     if (!id) return null;
@@ -80,6 +87,14 @@ class PlanPriceChange {
    *     antes dele (`old_cents` do primeiro aplicado depois do vencimento);
    *   - a que vence NA data de um reajuste ainda agendado, ou depois, paga o
    *     preço novo (`new_cents` do último agendado até o vencimento);
+   *   - a que vence na data de um reajuste já APLICADO, ou depois, também paga
+   *     o preço novo dele (`new_cents` do último até o vencimento) — e não o
+   *     da linha de `plan` que quem chama leu: a emissão pode ter lido o plano
+   *     um instante antes de a aplicação gravar nele o preço novo, e o
+   *     reajuste, que já se vê aplicado, não pode deixar essa fatura sair pelo
+   *     preço velho. A exceção é o plano editado DEPOIS da aplicação
+   *     (`plan.updated_at` posterior ao `applied_at`): aí a linha foi lida
+   *     depois dela, e o preço que o console pôs à mão é o que vale;
    *   - o resto, o preço do plano.
    *
    * Nulo quando nada disso muda o preço do plano (o caso de quase sempre).
@@ -91,9 +106,15 @@ class PlanPriceChange {
       .sort((a, b) => (a.effective_at < b.effective_at ? -1 : a.effective_at > b.effective_at ? 1 : a.id - b.id));
     const aplicadoDepois = doCiclo.find((c) => c.status === 'applied' && c.effective_at > dueKey);
     if (aplicadoDepois) return aplicadoDepois.old_cents;
-    const agendados = doCiclo.filter((c) => c.status === 'scheduled' && c.effective_at <= dueKey);
-    if (agendados.length) return agendados[agendados.length - 1].new_cents;
-    return null;
+    const ate = doCiclo.filter((c) => c.effective_at <= dueKey);
+    const ultimo = ate[ate.length - 1];
+    if (!ultimo) return null;
+    if (ultimo.status === 'scheduled') return ultimo.new_cents;
+    // O último até o vencimento é um aplicado.
+    const editadoEm = instante(plan?.updated_at);
+    const aplicadoEm = instante(ultimo.applied_at);
+    if (editadoEm !== null && aplicadoEm !== null && editadoEm > aplicadoEm) return null;
+    return ultimo.new_cents;
   }
 
   /**
@@ -164,6 +185,16 @@ class PlanPriceChange {
         attempts: db.raw('attempts + 1'),
         detail: detail ? String(detail).slice(0, 255) : null
       });
+  }
+
+  /**
+   * Solta a garra sem marcar nada: a linha some, e a próxima passada a toma
+   * de novo como nova. Só a que ainda está `claimed` (a de quem chama).
+   */
+  static async releaseMark({ changeId, tenantId, mark }, db = getDb()) {
+    await db('plan_price_change_marks')
+      .where({ change_id: changeId, tenant_id: tenantId, mark, status: 'claimed' })
+      .del();
   }
 
   static async marksOf(changeId, { prefix = null, status = null } = {}, db = getDb()) {

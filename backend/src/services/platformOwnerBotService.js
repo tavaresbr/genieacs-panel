@@ -29,9 +29,16 @@ import { paymentInfo as lerSegundaVia } from './tenantChargeService.js';
  *
  * O telefone NÃO autentica. Ele só diz de quem PODE ser a conversa: o número
  * bate com o `billing_phone` do provedor ou com o `users.phone` de um dono.
- * Antes de qualquer dado de cobrança, o bot pede os 5 primeiros dígitos do
- * CNPJ/CPF de cobrança daquele provedor; a confirmação vale 30 minutos, e três
- * erros numa hora travam a conversa por uma hora.
+ * Antes de qualquer dado de cobrança, o bot pede os 5 ÚLTIMOS dígitos do
+ * CNPJ/CPF de cobrança daquele provedor — os primeiros oito de um CNPJ são a
+ * raiz, pública em qualquer consulta, e não provam nada; a confirmação vale 30
+ * minutos, e três erros numa hora travam a conversa por uma hora.
+ *
+ * Um telefone que nomeia VÁRIOS provedores não ouve o nome de nenhum antes da
+ * confirmação: o bot pede os dígitos primeiro e escolhe o provedor cujo
+ * documento termina neles. Nenhum confere, é um erro como outro qualquer;
+ * mais de um (o mesmo final em dois provedores), só então a lista — dos que
+ * conferiram, e já confirmados.
  *
  * Toda leitura de cobrança roda em `runInTenant` do provedor CONFIRMADO, e só
  * dele: a cobrança de outro provedor simplesmente não existe ali. E todo envio
@@ -49,7 +56,8 @@ import { paymentInfo as lerSegundaVia } from './tenantChargeService.js';
  * resposta que é SÓ um número ("9", "10") — a nota de uma pesquisa pendente.
  * O gancho roda depois da identificação pelo telefone e antes do menu, e
  * nunca no meio de um passo (escolhendo o provedor ou digitando o documento),
- * onde o número é a resposta do passo. Ele recebe
+ * onde o número é a resposta do passo — nem com o menu confirmado, onde "1" é
+ * a segunda via e não uma nota. Ele recebe
  *
  *   { conversation, text, number, tenantIds, phone }
  *
@@ -214,11 +222,14 @@ function opcaoDoMenu(texto) {
   return null;
 }
 
-/** Os 5 primeiros dígitos, comparados em tempo constante. */
+/**
+ * Os 5 ÚLTIMOS dígitos, comparados em tempo constante. Quem digita o
+ * documento inteiro também passa: o fim do que digitou é o fim do documento.
+ */
 function digitosConferem(digitados, documento) {
   if (documento.length < DIGITOS_PEDIDOS || digitados.length < DIGITOS_PEDIDOS) return false;
-  const a = Buffer.from(digitados.slice(0, DIGITOS_PEDIDOS), 'utf8');
-  const b = Buffer.from(documento.slice(0, DIGITOS_PEDIDOS), 'utf8');
+  const a = Buffer.from(digitados.slice(-DIGITOS_PEDIDOS), 'utf8');
+  const b = Buffer.from(documento.slice(-DIGITOS_PEDIDOS), 'utf8');
   return crypto.timingSafeEqual(a, b);
 }
 
@@ -377,15 +388,22 @@ class PlatformOwnerBotService {
     }
     const porId = new Map(provedores.map((p) => [p.id, p]));
 
-    const escolhendo = passo === PASSO_ESCOLHA && agora - desde < PASSO_VALIDADE_MS;
+    // A escolha só vale depois dos dígitos (`v`): a lista é dos que conferiram.
+    const escolhendo = passo === PASSO_ESCOLHA && dados.v === true && agora - desde < PASSO_VALIDADE_MS;
     const noDocumento = passo === PASSO_DOCUMENTO && agora - desde < PASSO_VALIDADE_MS && porId.has(Number(dados.t));
+    // Os dígitos pedidos sem provedor escolhido: os candidatos que ainda valem.
+    const opcoesDoDocumento = passo === PASSO_DOCUMENTO && !dados.t && Array.isArray(dados.opcoes)
+      && agora - desde < PASSO_VALIDADE_MS
+      ? dados.opcoes.map(Number).filter((id) => porId.has(id))
+      : [];
+    const noDocumentoDeVarios = opcoesDoDocumento.length > 0;
     const confirmado = passo === PASSO_MENU && Number(dados.ate) > agora && porId.has(Number(dados.t));
 
     if (pedeAtendente(texto) || (confirmado && opcaoDoMenu(texto) === 4)) return passarParaEquipe();
 
     // O gancho numérico, fora de um passo em andamento (ver o cabeçalho).
     const soNumero = /^\s*(\d{1,2})\s*$/.exec(texto);
-    if (soNumero && !escolhendo && !noDocumento && ganchosNumericos.length) {
+    if (soNumero && !escolhendo && !noDocumento && !noDocumentoDeVarios && !confirmado && ganchosNumericos.length) {
       for (const gancho of [...ganchosNumericos]) {
         let resultado = null;
         try {
@@ -413,25 +431,32 @@ class PlatformOwnerBotService {
     if (confirmado) return this.menu(atual, porId.get(Number(dados.t)), texto, falar);
 
     if (escolhendo) {
-      const opcoes = Array.isArray(dados.opcoes) ? dados.opcoes.map(Number) : [];
+      const opcoes = (Array.isArray(dados.opcoes) ? dados.opcoes.map(Number) : []).filter((id) => porId.has(id));
       const escolhida = /^\s*(\d{1,2})(?:\D|$)/.exec(texto);
       const id = escolhida ? opcoes[Number(escolhida[1]) - 1] : null;
-      if (id && porId.has(id)) return this.pedirDocumento(atual, porId.get(id), bot, falar, agora);
-      return this.listar(atual, provedores, bot, falar, agora);
+      // Os dígitos já conferiram com todos da lista: escolher é confirmar.
+      if (id) return this.confirmar(atual, porId.get(id), bot, falar, agora);
+      if (opcoes.length) return this.listar(atual, opcoes.map((o) => porId.get(o)), bot, falar, agora);
+      return this.pedirDocumentoDeVarios(atual, provedores, bot, falar, agora);
     }
 
     if (noDocumento) return this.conferir(atual, porId.get(Number(dados.t)), texto, bot, falar, agora);
+    if (noDocumentoDeVarios) {
+      return this.conferirVarios(atual, opcoesDoDocumento.map((id) => porId.get(id)), texto, bot, falar, agora);
+    }
 
-    // Começo: um provedor só vai direto ao documento; vários, à lista.
+    // Começo: um provedor só vai direto ao documento; vários, aos dígitos sem
+    // nome nenhum — quem escolhe é o documento.
     if (provedores.length === 1) return this.pedirDocumento(atual, provedores[0], bot, falar, agora);
-    return this.listar(atual, provedores, bot, falar, agora);
+    return this.pedirDocumentoDeVarios(atual, provedores, bot, falar, agora);
   }
 
+  /** A lista dos provedores cujo documento conferiu com os dígitos — já confirmados. */
   static async listar(conversation, provedores, bot, falar, agora) {
     const lista = provedores.slice(0, MAX_PROVEDORES_NA_LISTA);
     await bot.gravarPasso(conversation, {
       bot_step: PASSO_ESCOLHA,
-      bot_step_data: JSON.stringify({ opcoes: lista.map((p) => p.id) }),
+      bot_step_data: JSON.stringify({ opcoes: lista.map((p) => p.id), v: true }),
       bot_step_at: new Date(agora)
     });
     const linhas = [t('whatsapp.platformBot.chooseProvider')];
@@ -457,6 +482,60 @@ class PlatformOwnerBotService {
     return { replied: true, intent: 'poAskTaxId' };
   }
 
+  /**
+   * O telefone de vários provedores: pede os dígitos sem dizer nome nenhum.
+   * Só os que têm documento de cobrança podem conferir; sem nenhum, gente.
+   */
+  static async pedirDocumentoDeVarios(conversation, provedores, bot, falar, agora) {
+    const comDocumento = provedores.filter((p) => p.taxId.length >= DIGITOS_PEDIDOS);
+    if (!comDocumento.length) {
+      await bot.gravarPasso(conversation, { bot_step: null, bot_step_data: null, bot_step_at: null });
+      await bot.pausar(conversation, new Date(agora + bot.PAUSA_ATENDENTE_MS));
+      await falar(t('whatsapp.platformBot.noTaxIdMulti'));
+      return { replied: true, intent: 'atendente', from: 'noTaxId' };
+    }
+    await bot.gravarPasso(conversation, {
+      bot_step: PASSO_DOCUMENTO,
+      bot_step_data: JSON.stringify({ opcoes: comDocumento.map((p) => p.id) }),
+      bot_step_at: new Date(agora)
+    });
+    await falar(t('whatsapp.platformBot.askTaxIdMulti'));
+    return { replied: true, intent: 'poAskTaxId' };
+  }
+
+  /** A confirmação: o menu do provedor, por 30 minutos, e o contador de erros zerado. */
+  static async confirmar(conversation, provedor, bot, falar, agora) {
+    await bot.gravarPasso(conversation, {
+      bot_step: PASSO_MENU,
+      bot_step_data: JSON.stringify({ t: provedor.id, ate: agora + CONFIRMACAO_MS }),
+      bot_step_at: new Date(agora),
+      bot_doc_attempts: 0,
+      bot_doc_window_at: null
+    });
+    await falar(t('whatsapp.platformBot.menu', { name: provedor.name }));
+    return { replied: true, intent: 'poVerified' };
+  }
+
+  /**
+   * Os dígitos contra todos os candidatos do telefone: um confere, confirma;
+   * nenhum, é tentativa errada; mais de um, a lista dos que conferiram.
+   */
+  static async conferirVarios(conversation, provedores, texto, bot, falar, agora) {
+    const digitos = normalizeTaxId(texto);
+    if (digitos.length < DIGITOS_PEDIDOS) {
+      await falar(t('whatsapp.platformBot.askTaxIdMultiAgain'));
+      return { replied: true, intent: 'poAskTaxId' };
+    }
+    // Todos comparados, sem parar no primeiro: o tempo não diz qual conferiu.
+    const conferiram = provedores.filter((p) => digitosConferem(digitos, p.taxId));
+    if (conferiram.length === 1) return this.confirmar(conversation, conferiram[0], bot, falar, agora);
+    if (conferiram.length > 1) {
+      await bot.gravarPasso(conversation, { bot_doc_attempts: 0, bot_doc_window_at: null });
+      return this.listar(conversation, conferiram, bot, falar, agora);
+    }
+    return this.contarErro(conversation, bot, falar, agora);
+  }
+
   /** Os dígitos digitados: tentativa contada, conferência e, certa, o menu. */
   static async conferir(conversation, provedor, texto, bot, falar, agora) {
     const digitos = normalizeTaxId(texto);
@@ -466,18 +545,12 @@ class PlatformOwnerBotService {
       return { replied: true, intent: 'poAskTaxId' };
     }
 
-    if (digitosConferem(digitos, provedor.taxId)) {
-      await bot.gravarPasso(conversation, {
-        bot_step: PASSO_MENU,
-        bot_step_data: JSON.stringify({ t: provedor.id, ate: agora + CONFIRMACAO_MS }),
-        bot_step_at: new Date(agora),
-        bot_doc_attempts: 0,
-        bot_doc_window_at: null
-      });
-      await falar(t('whatsapp.platformBot.menu', { name: provedor.name }));
-      return { replied: true, intent: 'poVerified' };
-    }
+    if (digitosConferem(digitos, provedor.taxId)) return this.confirmar(conversation, provedor, bot, falar, agora);
+    return this.contarErro(conversation, bot, falar, agora);
+  }
 
+  /** Um erro de documento: conta na janela de uma hora e, no terceiro, trava. */
+  static async contarErro(conversation, bot, falar, agora) {
     const janela = conversation.bot_doc_window_at ? new Date(conversation.bot_doc_window_at).getTime() : 0;
     const anteriores = agora - janela < JANELA_TENTATIVAS_MS ? Number(conversation.bot_doc_attempts || 0) : 0;
     const tentativas = anteriores + 1;
@@ -631,7 +704,10 @@ class PlatformOwnerBotService {
 
     const chargeId = Number(lido.charge.id);
     const token = signReceiptToken({ tenantId: provedor.id, chargeId }, deps.now());
-    const link = `${base}/api/public/receipt/${token}`;
+    // O token no FRAGMENTO, que o navegador não manda a servidor nenhum: a
+    // página pública (`/receipt`) o lê e o manda no corpo de um POST — fora
+    // do caminho, e portanto fora de todo log de acesso e de proxy.
+    const link = `${base}/receipt#${token}`;
     await auditar(provedor, conversation, { what: 'receipt', chargeId });
     return {
       mensagens: [[

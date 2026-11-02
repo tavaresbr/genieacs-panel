@@ -13,6 +13,7 @@ const { default: Plan } = await import('../src/models/Plan.js');
 const { default: Coupon } = await import('../src/models/Coupon.js');
 const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
 const { default: PlanPriceChange } = await import('../src/models/PlanPriceChange.js');
+const { tinsertReturningId } = await import('../src/config/database.js');
 const { default: ChargeIssuingService } = await import('../src/services/chargeIssuingService.js');
 const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
 const { default: PlanPriceChangeService, addDaysIso } = await import('../src/services/planPriceChangeService.js');
@@ -596,6 +597,137 @@ describe('o aviso', () => {
   });
 });
 
+describe('a edição direta com reajuste agendado', () => {
+  const editar = (body) => platform(`/plans/${planos.pro.id}`, { method: 'PATCH', body });
+
+  it('o preço do ciclo agendado não muda à mão: 409 price_change_scheduled', async () => {
+    assert.equal((await agendar(planos.pro.id)).status, 201);
+    const r = await editar({ priceCents: 15000 });
+    assert.equal(r.status, 409, JSON.stringify(r.body));
+    assert.equal(r.body.code, 'price_change_scheduled');
+    assert.ok(r.body.message.includes(addDaysIso(hoje(), 40)), r.body.message);
+    assert.equal(Number((await Plan.findById(planos.pro.id)).price_cents), 10000);
+
+    // O mesmo preço (a tela manda os dois em toda edição) e o outro ciclo passam.
+    const nome = await editar({ name: 'Pro Plus', priceCents: 10000, priceYearlyCents: 110000 });
+    assert.equal(nome.status, 200, JSON.stringify(nome.body));
+    assert.equal(Number((await Plan.findById(planos.pro.id)).price_yearly_cents), 110000);
+    await getDb()('plans').where({ id: planos.pro.id }).update({ name: 'Pro' });
+
+    // O anual agendado também trava o anual.
+    assert.equal((await agendar(planos.pro.id, { cycle: 'annual', newCents: 130000 })).status, 201);
+    const anual = await editar({ priceYearlyCents: 120000 });
+    assert.equal(anual.status, 409);
+    assert.equal(anual.body.code, 'price_change_scheduled');
+  });
+
+  it('cancelado o agendado, a edição direta volta a valer', async () => {
+    const r = await agendar(planos.pro.id);
+    await platform(`/plan-price-changes/${r.body.data.priceChange.id}/cancel`, { method: 'POST' });
+    const editado = await editar({ priceCents: 15000 });
+    assert.equal(editado.status, 200, JSON.stringify(editado.body));
+  });
+});
+
+describe('quem vai estar no plano (a troca agendada)', () => {
+  it('entra na prévia e recebe o aviso, pelo ciclo agendado', async () => {
+    // Beta está no "Só mensal" e desce para o Pro na renovação, no mensal.
+    await getDb()('subscriptions').where({ tenant_id: beta }).update({ pending_plan_id: planos.pro.id, pending_billing_cycle: null });
+    // Gama vai para o Pro no ANUAL: não entra no reajuste do mensal.
+    await getDb()('subscriptions').where({ tenant_id: gama }).update({ pending_plan_id: planos.pro.id, pending_billing_cycle: 'annual' });
+    await SubscriptionService.invalidate(beta);
+    await SubscriptionService.invalidate(gama);
+    await getDb()('tenants').where({ id: beta }).update({ billing_email: 'financeiro@beta.test' });
+
+    const p = (await platform(`/plans/${planos.pro.id}/price-change-preview?cycle=monthly&newCents=12000`)).body.data.preview;
+    assert.equal(p.affected, 2, 'alfa e beta');
+    assert.equal(p.revenueBeforeCents, 20000);
+    assert.equal(p.revenueAfterCents, 24000);
+    const anual = (await platform(`/plans/${planos.pro.id}/price-change-preview?cycle=annual&newCents=120000`)).body.data.preview;
+    assert.equal(anual.affected, 1, 'gama, no anual agendado');
+
+    const r = await agendar(planos.pro.id);
+    const naHora = meioDia(addDaysIso(r.body.data.priceChange.effectiveAt, -30));
+    await PlanPriceChangeService.runDue({ now: naHora });
+    const avisados = (await PlanPriceChange.marksOf(r.body.data.priceChange.id)).filter((m) => m.mark === 'notice');
+    assert.deepEqual(avisados.map((m) => Number(m.tenant_id)).sort((a, b) => a - b), [alfa, beta].sort((a, b) => a - b));
+    assert.ok(emails.length >= 1);
+  });
+});
+
+describe('a marca da reprecificação', () => {
+  it('a candidata que não é a cobrança viva fica sem marca, e é revista depois', async () => {
+    // Uma cobrança em aberto de OUTRO prazo (não a do `renews_at`), já no gateway.
+    const efetiva = addDaysIso(hoje(), 40);
+    const outroPrazo = addDaysIso(hoje(), 75);
+    await runInTenant(alfa, () => tinsertReturningId('billing_charges', {
+      period_end: outroPrazo, amount_cents: 10000, currency: 'BRL', provider: 'asaas', status: 'pending',
+      gateway_charge_id: 'pay_outro_prazo', due_date: outroPrazo
+    }));
+    assert.equal((await agendar(planos.pro.id, { notify: false })).status, 201);
+    assert.ok(outroPrazo >= efetiva);
+    const change = (await PlanPriceChange.list({ planId: planos.pro.id }))[0];
+
+    await PlanPriceChangeService.runDue();
+    const marcas = await PlanPriceChange.marksOf(change.id, { prefix: 'reprice:' });
+    assert.deepEqual(marcas, [], 'nenhuma marca para a cobrança que a reprecificação não olhou');
+    // E segue candidata na passada seguinte.
+    const candidatas = await PlanPriceChangeService.candidateCharges(change, 'reprice:');
+    assert.equal(candidatas.length, 1);
+    assert.equal(Number((await cobrancasDe(alfa))[0].amount_cents), 10000, 'não foi tocada');
+  });
+
+  it('a cobrança viva fica marcada, uma vez', async () => {
+    assert.equal((await emitir(alfa)).issued, true);
+    recebidas = [];
+    assert.equal((await agendar(planos.pro.id, { notify: false })).status, 201);
+    const change = (await PlanPriceChange.list({ planId: planos.pro.id }))[0];
+    await PlanPriceChangeService.runDue();
+    const [linha] = await cobrancasDe(alfa);
+    const marcas = await PlanPriceChange.marksOf(change.id, { prefix: 'reprice:' });
+    assert.deepEqual(marcas.map((m) => [m.mark, m.status]), [[`reprice:${linha.id}`, 'done']]);
+  });
+});
+
+describe('o aviso de cancelamento', () => {
+  it('quem foi avisado ouve, uma vez, que o reajuste caiu; quem não foi, nada', async () => {
+    await assinar(beta);
+    await getDb()('tenants').where({ id: beta }).update({ billing_email: 'financeiro@beta.test' });
+    const r = await agendar(planos.pro.id);
+    const id = r.body.data.priceChange.id;
+    const naHora = meioDia(addDaysIso(r.body.data.priceChange.effectiveAt, -30));
+    await PlanPriceChangeService.runDue({ now: naHora });
+    assert.equal(emails.length, 2);
+    emails.length = 0;
+
+    // Cancelar pelo console manda o aviso de cancelamento na hora.
+    assert.equal((await platform(`/plan-price-changes/${id}/cancel`, { method: 'POST' })).status, 200);
+    assert.equal(emails.length, 2);
+    const texto = decodificarQuotedPrintable(emails.join('\n'));
+    assert.match(texto, /cancelado/);
+    const marcas = (await PlanPriceChange.marksOf(id)).filter((m) => m.mark === 'cancel_notice');
+    assert.equal(marcas.length, 2);
+    assert.ok(marcas.every((m) => m.status === 'done'));
+    const trilha = await getDb()('audit_log').where({ tenant_id: beta }).where('detail', 'like', '%plan.price_change_cancel_notified%');
+    assert.equal(trilha.length, 1);
+
+    // A passada seguinte não repete.
+    emails.length = 0;
+    const resumo = await PlanPriceChangeService.runDue({ now: new Date(Date.now() + 60 * 60 * 1000) });
+    assert.equal(resumo.canceledNotices, 0);
+    assert.equal(emails.length, 0);
+  });
+
+  it('cancelado antes do aviso: ninguém ouve nada', async () => {
+    await getDb()('tenants').where({ id: alfa }).update({ billing_email: 'financeiro@alfa.test' });
+    const r = await agendar(planos.pro.id);
+    assert.equal((await platform(`/plan-price-changes/${r.body.data.priceChange.id}/cancel`, { method: 'POST' })).status, 200);
+    await PlanPriceChangeService.runDue();
+    assert.equal(emails.length, 0);
+    assert.deepEqual((await PlanPriceChange.marksOf(r.body.data.priceChange.id)).filter((m) => m.mark === 'cancel_notice'), []);
+  });
+});
+
 describe('a regra pura', () => {
   it('resolvePrice: agendado vale da data em diante; aplicado vale o de antes antes dele', () => {
     const plano = { id: 1, price_cents: 10000 };
@@ -605,7 +737,26 @@ describe('a regra pura', () => {
     assert.equal(PlanPriceChange.resolvePrice([agendado], plano, 'annual', '2027-01-10'), null);
     const aplicado = { ...agendado, status: 'applied' };
     assert.equal(PlanPriceChange.resolvePrice([aplicado], plano, 'monthly', '2027-01-09'), 10000);
-    assert.equal(PlanPriceChange.resolvePrice([aplicado], plano, 'monthly', '2027-01-10'), null);
     assert.equal(PlanPriceChange.resolvePrice([{ ...agendado, status: 'canceled' }], plano, 'monthly', '2027-02-01'), null);
+  });
+
+  it('resolvePrice: o aplicado vale o novo dele da data em diante, mesmo com a linha do plano lida antes da aplicação', () => {
+    const aplicado = {
+      id: 1, cycle: 'monthly', status: 'applied', effective_at: '2027-01-10', old_cents: 10000, new_cents: 12000,
+      applied_at: new Date('2027-01-10T15:00:00Z')
+    };
+    // A emissão leu o plano um instante antes de a aplicação gravar nele.
+    const velho = { id: 1, price_cents: 10000, updated_at: new Date('2027-01-01T00:00:00Z') };
+    assert.equal(PlanPriceChange.resolvePrice([aplicado], velho, 'monthly', '2027-01-10'), 12000);
+    assert.equal(PlanPriceChange.resolvePrice([aplicado], velho, 'monthly', '2027-03-10'), 12000);
+    // Antes da data, a regra de sempre: o preço de antes.
+    assert.equal(PlanPriceChange.resolvePrice([aplicado], velho, 'monthly', '2027-01-09'), 10000);
+    // O plano editado à mão DEPOIS da aplicação: a linha é a que vale.
+    const editado = { id: 1, price_cents: 13000, updated_at: new Date('2027-02-01T00:00:00Z') };
+    assert.equal(PlanPriceChange.resolvePrice([aplicado], editado, 'monthly', '2027-03-10'), null);
+    // Um agendado depois do aplicado, até o vencimento, manda.
+    const agendado = { id: 2, cycle: 'monthly', status: 'scheduled', effective_at: '2027-06-10', old_cents: 12000, new_cents: 14000 };
+    assert.equal(PlanPriceChange.resolvePrice([aplicado, agendado], velho, 'monthly', '2027-06-10'), 14000);
+    assert.equal(PlanPriceChange.resolvePrice([aplicado, agendado], velho, 'monthly', '2027-05-10'), 12000);
   });
 });

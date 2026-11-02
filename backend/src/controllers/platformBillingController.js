@@ -551,6 +551,25 @@ class PlatformBillingController {
         }
       }
 
+      // Com um reajuste agendado para o ciclo (0122), o preço desse ciclo não
+      // muda à mão: o reajuste guardou o "de" de hoje, vai gravar o "para" na
+      // data e já decide o preço das faturas que vencem depois dela — mexer no
+      // plano por baixo dele cobraria um terceiro valor sem aviso nenhum. Quem
+      // quer outro preço cancela o agendado primeiro. Só o valor que MUDA: a
+      // tela manda os dois preços em toda edição, inclusive a de um nome.
+      for (const [coluna, ciclo] of [['price_cents', 'monthly'], ['price_yearly_cents', 'annual']]) {
+        if (!(coluna in patch)) continue;
+        const antes = plan[coluna] === null || plan[coluna] === undefined ? null : Number(plan[coluna]);
+        const depois = patch[coluna] === null || patch[coluna] === undefined ? null : Number(patch[coluna]);
+        if (antes === depois) continue;
+        const agendado = await PlanPriceChange.scheduledFor(id, ciclo);
+        if (agendado) {
+          return priceChangeRefusal(req, res, new PlanPriceChangeError('priceChange.directEditScheduled', {
+            code: 'price_change_scheduled', status: 409, vars: { date: agendado.effective_at }
+          }));
+        }
+      }
+
       const updated = await Plan.update(id, patch);
       await PlatformAudit.fromRequest(req, {
         action: PlatformAudit.ACTIONS.PLAN_UPDATED,
@@ -654,6 +673,11 @@ class PlatformBillingController {
       });
       await PlanPriceChangeService.revertCharges(change).catch((error) => {
         console.warn(`Could not revert the charges of price change ${change.id}: ${error.message}`);
+      });
+      // Quem já tinha sido avisado ouve que o reajuste caiu; o que falhar
+      // aqui a passada do agendador repete (`cancel_notice`, uma vez por provedor).
+      await PlanPriceChangeService.notifyCanceled(change).catch((error) => {
+        console.warn(`Could not send the cancellation notice of price change ${change.id}: ${error.message}`);
       });
       return res.json(createResponse('Price change canceled', { priceChange: presentPriceChange(change) }));
     } catch (error) {

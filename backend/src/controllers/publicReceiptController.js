@@ -5,8 +5,16 @@ import { esc, receiptData, renderReceipt, RECEIPT_CSP } from '../services/charge
 import { verifyReceiptToken } from '../utils/receiptLinkToken.js';
 
 /**
- * `GET /api/public/receipt/:token` — o recibo de uma cobrança PAGA, aberto do
- * link que o bot do WhatsApp da plataforma mandou ao dono do provedor.
+ * O recibo de uma cobrança PAGA, aberto do link que o bot do WhatsApp da
+ * plataforma mandou ao dono do provedor:
+ *
+ *   - `POST /api/public/receipt` com `{ token }` no corpo — o que a página
+ *     pública `/receipt#<token>` chama. O token vem no fragmento do link e vai
+ *     no corpo, como o da pesquisa e o do convite: fora do caminho, fora de
+ *     todo log de acesso;
+ *   - `GET /api/public/receipt/:token` — o link antigo, com o token no
+ *     caminho, que continua abrindo enquanto os já mandados valem (sete dias).
+ *     O log de acesso mascara o segmento (`redactPath`).
  *
  * Sem sessão: o token assinado (`receiptLinkToken.js`) é a credencial e nomeia
  * o provedor e a cobrança. Toda recusa — token adulterado, vencido, cobrança
@@ -39,8 +47,19 @@ function recusa(req, res) {
 }
 
 class PublicReceiptController {
+  /** `GET /receipt/:token` — o link antigo. */
   static async receipt(req, res) {
-    const alvo = verifyReceiptToken(req.params.token);
+    return PublicReceiptController.responder(req, res, req.params?.token);
+  }
+
+  /** `POST /receipt` — `{ token }` no corpo; a mesma resposta, HTML. */
+  static async receiptByBody(req, res) {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    return PublicReceiptController.responder(req, res, token);
+  }
+
+  static async responder(req, res, token) {
+    const alvo = verifyReceiptToken(token);
     if (!alvo) return recusa(req, res);
     try {
       // A caixa da plataforma não tem recibo de assinatura: só provedor.

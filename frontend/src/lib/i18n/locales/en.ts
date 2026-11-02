@@ -5469,6 +5469,13 @@ const en = {
   'platform.plans.priceEditConfirm': 'The price changes right away for {count} provider(s): their next invoices not yet issued will be {price}. To give notice and pick a date, use "Schedule price change". Save anyway?',
   'plan.priceChangeBanner': 'Your plan price changes to {price} on {date}.',
   'plan.priceChangeBannerHint': 'Invoices due on or after that date will carry the new price.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'A price change is scheduled for this plan\'s price ({cycle}) on {date}. To change that price by hand, first cancel the scheduled change ("Cancel price change" on the plan card).',
+  'receiptPage.title': 'Payment receipt',
+  'receiptPage.invalid': 'This receipt link is no longer valid. Ask for a new one on WhatsApp.',
+  'receiptPage.failed': 'Could not open the receipt right now. Try again in a moment.',
+  'receiptPage.openTab': 'Open in a new tab',
+  'receiptPage.frameTitle': 'Receipt',
 }
 
 export default en

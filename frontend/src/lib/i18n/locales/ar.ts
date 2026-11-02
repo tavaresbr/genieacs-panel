@@ -5476,6 +5476,13 @@ const ar: Dictionary = {
   'platform.plans.priceEditConfirm': 'يتغيّر السعر فورًا لـ {count} مزوّد: ستصدر فواتيرهم التالية غير الصادرة بعد بمبلغ {price}. للإشعار مسبقًا واختيار التاريخ، استخدم "جدولة تعديل السعر". هل تريد الحفظ على أي حال؟',
   'plan.priceChangeBanner': 'يتغيّر سعر خطتك إلى {price} في {date}.',
   'plan.priceChangeBannerHint': 'الفواتير المستحقة من ذلك التاريخ ستصدر بالسعر الجديد.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'يوجد تعديل مجدول لسعر ({cycle}) هذه الخطة في {date}. لتغيير هذا السعر يدويًا، ألغِ التعديل المجدول أولًا ("إلغاء تعديل السعر" في بطاقة الخطة).',
+  'receiptPage.title': 'إيصال الدفع',
+  'receiptPage.invalid': 'رابط الإيصال هذا لم يعد صالحًا. اطلب رابطًا جديدًا عبر واتساب.',
+  'receiptPage.failed': 'تعذّر فتح الإيصال الآن. حاول مرة أخرى بعد قليل.',
+  'receiptPage.openTab': 'فتح في علامة تبويب جديدة',
+  'receiptPage.frameTitle': 'الإيصال',
 }
 
 export default ar

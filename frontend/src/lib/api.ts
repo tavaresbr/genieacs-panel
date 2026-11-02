@@ -7311,3 +7311,24 @@ export const planPriceChangeAPI = {
   cancel: (id: number) =>
     apiClient.post<{ priceChange: PlanPriceChange }>(`/platform/plan-price-changes/${id}/cancel`, {})
 }
+
+// ── O recibo pelo link do bot do WhatsApp da plataforma ─────────────────
+
+export const receiptAPI = {
+  /**
+   * A página pública `/receipt#<token>`: o token vai no CORPO (fora do log de
+   * acesso) e a resposta é o HTML do recibo, ou o mesmo 404 para toda recusa.
+   * Sem sessão e sem o `apiClient`, que espera JSON.
+   */
+  open: async (token: string): Promise<{ ok: boolean; status: number; html: string }> => {
+    const response = await fetch(`${API_BASE_URL}/api/public/receipt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+      credentials: 'omit',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+    })
+    return { ok: response.ok, status: response.status, html: await response.text() }
+  },
+}

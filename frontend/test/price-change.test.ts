@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_NOTICE_DAYS, currentCyclePrice, directPriceEdits, isoDaysFromToday } from '@/lib/price-change'
+import { DEFAULT_NOTICE_DAYS, currentCyclePrice, directPriceEdits, isoDaysFromToday, scheduledChangeFor } from '@/lib/price-change'
 import en from '@/lib/i18n/locales/en'
 import ptBR from '@/lib/i18n/locales/pt-BR'
 
@@ -27,6 +27,20 @@ describe('o reajuste de preço (0122)', () => {
     // Tirar o anual ou zerar o mensal não é reajuste (o servidor cuida do anual em uso).
     expect(directPriceEdits(plano, 10000, null)).toEqual([])
     expect(directPriceEdits(plano, 0, 100000)).toEqual([])
+  })
+
+  it('o reajuste agendado de um ciclo trava a edição direta só daquele ciclo', () => {
+    const base = { id: 1, planId: 1, oldCents: 10000, newCents: 12000, effectiveAt: '2027-01-10', noticeDays: 30, notify: true,
+      reason: null, createdAt: null, notifiedAt: null, appliedAt: null, canceledAt: null }
+    const plano = {
+      priceChanges: [
+        { ...base, cycle: 'monthly' as const, status: 'scheduled' as const },
+        { ...base, id: 2, cycle: 'annual' as const, status: 'applied' as const }
+      ]
+    }
+    expect(scheduledChangeFor(plano, 'monthly')?.id).toBe(1)
+    expect(scheduledChangeFor(plano, 'annual')).toBeNull()
+    expect(scheduledChangeFor({}, 'monthly')).toBeNull()
   })
 
   it('as frases levam as mesmas variáveis em inglês e português', () => {

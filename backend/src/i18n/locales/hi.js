@@ -1296,8 +1296,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': 'नमस्ते! इस WhatsApp नंबर से पंजीकृत कोई प्रदाता नहीं मिला। मैं आपका संदेश हमारी टीम को भेज रहा हूँ, जो जल्द ही जवाब देगी।',
   'whatsapp.platformBot.chooseProvider': 'यह नंबर एक से अधिक प्रदाताओं से जुड़ा है। जिस प्रदाता के लिए सहायता चाहिए, उसका नंबर भेजें:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': 'नमस्ते! हमें *{name}* का खाता मिल गया। आपकी सुरक्षा के लिए, बिलिंग डेटा भेजने से पहले बिलिंग CNPJ या CPF के पहले 5 अंक दर्ज करें।',
-  'whatsapp.platformBot.askTaxIdAgain': 'जारी रखने के लिए *{name}* के बिलिंग CNPJ या CPF के पहले 5 अंक दर्ज करें। चाहें तो हमारी टीम से बात करने के लिए *atendente* लिखें।',
+  'whatsapp.platformBot.askTaxId': 'नमस्ते! हमें *{name}* का खाता मिल गया। आपकी सुरक्षा के लिए, बिलिंग डेटा भेजने से पहले बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें।',
+  'whatsapp.platformBot.askTaxIdAgain': 'जारी रखने के लिए *{name}* के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें। चाहें तो हमारी टीम से बात करने के लिए *atendente* लिखें।',
   'whatsapp.platformBot.wrongTaxId': 'अंक मेल नहीं खाते। शेष प्रयास: {remaining}।',
   'whatsapp.platformBot.locked': 'सुरक्षा के लिए, कई गलत प्रयासों के बाद पुष्टि 1 घंटे के लिए लॉक कर दी गई है। बाद में फिर कोशिश करें या हमारी टीम से बात करने के लिए *atendente* लिखें।',
   'whatsapp.platformBot.noTaxId': '*{name}* के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।',
@@ -1353,5 +1353,14 @@ export default {
   'priceChange.cycleMonthly': 'मासिक',
   'priceChange.cycleAnnual': 'वार्षिक',
   'priceChange.noticeSubject': '{plan} प्लान का मूल्य परिवर्तन',
-  'priceChange.noticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का मूल्य {date} से {old} से बदलकर {new} हो रहा है। उस तिथि या उसके बाद देय इनवॉइस नए मूल्य पर आएँगे; पहले वाले मौजूदा मूल्य पर ही रहेंगे। कोई प्रश्न हो तो बस इस संदेश का उत्तर दें।'
+  'priceChange.noticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का मूल्य {date} से {old} से बदलकर {new} हो रहा है। उस तिथि या उसके बाद देय इनवॉइस नए मूल्य पर आएँगे; पहले वाले मौजूदा मूल्य पर ही रहेंगे। कोई प्रश्न हो तो बस इस संदेश का उत्तर दें।',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': 'इस प्लान के इस चक्र के लिए {date} को मूल्य समायोजन निर्धारित है। कीमत सीधे बदलने से पहले निर्धारित समायोजन रद्द करें।',
+  'priceChange.cancelNoticeSubject': '{plan} प्लान का मूल्य समायोजन रद्द',
+  'priceChange.cancelNoticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का {old} से {new} वाला मूल्य समायोजन, जो {date} से लागू होना था, रद्द कर दिया गया है। कीमत {old} ही रहेगी, और इसकी वजह से कोई इनवॉइस नहीं बदलेगा। कोई सवाल हो तो बस इस संदेश का जवाब दें।',
+  'whatsapp.platformBot.askTaxIdMulti': 'नमस्ते! आपकी सुरक्षा के लिए, बिलिंग डेटा भेजने से पहले अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें।',
+  'whatsapp.platformBot.askTaxIdMultiAgain': 'जारी रखने के लिए अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें। चाहें तो हमारी टीम से बात करने के लिए *atendente* लिखें।',
+  'whatsapp.platformBot.noTaxIdMulti': 'इस नंबर के प्रदाताओं के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।'
 };

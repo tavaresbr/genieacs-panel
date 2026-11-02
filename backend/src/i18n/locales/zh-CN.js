@@ -1296,8 +1296,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': '您好！我们没有找到使用此 WhatsApp 号码注册的服务商。我会把您的消息转给我们的团队，他们会尽快回复。',
   'whatsapp.platformBot.chooseProvider': '此号码关联了多个服务商。请回复您需要服务的服务商编号：',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': '您好！我们找到了 *{name}* 的账户。为了您的安全，在发送账单信息之前，请输入账单 CNPJ 或 CPF 的前 5 位数字。',
-  'whatsapp.platformBot.askTaxIdAgain': '如需继续，请输入 *{name}* 的账单 CNPJ 或 CPF 的前 5 位数字。您也可以输入 *atendente* 与我们的团队沟通。',
+  'whatsapp.platformBot.askTaxId': '您好！我们找到了 *{name}* 的账户。为了您的安全，在发送账单信息之前，请输入账单 CNPJ 或 CPF 的后 5 位数字。',
+  'whatsapp.platformBot.askTaxIdAgain': '如需继续，请输入 *{name}* 的账单 CNPJ 或 CPF 的后 5 位数字。您也可以输入 *atendente* 与我们的团队沟通。',
   'whatsapp.platformBot.wrongTaxId': '数字不匹配。剩余尝试次数：{remaining}。',
   'whatsapp.platformBot.locked': '为了安全，多次输入错误后确认已被锁定 1 小时。请稍后再试，或输入 *atendente* 与我们的团队沟通。',
   'whatsapp.platformBot.noTaxId': '*{name}* 没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。',
@@ -1353,5 +1353,14 @@ export default {
   'priceChange.cycleMonthly': '按月',
   'priceChange.cycleAnnual': '按年',
   'priceChange.noticeSubject': '{plan} 套餐调价通知',
-  'priceChange.noticeBody': '{provider}，您好。{plan} 套餐（{cycle}）的价格将从 {date} 起由 {old} 调整为 {new}。到期日在该日期或之后的账单将按新价格开具；之前的账单保持当前价格。如有疑问，请直接回复此消息。'
+  'priceChange.noticeBody': '{provider}，您好。{plan} 套餐（{cycle}）的价格将从 {date} 起由 {old} 调整为 {new}。到期日在该日期或之后的账单将按新价格开具；之前的账单保持当前价格。如有疑问，请直接回复此消息。',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': '此套餐在该周期已安排于 {date} 调价。直接修改价格之前，请先取消已安排的调价。',
+  'priceChange.cancelNoticeSubject': '{plan} 套餐调价已取消',
+  'priceChange.cancelNoticeBody': '{provider}，您好。原定于 {date} 生效的 {plan} 套餐（{cycle}）从 {old} 调整为 {new} 的调价已取消。价格仍为 {old}，不会因此更改任何账单。如有疑问，直接回复此消息即可。',
+  'whatsapp.platformBot.askTaxIdMulti': '您好！为了您的安全，在发送账单信息之前，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。',
+  'whatsapp.platformBot.askTaxIdMultiAgain': '如需继续，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。您也可以输入 *atendente* 与我们的团队沟通。',
+  'whatsapp.platformBot.noTaxIdMulti': '此号码关联的服务商都没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。'
 };

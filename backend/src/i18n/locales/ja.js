@@ -1296,8 +1296,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': 'こんにちは。この WhatsApp 番号で登録されたプロバイダーが見つかりませんでした。メッセージをチームに引き継ぎます。まもなく返信します。',
   'whatsapp.platformBot.chooseProvider': 'この番号は複数のプロバイダーに紐づいています。サポートが必要なプロバイダーの番号で返信してください:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': 'こんにちは。*{name}* のアカウントが見つかりました。安全のため、請求データを送る前に請求先 CNPJ または CPF の最初の 5 桁を入力してください。',
-  'whatsapp.platformBot.askTaxIdAgain': '続けるには、*{name}* の請求先 CNPJ または CPF の最初の 5 桁を入力してください。チームと話したい場合は *atendente* と入力してください。',
+  'whatsapp.platformBot.askTaxId': 'こんにちは。*{name}* のアカウントが見つかりました。安全のため、請求データを送る前に請求先 CNPJ または CPF の最後の 5 桁を入力してください。',
+  'whatsapp.platformBot.askTaxIdAgain': '続けるには、*{name}* の請求先 CNPJ または CPF の最後の 5 桁を入力してください。チームと話したい場合は *atendente* と入力してください。',
   'whatsapp.platformBot.wrongTaxId': '数字が一致しません。残りの試行回数: {remaining}。',
   'whatsapp.platformBot.locked': '安全のため、複数回の誤入力により確認を 1 時間ロックしました。後でもう一度試すか、*atendente* と入力してチームと話してください。',
   'whatsapp.platformBot.noTaxId': '*{name}* には請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。',
@@ -1353,5 +1353,14 @@ export default {
   'priceChange.cycleMonthly': '月額',
   'priceChange.cycleAnnual': '年額',
   'priceChange.noticeSubject': '{plan} プランの価格改定',
-  'priceChange.noticeBody': '{provider} 様。{plan} プラン（{cycle}）の料金は {date} から {old} から {new} に変わります。この日以降に期日を迎える請求書は新しい料金で発行され、それ以前の請求書は現在の料金のままです。ご不明な点があれば、このメッセージにご返信ください。'
+  'priceChange.noticeBody': '{provider} 様。{plan} プラン（{cycle}）の料金は {date} から {old} から {new} に変わります。この日以降に期日を迎える請求書は新しい料金で発行され、それ以前の請求書は現在の料金のままです。ご不明な点があれば、このメッセージにご返信ください。',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': 'このプランのこのサイクルには {date} に料金改定が予定されています。料金を直接変更する前に、予定された改定をキャンセルしてください。',
+  'priceChange.cancelNoticeSubject': '{plan} プランの料金改定はキャンセルされました',
+  'priceChange.cancelNoticeBody': '{provider} 様。{date} に予定していた {plan} プラン（{cycle}）の {old} から {new} への料金改定はキャンセルされました。料金は {old} のままで、これにより変わる請求書はありません。ご不明な点があれば、このメッセージにご返信ください。',
+  'whatsapp.platformBot.askTaxIdMulti': 'こんにちは。安全のため、請求データを送る前に、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。',
+  'whatsapp.platformBot.askTaxIdMultiAgain': '続けるには、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。チームと話したい場合は *atendente* と入力してください。',
+  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。'
 };

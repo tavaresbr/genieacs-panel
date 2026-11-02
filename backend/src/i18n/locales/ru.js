@@ -1297,8 +1297,8 @@ export default {
   'whatsapp.platformBot.unknownNumber': 'Здравствуйте! Мы не нашли провайдера, зарегистрированного с этим номером WhatsApp. Я передам ваше сообщение нашей команде, она скоро ответит.',
   'whatsapp.platformBot.chooseProvider': 'Этот номер связан с несколькими провайдерами. Ответьте номером того, по которому вам нужна помощь:',
   'whatsapp.platformBot.providerOption': '{n} — {name}',
-  'whatsapp.platformBot.askTaxId': 'Здравствуйте! Мы нашли учётную запись *{name}*. В целях безопасности перед отправкой платёжных данных укажите первые 5 цифр платёжного CNPJ или CPF.',
-  'whatsapp.platformBot.askTaxIdAgain': 'Чтобы продолжить, укажите первые 5 цифр платёжного CNPJ или CPF *{name}*. Если хотите, напишите *atendente*, чтобы связаться с нашей командой.',
+  'whatsapp.platformBot.askTaxId': 'Здравствуйте! Мы нашли учётную запись *{name}*. В целях безопасности перед отправкой платёжных данных укажите последние 5 цифр платёжного CNPJ или CPF.',
+  'whatsapp.platformBot.askTaxIdAgain': 'Чтобы продолжить, укажите последние 5 цифр платёжного CNPJ или CPF *{name}*. Если хотите, напишите *atendente*, чтобы связаться с нашей командой.',
   'whatsapp.platformBot.wrongTaxId': 'Цифры не совпадают. Осталось попыток: {remaining}.',
   'whatsapp.platformBot.locked': 'В целях безопасности подтверждение заблокировано на 1 час после нескольких неверных попыток. Попробуйте позже или напишите *atendente*, чтобы связаться с нашей командой.',
   'whatsapp.platformBot.noTaxId': 'Для *{name}* не указан платёжный CNPJ или CPF, поэтому я не могу подтвердить вашу личность здесь. Я передам разговор нашей команде.',
@@ -1354,5 +1354,14 @@ export default {
   'priceChange.cycleMonthly': 'ежемесячно',
   'priceChange.cycleAnnual': 'ежегодно',
   'priceChange.noticeSubject': 'Изменение цены тарифа {plan}',
-  'priceChange.noticeBody': 'Здравствуйте, {provider}. Цена тарифа {plan} ({cycle}) меняется с {old} на {new} с {date}. Счета со сроком оплаты в эту дату или позже будут выставлены по новой цене; более ранние сохраняют текущую. Если есть вопросы, просто ответьте на это сообщение.'
+  'priceChange.noticeBody': 'Здравствуйте, {provider}. Цена тарифа {plan} ({cycle}) меняется с {old} на {new} с {date}. Счета со сроком оплаты в эту дату или позже будут выставлены по новой цене; более ранние сохраняют текущую. Если есть вопросы, просто ответьте на это сообщение.',
+
+  // O reajuste: a edição direta barrada pelo agendado e o aviso de cancelamento;
+  // o bot da plataforma pedindo os dígitos sem nomear provedor (0122/0123).
+  'priceChange.directEditScheduled': 'Для этого тарифа на этот цикл запланировано изменение цены на {date}. Отмените запланированное изменение, прежде чем менять цену вручную.',
+  'priceChange.cancelNoticeSubject': 'Изменение цены тарифа {plan} отменено',
+  'priceChange.cancelNoticeBody': 'Здравствуйте, {provider}. Изменение цены тарифа {plan} ({cycle}) с {old} на {new}, запланированное на {date}, отменено. Цена остаётся {old}, и ни один счёт из-за него не меняется. Если есть вопросы, просто ответьте на это сообщение.',
+  'whatsapp.platformBot.askTaxIdMulti': 'Здравствуйте! В целях безопасности перед отправкой платёжных данных укажите последние 5 цифр платёжного CNPJ или CPF вашего провайдера.',
+  'whatsapp.platformBot.askTaxIdMultiAgain': 'Чтобы продолжить, укажите последние 5 цифр платёжного CNPJ или CPF вашего провайдера. Если хотите, напишите *atendente*, чтобы связаться с нашей командой.',
+  'whatsapp.platformBot.noTaxIdMulti': 'Для провайдеров этого номера не указан платёжный CNPJ или CPF, поэтому я не могу подтвердить вашу личность здесь. Я передам разговор нашей команде.'
 };

@@ -5471,6 +5471,13 @@ const de: Dictionary = {
   'platform.plans.priceEditConfirm': 'Der Preis ändert sich sofort für {count} Anbieter: Ihre nächsten, noch nicht ausgestellten Rechnungen betragen {price}. Um vorher zu benachrichtigen und ein Datum zu wählen, nutzen Sie „Preisanpassung planen“. Trotzdem speichern?',
   'plan.priceChangeBanner': 'Der Preis Ihres Tarifs ändert sich am {date} auf {price}.',
   'plan.priceChangeBannerHint': 'Rechnungen mit Fälligkeit ab diesem Datum enthalten den neuen Preis.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'Für den Preis ({cycle}) dieses Tarifs ist zum {date} eine Preisanpassung geplant. Um diesen Preis von Hand zu ändern, stornieren Sie zuerst die geplante Anpassung („Preisanpassung stornieren“ auf der Tarifkarte).',
+  'receiptPage.title': 'Zahlungsbeleg',
+  'receiptPage.invalid': 'Dieser Beleg-Link ist nicht mehr gültig. Fordern Sie über WhatsApp einen neuen an.',
+  'receiptPage.failed': 'Der Beleg kann gerade nicht geöffnet werden. Versuchen Sie es gleich noch einmal.',
+  'receiptPage.openTab': 'In neuem Tab öffnen',
+  'receiptPage.frameTitle': 'Beleg',
 }
 
 export default de

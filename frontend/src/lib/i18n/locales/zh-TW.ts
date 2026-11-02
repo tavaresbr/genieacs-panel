@@ -5468,6 +5468,13 @@ const zhTW: Dictionary = {
   'platform.plans.priceEditConfirm': '{count} 個服務商的價格將立即變更：他們尚未開立的下一張帳單將為 {price}。如需提前通知並選擇日期，請使用「排定調價」。仍要儲存嗎？',
   'plan.priceChangeBanner': '您的方案價格將於 {date} 調整為 {price}。',
   'plan.priceChangeBannerHint': '到期日在該日期或之後的帳單將以新價格開立。',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': '此方案的（{cycle}）價格已安排於 {date} 調價。如需手動修改該價格，請先取消已安排的調價（方案卡片上的「取消調價」）。',
+  'receiptPage.title': '付款收據',
+  'receiptPage.invalid': '此收據連結已失效。請透過 WhatsApp 重新索取。',
+  'receiptPage.failed': '暫時無法開啟收據，請稍後再試。',
+  'receiptPage.openTab': '在新分頁中開啟',
+  'receiptPage.frameTitle': '收據',
 }
 
 export default zhTW

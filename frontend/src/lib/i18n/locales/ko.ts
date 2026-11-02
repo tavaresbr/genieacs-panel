@@ -5474,6 +5474,13 @@ const ko: Dictionary = {
   'platform.plans.priceEditConfirm': '제공업체 {count}곳의 가격이 즉시 바뀝니다. 아직 발행되지 않은 다음 청구서는 {price}(으)로 발행됩니다. 미리 안내하고 날짜를 정하려면 "가격 조정 예약"을 사용하세요. 그래도 저장할까요?',
   'plan.priceChangeBanner': '요금제 가격이 {date}부터 {price}(으)로 변경됩니다.',
   'plan.priceChangeBannerHint': '이 날짜 이후가 만기인 청구서는 새 가격으로 발행됩니다.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': '이 요금제의 ({cycle}) 가격에 {date} 가격 조정이 예정되어 있습니다. 이 가격을 직접 바꾸려면 먼저 예정된 조정을 취소하세요(요금제 카드의 "가격 조정 취소").',
+  'receiptPage.title': '결제 영수증',
+  'receiptPage.invalid': '이 영수증 링크는 더 이상 유효하지 않습니다. WhatsApp으로 새 링크를 요청하세요.',
+  'receiptPage.failed': '지금은 영수증을 열 수 없습니다. 잠시 후 다시 시도하세요.',
+  'receiptPage.openTab': '새 탭에서 열기',
+  'receiptPage.frameTitle': '영수증',
 }
 
 export default ko

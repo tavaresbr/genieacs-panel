@@ -167,9 +167,10 @@ describe('o sitemap.xml', () => {
   it('e toda rota pública do console está classificada', () => {
     // `/impersonate` resgata um bilhete; `/platform` é o console, atrás de
     // sessão; `*` é o redirecionamento. `/nps` é a pesquisa de satisfação dos
-    // provedores (0123), aberta só pelo link com token: nada a indexar.
+    // provedores (0123), aberta só pelo link com token: nada a indexar. E
+    // `/receipt` é o recibo do link do bot da plataforma, também só pelo token.
     // Nenhuma é página.
-    const NAO_E_PAGINA = new Set(['/impersonate', '/platform', '/nps', '*']);
+    const NAO_E_PAGINA = new Set(['/impersonate', '/platform', '/nps', '/receipt', '*']);
     const naoClassificadas = [...rotasDoConsole()]
       .filter((p) => !PUBLIC_PATHS.includes(p) && !NAO_E_PAGINA.has(p));
 

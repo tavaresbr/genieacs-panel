@@ -5473,6 +5473,13 @@ const it: Dictionary = {
   'platform.plans.priceEditConfirm': 'Il prezzo cambia subito per {count} provider: le loro prossime fatture non ancora emesse saranno di {price}. Per avvisare prima e scegliere la data, usa "Programma adeguamento". Salvare comunque?',
   'plan.priceChangeBanner': 'Il prezzo del tuo piano passa a {price} il {date}.',
   'plan.priceChangeBannerHint': 'Le fatture con scadenza da quella data in poi avranno il nuovo prezzo.',
+  // A edição direta barrada pelo reajuste agendado e a página pública do recibo.
+  'platform.plans.priceChange.directEditBlocked': 'È programmato un adeguamento del prezzo ({cycle}) di questo piano il {date}. Per cambiare quel prezzo a mano, annulla prima l’adeguamento programmato («Annulla adeguamento», nella scheda del piano).',
+  'receiptPage.title': 'Ricevuta di pagamento',
+  'receiptPage.invalid': 'Questo link della ricevuta non è più valido. Chiedine uno nuovo su WhatsApp.',
+  'receiptPage.failed': 'Impossibile aprire la ricevuta ora. Riprova tra un istante.',
+  'receiptPage.openTab': 'Apri in una nuova scheda',
+  'receiptPage.frameTitle': 'Ricevuta',
 }
 
 export default it
