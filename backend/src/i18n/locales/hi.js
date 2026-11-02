@@ -1328,5 +1328,11 @@ export default {
   'whatsapp.platformBot.receipt': '{amount} के भुगतान की रसीद ({date}): {link}\nलिंक 7 दिनों तक मान्य है।',
 
   'platformAlert.accounting_export.subject': "लेखा निर्यात: {month}",
-  'platformAlert.accounting_export.body': "{month} का लेखा निर्यात ({format}) संलग्न है: बिल, भुगतान, रिफंड, क्रेडिट, NFS-e और सारांश।\n\nबिल: {count} · शुद्ध राशि: {net}\nप्राप्त: {received} · रिफंड: {refunded}\n\nतिथियाँ ब्रासीलिया समय में और राशियाँ रियाल में।"
+  'platformAlert.accounting_export.body': "{month} का लेखा निर्यात ({format}) संलग्न है: बिल, भुगतान, रिफंड, क्रेडिट, NFS-e और सारांश।\n\nबिल: {count} · शुद्ध राशि: {net}\nप्राप्त: {received} · रिफंड: {refunded}\n\nतिथियाँ ब्रासीलिया समय में और राशियाँ रियाल में।",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '{product} के साथ आपका अनुभव कैसा है?',
+  'nps.askBody': 'नमस्ते {provider}!\n\n0 से 10 के पैमाने पर, आप किसी दूसरे प्रोवाइडर के सहकर्मी को {product} की सिफ़ारिश करने की कितनी संभावना रखते हैं?\n\nएक क्लिक में जवाब दें (एक मिनट से कम): {link}\n\nआपका स्कोर और टिप्पणी सीधे प्लेटफ़ॉर्म चलाने वाली टीम तक पहुँचते हैं।',
+  'nps.askWhatsappHint': 'चाहें तो यहीं सिर्फ़ 0 से 10 तक की संख्या भेजकर जवाब दें।',
+  'nps.whatsappThanks': 'धन्यवाद! हमें आपका स्कोर {score} मिल गया। अगर आप कारण बताना चाहें, तो सर्वे के लिंक से जवाब दें।'
 };

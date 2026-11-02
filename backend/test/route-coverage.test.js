@@ -86,7 +86,12 @@ const PUBLICAS = new Map([
   ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço'],
   // O recibo pelo link do bot do WhatsApp da plataforma: o token assinado é a
   // credencial; prova em platform-owner-bot.test.js.
-  ['GET /api/public/receipt/:token', 'recibo de cobrança PAGA por token HMAC de 7 dias que nomeia provedor e cobrança; toda recusa é o mesmo 404']
+  ['GET /api/public/receipt/:token', 'recibo de cobrança PAGA por token HMAC de 7 dias que nomeia provedor e cobrança; toda recusa é o mesmo 404'],
+  // A pesquisa de satisfação dos provedores (0123). O token do link é a
+  // credencial, vai no CORPO e é conferido pelo hash; token desconhecido é 404
+  // sem nada. Prova em platform-nps.test.js.
+  ['POST /api/public/nps/lookup', 'a pesquisa do link: o token no corpo é a credencial; devolve só a nota e o nome do produto'],
+  ['POST /api/public/nps/answer', 'a resposta da pesquisa: só grava a nota na linha que o hash do token acha, e só dentro dos prazos']
 ]);
 
 /**
@@ -207,7 +212,8 @@ const POR_ID = new Map([
   ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404'],
   ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe'],
   ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404'],
-  ['GET /api/public/receipt/:token', 'o parâmetro é um token assinado que já nomeia provedor e cobrança, aberto em runInTenant do provedor do token; prova em platform-owner-bot.test.js']
+  ['GET /api/public/receipt/:token', 'o parâmetro é um token assinado que já nomeia provedor e cobrança, aberto em runInTenant do provedor do token; prova em platform-owner-bot.test.js'],
+  ['POST /api/platform/tenants/:id/nps', 'plano de controle; prova em platform-nps.test.js — manda só ao provedor da URL, e a caixa da plataforma e quem não existe respondem 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -296,6 +302,12 @@ describe('toda rota sem sessão', () => {
       // é tabela da plataforma, sem `tenant_id` — não há cadastro de provedor
       // nenhum ao alcance dela.
       'POST /api/public/leads',
+      // A pesquisa de satisfação (0123): `answer` grava a nota na linha de
+      // `platform_nps` que o hash do token acha — de UM provedor, o do token —,
+      // e `lookup` não escreve nada: é POST pelo mesmo motivo da prévia do
+      // convite, o token fora do caminho.
+      'POST /api/public/nps/answer',
+      'POST /api/public/nps/lookup',
       'POST /api/sgp/events/webhook',
       'POST /api/whatsapp-webhook'
     ]);
@@ -452,8 +464,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // token HMAC que já nomeia provedor e cobrança, como o do anexo — o vizinho
   // não alcança a linha de ninguém sem a assinatura. Não é do console, então
   // entra também na conta de fora dele (29 → 30, dentro do teto). Prova em
-  // platform-owner-bot.test.js. São 75.
-  const TETO_DE_EXCECOES = 75;
+  // platform-owner-bot.test.js. 
+  // E o "Enviar pesquisa" de satisfação pelo console (`POST .../nps`, 0123):
+  // grava uma linha em `platform_nps` NO ESCOPO do provedor da URL e manda a
+  // pesquisa só aos contatos dele. Mesmo pedágio: uma linha em `DO_CONSOLE` e
+  // mais uma aqui; prova em platform-nps.test.js. São 76.
+  const TETO_DE_EXCECOES = 76;
 
 
   /**
@@ -512,7 +528,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/credits',
     'DELETE /api/platform/tenants/:id/subscription/cancellation',
     'POST /api/platform/alerts/:id/resend',
-    'GET /api/platform/tenants/:id/subscription/plan-preview'
+    'GET /api/platform/tenants/:id/subscription/plan-preview',
+    'POST /api/platform/tenants/:id/nps'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

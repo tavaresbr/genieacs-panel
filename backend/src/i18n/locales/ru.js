@@ -1329,5 +1329,11 @@ export default {
   'whatsapp.platformBot.receipt': 'Квитанция о платеже {amount} ({date}): {link}\nСсылка действует 7 дней.',
 
   'platformAlert.accounting_export.subject': "Бухгалтерская выгрузка: {month}",
-  'platformAlert.accounting_export.body': "Во вложении бухгалтерская выгрузка за {month} ({format}): счета, платежи, возвраты, кредиты, NFS-e и сводка.\n\nСчетов: {count} · Сумма нетто: {net}\nПолучено: {received} · Возвращено: {refunded}\n\nДаты по времени Бразилиа, суммы в реалах."
+  'platformAlert.accounting_export.body': "Во вложении бухгалтерская выгрузка за {month} ({format}): счета, платежи, возвраты, кредиты, NFS-e и сводка.\n\nСчетов: {count} · Сумма нетто: {net}\nПолучено: {received} · Возвращено: {refunded}\n\nДаты по времени Бразилиа, суммы в реалах.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'Как вам работа с {product}?',
+  'nps.askBody': 'Здравствуйте, {provider}!\n\nПо шкале от 0 до 10, насколько вероятно, что вы порекомендуете {product} коллеге из другого провайдера?\n\nОтветьте в один клик (меньше минуты): {link}\n\nВаша оценка и комментарий попадут прямо к команде, которая развивает платформу.',
+  'nps.askWhatsappHint': 'Если удобнее, просто ответьте здесь числом от 0 до 10.',
+  'nps.whatsappThanks': 'Спасибо! Мы получили вашу оценку {score}. Если хотите рассказать почему, ответьте по ссылке опроса.'
 };

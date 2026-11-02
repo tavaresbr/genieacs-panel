@@ -1328,5 +1328,11 @@ export default {
   'whatsapp.platformBot.receipt': '{amount} 付款收据（{date}）：{link}\n链接有效期为 7 天。',
 
   'platformAlert.accounting_export.subject': "会计导出：{month}",
-  'platformAlert.accounting_export.body': "附件为 {month} 的会计导出（{format}）：账单、收款、退款、抵扣额、NFS-e 发票和汇总。\n\n账单：{count} 笔 · 净额：{net}\n收款：{received} · 退款：{refunded}\n\n日期为巴西利亚时间，金额单位为雷亚尔。"
+  'platformAlert.accounting_export.body': "附件为 {month} 的会计导出（{format}）：账单、收款、退款、抵扣额、NFS-e 发票和汇总。\n\n账单：{count} 笔 · 净额：{net}\n收款：{received} · 退款：{refunded}\n\n日期为巴西利亚时间，金额单位为雷亚尔。",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '您使用 {product} 的感受如何？',
+  'nps.askBody': '{provider}，您好！\n\n在 0 到 10 分之间，您有多大可能向其他运营商的同行推荐 {product}？\n\n一键作答（不到一分钟）：{link}\n\n您的评分和意见会直接送达负责平台的团队。',
+  'nps.askWhatsappHint': '如果方便，也可以直接在这里回复 0 到 10 的数字。',
+  'nps.whatsappThanks': '谢谢！我们已收到您的评分 {score}。如想告诉我们原因，请通过问卷链接作答。'
 };

@@ -1326,5 +1326,11 @@ export default {
   'whatsapp.platformBot.receipt': 'Ricevuta del pagamento di {amount} ({date}): {link}\nIl link è valido per 7 giorni.',
 
   'platformAlert.accounting_export.subject': "Esportazione contabile: {month}",
-  'platformAlert.accounting_export.body': "In allegato l'esportazione contabile di {month} ({format}): addebiti, pagamenti, rimborsi, crediti, NFS-e e il riepilogo.\n\nAddebiti: {count} · Importo netto: {net}\nIncassato: {received} · Rimborsato: {refunded}\n\nDate nell'orario di Brasília e importi in real."
+  'platformAlert.accounting_export.body': "In allegato l'esportazione contabile di {month} ({format}): addebiti, pagamenti, rimborsi, crediti, NFS-e e il riepilogo.\n\nAddebiti: {count} · Importo netto: {net}\nIncassato: {received} · Rimborsato: {refunded}\n\nDate nell'orario di Brasília e importi in real.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'Come si trova con {product}?',
+  'nps.askBody': 'Ciao {provider}!\n\nDa 0 a 10, quanto consiglieresti {product} a un collega di un altro provider?\n\nRispondi con un clic (richiede meno di un minuto): {link}\n\nIl tuo voto e il tuo commento arrivano direttamente al team che gestisce la piattaforma.',
+  'nps.askWhatsappHint': 'Se preferisci, rispondi qui solo con il numero, da 0 a 10.',
+  'nps.whatsappThanks': 'Grazie! Abbiamo ricevuto il tuo voto {score}. Se vuoi dirci il perché, rispondi tramite il link del sondaggio.'
 };

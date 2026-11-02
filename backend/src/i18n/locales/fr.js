@@ -1324,5 +1324,11 @@ export default {
   'whatsapp.platformBot.receipt': 'Reçu du paiement de {amount} ({date}) : {link}\nLe lien est valable 7 jours.',
 
   'platformAlert.accounting_export.subject': "Export comptable : {month}",
-  'platformAlert.accounting_export.body': "Ci-joint l'export comptable de {month} ({format}) : facturations, paiements, remboursements, crédits, NFS-e et le récapitulatif.\n\nFacturations : {count} · Montant net : {net}\nReçu : {received} · Remboursé : {refunded}\n\nDates à l'heure de Brasília et montants en reais."
+  'platformAlert.accounting_export.body': "Ci-joint l'export comptable de {month} ({format}) : facturations, paiements, remboursements, crédits, NFS-e et le récapitulatif.\n\nFacturations : {count} · Montant net : {net}\nReçu : {received} · Remboursé : {refunded}\n\nDates à l'heure de Brasília et montants en reais.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'Comment se passe votre utilisation de {product} ?',
+  'nps.askBody': 'Bonjour {provider} !\n\nSur une échelle de 0 à 10, quelle est la probabilité que vous recommandiez {product} à un collègue d’un autre fournisseur ?\n\nRépondez en un clic (moins d’une minute) : {link}\n\nVotre note et votre commentaire vont directement à l’équipe qui gère la plateforme.',
+  'nps.askWhatsappHint': 'Si vous préférez, répondez ici simplement avec le chiffre, de 0 à 10.',
+  'nps.whatsappThanks': 'Merci ! Nous avons bien reçu votre note de {score}. Pour nous dire pourquoi, répondez via le lien de l’enquête.'
 };

@@ -1328,5 +1328,11 @@ export default {
   'whatsapp.platformBot.receipt': '{amount} の支払いの領収書 ({date}): {link}\nリンクの有効期限は 7 日間です。',
 
   'platformAlert.accounting_export.subject': "会計エクスポート: {month}",
-  'platformAlert.accounting_export.body': "{month} の会計エクスポート ({format}) を添付します: 請求、入金、返金、クレジット、NFS-e、サマリー。\n\n請求: {count} 件 · 純額: {net}\n入金: {received} · 返金: {refunded}\n\n日時はブラジリア時間、金額はレアルです。"
+  'platformAlert.accounting_export.body': "{month} の会計エクスポート ({format}) を添付します: 請求、入金、返金、クレジット、NFS-e、サマリー。\n\n請求: {count} 件 · 純額: {net}\n入金: {received} · 返金: {refunded}\n\n日時はブラジリア時間、金額はレアルです。",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '{product} の使い心地はいかがですか？',
+  'nps.askBody': '{provider} 様\n\n0〜10 の尺度で、{product} を他のプロバイダーの同業者に勧める可能性はどのくらいですか？\n\nワンクリックで回答できます（1 分かかりません）：{link}\n\nいただいたスコアとコメントは、プラットフォームを運営するチームに直接届きます。',
+  'nps.askWhatsappHint': 'よろしければ、ここに 0〜10 の数字だけを返信していただいても構いません。',
+  'nps.whatsappThanks': 'ありがとうございます！スコア {score} を受け取りました。理由を教えていただける場合は、アンケートのリンクからご回答ください。'
 };

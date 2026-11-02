@@ -1320,5 +1320,11 @@ export default {
   'whatsapp.platformBot.receipt': 'إيصال دفعة بقيمة {amount} ({date}): {link}\nالرابط صالح لمدة 7 أيام.',
 
   'platformAlert.accounting_export.subject': "تصدير محاسبي: {month}",
-  'platformAlert.accounting_export.body': "مرفق التصدير المحاسبي لشهر {month} ({format}): الفواتير والمدفوعات والمبالغ المستردة والأرصدة وفواتير الخدمة NFS-e والملخص.\n\nالفواتير: {count} · المبلغ الصافي: {net}\nالمستلم: {received} · المسترد: {refunded}\n\nالتواريخ بتوقيت برازيليا والمبالغ بالريال."
+  'platformAlert.accounting_export.body': "مرفق التصدير المحاسبي لشهر {month} ({format}): الفواتير والمدفوعات والمبالغ المستردة والأرصدة وفواتير الخدمة NFS-e والملخص.\n\nالفواتير: {count} · المبلغ الصافي: {net}\nالمستلم: {received} · المسترد: {refunded}\n\nالتواريخ بتوقيت برازيليا والمبالغ بالريال.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'كيف هي تجربتك مع {product}؟',
+  'nps.askBody': 'مرحبًا {provider}!\n\nمن 0 إلى 10، ما مدى احتمال أن توصي بـ {product} لزميل في مزوّد آخر؟\n\nأجب بنقرة واحدة (أقل من دقيقة): {link}\n\nتصل درجتك وتعليقك مباشرة إلى الفريق المسؤول عن المنصة.',
+  'nps.askWhatsappHint': 'إن شئت، يمكنك الرد هنا بالرقم فقط، من 0 إلى 10.',
+  'nps.whatsappThanks': 'شكرًا! تلقينا درجتك {score}. إن أردت إخبارنا بالسبب، أجب عبر رابط الاستطلاع.'
 };

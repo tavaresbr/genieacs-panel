@@ -1329,5 +1329,11 @@ export default {
   'whatsapp.platformBot.receipt': 'Beleg der Zahlung über {amount} ({date}): {link}\nDer Link ist 7 Tage gültig.',
 
   'platformAlert.accounting_export.subject': "Buchhaltungsexport: {month}",
-  'platformAlert.accounting_export.body': "Anbei der Buchhaltungsexport für {month} ({format}): Rechnungen, Zahlungen, Erstattungen, Gutschriften, NFS-e und die Zusammenfassung.\n\nRechnungen: {count} · Nettobetrag: {net}\nEingegangen: {received} · Erstattet: {refunded}\n\nDaten in Brasília-Zeit und Beträge in Real."
+  'platformAlert.accounting_export.body': "Anbei der Buchhaltungsexport für {month} ({format}): Rechnungen, Zahlungen, Erstattungen, Gutschriften, NFS-e und die Zusammenfassung.\n\nRechnungen: {count} · Nettobetrag: {net}\nEingegangen: {received} · Erstattet: {refunded}\n\nDaten in Brasília-Zeit und Beträge in Real.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'Wie zufrieden sind Sie mit {product}?',
+  'nps.askBody': 'Hallo {provider}!\n\nWie wahrscheinlich ist es auf einer Skala von 0 bis 10, dass Sie {product} einem Kollegen bei einem anderen Anbieter empfehlen?\n\nAntworten Sie mit einem Klick (dauert weniger als eine Minute): {link}\n\nIhre Bewertung und Ihr Kommentar gehen direkt an das Team, das die Plattform betreibt.',
+  'nps.askWhatsappHint': 'Wenn Sie möchten, antworten Sie hier einfach mit der Zahl von 0 bis 10.',
+  'nps.whatsappThanks': 'Danke! Wir haben Ihre Bewertung {score} erhalten. Wenn Sie uns den Grund nennen möchten, antworten Sie über den Link der Umfrage.'
 };

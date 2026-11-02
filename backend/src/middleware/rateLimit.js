@@ -635,3 +635,16 @@ export const publicReceiptLimiter = limiter({
   keyGenerator: ipKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
+
+/**
+ * A página pública da pesquisa de satisfação (0123): ler e responder pelo
+ * token do link. Por IP — quem responde lê, escolhe a nota e talvez a mude,
+ * meia dúzia de pedidos; adivinhar um token de 256 bits não é plano, e o
+ * limite só corta o barulho.
+ */
+export const publicNpsLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});

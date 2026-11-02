@@ -1328,5 +1328,11 @@ export default {
   'whatsapp.platformBot.receipt': 'Receipt for the payment of {amount} ({date}): {link}\nThe link is valid for 7 days.',
 
   'platformAlert.accounting_export.subject': "Accounting export: {month}",
-  'platformAlert.accounting_export.body': "Attached is the accounting export for {month} ({format}): charges, payments, refunds, credits, service invoices (NFS-e) and the summary.\n\nCharges: {count} · Net amount: {net}\nReceived: {received} · Refunded: {refunded}\n\nDates in Brasília time and amounts in reais."
+  'platformAlert.accounting_export.body': "Attached is the accounting export for {month} ({format}): charges, payments, refunds, credits, service invoices (NFS-e) and the summary.\n\nCharges: {count} · Net amount: {net}\nReceived: {received} · Refunded: {refunded}\n\nDates in Brasília time and amounts in reais.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'How is {product} working for you?',
+  'nps.askBody': 'Hello, {provider}!\n\nOn a scale from 0 to 10, how likely are you to recommend {product} to a colleague at another provider?\n\nAnswer in one click (it takes less than a minute): {link}\n\nYour score and comment go straight to the team that runs the platform.',
+  'nps.askWhatsappHint': 'If you prefer, just reply here with the number, from 0 to 10.',
+  'nps.whatsappThanks': 'Thank you! We received your score of {score}. If you want to tell us why, just answer through the survey link.'
 };

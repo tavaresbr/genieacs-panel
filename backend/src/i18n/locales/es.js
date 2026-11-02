@@ -1325,5 +1325,11 @@ export default {
   'whatsapp.platformBot.receipt': 'Recibo del pago de {amount} ({date}): {link}\nEl enlace es válido durante 7 días.',
 
   'platformAlert.accounting_export.subject': "Exportación contable: {month}",
-  'platformAlert.accounting_export.body': "Adjuntamos la exportación contable de {month} ({format}): cobros, pagos, reembolsos, créditos, NFS-e y el resumen.\n\nCobros: {count} · Valor neto: {net}\nRecibido: {received} · Reembolsado: {refunded}\n\nFechas en horario de Brasilia y valores en reales."
+  'platformAlert.accounting_export.body': "Adjuntamos la exportación contable de {month} ({format}): cobros, pagos, reembolsos, créditos, NFS-e y el resumen.\n\nCobros: {count} · Valor neto: {net}\nRecibido: {received} · Reembolsado: {refunded}\n\nFechas en horario de Brasilia y valores en reales.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '¿Cómo le está yendo con {product}?',
+  'nps.askBody': '¡Hola, {provider}!\n\nDe 0 a 10, ¿qué tan probable es que recomiende {product} a un colega de otro proveedor?\n\nResponda con un clic (toma menos de un minuto): {link}\n\nSu nota y su comentario llegan directo al equipo que cuida la plataforma.',
+  'nps.askWhatsappHint': 'Si lo prefiere, responda aquí mismo solo con el número, de 0 a 10.',
+  'nps.whatsappThanks': '¡Gracias! Recibimos su nota {score}. Si quiere contarnos por qué, responda por el enlace de la encuesta.'
 };

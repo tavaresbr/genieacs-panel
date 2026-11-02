@@ -56,6 +56,7 @@ export function PlatformOverviewTab({ onNavigate }: { onNavigate: (target: Overv
   const alertas = dados?.alerts ?? null
   const cancel = dados?.cancellations ?? null
   const novos = dados?.newTenants ?? null
+  const risco = dados?.risk ?? null
 
   return (
     <section className="space-y-4" aria-labelledby="overview-title" aria-busy={loading}>
@@ -158,6 +159,15 @@ export function PlatformOverviewTab({ onNavigate }: { onNavigate: (target: Overv
               hint={novos ? t('platform.overview.newTenantsHint', { previous: novos.previous ?? 0 }) : falhou}
               onClick={() => onNavigate('tenants')}
               actionLabel={abrir('platform.tabs.tenants')}
+            />
+            {/* O risco (0123): detratores do NPS com atraso, cartão recusado,
+                cancelamento ou pausa. O detalhe está na Satisfação da Receita. */}
+            <StatTile
+              label={t('platform.overview.risk')}
+              value={risco ? String(risco.atRisk) : '—'}
+              hint={risco ? t('platform.overview.riskHint', { count: risco.detractors }) : falhou}
+              onClick={() => onNavigate('revenue')}
+              actionLabel={abrir('platform.tabs.revenue')}
             />
           </div>
 

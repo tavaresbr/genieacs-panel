@@ -1327,5 +1327,11 @@ export default {
   'whatsapp.platformBot.receipt': 'Recibo do pagamento de {amount} ({date}): {link}\nO link vale por 7 dias.',
 
   'platformAlert.accounting_export.subject': "Exportação contábil: {month}",
-  'platformAlert.accounting_export.body': "Segue em anexo a exportação contábil de {month} ({format}): cobranças, pagamentos, estornos, créditos, NFS-e e o resumo.\n\nCobranças: {count} · Valor líquido: {net}\nRecebido: {received} · Estornado: {refunded}\n\nDatas no horário de Brasília e valores em reais."
+  'platformAlert.accounting_export.body': "Segue em anexo a exportação contábil de {month} ({format}): cobranças, pagamentos, estornos, créditos, NFS-e e o resumo.\n\nCobranças: {count} · Valor líquido: {net}\nRecebido: {received} · Estornado: {refunded}\n\nDatas no horário de Brasília e valores em reais.",
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'Como está sendo usar o {product}?',
+  'nps.askBody': 'Olá, {provider}!\n\nDe 0 a 10, quanto você recomendaria o {product} a um colega de outro provedor?\n\nResponda em um clique (leva menos de um minuto): {link}\n\nSua nota e seu comentário vão direto para a equipe que cuida da plataforma.',
+  'nps.askWhatsappHint': 'Se preferir, responda aqui mesmo só com o número, de 0 a 10.',
+  'nps.whatsappThanks': 'Obrigado! Recebemos sua nota {score}. Se quiser contar o porquê, é só responder pelo link da pesquisa.'
 };
