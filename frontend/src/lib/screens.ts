@@ -138,6 +138,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { tab: 'customer-portal', labelKey: 'settings.tab.customerPortal' },
   { tab: 'integrations', labelKey: 'settings.tab.integrations' },
   { tab: 'sgp', labelKey: 'settings.tab.sgp' },
+  { tab: 'asaas', labelKey: 'settings.tab.asaas', permission: 'asaas.config' },
   { tab: 'teiah', labelKey: 'settings.tab.teiah', permission: 'teiah.read' },
   { tab: 'focuschat', labelKey: 'settings.tab.focuschat', permission: 'settings.write' },
   { tab: 'provisioning', labelKey: 'settings.tab.provisioning' },

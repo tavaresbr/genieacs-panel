@@ -1,0 +1,245 @@
+import AppState from '../models/AppState.js';
+import { createSecretBox } from '../utils/secretBox.js';
+import { TenantCache } from '../config/tenantCache.js';
+import { BASE_URLS, ENVIRONMENTS } from './billing/asaasSettingsService.js';
+import { AsaasError, testConnection as asaasTestConnection } from './billing/asaasClient.js';
+
+/**
+ * A conta Asaas DO PROVEDOR — a que cobra os assinantes dele.
+ *
+ * Não é a conta da plataforma (`asaasSettingsService`), que cobra os
+ * provedores: são duas contas, duas chaves e dois donos. As duas usam o mesmo
+ * cliente HTTP, que recebe a credencial por parâmetro.
+ *
+ * ## O endereço não é digitado
+ *
+ * O SGP é um servidor do próprio provedor, e por isso aceita o endereço que ele
+ * digita. O Asaas é um serviço único com duas bases fixas; o provedor escolhe
+ * o AMBIENTE (`sandbox` ou `production`) e o endereço vem de `BASE_URLS`.
+ * Nenhum texto do inquilino vira destino de uma chamada que leva a chave da API.
+ *
+ * ## Onde mora
+ *
+ * No `app_state` do próprio provedor (`tdb` já filtra por inquilino), com a
+ * chave cifrada no mesmo molde do token do SGP — contexto próprio, para que um
+ * texto cifrado de um recurso nunca decifre como outro.
+ */
+
+export const CONFIG_KEY = 'asaas_provider_config';
+const SECRET_CONTEXT = 'skygenpanel-asaas-provider-key-v1';
+const CACHE_TTL_MS = 30_000;
+
+const box = createSecretBox(SECRET_CONTEXT);
+
+/** As chaves do Asaas: `$aact_prod_…` em produção, `$aact_hmlg_…` no sandbox. */
+const KEY_FAMILY = Object.freeze({ production: '_prod_', sandbox: '_hmlg_' });
+const KEY_MAX_LENGTH = 512;
+
+export class AsaasProviderError extends Error {
+  constructor(message, { code = 'asaas_provider_error', status = 400, vars = null } = {}) {
+    super(message);
+    this.name = 'AsaasProviderError';
+    this.code = code;
+    this.status = status;
+    this.translationKey = message;
+    this.translationVars = vars;
+  }
+}
+
+const DEFAULTS = Object.freeze({
+  enabled: false,
+  environment: 'sandbox',
+  apiKey: null,
+  accountName: null,
+  lastTestAt: null,
+  updatedAt: null
+});
+
+function encrypt(value) {
+  return value ? { v: 1, ...box.encrypt(value) } : null;
+}
+
+function decrypt(envelope) {
+  if (!envelope || typeof envelope !== 'object') return null;
+  try {
+    const { v, ...payload } = envelope;
+    return box.decrypt(payload) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** A chave só vale no ambiente da família dela; uma chave sem família conhecida passa. */
+function assertKeyMatchesEnvironment(key, environment) {
+  const other = environment === 'production' ? 'sandbox' : 'production';
+  if (key.includes(KEY_FAMILY[other]) && !key.includes(KEY_FAMILY[environment])) {
+    throw new AsaasProviderError('asaas.error.keyEnvironmentMismatch', {
+      code: 'key_environment_mismatch',
+      vars: { environment }
+    });
+  }
+}
+
+function normalizeEnvironment(value, fallback) {
+  if (value === undefined) return fallback;
+  if (!ENVIRONMENTS.includes(value)) {
+    throw new AsaasProviderError('asaas.error.environmentInvalid', { code: 'invalid_environment' });
+  }
+  return value;
+}
+
+function normalizeKey(value) {
+  const key = String(value ?? '').trim();
+  if (key.length > KEY_MAX_LENGTH || /\s/.test(key)) {
+    throw new AsaasProviderError('asaas.error.keyInvalid', { code: 'invalid_key' });
+  }
+  return key;
+}
+
+class AsaasProviderService {
+  static configCache = new TenantCache(CACHE_TTL_MS);
+
+  static invalidateConfigCache() {
+    this.configCache.invalidate();
+  }
+
+  static async getConfig() {
+    const cached = this.configCache.get();
+    if (cached) return cached;
+    const raw = await AppState.get(CONFIG_KEY);
+    let stored = {};
+    if (raw) {
+      try { stored = JSON.parse(raw) || {}; } catch { stored = {}; }
+    }
+    const config = {
+      enabled: stored.enabled === true,
+      environment: ENVIRONMENTS.includes(stored.environment) ? stored.environment : DEFAULTS.environment,
+      apiKey: decrypt(stored.apiKey),
+      accountName: stored.accountName ? String(stored.accountName) : null,
+      lastTestAt: stored.lastTestAt || null,
+      updatedAt: stored.updatedAt || null
+    };
+    return this.configCache.set(config);
+  }
+
+  /** O que o navegador recebe: nunca a chave, só se ela existe. */
+  static async getPublicConfig() {
+    const config = await this.getConfig();
+    const { apiKey, ...rest } = config;
+    return { ...rest, apiKeyConfigured: Boolean(apiKey), ready: this.isReady(config) };
+  }
+
+  static isReady(config) {
+    return Boolean(config.enabled && config.apiKey);
+  }
+
+  static credentialOf(config) {
+    return { apiKey: config.apiKey, baseUrl: BASE_URLS[config.environment] };
+  }
+
+  /**
+   * Grava. Chave omitida mantém a guardada; `''` apaga (e desliga) — o mesmo
+   * contrato do token do SGP, para o provedor revogar sem perder o resto.
+   *
+   * Trocar de ambiente exige a chave nova: a guardada é da família do ambiente
+   * antigo, e mantê-la mandaria uma chave de produção ao sandbox (ou o
+   * contrário) na chamada seguinte.
+   */
+  static async saveConfig(patch = {}) {
+    const current = await this.getConfig();
+    const environment = normalizeEnvironment(patch.environment, current.environment);
+
+    let apiKey = current.apiKey;
+    if (patch.apiKey !== undefined) {
+      apiKey = normalizeKey(patch.apiKey);
+    } else if (apiKey && environment !== current.environment) {
+      throw new AsaasProviderError('asaas.error.keyRequiredForEnvironment', {
+        code: 'key_required', vars: { environment }
+      });
+    }
+    if (apiKey) assertKeyMatchesEnvironment(apiKey, environment);
+
+    let enabled = patch.enabled === undefined ? current.enabled : patch.enabled === true;
+    if (patch.apiKey === '') enabled = false;
+    if (enabled && !apiKey) {
+      throw new AsaasProviderError('asaas.error.configIncomplete', { code: 'incomplete_config' });
+    }
+
+    const keyChanged = apiKey !== current.apiKey || environment !== current.environment;
+    await AppState.upsert(CONFIG_KEY, JSON.stringify({
+      enabled,
+      environment,
+      apiKey: encrypt(apiKey),
+      // O nome da conta é o do ÚLTIMO teste com esta chave; outra chave, outro nome.
+      accountName: keyChanged ? null : current.accountName,
+      lastTestAt: keyChanged ? null : current.lastTestAt,
+      updatedAt: new Date().toISOString()
+    }));
+    this.invalidateConfigCache();
+    return this.getPublicConfig();
+  }
+
+  /**
+   * Testa a chave — a digitada ainda não salva, ou a guardada. O resultado do
+   * teste da chave guardada é gravado (nome da conta e hora), para a tela
+   * dizer de quem é a conta sem outro clique.
+   */
+  static async testConnection({ apiKey, environment } = {}) {
+    const current = await this.getConfig();
+    const typed = apiKey !== undefined && String(apiKey).trim() !== '';
+    const env = normalizeEnvironment(environment, current.environment);
+    const key = typed ? normalizeKey(apiKey) : current.apiKey;
+    if (!key) throw new AsaasProviderError('asaas.error.keyMissing', { code: 'not_configured', status: 409 });
+    if (!typed && env !== current.environment) {
+      throw new AsaasProviderError('asaas.error.keyRequiredForEnvironment', {
+        code: 'key_required', vars: { environment: env }
+      });
+    }
+    assertKeyMatchesEnvironment(key, env);
+
+    let result;
+    try {
+      result = await asaasTestConnection({ apiKey: key, baseUrl: BASE_URLS[env] });
+    } catch (error) {
+      throw this.translateGatewayError(error);
+    }
+
+    if (!typed) {
+      const stored = await AppState.get(CONFIG_KEY);
+      let parsed = {};
+      try { parsed = JSON.parse(stored || '{}') || {}; } catch { parsed = {}; }
+      await AppState.upsert(CONFIG_KEY, JSON.stringify({
+        ...parsed,
+        accountName: result.accountName,
+        lastTestAt: new Date().toISOString()
+      }));
+      this.invalidateConfigCache();
+    }
+    return { accountName: result.accountName, environment: env };
+  }
+
+  /**
+   * O erro do gateway em chave de tradução. O corpo do erro do Asaas não vai
+   * para o navegador: o que ele diz é diagnóstico, e a tela precisa de uma
+   * frase que diga o que o provedor faz em seguida.
+   */
+  static translateGatewayError(error) {
+    if (error instanceof AsaasProviderError) return error;
+    if (!(error instanceof AsaasError)) return error;
+    const byCode = {
+      unauthorized: ['asaas.error.unauthorized', 401],
+      unreachable: ['asaas.error.unreachable', 502],
+      blocked_host: ['asaas.error.unreachable', 502],
+      gateway_error: ['asaas.error.gatewayDown', 502]
+    };
+    const [key, status] = byCode[error.code] || ['asaas.error.refused', 502];
+    // 401 do Asaas não é "sessão do painel expirada": o painel usa o status
+    // para isso, então a recusa da chave sobe como 400.
+    return new AsaasProviderError(key, {
+      code: error.code,
+      status: error.code === 'unauthorized' ? 400 : status
+    });
+  }
+}
+
+export default AsaasProviderService;

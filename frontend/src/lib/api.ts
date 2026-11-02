@@ -4217,6 +4217,30 @@ export const focusChatAPI = {
     apiClient.post<{ ok: boolean; firstPage: number; durationMs: number }>('/focuschat/test', payload)
 }
 
+export type AsaasEnvironment = 'production' | 'sandbox'
+
+/** A conta Asaas do provedor. A chave da API nunca vem: só se ela existe. */
+export interface AsaasProviderConfig {
+  enabled: boolean
+  environment: AsaasEnvironment
+  apiKeyConfigured: boolean
+  accountName: string | null
+  lastTestAt: string | null
+  updatedAt: string | null
+  ready: boolean
+}
+
+export const asaasProviderAPI = {
+  getConfig: () =>
+    apiClient.get<AsaasProviderConfig>('/asaas/config'),
+
+  updateConfig: (config: { enabled?: boolean; environment?: AsaasEnvironment; apiKey?: string }) =>
+    apiClient.put<AsaasProviderConfig>('/asaas/config', config),
+
+  test: (payload: { environment?: AsaasEnvironment; apiKey?: string }) =>
+    apiClient.post<{ accountName: string | null; environment: AsaasEnvironment }>('/asaas/test', payload)
+}
+
 export const teiahAPI = {
   getConfig: () =>
     apiClient.get<TeiahConfig>('/teiah/config'),

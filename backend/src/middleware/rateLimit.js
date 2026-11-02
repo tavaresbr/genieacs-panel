@@ -339,6 +339,13 @@ export const sgpAdminLimiter = limiter({
   message: limitMessage('rateLimit.sgpAdmin', 'rate_limited_sgp')
 });
 
+export const asaasAdminLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.asaasAdmin', 'rate_limited_asaas')
+});
+
 /**
  * Baixar o cadastro inteiro de um provedor, pelo console.
  *

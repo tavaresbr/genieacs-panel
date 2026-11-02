@@ -100,11 +100,14 @@ export async function baseUrl() {
  * (idem). O job trata todos como falha, mas o `last_error` da linha guarda qual
  * — e é o que alguém vai ler.
  */
-async function chamar(caminho, { method = 'POST', payload = null } = {}) {
-  const chave = await apiKey();
+async function chamar(caminho, { method = 'POST', payload = null, credencial = null } = {}) {
+  // `credencial` é a conta de um PROVEDOR (`{ apiKey, baseUrl }`): o cliente
+  // serve às duas contas — a da plataforma, que cobra os provedores, e a de
+  // cada provedor, que cobra os assinantes dele. Sem ela vale a da plataforma.
+  const chave = credencial ? credencial.apiKey : await apiKey();
   if (!chave) throw new AsaasError('the Asaas API key is not configured', { code: 'not_configured' });
 
-  const base = await baseUrl();
+  const base = credencial ? credencial.baseUrl : await baseUrl();
   let url;
   try {
     url = new URL(`${base}${caminho}`);
@@ -615,15 +618,15 @@ export async function updateCharge(chargeId, {
  *
  * @returns {Promise<{accountName: string|null}>}
  */
-export async function testConnection() {
+export async function testConnection(credencial = null) {
   try {
-    const conta = await chamar('/myAccount/commercialInfo', { method: 'GET' });
+    const conta = await chamar('/myAccount/commercialInfo', { method: 'GET', credencial });
     const nome = conta?.companyName || conta?.name || conta?.tradingName || null;
     return { accountName: nome ? String(nome) : null };
   } catch (error) {
     if (!(error instanceof AsaasError) || error.status !== 404) throw error;
   }
-  await chamar('/finance/balance', { method: 'GET' });
+  await chamar('/finance/balance', { method: 'GET', credencial });
   return { accountName: null };
 }
 
