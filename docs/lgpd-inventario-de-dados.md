@@ -156,7 +156,7 @@ diz isso; escolher um número para elas é decisão de negócio que ainda não f
 
 Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **vale** é o menor dos dois, e "para sempre" vira o próprio teto (`SubscriptionService.effectiveRetention`). É a única janela que o provedor não escolheu: a tela mostra o número dele, não o que vale.
 
-### 4.2 O que nenhuma rotina apaga por idade — 24 tabelas com dado de assinante
+### 4.2 O que nenhuma rotina apaga por idade — 26 tabelas com dado de assinante
 
 "Sem prazo" não é "nunca sai": várias têm saída pelo ciclo de vida, e todas as do assinante saem pela exclusão do art. 18. O que não existe é uma rotina que as apague porque ficaram velhas.
 
@@ -185,6 +185,8 @@ Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **
 | `outage_incident_devices` | que aparelhos foram atingidos por uma queda; nenhuma rotina o apaga |
 | `maintenance_window_devices` | que aparelhos foram avisados de uma manutenção; nenhuma rotina o apaga |
 | `teiah_exports` | o registro do que já saiu do painel sobre o assinante; sai só pela exclusão do art. 18 |
+| `asaas_customers` | o cliente da conta Asaas do provedor, importado (nome, CPF/CNPJ, telefone, e-mail, endereço); é reescrito a cada importação, fica marcado como removido quando o Asaas o remove e sai só pela exclusão do art. 18 |
+| `asaas_charges` | a cobrança da conta Asaas do provedor, importada (valor, vencimento, situação); a paga ou cancelada fica como histórico e a exclusão do art. 18 a apaga |
 | `teiah_consultations` | a resposta da TeiaH sobre um CPF/CNPJ, guardada 30 dias para não consultar de novo; as vencidas saem a cada nova consulta e tudo sai pela exclusão do art. 18 |
 
 ### 4.3 O mesmo, nas 7 tabelas globais com dado pessoal e sem janela (somos o controlador)

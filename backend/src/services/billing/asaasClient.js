@@ -473,8 +473,8 @@ export async function receiveInCash(chargeId, { paymentDate, value }) {
  *
  * @returns {Promise<{ id: string, status: string|null, valueCents: number|null }>}
  */
-export async function getCharge(chargeId) {
-  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { method: 'GET' });
+export async function getCharge(chargeId, credencial = null) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { method: 'GET', credencial });
   const valor = Number(resposta?.value);
   return {
     id: String(resposta?.id ?? chargeId),
@@ -630,6 +630,103 @@ export async function testConnection(credencial = null) {
   return { accountName: null };
 }
 
+/** Texto de um campo do gateway, cortado: nulo quando vazio. */
+function textoDe(valor, max) {
+  if (valor === null || valor === undefined) return null;
+  const texto = String(valor).trim();
+  return texto ? texto.slice(0, max) : null;
+}
+
+/** `2026-11-05` de um valor do gateway; nulo para qualquer outra forma. */
+function diaDe(valor) {
+  return /^\d{4}-\d{2}-\d{2}/.test(String(valor ?? '')) ? String(valor).slice(0, 10) : null;
+}
+
+/** O tamanho de página que o gateway aceita no máximo. */
+export const MAX_PAGE_SIZE = 100;
+
+/**
+ * Uma página de clientes da conta — `GET /customers?offset=&limit=`.
+ *
+ * Só leitura, e com a credencial do PROVEDOR (`credencial`): é a conta dele
+ * que se lista. O gateway devolve `hasMore`, e é ele — e não o tamanho da
+ * página — que diz se há outra: uma página cheia que é a última não pede uma
+ * leitura a mais.
+ *
+ * @returns {Promise<{ rows: Array<object>, hasMore: boolean, totalCount: number|null }>}
+ */
+export async function listCustomersPage({ offset = 0, limit = MAX_PAGE_SIZE } = {}, credencial = null) {
+  const consulta = new URLSearchParams({
+    offset: String(Math.max(0, Number(offset) || 0)),
+    limit: String(Math.min(MAX_PAGE_SIZE, Math.max(1, Number(limit) || MAX_PAGE_SIZE)))
+  });
+  const resposta = await chamar(`/customers?${consulta}`, { method: 'GET', credencial });
+  const lista = Array.isArray(resposta?.data) ? resposta.data : [];
+  return {
+    rows: lista
+      .filter((item) => item && item.id)
+      .map((item) => ({
+        id: String(item.id).slice(0, 32),
+        name: textoDe(item.name, 255),
+        document: textoDe(item.cpfCnpj, 32),
+        email: textoDe(item.email, 255),
+        phone: textoDe(item.phone, 32),
+        mobilePhone: textoDe(item.mobilePhone, 32),
+        postalCode: textoDe(item.postalCode, 16),
+        address: textoDe(item.address, 255),
+        addressNumber: textoDe(item.addressNumber, 32),
+        complement: textoDe(item.complement, 255),
+        province: textoDe(item.province, 255),
+        city: textoDe(item.cityName ?? item.city, 255),
+        state: textoDe(item.state, 8),
+        externalReference: textoDe(item.externalReference, 128),
+        deleted: item.deleted === true
+      })),
+    hasMore: resposta?.hasMore === true,
+    totalCount: Number.isFinite(Number(resposta?.totalCount)) ? Number(resposta.totalCount) : null
+  };
+}
+
+/**
+ * Uma página de cobranças da conta — `GET /payments?status=&offset=&limit=`.
+ * Um status por chamada: é como o gateway filtra. O valor sai em centavos,
+ * pelo mesmo ponto único de conversão das cobranças.
+ *
+ * @returns {Promise<{ rows: Array<object>, hasMore: boolean }>}
+ */
+export async function listChargesPage({ status, offset = 0, limit = MAX_PAGE_SIZE } = {}, credencial = null) {
+  const consulta = new URLSearchParams({
+    offset: String(Math.max(0, Number(offset) || 0)),
+    limit: String(Math.min(MAX_PAGE_SIZE, Math.max(1, Number(limit) || MAX_PAGE_SIZE)))
+  });
+  if (status) consulta.set('status', String(status).toUpperCase());
+  const resposta = await chamar(`/payments?${consulta}`, { method: 'GET', credencial });
+  const lista = Array.isArray(resposta?.data) ? resposta.data : [];
+  return {
+    rows: lista
+      .filter((item) => item && item.id)
+      .map((item) => {
+        const valor = Number(item.value);
+        return {
+          id: String(item.id).slice(0, 32),
+          customerId: textoDe(item.customer, 32),
+          status: textoDe(item.status, 32)?.toUpperCase() ?? null,
+          billingType: textoDe(item.billingType, 32)?.toUpperCase() ?? null,
+          valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null,
+          dueDate: diaDe(item.dueDate),
+          paymentDate: diaDe(item.paymentDate ?? item.confirmedDate),
+          description: textoDe(item.description, 500),
+          invoiceUrl: textoDe(item.invoiceUrl, 512),
+          bankSlipUrl: textoDe(item.bankSlipUrl, 512),
+          invoiceNumber: textoDe(item.invoiceNumber, 32),
+          externalReference: textoDe(item.externalReference, 128),
+          deleted: item.deleted === true
+        };
+      }),
+    hasMore: resposta?.hasMore === true
+  };
+}
+
 /**
  * Cria o cliente no gateway e devolve o id dele — o `billing_customer_ref` que
  * o console grava no provedor.
@@ -720,6 +817,6 @@ export async function cancelInvoice(invoiceId) {
 
 export default {
   createCharge, chargeTermsFor, cancelCharge, getCharge, getPixQrCode, getIdentificationField, getPaymentCard, findChargesByReference, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
-  createCustomer, testConnection, apiKey, baseUrl, AsaasError,
+  createCustomer, listCustomersPage, listChargesPage, testConnection, apiKey, baseUrl, AsaasError,
   createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment
 };

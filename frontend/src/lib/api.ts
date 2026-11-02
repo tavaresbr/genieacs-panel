@@ -4270,18 +4270,59 @@ export interface AsaasProviderConfig {
   enabled: boolean
   environment: AsaasEnvironment
   apiKeyConfigured: boolean
+  importCustomers: boolean
+  importCharges: boolean
+  syncEnabled: boolean
+  syncIntervalHours: number
   accountName: string | null
   lastTestAt: string | null
   updatedAt: string | null
   ready: boolean
 }
 
+/** O que a última importação fez, e o que o painel tem agora. */
+export interface AsaasImportStatus {
+  lastRun: {
+    startedAt: string
+    finishedAt: string
+    durationMs: number
+    pages: number
+    partial?: boolean
+    customers: { total: number; created: number; updated: number }
+    charges: { total: number; created: number; updated: number; withoutCustomer: number; reconciled: number; gone: number }
+  } | null
+  running: boolean
+  lastError: { at: string; code: string; translationKey: string | null; message: string | null } | null
+  totals: {
+    customers: number
+    openCharges: number
+    overdueCharges: number
+    withoutDocument: number
+    duplicateDocuments: number
+    matchingSgp: number
+  }
+}
+
 export const asaasProviderAPI = {
   getConfig: () =>
     apiClient.get<AsaasProviderConfig>('/asaas/config'),
 
-  updateConfig: (config: { enabled?: boolean; environment?: AsaasEnvironment; apiKey?: string }) =>
+  updateConfig: (config: {
+    enabled?: boolean
+    environment?: AsaasEnvironment
+    apiKey?: string
+    importCustomers?: boolean
+    importCharges?: boolean
+    syncEnabled?: boolean
+    syncIntervalHours?: number
+  }) =>
     apiClient.put<AsaasProviderConfig>('/asaas/config', config),
+
+  getImport: () =>
+    apiClient.get<AsaasImportStatus>('/asaas/import'),
+
+  startImport: () =>
+    apiClient.post<{ started: boolean }>('/asaas/import/sync', {}),
 
   test: (payload: { environment?: AsaasEnvironment; apiKey?: string }) =>
     apiClient.post<{ accountName: string | null; environment: AsaasEnvironment }>('/asaas/test', payload)

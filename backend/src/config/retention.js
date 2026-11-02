@@ -251,6 +251,8 @@ export const SEM_PRAZO = Object.freeze({
   maintenance_window_devices: 'que aparelhos foram avisados de uma manutenção; nenhuma rotina o apaga',
   // Exportação
   teiah_exports: 'o registro do que já saiu do painel sobre o assinante; sai só pela exclusão do art. 18',
+  asaas_customers: 'o cliente da conta Asaas do provedor, importado (nome, CPF/CNPJ, telefone, e-mail, endereço); é reescrito a cada importação, fica marcado como removido quando o Asaas o remove e sai só pela exclusão do art. 18',
+  asaas_charges: 'a cobrança da conta Asaas do provedor, importada (valor, vencimento, situação); a paga ou cancelada fica como histórico e a exclusão do art. 18 a apaga',
   teiah_consultations: 'a resposta da TeiaH sobre um CPF/CNPJ, guardada 30 dias para não consultar de novo; as vencidas saem a cada nova consulta e tudo sai pela exclusão do art. 18'
 });
 
