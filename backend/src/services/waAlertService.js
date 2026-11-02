@@ -96,7 +96,9 @@ const RULE_KEYS = Object.freeze({
   wa_meta_quality: { firing: 'whatsapp.alerts.metaQualityDropped', cleared: null },
   // Alguém quer contratar: a IA registrou o interesse (`WaAiService.registrarInteresse`).
   // Avulso como o de cima — sem limite nem cooldown, e sem "recuperação".
-  wa_lead: { firing: 'whatsapp.alerts.lead', cleared: null }
+  wa_lead: { firing: 'whatsapp.alerts.lead', cleared: null },
+  // O crédito da IA acabou (`WaBotConfigService.alertarSemCredito`).
+  wa_ai_no_credit: { firing: 'whatsapp.alerts.aiNoCredit', cleared: null }
 });
 
 /**
@@ -937,6 +939,12 @@ class WaAlertService {
    * Onde reconectar: o endereço da aba de WhatsApp das Configurações quando o
    * painel sabe o próprio endereço, ou só o caminho na tela.
    */
+  static async chatbotLink() {
+    const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
+    const base = panelUrlFor(tenant);
+    return base ? `: ${base}/settings?tab=chatbot` : '';
+  }
+
   static async reconnectLink() {
     const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
     const base = panelUrlFor(tenant);

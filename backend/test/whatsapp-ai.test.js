@@ -530,6 +530,32 @@ describe('a IA atendendo', () => {
     });
   });
 
+  it('crédito da IA acabou: avisa a equipe uma vez a cada 6 h, e só para essa falha', async () => {
+    const original = WaAlertService.notifyEvent;
+    const avisos = [];
+    WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    try {
+      await asTenant(() => getDb()('app_state').where({ key: 'wa_ai_credit_alert_at' }).del());
+      await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized'));
+      assert.equal(avisos.length, 0, 'outra falha não avisa');
+      await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance', 'HTTP 400'));
+      await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance', 'HTTP 400'));
+      assert.equal(avisos.length, 1, 'repetida dentro de 6 h não avisa de novo');
+      assert.equal(avisos[0].rule, 'wa_ai_no_credit');
+      assert.match(avisos[0].vars.provider, /127\.0\.0\.1|Claude/);
+      const texto = WaAlertService.compose({ rule: 'wa_ai_no_credit', vars: avisos[0].vars }, false);
+      assert.match(texto, /sem crédito/);
+      // Passadas as 6 h, avisa de novo.
+      await asTenant(() => getDb()('app_state').where({ key: 'wa_ai_credit_alert_at' })
+        .update({ value: new Date(Date.now() - 7 * 3600 * 1000).toISOString() }));
+      await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance'));
+      assert.equal(avisos.length, 2);
+    } finally {
+      WaAlertService.notifyEvent = original;
+      await asTenant(() => WaBotConfigService.recordAiError(null));
+    }
+  });
+
   it('a fatura: o texto da IA e o PIX literal do SGP', async () => {
     await limparFio(ASSINANTE);
     roteiro = [{ tool: 'consultar_fatura' }, { content: 'Encontrei sua fatura de R$ 99,90, os dados estão logo abaixo.' }];

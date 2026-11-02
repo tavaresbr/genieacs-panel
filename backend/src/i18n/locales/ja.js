@@ -878,6 +878,7 @@ export default {
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp再接続: 番号 {account} が復旧しました',
   'whatsapp.alerts.metaQualityDropped': "公式番号 {account} の Meta での評価が低下しました: {changes}。設定 › WhatsApp を確認してください{link}",
   'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "品質 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "1日の上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "ステータス {to}",

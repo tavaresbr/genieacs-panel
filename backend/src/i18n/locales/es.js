@@ -883,6 +883,7 @@ export default {
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp reconectado: el número {account} volvió a funcionar',
   'whatsapp.alerts.metaQualityDropped': "El número oficial {account} empeoró en Meta: {changes}. Ver en Configuración › WhatsApp{link}",
   'whatsapp.alerts.lead': 'Nuevo interesado en contratar (IA): {name} — plan: {plan}, barrio: {area}, WhatsApp {phone}. La conversación tiene la etiqueta Venda.',
+  'whatsapp.alerts.aiNoCredit': 'La IA de atención se quedó sin crédito en {provider}: los clientes están cayendo al menú. Recargue en el sitio del proveedor de IA y revise en Configuración › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "calidad {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "límite diario {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "estado {to}",

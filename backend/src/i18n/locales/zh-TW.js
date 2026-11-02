@@ -885,6 +885,7 @@ export default {
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新連線：號碼 {account} 恢復正常',
   'whatsapp.alerts.metaQualityDropped': "官方號碼 {account} 在 Meta 的狀況變差：{changes}。請查看 設定 › WhatsApp{link}",
   'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "品質 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "每日上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "狀態 {to}",

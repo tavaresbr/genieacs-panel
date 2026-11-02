@@ -884,6 +884,7 @@ export default {
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 재연결: 번호 {account}이(가) 다시 작동합니다',
   'whatsapp.alerts.metaQualityDropped': "공식 번호 {account}의 Meta 상태가 나빠졌습니다: {changes}. 설정 › WhatsApp에서 확인하세요{link}",
   'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "품질 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "일일 한도 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "상태 {to}",

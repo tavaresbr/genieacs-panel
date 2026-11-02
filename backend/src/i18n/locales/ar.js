@@ -883,6 +883,7 @@ export default {
   'whatsapp.alerts.waDisconnectedCleared': 'تمت إعادة اتصال واتساب: الرقم {account} يعمل مجددًا',
   'whatsapp.alerts.metaQualityDropped': "تراجع الرقم الرسمي {account} لدى Meta: {changes}. راجع الإعدادات › WhatsApp{link}",
   'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "الجودة {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "الحد اليومي {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "الحالة {to}",
