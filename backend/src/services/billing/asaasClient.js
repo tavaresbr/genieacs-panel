@@ -507,8 +507,8 @@ export async function getCharge(chargeId, credencial = null) {
  *
  * @returns {Promise<{ encodedImage: string|null, payload: string|null, expirationDate: string|null }>}
  */
-export async function getPixQrCode(chargeId) {
-  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/pixQrCode`, { method: 'GET' });
+export async function getPixQrCode(chargeId, credencial = null) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/pixQrCode`, { method: 'GET', credencial });
   return {
     encodedImage: resposta?.encodedImage ? String(resposta.encodedImage) : null,
     payload: resposta?.payload ? String(resposta.payload) : null,
@@ -522,8 +522,8 @@ export async function getPixQrCode(chargeId) {
  *
  * @returns {Promise<{ identificationField: string|null, barCode: string|null }>}
  */
-export async function getIdentificationField(chargeId) {
-  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/identificationField`, { method: 'GET' });
+export async function getIdentificationField(chargeId, credencial = null) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/identificationField`, { method: 'GET', credencial });
   return {
     identificationField: resposta?.identificationField ? String(resposta.identificationField) : null,
     barCode: resposta?.barCode ? String(resposta.barCode) : null

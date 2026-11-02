@@ -86,7 +86,9 @@ export const ALERT_EVENTS = Object.freeze([
   'referral_signup',
   'nfse_error',
   'auto_suspended',
-  'big_overdue'
+  'big_overdue',
+  'backup_stale',
+  'cert_expiring'
 ]);
 export const ALERT_CHANNELS = Object.freeze(['whatsapp', 'email']);
 export const ALERT_DEFAULTS = Object.freeze({

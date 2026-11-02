@@ -54,6 +54,15 @@ class ContactController {
     }
   }
 
+  /** As faturas em aberto do cliente na conta Asaas do provedor, como a última importação as deixou. */
+  static async asaasInvoices(req, res) {
+    try {
+      return res.json(createResponse(req.t('contacts.loaded'), await ContactProfileService.asaasInvoices(req.params.key)));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.loadFailed');
+    }
+  }
+
   /** What each contract's ONT says about the line now: asked of the ACS, stored nowhere. */
   static async serviceStatus(req, res) {
     try {

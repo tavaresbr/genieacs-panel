@@ -1,5 +1,6 @@
 import WaMetaTemplateService from './waMetaTemplateService.js';
 import AppState from '../models/AppState.js';
+import { tdb } from '../config/database.js';
 import MappingEdge from '../models/MappingEdge.js';
 import MappingNode from '../models/MappingNode.js';
 import WaAlertState from '../models/WaAlertState.js';
@@ -28,6 +29,11 @@ import { TELEGRAM_CHAT_PATTERN, TELEGRAM_TOKEN_PATTERN, sendTelegramMessage } fr
 import { detectOutages, mapsLink } from './outageDetector.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
+/** O resumo diário da IA: o dia (no fuso do provedor) em que já saiu, e a hora a partir da qual sai. */
+const AI_SUMMARY_KEY = 'wa_ai_daily_summary_day';
+const AI_SUMMARY_HOUR = 8;
+/** Há quantos minutos uma mensagem na fila, sem sair, conta como parada. */
+const OUTBOX_STUCK_MINUTES = 15;
 
 /**
  * Where the last scan's stamp lives, beside the settings and read the same way.
@@ -99,7 +105,16 @@ const RULE_KEYS = Object.freeze({
   // Avulso como o de cima — sem limite nem cooldown, e sem "recuperação".
   wa_lead: { firing: 'whatsapp.alerts.lead', cleared: null },
   // O crédito da IA acabou (`WaBotConfigService.alertarSemCredito`).
-  wa_ai_no_credit: { firing: 'whatsapp.alerts.aiNoCredit', cleared: null }
+  wa_ai_no_credit: { firing: 'whatsapp.alerts.aiNoCredit', cleared: null },
+  wa_ai_key_rejected: { firing: 'whatsapp.alerts.aiKeyRejected', cleared: null },
+  wa_ai_credit_back: { firing: 'whatsapp.alerts.aiCreditBack', cleared: null },
+  wa_ai_daily_summary: { firing: 'whatsapp.alerts.aiDailySummary', cleared: null },
+  sgp_down: { firing: 'whatsapp.alerts.sgpDown', cleared: null },
+  sgp_unauthorized: { firing: 'whatsapp.alerts.sgpUnauthorized', cleared: null },
+  wa_unlock_failed: { firing: 'whatsapp.alerts.unlockFailed', cleared: null },
+  genieacs_down: { firing: 'whatsapp.alerts.genieacsDown', cleared: null },
+  wa_outbox_stuck: { firing: 'whatsapp.alerts.outboxStuck', cleared: null },
+  wa_dunning_failed: { firing: 'whatsapp.alerts.dunningFailed', cleared: null }
 });
 
 /**
@@ -577,6 +592,7 @@ class WaAlertService {
     await this.flushDigest(settings).catch((error) => {
       console.warn(`WhatsApp alert digest failed: ${error.message}`);
     });
+    await this.aiDailySummary();
     const lastScanAt = await this.readLastScanAt();
     if (Date.now() - lastScanAt < settings.intervalSeconds * 1000) {
       return { skipped: 'not_due' };
@@ -642,7 +658,16 @@ class WaAlertService {
       const esperas = await this.evaluateWaiting(settings, now);
       await this.reconcile({ ...esperas, settings, channels, now, summary, scope: (rule) => rule === 'wa_waiting' });
 
-      const devices = await DeviceService.getDashboardDevices();
+      // Mensagens paradas na fila de saída: também independe da frota.
+      await this.avisarFilaTravada({ now });
+
+      let devices;
+      try {
+        devices = await DeviceService.getDashboardDevices();
+      } catch (error) {
+        await this.avisarGenieAcs(error);
+        throw error;
+      }
       if (!Array.isArray(devices) || devices.length === 0) {
         // An empty fleet read is far more likely to be a broken GenieACS than a
         // provider with no ONTs, and treating it as "nothing is firing" would
@@ -944,10 +969,15 @@ class WaAlertService {
    * Onde reconectar: o endereço da aba de WhatsApp das Configurações quando o
    * painel sabe o próprio endereço, ou só o caminho na tela.
    */
-  static async chatbotLink() {
+  /** `": <painel>/settings?tab=<aba>"` ou nada, para fechar a frase do aviso. */
+  static async settingsLink(tab) {
     const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
     const base = panelUrlFor(tenant);
-    return base ? `: ${base}/settings?tab=chatbot` : '';
+    return base ? `: ${base}/settings?tab=${tab}` : '';
+  }
+
+  static async chatbotLink() {
+    return this.settingsLink('chatbot');
   }
 
   static async reconnectLink() {
@@ -1172,6 +1202,125 @@ class WaAlertService {
       return await this.notify({ channels, condition: { rule, subject: String(subject), vars }, cleared: false });
     } catch (error) {
       console.warn(`WhatsApp alert event not sent: ${error.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Um aviso avulso com limite: no máximo um por `intervalMs` para o mesmo
+   * carimbo (`stampKey`, em `app_state`). O carimbo é gravado ANTES do envio,
+   * para duas falhas ao mesmo tempo não mandarem dois avisos. Nunca lança.
+   *
+   * @returns {Promise<number>} cópias enviadas; 0 se dentro do limite ou sem canal
+   */
+  static throttleLocks = new Set();
+
+  /**
+   * O GenieACS não respondeu à leitura da frota: sem ele, nenhum alerta de ONT
+   * pode sair, e ninguém percebe porque nada dispara. Um provedor sem
+   * GenieACS configurado não é falha. No máximo um aviso a cada 6 h. Nunca lança.
+   */
+  static async avisarGenieAcs(error) {
+    const texto = String(error?.message || error || '');
+    if (/not configured|não configurad/i.test(texto)) return 0;
+    return this.notifyThrottled({
+      stampKey: 'genieacs_down_alert_at',
+      rule: 'genieacs_down',
+      subject: 'acs',
+      vars: { reason: texto.slice(0, 120), link: await this.settingsLink('general').catch(() => '') }
+    });
+  }
+
+  /**
+   * Mensagens do WhatsApp na fila há mais de `OUTBOX_STUCK_MINUTES` sem sair:
+   * número caído, servidor de WhatsApp parado ou fila travada. Se o WhatsApp é
+   * a causa, só o e-mail e o Telegram levam este aviso. No máximo um a cada 2 h.
+   */
+  static async avisarFilaTravada({ now = Date.now() } = {}) {
+    try {
+      const limite = new Date(now - OUTBOX_STUCK_MINUTES * 60_000);
+      const row = await tdb('wa_messages')
+        .where({ delivery_status: 'queued', is_note: false })
+        .whereNull('external_id')
+        .where('created_at', '<', limite)
+        .count({ n: '*' })
+        .first();
+      const count = Number(row?.n || 0);
+      if (count === 0) return 0;
+      return await this.notifyThrottled({
+        stampKey: 'wa_outbox_stuck_alert_at',
+        rule: 'wa_outbox_stuck',
+        subject: 'outbox',
+        intervalMs: 2 * 3600 * 1000,
+        vars: { count, minutes: OUTBOX_STUCK_MINUTES, link: await this.settingsLink('whatsapp').catch(() => '') }
+      });
+    } catch (error) {
+      console.warn(`WhatsApp outbox check failed: ${error?.message || error}`);
+      return 0;
+    }
+  }
+
+  static async notifyThrottled({ stampKey, rule, subject = '', vars = {}, intervalMs = 6 * 3600 * 1000 }) {
+    // Ler e gravar o carimbo são dois passos: sem isto, várias falhas ao mesmo
+    // tempo (um SGP caído derruba dezenas de chamadas juntas) leem o carimbo
+    // antes de qualquer uma gravá-lo e cada uma manda o seu aviso.
+    const trava = `${currentTenantId()}:${stampKey}`;
+    if (this.throttleLocks.has(trava)) return 0;
+    this.throttleLocks.add(trava);
+    try {
+      let liberado = false;
+      try {
+        const ultimo = Date.parse((await AppState.get(stampKey)) || '');
+        if (Number.isFinite(ultimo) && Date.now() - ultimo < intervalMs) return 0;
+        await AppState.upsert(stampKey, new Date().toISOString());
+        liberado = true;
+      } finally {
+        this.throttleLocks.delete(trava);
+      }
+      return liberado ? await this.notifyEvent({ rule, subject, vars }) : 0;
+    } catch (error) {
+      console.warn(`WhatsApp alert ${rule} not sent: ${error?.message || error}`);
+      return 0;
+    }
+  }
+
+  /**
+   * O resumo diário da IA: uma vez por dia, a partir das 8h no fuso do provedor,
+   * o que a IA fez nas últimas 24 h. Sem atividade, não manda nada (mas o dia
+   * conta como feito). Só com a IA ligada. Nunca lança.
+   */
+  static async aiDailySummary({ now = new Date() } = {}) {
+    try {
+      const { ai, hours } = await WaBotConfigService.getConfig();
+      if (!ai.enabled) return 0;
+      const partes = new Intl.DateTimeFormat('en-CA', {
+        timeZone: hours.timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23'
+      }).formatToParts(now);
+      const valor = (tipo) => partes.find((p) => p.type === tipo)?.value;
+      const dia = `${valor('year')}-${valor('month')}-${valor('day')}`;
+      if (Number(valor('hour')) < AI_SUMMARY_HOUR) return 0;
+      if ((await AppState.get(AI_SUMMARY_KEY)) === dia) return 0;
+      await AppState.upsert(AI_SUMMARY_KEY, dia);
+
+      const eventos = await tdb('wa_bot_events')
+        .where('created_at', '>=', new Date(now.getTime() - 24 * 3600 * 1000))
+        .select('conversation_id', 'intent');
+      if (eventos.length === 0) return 0;
+      const conversas = new Set(eventos.map((e) => e.conversation_id).filter((id) => id !== null)).size;
+      const conta = (...intents) => eventos.filter((e) => intents.includes(e.intent)).length;
+      return await this.notifyEvent({
+        rule: 'wa_ai_daily_summary',
+        subject: dia,
+        vars: {
+          replies: eventos.length,
+          conversations: conversas,
+          handoffs: conta('atendente', 'handoff', 'tooManyAttempts'),
+          leads: conta('lead'),
+          invoices: conta('fatura')
+        }
+      });
+    } catch (error) {
+      console.warn(`WhatsApp AI daily summary failed: ${error?.message || error}`);
       return 0;
     }
   }

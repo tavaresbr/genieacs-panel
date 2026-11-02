@@ -10,6 +10,7 @@ import { AI_PROVIDERS, AI_PROVIDER_ANTHROPIC, AI_PROVIDER_OPENAI, aiProviderOrDe
 const aiKeyBox = createSecretBox('skygenpanel-wa-ai-key-v1');
 const AI_ERROR_KEY = 'wa_ai_last_error';
 const AI_CREDIT_ALERT_KEY = 'wa_ai_credit_alert_at';
+const AI_KEY_ALERT_KEY = 'wa_ai_key_alert_at';
 const AI_CREDIT_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const AI_INSTRUCTIONS_MAX = 4000;
 const AI_MODEL_MAX = 64;
@@ -327,39 +328,73 @@ class WaBotConfigService {
     }
   }
 
-  static async recordAiError(code, detail = null) {
+  /**
+   * Guarda a última falha da IA (ou limpa, com `code = null`) e avisa a equipe
+   * nos casos que pedem uma pessoa: crédito acabou, chave recusada no
+   * atendimento automático, e o crédito que voltou. `automatico` é o
+   * atendimento ao cliente: quem recebe a recusa numa ação da tela já a vê.
+   */
+  static async recordAiError(code, detail = null, { automatico = false } = {}) {
     try {
       const valor = code ? { at: new Date().toISOString(), code, detail: detail ? String(detail).slice(0, 240) : null } : null;
       await AppState.upsert(AI_ERROR_KEY, JSON.stringify(valor));
     } catch {
       // A tela perder o último erro é melhor que o bot perder a resposta.
     }
-    if (code === 'ai_no_balance') await this.alertarSemCredito();
+    if (code === 'ai_no_balance') await this.alertarIa('wa_ai_no_credit', AI_CREDIT_ALERT_KEY);
+    else if (code === 'ai_unauthorized' && automatico) await this.alertarIa('wa_ai_key_rejected', AI_KEY_ALERT_KEY);
+    else if (!code) await this.avisarCreditoVoltou();
+  }
+
+  /** Nome do provedor de IA para o aviso: "Claude (Anthropic)" ou o host da API. */
+  static async rotuloDoProvedorDeIa() {
+    const { ai } = await this.getConfig();
+    if (aiProviderOrDefault(ai.provider) === AI_PROVIDER_ANTHROPIC) return 'Claude (Anthropic)';
+    try { return new URL(ai.baseUrl).hostname; } catch { return String(ai.baseUrl); }
   }
 
   /**
-   * Avisa a equipe (canais dos alertas) que o crédito da IA acabou. No máximo
-   * um aviso a cada 6 horas: cada mensagem de cliente repetiria a falha, e a
-   * equipe não precisa de um alerta para cada uma. Nunca lança.
+   * Avisa a equipe (canais dos alertas) de uma falha da IA que pede gente. No
+   * máximo um aviso a cada 6 horas por tipo: cada mensagem de cliente repetiria
+   * a falha. Nunca lança.
    */
-  static async alertarSemCredito() {
+  static async alertarIa(rule, stampKey) {
     try {
-      const ultimo = Date.parse((await AppState.get(AI_CREDIT_ALERT_KEY)) || '');
-      if (Number.isFinite(ultimo) && Date.now() - ultimo < AI_CREDIT_ALERT_INTERVAL_MS) return;
-      // Antes de enviar: duas falhas ao mesmo tempo não mandam dois avisos.
-      await AppState.upsert(AI_CREDIT_ALERT_KEY, new Date().toISOString());
-      const { ai } = await this.getConfig();
-      const provider = aiProviderOrDefault(ai.provider) === AI_PROVIDER_ANTHROPIC
-        ? 'Claude (Anthropic)'
-        : (() => { try { return new URL(ai.baseUrl).hostname; } catch { return ai.baseUrl; } })();
       const { default: WaAlertService } = await import('./waAlertService.js');
-      await WaAlertService.notifyEvent({
-        rule: 'wa_ai_no_credit',
+      await WaAlertService.notifyThrottled({
+        stampKey,
+        rule,
         subject: 'ai',
-        vars: { provider, link: await WaAlertService.chatbotLink().catch(() => '') }
+        intervalMs: AI_CREDIT_ALERT_INTERVAL_MS,
+        vars: { provider: await this.rotuloDoProvedorDeIa(), link: await WaAlertService.chatbotLink().catch(() => '') }
       });
     } catch (error) {
-      console.warn(`IA sem crédito: aviso não enviado: ${error?.message || error}`);
+      console.warn(`IA: aviso ${rule} não enviado: ${error?.message || error}`);
+    }
+  }
+
+  /** Mantido: o nome antigo do aviso de crédito esgotado. */
+  static async alertarSemCredito() {
+    await this.alertarIa('wa_ai_no_credit', AI_CREDIT_ALERT_KEY);
+  }
+
+  /**
+   * A IA respondeu depois de um aviso de crédito esgotado: o crédito voltou.
+   * Só lê o carimbo (uma leitura por resposta) e o apaga ao avisar, para o
+   * próximo esgotamento avisar na hora. Nunca lança.
+   */
+  static async avisarCreditoVoltou() {
+    try {
+      if (!(await AppState.get(AI_CREDIT_ALERT_KEY))) return;
+      await AppState.upsert(AI_CREDIT_ALERT_KEY, '');
+      const { default: WaAlertService } = await import('./waAlertService.js');
+      await WaAlertService.notifyEvent({
+        rule: 'wa_ai_credit_back',
+        subject: 'ai',
+        vars: { provider: await this.rotuloDoProvedorDeIa() }
+      });
+    } catch (error) {
+      console.warn(`IA: aviso de crédito de volta não enviado: ${error?.message || error}`);
     }
   }
 

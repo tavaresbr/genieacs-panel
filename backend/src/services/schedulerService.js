@@ -527,6 +527,16 @@ class SchedulerService {
         summary.dunning = 'started';
         void WaDunningService.run({}).catch((error) => {
           console.warn(`WhatsApp dunning pass failed: ${error.code || error.message}`);
+          // A régua que não consegue rodar é cobrança que não sai: a equipe precisa saber.
+          // Recusas esperadas (já rodando, sem número) não são falha.
+          if (!['already_running', 'not_enabled', 'no_account'].includes(error?.code)) {
+            void import('./waAlertService.js').then(({ default: WaAlertService }) => WaAlertService.notifyThrottled({
+              stampKey: 'wa_dunning_failed_alert_at',
+              rule: 'wa_dunning_failed',
+              subject: String(error?.code || 'error'),
+              vars: { reason: String(error?.code || error?.message || 'error').slice(0, 80) }
+            })).catch(() => {});
+          }
         });
       }
     }
