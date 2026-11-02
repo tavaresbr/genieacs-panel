@@ -137,8 +137,8 @@ class AsaasImportService {
     try {
       if (config.importCustomers) await this.importCustomers(credential, startedAt, summary);
       if (config.importCharges) {
-        await this.importCharges(credential, startedAt, summary);
-        await this.reconcile(credential, startedAt, summary);
+        const seen = await this.importCharges(credential, startedAt, summary);
+        await this.reconcile(credential, seen, summary);
       }
     } catch (error) {
       // O que já foi gravado fica gravado — e é dito: uma passada que morre na
@@ -173,7 +173,9 @@ class AsaasImportService {
     summary.reason = 'ceiling';
   }
 
+  /** Devolve os ids do gateway vistos nesta passada: é contra eles que `reconcile` confere o que sumiu. */
   static async importCharges(credential, startedAt, summary) {
+    const seen = new Set();
     // O CPF/CNPJ de cada cliente, lido do banco uma vez por cliente e guardado.
     const documents = new Map();
     const documentOf = async (customerId) => {
@@ -196,6 +198,7 @@ class AsaasImportService {
           const document = await documentOf(row.customerId);
           if (!document) summary.charges.withoutCustomer += 1;
           const outcome = await AsaasCharge.upsertFromAsaas(row, { document, seenAt: startedAt });
+          seen.add(row.id);
           summary.charges.total += 1;
           summary.charges[outcome] += 1;
         }
@@ -206,15 +209,23 @@ class AsaasImportService {
         }
       }
     }
+    return seen;
   }
 
   /**
    * As que estavam em aberto e saíram da lista: lidas uma a uma, com o status
    * de verdade. Só depois de uma passada completa (ver o cabeçalho da classe).
+   *
+   * "Saíram da lista" é conferido pelos ids vistos NESTA passada, e não por um
+   * `last_seen_at` anterior ao início dela: o MySQL guarda o timestamp em
+   * segundos e arredonda, então duas passadas no mesmo segundo se confundiam —
+   * a que acabou de ser vista parecia velha e a velha parecia recém-vista.
    */
-  static async reconcile(credential, startedAt, summary) {
+  static async reconcile(credential, seen, summary) {
     if (summary.partial) return;
-    const stale = await AsaasCharge.openNotSeenSince(startedAt, { limit: RECONCILE_LIMIT });
+    const stale = (await AsaasCharge.listOpen())
+      .filter((charge) => !seen.has(charge.asaas_id))
+      .slice(0, RECONCILE_LIMIT);
     for (const charge of stale) {
       await sleep(this.PAGE_PACE_MS);
       try {

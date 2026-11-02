@@ -36,14 +36,13 @@ class AsaasCharge {
     return existing ? 'updated' : 'created';
   }
 
-  /** As cobranças em aberto que a passada que começou em `before` não viu: ou pagaram, ou sumiram. */
-  static async openNotSeenSince(before, { limit = 200 } = {}) {
+  /** Todas as cobranças que o painel tem como em aberto (id interno e id do gateway). */
+  static async listOpen() {
     return tdb('asaas_charges')
       .whereIn('status', OPEN_STATUSES)
       .where({ deleted: false })
-      .where((q) => q.whereNull('last_seen_at').orWhere('last_seen_at', '<', before))
       .orderBy('id')
-      .limit(limit);
+      .select('id', 'asaas_id');
   }
 
   /** Atualiza o que o gateway disse da cobrança depois que ela saiu da lista de abertas. */
