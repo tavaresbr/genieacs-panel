@@ -16,6 +16,7 @@ import { PlatformDelinquency } from '@/components/platform/platform-delinquency'
 import { PlatformRevenue } from '@/components/platform/platform-revenue'
 import { PlatformCoupons } from '@/components/platform/platform-coupons'
 import { PlatformHelp } from '@/components/platform/platform-help'
+import { PlatformStatus } from '@/components/platform/platform-status'
 import { PlatformOverviewTab, type OverviewTarget } from '@/components/platform/platform-overview'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
@@ -543,6 +544,10 @@ export default function PlatformPage() {
             // fabricante, abre-se quando alguma coisa não chegou ou um
             // provedor não está reconhecendo os aparelhos dele.
             ['deployment', 'platform.tabs.deployment'],
+            // A página de status (0126): as verificações automáticas e os
+            // incidentes e manutenções que a página pública mostra. Ao lado
+            // do deploy, que é a outra tela de "o que está no ar".
+            ['status', 'platform.tabs.status'],
             ['catalogue', 'platform.tabs.catalogue'],
             // O manual de cobrança, por último: é o que se abre quando não se
             // sabe em qual das outras abas está a resposta.
@@ -582,6 +587,7 @@ export default function PlatformPage() {
         {aba === 'deployment' && <DeploymentHealth />}
         {aba === 'catalogue' && <DefaultCatalogueTab />}
         {aba === 'help' && <PlatformHelp />}
+        {aba === 'status' && <PlatformStatus />}
 
         {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
 

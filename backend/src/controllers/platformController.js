@@ -4,6 +4,7 @@ import { providerFor, PROVEDORES } from '../services/billing/registry.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { panelBaseDomain, portalBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import { EDITION } from '../config/edition.js';
+import { SERVER_VERSION } from '../config/version.js';
 import { resolveClient } from '../config/dbConfig.js';
 import { rlsEnabled } from '../config/rls.js';
 import { mailConfigured } from '../services/mail/index.js';
@@ -203,6 +204,8 @@ class PlatformController {
       );
     }
     return res.json(createResponse('Deployment retrieved successfully', {
+      // A versão exata: saiu do `/api/health` aberto (0126) e mora aqui, atrás da sessão.
+      version: SERVER_VERSION,
       edition: EDITION,
       database: {
         // O dialeto, e só. Host, usuário e nome do banco ficam de fora: a

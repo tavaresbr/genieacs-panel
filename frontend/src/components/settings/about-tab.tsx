@@ -9,14 +9,17 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { LOCALE_METADATA } from '@/lib/i18n/config'
 import { normalizeRole, ROLE_LABEL_KEYS } from '@/lib/permissions'
-import { settingsAPI, type OnboardingStatus } from '@/lib/api'
+import { settingsAPI, statusAPI, type OnboardingStatus } from '@/lib/api'
 
-/** O que `GET /api/health` responde. Rota pública, fora do envelope `{ success, data }`. */
+/**
+ * O que `GET /api/health` responde. Rota pública, fora do envelope `{ success, data }`.
+ * Sem a versão desde a página de status (0126): ela vem de `GET /api/version`,
+ * que pede sessão.
+ */
 interface Health {
   status: 'ok' | 'degraded'
   database: 'ok' | 'unavailable'
   timestamp: string
-  version: string
 }
 
 function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
@@ -47,6 +50,7 @@ export function AboutTab({ appName }: { appName: string }) {
   const providerSlug = user?.tenant?.slug || tenant?.slug
   const [health, setHealth] = useState<Health | null>(null)
   const [healthError, setHealthError] = useState(false)
+  const [serverVersion, setServerVersion] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   const [integrations, setIntegrations] = useState<OnboardingStatus | null>(null)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -61,6 +65,8 @@ export function AboutTab({ appName }: { appName: string }) {
       const res = await fetch(`${base}/api/health`, { headers: { Accept: 'application/json' } })
       const body = await res.json() as Health
       setHealth(body)
+      const versao = await statusAPI.serverVersion().catch(() => null)
+      setServerVersion(versao?.success && versao.data ? versao.data.version : null)
     } catch {
       setHealth(null)
       setHealthError(true)
@@ -83,7 +89,7 @@ export function AboutTab({ appName }: { appName: string }) {
   }, [podeVerIntegracoes])
 
   const versaoPainel = APP_RELEASE.version
-  const versaoDiferente = Boolean(health?.version && health.version !== versaoPainel)
+  const versaoDiferente = Boolean(serverVersion && serverVersion !== versaoPainel)
   const operando = health?.status === 'ok'
 
   return (
@@ -149,7 +155,7 @@ export function AboutTab({ appName }: { appName: string }) {
               ) : '—'}
             </Linha>
             <Linha rotulo={t('settings.about.serverVersion')}>
-              <span className="font-mono">{health?.version ? `v${health.version}` : '—'}</span>
+              <span className="font-mono">{serverVersion ? `v${serverVersion}` : '—'}</span>
             </Linha>
             <Linha rotulo={t('settings.about.checkedAt')}>
               {health?.timestamp ? formatDateTime(health.timestamp) : '—'}

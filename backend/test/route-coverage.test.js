@@ -94,7 +94,10 @@ const PUBLICAS = new Map([
   // credencial, vai no CORPO e é conferido pelo hash; token desconhecido é 404
   // sem nada. Prova em platform-nps.test.js.
   ['POST /api/public/nps/lookup', 'a pesquisa do link: o token no corpo é a credencial; devolve só a nota e o nome do produto'],
-  ['POST /api/public/nps/answer', 'a resposta da pesquisa: só grava a nota na linha que o hash do token acha, e só dentro dos prazos']
+  ['POST /api/public/nps/answer', 'a resposta da pesquisa: só grava a nota na linha que o hash do token acha, e só dentro dos prazos'],
+  // A página de status (0126): só leitura, guardada por 30 s, sem detalhe de
+  // erro, versão nem provedor. Prova em platform-status.test.js.
+  ['GET /api/public/status', 'a página de status: só lê o estado dos componentes e os incidentes escritos para o público; nada de provedor, versão nem erro']
 ]);
 
 /**
@@ -221,7 +224,11 @@ const POR_ID = new Map([
   // (`plans`, `plan_price_changes`), sem vizinho a alcançar.
   ['GET /api/platform/plans/:id/price-change-preview', 'plano de controle; prova em plan-price-change.test.js — só lê, e plano que não existe é 404'],
   ['POST /api/platform/plans/:id/price-changes', 'plano de controle; prova em plan-price-change.test.js — plano que não existe é 404, e quem não é da plataforma é 403'],
-  ['POST /api/platform/plan-price-changes/:id/cancel', 'plano de controle; prova em plan-price-change.test.js — reajuste que não existe é 404']
+  ['POST /api/platform/plan-price-changes/:id/cancel', 'plano de controle; prova em plan-price-change.test.js — reajuste que não existe é 404'],
+  // A página de status (0126): id de `status_incidents`, tabela da plataforma,
+  // sem vizinho a alcançar.
+  ['PATCH /api/platform/status/incidents/:id', 'plano de controle; prova em platform-status.test.js — incidente que não existe é 404, e quem não é da plataforma também'],
+  ['POST /api/platform/status/incidents/:id/updates', 'plano de controle; prova em platform-status.test.js — incidente que não existe é 404, e o resolvido responde 409']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -486,7 +493,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // `plan_price_changes`), como o `PATCH /plans/:id`: não há vizinho a
   // alcançar. Mesmo pedágio, três vezes: três linhas em `DO_CONSOLE` e três
   // aqui; prova em plan-price-change.test.js. São 79.
-  const TETO_DE_EXCECOES = 79;
+  // E as duas da página de status (0126): mudar um incidente e postar na
+  // linha do tempo dele (`/status/incidents/:id` e `.../updates`). Id de
+  // `status_incidents`, tabela da PLATAFORMA, sem provedor nenhum para vazar.
+  // Mesmo pedágio, duas vezes: duas linhas em `DO_CONSOLE` e duas aqui; prova
+  // em platform-status.test.js. São 81.
+  const TETO_DE_EXCECOES = 81;
 
 
   /**
@@ -549,7 +561,9 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/nps',
     'GET /api/platform/plans/:id/price-change-preview',
     'POST /api/platform/plans/:id/price-changes',
-    'POST /api/platform/plan-price-changes/:id/cancel'
+    'POST /api/platform/plan-price-changes/:id/cancel',
+    'PATCH /api/platform/status/incidents/:id',
+    'POST /api/platform/status/incidents/:id/updates'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

@@ -1382,5 +1382,21 @@ export default {
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Pour continuer, indiquez les 5 derniers chiffres du CNPJ ou CPF de facturation de votre fournisseur. Si vous préférez, écrivez *atendente* pour parler à notre équipe.',
   'whatsapp.platformBot.noTaxIdMulti': 'Aucun CNPJ ou CPF de facturation n’est enregistré pour les fournisseurs de ce numéro : je ne peux donc pas confirmer votre identité ici. Je transmets votre conversation à notre équipe.',
   'auth.passwordTooCommon': 'Ce mot de passe est trop courant et facile à deviner. Choisissez-en un autre.',
-  'auth.passwordMatchesIdentity': 'Le mot de passe ne peut pas être identique à votre identifiant ou à votre e-mail.'
+  'auth.passwordMatchesIdentity': 'Le mot de passe ne peut pas être identique à votre identifiant ou à votre e-mail.',
+
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'Panneau',
+  'status.component.payments': 'Paiements',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] Incident : {title}',
+  'status.notice.openedBody': 'Bonjour, {provider}. Nous rencontrons un problème qui affecte {components} : {title}. Notre équipe y travaille déjà, et nous vous préviendrons dès qu’il sera résolu.',
+  'status.notice.resolvedSubject': '[{product}] Résolu : {title}',
+  'status.notice.resolvedBody': 'Bonjour, {provider}. Le problème qui affectait {components} ({title}) a été résolu. Merci de votre patience.',
+  'status.notice.maintenanceSubject': '[{product}] Maintenance programmée : {title}',
+  'status.notice.maintenanceBody': 'Bonjour, {provider}. Nous effectuerons une maintenance programmée sur {components} du {start} au {end} (heure de Brasília) : {title}. Le service peut être instable pendant cette fenêtre.',
+  'status.notice.maintenanceDoneSubject': '[{product}] Maintenance terminée : {title}',
+  'status.notice.maintenanceDoneBody': 'Bonjour, {provider}. La maintenance programmée sur {components} ({title}) est terminée.',
+  'status.notice.follow': 'Suivez-la sur la page d’état : {link}'
 };

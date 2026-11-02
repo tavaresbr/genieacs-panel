@@ -1404,6 +1404,8 @@ export interface CatalogueTenant {
 }
 
 export interface DeploymentInfo {
+  /** A versão do servidor (saiu do `/api/health` aberto na 0126). */
+  version?: string
   edition: 'saas' | 'selfhosted'
   database: {
     /** O dialeto em uso. Host, usuário e nome do banco ficam fora de propósito. */
@@ -7407,4 +7409,109 @@ export const receiptAPI = {
     })
     return { ok: response.ok, status: response.status, html: await response.text() }
   },
+}
+
+// ── A página de status (0126) ────────────────────────────────────────────
+
+export type StatusComponentCode = 'panel' | 'payments' | 'whatsapp' | 'genieacs'
+export type StatusComponentState = 'operational' | 'maintenance' | 'degraded' | 'partial_outage' | 'major_outage' | 'unknown'
+export type StatusIncidentKind = 'incident' | 'maintenance'
+export type StatusIncidentImpact = 'none' | 'minor' | 'major' | 'critical'
+export type StatusIncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved' | 'scheduled' | 'in_progress'
+
+export interface StatusDay {
+  /** O dia UTC, `YYYY-MM-DD`. */
+  date: string
+  /** Porcentagem de verificações que deram certo; nula no dia sem verificação. */
+  uptime: number | null
+}
+
+export interface StatusCheck {
+  ok: boolean
+  latencyMs: number | null
+  detail: string | null
+  checkedAt: string | null
+}
+
+export interface StatusComponent {
+  code: StatusComponentCode
+  status: StatusComponentState
+  /** A disponibilidade dos 90 dias; nula sem verificação. */
+  uptime: number | null
+  days: StatusDay[]
+  /** Só no console: as últimas verificações, da mais nova para a mais velha. */
+  checks?: StatusCheck[]
+}
+
+export interface StatusIncidentUpdate {
+  status: StatusIncidentStatus
+  /** Vazio na manutenção encerrada pelo sistema no fim agendado. */
+  message: string
+  createdAt: string | null
+}
+
+export interface StatusIncident {
+  id: number
+  title: string
+  kind: StatusIncidentKind
+  impact: StatusIncidentImpact
+  status: StatusIncidentStatus
+  components: StatusComponentCode[]
+  startsAt: string | null
+  endsAt: string | null
+  resolvedAt: string | null
+  createdAt: string | null
+  updates: StatusIncidentUpdate[]
+  /** Só no console. */
+  notifyProviders?: boolean
+  /** Só no console: quantos provedores receberam cada aviso. */
+  notified?: Partial<Record<'opened' | 'maintenance' | 'resolved', number>>
+}
+
+export interface PublicStatus {
+  status: StatusComponentState
+  updatedAt: string
+  components: StatusComponent[]
+  activeIncidents: StatusIncident[]
+  scheduledMaintenance: StatusIncident[]
+  history: StatusIncident[]
+}
+
+export interface ConsoleStatus {
+  status: StatusComponentState
+  updatedAt: string
+  components: StatusComponent[]
+  incidents: StatusIncident[]
+}
+
+export interface StatusIncidentInput {
+  kind?: StatusIncidentKind
+  title?: string
+  message?: string
+  components?: StatusComponentCode[]
+  impact?: StatusIncidentImpact
+  status?: StatusIncidentStatus
+  startsAt?: string | null
+  endsAt?: string | null
+  notifyProviders?: boolean
+}
+
+export const statusAPI = {
+  /** A página pública `/status`: sem sessão, guardada por 30 s no servidor. */
+  public: () => apiClient.get<PublicStatus>('/public/status'),
+  /** O console: as verificações com o detalhe e os incidentes recentes. */
+  overview: () => apiClient.get<ConsoleStatus>('/platform/status'),
+  /** Roda as verificações agora. */
+  runChecks: () => apiClient.post<ConsoleStatus>('/platform/status/checks', {}),
+  /** 400 `invalid_*`. */
+  create: (payload: StatusIncidentInput) =>
+    apiClient.post<{ incident: StatusIncident }>('/platform/status/incidents', payload),
+  /** Título, componentes, impacto, janela e aviso. 404, 409 `already_resolved`. */
+  update: (id: number, payload: StatusIncidentInput) =>
+    apiClient.patch<{ incident: StatusIncident }>(`/platform/status/incidents/${id}`, payload),
+  /** Uma mensagem na linha do tempo; `resolved` encerra. 404, 409 `already_resolved`. */
+  postUpdate: (id: number, payload: { status: StatusIncidentStatus; message: string }) =>
+    apiClient.post<{ incident: StatusIncident }>(`/platform/status/incidents/${id}/updates`, payload),
+  /** A versão do servidor, só com sessão (saiu do `/api/health`). */
+  serverVersion: () => apiClient.get<{ version: string }>('/version'),
 }

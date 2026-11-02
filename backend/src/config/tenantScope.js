@@ -254,7 +254,16 @@ export const SHARED_TABLES = new Set([
   // pelo agendador da plataforma fora do laço por provedor, como
   // `platform_alerts`; cada provedor só é tocado dentro do próprio escopo.
   'plan_price_changes',
-  'plan_price_change_marks'
+  'plan_price_change_marks',
+  // A página de status (0126): as verificações, a soma do dia, os incidentes
+  // e o que já foi avisado a cada provedor. Do serviço, acima dos provedores —
+  // a página pública as lê sem escopo nenhum, e o aviso é um passo só do
+  // agendador, fora do laço por provedor, como `plan_price_change_marks`.
+  'status_checks',
+  'status_daily',
+  'status_incidents',
+  'status_incident_updates',
+  'status_notification_marks'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

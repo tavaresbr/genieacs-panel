@@ -1386,5 +1386,21 @@ export default {
   'whatsapp.platformBot.askTaxIdMultiAgain': '如需繼續，請輸入您所屬服務商的帳單 CNPJ 或 CPF 的後 5 位數字。您也可以輸入 *atendente* 與我們的團隊溝通。',
   'whatsapp.platformBot.noTaxIdMulti': '此號碼關聯的服務商都沒有登記帳單 CNPJ 或 CPF，因此無法在這裡確認您的身分。我會將對話轉給我們的團隊。',
   'auth.passwordTooCommon': '此密碼太常見，容易被猜到。請換一個。',
-  'auth.passwordMatchesIdentity': '密碼不能與使用者名稱或電子郵件相同。'
+  'auth.passwordMatchesIdentity': '密碼不能與使用者名稱或電子郵件相同。',
+
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': '面板',
+  'status.component.payments': '付款',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] 故障：{title}',
+  'status.notice.openedBody': '{provider}，您好。我們遇到了影響 {components} 的問題：{title}。我們的團隊正在處理，解決後會通知您。',
+  'status.notice.resolvedSubject': '[{product}] 已解決：{title}',
+  'status.notice.resolvedBody': '{provider}，您好。影響 {components} 的問題（{title}）已解決。感謝您的耐心。',
+  'status.notice.maintenanceSubject': '[{product}] 計畫維護：{title}',
+  'status.notice.maintenanceBody': '{provider}，您好。我們將於 {start} 至 {end}（巴西利亞時間）對 {components} 進行計畫維護：{title}。維護期間服務可能不穩定。',
+  'status.notice.maintenanceDoneSubject': '[{product}] 維護已完成：{title}',
+  'status.notice.maintenanceDoneBody': '{provider}，您好。{components} 的計畫維護（{title}）已完成。',
+  'status.notice.follow': '請在狀態頁面查看：{link}'
 };

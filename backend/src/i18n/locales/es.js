@@ -1383,5 +1383,21 @@ export default {
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Para continuar, indica los 5 últimos dígitos del CNPJ o CPF de facturación de tu proveedor. Si prefieres, escribe *atendente* para hablar con nuestro equipo.',
   'whatsapp.platformBot.noTaxIdMulti': 'No hay CNPJ ni CPF de facturación registrado para los proveedores de este número, así que no puedo confirmar tu identidad por aquí. Pasaré tu conversación a nuestro equipo.',
   'auth.passwordTooCommon': 'Esta contraseña es demasiado común y fácil de adivinar. Elige otra.',
-  'auth.passwordMatchesIdentity': 'La contraseña no puede ser igual a tu usuario o correo electrónico.'
+  'auth.passwordMatchesIdentity': 'La contraseña no puede ser igual a tu usuario o correo electrónico.',
+
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'Panel',
+  'status.component.payments': 'Pagos',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] Incidente: {title}',
+  'status.notice.openedBody': 'Hola, {provider}. Tenemos un problema que afecta a {components}: {title}. Nuestro equipo ya está trabajando en ello y te avisaremos cuando esté resuelto.',
+  'status.notice.resolvedSubject': '[{product}] Resuelto: {title}',
+  'status.notice.resolvedBody': 'Hola, {provider}. El problema que afectaba a {components} ({title}) se ha resuelto. Gracias por tu paciencia.',
+  'status.notice.maintenanceSubject': '[{product}] Mantenimiento programado: {title}',
+  'status.notice.maintenanceBody': 'Hola, {provider}. Realizaremos un mantenimiento programado en {components} de {start} a {end} (hora de Brasilia): {title}. Durante la ventana el servicio puede estar inestable.',
+  'status.notice.maintenanceDoneSubject': '[{product}] Mantenimiento completado: {title}',
+  'status.notice.maintenanceDoneBody': 'Hola, {provider}. El mantenimiento programado en {components} ({title}) ha finalizado.',
+  'status.notice.follow': 'Síguelo en la página de estado: {link}'
 };
