@@ -2691,6 +2691,7 @@ const ptBR: Dictionary = {
   'whatsapp.sgp.search': 'Buscar',
   'whatsapp.sgp.bind': 'Vincular o contrato {contract} a esta conversa',
   'whatsapp.sgp.bindFirst': "Este contrato ainda não é desta conversa. Vincule-o para enviar fatura, liberar em confiança ou abrir chamado.",
+  'whatsapp.sgp.bindingUnverified': "Vínculo só por CPF, não verificado. Confirme e vincule o contrato para liberar esta ação.",
   'whatsapp.sgp.bound': 'Conversa vinculada ao contrato {contract}',
   'whatsapp.sgp.router': 'Acesso ao roteador',
   'whatsapp.sgp.routerUnlinked': 'Nenhuma ONU vinculada a este contrato.',

@@ -150,6 +150,13 @@ class WaSubscriberPanelService {
       let { contracts } = await SgpService.lookupCustomer(
         searchDocument ? { document: searchDocument } : { contract: searchContract }
       );
+      // Um contrato de outro documento não é do cliente que se procurou.
+      if (searchDocument) {
+        contracts = contracts.filter((c) => {
+          const doc = onlyDigits(c.document);
+          return !doc || doc === searchDocument;
+        });
+      }
       // Achou pelo contrato e o cadastro daquele contrato diz de quem é: os
       // outros contratos do mesmo cliente vêm pelo documento. Se esta segunda
       // consulta falhar, fica o que a primeira trouxe.
@@ -293,7 +300,9 @@ class WaSubscriberPanelService {
       contract: conversation.contract || null,
       deviceId: conversation.device_id || null,
       // The client with no contract this thread is bound to, by its `c:<id>` key.
-      registration: !conversation.contract && conversation.sgp_contact_id ? `c:${conversation.sgp_contact_id}` : null
+      registration: !conversation.contract && conversation.sgp_contact_id ? `c:${conversation.sgp_contact_id}` : null,
+      // `document`: ligada só pelo CPF que o cliente digitou, sem conferência.
+      boundVia: conversation.bound_via || null
     };
 
     if (!SgpService.isReady(config)) {
@@ -395,6 +404,8 @@ class WaSubscriberPanelService {
     await WaConversation.update(conversation.id, {
       contract: clean,
       device_id: first?.device_id ?? null,
+      // O atendente confirmou: deixa de ser um vínculo só por CPF.
+      bound_via: null,
       unlinked_at: null
     });
     return this.build(conversation.id, { contract: clean });
@@ -515,6 +526,11 @@ class WaSubscriberPanelService {
    */
   static async savePhone(conversationId, { contract }) {
     const { conversation, contract: clean } = await this.actionContract(conversationId, contract);
+    // Gravar este número no cadastro de um contrato que só o CPF digitado ligou
+    // deixaria quem sabe o CPF de outra pessoa receber as cobranças dela.
+    if (conversation.bound_via === 'document') {
+      throw new WaError('whatsapp.error.bindingUnverified', { code: 'binding_unverified', status: 409 });
+    }
     if (!conversation.wa_phone_e164) {
       throw new WaError('whatsapp.error.invalidPhone', { code: 'invalid_phone', status: 400 });
     }

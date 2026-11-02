@@ -798,6 +798,7 @@ export default {
   'whatsapp.phoneSaved': 'Numéro de téléphone enregistré',
   'whatsapp.phoneSaveFailed': 'Le numéro de téléphone n’a pas pu être enregistré',
   'whatsapp.error.invalidPhone': 'Cela ne ressemble pas à un numéro de téléphone utilisable',
+  'whatsapp.error.bindingUnverified': "Ce lien repose uniquement sur le numéro de document saisi par le client. Confirmez le contrat avec le client et liez-le ici avant d'enregistrer le téléphone.",
   'whatsapp.error.invalidOptOutCategories': "Choisissez des types de message valides pour la liste « ne pas déranger »",
   'whatsapp.error.subscriberNotFound': 'Aucun abonné avec ce contrat',
   'whatsapp.contactsLoaded': '{count} contact(s)',

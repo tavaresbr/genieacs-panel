@@ -2693,6 +2693,7 @@ const en = {
   'whatsapp.sgp.search': 'Search',
   'whatsapp.sgp.bind': 'Link contract {contract} to this conversation',
   'whatsapp.sgp.bindFirst': "This contract is not linked to this conversation yet. Link it to send an invoice, unlock, or open a ticket.",
+  'whatsapp.sgp.bindingUnverified': "Linked by tax ID only, not verified. Confirm and link the contract to allow this action.",
   'whatsapp.sgp.bound': 'Conversation linked to contract {contract}',
   'whatsapp.sgp.router': 'Router access',
   'whatsapp.sgp.routerUnlinked': 'No ONT is linked to this contract.',

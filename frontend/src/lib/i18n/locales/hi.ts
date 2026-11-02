@@ -2671,6 +2671,7 @@ const hi: Dictionary = {
   'whatsapp.sgp.search': 'खोजें',
   'whatsapp.sgp.bind': 'अनुबंध {contract} को इस बातचीत से जोड़ें',
   'whatsapp.sgp.bindFirst': "यह अनुबंध अभी इस बातचीत से जुड़ा नहीं है। बिल भेजने, अनलॉक करने या टिकट खोलने के लिए इसे लिंक करें।",
+  'whatsapp.sgp.bindingUnverified': "केवल दस्तावेज़ से लिंक, सत्यापित नहीं। इस कार्रवाई के लिए अनुबंध की पुष्टि कर लिंक करें।",
   'whatsapp.sgp.bound': 'बातचीत अनुबंध {contract} से जुड़ गई',
   'whatsapp.sgp.router': 'राउटर एक्सेस',
   'whatsapp.sgp.routerUnlinked': 'इस अनुबंध से कोई ONT जुड़ा नहीं है।',

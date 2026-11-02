@@ -781,6 +781,7 @@ export default {
   'whatsapp.phoneSaved': 'Phone number saved',
   'whatsapp.phoneSaveFailed': 'The phone number could not be saved',
   'whatsapp.error.invalidPhone': 'That does not look like a usable phone number',
+  'whatsapp.error.bindingUnverified': "This link was made only by the tax ID the customer typed. Confirm the contract with the customer and link it here before saving the phone.",
   'whatsapp.error.invalidOptOutCategories': "Pick valid message types for the do-not-disturb entry",
   'whatsapp.error.subscriberNotFound': 'No subscriber with that contract',
   'whatsapp.contactsLoaded': '{count} contact(s)',

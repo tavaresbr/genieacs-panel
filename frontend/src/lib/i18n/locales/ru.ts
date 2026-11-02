@@ -2698,6 +2698,7 @@ const ru: Dictionary = {
   'whatsapp.sgp.search': 'Найти',
   'whatsapp.sgp.bind': 'Привязать договор {contract} к этому диалогу',
   'whatsapp.sgp.bindFirst': "Этот договор ещё не привязан к диалогу. Привяжите его, чтобы отправить счёт, разблокировать или открыть заявку.",
+  'whatsapp.sgp.bindingUnverified': "Привязка только по документу, не проверена. Подтвердите и привяжите договор, чтобы разрешить это действие.",
   'whatsapp.sgp.bound': 'Диалог привязан к договору {contract}',
   'whatsapp.sgp.router': 'Доступ к роутеру',
   'whatsapp.sgp.routerUnlinked': 'К этому договору не привязан ни один ONT.',

@@ -779,6 +779,7 @@ export default {
   'whatsapp.phoneSaved': '전화번호를 저장했습니다',
   'whatsapp.phoneSaveFailed': '전화번호를 저장하지 못했습니다',
   'whatsapp.error.invalidPhone': '사용할 수 있는 전화번호 형식이 아닙니다',
+  'whatsapp.error.bindingUnverified': "이 연결은 고객이 입력한 문서 번호만으로 이루어졌습니다. 전화번호를 저장하기 전에 고객에게 계약을 확인하고 여기서 연결하세요.",
   'whatsapp.error.invalidOptOutCategories': "수신 거부 항목에 유효한 메시지 유형을 선택하세요",
   'whatsapp.error.subscriberNotFound': '해당 계약의 가입자를 찾을 수 없습니다',
   'whatsapp.contactsLoaded': '연락처 {count}건',

@@ -781,6 +781,7 @@ export default {
   'whatsapp.phoneSaved': 'फ़ोन नंबर सहेजा गया',
   'whatsapp.phoneSaveFailed': 'फ़ोन नंबर सहेजा नहीं जा सका',
   'whatsapp.error.invalidPhone': 'यह उपयोग योग्य फ़ोन नंबर नहीं लगता',
+  'whatsapp.error.bindingUnverified': "यह लिंक केवल ग्राहक द्वारा लिखे गए दस्तावेज़ से बना है। फ़ोन सहेजने से पहले ग्राहक से अनुबंध की पुष्टि करें और उसे यहाँ लिंक करें।",
   'whatsapp.error.invalidOptOutCategories': "परेशान न करें प्रविष्टि के लिए मान्य संदेश प्रकार चुनें",
   'whatsapp.error.subscriberNotFound': 'उस अनुबंध वाला कोई ग्राहक नहीं है',
   'whatsapp.contactsLoaded': '{count} संपर्क',

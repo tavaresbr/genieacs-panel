@@ -1785,6 +1785,15 @@ const WA_CONVERSATION_UNLINK_COLUMNS = [
   ['unlinked_at', (t) => t.timestamp('unlinked_at').nullable()]
 ];
 
+/**
+ * Como a conversa foi vinculada (0125): `document` quando só o CPF/CNPJ digitado
+ * pelo cliente ligou a conversa ao contrato (não verificado), nulo quando foi o
+ * telefone ou um atendente.
+ */
+const WA_CONVERSATION_BOUND_VIA_COLUMNS = [
+  ['bound_via', (t) => t.string('bound_via', 16).nullable()]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -6940,6 +6949,22 @@ export const migrations = [
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'asaas_customers', asaasCustomersTable(db));
       await createTableIfMissing(db, 'asaas_charges', asaasChargesTable(db));
+    }
+  },
+  {
+    /** Como a conversa foi vinculada — ver `WA_CONVERSATION_BOUND_VIA_COLUMNS`. */
+    id: '0125_wa_conversation_bound_via',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_BOUND_VIA_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_BOUND_VIA_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

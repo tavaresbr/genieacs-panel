@@ -781,6 +781,7 @@ export default {
   'whatsapp.phoneSaved': '电话号码已保存',
   'whatsapp.phoneSaveFailed': '无法保存电话号码',
   'whatsapp.error.invalidPhone': '这不像是一个可用的电话号码',
+  'whatsapp.error.bindingUnverified': "此绑定仅凭客户输入的证件号完成。保存电话前,请与客户确认合同并在此绑定。",
   'whatsapp.error.invalidOptOutCategories': "请为免打扰条目选择有效的消息类型",
   'whatsapp.error.subscriberNotFound': '找不到该合同号对应的用户',
   'whatsapp.contactsLoaded': '{count} 个联系人',

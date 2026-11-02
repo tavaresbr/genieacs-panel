@@ -2574,6 +2574,7 @@ const de: Dictionary = {
   'whatsapp.sgp.search': 'Suchen',
   'whatsapp.sgp.bind': 'Vertrag {contract} mit diesem Gespräch verknüpfen',
   'whatsapp.sgp.bindFirst': "Dieser Vertrag ist noch nicht mit dieser Unterhaltung verknüpft. Verknüpfen Sie ihn, um eine Rechnung zu senden, freizuschalten oder ein Ticket zu öffnen.",
+  'whatsapp.sgp.bindingUnverified': "Nur per Steuernummer verknüpft, nicht verifiziert. Vertrag bestätigen und verknüpfen, um diese Aktion zu erlauben.",
   'whatsapp.sgp.bound': 'Gespräch mit Vertrag {contract} verknüpft',
   'whatsapp.sgp.router': 'Routerzugang',
   'whatsapp.sgp.routerUnlinked': 'Mit diesem Vertrag ist keine ONT verknüpft.',
