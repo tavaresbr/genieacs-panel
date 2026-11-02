@@ -883,6 +883,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp 연결 끊김: 번호 {account}이(가) {minutes}분 전부터 중단되어 고객 메시지가 발송되지 않습니다. 설정 › WhatsApp에서 QR로 다시 연결하세요{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 재연결: 번호 {account}이(가) 다시 작동합니다',
   'whatsapp.alerts.metaQualityDropped': "공식 번호 {account}의 Meta 상태가 나빠졌습니다: {changes}. 설정 › WhatsApp에서 확인하세요{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "품질 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "일일 한도 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "상태 {to}",

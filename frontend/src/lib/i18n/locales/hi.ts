@@ -1129,7 +1129,7 @@ const hi: Dictionary = {
   'settings.chatbot.aiSuggest': 'एजेंटों को जवाब सुझाएँ',
   'settings.chatbot.aiSuggestHint': 'बातचीत में “सुझाव (AI)” बटन: AI एक ड्राफ़्ट लिखता है, एजेंट उसे जाँचकर भेजता है।',
   'settings.chatbot.aiSales': 'Hand off people who want to sign up',
-  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions.',
+  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions. With alerts turned on, the team is also notified by WhatsApp, email or Telegram.',
   'settings.chatbot.aiBaseUrl': 'API पता',
   'settings.chatbot.aiBaseUrlHint': 'सामान्य z.ai कुंजी: api.z.ai/api/paas/v4. GLM Coding Plan: api.z.ai/api/coding/paas/v4. bigmodel.cn कुंजी: open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Fixed Anthropic address; change it only if you use your own proxy.',

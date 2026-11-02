@@ -1134,7 +1134,7 @@ const zhCN: Dictionary = {
   'settings.chatbot.aiSuggest': '为客服人员建议回复',
   'settings.chatbot.aiSuggestHint': '对话中的“建议（AI）”按钮：AI 撰写草稿，客服人员审核后发送。',
   'settings.chatbot.aiSales': 'Hand off people who want to sign up',
-  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions.',
+  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions. With alerts turned on, the team is also notified by WhatsApp, email or Telegram.',
   'settings.chatbot.aiBaseUrl': 'API 地址',
   'settings.chatbot.aiBaseUrlHint': '普通 z.ai 密钥：api.z.ai/api/paas/v4。GLM Coding Plan：api.z.ai/api/coding/paas/v4。bigmodel.cn 密钥：open.bigmodel.cn/api/paas/v4。',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Fixed Anthropic address; change it only if you use your own proxy.',

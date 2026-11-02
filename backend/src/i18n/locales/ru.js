@@ -886,6 +886,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp отключён: номер {account} не работает уже {minutes} мин, сообщения клиентам не отправляются. Переподключите его по QR-коду в Настройки › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp снова подключён: номер {account} снова работает',
   'whatsapp.alerts.metaQualityDropped': "Официальный номер {account} ухудшился в Meta: {changes}. См. Настройки › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "качество {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "дневной лимит {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "статус {to}",

@@ -1136,7 +1136,7 @@ const en = {
   'settings.chatbot.aiSuggest': 'Suggest replies to agents',
   'settings.chatbot.aiSuggestHint': '"Suggest (AI)" button in the conversation: the AI writes a draft, the agent reviews and sends it.',
   'settings.chatbot.aiSales': 'Hand off people who want to sign up',
-  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions.',
+  'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions. With alerts turned on, the team is also notified by WhatsApp, email or Telegram.',
   'settings.chatbot.aiBaseUrl': 'API address',
   'settings.chatbot.aiBaseUrlHint': 'Regular z.ai key: api.z.ai/api/paas/v4. GLM Coding Plan: api.z.ai/api/coding/paas/v4. bigmodel.cn key: open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Fixed Anthropic address; change it only if you use your own proxy.',

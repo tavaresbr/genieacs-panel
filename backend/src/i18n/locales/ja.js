@@ -877,6 +877,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp切断: 番号 {account} が {minutes} 分前から停止しており、顧客へのメッセージが送信されていません。設定 › WhatsApp でQRコードから再接続してください{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp再接続: 番号 {account} が復旧しました',
   'whatsapp.alerts.metaQualityDropped': "公式番号 {account} の Meta での評価が低下しました: {changes}。設定 › WhatsApp を確認してください{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "品質 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "1日の上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "ステータス {to}",

@@ -889,6 +889,7 @@ export default {
   'whatsapp.alerts.waDisconnected': 'WhatsApp déconnecté : le numéro {account} est tombé il y a {minutes} min et les messages aux clients ne partent plus. Reconnectez-le avec le QR dans Paramètres › WhatsApp{link}',
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp reconnecté : le numéro {account} fonctionne à nouveau',
   'whatsapp.alerts.metaQualityDropped': "Le numéro officiel {account} s'est dégradé chez Meta : {changes}. Voir Paramètres › WhatsApp{link}",
+  'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
   'whatsapp.alerts.metaQualityChange': "qualité {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "limite quotidienne {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "statut {to}",
