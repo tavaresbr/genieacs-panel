@@ -7,6 +7,23 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.22.0] - 2026-11-02
+
+### New
+
+- Importação de clientes e cobranças do Asaas (fase 2) (`103732d7`)
+- Avisa a equipe quando o crédito da IA acaba (`a289cece`)
+
+### Fixed
+
+- Conferir cobranças sumidas pelos ids vistos, não por timestamp (`b9e35a86`)
+
+### Maintenance
+
+- Segurança: o robô e a IA respeitam a conversa que o atendente desvinculou (`7ed3b694`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/148a0376ec7b...5dc0f292f97f)
+
 ## [1.21.0] - 2026-11-02
 
 ### New

@@ -1,58 +1,34 @@
 {
-  "version": "1.21.0",
-  "build": 1449,
-  "sourceCommit": "d83be1c00696",
+  "version": "1.22.0",
+  "build": 1458,
+  "sourceCommit": "5dc0f292f97f",
   "releasedAt": "2026-11-02",
-  "basedOnTag": "v1.20.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5111f28ec960...d83be1c00696",
+  "basedOnTag": "v1.21.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/148a0376ec7b...5dc0f292f97f",
   "changes": [
     {
-      "shortHash": "27aa1c30",
+      "shortHash": "103732d7",
       "date": "2026-11-02",
-      "title": "Atendimento dos donos de provedor pelo WhatsApp da plataforma",
+      "title": "Importação de clientes e cobranças do Asaas (fase 2)",
       "category": "New"
     },
     {
-      "shortHash": "ef4a015c",
+      "shortHash": "a289cece",
       "date": "2026-11-02",
-      "title": "Exportação para a contabilidade (XLSX/CSV, envio mensal ao contador)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "33696799",
-      "date": "2026-11-02",
-      "title": "Pesquisa de satisfação dos provedores (NPS, 0123)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "752ddbc3",
-      "date": "2026-11-02",
-      "title": "Reajuste de preço do plano com data de vigência (0122)",
+      "title": "Avisa a equipe quando o crédito da IA acaba",
       "category": "New"
     },
     {
-      "shortHash": "a5275999",
+      "shortHash": "7ed3b694",
       "date": "2026-11-02",
-      "title": "Revisão: reajuste, pesquisa pelo WhatsApp, bot e recibo pelo fragmento",
+      "title": "Segurança: o robô e a IA respeitam a conversa que o atendente desvinculou",
       "category": "Maintenance"
     },
     {
-      "shortHash": "ec52d62d",
+      "shortHash": "b9e35a86",
       "date": "2026-11-02",
-      "title": "E2e: reajuste agendado, exportação contábil, Satisfação, NPS e recibo públicos",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ddcfe0e6",
-      "date": "2026-11-02",
-      "title": "Open the \"what's new\" modal with what is new",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "23028592",
-      "date": "2026-11-02",
-      "title": "Avisa a equipe quando a IA registra um interessado em contratar",
-      "category": "New"
+      "title": "Conferir cobranças sumidas pelos ids vistos, não por timestamp",
+      "category": "Fixed"
     }
   ]
 }
