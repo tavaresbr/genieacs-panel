@@ -174,7 +174,7 @@ class AffiliateController {
   static async passwordLink(req, res) {
     try {
       const { token, expiresAt } = await AffiliateService.issuePasswordLink(req.params.id);
-      await auditar(req, PlatformAudit.ACTIONS.AFFILIATE_PASSWORD_LINK, { affiliateId: Number(req.params.id) });
+      await auditar(req, PlatformAudit.ACTIONS.AFFILIATE_ACCESS_LINK, { affiliateId: Number(req.params.id) });
       return res.json(createResponse('Password link issued', { token, expiresAt: expiresAt.toISOString(), path: `/afiliados#senha=${token}` }));
     } catch (error) {
       return falha(res, error, 'Affiliate password link');

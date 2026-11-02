@@ -688,7 +688,7 @@ class WaAlertService {
       // Reported, not thrown — see the method comment.
       summary.error = error.message;
       summary.skipped = summary.skipped || 'error';
-      console.warn(`WhatsApp alert scan failed: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
+      console.warn(`WhatsApp alert scan failed: ${JSON.stringify(String(error?.message).slice(0, 300))}`);
     }
     return summary;
   }

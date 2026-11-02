@@ -365,8 +365,9 @@ class BillingWebhookController {
       } catch (error) {
         // O evento e a mensagem vêm da entrega: sem quebra de linha (que
         // forjaria uma linha nova no log) e cortados, ali mesmo na chamada.
-        const evento = logSafe(req.body?.event, 64).replace(/[\r\n\u2028\u2029]+/g, ' ');
-        const motivo = logSafe(error?.message, 300).replace(/[\r\n\u2028\u2029]+/g, ' ');
+        // JSON.stringify também escapa o que sobrar de controle e aspas.
+        const evento = JSON.stringify(logSafe(req.body?.event, 64));
+        const motivo = JSON.stringify(logSafe(error?.message, 300));
         console.error(`Billing webhook: could not apply ${evento} to an affiliate payout `
           + `(the hourly refresh reconciles it): ${motivo}`);
         return res.json({ success: true, code: 'transfer_deferred' });

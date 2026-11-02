@@ -209,7 +209,7 @@ class PlatformAudit {
     AFFILIATE_CREATED: 'affiliate.created',
     AFFILIATE_UPDATED: 'affiliate.updated',
     AFFILIATE_STATUS_CHANGED: 'affiliate.status_changed',
-    AFFILIATE_PASSWORD_LINK: 'affiliate.password_link',
+    AFFILIATE_ACCESS_LINK: 'affiliate.password_link',
     AFFILIATE_PAYOUTS_BUILT: 'affiliate.payouts_built',
     AFFILIATE_PAYOUT_APPROVED: 'affiliate.payout_approved',
     AFFILIATE_PAYOUT_SENT: 'affiliate.payout_sent',
