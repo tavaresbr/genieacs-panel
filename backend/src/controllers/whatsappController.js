@@ -32,6 +32,11 @@ export function handleError(req, res, error, fallbackKey) {
   return res.status(500).json(createErrorResponse(req.t(fallbackKey), error.message));
 }
 
+/** Os NOMES dos campos de um pedido de configuração: nunca os valores (URLs, chaves, tokens). */
+function camposEnviados(body) {
+  return Object.keys(body ?? {}).filter((key) => body[key] !== undefined).slice(0, 40);
+}
+
 /**
  * Erro da IA: a frase do painel e, ao lado, o que o provedor disse
  * ("HTTP 401 · 1000: Authentication failed"). Sem isso o provedor de internet
@@ -131,6 +136,12 @@ class WhatsAppController {
         autoTags: body.autoTags,
         ai: body.ai
       }, req.locale);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CONFIG_SAVED,
+        subjectType: 'whatsapp_config',
+        subjectId: null,
+        detail: { kind: 'bot', fields: camposEnviados(body) }
+      });
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configSaveFailed');
@@ -199,6 +210,12 @@ class WhatsAppController {
         cloudCallbackUrl: body.cloudCallbackUrl,
         cloudVerifyToken: body.cloudVerifyToken === undefined ? undefined : body.cloudVerifyToken
       });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CONFIG_SAVED,
+        subjectType: 'whatsapp_config',
+        subjectId: null,
+        detail: { kind: 'integration', fields: camposEnviados(body) }
+      });
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configSaveFailed');
@@ -233,6 +250,12 @@ class WhatsAppController {
         phoneNumberId: body.phoneNumberId,
         wabaId: body.wabaId
       });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: account?.id != null ? String(account.id) : null,
+        detail: { op: 'create', kind: body.kind === 'cloud' ? 'cloud' : 'baileys' }
+      });
       return res.status(201).json(createResponse(req.t('whatsapp.accountConnecting'), {
         account: WhatsAppConfigService.publicAccount(account),
         qr,
@@ -264,6 +287,12 @@ class WhatsAppController {
         metaToken: req.body?.metaToken,
         adminKey: req.body?.adminKey
       });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: String(req.params?.id),
+        detail: { op: 'meta_token' }
+      });
       return res.json(createResponse(req.t('whatsapp.metaTokenUpdated'), {
         account: WhatsAppConfigService.publicAccount(account)
       }));
@@ -280,6 +309,12 @@ class WhatsAppController {
   static async registerMetaWebhook(req, res) {
     try {
       const { account } = await MetaWebhookService.retry(req.params?.id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: String(req.params?.id),
+        detail: { op: 'meta_webhook' }
+      });
       return res.json(createResponse(req.t('whatsapp.metaWebhook.registered'), {
         account: WhatsAppConfigService.publicAccount(account)
       }));
@@ -481,6 +516,12 @@ class WhatsAppController {
   static async disconnectAccount(req, res) {
     try {
       const { account } = await EvolutionInstanceService.disconnect(req.params?.id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: String(req.params?.id),
+        detail: { op: 'disconnect' }
+      });
       return res.json(createResponse(req.t('whatsapp.disconnected'), {
         account: WhatsAppConfigService.publicAccount(account)
       }));
@@ -496,6 +537,12 @@ class WhatsAppController {
       });
       // Success even when the server refused: the row is gone either way, and
       // `serverError` is how the operator learns an instance was left running.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: String(req.params?.id),
+        detail: { op: 'delete' }
+      });
       return res.json(createResponse(req.t('whatsapp.accountDeleted'), result));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.accountActionFailed');
@@ -510,6 +557,12 @@ class WhatsAppController {
         purpose: body.purpose,
         isDefault: body.isDefault,
         color: body.color
+      });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: String(req.params?.id),
+        detail: { op: 'update', default: body.isDefault ?? null }
       });
       return res.json(createResponse(req.t('whatsapp.accountUpdated'), {
         account: WhatsAppConfigService.publicAccount(account)
