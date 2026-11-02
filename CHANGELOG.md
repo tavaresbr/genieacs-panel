@@ -7,6 +7,23 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.23.0] - 2026-11-02
+
+### New
+
+- Avisos da IA: chave recusada, crédito de volta e resumo diário (`5105e8f9`)
+- Avisos do SGP: fora do ar, credencial recusada e desbloqueio com erro (`e58de674`)
+- Avisos de operação: GenieACS sem resposta, fila travada e régua que falha (`adf4730e`)
+- Bot e ficha usam as faturas do Asaas (fase 3) (`fe13d55e`)
+- Avisos da plataforma: backup atrasado e certificado perto de vencer (`5fbd82f5`)
+
+### Maintenance
+
+- Segurança: vínculo só por CPF fica não verificado; CPF e PIX não vão para a IA (`a13da37c`)
+- Novo cliente: novo contrato para quem já está no SGP; CTO vai como splitter_port (`2a98d77f`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/fcc06f9adc59...df10ca35fe98)
+
 ## [1.22.1] - 2026-11-02
 
 ### Maintenance

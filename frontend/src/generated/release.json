@@ -1,21 +1,51 @@
 {
-  "version": "1.22.1",
-  "build": 1463,
-  "sourceCommit": "a2475fdd7354",
+  "version": "1.23.0",
+  "build": 1475,
+  "sourceCommit": "df10ca35fe98",
   "releasedAt": "2026-11-02",
-  "basedOnTag": "v1.22.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/9648e04194d4...a2475fdd7354",
+  "basedOnTag": "v1.22.1",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/fcc06f9adc59...df10ca35fe98",
   "changes": [
     {
-      "shortHash": "0dc8cdf9",
+      "shortHash": "a13da37c",
       "date": "2026-11-02",
-      "title": "Auditoria das ações sensíveis do WhatsApp: liberar, vincular, chamado, telefone, régua, campanha, opt-out, modelos e configuração",
+      "title": "Segurança: vínculo só por CPF fica não verificado; CPF e PIX não vão para a IA",
       "category": "Maintenance"
     },
     {
-      "shortHash": "f205caf1",
+      "shortHash": "5105e8f9",
       "date": "2026-11-02",
-      "title": "Let a server follow new releases on its own",
+      "title": "Avisos da IA: chave recusada, crédito de volta e resumo diário",
+      "category": "New"
+    },
+    {
+      "shortHash": "e58de674",
+      "date": "2026-11-02",
+      "title": "Avisos do SGP: fora do ar, credencial recusada e desbloqueio com erro",
+      "category": "New"
+    },
+    {
+      "shortHash": "adf4730e",
+      "date": "2026-11-02",
+      "title": "Avisos de operação: GenieACS sem resposta, fila travada e régua que falha",
+      "category": "New"
+    },
+    {
+      "shortHash": "fe13d55e",
+      "date": "2026-11-02",
+      "title": "Bot e ficha usam as faturas do Asaas (fase 3)",
+      "category": "New"
+    },
+    {
+      "shortHash": "5fbd82f5",
+      "date": "2026-11-02",
+      "title": "Avisos da plataforma: backup atrasado e certificado perto de vencer",
+      "category": "New"
+    },
+    {
+      "shortHash": "2a98d77f",
+      "date": "2026-11-02",
+      "title": "Novo cliente: novo contrato para quem já está no SGP; CTO vai como splitter_port",
       "category": "Maintenance"
     }
   ]
