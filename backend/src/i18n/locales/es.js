@@ -29,7 +29,7 @@ export default {
   'auth.setupStatusFailed': 'No se pudo obtener el estado de la configuración inicial',
   'auth.setupAlreadyCompleted': 'La configuración inicial ya se completó',
   'auth.usernameLength': 'El usuario debe tener entre 3 y 64 caracteres',
-  'auth.passwordLength': 'La contraseña debe tener entre 8 y 128 caracteres',
+  'auth.passwordLength': 'La contraseña debe tener entre 10 y 128 caracteres',
   'auth.adminCreated': 'Cuenta de propietario creada correctamente',
   'auth.usernameTaken': 'Ese usuario ya está en uso',
   'auth.adminCreateFailed': 'No se pudo crear la cuenta de administrador',
@@ -44,7 +44,7 @@ export default {
   'auth.currentUsernameIncorrect': 'El usuario actual es incorrecto',
   'auth.usernameUpdated': 'Usuario actualizado correctamente',
   'auth.passwordChangeRequired': 'La contraseña actual y la nueva contraseña son obligatorias',
-  'auth.newPasswordLength': 'La nueva contraseña debe tener entre 8 y 128 caracteres',
+  'auth.newPasswordLength': 'La nueva contraseña debe tener entre 10 y 128 caracteres',
   'auth.currentPasswordIncorrect': 'La contraseña actual es incorrecta',
   'auth.mfaRequired': 'Ingrese el código de su app de autenticación',
   'auth.mfaInvalid': 'Código no válido',
@@ -1040,7 +1040,7 @@ export default {
   'tenant.nameInvalid': 'El nombre del proveedor debe tener entre 1 y 128 caracteres',
   'auth.signupCreated': 'Proveedor creado. Inicie sesión en su propia dirección.',
   'auth.signupFailed': 'No se pudo crear el proveedor',
-  'auth.signupInvalid': 'Se requieren nombre del proveedor, usuario (3–64) y contraseña (8–128)',
+  'auth.signupInvalid': 'Se requieren nombre del proveedor, usuario (3–64) y contraseña (10–128)',
   'auth.signupSlugTaken': 'Este subdominio ya está en uso',
   'auth.signupUsernameTaken': 'Este nombre de usuario ya está en uso',
   'auth.signupPhoneInvalid': 'Introduce un WhatsApp con código de área',
@@ -1381,5 +1381,7 @@ export default {
   'priceChange.cancelNoticeBody': 'Hola, {provider}. El reajuste del plan {plan} ({cycle}) de {old} a {new}, previsto para el {date}, fue cancelado. El valor sigue siendo {old} y ninguna factura cambia por él. Si tienes dudas, solo responde este mensaje.',
   'whatsapp.platformBot.askTaxIdMulti': '¡Hola! Por tu seguridad, antes de enviar datos de facturación, indica los 5 últimos dígitos del CNPJ o CPF de facturación de tu proveedor.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Para continuar, indica los 5 últimos dígitos del CNPJ o CPF de facturación de tu proveedor. Si prefieres, escribe *atendente* para hablar con nuestro equipo.',
-  'whatsapp.platformBot.noTaxIdMulti': 'No hay CNPJ ni CPF de facturación registrado para los proveedores de este número, así que no puedo confirmar tu identidad por aquí. Pasaré tu conversación a nuestro equipo.'
+  'whatsapp.platformBot.noTaxIdMulti': 'No hay CNPJ ni CPF de facturación registrado para los proveedores de este número, así que no puedo confirmar tu identidad por aquí. Pasaré tu conversación a nuestro equipo.',
+  'auth.passwordTooCommon': 'Esta contraseña es demasiado común y fácil de adivinar. Elige otra.',
+  'auth.passwordMatchesIdentity': 'La contraseña no puede ser igual a tu usuario o correo electrónico.'
 };

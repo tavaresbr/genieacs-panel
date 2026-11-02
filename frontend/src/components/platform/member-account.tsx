@@ -14,6 +14,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS } from '@/lib/permissions'
 import { panelLink } from '@/lib/panel-link'
 import { formatPhone, whatsappShareUrl } from '@/lib/whatsapp-share'
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
 
 interface Props {
   tenant: Tenant
@@ -126,7 +127,7 @@ export function MemberAccount({ tenant, member, busy, onUpdated, onRemove }: Pro
   }
 
   const definirSenha = async () => {
-    if (senha.length < 8) {
+    if (senha.length < PASSWORD_MIN_LENGTH) {
       toast.error(t('platform.operator.passwordShort'))
       return
     }

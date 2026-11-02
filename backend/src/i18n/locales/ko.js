@@ -32,7 +32,7 @@ export default {
   'auth.setupStatusFailed': '초기 설정 상태를 조회하지 못했습니다',
   'auth.setupAlreadyCompleted': '초기 설정이 이미 완료되었습니다',
   'auth.usernameLength': '사용자 이름은 3자에서 64자 사이여야 합니다',
-  'auth.passwordLength': '비밀번호는 8자에서 128자 사이여야 합니다',
+  'auth.passwordLength': '비밀번호는 10자에서 128자 사이여야 합니다',
   'auth.adminCreated': '소유자 계정을 생성했습니다',
   'auth.usernameTaken': '이미 사용 중인 사용자 이름입니다',
   'auth.adminCreateFailed': '관리자 계정을 생성하지 못했습니다',
@@ -47,7 +47,7 @@ export default {
   'auth.currentUsernameIncorrect': '현재 사용자 이름이 올바르지 않습니다',
   'auth.usernameUpdated': '사용자 이름을 변경했습니다',
   'auth.passwordChangeRequired': '현재 비밀번호와 새 비밀번호가 필요합니다',
-  'auth.newPasswordLength': '새 비밀번호는 8자에서 128자 사이여야 합니다',
+  'auth.newPasswordLength': '새 비밀번호는 10자에서 128자 사이여야 합니다',
   'auth.currentPasswordIncorrect': '현재 비밀번호가 올바르지 않습니다',
   'auth.mfaRequired': '인증 앱의 코드를 입력하세요',
   'auth.mfaInvalid': '잘못된 코드입니다',
@@ -1046,7 +1046,7 @@ export default {
   'tenant.nameInvalid': '사업자 이름은 1~128자여야 합니다',
   'auth.signupCreated': '사업자가 생성되었습니다. 전용 주소에서 로그인하세요.',
   'auth.signupFailed': '사업자를 생성하지 못했습니다',
-  'auth.signupInvalid': '사업자 이름, 사용자 이름(3~64자), 비밀번호(8~128자)가 필요합니다',
+  'auth.signupInvalid': '사업자 이름, 사용자 이름(3~64자), 비밀번호(10~128자)가 필요합니다',
   'auth.signupSlugTaken': '이 하위 도메인은 이미 사용 중입니다',
   'auth.signupUsernameTaken': '이 사용자 이름은 이미 사용 중입니다',
   'auth.signupPhoneInvalid': '지역 번호를 포함한 WhatsApp 번호를 입력하세요',
@@ -1387,5 +1387,7 @@ export default {
   'priceChange.cancelNoticeBody': '안녕하세요, {provider}님. {date}로 예정되었던 {plan} 요금제({cycle})의 {old}에서 {new}로의 가격 조정이 취소되었습니다. 가격은 {old} 그대로이며, 이로 인해 바뀌는 청구서는 없습니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.',
   'whatsapp.platformBot.askTaxIdMulti': '안녕하세요! 보안을 위해 청구 정보를 보내기 전에 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요.',
   'whatsapp.platformBot.askTaxIdMultiAgain': '계속하려면 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요. 원하시면 *atendente*를 입력해 팀과 이야기하세요.',
-  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.'
+  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.',
+  'auth.passwordTooCommon': '이 비밀번호는 너무 흔해서 쉽게 추측됩니다. 다른 비밀번호를 선택하세요.',
+  'auth.passwordMatchesIdentity': '비밀번호는 사용자 이름이나 이메일과 같을 수 없습니다.'
 };

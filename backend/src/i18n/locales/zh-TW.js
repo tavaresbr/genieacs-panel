@@ -32,7 +32,7 @@ export default {
   'auth.setupStatusFailed': '無法取得設定狀態',
   'auth.setupAlreadyCompleted': '設定已完成',
   'auth.usernameLength': '使用者名稱需為 3 至 64 個字元',
-  'auth.passwordLength': '密碼需為 8 至 128 個字元',
+  'auth.passwordLength': '密碼需為 10 至 128 個字元',
   'auth.adminCreated': '擁有者帳號已建立',
   'auth.usernameTaken': '該使用者名稱已被使用',
   'auth.adminCreateFailed': '無法建立管理員帳號',
@@ -47,7 +47,7 @@ export default {
   'auth.currentUsernameIncorrect': '目前的使用者名稱不正確',
   'auth.usernameUpdated': '使用者名稱已更新',
   'auth.passwordChangeRequired': '需要填寫目前的密碼與新密碼',
-  'auth.newPasswordLength': '新密碼需為 8 至 128 個字元',
+  'auth.newPasswordLength': '新密碼需為 10 至 128 個字元',
   'auth.currentPasswordIncorrect': '目前的密碼不正確',
   'auth.mfaRequired': '請輸入驗證器應用程式中的代碼',
   'auth.mfaInvalid': '代碼無效',
@@ -1043,7 +1043,7 @@ export default {
   'tenant.nameInvalid': '業者名稱長度須為 1 到 128 個字元',
   'auth.signupCreated': '業者已建立。請在其專屬網址登入。',
   'auth.signupFailed': '無法建立業者',
-  'auth.signupInvalid': '需要業者名稱、使用者名稱（3–64）和密碼（8–128）',
+  'auth.signupInvalid': '需要業者名稱、使用者名稱（3–64）和密碼（10–128）',
   'auth.signupSlugTaken': '此子網域已被使用',
   'auth.signupUsernameTaken': '此使用者名稱已被使用',
   'auth.signupPhoneInvalid': '請輸入含區碼的 WhatsApp 號碼',
@@ -1384,5 +1384,7 @@ export default {
   'priceChange.cancelNoticeBody': '{provider}，您好。原定於 {date} 生效的 {plan} 方案（{cycle}）從 {old} 調整為 {new} 的調價已取消。價格仍為 {old}，不會因此變更任何帳單。如有疑問，直接回覆此訊息即可。',
   'whatsapp.platformBot.askTaxIdMulti': '您好！為了您的安全，在傳送帳單資料之前，請輸入您所屬服務商的帳單 CNPJ 或 CPF 的後 5 位數字。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '如需繼續，請輸入您所屬服務商的帳單 CNPJ 或 CPF 的後 5 位數字。您也可以輸入 *atendente* 與我們的團隊溝通。',
-  'whatsapp.platformBot.noTaxIdMulti': '此號碼關聯的服務商都沒有登記帳單 CNPJ 或 CPF，因此無法在這裡確認您的身分。我會將對話轉給我們的團隊。'
+  'whatsapp.platformBot.noTaxIdMulti': '此號碼關聯的服務商都沒有登記帳單 CNPJ 或 CPF，因此無法在這裡確認您的身分。我會將對話轉給我們的團隊。',
+  'auth.passwordTooCommon': '此密碼太常見，容易被猜到。請換一個。',
+  'auth.passwordMatchesIdentity': '密碼不能與使用者名稱或電子郵件相同。'
 };

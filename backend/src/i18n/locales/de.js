@@ -32,7 +32,7 @@ export default {
   'auth.setupStatusFailed': 'Der Einrichtungsstatus konnte nicht abgerufen werden',
   'auth.setupAlreadyCompleted': 'Die Einrichtung ist bereits abgeschlossen',
   'auth.usernameLength': 'Der Benutzername muss zwischen 3 und 64 Zeichen lang sein',
-  'auth.passwordLength': 'Das Passwort muss zwischen 8 und 128 Zeichen lang sein',
+  'auth.passwordLength': 'Das Passwort muss zwischen 10 und 128 Zeichen lang sein',
   'auth.adminCreated': 'Inhaberkonto erfolgreich erstellt',
   'auth.usernameTaken': 'Dieser Benutzername ist bereits vergeben',
   'auth.adminCreateFailed': 'Das Administratorkonto konnte nicht erstellt werden',
@@ -47,7 +47,7 @@ export default {
   'auth.currentUsernameIncorrect': 'Der aktuelle Benutzername ist falsch',
   'auth.usernameUpdated': 'Benutzername erfolgreich aktualisiert',
   'auth.passwordChangeRequired': 'Das aktuelle und das neue Passwort sind erforderlich',
-  'auth.newPasswordLength': 'Das neue Passwort muss zwischen 8 und 128 Zeichen lang sein',
+  'auth.newPasswordLength': 'Das neue Passwort muss zwischen 10 und 128 Zeichen lang sein',
   'auth.currentPasswordIncorrect': 'Das aktuelle Passwort ist falsch',
   'auth.mfaRequired': 'Geben Sie den Code aus Ihrer Authenticator-App ein',
   'auth.mfaInvalid': 'Ungültiger Code',
@@ -1044,7 +1044,7 @@ export default {
   'tenant.nameInvalid': 'Der Anbietername muss zwischen 1 und 128 Zeichen lang sein',
   'auth.signupCreated': 'Anbieter erstellt. Melden Sie sich unter seiner eigenen Adresse an.',
   'auth.signupFailed': 'Anbieter konnte nicht erstellt werden',
-  'auth.signupInvalid': 'Anbietername, Benutzername (3–64) und Passwort (8–128) sind erforderlich',
+  'auth.signupInvalid': 'Anbietername, Benutzername (3–64) und Passwort (10–128) sind erforderlich',
   'auth.signupSlugTaken': 'Diese Subdomain ist bereits vergeben',
   'auth.signupUsernameTaken': 'Dieser Benutzername ist bereits vergeben',
   'auth.signupPhoneInvalid': 'Gib eine WhatsApp-Nummer mit Vorwahl ein',
@@ -1385,5 +1385,7 @@ export default {
   'priceChange.cancelNoticeBody': 'Hallo {provider}, die Preisanpassung des Tarifs {plan} ({cycle}) von {old} auf {new}, geplant zum {date}, wurde storniert. Der Preis bleibt bei {old}, und keine Rechnung ändert sich deswegen. Bei Fragen antworten Sie einfach auf diese Nachricht.',
   'whatsapp.platformBot.askTaxIdMulti': 'Hallo! Zu Ihrer Sicherheit geben Sie bitte vor dem Versand von Abrechnungsdaten die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Um fortzufahren, geben Sie die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein. Wenn Sie möchten, schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.',
+  'auth.passwordTooCommon': 'Dieses Passwort ist zu verbreitet und leicht zu erraten. Wählen Sie ein anderes.',
+  'auth.passwordMatchesIdentity': 'Das Passwort darf nicht mit Ihrem Benutzernamen oder Ihrer E-Mail-Adresse übereinstimmen.'
 };

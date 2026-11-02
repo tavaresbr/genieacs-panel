@@ -9,6 +9,7 @@ import { OPERATOR_ROLES, ROLE_LABEL_KEYS } from '@/lib/permissions'
 import { panelLink } from '@/lib/panel-link'
 import { whatsappShareUrl } from '@/lib/whatsapp-share'
 import { MemberAccount } from '@/components/platform/member-account'
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
 
 interface Props {
   tenant: Tenant
@@ -144,7 +145,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
       return
     }
     if (senhaDigitada) {
-      if (password.length < 8) {
+      if (password.length < PASSWORD_MIN_LENGTH) {
         toast.error(t('platform.operator.passwordShort'))
         return
       }

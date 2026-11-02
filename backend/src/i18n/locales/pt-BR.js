@@ -29,7 +29,7 @@ export default {
   'auth.setupStatusFailed': 'Não foi possível obter o status da configuração inicial',
   'auth.setupAlreadyCompleted': 'A configuração inicial já foi concluída',
   'auth.usernameLength': 'O usuário deve ter entre 3 e 64 caracteres',
-  'auth.passwordLength': 'A senha deve ter entre 8 e 128 caracteres',
+  'auth.passwordLength': 'A senha deve ter entre 10 e 128 caracteres',
   'auth.adminCreated': 'Conta de proprietário criada com sucesso',
   'auth.usernameTaken': 'Esse usuário já está em uso',
   'auth.adminCreateFailed': 'Não foi possível criar a conta de administrador',
@@ -44,7 +44,7 @@ export default {
   'auth.currentUsernameIncorrect': 'O usuário atual está incorreto',
   'auth.usernameUpdated': 'Usuário atualizado com sucesso',
   'auth.passwordChangeRequired': 'A senha atual e a nova senha são obrigatórias',
-  'auth.newPasswordLength': 'A nova senha deve ter entre 8 e 128 caracteres',
+  'auth.newPasswordLength': 'A nova senha deve ter entre 10 e 128 caracteres',
   'auth.currentPasswordIncorrect': 'A senha atual está incorreta',
   'auth.mfaRequired': 'Digite o código do app autenticador',
   'auth.mfaInvalid': 'Código inválido',
@@ -1042,7 +1042,7 @@ export default {
   'tenant.nameInvalid': 'O nome do provedor deve ter entre 1 e 128 caracteres',
   'auth.signupCreated': 'Provedor criado. Entre pelo endereço dele.',
   'auth.signupFailed': 'Não foi possível criar o provedor',
-  'auth.signupInvalid': 'Nome do provedor, usuário (3–64) e senha (8–128) são obrigatórios',
+  'auth.signupInvalid': 'Nome do provedor, usuário (3–64) e senha (10–128) são obrigatórios',
   'auth.signupSlugTaken': 'Este subdomínio já está em uso',
   'auth.signupUsernameTaken': 'Este nome de usuário já está em uso',
   'auth.signupPhoneInvalid': 'Informe um WhatsApp com DDD',
@@ -1383,5 +1383,7 @@ export default {
   'priceChange.cancelNoticeBody': 'Olá, {provider}. O reajuste do plano {plan} ({cycle}) de {old} para {new}, previsto para {date}, foi cancelado. O valor continua {old}, e nenhuma fatura muda por causa dele. Qualquer dúvida, é só responder esta mensagem.',
   'whatsapp.platformBot.askTaxIdMulti': 'Olá! Para sua segurança, antes de enviar dados de cobrança, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Para continuar, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor. Se preferir, escreva *atendente* para falar com a nossa equipe.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.',
+  'auth.passwordTooCommon': 'Essa senha é comum demais e fácil de adivinhar. Escolha outra.',
+  'auth.passwordMatchesIdentity': 'A senha não pode ser igual ao seu usuário ou e-mail.'
 };

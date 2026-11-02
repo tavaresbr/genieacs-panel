@@ -9,6 +9,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
 import { referralCodeFromQuery } from '@/lib/referrals'
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
 
 /** O nome do provedor como subdomínio: minúsculas, sem acento, hífens. */
 function slugFromName(value: string) {
@@ -109,7 +110,7 @@ export default function Signup() {
     if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(form.slug) || form.slug.length < 3) return setError(t('signup.error.slug'))
     if (form.username.trim().length < 3) return setError(t('setup.error.usernameTooShort'))
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setError(t('setup.error.emailInvalid'))
-    if (form.password.length < 8) return setError(t('setup.error.passwordTooShort'))
+    if (form.password.length < PASSWORD_MIN_LENGTH) return setError(t('setup.error.passwordTooShort'))
     if (form.password !== form.confirm) return setError(t('setup.error.passwordMismatch'))
     const telefone = form.phone.replace(/\D/g, '')
     if (telefone && (telefone.length < 10 || telefone.length > 13)) return setError(t('signup.error.phone'))

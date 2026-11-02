@@ -30,7 +30,7 @@ export default {
   'auth.setupStatusFailed': 'تعذّر جلب حالة الإعداد الأولي',
   'auth.setupAlreadyCompleted': 'الإعداد الأولي مكتمل بالفعل',
   'auth.usernameLength': 'يجب أن يتراوح اسم المستخدم بين ٣ و٦٤ حرفًا',
-  'auth.passwordLength': 'يجب أن تتراوح كلمة المرور بين ٨ و١٢٨ حرفًا',
+  'auth.passwordLength': 'يجب أن تتراوح كلمة المرور بين ١٠ و١٢٨ حرفًا',
   'auth.adminCreated': 'تم إنشاء حساب المالك',
   'auth.usernameTaken': 'اسم المستخدم هذا مستخدم بالفعل',
   'auth.adminCreateFailed': 'تعذّر إنشاء حساب المدير',
@@ -45,7 +45,7 @@ export default {
   'auth.currentUsernameIncorrect': 'اسم المستخدم الحالي غير صحيح',
   'auth.usernameUpdated': 'تم تحديث اسم المستخدم',
   'auth.passwordChangeRequired': 'كلمة المرور الحالية والجديدة مطلوبتان',
-  'auth.newPasswordLength': 'يجب أن تتراوح كلمة المرور الجديدة بين ٨ و١٢٨ حرفًا',
+  'auth.newPasswordLength': 'يجب أن تتراوح كلمة المرور الجديدة بين ١٠ و١٢٨ حرفًا',
   'auth.currentPasswordIncorrect': 'كلمة المرور الحالية غير صحيحة',
   'auth.mfaRequired': 'أدخل الرمز من تطبيق المصادقة',
   'auth.mfaInvalid': 'رمز غير صالح',
@@ -960,7 +960,7 @@ export default {
   'users.deleteFailed': 'تعذّر حذف المشغّل',
   'auth.signupCreated': 'تم إنشاء المزوّد. سجّل الدخول على عنوانه الخاص.',
   'auth.signupFailed': 'تعذّر إنشاء المزوّد',
-  'auth.signupInvalid': 'اسم المزوّد واسم المستخدم (3–64) وكلمة المرور (8–128) مطلوبة',
+  'auth.signupInvalid': 'اسم المزوّد واسم المستخدم (3–64) وكلمة المرور (10–128) مطلوبة',
   'auth.signupSlugTaken': 'هذا النطاق الفرعي مستخدم بالفعل',
   'auth.signupUsernameTaken': 'اسم المستخدم هذا مستخدم بالفعل',
   'auth.signupPhoneInvalid': 'أدخل رقم واتساب مع رمز المنطقة',
@@ -1376,5 +1376,7 @@ export default {
   'priceChange.cancelNoticeBody': 'مرحبًا {provider}. تم إلغاء تعديل سعر الخطة {plan} ({cycle}) من {old} إلى {new} الذي كان مقررًا في {date}. يبقى السعر {old}، ولن تتغير أي فاتورة بسببه. لأي استفسار، يكفي الرد على هذه الرسالة.',
   'whatsapp.platformBot.askTaxIdMulti': 'مرحبًا! حفاظًا على أمانك، وقبل إرسال أي بيانات فوترة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'للمتابعة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك. ويمكنك كتابة *atendente* للتحدث مع فريقنا.',
-  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.'
+  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.',
+  'auth.passwordTooCommon': 'كلمة المرور هذه شائعة جدًا ويسهل تخمينها. اختر كلمة أخرى.',
+  'auth.passwordMatchesIdentity': 'لا يمكن أن تكون كلمة المرور مطابقة لاسم المستخدم أو البريد الإلكتروني.'
 };

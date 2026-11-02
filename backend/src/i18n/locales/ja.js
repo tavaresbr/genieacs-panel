@@ -32,7 +32,7 @@ export default {
   'auth.setupStatusFailed': 'セットアップの状態を取得できませんでした',
   'auth.setupAlreadyCompleted': 'セットアップは完了しています',
   'auth.usernameLength': 'ユーザー名は 3〜64 文字で入力してください',
-  'auth.passwordLength': 'パスワードは 8〜128 文字で入力してください',
+  'auth.passwordLength': 'パスワードは 10〜128 文字で入力してください',
   'auth.adminCreated': 'オーナーアカウントを作成しました',
   'auth.usernameTaken': 'このユーザー名はすでに使用されています',
   'auth.adminCreateFailed': '管理者アカウントを作成できませんでした',
@@ -47,7 +47,7 @@ export default {
   'auth.currentUsernameIncorrect': '現在のユーザー名が正しくありません',
   'auth.usernameUpdated': 'ユーザー名を更新しました',
   'auth.passwordChangeRequired': '現在のパスワードと新しいパスワードが必要です',
-  'auth.newPasswordLength': '新しいパスワードは 8〜128 文字で入力してください',
+  'auth.newPasswordLength': '新しいパスワードは 10〜128 文字で入力してください',
   'auth.currentPasswordIncorrect': '現在のパスワードが正しくありません',
   'auth.mfaRequired': '認証アプリのコードを入力してください',
   'auth.mfaInvalid': 'コードが無効です',
@@ -1043,7 +1043,7 @@ export default {
   'tenant.nameInvalid': 'プロバイダー名は1〜128文字で入力してください',
   'auth.signupCreated': 'プロバイダーを作成しました。専用アドレスからサインインしてください。',
   'auth.signupFailed': 'プロバイダーを作成できませんでした',
-  'auth.signupInvalid': 'プロバイダー名、ユーザー名（3〜64文字）、パスワード（8〜128文字）が必要です',
+  'auth.signupInvalid': 'プロバイダー名、ユーザー名（3〜64文字）、パスワード（10〜128文字）が必要です',
   'auth.signupSlugTaken': 'このサブドメインは既に使用されています',
   'auth.signupUsernameTaken': 'このユーザー名は既に使用されています',
   'auth.signupPhoneInvalid': '市外局番付きの WhatsApp 番号を入力してください',
@@ -1384,5 +1384,7 @@ export default {
   'priceChange.cancelNoticeBody': '{provider} 様。{date} に予定していた {plan} プラン（{cycle}）の {old} から {new} への料金改定はキャンセルされました。料金は {old} のままで、これにより変わる請求書はありません。ご不明な点があれば、このメッセージにご返信ください。',
   'whatsapp.platformBot.askTaxIdMulti': 'こんにちは。安全のため、請求データを送る前に、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '続けるには、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。チームと話したい場合は *atendente* と入力してください。',
-  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。'
+  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。',
+  'auth.passwordTooCommon': 'このパスワードは一般的すぎて推測されやすいです。別のパスワードを選んでください。',
+  'auth.passwordMatchesIdentity': 'パスワードをユーザー名やメールアドレスと同じにすることはできません。'
 };

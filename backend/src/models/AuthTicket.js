@@ -140,6 +140,25 @@ class AuthTicket {
   }
 
   /**
+   * Olha um bilhete aberto SEM resgatá-lo: a linha, ou null.
+   *
+   * Existe para a redefinição conferir a senha nova contra o login da conta
+   * antes de gastar o bilhete — uma recusa de regra não pode obrigar a pessoa
+   * a pedir outro e-mail. Os mesmos filtros do `redeem`, e nenhuma escrita; o
+   * resgate continua sendo o `UPDATE` condicional de lá, que é quem decide.
+   */
+  static async peek({ token, purpose, tenantId }) {
+    if (!token) return null;
+    const alvo = { token_hash: AuthTicket.hash(token), purpose };
+    if (tenantId !== null && tenantId !== undefined) alvo.tenant_id = Number(tenantId);
+    return (await getDb()('auth_tickets')
+      .where(alvo)
+      .whereNull('redeemed_at')
+      .where('expires_at', '>', new Date())
+      .first()) || null;
+  }
+
+  /**
    * Apaga o que já não serve: vencido ou usado há mais de um dia.
    *
    * O dia de folga é para a linha gasta continuar visível logo depois do

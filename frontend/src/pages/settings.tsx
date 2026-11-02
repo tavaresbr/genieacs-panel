@@ -69,6 +69,7 @@ import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-pa
 import { IntegrationsHub } from '@/components/settings/integrations-hub'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
 
 /**
  * Mapas em vez de nome de chave montado com template literal.
@@ -891,6 +892,11 @@ export default function Settings() {
       toast.error(t('settings.security.passwordMismatch'))
       return
     }
+    // Só a senha NOVA tem o mínimo; a atual é aceita como estiver.
+    if (passwordForm.newPassword.length < PASSWORD_MIN_LENGTH) {
+      toast.error(t('setup.error.passwordTooShort'))
+      return
+    }
     const res = await authAPI.changePassword(passwordForm.currentPassword, passwordForm.newPassword)
     if (res.success) {
       toast.success(t('settings.security.passwordUpdated'))
@@ -974,7 +980,7 @@ export default function Settings() {
       toast.error(t('settings.operators.usernameLength'))
       return
     }
-    if (operatorForm.password.length < 8 || operatorForm.password.length > 128) {
+    if (operatorForm.password.length < PASSWORD_MIN_LENGTH || operatorForm.password.length > PASSWORD_MAX_LENGTH) {
       toast.error(t('settings.operators.passwordLength'))
       return
     }
@@ -1031,7 +1037,7 @@ export default function Settings() {
   }
 
   const submitOperatorPassword = async (operator: Operator) => {
-    if (resetPasswordValue.length < 8 || resetPasswordValue.length > 128) {
+    if (resetPasswordValue.length < PASSWORD_MIN_LENGTH || resetPasswordValue.length > PASSWORD_MAX_LENGTH) {
       toast.error(t('settings.operators.passwordLength'))
       return
     }

@@ -32,7 +32,7 @@ export default {
   'auth.setupStatusFailed': 'Failed to get the setup status',
   'auth.setupAlreadyCompleted': 'Setup already completed',
   'auth.usernameLength': 'The username must be between 3 and 64 characters',
-  'auth.passwordLength': 'The password must be between 8 and 128 characters',
+  'auth.passwordLength': 'The password must be between 10 and 128 characters',
   'auth.adminCreated': 'Owner account created successfully',
   'auth.usernameTaken': 'That username is already taken',
   'auth.adminCreateFailed': 'Failed to create the administrator account',
@@ -47,7 +47,7 @@ export default {
   'auth.currentUsernameIncorrect': 'The current username is incorrect',
   'auth.usernameUpdated': 'Username updated successfully',
   'auth.passwordChangeRequired': 'The current password and the new password are required',
-  'auth.newPasswordLength': 'The new password must be between 8 and 128 characters',
+  'auth.newPasswordLength': 'The new password must be between 10 and 128 characters',
   'auth.currentPasswordIncorrect': 'The current password is incorrect',
   'auth.mfaRequired': 'Enter the code from your authenticator app',
   'auth.mfaInvalid': 'Invalid code',
@@ -1043,7 +1043,7 @@ export default {
   'tenant.nameInvalid': 'The provider name must be between 1 and 128 characters',
   'auth.signupCreated': 'Provider created. Sign in at its own address.',
   'auth.signupFailed': 'Failed to create the provider',
-  'auth.signupInvalid': 'Provider name, username (3–64) and password (8–128) are required',
+  'auth.signupInvalid': 'Provider name, username (3–64) and password (10–128) are required',
   'auth.signupSlugTaken': 'This subdomain is already taken',
   'auth.signupUsernameTaken': 'This username is already taken',
   'auth.signupPhoneInvalid': 'Enter a WhatsApp number with area code',
@@ -1384,5 +1384,7 @@ export default {
   'priceChange.cancelNoticeBody': 'Hello, {provider}. The price change of the {plan} plan ({cycle}) from {old} to {new}, planned for {date}, has been canceled. The price stays at {old}, and no invoice changes because of it. If you have any questions, just reply to this message.',
   'whatsapp.platformBot.askTaxIdMulti': 'Hello! For your security, before sending any billing data, please enter the last 5 digits of your provider\'s billing CNPJ or CPF.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'To continue, enter the last 5 digits of your provider\'s billing CNPJ or CPF. If you prefer, type *atendente* to talk to our team.',
-  'whatsapp.platformBot.noTaxIdMulti': 'There is no billing CNPJ or CPF registered for the providers of this number, so I cannot confirm your identity here. I will pass your conversation on to our team.'
+  'whatsapp.platformBot.noTaxIdMulti': 'There is no billing CNPJ or CPF registered for the providers of this number, so I cannot confirm your identity here. I will pass your conversation on to our team.',
+  'auth.passwordTooCommon': 'This password is too common and easy to guess. Choose another one.',
+  'auth.passwordMatchesIdentity': 'The password cannot be the same as your username or e-mail.'
 };

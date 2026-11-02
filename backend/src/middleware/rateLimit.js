@@ -655,3 +655,31 @@ export const publicNpsLimiter = limiter({
   keyGenerator: ipKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
+
+/**
+ * `POST /api/auth/change-password`: a senha atual pedida aqui é um oráculo na
+ * mão de quem tem só o token (sessão roubada, computador destravado). A trava
+ * por conta (`AccountLockout`) já para os palpites em dez; este balde, por
+ * pessoa e montado DEPOIS da sessão, é o teto de custo — cada chamada roda um
+ * bcrypt — e o que sobra se a trava um dia for afrouxada. Vinte por quarto de
+ * hora fica acima da trava de propósito: quem esbarra nela recebe a resposta
+ * da trava, que diz o que fazer, e não um 429 genérico.
+ */
+export const passwordChangeLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.attempts', 'rate_limited')
+});
+
+/**
+ * `POST /api/auth/change-username`: troca o identificador de login e responde
+ * 409 quando o nome já existe em QUALQUER provedor — o mesmo oráculo do
+ * `emailChangeLimiter`, e o mesmo remédio, só que por pessoa.
+ */
+export const usernameChangeLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});

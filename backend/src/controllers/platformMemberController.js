@@ -24,6 +24,7 @@ import {
   sendPasswordSetup
 } from '../services/inviteDelivery.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import { newPasswordProblem, PASSWORD_PROBLEM_TEXT_EN } from '../utils/passwordPolicy.js';
 
 /**
  * Who works for a provider, decided from the control plane.
@@ -377,9 +378,12 @@ class PlatformMemberController {
           createErrorResponse(`Role must be one of: ${ROLES.join(', ')}`)
         );
       }
-      if (mandouSenha && (password.length < 8 || password.length > 128)) {
+      // A regra da senha nova (ver `utils/passwordPolicy.js`), em inglês fixo
+      // como o resto das respostas do console.
+      const senhaRuim = mandouSenha ? newPasswordProblem(password, { username, email }) : null;
+      if (senhaRuim) {
         return res.status(400).json(
-          createErrorResponse('Password must be between 8 and 128 characters')
+          createErrorResponse(PASSWORD_PROBLEM_TEXT_EN[senhaRuim.code], null, senhaRuim.code)
         );
       }
 
@@ -853,8 +857,12 @@ class PlatformMemberController {
       const password = req.body?.password === undefined || req.body?.password === null
         ? ''
         : String(req.body.password);
-      if (password.length < 8 || password.length > 128) {
-        return res.status(400).json(createErrorResponse('Password must be between 8 and 128 characters'));
+      const senhaRuim = newPasswordProblem(password, {
+        username: alvo.person?.username,
+        email: alvo.person?.email
+      });
+      if (senhaRuim) {
+        return res.status(400).json(createErrorResponse(PASSWORD_PROBLEM_TEXT_EN[senhaRuim.code], null, senhaRuim.code));
       }
       await User.updatePassword(alvo.userId, await bcrypt.hash(password, BCRYPT_ROUNDS));
       await recordMemberAction(

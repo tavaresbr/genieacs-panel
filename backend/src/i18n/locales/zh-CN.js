@@ -32,7 +32,7 @@ export default {
   'auth.setupStatusFailed': '无法获取配置状态',
   'auth.setupAlreadyCompleted': '配置已完成',
   'auth.usernameLength': '用户名需为 3 至 64 个字符',
-  'auth.passwordLength': '密码需为 8 至 128 个字符',
+  'auth.passwordLength': '密码需为 10 至 128 个字符',
   'auth.adminCreated': '所有者账号已创建',
   'auth.usernameTaken': '该用户名已被占用',
   'auth.adminCreateFailed': '无法创建管理员账号',
@@ -47,7 +47,7 @@ export default {
   'auth.currentUsernameIncorrect': '当前用户名不正确',
   'auth.usernameUpdated': '用户名已更新',
   'auth.passwordChangeRequired': '需要填写当前密码和新密码',
-  'auth.newPasswordLength': '新密码需为 8 至 128 个字符',
+  'auth.newPasswordLength': '新密码需为 10 至 128 个字符',
   'auth.currentPasswordIncorrect': '当前密码不正确',
   'auth.mfaRequired': '请输入身份验证器应用中的代码',
   'auth.mfaInvalid': '代码无效',
@@ -1043,7 +1043,7 @@ export default {
   'tenant.nameInvalid': '运营商名称长度须为 1 到 128 个字符',
   'auth.signupCreated': '运营商已创建。请在其专属地址登录。',
   'auth.signupFailed': '无法创建运营商',
-  'auth.signupInvalid': '需要运营商名称、用户名（3–64）和密码（8–128）',
+  'auth.signupInvalid': '需要运营商名称、用户名（3–64）和密码（10–128）',
   'auth.signupSlugTaken': '该子域名已被占用',
   'auth.signupUsernameTaken': '该用户名已被占用',
   'auth.signupPhoneInvalid': '请输入带区号的 WhatsApp 号码',
@@ -1384,5 +1384,7 @@ export default {
   'priceChange.cancelNoticeBody': '{provider}，您好。原定于 {date} 生效的 {plan} 套餐（{cycle}）从 {old} 调整为 {new} 的调价已取消。价格仍为 {old}，不会因此更改任何账单。如有疑问，直接回复此消息即可。',
   'whatsapp.platformBot.askTaxIdMulti': '您好！为了您的安全，在发送账单信息之前，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '如需继续，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。您也可以输入 *atendente* 与我们的团队沟通。',
-  'whatsapp.platformBot.noTaxIdMulti': '此号码关联的服务商都没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。'
+  'whatsapp.platformBot.noTaxIdMulti': '此号码关联的服务商都没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。',
+  'auth.passwordTooCommon': '该密码过于常见，容易被猜到。请换一个。',
+  'auth.passwordMatchesIdentity': '密码不能与用户名或电子邮件相同。'
 };

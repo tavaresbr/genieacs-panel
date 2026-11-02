@@ -30,7 +30,7 @@ export default {
   'auth.setupStatusFailed': 'सेटअप स्थिति प्राप्त नहीं हो सकी',
   'auth.setupAlreadyCompleted': 'सेटअप पहले ही पूरा हो चुका है',
   'auth.usernameLength': 'उपयोगकर्ता नाम 3 से 64 अक्षरों के बीच होना चाहिए',
-  'auth.passwordLength': 'पासवर्ड 8 से 128 अक्षरों के बीच होना चाहिए',
+  'auth.passwordLength': 'पासवर्ड 10 से 128 अक्षरों के बीच होना चाहिए',
   'auth.adminCreated': 'स्वामी खाता बन गया',
   'auth.usernameTaken': 'यह उपयोगकर्ता नाम पहले से लिया जा चुका है',
   'auth.adminCreateFailed': 'प्रशासक खाता नहीं बनाया जा सका',
@@ -45,7 +45,7 @@ export default {
   'auth.currentUsernameIncorrect': 'मौजूदा उपयोगकर्ता नाम ग़लत है',
   'auth.usernameUpdated': 'उपयोगकर्ता नाम अपडेट हो गया',
   'auth.passwordChangeRequired': 'मौजूदा और नया पासवर्ड आवश्यक हैं',
-  'auth.newPasswordLength': 'नया पासवर्ड 8 से 128 अक्षरों के बीच होना चाहिए',
+  'auth.newPasswordLength': 'नया पासवर्ड 10 से 128 अक्षरों के बीच होना चाहिए',
   'auth.currentPasswordIncorrect': 'मौजूदा पासवर्ड ग़लत है',
   'auth.mfaRequired': 'ऑथेंटिकेटर ऐप का कोड दर्ज करें',
   'auth.mfaInvalid': 'अमान्य कोड',
@@ -968,7 +968,7 @@ export default {
   'users.deleteFailed': 'ऑपरेटर नहीं हटाया जा सका',
   'auth.signupCreated': 'प्रदाता बन गया। उसके अपने पते पर साइन इन करें।',
   'auth.signupFailed': 'प्रदाता नहीं बनाया जा सका',
-  'auth.signupInvalid': 'प्रदाता का नाम, उपयोगकर्ता नाम (3–64) और पासवर्ड (8–128) आवश्यक हैं',
+  'auth.signupInvalid': 'प्रदाता का नाम, उपयोगकर्ता नाम (3–64) और पासवर्ड (10–128) आवश्यक हैं',
   'auth.signupSlugTaken': 'यह सबडोमेन पहले से लिया जा चुका है',
   'auth.signupUsernameTaken': 'यह उपयोगकर्ता नाम पहले से लिया जा चुका है',
   'auth.signupPhoneInvalid': 'एरिया कोड के साथ WhatsApp नंबर दर्ज करें',
@@ -1384,5 +1384,7 @@ export default {
   'priceChange.cancelNoticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का {old} से {new} वाला मूल्य समायोजन, जो {date} से लागू होना था, रद्द कर दिया गया है। कीमत {old} ही रहेगी, और इसकी वजह से कोई इनवॉइस नहीं बदलेगा। कोई सवाल हो तो बस इस संदेश का जवाब दें।',
   'whatsapp.platformBot.askTaxIdMulti': 'नमस्ते! आपकी सुरक्षा के लिए, बिलिंग डेटा भेजने से पहले अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें।',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'जारी रखने के लिए अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें। चाहें तो हमारी टीम से बात करने के लिए *atendente* लिखें।',
-  'whatsapp.platformBot.noTaxIdMulti': 'इस नंबर के प्रदाताओं के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।'
+  'whatsapp.platformBot.noTaxIdMulti': 'इस नंबर के प्रदाताओं के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।',
+  'auth.passwordTooCommon': 'यह पासवर्ड बहुत आम है और आसानी से अनुमान लगाया जा सकता है। कोई दूसरा चुनें।',
+  'auth.passwordMatchesIdentity': 'पासवर्ड आपके उपयोगकर्ता नाम या ईमेल के समान नहीं हो सकता।'
 };
