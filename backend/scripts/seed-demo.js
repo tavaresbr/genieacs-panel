@@ -23,6 +23,12 @@ import 'dotenv/config';
  *     provedor em que o e2e aplica a troca de plano pelo console sem nenhuma
  *     chamada ao gateway;
  * - um alerta da plataforma que falhou (o "Reenviar" do histórico);
+ * - duas respostas da pesquisa de satisfação (0123) — a Beta detratora, a
+ *   Delta promotora —, para a seção "Satisfação" da aba Receita ter o que
+ *   mostrar; e, SÓ no banco de teste (`APP_ENV=test`), uma pesquisa pendente
+ *   da Alfa com um token cru conhecido (`E2E_NPS_TOKEN`), que o e2e abre em
+ *   `/nps#<token>`. Num banco de desenvolvimento o token conhecido não entra:
+ *   quem o lesse aqui responderia a pesquisa;
  * - a caixa da plataforma, sem membros (é onde o perfil da plataforma grava).
  *
  * As cobranças com id no gateway pressupõem um Asaas — de verdade não, que
@@ -66,12 +72,21 @@ const { default: User } = await import('../src/models/User.js');
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: OnboardingService } = await import('../src/services/onboardingService.js');
 const { default: ChargeIssuingService } = await import('../src/services/chargeIssuingService.js');
+const { default: crypto } = await import('node:crypto');
 
 const DIA = 24 * 60 * 60 * 1000;
 /** Instantes ao segundo: o MySQL arredonda os milissegundos. */
 const aoSegundo = (ms) => new Date(Math.floor(ms / 1000) * 1000);
 const daqui = (dias) => aoSegundo(Date.now() + dias * DIA);
 const dia = (instante) => ChargeIssuingService.isoDate(instante);
+
+/**
+ * O token cru da pesquisa pendente da Alfa, só com `APP_ENV=test` — o mesmo
+ * de `frontend/e2e/support/demo.ts`. O banco guarda o sha256, como guarda o
+ * de toda pesquisa (`NpsService.hashToken`).
+ */
+const E2E_NPS_TOKEN = 'seed-demo-e2e-nps-alfa-fibra-pendente-0001';
+const sha256 = (texto) => crypto.createHash('sha256').update(texto).digest('hex');
 
 const DEMO_PLANS = Object.freeze([
   {
@@ -259,6 +274,26 @@ async function historicoPago(tenantId, { renovaEm, meses, valor, planId, prefixo
 }
 
 /**
+ * Uma linha da pesquisa de satisfação, só se o hash do token ainda não existe.
+ * Os tokens das respondidas são fixos também: a chave natural da linha é ele.
+ */
+async function garantirPesquisa(tenantId, { raw, ...row }) {
+  return runInTenant(tenantId, async () => {
+    const db = getDb();
+    const hash = sha256(raw);
+    // tenant-scope-exempt: por id do provedor explícito, dentro do escopo dele.
+    if (await db('platform_nps').where({ tenant_id: tenantId, token_hash: hash }).first()) return;
+    await tinsertReturningId('platform_nps', {
+      wave: 'manual',
+      wave_key: null,
+      channel: 'email,whatsapp',
+      token_hash: hash,
+      ...row
+    });
+  });
+}
+
+/**
  * A caixa da plataforma (`kind = 'platform'`), como `create-platform-tenant.js`
  * a cria — sem vincular ninguém: com o admin como membro de dois provedores, o
  * login perguntaria para onde ir. É nela que o perfil da plataforma (Dados do
@@ -408,6 +443,30 @@ async function main() {
       created_at: daqui(-1)
     });
   });
+
+  // A pesquisa de satisfação: a Beta (vencida) detratora — em risco —, a
+  // Delta promotora. E a pendente da Alfa com o token conhecido, só no teste.
+  await garantirPesquisa(beta.tenant.id, {
+    raw: 'seed-demo-nps-beta-net-respondida-0001',
+    status: 'answered',
+    score: 4,
+    comment: 'Demonstração: o boleto chegou tarde e o suporte demorou.',
+    answer_channel: 'link',
+    asked_at: daqui(-12),
+    answered_at: daqui(-11)
+  });
+  await garantirPesquisa(delta.tenant.id, {
+    raw: 'seed-demo-nps-delta-link-respondida-0001',
+    status: 'answered',
+    score: 10,
+    comment: 'Demonstração: a troca de plano foi simples.',
+    answer_channel: 'whatsapp',
+    asked_at: daqui(-6),
+    answered_at: daqui(-6)
+  });
+  if (process.env.APP_ENV === 'test') {
+    await garantirPesquisa(alfa.tenant.id, { raw: E2E_NPS_TOKEN, status: 'pending', asked_at: daqui(-1) });
+  }
 
   console.log('Demo data ready:');
   for (const spec of DEMO_PROVIDERS) {

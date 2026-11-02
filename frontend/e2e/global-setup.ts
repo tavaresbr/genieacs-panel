@@ -22,7 +22,9 @@ import {
  *    livre, servindo o `dist` — com `support/allow-fake-asaas.mjs`
  *    pré-carregado;
  * 4. `POST /api/auth/setup`, que cria quem opera a plataforma;
- * 5. `backend/scripts/seed-demo.js`, com o mesmo ambiente do backend;
+ * 5. `backend/scripts/seed-demo.js`, com o mesmo ambiente do backend — e o
+ *    token do link do recibo da Alfa, cunhado pelo `receiptLinkToken.js` do
+ *    backend com o mesmo `JWT_SECRET` (`E2E_RECEIPT_TOKEN`);
  * 6. o login das duas contas pela tela, guardado em `e2e/.auth/` para os
  *    cenários que começam já dentro.
  *
@@ -37,6 +39,24 @@ declare global {
 }
 
 const SECRET = () => crypto.randomBytes(32).toString('hex')
+
+/** Cunha o token do recibo da última cobrança paga da Alfa e o imprime. */
+const RECEIPT_TOKEN_SCRIPT = `
+const { getDb, closePool } = await import('./src/config/database.js');
+const { runUnscoped } = await import('./src/config/tenantContext.js');
+const { signReceiptToken } = await import('./src/utils/receiptLinkToken.js');
+try {
+  const token = await runUnscoped('the e2e setup mints the receipt link of the demo provider', async () => {
+    const tenant = await getDb()('tenants').where({ slug: 'alfa-fibra' }).first();
+    const paga = await getDb()('billing_charges').where({ tenant_id: tenant.id, status: 'paid' })
+      .orderBy('period_end', 'desc').first();
+    return signReceiptToken({ tenantId: tenant.id, chargeId: paga.id });
+  });
+  console.log(token);
+} finally {
+  await closePool();
+}
+`
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -172,8 +192,20 @@ export default async function globalSetup(_config: FullConfig) {
   fs.appendFileSync(log, `\n--- seed-demo ---\n${seed.stdout}${seed.stderr}\n`)
   if (seed.status !== 0) throw new Error(`seed-demo failed:\n${seed.stdout}${seed.stderr}`)
 
+  // O link do recibo que o bot mandaria à Alfa: a última cobrança paga dela,
+  // assinada pelo util do backend — num processo à parte, com o ambiente do
+  // backend (o mesmo `JWT_SECRET` e o mesmo `DATA_DIR`).
+  const cunhar = spawnSync(process.execPath, ['--input-type=module', '-e', RECEIPT_TOKEN_SCRIPT], {
+    cwd: BACKEND_DIR, env, encoding: 'utf8'
+  })
+  const receiptToken = cunhar.stdout.trim().split('\n').pop() ?? ''
+  if (cunhar.status !== 0 || !receiptToken) {
+    throw new Error(`could not mint the receipt token:\n${cunhar.stdout}${cunhar.stderr}`)
+  }
+
   // Os cenários (e o `baseURL` do config, relido em cada worker) leem daqui.
   process.env.E2E_BASE_URL = baseURL
+  process.env.E2E_RECEIPT_TOKEN = receiptToken
 
   const browser = await chromium.launch(launchOptions())
   try {
