@@ -499,7 +499,7 @@ export default {
   'sgp.error.identifierRequired': '請輸入證號、合約或 PPPoE 帳號以查詢 SGP',
   'sgp.error.contractRequired': '需要提供 SGP 合約',
   'sgp.error.unlockRefused': 'SGP 拒絕了此合約的信任解鎖',
-  'sgp.error.contractNotInConversation': '此合約不屬於該對話',
+  'sgp.error.contractNotInConversation': "此合約尚未關聯到該對話，請先關聯。",
   'sgp.error.deviceUnlinked': '該 ONT 尚未連結任何 SGP 合約。請手動連結，或確認 PPPoE 帳號。',
   'sgp.error.loginRequested': '該 ONT 尚未向 GenieACS 回報 PPPoE 帳號。已要求讀取，將隨下一次 Inform 送達；請幾分鐘後重試，或依 CPF/合約手動連結。',
   'sgp.error.loginNotReported': '該 ONT 不透過 TR-069 回報 PPPoE 帳號（OLT 透過 OMCI 設定 WAN 時常見）。請依 CPF/合約手動連結。',

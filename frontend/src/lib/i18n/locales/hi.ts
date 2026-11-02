@@ -2670,6 +2670,7 @@ const hi: Dictionary = {
   'whatsapp.sgp.documentPlaceholder': "CPF, CNPJ या अनुबंध संख्या",
   'whatsapp.sgp.search': 'खोजें',
   'whatsapp.sgp.bind': 'अनुबंध {contract} को इस बातचीत से जोड़ें',
+  'whatsapp.sgp.bindFirst': "यह अनुबंध अभी इस बातचीत से जुड़ा नहीं है। बिल भेजने, अनलॉक करने या टिकट खोलने के लिए इसे लिंक करें।",
   'whatsapp.sgp.bound': 'बातचीत अनुबंध {contract} से जुड़ गई',
   'whatsapp.sgp.router': 'राउटर एक्सेस',
   'whatsapp.sgp.routerUnlinked': 'इस अनुबंध से कोई ONT जुड़ा नहीं है।',

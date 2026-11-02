@@ -2690,6 +2690,7 @@ const es: Dictionary = {
   'whatsapp.sgp.documentPlaceholder': "CPF, CNPJ o n.º de contrato",
   'whatsapp.sgp.search': 'Buscar',
   'whatsapp.sgp.bind': 'Vincular el contrato {contract} a esta conversación',
+  'whatsapp.sgp.bindFirst': "Este contrato aún no está vinculado a esta conversación. Vincúlelo para enviar factura, liberar o abrir un ticket.",
   'whatsapp.sgp.bound': 'Conversación vinculada al contrato {contract}',
   'whatsapp.sgp.router': 'Acceso al router',
   'whatsapp.sgp.routerUnlinked': 'Ninguna ONT vinculada a este contrato.',

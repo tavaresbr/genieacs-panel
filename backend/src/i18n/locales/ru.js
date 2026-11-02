@@ -500,7 +500,7 @@ export default {
   'sgp.error.identifierRequired': 'Для запроса в SGP укажите документ, договор или логин PPPoE',
   'sgp.error.contractRequired': 'Требуется договор SGP',
   'sgp.error.unlockRefused': 'SGP отклонил доверительную разблокировку этого договора',
-  'sgp.error.contractNotInConversation': 'Этот договор не относится к этому диалогу',
+  'sgp.error.contractNotInConversation': "Этот договор ещё не привязан к диалогу. Сначала привяжите его.",
   'sgp.error.deviceUnlinked': 'Этот ONT ещё не привязан к договору SGP. Привяжите его вручную или проверьте логин PPPoE.',
   'sgp.error.loginRequested': 'ONT ещё не сообщил GenieACS логин PPPoE. Чтение запрошено и придёт со следующим Inform; повторите через несколько минут или привяжите вручную по CPF/договору.',
   'sgp.error.loginNotReported': 'ONT не сообщает логин PPPoE по TR-069 (часто, когда WAN настраивается OLT через OMCI). Привяжите вручную по CPF/договору.',

@@ -499,7 +499,7 @@ export default {
   'sgp.error.identifierRequired': 'SGP に照会するには、証明書番号、契約、PPPoE ログインのいずれかを入力してください',
   'sgp.error.contractRequired': 'SGP の契約が必要です',
   'sgp.error.unlockRefused': 'SGPがこの契約の信頼解除を拒否しました',
-  'sgp.error.contractNotInConversation': 'この契約はこの会話に属していません',
+  'sgp.error.contractNotInConversation': "この契約はまだこの会話に関連付けられていません。先に関連付けてください。",
   'sgp.error.deviceUnlinked': 'この ONT にはまだ SGP の契約が紐づいていません。手動で紐づけるか、PPPoE ログインを確認してください。',
   'sgp.error.loginRequested': 'ONT はまだ GenieACS に PPPoE ログインを報告していません。読み取りを要求しました。次の Inform で届きます。数分後に再試行するか、CPF/契約で手動で紐づけてください。',
   'sgp.error.loginNotReported': 'ONT は TR-069 で PPPoE ログインを報告しません（OLT が OMCI で WAN を設定している場合によくあります）。CPF/契約で手動で紐づけてください。',

@@ -2690,6 +2690,7 @@ const zhTW: Dictionary = {
   'whatsapp.sgp.documentPlaceholder': "CPF、CNPJ 或合約號",
   'whatsapp.sgp.search': '搜尋',
   'whatsapp.sgp.bind': '將合約 {contract} 連結到此對話',
+  'whatsapp.sgp.bindFirst': "此合約尚未關聯到該對話。請先關聯，才能傳送帳單、解除限制或建立工單。",
   'whatsapp.sgp.bound': '對話已連結到合約 {contract}',
   'whatsapp.sgp.router': '路由器存取',
   'whatsapp.sgp.routerUnlinked': '此合約未連結任何 ONT。',

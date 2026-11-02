@@ -3280,6 +3280,7 @@ const fr: Dictionary = {
   'whatsapp.sgp.documentPlaceholder': "CPF, CNPJ ou n° de contrat",
   'whatsapp.sgp.search': 'Rechercher',
   'whatsapp.sgp.bind': 'Lier le contrat {contract} à cette conversation',
+  'whatsapp.sgp.bindFirst': "Ce contrat n'est pas encore lié à cette conversation. Liez-le pour envoyer une facture, débloquer ou ouvrir un ticket.",
   'whatsapp.sgp.bound': 'Conversation liée au contrat {contract}',
   'whatsapp.sgp.router': 'Accès au routeur',
   'whatsapp.sgp.routerUnlinked': 'Aucune ONT n\'est liée à ce contrat.',

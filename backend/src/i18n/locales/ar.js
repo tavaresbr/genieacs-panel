@@ -500,7 +500,7 @@ export default {
   'sgp.error.identifierRequired': 'أدخل رقم مستند أو عقد أو اسم دخول PPPoE للاستعلام من SGP',
   'sgp.error.contractRequired': 'عقد SGP مطلوب',
   'sgp.error.unlockRefused': 'رفض SGP فك الحظر بالثقة لهذا العقد',
-  'sgp.error.contractNotInConversation': 'هذا العقد لا يخص هذه المحادثة',
+  'sgp.error.contractNotInConversation': "هذا العقد غير مرتبط بهذه المحادثة بعد. اربطه أولًا.",
   'sgp.error.deviceUnlinked': 'هذا الجهاز غير مرتبط بعقد في SGP بعد. اربطه يدويًا أو تحقّق من اسم دخول PPPoE.',
   'sgp.error.loginRequested': 'لم يُبلغ جهاز ONT خادم GenieACS باسم دخول PPPoE بعد. طُلبت القراءة وستصل مع رسالة Inform التالية؛ أعد المحاولة بعد دقائق أو اربطه يدويًا عبر CPF/العقد.',
   'sgp.error.loginNotReported': 'لا يُبلغ جهاز ONT عن اسم دخول PPPoE عبر TR-069 (شائع عندما يهيّئ OLT واجهة WAN عبر OMCI). اربطه يدويًا عبر CPF/العقد.',

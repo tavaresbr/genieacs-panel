@@ -501,7 +501,7 @@ export default {
   'sgp.error.identifierRequired': 'SGP를 조회하려면 증서 번호, 계약 또는 PPPoE 로그인을 입력하십시오',
   'sgp.error.contractRequired': 'SGP 계약이 필요합니다',
   'sgp.error.unlockRefused': 'SGP가 이 계약의 신뢰 해제를 거부했습니다',
-  'sgp.error.contractNotInConversation': '이 계약은 이 대화에 속하지 않습니다',
+  'sgp.error.contractNotInConversation': "이 계약은 아직 이 대화에 연결되지 않았습니다. 먼저 연결하세요.",
   'sgp.error.deviceUnlinked': '이 ONT에는 아직 SGP 계약이 연결되지 않았습니다. 수동으로 연결하거나 PPPoE 로그인을 확인하십시오.',
   'sgp.error.loginRequested': 'ONT가 아직 GenieACS에 PPPoE 로그인을 보고하지 않았습니다. 읽기를 요청했으며 다음 Inform과 함께 도착합니다. 몇 분 후 다시 시도하거나 CPF/계약으로 수동 연결하십시오.',
   'sgp.error.loginNotReported': 'ONT가 TR-069로 PPPoE 로그인을 보고하지 않습니다(OLT가 OMCI로 WAN을 구성할 때 흔함). CPF/계약으로 수동 연결하십시오.',

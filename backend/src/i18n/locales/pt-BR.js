@@ -497,7 +497,7 @@ export default {
   'sgp.error.identifierRequired': 'Informe CPF/CNPJ, contrato ou login PPPoE para consultar o SGP',
   'sgp.error.contractRequired': 'Contrato do SGP é obrigatório',
   'sgp.error.unlockRefused': 'O SGP recusou a liberação em confiança deste contrato',
-  'sgp.error.contractNotInConversation': 'Este contrato não pertence a esta conversa',
+  'sgp.error.contractNotInConversation': "Este contrato ainda não está vinculado a esta conversa. Vincule-o primeiro.",
   'sgp.error.deviceUnlinked': 'Este ONT ainda não tem contrato do SGP vinculado. Faça o vínculo manual ou verifique o login PPPoE.',
   'sgp.error.loginRequested': 'A ONT ainda não informou o login PPPoE ao GenieACS. A leitura foi solicitada e chega no próximo Inform; tente de novo em alguns minutos ou faça o vínculo manual por CPF/contrato.',
   'sgp.error.loginNotReported': 'A ONT não informa o login PPPoE pelo TR-069 (comum quando a WAN é configurada pela OLT via OMCI). Faça o vínculo manual por CPF/contrato.',
