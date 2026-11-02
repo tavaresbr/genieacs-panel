@@ -6,6 +6,8 @@ import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
 import SgpContactSyncService from './sgpContactSyncService.js';
 import TeiahService from './teiahService.js';
+import AsaasProviderService from './asaasProviderService.js';
+import AsaasImportService from './asaasImportService.js';
 import TeiahExportService from './teiahExportService.js';
 import WaDunningService from './waDunningService.js';
 import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
@@ -431,6 +433,24 @@ class SchedulerService {
     ) {
       summary.provisioning = await ProvisioningService.processDue({});
       await this.writeState({ lastProvisioningAt: new Date().toISOString() });
+    }
+
+    // Os clientes e as cobranças da conta Asaas do provedor. Mesma forma da
+    // sincronização de contatos do SGP: o relógio anda ANTES da passada, que
+    // segue no fundo, e o bloqueio do próprio serviço recusa a sobreposição com
+    // o botão das Configurações.
+    const asaasConfig = await AsaasProviderService.getConfig();
+    if (
+      AsaasProviderService.isReady(asaasConfig)
+      && asaasConfig.syncEnabled
+      && (asaasConfig.importCustomers || asaasConfig.importCharges)
+      && this.due(state.lastAsaasImportAt, asaasConfig.syncIntervalHours * 3_600_000)
+    ) {
+      await this.writeState({ lastAsaasImportAt: new Date().toISOString() });
+      summary.asaasImport = 'started';
+      void AsaasImportService.syncAll().catch((error) => {
+        console.warn(`Asaas import failed: ${error.code || error.message}`);
+      });
     }
 
     const sgpConfig = await SgpService.getConfig();

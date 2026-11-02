@@ -68,6 +68,11 @@ export const SCOPED_TABLES = new Set([
   // O que a TeiaH respondeu sobre um documento, guardado para não consultar de
   // novo. Dado de titular, e de um provedor só.
   'teiah_consultations',
+  // Os clientes e as cobranças da conta Asaas do provedor, importados: nome,
+  // CPF/CNPJ, telefone, e-mail, endereço e o que cada um deve. Dado de
+  // assinante, de um provedor só.
+  'asaas_customers',
+  'asaas_charges',
   // A régua de cobrança automática: contrato, telefone e valor devido de cada
   // assinante cobrado, e quando pagou. Dado de assinante, de um provedor só.
   'wa_dunning_sends',

@@ -2688,6 +2688,94 @@ const INITIAL_TABLES = [
 ];
 
 /**
+ * Os clientes da conta Asaas DO PROVEDOR (0124), importados para o painel.
+ *
+ * Tabela própria, e não linhas em `sgp_contacts`: aquela é chaveada por contrato
+ * e por cliente do SGP, e tudo que a conversa do WhatsApp, a ficha e o vínculo
+ * com a ONT pendura nela depende dessas duas chaves. O Asaas não tem contrato,
+ * então o encontro entre as duas fontes é pelo CPF/CNPJ (`document`, só dígitos)
+ * — e é uma leitura, não uma fusão: nada aqui reescreve o cadastro do SGP.
+ *
+ *   asaas_id            o `cus_…` do gateway; único por provedor.
+ *   document            CPF/CNPJ só com dígitos; nulo quando o cliente não tem.
+ *   phone_e164          o celular (ou o fixo) normalizado, para casar com a conversa.
+ *   deleted             o gateway marca o cliente removido; a linha fica.
+ *   last_seen_at        a última passada que o viu: o que não aparece mais está velho.
+ */
+const asaasCustomersTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('asaas_id', 32).notNullable();
+  t.string('document', 32);
+  t.string('name', 255);
+  t.string('email', 255);
+  t.string('phone', 32);
+  t.string('mobile_phone', 32);
+  t.string('phone_e164', 24);
+  t.string('postal_code', 16);
+  t.string('address', 255);
+  t.string('address_number', 32);
+  t.string('complement', 255);
+  t.string('province', 255);
+  t.string('city', 255);
+  t.string('state', 8);
+  t.string('external_reference', 128);
+  t.boolean('deleted').notNullable().defaultTo(false);
+  t.timestamp('last_seen_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'asaas_id'], 'asaas_customers_asaas_uq');
+  t.index(['tenant_id', 'document'], 'asaas_customers_document_idx');
+  t.index(['tenant_id', 'phone_e164'], 'asaas_customers_phone_idx');
+};
+
+/**
+ * As cobranças da conta Asaas do provedor (0124): as em aberto (`PENDING`,
+ * `OVERDUE`) e o que já foi aberto aqui e depois pago ou cancelado.
+ *
+ * `document` é o CPF/CNPJ do cliente, copiado para a linha: é por ele que o
+ * dossiê do titular e a exclusão alcançam a cobrança, e é por ele que a fatura
+ * do Asaas encontra o assinante do SGP. A linha digitável e o Pix NÃO são
+ * guardados — mudam, expiram e se pedem ao gateway na hora de usar.
+ *
+ *   value_cents   o valor em centavos, o ponto único de conversão das cobranças.
+ *   due_date      o vencimento (`YYYY-MM-DD`).
+ *   last_seen_at  a última passada que a viu aberta.
+ */
+const asaasChargesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('asaas_id', 32).notNullable();
+  t.string('customer_asaas_id', 32);
+  t.string('document', 32);
+  t.string('status', 32);
+  t.string('billing_type', 32);
+  t.bigInteger('value_cents');
+  t.string('due_date', 10);
+  t.string('payment_date', 10);
+  t.string('description', 500);
+  t.string('invoice_url', 512);
+  t.string('bank_slip_url', 512);
+  t.string('invoice_number', 32);
+  t.string('external_reference', 128);
+  t.boolean('deleted').notNullable().defaultTo(false);
+  t.timestamp('last_seen_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'asaas_id'], 'asaas_charges_asaas_uq');
+  t.index(['tenant_id', 'document'], 'asaas_charges_document_idx');
+  t.index(['tenant_id', 'customer_asaas_id'], 'asaas_charges_customer_idx');
+  t.index(['tenant_id', 'status', 'due_date'], 'asaas_charges_status_idx');
+};
+
+const ASAAS_IMPORT_TABLES = [
+  ['asaas_customers', asaasCustomersTable],
+  ['asaas_charges', asaasChargesTable]
+];
+
+/**
  * Os lembretes de cobrança que a plataforma mandou ao provedor — ver
  * `subscriptionNoticeService.js` (migração 0092).
  *
@@ -3201,7 +3289,8 @@ export const SCHEMA_TABLES = [
   ...PLATFORM_ALERT_TABLES,
   ...WA_MARKETING_OPT_OUT_TABLES,
   ...PLAN_PRICE_CHANGE_TABLES,
-  ...PLATFORM_NPS_TABLES
+  ...PLATFORM_NPS_TABLES,
+  ...ASAAS_IMPORT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6835,6 +6924,22 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'platform_nps', platformNpsTable(db));
+    }
+  },
+  {
+    /**
+     * Os clientes e as cobranças da conta Asaas do provedor — ver
+     * `asaasCustomersTable` e `asaasChargesTable`.
+     */
+    id: '0124_asaas_import',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return (await db.schema.hasTable('asaas_customers')) && (await db.schema.hasTable('asaas_charges'));
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'asaas_customers', asaasCustomersTable(db));
+      await createTableIfMissing(db, 'asaas_charges', asaasChargesTable(db));
     }
   }
 ];

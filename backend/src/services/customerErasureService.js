@@ -121,6 +121,8 @@ class CustomerErasureService {
       sgp_links: vinculos.length,
       sgp_contacts: contatos.length,
       sgp_clients: alcance.clientes.length,
+      asaas_customers: alcance.asaasClientes.length,
+      asaas_charges: alcance.asaasCobrancas.length,
       teiah_exports: contratos.length
         ? await contar('teiah_exports', (q) => q.whereIn('contract', contratos))
         : 0,
@@ -278,6 +280,17 @@ class CustomerErasureService {
       }
       if (alcance.documentos.length) {
         await tdb('teiah_consultations', trx).whereIn('document', alcance.documentos).del();
+      }
+
+      // O cliente e as cobranças da conta Asaas do provedor saem inteiros: são
+      // a pessoa e o que ela deve, sem nada que não seja dela. Uma importação
+      // posterior os traz de volta se o cadastro continuar no Asaas, que é onde
+      // o pedido de exclusão tem que ser atendido também.
+      if (alcance.asaasCobrancas.length) {
+        await tdb('asaas_charges', trx).whereIn('id', alcance.asaasCobrancas.map((c) => c.id)).del();
+      }
+      if (alcance.asaasClientes.length) {
+        await tdb('asaas_customers', trx).whereIn('id', alcance.asaasClientes.map((c) => c.id)).del();
       }
 
       // A ficha completa é a pessoa inteira — endereço, nascimento, todos os

@@ -82,6 +82,7 @@ async function semear() {
     'wa_broadcasts', 'whatsapp_accounts', 'sgp_events', 'sgp_links',
     'device_samples', 'device_sample_hours', 'device_swaps',
     'customer_wifi_credentials', 'mapping_edges', 'mapping_nodes',
+    'asaas_charges', 'asaas_customers',
     'audit_log', 'customer_accounts'
   ]) {
     await db(tabela).del();
@@ -109,6 +110,16 @@ async function semear() {
       client_name: `Fulana do ${slug}`,
       login: `pppoe-${slug}`,
       phone_e164: `551199999000${slug === 'meu' ? 1 : 2}`
+    });
+    // A mesma pessoa na conta Asaas do provedor: casa pelo CPF/CNPJ, e a
+    // cobrança leva o documento copiado para a linha.
+    await tinsertReturningId('asaas_customers', {
+      asaas_id: `cus_${slug}`, document: '52998224725', name: `Fulana do ${slug}`,
+      email: `${slug}@exemplo.test`, phone_e164: `551199999000${slug === 'meu' ? 1 : 2}`
+    });
+    await tinsertReturningId('asaas_charges', {
+      asaas_id: `pay_${slug}`, customer_asaas_id: `cus_${slug}`, document: '52998224725',
+      status: 'PENDING', value_cents: 9990, due_date: '2026-11-10'
     });
     await tinsertReturningId('sgp_events', {
       dedupe_key: `evento-${slug}`,
@@ -263,6 +274,22 @@ describe('o que a exclusão destrói', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.data.attachments, 1);
     await assert.rejects(() => fs.access(anexo), 'a foto do assinante continua no disco');
+  });
+});
+
+describe('a conta Asaas do provedor', () => {
+  it('o cliente e as cobranças da mesma pessoa saem, pelo CPF/CNPJ', async () => {
+    assert.ok(await cru('asaas_customers', { tenant_id: meu }), 'o fixture precisa ter o cliente');
+    assert.ok(await cru('asaas_charges', { tenant_id: meu }), 'e a cobrança');
+    assert.equal((await apagar()).status, 200);
+    assert.equal(await cru('asaas_customers', { tenant_id: meu }), undefined);
+    assert.equal(await cru('asaas_charges', { tenant_id: meu }), undefined);
+  });
+
+  it('e o cliente e a cobrança do vizinho, com o mesmo CPF, ficam', async () => {
+    assert.equal((await apagar()).status, 200);
+    assert.ok(await cru('asaas_customers', { tenant_id: vizinho }));
+    assert.ok(await cru('asaas_charges', { tenant_id: vizinho }));
   });
 });
 
