@@ -105,7 +105,10 @@ const RULE_KEYS = Object.freeze({
   wa_ai_no_credit: { firing: 'whatsapp.alerts.aiNoCredit', cleared: null },
   wa_ai_key_rejected: { firing: 'whatsapp.alerts.aiKeyRejected', cleared: null },
   wa_ai_credit_back: { firing: 'whatsapp.alerts.aiCreditBack', cleared: null },
-  wa_ai_daily_summary: { firing: 'whatsapp.alerts.aiDailySummary', cleared: null }
+  wa_ai_daily_summary: { firing: 'whatsapp.alerts.aiDailySummary', cleared: null },
+  sgp_down: { firing: 'whatsapp.alerts.sgpDown', cleared: null },
+  sgp_unauthorized: { firing: 'whatsapp.alerts.sgpUnauthorized', cleared: null },
+  wa_unlock_failed: { firing: 'whatsapp.alerts.unlockFailed', cleared: null }
 });
 
 /**
@@ -947,10 +950,15 @@ class WaAlertService {
    * Onde reconectar: o endereço da aba de WhatsApp das Configurações quando o
    * painel sabe o próprio endereço, ou só o caminho na tela.
    */
-  static async chatbotLink() {
+  /** `": <painel>/settings?tab=<aba>"` ou nada, para fechar a frase do aviso. */
+  static async settingsLink(tab) {
     const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
     const base = panelUrlFor(tenant);
-    return base ? `: ${base}/settings?tab=chatbot` : '';
+    return base ? `: ${base}/settings?tab=${tab}` : '';
+  }
+
+  static async chatbotLink() {
+    return this.settingsLink('chatbot');
   }
 
   static async reconnectLink() {
@@ -1186,12 +1194,26 @@ class WaAlertService {
    *
    * @returns {Promise<number>} cópias enviadas; 0 se dentro do limite ou sem canal
    */
+  static throttleLocks = new Set();
+
   static async notifyThrottled({ stampKey, rule, subject = '', vars = {}, intervalMs = 6 * 3600 * 1000 }) {
+    // Ler e gravar o carimbo são dois passos: sem isto, várias falhas ao mesmo
+    // tempo (um SGP caído derruba dezenas de chamadas juntas) leem o carimbo
+    // antes de qualquer uma gravá-lo e cada uma manda o seu aviso.
+    const trava = `${currentTenantId()}:${stampKey}`;
+    if (this.throttleLocks.has(trava)) return 0;
+    this.throttleLocks.add(trava);
     try {
-      const ultimo = Date.parse((await AppState.get(stampKey)) || '');
-      if (Number.isFinite(ultimo) && Date.now() - ultimo < intervalMs) return 0;
-      await AppState.upsert(stampKey, new Date().toISOString());
-      return await this.notifyEvent({ rule, subject, vars });
+      let liberado = false;
+      try {
+        const ultimo = Date.parse((await AppState.get(stampKey)) || '');
+        if (Number.isFinite(ultimo) && Date.now() - ultimo < intervalMs) return 0;
+        await AppState.upsert(stampKey, new Date().toISOString());
+        liberado = true;
+      } finally {
+        this.throttleLocks.delete(trava);
+      }
+      return liberado ? await this.notifyEvent({ rule, subject, vars }) : 0;
     } catch (error) {
       console.warn(`WhatsApp alert ${rule} not sent: ${error?.message || error}`);
       return 0;

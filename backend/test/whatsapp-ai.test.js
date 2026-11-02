@@ -18,6 +18,7 @@ const { default: WaBotConfigService } = await import('../src/services/waBotConfi
 const { default: WaAiService } = await import('../src/services/waAiService.js');
 const { default: WaBotService } = await import('../src/services/waBotService.js');
 const { default: WaAlertService } = await import('../src/services/waAlertService.js');
+const { default: SgpService } = await import('../src/services/sgpService.js');
 
 /**
  * O atendimento por IA: a IA fala dentro das travas do bot, só sabe da conta
@@ -623,6 +624,64 @@ describe('a IA atendendo', () => {
         await asTenant(() => WaAlertService.aiDailySummary({ now: meioDia }));
         assert.equal(avisos.length, 1, 'uma vez por dia');
       } finally { restaurar(); }
+    });
+  });
+
+  describe('avisos do SGP para a equipe', () => {
+    let original;
+    let avisos;
+    beforeEach(() => {
+      original = WaAlertService.notifyEvent;
+      avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    });
+    const restaurar = () => { WaAlertService.notifyEvent = original; };
+    const esperar = async (condicao) => {
+      for (let i = 0; i < 100 && !condicao(); i += 1) await new Promise((r) => { setTimeout(r, 10); });
+    };
+    const limpar = () => asTenant(() => getDb()('app_state')
+      .whereIn('key', ['sgp_down_alert_at', 'sgp_unauthorized_alert_at', 'wa_unlock_failed_alert_at']).del());
+
+    it('SGP fora do ar / credencial recusada: um aviso por tipo a cada 6 h, sem travar quem chamou', async () => {
+      try {
+        await limpar();
+        await asTenant(async () => {
+          SgpService.avisarFalha('unreachable');
+          SgpService.avisarFalha('timeout');
+          SgpService.avisarFalha('unauthorized');
+        });
+        await esperar(() => avisos.length >= 2);
+        assert.deepEqual(avisos.map((a) => a.rule).sort(), ['sgp_down', 'sgp_unauthorized']);
+        assert.match(WaAlertService.compose({ rule: 'sgp_down', vars: { reason: 'timeout', link: '' } }, false), /SGP/);
+      } finally { restaurar(); }
+    });
+
+    it('desbloqueio que falha por erro do SGP avisa; recusa de regra e rede não', async () => {
+      const guardados = { cfg: WhatsAppConfigService.getConfig, lookup: SgpService.lookupContacts, unlock: SgpService.requestTrustUnlock };
+      try {
+        await limpar();
+        WhatsAppConfigService.getConfig = async () => ({ botUnlockEnabled: true });
+        SgpService.lookupContacts = async () => [{ contract: CONTRACT, blocked: true }];
+        const tentar = async (code) => {
+          SgpService.requestTrustUnlock = async () => { throw Object.assign(new Error(code), { code }); };
+          await asTenant(() => WaBotService.textoLiberacao({ contract: CONTRACT }, { id: 1 })).catch(() => {});
+          await new Promise((r) => { setTimeout(r, 50); });
+        };
+        await tentar('unlock_refused');
+        await tentar('unreachable');
+        assert.equal(avisos.length, 0, 'recusa de regra e rede não geram este aviso');
+        await tentar('http_error');
+        await esperar(() => avisos.length >= 1);
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_unlock_failed');
+        await tentar('sgp_rejected');
+        assert.equal(avisos.length, 1, 'dentro das 6 h não repete');
+      } finally {
+        WhatsAppConfigService.getConfig = guardados.cfg;
+        SgpService.lookupContacts = guardados.lookup;
+        SgpService.requestTrustUnlock = guardados.unlock;
+        restaurar();
+      }
     });
   });
 
