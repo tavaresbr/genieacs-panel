@@ -1,12 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { platformAPI, type Plan } from '@/lib/api'
+import { planPriceChangeAPI, platformAPI, type Plan } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { parseAmountToCents } from '@/lib/utils'
 import { overagePriceFromInput } from '@/lib/overage'
+import { PlanPriceChanges } from '@/components/platform/plan-price-changes'
+import { directPriceEdits, scheduledChangeFor } from '@/lib/price-change'
+import { displayDate } from '@/lib/date-format'
 
 interface Props {
   plans: Plan[]
@@ -228,6 +231,31 @@ export function PlanCatalog({ plans, onChange }: Props) {
       priceYearlyCents: anualCentavos
     }
 
+    // A edição direta do preço (0122) muda o preço de quem já assina a partir
+    // da próxima fatura ainda não emitida, sem aviso. Continua existindo, mas
+    // pede confirmação com quantos provedores ela pega — e aponta para o
+    // reajuste agendado, que avisa antes e escolhe a data.
+    const atual = !criando ? plans.find((p) => p.id === editandoId) : undefined
+    // Com um reajuste agendado para o ciclo, o preço dele não muda à mão (o
+    // servidor recusa com 409): a tela diz por quê antes, e o que fazer.
+    const avisarAgendado = (ciclo: 'monthly' | 'annual', data: string) => toast.error(t('platform.plans.priceChange.directEditBlocked', {
+      cycle: t(ciclo === 'annual' ? 'platform.plans.priceChange.cycleAnnual' : 'platform.plans.priceChange.cycleMonthly').toLowerCase(),
+      date: displayDate(data) ?? data
+    }))
+    if (atual) {
+      for (const [ciclo] of directPriceEdits(atual, precoCentavos, anualCentavos)) {
+        const agendado = scheduledChangeFor(atual, ciclo)
+        if (agendado) { avisarAgendado(ciclo, agendado.effectiveAt); return }
+      }
+      for (const [ciclo, centavos] of directPriceEdits(atual, precoCentavos, anualCentavos)) {
+        const previa = await planPriceChangeAPI.preview(atual.id, ciclo, centavos)
+        const afetados = previa.success && previa.data ? previa.data.preview.affected : (atual.subscribers ?? 0)
+        if (afetados > 0 && !window.confirm(t('platform.plans.priceEditConfirm', {
+          count: afetados, price: dinheiro(centavos, rascunho.currency.trim().toUpperCase() || atual.currency)
+        }))) return
+      }
+    }
+
     setSalvando(true)
     try {
       const res = criando
@@ -237,6 +265,13 @@ export function PlanCatalog({ plans, onChange }: Props) {
         // 409 quando o código já existe, 400 quando um número não serve: o
         // backend diz qual, e isso ajuda mais do que uma frase genérica. O
         // preço anual em uso (0104) tem frase própria, traduzida.
+        if (res.code === 'price_change_scheduled' && atual) {
+          // Agendado por outra aba depois que esta abriu: a mesma frase.
+          const agendado = scheduledChangeFor(atual, 'monthly') ?? scheduledChangeFor(atual, 'annual')
+          if (agendado) { avisarAgendado(agendado.cycle, agendado.effectiveAt); return }
+          toast.error(res.message || t('platform.plans.saveFailed'))
+          return
+        }
         toast.error(res.code === 'plan_has_annual_subscriptions'
           ? t('platform.plans.annualInUse')
           : res.message || t('platform.plans.saveFailed'))
@@ -564,6 +599,8 @@ export function PlanCatalog({ plans, onChange }: Props) {
               </div>
             </div>
             {editandoEste(plan) && formulario}
+            {/* O reajuste de preço com data de vigência (0122). */}
+            <PlanPriceChanges plan={plan} onChange={onChange} />
           </div>
         ))}
       </div>

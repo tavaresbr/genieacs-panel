@@ -14,7 +14,7 @@ import { ALERT_EVENT_LABELS } from '@/lib/platform-alerts'
  * de verdade é o servidor.
  */
 
-export const HISTORY_EVENTS: readonly PlatformAlertHistoryEvent[] = [...PLATFORM_ALERT_EVENTS, 'digest', 'test', 'monthly_report']
+export const HISTORY_EVENTS: readonly PlatformAlertHistoryEvent[] = [...PLATFORM_ALERT_EVENTS, 'digest', 'test', 'monthly_report', 'accounting_export']
 
 export const ALERT_STATUS_LABELS: Record<PlatformAlertStatus, TranslationKey> = {
   pending: 'platform.alertHistory.status.pending',
@@ -35,6 +35,7 @@ export function historyEventLabel(event: PlatformAlertHistoryEvent): Translation
   if (event === 'digest') return 'platform.alertHistory.event.digest'
   if (event === 'test') return 'platform.alertHistory.event.test'
   if (event === 'monthly_report') return 'platform.alertHistory.event.monthlyReport'
+  if (event === 'accounting_export') return 'platform.alertHistory.event.accounting'
   return ALERT_EVENT_LABELS[event]
 }
 

@@ -1,7 +1,8 @@
+import fs from 'node:fs'
 import { expect, test } from '@playwright/test'
 import {
-  ADMIN, ADMIN_STATE, DELINQUENT_PROVIDER, RENEWING_PROVIDER, SUSPENDED_PROVIDER, consoleTabs, loginViaForm,
-  openConsole, shot
+  ADMIN, ADMIN_STATE, DELINQUENT_PROVIDER, RENEWING_PROVIDER, SCREENSHOTS_DIR, SUSPENDED_PROVIDER, consoleTabs,
+  loginViaForm, openConsole, shot
 } from './support/demo'
 
 /**
@@ -238,5 +239,92 @@ test.describe('console', () => {
 
     await busca.fill('nada-disso-existe-no-manual')
     await expect(page.getByText('Nada encontrado para "nada-disso-existe-no-manual".')).toBeVisible()
+  })
+  test('Planos → Agendar reajuste: a prévia, o agendamento, a edição direta barrada e o cancelamento', async ({ page }) => {
+    await consoleTabs(page).getByRole('button', { name: 'Planos', exact: true }).click()
+    const cartao = page.locator('div.rounded-md.border.p-3').filter({
+      has: page.locator('code', { hasText: /^demo-profissional$/ })
+    })
+    await expect(cartao).toBeVisible()
+    await cartao.getByRole('button', { name: 'Agendar reajuste' }).click()
+
+    const painel = cartao.getByRole('region', { name: 'Agendar reajuste de preço' })
+    await expect(painel).toBeVisible()
+    await expect(painel.getByText(/Preço de hoje: R\$\s399,00/)).toBeVisible()
+    await painel.getByLabel('Preço novo').fill('449,00')
+    await painel.getByLabel('Motivo (opcional)').fill('IPCA (teste no navegador)')
+    await painel.getByRole('button', { name: 'Ver prévia' }).click()
+    const previa = painel.getByRole('status')
+    await expect(previa).toContainText('passam a pagar o preço novo')
+    await expect(previa).toContainText(/Receita por ciclo: .+ → .+ \(\+/)
+    await shot(page, 'console-20-price-change-preview')
+
+    await painel.getByRole('button', { name: 'Agendar', exact: true }).click()
+    await expect(page.getByText('Reajuste agendado.').first()).toBeVisible()
+    const selo = cartao.getByText(/Reajuste Mensal: R\$\s399,00 → R\$\s449,00 em \d{2}\/\d{2}\/\d{4}/)
+    await expect(selo).toBeVisible()
+    await expect(cartao.getByText('IPCA (teste no navegador)')).toBeVisible()
+    await shot(page, 'console-21-price-change-scheduled')
+
+    // Com o reajuste agendado, o preço mensal não muda à mão: a tela diz por
+    // quê e aponta o "Cancelar reajuste", sem mandar nada.
+    await cartao.getByRole('button', { name: 'Editar', exact: true }).click()
+    await page.locator('#plan-price').fill('459,00')
+    await cartao.getByRole('button', { name: 'Salvar', exact: true }).click()
+    await expect(page.getByText(/Há um reajuste agendado para o preço \(mensal\) deste plano em/).first()).toBeVisible()
+    // O aviso entra com uma animação: a captura espera ela terminar.
+    await page.waitForTimeout(600)
+    await shot(page, 'console-22-price-change-direct-edit-blocked', { fullPage: false })
+    await cartao.getByRole('button', { name: 'Cancelar', exact: true }).first().click()
+
+    // Cancelar pede confirmação, e o selo some.
+    page.once('dialog', (dialog) => {
+      expect(dialog.message()).toContain('Cancelar o reajuste para')
+      void dialog.accept()
+    })
+    await cartao.getByRole('button', { name: 'Cancelar reajuste' }).click()
+    await expect(page.getByText('Reajuste cancelado.').first()).toBeVisible()
+    await expect(selo).toBeHidden()
+    await cartao.getByText('Reajustes anteriores').click()
+    await expect(cartao.getByText(/\(cancelado\)/)).toBeVisible()
+    await shot(page, 'console-23-price-change-canceled')
+  })
+
+  test('Receita → Exportar para contabilidade baixa o XLSX', async ({ page }) => {
+    await consoleTabs(page).getByRole('button', { name: 'Receita', exact: true }).click()
+    const cartao = page.locator('section').filter({
+      has: page.getByRole('heading', { name: 'Exportar para contabilidade' })
+    })
+    await expect(cartao).toBeVisible()
+    await expect(cartao.getByLabel('Formato')).toHaveValue('xlsx')
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      cartao.getByRole('button', { name: 'Exportar para contabilidade' }).click()
+    ])
+    expect(download.suggestedFilename()).toMatch(/\.xlsx$/)
+    const arquivo = await download.path()
+    expect(arquivo).toBeTruthy()
+    const tamanho = fs.statSync(arquivo!).size
+    expect(tamanho).toBeGreaterThan(0)
+    // Um XLSX é um zip: começa com "PK".
+    expect(fs.readFileSync(arquivo!).subarray(0, 2).toString('latin1')).toBe('PK')
+    await cartao.scrollIntoViewIfNeeded()
+    await shot(page, 'console-24-accounting-export', { fullPage: false })
+  })
+
+  test('Receita → Satisfação: o NPS, a distribuição, os detratores e os comentários do seed', async ({ page }) => {
+    await consoleTabs(page).getByRole('button', { name: 'Receita', exact: true }).click()
+    const secao = page.locator('section[aria-labelledby="satisfaction-title"]')
+    await expect(secao.getByRole('heading', { name: 'Satisfação dos provedores (NPS)' })).toBeVisible()
+    await expect(secao.getByText('Promotores', { exact: true })).toBeVisible()
+    await expect(secao.getByText('Distribuição das notas')).toBeVisible()
+    // A Beta (nota 4, vencida) entre os detratores, e os comentários do seed.
+    await expect(secao.getByText(DELINQUENT_PROVIDER).first()).toBeVisible()
+    await expect(secao.getByText(/o boleto chegou tarde/).first()).toBeVisible()
+    await expect(secao.getByText(/a troca de plano foi simples/)).toBeVisible()
+    await secao.scrollIntoViewIfNeeded()
+    await page.waitForLoadState('networkidle')
+    await secao.screenshot({ path: `${SCREENSHOTS_DIR}/console-25-satisfaction.png` })
   })
 })

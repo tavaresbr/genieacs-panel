@@ -19,6 +19,12 @@ const guard = [authenticateToken, requirePlatformAdmin];
 router.get('/plans', ...guard, PlatformBillingController.listPlans);
 router.post('/plans', ...guard, PlatformBillingController.createPlan);
 router.patch('/plans/:id', ...guard, PlatformBillingController.updatePlan);
+// O reajuste de preço com data de vigência (0122): a prévia (quantos pega e a
+// receita antes e depois), o agendamento, e o cancelamento do agendado. A
+// lista vem junto de cada plano, no `GET /plans`.
+router.get('/plans/:id/price-change-preview', ...guard, PlatformBillingController.previewPriceChange);
+router.post('/plans/:id/price-changes', ...guard, PlatformBillingController.schedulePriceChange);
+router.post('/plan-price-changes/:id/cancel', ...guard, PlatformBillingController.cancelPriceChange);
 
 router.get('/tenants/:id/subscription', ...guard, PlatformBillingController.getSubscription);
 router.put('/tenants/:id/subscription', ...guard, PlatformBillingController.updateSubscription);

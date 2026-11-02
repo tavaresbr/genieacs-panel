@@ -44,6 +44,8 @@ const ImpersonatePage = lazy(() => import('@/pages/impersonate'))
 const ForgotPasswordPage = lazy(() => import('@/pages/forgot-password'))
 const ResetPasswordPage = lazy(() => import('@/pages/reset-password'))
 const VerifyEmailPage = lazy(() => import('@/pages/verify-email'))
+const NpsPage = lazy(() => import('@/pages/nps'))
+const ReceiptPage = lazy(() => import('@/pages/receipt'))
 
 function PageFallback() {
   const { t } = useTranslation()
@@ -336,6 +338,12 @@ function ConsoleRoutes() {
           próprio console. Resgatado, a sessão da aba passa a ser de provedor
           e a casca troca sozinha. */}
       <Route path="/impersonate" element={<Suspense fallback={<AuthFallback />}><ImpersonatePage /></Suspense>} />
+      {/* A pesquisa de satisfação dos provedores (0123): pública, o token no
+          fragmento. O link aponta para o endereço da plataforma. */}
+      <Route path="/nps" element={<Suspense fallback={<AuthFallback />}><NpsPage /></Suspense>} />
+      {/* O recibo do link do bot do WhatsApp da plataforma: público, o token
+          no fragmento, mandado no corpo de um POST. */}
+      <Route path="/receipt" element={<Suspense fallback={<AuthFallback />}><ReceiptPage /></Suspense>} />
       <Route element={<ConsoleShell />}>
         <Route path="/platform" element={<PlatformPage />} />
         <Route path="*" element={<Navigate to="/platform" replace />} />
@@ -383,6 +391,10 @@ function ProviderRoutes() {
                 <Route path="/forgot-password" element={<Suspense fallback={<AuthFallback />}><ForgotPasswordPage /></Suspense>} />
                 <Route path="/reset-password" element={<Suspense fallback={<AuthFallback />}><ResetPasswordPage /></Suspense>} />
                 <Route path="/verify-email" element={<Suspense fallback={<AuthFallback />}><VerifyEmailPage /></Suspense>} />
+                {/* A pesquisa de satisfação (0123), num deploy de endereço único. */}
+                <Route path="/nps" element={<Suspense fallback={<AuthFallback />}><NpsPage /></Suspense>} />
+                {/* O recibo do link do bot da plataforma, num deploy de endereço único. */}
+                <Route path="/receipt" element={<Suspense fallback={<AuthFallback />}><ReceiptPage /></Suspense>} />
                 <Route element={<ProtectedShell />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />

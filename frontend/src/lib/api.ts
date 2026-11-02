@@ -1640,6 +1640,8 @@ export interface Plan {
   createdAt: string | null
   /** How many providers are on it — only from the console's list. */
   subscribers?: number
+  /** Os reajustes do plano (0122): os agendados e o histórico recente. Só na lista do console. */
+  priceChanges?: PlanPriceChange[]
 }
 
 /** O plano como a página pública o mostra. */
@@ -1678,6 +1680,8 @@ export interface PlatformProfile {
   /** A régua de cobrança (0121): a que vale, e a padrão (a do "Restaurar padrão"). */
   reminderPolicy?: ReminderPolicy
   reminderPolicyDefault?: ReminderPolicy
+  /** A exportação para a contabilidade: o envio mensal ao contador. */
+  accounting?: PlatformAccountingConfig
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
@@ -1967,6 +1971,11 @@ export interface SubscriptionUsage {
  * assina hoje. Limite nulo é ilimitado.
  */
 export interface TenantPlanOption {
+  /**
+   * Só no plano atual (`current`): o reajuste agendado que pega esta
+   * assinatura (0122), ou nulo. Opcional: servidores antigos não mandam.
+   */
+  priceChange?: UpcomingPriceChange | null
   id: number
   code: string
   name: string
@@ -2426,6 +2435,7 @@ export const platformAPI = {
       & Partial<Record<keyof PlatformBillingPolicy | keyof PlatformReferralPolicy, number | null>>
       & { alerts?: PlatformAlertsUpdate }
       & { reminderPolicy?: ReminderPolicy | null }
+      & { accounting?: Partial<Omit<PlatformAccountingConfig, 'email'>> & { email?: string | null } }
   ) =>
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
@@ -6978,7 +6988,7 @@ export type PlatformAlertStatus = 'pending' | 'sent' | 'failed' | 'skipped'
 export const PLATFORM_ALERT_STATUSES: readonly PlatformAlertStatus[] = ['pending', 'sent', 'failed', 'skipped']
 
 /** Os eventos do histórico: os configuráveis, o resumo diário e o teste. */
-export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test' | 'monthly_report'
+export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test' | 'monthly_report' | 'accounting_export'
 
 export interface PlatformAlertHistoryItem {
   id: number
@@ -7082,7 +7092,7 @@ export interface PlatformOverviewTrial {
 }
 
 export type PlatformOverviewBlock =
-  'revenue' | 'delinquency' | 'alerts' | 'cancellations' | 'renewals' | 'trials' | 'newTenants'
+  'revenue' | 'delinquency' | 'alerts' | 'cancellations' | 'renewals' | 'trials' | 'newTenants' | 'risk'
 
 /** Cada bloco é `null` quando falhou no servidor (e o nome vem em `errors`). */
 export interface PlatformOverview {
@@ -7107,6 +7117,8 @@ export interface PlatformOverview {
   renewals: { total: number; items: PlatformOverviewRenewal[] } | null
   trials: { total: number; items: PlatformOverviewTrial[] } | null
   newTenants: (PlatformOverviewDelta & { month: string; count: number }) | null
+  /** Os detratores do NPS (0123) e quantos deles têm sinal de risco. Opcional: servidor antigo. */
+  risk?: { detractors: number; atRisk: number } | null
   errors: PlatformOverviewBlock[]
 }
 
@@ -7200,4 +7212,199 @@ export interface ConsolePlanChangeOutcome {
     reason?: string
     chargeId?: number
   } | null
+}
+
+// ── A exportação para a contabilidade ─────────────────────────────────────
+
+/** O envio mensal ao contador (Configurações → Contabilidade). */
+export interface PlatformAccountingConfig {
+  enabled: boolean
+  email: string | null
+  format: 'xlsx' | 'csv'
+}
+
+export const accountingAPI = {
+  /**
+   * O arquivo (caminho de `accountingExportPath`): o XLSX com as seis abas, ou
+   * uma aba em CSV. 400 `invalid_date`/`invalid_format`/`invalid_sheet`.
+   */
+  download: (path: string) => apiClient.getBlob(path),
+  /**
+   * Manda agora a exportação de `month` (padrão: o mês anterior) ao e-mail do
+   * contador. 409 `no_destination`; 502 `send_failed`; 400 `invalid_date`.
+   */
+  sendNow: (month?: string) =>
+    apiClient.post<{ month: string; format: 'xlsx' | 'csv' }>('/platform/reports/accounting/send', month ? { month } : {}),
+}
+
+// ── A pesquisa de satisfação dos provedores (NPS, 0123) ──────────────────
+
+export type NpsWave = 'd30' | 'd90' | 'manual'
+export type NpsRiskSignal = 'overdue' | 'card_refused' | 'cancellation' | 'paused'
+
+/** O que a página pública (`/nps#token`) vê da pesquisa. */
+export interface NpsPublicView {
+  status: 'pending' | 'answered'
+  score: number | null
+  comment: string | null
+  product: string
+  /** Até quando a nota ainda pode mudar (7 dias da primeira resposta). */
+  editableUntil: string | null
+  canAnswer: boolean
+}
+
+export interface NpsSummary {
+  total: number
+  promoters: number
+  passives: number
+  detractors: number
+  /** De -100 a 100; nulo sem resposta. */
+  nps: number | null
+  /** `distribution[n]`: quantos deram a nota n (0 a 10). */
+  distribution: number[]
+  sent: number
+  answered: number
+  responseRate: number | null
+}
+
+export interface NpsTrendMonth {
+  month: string
+  responses: number
+  nps: number | null
+  promoters: number
+  passives: number
+  detractors: number
+}
+
+export interface NpsTenantRef {
+  id: number
+  name: string | null
+  slug: string | null
+}
+
+export interface NpsComment {
+  id: number
+  tenant: NpsTenantRef
+  score: number
+  comment: string
+  wave: NpsWave
+  answeredAt: string | null
+}
+
+export interface NpsDetractor {
+  tenant: NpsTenantRef
+  score: number
+  comment: string | null
+  answeredAt: string
+  wave: NpsWave
+  signals: NpsRiskSignal[]
+  atRisk: boolean
+}
+
+export interface NpsReport {
+  from: string | null
+  summary: NpsSummary
+  trend: NpsTrendMonth[]
+  comments: NpsComment[]
+  detractors: NpsDetractor[]
+  atRisk: number
+  providers: (NpsTenantRef & { lastAskedAt: string | null })[]
+}
+
+export const npsAPI = {
+  /** A página pública: o token vai no CORPO (fora do log). 404 `not_found`, 410 `expired`. */
+  lookup: (token: string) => apiClient.post<NpsPublicView>('/public/nps/lookup', { token }),
+  /** 400 `invalid_score`, 404, 410, 409 `already_answered` (passou a semana de edição). */
+  answer: (token: string, payload: { score: number; comment?: string }) =>
+    apiClient.post<NpsPublicView>('/public/nps/answer', { ...payload, token }),
+  /** O relatório do console, desde `from` (YYYY-MM-DD) ou tudo. */
+  report: (from?: string) =>
+    apiClient.get<NpsReport>(`/platform/reports/nps${from ? `?from=${encodeURIComponent(from)}` : ''}`),
+  /** "Enviar pesquisa". 409 `recent` | `no_destination` | `no_link`; 502 `send_failed`. */
+  send: (tenantId: number) =>
+    apiClient.post<{ id: number; channels: string[] }>(`/platform/tenants/${tenantId}/nps`, {}),
+}
+
+// ── O reajuste de preço com data de vigência (0122) ─────────────────────
+
+/** Um reajuste do catálogo: o preço de um ciclo de um plano muda numa data. */
+export interface PlanPriceChange {
+  id: number
+  planId: number
+  cycle: BillingCycle
+  oldCents: number
+  newCents: number
+  /** A data de vigência, `YYYY-MM-DD` no fuso da cobrança. */
+  effectiveAt: string
+  noticeDays: number
+  notify: boolean
+  status: 'scheduled' | 'applied' | 'canceled'
+  reason: string | null
+  createdAt: string | null
+  notifiedAt: string | null
+  appliedAt: string | null
+  canceledAt: string | null
+}
+
+/** A prévia: quantos o preço novo pega e a soma das faturas de um ciclo, antes e depois. */
+export interface PlanPriceChangePreview {
+  planId: number
+  cycle: BillingCycle
+  currency: string
+  currentCents: number | null
+  newCents: number | null
+  affected: number
+  /** Os isentos no mesmo plano e ciclo: não pagam, e não mudam. */
+  exempt: number
+  revenueBeforeCents: number
+  revenueAfterCents: number
+  deltaCents: number
+}
+
+/** O reajuste agendado que pega a assinatura do provedor — o aviso da tela de Plano. */
+export interface UpcomingPriceChange {
+  cycle: BillingCycle
+  oldCents: number
+  newCents: number
+  effectiveAt: string
+  currency: string
+}
+
+export const planPriceChangeAPI = {
+  preview: (planId: number, cycle: BillingCycle, newCents?: number | null) => {
+    const params = new URLSearchParams({ cycle })
+    if (newCents !== undefined && newCents !== null) params.set('newCents', String(newCents))
+    return apiClient.get<{ preview: PlanPriceChangePreview }>(`/platform/plans/${planId}/price-change-preview?${params.toString()}`)
+  },
+
+  schedule: (planId: number, payload: {
+    cycle: BillingCycle; newCents: number; effectiveAt: string; noticeDays: number; notify: boolean; reason?: string | null
+  }) =>
+    apiClient.post<{ priceChange: PlanPriceChange; preview: PlanPriceChangePreview | null }>(
+      `/platform/plans/${planId}/price-changes`, payload
+    ),
+
+  cancel: (id: number) =>
+    apiClient.post<{ priceChange: PlanPriceChange }>(`/platform/plan-price-changes/${id}/cancel`, {})
+}
+
+// ── O recibo pelo link do bot do WhatsApp da plataforma ─────────────────
+
+export const receiptAPI = {
+  /**
+   * A página pública `/receipt#<token>`: o token vai no CORPO (fora do log de
+   * acesso) e a resposta é o HTML do recibo, ou o mesmo 404 para toda recusa.
+   * Sem sessão e sem o `apiClient`, que espera JSON.
+   */
+  open: async (token: string): Promise<{ ok: boolean; status: number; html: string }> => {
+    const response = await fetch(`${API_BASE_URL}/api/public/receipt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+      credentials: 'omit',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+    })
+    return { ok: response.ok, status: response.status, html: await response.text() }
+  },
 }

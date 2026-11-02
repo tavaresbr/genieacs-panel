@@ -23,6 +23,8 @@ import ReferralService from '../services/referralService.js';
 import { readBranding, readBrandingImage } from '../services/platformBrandingService.js';
 import TenantChargeService, { TenantChargeError } from '../services/tenantChargeService.js';
 import { receiptData, renderReceipt, RECEIPT_CSP } from '../services/chargeReceiptService.js';
+import Subscription from '../models/Subscription.js';
+import PlanPriceChangeService from '../services/planPriceChangeService.js';
 
 /** As mensagens das recusas das faturas do provedor, por código. */
 const TENANT_CHARGE_MESSAGES = Object.freeze({
@@ -442,7 +444,16 @@ class TenantController {
    */
   static async listPlans(req, res) {
     try {
-      return res.json(createResponse(req.t('plans.retrieved'), await SelfBillingService.listPlans()));
+      const planos = await SelfBillingService.listPlans();
+      // O reajuste agendado que pega esta assinatura (0122), no plano ATUAL:
+      // a tela de Plano diz "o valor muda para X em DD/MM". Aqui e não em
+      // `/subscription`, que não fala de preço; o catálogo já fala. Melhor
+      // esforço — a tela abre sem ele.
+      const reajuste = await Subscription.forTenant(req.tenantId)
+        .then((assinatura) => PlanPriceChangeService.upcomingFor(assinatura))
+        .catch(() => null);
+      const comReajuste = planos.map((plano) => (plano.current ? { ...plano, priceChange: reajuste } : plano));
+      return res.json(createResponse(req.t('plans.retrieved'), comReajuste));
     } catch (error) {
       console.error('List plans (tenant) error:', error);
       return res.status(500).json(createErrorResponse(req.t('plans.retrieveFailed'), error.message));

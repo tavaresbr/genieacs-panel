@@ -68,6 +68,12 @@ class PlatformAudit {
     // O "Enviar relatório agora" do relatório mensal. O detalhe diz o mês, os
     // canais e o resultado de cada um, nunca o destino.
     PLATFORM_MONTHLY_REPORT_SENT: 'platform.monthly_report_sent',
+    // A exportação para a contabilidade: quem baixou o quê (período, formato,
+    // aba) e o "Enviar agora" ao contador (mês, formato, resultado). Nunca o
+    // e-mail do contador. Linha própria porque a planilha leva o faturamento
+    // inteiro, com o CNPJ de cada provedor, para fora do deploy.
+    PLATFORM_ACCOUNTING_EXPORTED: 'platform.accounting_exported',
+    PLATFORM_ACCOUNTING_SENT: 'platform.accounting_sent',
     // O "Enviar e-mail de teste" do SMTP do deploy. O detalhe diz se saiu e,
     // se não, o código do motivo — nunca o destino nem o texto do erro.
     PLATFORM_MAIL_TEST: 'platform.mail_test',
@@ -84,6 +90,12 @@ class PlatformAudit {
     // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
     PLAN_CREATED: 'plan.created',
     PLAN_UPDATED: 'plan.updated',
+    // O reajuste de preço com data de vigência (0122): agendado e cancelado
+    // pelo console, aplicado ao plano pelo agendador na data. O detalhe diz o
+    // plano, o ciclo, o "de" e o "para", a data e quantos provedores pega.
+    PLAN_PRICE_CHANGE_SCHEDULED: 'plan.price_change_scheduled',
+    PLAN_PRICE_CHANGE_CANCELED: 'plan.price_change_canceled',
+    PLAN_PRICE_CHANGE_APPLIED: 'plan.price_change_applied',
     // Um pedido de demonstração da página pública mudou de etapa.
     LEAD_UPDATED: 'lead.updated',
     SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',
@@ -133,6 +145,8 @@ class PlatformAudit {
     // O lembrete de cobrança mandado à mão pelo painel de inadimplência —
     // fora da régua, no máximo um por provedor a cada vinte e quatro horas.
     SUBSCRIPTION_REMINDER_SENT: 'subscription.reminder_sent',
+    // A pesquisa de satisfação (0123) mandada à mão pelo console a um provedor.
+    TENANT_NPS_SENT: 'tenant.nps_sent',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem
@@ -174,7 +188,12 @@ class PlatformAudit {
     // qualquer cliente. Sem estas linhas, a promoção que precede tudo isso
     // seria o único passo sem rastro da cadeia inteira.
     PLATFORM_ADMIN_GRANTED: 'platform_admin.granted',
-    PLATFORM_ADMIN_REVOKED: 'platform_admin.revoked'
+    PLATFORM_ADMIN_REVOKED: 'platform_admin.revoked',
+    // O bot do WhatsApp da plataforma mandou dado de cobrança a um dono de
+    // provedor já confirmado pelo documento: a segunda via, a situação da
+    // assinatura ou o link do recibo. O detalhe diz O QUE saiu (e para qual
+    // telefone, mascarado) — nunca o Pix nem a linha digitável.
+    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed'
   });
 
   /**

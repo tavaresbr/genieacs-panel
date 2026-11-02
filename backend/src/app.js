@@ -40,6 +40,7 @@ import platformAdminRoutes from './routes/platformAdmins.js';
 import platformBillingRoutes from './routes/platformBilling.js';
 import platformLeadsRoutes from './routes/platformLeads.js';
 import platformReportsRoutes from './routes/platformReports.js';
+import platformNpsRoutes from './routes/platformNps.js';
 import publicRoutes from './routes/public.js';
 import platformIntegrationsRoutes from './routes/platformIntegrations.js';
 import userRoutes from './routes/users.js';
@@ -67,8 +68,14 @@ import { FIRMWARE_REASSIGN_PATH, FIRMWARE_UPLOAD_PATH, firmwareRawBody } from '.
 import provisioningRoutes from './routes/provisioning.js';
 import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
+import { wireNpsWhatsappReply } from './services/npsWhatsappReply.js';
 
 dotenv.config();
+
+// A nota da pesquisa de satisfação pelo WhatsApp da plataforma (0123): o
+// gancho numérico do bot, ligado aqui no arranque para não haver ciclo entre
+// os dois serviços.
+wireNpsWhatsappReply();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -379,6 +386,8 @@ if (IS_SAAS) {
   app.use('/api/platform', platformLeadsRoutes);
   // E a sexta: os relatórios (a receita), só leitura.
   app.use('/api/platform', platformReportsRoutes);
+  // A pesquisa de satisfação dos provedores (0123): relatório e envio manual.
+  app.use('/api/platform', platformNpsRoutes);
   // A página pública do ápice — o catálogo e o que o cadastro pergunta antes
   // de existir conta. Mesma regra do console: só no endereço da plataforma.
   app.use('/api/public', platformHostOnly);

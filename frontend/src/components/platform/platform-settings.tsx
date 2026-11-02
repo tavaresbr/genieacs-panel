@@ -7,6 +7,7 @@ import { PlatformAlertsSettings } from '@/components/platform/platform-alerts'
 import { PlatformAlertsPanel } from '@/components/platform/platform-alert-history'
 import { PlatformMailSettings } from '@/components/platform/platform-mail'
 import { PlatformReminderPolicy } from '@/components/platform/platform-reminders'
+import { PlatformAccountingSettings } from '@/components/platform/platform-accounting'
 import { useTranslation } from '@/contexts/language-context'
 
 /**
@@ -17,11 +18,11 @@ import { useTranslation } from '@/contexts/language-context'
  */
 export function PlatformSettings({ initialSub = 'profile', initialAlertsTab = 'settings' }: {
   /** O submenu aberto ao montar (o painel Início abre direto nos alertas). */
-  initialSub?: 'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders'
+  initialSub?: 'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders' | 'accounting'
   initialAlertsTab?: 'settings' | 'history'
 } = {}) {
   const { t } = useTranslation()
-  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders'>(initialSub)
+  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders' | 'accounting'>(initialSub)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
@@ -31,7 +32,8 @@ export function PlatformSettings({ initialSub = 'profile', initialAlertsTab = 's
           ['alerts', 'platform.settings.alerts'],
           ['mail', 'platform.settings.mail'],
           ['integrations', 'platform.tabs.integrations'],
-          ['reminders', 'platform.settings.reminders']
+          ['reminders', 'platform.settings.reminders'],
+          ['accounting', 'platform.settings.accounting']
         ] as const).map(([chave, rotulo]) => (
           <button
             key={chave}
@@ -52,6 +54,7 @@ export function PlatformSettings({ initialSub = 'profile', initialAlertsTab = 's
         {sub === 'mail' && <PlatformMailSettings />}
         {sub === 'integrations' && <PlatformIntegrations />}
         {sub === 'reminders' && <PlatformReminderPolicy />}
+        {sub === 'accounting' && <PlatformAccountingSettings />}
       </div>
     </div>
   )

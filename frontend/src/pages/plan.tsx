@@ -328,6 +328,8 @@ export default function PlanPage() {
   const planoAtualId = plans?.find((p) => p.current)?.id ?? null
   const cupomAtual = subscription?.coupon ?? null
   const moedaAtual = plans?.find((p) => p.current)?.currency ?? 'BRL'
+  // O reajuste agendado que pega esta assinatura (0122), no plano atual do catálogo.
+  const reajuste = plans?.find((p) => p.current)?.priceChange ?? null
   // O campo do cupom: quem escreve, com a assinatura viva, sem isenção e sem
   // cupom (trocar de cupom é com a plataforma).
   const podeCupom = podeEscrever && !isento && !cupomAtual && subscriptionAllowsChanges(subscription)
@@ -402,6 +404,20 @@ export default function PlanPage() {
                 <p role="status" className="mt-3 flex items-start gap-2 text-sm text-foreground">
                   <Icon name="info" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
                   {isentoAte ? t('plan.billingExemptUntilNote', { date: isentoAte }) : t('plan.billingExemptNote')}
+                </p>
+              )}
+              {/* O reajuste agendado que pega esta assinatura (0122). */}
+              {!isento && reajuste && (
+                <p role="status" className="mt-3 flex items-start gap-2 text-sm text-foreground">
+                  <Icon name="info" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
+                  <span>
+                    {t('plan.priceChangeBanner', {
+                      price: formatMoney(reajuste.newCents, reajuste.currency),
+                      date: displayDayMonth(reajuste.effectiveAt) ?? reajuste.effectiveAt
+                    })}
+                    {' '}
+                    <span className="text-muted-foreground">{t('plan.priceChangeBannerHint')}</span>
+                  </span>
                 </p>
               )}
               <dl className="mt-4 space-y-2 text-sm">

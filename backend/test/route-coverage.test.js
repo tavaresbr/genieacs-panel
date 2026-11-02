@@ -83,7 +83,18 @@ const PUBLICAS = new Map([
   ['GET /api/public/plans', 'o catálogo à venda: só planos ativos e marcados como públicos, sem id nem contagem'],
   ['GET /api/public/slug-available', 'a mesma pergunta que o cadastro faz ao gravar, feita antes; responde só livre/ocupado'],
   ['GET /api/public/cnpj', 'o cadastro da Receita, que é público; limite apertado porque sai para uma API de fora'],
-  ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço']
+  ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço'],
+  // O recibo pelo link do bot do WhatsApp da plataforma: o token assinado é a
+  // credencial; prova em platform-owner-bot.test.js.
+  ['GET /api/public/receipt/:token', 'recibo de cobrança PAGA por token HMAC de 7 dias que nomeia provedor e cobrança; toda recusa é o mesmo 404'],
+  // O mesmo recibo com o token no CORPO — o que a página `/receipt#<token>`
+  // chama; o GET acima fica para os links já mandados.
+  ['POST /api/public/receipt', 'o mesmo recibo, com o token HMAC no corpo em vez do caminho; só lê, e toda recusa é o mesmo 404'],
+  // A pesquisa de satisfação dos provedores (0123). O token do link é a
+  // credencial, vai no CORPO e é conferido pelo hash; token desconhecido é 404
+  // sem nada. Prova em platform-nps.test.js.
+  ['POST /api/public/nps/lookup', 'a pesquisa do link: o token no corpo é a credencial; devolve só a nota e o nome do produto'],
+  ['POST /api/public/nps/answer', 'a resposta da pesquisa: só grava a nota na linha que o hash do token acha, e só dentro dos prazos']
 ]);
 
 /**
@@ -203,7 +214,14 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
   ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404'],
   ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe'],
-  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404']
+  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404'],
+  ['GET /api/public/receipt/:token', 'o parâmetro é um token assinado que já nomeia provedor e cobrança, aberto em runInTenant do provedor do token; prova em platform-owner-bot.test.js'],
+  ['POST /api/platform/tenants/:id/nps', 'plano de controle; prova em platform-nps.test.js — manda só ao provedor da URL, e a caixa da plataforma e quem não existe respondem 404'],
+  // O reajuste de preço (0122): id de plano e de reajuste, tabelas do catálogo
+  // (`plans`, `plan_price_changes`), sem vizinho a alcançar.
+  ['GET /api/platform/plans/:id/price-change-preview', 'plano de controle; prova em plan-price-change.test.js — só lê, e plano que não existe é 404'],
+  ['POST /api/platform/plans/:id/price-changes', 'plano de controle; prova em plan-price-change.test.js — plano que não existe é 404, e quem não é da plataforma é 403'],
+  ['POST /api/platform/plan-price-changes/:id/cancel', 'plano de controle; prova em plan-price-change.test.js — reajuste que não existe é 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -292,6 +310,15 @@ describe('toda rota sem sessão', () => {
       // é tabela da plataforma, sem `tenant_id` — não há cadastro de provedor
       // nenhum ao alcance dela.
       'POST /api/public/leads',
+      // A pesquisa de satisfação (0123): `answer` grava a nota na linha de
+      // `platform_nps` que o hash do token acha — de UM provedor, o do token —,
+      // e `lookup` não escreve nada: é POST pelo mesmo motivo da prévia do
+      // convite, o token fora do caminho.
+      'POST /api/public/nps/answer',
+      'POST /api/public/nps/lookup',
+      // O recibo pelo token no corpo: não escreve nada — é POST pelo mesmo
+      // motivo da prévia do convite, o token fora do caminho.
+      'POST /api/public/receipt',
       'POST /api/sgp/events/webhook',
       'POST /api/whatsapp-webhook'
     ]);
@@ -442,7 +469,24 @@ describe('toda rota endereçada por um parâmetro', () => {
   // (`GET .../subscription/plan-preview`): o que cada modo faria, só leitura,
   // no provedor da URL. Mesmo pedágio: uma linha em `DO_CONSOLE` e mais uma
   // aqui; prova em platform-plan-change.test.js. São 74.
-  const TETO_DE_EXCECOES = 74;
+  //
+  // E o recibo pelo link do WhatsApp da plataforma
+  // (`GET /api/public/receipt/:token`). O parâmetro não é id de linha: é um
+  // token HMAC que já nomeia provedor e cobrança, como o do anexo — o vizinho
+  // não alcança a linha de ninguém sem a assinatura. Não é do console, então
+  // entra também na conta de fora dele (29 → 30, dentro do teto). Prova em
+  // platform-owner-bot.test.js.
+  // E o "Enviar pesquisa" de satisfação pelo console (`POST .../nps`, 0123):
+  // grava uma linha em `platform_nps` NO ESCOPO do provedor da URL e manda a
+  // pesquisa só aos contatos dele. Mesmo pedágio: uma linha em `DO_CONSOLE` e
+  // mais uma aqui; prova em platform-nps.test.js.
+  // E as três do reajuste de preço com data de vigência (0122): a prévia e o
+  // agendamento em `/plans/:id/...` e o cancelamento em
+  // `/plan-price-changes/:id/cancel`. Ids de tabela do catálogo (`plans`,
+  // `plan_price_changes`), como o `PATCH /plans/:id`: não há vizinho a
+  // alcançar. Mesmo pedágio, três vezes: três linhas em `DO_CONSOLE` e três
+  // aqui; prova em plan-price-change.test.js. São 79.
+  const TETO_DE_EXCECOES = 79;
 
 
   /**
@@ -501,7 +545,11 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/credits',
     'DELETE /api/platform/tenants/:id/subscription/cancellation',
     'POST /api/platform/alerts/:id/resend',
-    'GET /api/platform/tenants/:id/subscription/plan-preview'
+    'GET /api/platform/tenants/:id/subscription/plan-preview',
+    'POST /api/platform/tenants/:id/nps',
+    'GET /api/platform/plans/:id/price-change-preview',
+    'POST /api/platform/plans/:id/price-changes',
+    'POST /api/platform/plan-price-changes/:id/cancel'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só
