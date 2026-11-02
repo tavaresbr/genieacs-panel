@@ -572,6 +572,15 @@ describe('a IA atendendo', () => {
   });
 });
 
+describe('a conversa que o atendente desvinculou', () => {
+  it('a IA não a reconhece pelo telefone', async () => {
+    const reconhecida = await asTenant(() => WaAiService.linkDe({ id: 1, wa_phone_e164: ASSINANTE }));
+    assert.ok(reconhecida, 'sem a marca, o telefone do assinante o identifica');
+    const desvinculada = await asTenant(() => WaAiService.linkDe({ id: 1, wa_phone_e164: ASSINANTE, unlinked_at: new Date() }));
+    assert.equal(desvinculada, null);
+  });
+});
+
 describe('sugerir resposta ao atendente', () => {
   it('devolve o rascunho e não grava mensagem', async () => {
     await limparFio(ASSINANTE);

@@ -517,6 +517,20 @@ describe('the line the bot must not cross', () => {
     }
   });
 
+  it('does not recognise by phone a thread the operator unlinked by hand', async () => {
+    const conversa = await fioVazio(ASSINANTE);
+    await getDb()('wa_conversations').where({ id: conversa.id }).update({
+      contract: null, device_id: null, sgp_contact_id: null, unlinked_at: new Date()
+    });
+    await receber(ASSINANTE, 'me manda a segunda via do boleto');
+    const saidas = (await respostas(ASSINANTE)).join('\n');
+    assert.match(saidas, /contrato/i, 'pede o CPF/CNPJ, como para um número desconhecido');
+    assert.ok(!saidas.includes(LINHA_DIGITAVEL), 'nenhuma linha digitável');
+    assert.ok(!saidas.includes(PIX), 'nenhum PIX');
+    const depois = await conversaDe(ASSINANTE);
+    assert.equal(depois.contract, null, 'e o telefone não religou a conversa');
+  });
+
   it('never answers contract data to a number it does not recognise', async () => {
     const texto = await unicaResposta(DESCONHECIDO, 'me manda a segunda via do boleto');
     assert.match(texto, /contrato/i);

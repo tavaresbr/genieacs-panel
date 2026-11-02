@@ -686,7 +686,12 @@ class WaBotService {
     // tables. A number the cadastre knows is the stage-1 convenience; one it
     // does not know is asked for the holder's CPF/CNPJ, and gets no contract
     // data until that matches.
-    let { link } = await WaConversationService.resolveSubscriber(conversation.wa_phone_e164);
+    // Uma conversa que o atendente desvinculou à mão não se reconhece pelo
+    // telefone: o número era do contrato errado, e é por isso que ele a tirou.
+    // O robô pede o CPF/CNPJ, como para um número que o cadastro não conhece.
+    let { link } = conversation.unlinked_at
+      ? { link: null }
+      : await WaConversationService.resolveSubscriber(conversation.wa_phone_e164);
     if (link) {
       // Worth doing while we are here and have the match: the thread carries
       // the contract from now on, so the operator opening it sees the ONT and

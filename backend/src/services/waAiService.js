@@ -398,6 +398,8 @@ class WaAiService {
   /** O contrato da conversa, pelo cadastro ou pelo que já foi ligado nela. */
   static async linkDe(conversation) {
     if (conversation.contract) return { contract: conversation.contract, device_id: conversation.device_id ?? null };
+    // Desvinculada à mão pelo atendente: o telefone não a liga de novo.
+    if (conversation.unlinked_at) return null;
     try {
       const { link } = await WaConversationService.resolveSubscriber(conversation.wa_phone_e164);
       if (link) {
