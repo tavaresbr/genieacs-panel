@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import nodemailer from 'nodemailer';
-import { MailTransport, NullMailTransport } from './mailTransport.js';
+import { MailTransport, NullMailTransport, mailAttachments } from './mailTransport.js';
 import { log } from '../../utils/logger.js';
 import { panelBaseDomain } from '../../middleware/tenantResolver.js';
 
@@ -37,12 +37,15 @@ class SmtpMailTransport extends MailTransport {
     return 'smtp';
   }
 
-  async send({ to, subject, text, html }) {
+  async send({ to, subject, text, html, attachments }) {
     try {
       // `html` é opcional (o relatório mensal da plataforma): o `text` vai
-      // sempre, e é o que o cliente de e-mail sem HTML mostra.
+      // sempre, e é o que o cliente de e-mail sem HTML mostra. Os anexos
+      // também (a exportação contábil), filtrados por `mailAttachments`.
+      const anexos = mailAttachments(attachments);
       await this.transporter.sendMail({
-        from: this.from, to, subject, text, ...(typeof html === 'string' && html ? { html } : {})
+        from: this.from, to, subject, text, ...(typeof html === 'string' && html ? { html } : {}),
+        ...(anexos.length ? { attachments: anexos } : {})
       });
       log.info('mail_sent', { to: maskAddress(to), subject });
       return true;

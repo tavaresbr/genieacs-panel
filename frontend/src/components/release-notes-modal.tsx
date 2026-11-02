@@ -4,6 +4,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { orderReleaseChanges } from '@/lib/release-notes'
 import release from '@/generated/release.json'
 
 const CATEGORY_STYLE: Record<string, { icon: string; className: string }> = {
@@ -17,6 +18,8 @@ const CATEGORY_STYLE: Record<string, { icon: string; className: string }> = {
 }
 
 export const APP_RELEASE = release
+
+const ORDERED_CHANGES = orderReleaseChanges(release.changes)
 
 export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t, formatDate } = useTranslation()
@@ -82,7 +85,7 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
             <p className="section-description">{t('release.highlightsDescription', { tag: release.basedOnTag })}</p>
           </div>
           <ol className="space-y-3">
-            {release.changes.map((change) => {
+            {ORDERED_CHANGES.map((change) => {
               const style = CATEGORY_STYLE[change.category] || CATEGORY_STYLE.Maintenance
               return (
                 <li key={`${change.shortHash}-${change.title}`} className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">

@@ -629,3 +629,29 @@ export const firmwareUploadLimiter = limiter({
   keyGenerator: ipKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
+
+/**
+ * O recibo pelo link assinado do WhatsApp da plataforma
+ * (`GET /api/public/receipt/:token`). Sem sessão: o token é a credencial, e o
+ * balde existe para que ninguém fique adivinhando tokens de um endereço só. Um
+ * dono abre o recibo uma ou duas vezes; trinta em quinze minutos é folga.
+ */
+export const publicReceiptLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
+ * A página pública da pesquisa de satisfação (0123): ler e responder pelo
+ * token do link. Por IP — quem responde lê, escolhe a nota e talvez a mude,
+ * meia dúzia de pedidos; adivinhar um token de 256 bits não é plano, e o
+ * limite só corta o barulho.
+ */
+export const publicNpsLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});

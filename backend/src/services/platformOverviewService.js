@@ -7,6 +7,7 @@ import SubscriptionService, { isCancelScheduled, isPauseScheduled } from './subs
 import DelinquencyService from './delinquencyService.js';
 import { FUSO, mesesAte, monthly } from './platformMetricsService.js';
 import { instanteMs } from './revenueReportService.js';
+import NpsService from './npsService.js';
 
 /**
  * O painel inicial do console (`GET /api/platform/overview`): uma foto de
@@ -44,7 +45,7 @@ export const OVERVIEW_LIST_LIMIT = 10;
 export const ALERTS_WINDOW_DAYS = 7;
 
 export const OVERVIEW_BLOCKS = Object.freeze([
-  'revenue', 'delinquency', 'alerts', 'cancellations', 'renewals', 'trials', 'newTenants'
+  'revenue', 'delinquency', 'alerts', 'cancellations', 'renewals', 'trials', 'newTenants', 'risk'
 ]);
 
 /** A variação de um número entre dois meses (`pct` nulo sem base). */
@@ -276,6 +277,16 @@ class PlatformOverviewService {
       else if (ms >= anterior.startMs && ms < anterior.endMs) previous += 1;
     }
     return { month: atual.month, ...variacao(count, previous), count };
+  }
+
+  /**
+   * O risco (0123): os detratores da pesquisa de satisfação — a última nota
+   * do provedor ≤ 6 — e quantos deles têm um sinal de risco agora (atraso,
+   * cartão recusado, cancelamento pedido ou agendado, pausa). A mesma conta
+   * da seção "Satisfação" da aba Receita.
+   */
+  static async risk({ now }) {
+    return NpsService.riskSummary({ now });
   }
 }
 

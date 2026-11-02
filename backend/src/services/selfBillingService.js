@@ -1,4 +1,5 @@
 import Plan from '../models/Plan.js';
+import PlanPriceChange from '../models/PlanPriceChange.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
@@ -155,6 +156,19 @@ async function cobrancaEmAberto(subscription) {
 }
 
 /**
+ * `plano` com o preço que vale no prazo vivo desta assinatura — o do reajuste
+ * agendado quando o prazo cai na vigência dele, ou o de antes de um já
+ * aplicado (0122, `PlanPriceChange.planAt`). É o mesmo preço que a emissão
+ * pede para esse prazo, e por isso a reprecificação e o lembrete leem daqui.
+ */
+async function noPrecoDoPrazo(subscription, plano) {
+  const prazo = subscription?.renews_at ?? subscription?.trial_ends_at;
+  const quando = prazo ? new Date(prazo) : null;
+  if (!plano || !quando || Number.isNaN(quando.getTime())) return plano;
+  return PlanPriceChange.planAt(plano, ChargeIssuingService.periodKey(quando));
+}
+
+/**
  * Põe a cobrança em aberto do prazo vivo no preço de `plano`: cancela no
  * gateway a que saiu com o preço velho e deixa a linha pronta para reemitir.
  *
@@ -169,8 +183,11 @@ async function cobrancaEmAberto(subscription) {
  * mesma coisa com a mesma linha, e três cópias desta dança com o gateway
  * seriam três lugares para uma delas esquecer a garra.
  */
-async function reprecificarCobranca(subscription, plano, { keepOverride = false } = {}) {
+async function reprecificarCobranca(subscription, planoInformado, { keepOverride = false } = {}) {
   const nada = { acao: 'none', linhaId: null };
+  // No preço do prazo vivo (0122): com um reajuste agendado para este
+  // vencimento, a fatura reemitida já sai pelo valor novo.
+  const plano = await noPrecoDoPrazo(subscription, planoInformado);
   // Isento de cobrança: a troca de plano continua valendo, mas não há fatura
   // a reprecificar — e mexer numa que ficou em aberto porque o gateway recusou
   // o cancelamento a deixaria sem id e sem reemissão (`issueCurrent` para no
@@ -326,7 +343,9 @@ async function descidaTravada(subscription, atual) {
  * `bloqueio` é o veredito do uso, para a reemissão não recontar.
  */
 async function planoDaFatura(subscription, { countDevices = null } = {}) {
-  const atual = subscription?.plan_id ? await Plan.findById(subscription.plan_id) : null;
+  const atual = subscription?.plan_id
+    ? await noPrecoDoPrazo(subscription, await Plan.findById(subscription.plan_id))
+    : null;
   // `assinatura` é a do ciclo que a fatura cobra (0104): a de agora, ou a
   // vista pelo ciclo agendado quando a fatura é a da troca agendada.
   const doAtual = { plano: atual, assinatura: subscription, bloqueio: undefined };
@@ -338,7 +357,7 @@ async function planoDaFatura(subscription, { countDevices = null } = {}) {
     || ChargeIssuingService.periodKey(agendada) !== ChargeIssuingService.periodKey(vivo)) {
     return doAtual;
   }
-  const agendado = await Plan.findById(subscription.pending_plan_id);
+  const agendado = await noPrecoDoPrazo(subscription, await Plan.findById(subscription.pending_plan_id));
   const agendadaView = SubscriptionService.scheduledView(subscription);
   if (!agendado || !(SubscriptionService.cyclePriceCents(agendadaView, agendado) > 0)) return doAtual;
   const bloqueio = await SubscriptionService.scheduledOverLimit(subscription, agendado, { countDevices });
@@ -1333,6 +1352,42 @@ class SelfBillingService {
     const cobranca = await reprecificarCobranca(subscription, plan);
     const reissue = await reemitir(cobranca, tenant, { pendingBlockedBy: blockedBy });
     return { charge: cobranca.acao, ...(reissue ? { reissue } : {}) };
+  }
+
+  /**
+   * A cobrança em aberto do prazo vivo posta no preço do reajuste (0122) — o
+   * novo, quando ela vence na vigência dele; o de antes, quando o reajuste foi
+   * cancelado depois de ela ter sido reemitida. Pela mesma porta da troca de
+   * plano (garra, cancelamento no gateway antes, reemissão depois), com o
+   * plano da fatura que a emissão escolheria (`planoDaFatura`).
+   *
+   * Só mexe quando a fatura é do plano e do ciclo do reajuste. Nunca a de
+   * valor mudado à mão pelo console (`keepOverride`), nunca a de quem está
+   * isento ou parado por gente. Lança `SelfBillingError` quando o gateway
+   * recusa cancelar — quem chama tenta de novo depois.
+   *
+   * `chargeId` é a cobrança que esta chamada olhou — a em aberto do prazo
+   * vivo, a única que ela pode tocar —, ou nulo quando não há uma. É por ele
+   * que quem chama sabe se a decisão foi sobre a cobrança que ele tinha em
+   * mãos ou sobre outra.
+   *
+   * @returns {Promise<{ charge: 'none'|'reissued'|'skipped', chargeId: number|null, reason?: string, reissue?: object }>}
+   */
+  static async repriceForPriceChange({ tenant, planId, cycle }) {
+    const subscription = await Subscription.forTenant(tenant.id);
+    if (!subscription) return { charge: 'skipped', reason: 'no_subscription', chargeId: null };
+    const viva = await cobrancaEmAberto(subscription);
+    const chargeId = viva ? Number(viva.id) : null;
+    if (subscription.billing_exempt_at) return { charge: 'skipped', reason: 'billing_exempt', chargeId };
+    if (!ESTADOS_VIVOS.has(subscription.status)) return { charge: 'skipped', reason: 'not_billable', chargeId };
+    const { plano, assinatura, bloqueio } = await planoDaFatura(subscription);
+    if (!plano || Number(plano.id) !== Number(planId)
+      || SubscriptionService.cycleOf(assinatura, plano) !== cycle) {
+      return { charge: 'skipped', reason: 'other_plan', chargeId };
+    }
+    const cobranca = await reprecificarCobranca(assinatura, plano, { keepOverride: true });
+    const reissue = await reemitir(cobranca, tenant, { pendingBlockedBy: bloqueio });
+    return { charge: cobranca.acao, chargeId, ...(reissue ? { reissue } : {}) };
   }
 
   /**

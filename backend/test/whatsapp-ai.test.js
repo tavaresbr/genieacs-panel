@@ -17,6 +17,7 @@ const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount
 const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
 const { default: WaAiService } = await import('../src/services/waAiService.js');
 const { default: WaBotService } = await import('../src/services/waBotService.js');
+const { default: WaAlertService } = await import('../src/services/waAlertService.js');
 
 /**
  * O atendimento por IA: a IA fala dentro das travas do bot, só sabe da conta
@@ -472,6 +473,28 @@ describe('a IA atendendo', () => {
       assert.ok(new Date(conversa.bot_paused_until) > new Date(), 'o bot ficou em pausa');
       const eventos = await getDb()('wa_bot_events').where({ conversation_id: conversa.id, intent: 'lead' });
       assert.equal(eventos.length, 1);
+    });
+
+    it('avisa a equipe pelos canais dos alertas, e uma falha do aviso não derruba o registro', async () => {
+      const original = WaAlertService.notifyEvent;
+      const avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+      try {
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'Oi!' }];
+        await receber(DESCONHECIDO, 'oi');
+        const conversation = await conversaDe(DESCONHECIDO);
+        const r = await asTenant(() => WaAiService.registrarInteresse({
+          conversation, dados: { nome: 'Carlos', plano: '300 Mega', endereco: 'Aeroporto' }
+        }));
+        assert.equal(r.intent, 'lead');
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_lead');
+        assert.deepEqual(avisos[0].vars, { name: 'Carlos', plan: '300 Mega', area: 'Aeroporto', phone: DESCONHECIDO });
+        const texto = WaAlertService.compose({ rule: 'wa_lead', vars: avisos[0].vars }, false);
+        assert.match(texto, /Carlos/);
+        assert.match(texto, /300 Mega/);
+      } finally { WaAlertService.notifyEvent = original; }
     });
 
     it('sem nome não registra; registrado uma vez, não repete em 24 h', async () => {

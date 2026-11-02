@@ -129,10 +129,26 @@ export function installTenantTaggedConsole(target = console) {
 }
 
 /**
+ * Os caminhos que levam uma credencial num segmento — o link antigo do recibo
+ * (`/api/public/receipt/<token>`), que o bot mandou antes de o token ir para
+ * o fragmento. Enquanto esses links ainda abrem, o segmento sai do log como
+ * `:token`: quem lê o log não ganha o recibo de ninguém.
+ */
+const CREDENTIAL_PATHS = [/^(\/api\/public\/receipt\/)[^/]+/];
+
+/** O caminho com os segmentos de credencial trocados por `:token`. */
+export function redactPath(path) {
+  let limpo = String(path ?? '');
+  for (const re of CREDENTIAL_PATHS) limpo = limpo.replace(re, '$1:token');
+  return limpo;
+}
+
+/**
  * Express middleware: one `http` line per request, when the response ends.
  *
  * `path` is the URL without its query string, because a query is where a
- * caller puts a token when a header is inconvenient. The provider is whatever
+ * caller puts a token when a header is inconvenient — and a path segment that
+ * is a credential is masked too (`redactPath`). The provider is whatever
  * the request ended up scoped to — the host's answer, or the token's after
  * `authenticateToken` re-scoped it — and `-` when it was refused before
  * either. `host` rides along on the SaaS because it is how a person maps a
@@ -152,7 +168,7 @@ export function requestLogger({ skipPath = '/api/health' } = {}) {
     res.setHeader('X-Request-Id', req.id);
 
     res.on('finish', () => {
-      const path = String(req.originalUrl || req.url || '').split('?')[0];
+      const path = redactPath(String(req.originalUrl || req.url || '').split('?')[0]);
       if (path === skipPath && res.statusCode < 400) return;
       const ms = Number(process.hrtime.bigint() - started) / 1e6;
       const fields = {

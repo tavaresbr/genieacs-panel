@@ -93,7 +93,10 @@ const RULE_KEYS = Object.freeze({
   // oficial piorou na Meta (`MetaNumberHealthService`). Fica fora de
   // `ALERT_RULES` — não tem limite nem cooldown para configurar —, mas sai
   // pelos mesmos canais e pelo mesmo resumo.
-  wa_meta_quality: { firing: 'whatsapp.alerts.metaQualityDropped', cleared: null }
+  wa_meta_quality: { firing: 'whatsapp.alerts.metaQualityDropped', cleared: null },
+  // Alguém quer contratar: a IA registrou o interesse (`WaAiService.registrarInteresse`).
+  // Avulso como o de cima — sem limite nem cooldown, e sem "recuperação".
+  wa_lead: { firing: 'whatsapp.alerts.lead', cleared: null }
 });
 
 /**

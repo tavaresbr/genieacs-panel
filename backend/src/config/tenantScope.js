@@ -180,7 +180,11 @@ export const SCOPED_TABLES = new Set([
   'credit_allocations',
   // Os pedidos de cancelamento do provedor (0107): o motivo que ele deu e o
   // que aceitou. Do provedor, como a assinatura de que falam.
-  'cancellation_requests'
+  'cancellation_requests',
+  // A pesquisa de satisfação do provedor (0123): a nota que ELE nos deu. Do
+  // provedor, como o pedido de cancelamento — o console a lê de cima,
+  // declarado, e o link público acha a linha pelo hash do token.
+  'platform_nps'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -249,7 +253,13 @@ export const SHARED_TABLES = new Set([
   // Os alertas para quem opera a plataforma (0112): a fila do que o console
   // avisa por WhatsApp e e-mail. Acima dos provedores — fala de vários, e o
   // envio é um passo só do agendador, fora do laço por provedor.
-  'platform_alerts'
+  'platform_alerts',
+  // O reajuste de preço agendado (0122): do catálogo, como `plans`. E a
+  // memória do que ele já fez com cada provedor (o aviso, a reemissão), lida
+  // pelo agendador da plataforma fora do laço por provedor, como
+  // `platform_alerts`; cada provedor só é tocado dentro do próprio escopo.
+  'plan_price_changes',
+  'plan_price_change_marks'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

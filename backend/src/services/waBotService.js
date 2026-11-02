@@ -8,6 +8,7 @@ import OutageIncidentService from './outageIncidentService.js';
 import MaintenanceService from './maintenanceService.js';
 import WaTagService from './waTagService.js';
 import BillingStatusService from './billingStatusService.js';
+import PlatformOwnerBotService from './platformOwnerBotService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -673,6 +674,13 @@ class WaBotService {
       await this.pausar(conversation, null);
     }
 
+    // O número da PLATAFORMA (a caixa, `kind = 'platform'`): quem escreve ali é
+    // dono de provedor, não assinante de SGP. Depois de todas as travas acima,
+    // que valem iguais, e antes da IA e do SGP, que não conhecem provedor.
+    if (await PlatformOwnerBotService.isPlatformScope()) {
+      return PlatformOwnerBotService.atender({ conversation, texto, bot: this.ferramentasDaPlataforma() });
+    }
+
     // Atendimento por IA: depois de todas as travas acima, no lugar do menu.
     // Pedido de senha/portal fica de fora: a resposta fixa, sempre. A IA que
     // falha devolve `null`, e a mensagem segue pelo menu como antes.
@@ -904,6 +912,21 @@ class WaBotService {
     const link = { contract: ligada?.contract || contract, device_id: ligada?.device_id ?? null };
     await this.responderCom(conversation, await menuPara(link));
     return { replied: true, intent: 'identified' };
+  }
+
+  /**
+   * O que o atendimento dos donos de provedor (`platformOwnerBotService.js`)
+   * usa daqui: a mesma fila, a mesma pausa, o mesmo passo e o mesmo texto de
+   * passagem. Por parâmetro, e não por import, para não haver ciclo.
+   */
+  static ferramentasDaPlataforma() {
+    return {
+      responderCom: (conversa, texto) => this.responderCom(conversa, texto),
+      pausar: (conversa, ate) => this.pausar(conversa, ate),
+      gravarPasso: (conversa, patch) => this.gravarPasso(conversa, patch),
+      textoPassagem: textoDePassagem,
+      PAUSA_ATENDENTE_MS
+    };
   }
 
   /** Grava o passo da identificação nesta conversa. */

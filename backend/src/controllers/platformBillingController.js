@@ -16,6 +16,8 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import CouponService, { couponTrail } from '../services/couponService.js';
 import SelfBillingService, { SelfBillingError, PLAN_CHANGE_MODES } from '../services/selfBillingService.js';
 import { translateError } from '../i18n/index.js';
+import PlanPriceChange from '../models/PlanPriceChange.js';
+import PlanPriceChangeService, { PlanPriceChangeError, presentPriceChange } from '../services/planPriceChangeService.js';
 
 /**
  * A metade comercial do plano de controle: planos, a assinatura de cada
@@ -193,6 +195,13 @@ function presentPlan(plan) {
       : Number(plan.price_yearly_cents),
     createdAt: plan.created_at ?? null
   };
+}
+
+/** A recusa do reajuste de preço (0122), no idioma de quem pediu e com o código que a tela lê. */
+function priceChangeRefusal(req, res, error) {
+  return res.status(error.status || 400).json(
+    createErrorResponse(translateError(req.t ?? ((k) => k), error), null, error.code)
+  );
 }
 
 /** A recusa da troca de plano, no idioma de quem pediu e com o código que a tela lê. */
@@ -390,8 +399,19 @@ class PlatformBillingController {
     try {
       const plans = await Plan.list();
       const counts = await Promise.all(plans.map((plan) => Plan.subscriberCount(plan.id)));
+      // Os reajustes de cada plano (0122): os agendados, e o histórico recente
+      // dos aplicados e cancelados, para a tela listar e cancelar.
+      const reajustes = await PlanPriceChange.list();
+      const porPlano = new Map();
+      for (const change of reajustes) {
+        const lista = porPlano.get(change.plan_id) ?? [];
+        if (change.status === 'scheduled' || lista.length < 10) lista.push(presentPriceChange(change));
+        porPlano.set(change.plan_id, lista);
+      }
       return res.json(createResponse('Plans retrieved', {
-        plans: plans.map((plan, i) => ({ ...presentPlan(plan), subscribers: counts[i] }))
+        plans: plans.map((plan, i) => ({
+          ...presentPlan(plan), subscribers: counts[i], priceChanges: porPlano.get(Number(plan.id)) ?? []
+        }))
       }));
     } catch (error) {
       console.error('List plans error:', error);
@@ -531,6 +551,25 @@ class PlatformBillingController {
         }
       }
 
+      // Com um reajuste agendado para o ciclo (0122), o preço desse ciclo não
+      // muda à mão: o reajuste guardou o "de" de hoje, vai gravar o "para" na
+      // data e já decide o preço das faturas que vencem depois dela — mexer no
+      // plano por baixo dele cobraria um terceiro valor sem aviso nenhum. Quem
+      // quer outro preço cancela o agendado primeiro. Só o valor que MUDA: a
+      // tela manda os dois preços em toda edição, inclusive a de um nome.
+      for (const [coluna, ciclo] of [['price_cents', 'monthly'], ['price_yearly_cents', 'annual']]) {
+        if (!(coluna in patch)) continue;
+        const antes = plan[coluna] === null || plan[coluna] === undefined ? null : Number(plan[coluna]);
+        const depois = patch[coluna] === null || patch[coluna] === undefined ? null : Number(patch[coluna]);
+        if (antes === depois) continue;
+        const agendado = await PlanPriceChange.scheduledFor(id, ciclo);
+        if (agendado) {
+          return priceChangeRefusal(req, res, new PlanPriceChangeError('priceChange.directEditScheduled', {
+            code: 'price_change_scheduled', status: 409, vars: { date: agendado.effective_at }
+          }));
+        }
+      }
+
       const updated = await Plan.update(id, patch);
       await PlatformAudit.fromRequest(req, {
         action: PlatformAudit.ACTIONS.PLAN_UPDATED,
@@ -540,6 +579,111 @@ class PlatformBillingController {
     } catch (error) {
       console.error('Update plan error:', error);
       return res.status(500).json(createErrorResponse('Failed to update the plan', error.message));
+    }
+  }
+
+  // ── O reajuste de preço com data de vigência (0122) ──────────────────
+
+  /**
+   * `GET /plans/:id/price-change-preview?cycle=&newCents=` — quantos
+   * provedores o preço novo pega e a soma das faturas de um ciclo deles,
+   * antes e depois (com o cupom de cada um). Só lê. É também o que a edição
+   * direta do preço mostra antes de pedir a confirmação.
+   */
+  static async previewPriceChange(req, res) {
+    try {
+      const id = parseId(req.params?.id);
+      if (!id) return res.status(400).json(createErrorResponse('Invalid plan id'));
+      const cycle = String(req.query?.cycle ?? 'monthly');
+      let newCents = null;
+      if (req.query?.newCents !== undefined && req.query.newCents !== '') {
+        newCents = Number(req.query.newCents);
+        if (!Number.isInteger(newCents) || newCents < 0) {
+          return priceChangeRefusal(req, res, new PlanPriceChangeError('priceChange.invalidPrice', { code: 'invalid_price' }));
+        }
+      }
+      const preview = await PlanPriceChangeService.preview({ planId: id, cycle, newCents });
+      return res.json(createResponse('Price change preview', { preview }));
+    } catch (error) {
+      if (error instanceof PlanPriceChangeError) return priceChangeRefusal(req, res, error);
+      console.error('Price change preview error:', error);
+      return res.status(500).json(createErrorResponse('Failed to preview the price change', error.message));
+    }
+  }
+
+  /**
+   * `POST /plans/:id/price-changes` — `{ cycle, newCents, effectiveAt,
+   * noticeDays?, notify?, reason? }`: agenda o reajuste. Ver
+   * `PlanPriceChangeService.schedule` para as recusas. Responde com o
+   * reajuste e a prévia do dia do agendamento, que vai também para a trilha.
+   */
+  static async schedulePriceChange(req, res) {
+    try {
+      const id = parseId(req.params?.id);
+      if (!id) return res.status(400).json(createErrorResponse('Invalid plan id'));
+      const body = req.body ?? {};
+      const { change, plan } = await PlanPriceChangeService.schedule({
+        planId: id,
+        cycle: String(body.cycle ?? 'monthly'),
+        newCents: body.newCents,
+        effectiveAt: body.effectiveAt,
+        noticeDays: body.noticeDays,
+        notify: body.notify === undefined ? true : body.notify,
+        reason: body.reason,
+        actorUserId: req.user?.userId ?? null
+      });
+      const preview = await PlanPriceChangeService.preview({
+        planId: id, cycle: change.cycle, newCents: change.new_cents
+      }).catch(() => null);
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.PLAN_PRICE_CHANGE_SCHEDULED,
+        detail: {
+          ...presentPriceChange(change),
+          planCode: plan.code,
+          affected: preview?.affected ?? null,
+          revenueBeforeCents: preview?.revenueBeforeCents ?? null,
+          revenueAfterCents: preview?.revenueAfterCents ?? null
+        }
+      });
+      return res.status(201).json(createResponse('Price change scheduled', {
+        priceChange: presentPriceChange(change), preview
+      }));
+    } catch (error) {
+      if (error instanceof PlanPriceChangeError) return priceChangeRefusal(req, res, error);
+      console.error('Schedule price change error:', error);
+      return res.status(500).json(createErrorResponse('Failed to schedule the price change', error.message));
+    }
+  }
+
+  /**
+   * `POST /plan-price-changes/:id/cancel` — cancela o reajuste ainda
+   * agendado (409 `not_scheduled` no aplicado ou já cancelado). A cobrança que
+   * ele já tinha reemitido volta ao preço de antes na passada seguinte do
+   * agendador — e já aqui, pelo melhor esforço.
+   */
+  static async cancelPriceChange(req, res) {
+    try {
+      const id = parseId(req.params?.id);
+      if (!id) return res.status(400).json(createErrorResponse('Invalid price change id'));
+      const change = await PlanPriceChangeService.cancel({ id, actorUserId: req.user?.userId ?? null });
+      const plan = await Plan.findById(change.plan_id);
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.PLAN_PRICE_CHANGE_CANCELED,
+        detail: { ...presentPriceChange(change), planCode: plan?.code ?? null }
+      });
+      await PlanPriceChangeService.revertCharges(change).catch((error) => {
+        console.warn(`Could not revert the charges of price change ${change.id}: ${error.message}`);
+      });
+      // Quem já tinha sido avisado ouve que o reajuste caiu; o que falhar
+      // aqui a passada do agendador repete (`cancel_notice`, uma vez por provedor).
+      await PlanPriceChangeService.notifyCanceled(change).catch((error) => {
+        console.warn(`Could not send the cancellation notice of price change ${change.id}: ${error.message}`);
+      });
+      return res.json(createResponse('Price change canceled', { priceChange: presentPriceChange(change) }));
+    } catch (error) {
+      if (error instanceof PlanPriceChangeError) return priceChangeRefusal(req, res, error);
+      console.error('Cancel price change error:', error);
+      return res.status(500).json(createErrorResponse('Failed to cancel the price change', error.message));
     }
   }
 

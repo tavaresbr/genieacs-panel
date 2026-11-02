@@ -34,6 +34,19 @@ export const PROVIDER = {
   password: 'Alfa-Demo-2026'
 } as const
 
+/**
+ * O token cru da pesquisa de satisfação pendente da Alfa — o mesmo de
+ * `seed-demo.js`, que só a cria no banco de teste.
+ */
+export const E2E_NPS_TOKEN = 'seed-demo-e2e-nps-alfa-fibra-pendente-0001'
+
+/** O token do link do recibo da Alfa, cunhado pelo `global-setup`. */
+export function receiptToken(): string {
+  const token = process.env.E2E_RECEIPT_TOKEN
+  if (!token) throw new Error('E2E_RECEIPT_TOKEN is not set: the global setup mints it')
+  return token
+}
+
 /** Os outros dois provedores do seed. */
 export const DELINQUENT_PROVIDER = 'Beta Net'
 export const SUSPENDED_PROVIDER = 'Gama Telecom'

@@ -4,6 +4,7 @@ import WaBotConfigService, { chaveParaNovoEndereco, mesmoEnderecoIa } from './wa
 import WaConversationService from './waConversationService.js';
 import WaSendService from './waSendService.js';
 import WaTagService from './waTagService.js';
+import WaAlertService from './waAlertService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import WaAiClient from './waAiClient.js';
 import { aiProviderOrDefault, isAiProvider } from './waAiAdapters.js';
@@ -557,6 +558,12 @@ class WaAiService {
       conversationId: conversation.id, body: linhas.join('\n'), isNote: true, userId: null, source: 'bot'
     });
     await WaTagService.tagSales(conversation.id);
+    // Avisa a equipe pelos canais dos alertas (WhatsApp, e-mail, Telegram), se ligados. Não lança.
+    await WaAlertService.notifyEvent({
+      rule: 'wa_lead',
+      subject: conversation.id,
+      vars: { name: nome, plan: plano || '—', area: endereco || '—', phone: conversation.wa_phone_e164 ?? '—' }
+    });
     return { transferir: true, texto: null, intent: 'lead', paraModelo: 'Interesse registrado.' };
   }
 

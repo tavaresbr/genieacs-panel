@@ -6,6 +6,7 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
 import Subscription from '../models/Subscription.js';
 import Plan from '../models/Plan.js';
+import PlanPriceChange from '../models/PlanPriceChange.js';
 import Coupon from '../models/Coupon.js';
 import UsagePeak from '../models/UsagePeak.js';
 import { providerFor } from './billing/registry.js';
@@ -984,6 +985,17 @@ class ChargeIssuingService {
 
     const periodo = periodoPronto ?? this.periodKey(vencimento);
 
+    // O reajuste de preço com data de vigência (0122): a cobrança paga o preço
+    // do SEU vencimento — o novo, quando vence na data do reajuste agendado ou
+    // depois; o de antes, quando vence antes de um já aplicado. Pela chave do
+    // período, sem tabela por assinante. `planAt` devolve o mesmo plano quando
+    // nenhum reajuste muda o preço deste prazo.
+    const planoNoPrazo = await PlanPriceChange.planAt(plan, periodo);
+    if (planoNoPrazo !== plan) {
+      preco = await SubscriptionService.effectivePriceCents(subscription, planoNoPrazo, { coupon: cupom });
+      if (!(preco > 0)) return { issued: false, reason: 'free_plan' };
+    }
+
     // A faxina vem ANTES da guarda de "ainda não venceu", e essa ordem foi o
     // teste que a encontrou: um provedor que acabou de pagar está, por
     // definição, longe do próximo vencimento — então pôr a limpeza depois da
@@ -1038,14 +1050,15 @@ class ChargeIssuingService {
     // Depois da guarda de antecedência, e não antes: o agendador passa a cada
     // minuto, e contar uso (às vezes no ACS) semanas antes da janela de
     // emissão seria carga sem resposta a dar.
-    let planoDoPeriodo = plan;
+    let planoDoPeriodo = planoNoPrazo;
     // A assinatura no ciclo do período que esta cobrança paga (0104).
     let assinaturaDoPeriodo = subscription;
     let descidaBloqueada = null;
     if (subscription.pending_plan_id && subscription.pending_plan_at) {
       const agendada = new Date(subscription.pending_plan_at);
       if (!Number.isNaN(agendada.getTime()) && this.periodKey(agendada) === periodo) {
-        const agendado = await Plan.findById(subscription.pending_plan_id);
+        // No preço do vencimento deste prazo, como o atual (0122).
+        const agendado = await PlanPriceChange.planAt(await Plan.findById(subscription.pending_plan_id), periodo);
         // No ciclo AGENDADO (0104): a troca do mensal para o anual faz a
         // fatura desta renovação sair pelo preço do ano.
         const agendadaView = SubscriptionService.scheduledView(subscription);
