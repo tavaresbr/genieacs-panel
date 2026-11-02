@@ -1,0 +1,63 @@
+name: Release
+
+# A release for every green `main`, with no one having to ask for it.
+#
+# It runs after CI, not on the push itself, so a commit that broke `main` never
+# becomes a version. CI cancels its own superseded runs on `main`, so a burst of
+# merges ends in one green run and one release covering all of them, instead of
+# a version per merge.
+#
+# The release commit is pushed with the workflow's own token, and pushes made
+# with it start no workflow — no loop, and no CI run on a commit that only
+# rewrites version numbers and the CHANGELOG.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      # The commit CI verified, not whatever `main` is by now: the script stands
+      # down on its own if the branch has moved past it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22'
+
+      - name: Cut the release
+        id: cut
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          scripts/auto-release.sh main
+
+      - name: Publish it on the Releases page
+        if: steps.cut.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.cut.outputs.version }}
+        run: |
+          awk -v head="## [${VERSION}]" '
+            index($0, head) == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          gh release create "v${VERSION}" --title "v${VERSION}" --notes-file notes.md --verify-tag

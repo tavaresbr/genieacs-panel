@@ -3,6 +3,9 @@
 TR69 Controle follows [Semantic Versioning](https://semver.org/). Release versions
 are calculated from conventional commits since the previous release commit
 (`chore(release): vX.Y.Z`); a `v*` Git tag counts too, when it names a newer version.
+Releases are cut automatically: once CI passes on `main`, the Release workflow
+(`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
+the release commit and publishes it on the Releases page.
 
 ## [1.19.0] - 2026-10-23
 
