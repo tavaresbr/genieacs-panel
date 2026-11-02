@@ -57,6 +57,10 @@ const ESTADOS_VIVOS = new Set(['trial', 'active', 'past_due']);
 
 const DAY_S = 86_400;
 
+/** Quantas vezes, e com que espera, a mudança tenta de novo a garra da fatura. */
+const REPRICE_RETRIES = 6;
+const REPRICE_RETRY_MS = 150;
+
 /** Uma recusa com o código que a tela lê e o status HTTP. */
 export class AddonError extends TranslatableError {
   constructor(key, { code, status, vars = null, detail = null } = {}) {
@@ -279,11 +283,30 @@ class AddonService {
     if (!tenant || tenant.kind === 'platform') return null;
     const direito = await this.entitlements(null, { now });
     if (direito.features.includes(feature)) return null;
+    const { subscription } = await SubscriptionService.current();
+    // Isento de cobrança (o parceiro, a conta de demonstração): não há fatura
+    // onde o add-on entraria, então a porta não o cobra dele.
+    if (subscription?.billing_exempt_at) return null;
     if (portas.some((addon) => addon.trial_access)) {
-      const { subscription } = await SubscriptionService.current();
       if (subscription && SubscriptionService.effectiveStatus(subscription, now).status === 'trial') return null;
     }
     return { feature, addons: portas.map((addon) => addon.code) };
+  }
+
+  /**
+   * A porta nos caminhos de FUNDO (o bot, a IA, as campanhas, a régua, o
+   * alerta por WhatsApp): se o provedor em escopo pode usar `feature`. Sem
+   * add-on `gated` no catálogo responde sim sem consulta (o padrão). Uma
+   * falha na leitura também responde sim — no fundo, ficar mudo por um erro
+   * de banco seria pior que mandar uma mensagem que o add-on cobraria.
+   */
+  static async allows(feature, { now = new Date() } = {}) {
+    try {
+      return !(await this.refusalFor(feature, { now }));
+    } catch (error) {
+      console.warn(`Could not check the add-on "${feature}" of provider ${currentTenantId()}: ${error.message}`);
+      return true;
+    }
   }
 
   // ── A cobrança ───────────────────────────────────────────────────────
@@ -406,10 +429,25 @@ class AddonService {
    * Grava `escrever` com a fatura em aberto da renovação posta no valor de
    * DEPOIS (`rowsAfter`) — a porta da troca de plano. A falha do gateway ao
    * cancelar a fatura velha lança e nada é gravado.
+   *
+   * `rowsAfter` é uma FUNÇÃO das linhas ativas (`(atuais) => depois`): a
+   * reprecificação a aplica de novo às linhas relidas depois de tomar a garra
+   * da fatura, e por isso duas ativações ao mesmo tempo (WhatsApp e IA) saem
+   * as duas na renovação. Quem chega com a garra tomada pela outra (`busy`)
+   * espera um pouco e tenta de novo, antes de gravar nada.
    */
   static async withReprice({ tenant, subscription, rowsAfter, escrever }) {
     const { default: SelfBillingService } = await import('./selfBillingService.js');
-    return SelfBillingService.repriceAround({ depois: subscription, tenant, escrever, addonRows: rowsAfter });
+    for (let tentativa = 0; ; tentativa += 1) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- só repete quando a garra é de outro
+        return await SelfBillingService.repriceAround({ depois: subscription, tenant, escrever, addonRows: rowsAfter });
+      } catch (error) {
+        if (error?.code !== 'busy' || tentativa >= REPRICE_RETRIES) throw error;
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => { setTimeout(resolve, REPRICE_RETRY_MS * (tentativa + 1)); });
+      }
+    }
   }
 
   /**
@@ -439,11 +477,10 @@ class AddonService {
       return { addon, already: true, row: existente, proration: null, charge: 'none' };
     }
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
-    const atuais = await TenantAddon.listActive();
 
     if (existente) {
       // A reativação antes da renovação: o período já está pago com ele.
-      const depois = atuais.map((linha) => (Number(linha.id) === Number(existente.id) ? { ...linha, cancel_at: null } : linha));
+      const depois = (linhas) => linhas.map((linha) => (Number(linha.id) === Number(existente.id) ? { ...linha, cancel_at: null } : linha));
       const { charge, reissue } = await this.withReprice({
         tenant,
         subscription,
@@ -470,7 +507,10 @@ class AddonService {
     const resultado = await this.withReprice({
       tenant,
       subscription,
-      rowsAfter: [...atuais, nova],
+      // Sem a própria linha, se ela já estiver lá (a repetição da garra
+      // depois de gravar não acontece, mas a conta não pode contá-la duas
+      // vezes — `renewalItemsFor` também deduplica).
+      rowsAfter: (linhas) => [...linhas.filter((linha) => Number(linha.addon_id) !== Number(addon.id)), nova],
       escrever: async () => {
         try {
           rowId = await TenantAddon.insertActive({ addonId: addon.id, startedAt: now, createdBy: actorUserId });
@@ -536,10 +576,9 @@ class AddonService {
 
     const renovacao = asDate(subscription.renews_at);
     const correndo = subscription.status === 'active' && renovacao && renovacao.getTime() > now.getTime();
-    const atuais = await TenantAddon.listActive();
-    const depois = correndo
-      ? atuais.map((item) => (Number(item.id) === Number(linha.id) ? { ...item, cancel_at: renovacao } : item))
-      : atuais.filter((item) => Number(item.id) !== Number(linha.id));
+    const depois = (linhas) => (correndo
+      ? linhas.map((item) => (Number(item.id) === Number(linha.id) ? { ...item, cancel_at: renovacao } : item))
+      : linhas.filter((item) => Number(item.id) !== Number(linha.id)));
     const { charge, reissue } = await this.withReprice({
       tenant,
       subscription,
@@ -583,8 +622,7 @@ class AddonService {
         await escrever();
         return { charge: 'none' };
       }
-      const rows = rowsAfterOf(await TenantAddon.listActive());
-      return this.withReprice({ tenant, subscription, rowsAfter: rows, escrever });
+      return this.withReprice({ tenant, subscription, rowsAfter: rowsAfterOf, escrever });
     });
   }
 

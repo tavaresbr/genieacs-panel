@@ -5815,6 +5815,10 @@ const zhCN: Dictionary = {
   'platform.addons.reason': "原因",
   'platform.addons.grant': "赠送",
   'platform.revenue.addonMrr': "+ 附加组件 {value}",
+  'affiliates.commissionStatus.held': "暂扣",
+  'affiliates.payouts.pixKeyChanged': "批准后推广员的 Pix 密钥已更改：发送前请重新批准。",
+  'platform.addons.form.gatedImpact': "设为必需后，{count} 个活跃服务商将无法使用此功能。是否继续？",
+  'platform.addons.form.gatedBackground': "开启后在后台同样生效：机器人和 AI 客服不再回复，营销活动和催缴不再发送，告警仅通过邮件和 Telegram 发送。故障和维护通知照常发送。",
 }
 
 export default zhCN

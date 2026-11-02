@@ -5824,6 +5824,10 @@ const ar: Dictionary = {
   'platform.addons.reason': "السبب",
   'platform.addons.grant': "منح",
   'platform.revenue.addonMrr': "+ {value} من الإضافات",
+  'affiliates.commissionStatus.held': "محتجزة",
+  'affiliates.payouts.pixKeyChanged': "تغيّر مفتاح Pix الخاص بالشريك بعد الموافقة: وافق مرة أخرى قبل الإرسال.",
+  'platform.addons.form.gatedImpact': "سيفقد {count} من المزوّدين النشطين الوصول إلى هذه الميزة عند جعلها إلزامية. هل تريد المتابعة؟",
+  'platform.addons.form.gatedBackground': "عند التفعيل يسري أيضًا في الخلفية: لا يرد الروبوت ولا مساعد الذكاء الاصطناعي، ولا تُرسل الحملات ولا تذكيرات الدفع، وتصل التنبيهات عبر البريد وTelegram فقط. تستمر إشعارات الأعطال والصيانة.",
 }
 
 export default ar

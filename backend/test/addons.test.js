@@ -583,3 +583,126 @@ describe('o console e o isolamento', () => {
     assert.equal(JSON.parse(trilha.detail).reason, 'pedido do cliente');
   });
 });
+
+describe('a porta fora das telas (revisão)', () => {
+  const ligarPorta = async (addon = addons.whatsapp) => {
+    await getDb()('addons').where({ id: addon.id }).update({ gated: true, trial_access: false });
+    AddonService.invalidateCatalog();
+  };
+  const get = (caminho) => call(`${panelUrl}/api/whatsapp${caminho}`, { headers: authHeaders(donoToken) });
+
+  it('com a porta do WhatsApp ligada, alertas, quedas, manutenções e indicações continuam abertos', async () => {
+    await ligarPorta();
+    assert.equal((await get('/accounts')).status, 402, 'o WhatsApp fecha');
+    for (const caminho of ['/alerts/settings', '/outages', '/maintenances', '/referrals']) {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await get(caminho);
+      assert.notEqual(res.status, 402, `${caminho}: ${JSON.stringify(res.body)}`);
+      assert.ok(res.status < 500, `${caminho}: ${res.status}`);
+    }
+  });
+
+  it('o bot, a campanha agendada e o alerta por WhatsApp param sem o add-on — e voltam sem a porta', async () => {
+    const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
+    const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
+    const { default: WaBotService } = await import('../src/services/waBotService.js');
+    const { default: WaBroadcastService } = await import('../src/services/waBroadcastService.js');
+    const { default: WaAlertService } = await import('../src/services/waAlertService.js');
+    await runInTenant(alfa, async () => {
+      await WhatsAppConfigService.saveConfig({
+        enabled: true, webhookBaseUrl: 'https://painel.addons.test/api/whatsapp-webhook', rateLimitPerMin: 60
+      });
+      if (!(await WhatsAppAccount.getForPurpose('billing'))) {
+        await WhatsAppAccount.create({
+          name: 'addons-avisos',
+          purpose: 'billing',
+          flavor: 'v2',
+          base_url: 'https://evo.addons.test',
+          status: 'connected',
+          is_default: true,
+          ...WhatsAppConfigService.encryptInstanceToken('token-instancia'),
+          ...WhatsAppConfigService.encryptWebhookToken('token-webhook')
+        });
+      }
+    });
+    const db = getDb();
+    const { default: WaBroadcast } = await import('../src/models/WaBroadcast.js');
+    const agendada = async () => (await runInTenant(alfa, () => WaBroadcast.create({
+      title: 'Aviso', body: 'Oi', status: 'queued', scheduled_at: daquiA(-1)
+    }))).id;
+    const conversa = { id: 1, wa_phone_e164: '5511999990000' };
+
+    await ligarPorta();
+    const bot = await runInTenant(alfa, () => WaBotService.responder({ conversation: conversa, messageId: 1, body: 'menu', direction: 'in' }));
+    assert.equal(bot.reason, 'addon_required');
+    const fechada = await agendada();
+    await runInTenant(alfa, () => WaBroadcastService.tickForTenant());
+    assert.equal((await db('wa_broadcasts').where({ id: fechada }).first()).status, 'queued', 'a campanha espera o add-on');
+    const canais = await runInTenant(alfa, () => WaAlertService.readyChannels({
+      recipients: ['5511988887777'], emailRecipients: [], telegram: { token: 'x', chatId: '-100' }
+    }));
+    assert.equal(canais.whatsapp, null);
+    assert.equal(canais.reason, 'addon_required');
+    assert.ok(canais.telegram, 'o Telegram não depende do add-on');
+
+    // Sem a porta, tudo como era.
+    await db('addons').update({ gated: false });
+    AddonService.invalidateCatalog();
+    const solto = await runInTenant(alfa, () => WaBotService.responder({ conversation: conversa, messageId: 1, body: 'menu', direction: 'in' }));
+    assert.notEqual(solto.reason, 'addon_required');
+    await runInTenant(alfa, () => WaBroadcastService.tickForTenant());
+    assert.notEqual((await db('wa_broadcasts').where({ id: fechada }).first()).status, 'queued', 'a campanha começa');
+    await db('wa_broadcasts').where({ id: fechada }).update({ status: 'canceled' });
+    await runInTenant(alfa, () => WhatsAppConfigService.saveConfig({ enabled: false }));
+  });
+
+  it('o isento de cobrança passa pela porta; a prévia do console conta quem perderia o acesso', async () => {
+    await ligarPorta();
+    const contar = async () => (await platform('/addons')).body.data.addons.find((a) => a.code === 'whatsapp').gateImpactCount;
+    const antes = await contar();
+    assert.ok(antes >= 2, `alfa e beta perderiam: ${antes}`);
+    assert.equal((await platform('/addons')).body.data.addons.find((a) => a.code === 'centavos').gateImpactCount, antes);
+
+    assert.equal((await ativar('whatsapp')).status, 200);
+    assert.equal(await contar(), antes - 1, 'quem tem o add-on não perde nada');
+
+    assert.ok(await runInTenant(beta, () => AddonService.refusalFor('whatsapp')));
+    await getDb()('subscriptions').where({ tenant_id: beta }).update({ billing_exempt_at: new Date() });
+    await SubscriptionService.invalidate(beta);
+    assert.equal(await runInTenant(beta, () => AddonService.refusalFor('whatsapp')), null);
+    assert.equal(await contar(), antes - 2, 'o isento não perde nada');
+  });
+});
+
+describe('a fatura da renovação com add-ons ao mesmo tempo (revisão)', () => {
+  it('duas ativações em paralelo saem as duas na renovação já emitida', async () => {
+    await assinar(alfa, { renewsAt: daquiA(2) });
+    assert.equal((await emitir(alfa)).issued, true);
+    const [a, b] = await Promise.all([ativar('whatsapp'), ativar('ia')]);
+    assert.equal(a.status, 200, JSON.stringify(a.body));
+    assert.equal(b.status, 200, JSON.stringify(b.body));
+    const [renovacao] = (await cobrancasDe(alfa)).filter(ehRenovacao);
+    assert.equal(Number(renovacao.amount_cents), 20000 + 6000 + 3000);
+    assert.deepEqual(BillingCharge.addonsOf(renovacao).map((i) => i.code).sort(), ['ia', 'whatsapp']);
+  });
+
+  it('com o valor mudado à mão, o add-on entra como diferença por cima dele, e a marca fica', async () => {
+    await assinar(alfa, { renewsAt: daquiA(2) });
+    assert.equal((await emitir(alfa)).issued, true);
+    const [antes] = (await cobrancasDe(alfa)).filter(ehRenovacao);
+    const marca = new Date(Math.floor(Date.now() / 1000) * 1000);
+    await getDb()('billing_charges').where({ id: antes.id }).update({ amount_cents: 15000, amount_overridden_at: marca });
+
+    assert.equal((await ativar('ia')).status, 200);
+    let [depois] = (await cobrancasDe(alfa)).filter(ehRenovacao);
+    assert.equal(Number(depois.amount_cents), 15000 + 3000);
+    assert.ok(depois.amount_overridden_at, 'o valor à mão continua marcado');
+    assert.deepEqual(BillingCharge.addonsOf(depois).map((i) => i.code), ['ia']);
+
+    // Cancelar devolve a diferença — de volta ao valor dado à mão.
+    assert.equal((await cancelar('ia')).status, 200);
+    [depois] = (await cobrancasDe(alfa)).filter(ehRenovacao);
+    assert.equal(Number(depois.amount_cents), 15000);
+    assert.ok(depois.amount_overridden_at);
+  });
+});

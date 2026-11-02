@@ -47,6 +47,13 @@ export function PlatformAddons() {
     setForm(EMPTY_ADDON_FORM)
   }
 
+  // Ligar a porta de um add-on de recurso tira o recurso de quem não o tem:
+  // o console avisa quantos provedores ativos perderiam o acesso (a conta do
+  // servidor, `gateImpactCount`) e pede confirmação antes de salvar.
+  const atual = editando !== null ? addons?.find((a) => a.id === editando) ?? null : null
+  const ligandoPorta = form.kind === 'feature' && form.gated && !atual?.gated
+  const impacto = ligandoPorta ? (atual?.gateImpactCount ?? null) : null
+
   const salvar = async (event: React.FormEvent) => {
     event.preventDefault()
     const lido = addonPayloadFrom(form, { editing: editando !== null })
@@ -54,6 +61,7 @@ export function PlatformAddons() {
       toast.error(t(lido.error))
       return
     }
+    if (impacto !== null && impacto > 0 && !window.confirm(t('platform.addons.form.gatedImpact', { count: impacto }))) return
     setSalvando(true)
     try {
       const res = editando !== null
@@ -166,8 +174,17 @@ export function PlatformAddons() {
             {form.kind === 'feature' && (
               <label className="flex items-start gap-2 text-sm">
                 <input type="checkbox" checked={form.gated} onChange={(e) => set('gated', e.target.checked)} />
-                <span>{t('platform.addons.form.gated')}<span className="block text-xs text-muted-foreground">{t('platform.addons.form.gatedHint')}</span></span>
+                <span>
+                  {t('platform.addons.form.gated')}
+                  <span className="block text-xs text-muted-foreground">{t('platform.addons.form.gatedHint')}</span>
+                  <span className="block text-xs text-muted-foreground">{t('platform.addons.form.gatedBackground')}</span>
+                </span>
               </label>
+            )}
+            {impacto !== null && (
+              <p className="text-sm text-destructive" role="alert" data-testid="addon-gate-impact">
+                {t('platform.addons.form.gatedImpact', { count: impacto })}
+              </p>
             )}
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.trialAccess} onChange={(e) => set('trialAccess', e.target.checked)} />

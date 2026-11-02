@@ -18,8 +18,10 @@ import AffiliateService from '../services/affiliateService.js';
  *    vale nada nestas rotas.
  * 3. **Audiência e tipo próprios** no payload, conferidos.
  *
- * O afiliado é relido a cada requisição: suspenso, ou com a senha trocada
- * (a impressão do hash no cookie, como no portal do assinante), está fora.
+ * O afiliado é relido a cada requisição: suspenso, com a senha trocada (a
+ * impressão do hash no cookie, como no portal do assinante) ou com o e-mail
+ * trocado pelo console (a impressão do e-mail, idem), está fora — a senha é
+ * da pessoa daquele endereço. O algoritmo é fixo em HS256 na verificação.
  */
 export const AFFILIATE_COOKIE_NAME = 'skygp_affiliate_session';
 const AFFILIATE_SESSION_TTL_SECONDS = 60 * 60;
@@ -58,9 +60,21 @@ function passwordFingerprint(affiliate) {
   return crypto.createHash('sha256').update(String(hash)).digest('base64url').slice(0, 22);
 }
 
+/** A impressão do e-mail: trocá-lo no console encerra as sessões abertas. */
+function emailFingerprint(affiliate) {
+  const email = String(affiliate?.email ?? '').trim().toLowerCase();
+  if (!email) return null;
+  return crypto.createHash('sha256').update(email).digest('base64url').slice(0, 16);
+}
+
 export function signAffiliateSession(affiliate) {
   return jwt.sign(
-    { affiliateId: Number(affiliate.id), pwd: passwordFingerprint(affiliate), tokenType: 'affiliate' },
+    {
+      affiliateId: Number(affiliate.id),
+      pwd: passwordFingerprint(affiliate),
+      em: emailFingerprint(affiliate),
+      tokenType: 'affiliate'
+    },
     affiliateSecret,
     { expiresIn: AFFILIATE_SESSION_TTL_SECONDS, issuer: 'skygenpanel', audience: AUDIENCE }
   );
@@ -95,7 +109,7 @@ export async function authenticateAffiliate(req, res, next) {
   if (!token) return recusar(req, res, 'affiliate_session_required');
   let decoded;
   try {
-    decoded = jwt.verify(token, affiliateSecret, { issuer: 'skygenpanel', audience: AUDIENCE });
+    decoded = jwt.verify(token, affiliateSecret, { issuer: 'skygenpanel', audience: AUDIENCE, algorithms: ['HS256'] });
   } catch {
     return recusar(req, res, 'affiliate_session_expired');
   }
@@ -105,7 +119,8 @@ export async function authenticateAffiliate(req, res, next) {
     }
     const affiliate = await AffiliateService.findById(decoded.affiliateId);
     const atual = passwordFingerprint(affiliate);
-    if (!affiliate || affiliate.status !== 'active' || !atual || decoded.pwd !== atual) {
+    if (!affiliate || affiliate.status !== 'active' || !atual || decoded.pwd !== atual
+      || decoded.em !== emailFingerprint(affiliate)) {
       return recusar(req, res, 'affiliate_session_invalid');
     }
     req.affiliate = affiliate;

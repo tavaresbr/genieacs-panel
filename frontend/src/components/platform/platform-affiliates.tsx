@@ -462,7 +462,7 @@ export function PlatformAffiliates() {
                                   <tr key={c.id}>
                                     <td>{displayDate(c.accruedAt) ?? '—'}</td>
                                     <td className="wrap-break-word">{c.kind === 'clawback' ? t('affiliates.kind.clawback') : c.providerName}</td>
-                                    <td>{brl(c.baseCents)} × {bpToPercent(c.rateBp)}%</td>
+                                    <td>{brl(c.baseCents ?? 0)} × {bpToPercent(c.rateBp)}%</td>
                                     <td className="font-semibold">{brl(c.amountCents)}</td>
                                     <td><span className={affiliateBadgeClass(c.status)}>{t(COMMISSION_STATUS_KEYS[c.status])}</span></td>
                                   </tr>
@@ -511,6 +511,7 @@ export function PlatformAffiliates() {
                     </div>
                     <span className={affiliateBadgeClass(p.status)}>{t(PAYOUT_STATUS_KEYS[p.status])}</span>
                   </div>
+                  {pode.reapprove && <p className="mt-2 text-sm text-destructive">{t('affiliates.payouts.pixKeyChanged')}</p>}
                   {p.error && <p className="mt-2 break-all text-sm text-destructive">{p.error}</p>}
                   {p.paidNote && <p className="mt-2 wrap-break-word text-sm text-muted-foreground">{p.paidNote}</p>}
                   <div className="mt-3 flex flex-wrap gap-2">

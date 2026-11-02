@@ -3221,7 +3221,9 @@ const affiliatesTable = (db) => (t) => {
  *                    a transferência anterior foi recusada PELO BANCO);
  *   transfer_*       o id e o estado da transferência Pix no gateway;
  *   error_code       `uncertain` quando a resposta se perdeu: o reenvio exige
- *                    a confirmação de quem opera de que nada saiu.
+ *                    a confirmação de quem opera de que nada saiu;
+ *   approved_pix_*   o retrato da chave Pix do afiliado na aprovação: o envio
+ *                    recusa (`pix_key_changed`) se a chave mudou depois dela.
  */
 const affiliatePayoutsTable = (db) => (t) => {
   t.increments('id').primary();
@@ -3239,6 +3241,8 @@ const affiliatePayoutsTable = (db) => (t) => {
   t.string('pix_key_type', 8).nullable();
   t.integer('approved_by').unsigned().nullable();
   t.timestamp('approved_at').nullable();
+  t.string('approved_pix_key', 140).nullable();
+  t.string('approved_pix_key_type', 8).nullable();
   t.timestamp('sent_at').nullable();
   t.timestamp('paid_at').nullable();
   t.boolean('paid_manually').notNullable().defaultTo(false);
@@ -3260,7 +3264,8 @@ const affiliatePayoutsTable = (db) => (t) => {
  * TRANSAÇÃO do pagamento. `clawback` é o estorno de uma comissão que já foi
  * para um lote: valor negativo, `<referência>:refund`, abatido do próximo.
  *
- *   status  accrued | reversed | in_payout | paid.
+ *   status  accrued | reversed | in_payout | paid | held (o afiliado suspenso:
+ *           guardada, volta a `accrued` na reativação dentro da janela).
  *
  * `tenant_id` é inteiro simples, sem chave estrangeira, como em
  * `platform_audit`: a comissão já paga é registro de dinheiro que saiu, e não
@@ -3289,6 +3294,15 @@ const affiliateCommissionsTable = (db) => (t) => {
   t.index(['payout_id'], 'affiliate_commissions_payout_idx');
   t.index(['tenant_id'], 'affiliate_commissions_tenant_idx');
 };
+
+/**
+ * O retrato da chave Pix na aprovação, para a base que já rodou a 0124 antes
+ * de ele existir (o desenvolvimento): a tabela nova já nasce com ele.
+ */
+const AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS = [
+  ['approved_pix_key', (t) => t.string('approved_pix_key', 140).nullable()],
+  ['approved_pix_key_type', (t) => t.string('approved_pix_key_type', 8).nullable()]
+];
 
 const AFFILIATE_TABLES = [
   ['affiliates', affiliatesTable],
@@ -7178,6 +7192,7 @@ export const migrations = [
       for (const [nome] of AFFILIATE_TABLES) {
         if (!(await db.schema.hasTable(nome))) return false;
       }
+      if ((await missingColumns(db, 'affiliate_payouts', AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS)).length) return false;
       return true;
     },
     async up(db) {
@@ -7191,6 +7206,12 @@ export const migrations = [
       for (const [nome, construtor] of AFFILIATE_TABLES) {
         // eslint-disable-next-line no-await-in-loop -- três tabelas, em ordem
         await createTableIfMissing(db, nome, construtor(db));
+      }
+      const semRetrato = await missingColumns(db, 'affiliate_payouts', AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS);
+      if (semRetrato.length) {
+        await db.schema.alterTable('affiliate_payouts', (t) => {
+          for (const add of semRetrato) add(t);
+        });
       }
     }
   },

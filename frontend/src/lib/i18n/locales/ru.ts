@@ -5823,6 +5823,10 @@ const ru: Dictionary = {
   'platform.addons.reason': "Причина",
   'platform.addons.grant': "Выдать",
   'platform.revenue.addonMrr': "+ {value} за дополнения",
+  'affiliates.commissionStatus.held': "Удержана",
+  'affiliates.payouts.pixKeyChanged': "Ключ Pix партнёра изменился после одобрения: одобрите снова перед отправкой.",
+  'platform.addons.form.gatedImpact': "{count} активных провайдеров потеряют доступ к этой функции, если она станет обязательной. Продолжить?",
+  'platform.addons.form.gatedBackground': "Во включённом состоянии действует и в фоне: бот и ИИ-ассистент не отвечают, кампании и напоминания об оплате не отправляются, а оповещения идут только по e-mail и Telegram. Уведомления о сбоях и работах продолжают отправляться.",
 }
 
 export default ru

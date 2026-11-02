@@ -5815,6 +5815,10 @@ const fr: Dictionary = {
   'platform.addons.reason': "Motif",
   'platform.addons.grant': "Accorder",
   'platform.revenue.addonMrr': "+ {value} en modules",
+  'affiliates.commissionStatus.held': "Retenue",
+  'affiliates.payouts.pixKeyChanged': "La clé Pix de l'affilié a changé après l'approbation : approuvez de nouveau avant d'envoyer.",
+  'platform.addons.form.gatedImpact': "{count} fournisseur(s) actif(s) perdraient l'accès à cette fonctionnalité si elle devient obligatoire. Continuer ?",
+  'platform.addons.form.gatedBackground': "Activée, elle s'applique aussi en arrière-plan : le bot et l'assistant IA ne répondent plus, les campagnes et les relances de paiement ne partent plus et les alertes passent uniquement par e-mail et Telegram. Les avis de panne et de maintenance continuent.",
 }
 
 export default fr

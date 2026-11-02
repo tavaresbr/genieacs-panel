@@ -1,4 +1,6 @@
+import crypto from 'node:crypto';
 import http from 'node:http';
+import jwt from 'jsonwebtoken';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -18,6 +20,7 @@ const { attachLocale } = await import('../src/middleware/locale.js');
 const { resolveTenant } = await import('../src/middleware/tenantResolver.js');
 const { default: platformAffiliatesRoutes } = await import('../src/routes/platformAffiliates.js');
 const { default: affiliatePortalRoutes } = await import('../src/routes/affiliatePortal.js');
+const { DEVELOPMENT_FALLBACK } = await import('../src/config/runtimeEnv.js');
 
 /**
  * O programa de afiliados (0124) — o dinheiro. O cadastro com `?aff=` está em
@@ -277,7 +280,7 @@ describe('a comissão', () => {
     assert.equal(JSON.parse(evento.detail).affiliateCommission.amountCents, 2000);
   });
 
-  it('não nasce depois da janela, nem para afiliado suspenso', async () => {
+  it('não nasce depois da janela; para o afiliado suspenso, fica guardada (`held`)', async () => {
     const af = await afiliado();
     const velho = await indicado(af.id, { diasAtras: 400 });
     await pagar(velho, { amountCents: 20000, externalId: `pay_velho_${velho}` });
@@ -287,7 +290,39 @@ describe('a comissão', () => {
     const id = await indicado(suspenso.id, { diasAtras: 5 });
     await AffiliateService.setStatus(suspenso.id, 'suspended');
     await pagar(id, { amountCents: 20000, externalId: `pay_susp_${id}` });
-    assert.equal((await comissoesDe(suspenso.id)).length, 0);
+    const [guardada] = await comissoesDe(suspenso.id);
+    assert.equal(guardada.status, 'held');
+    assert.equal(Number(guardada.amount_cents), 2000);
+
+    // Guardada não entra em lote.
+    const futuro = new Date(Date.now() + 40 * DAY);
+    await AffiliatePayoutService.buildBatches({ period: previousPeriod(futuro), now: futuro });
+    assert.equal((await lotesDe(suspenso.id)).length, 0);
+    const totais = (await AffiliateService.totalsByAffiliate([suspenso.id])).get(Number(suspenso.id));
+    assert.equal(totais.heldCents, 2000);
+
+    // Reativado dentro da janela: volta a `accrued`, com a data de origem.
+    const reativado = await AffiliateService.setStatus(suspenso.id, 'active');
+    assert.deepEqual(reativado.released, { released: 1, forfeited: 0 });
+    const [liberada] = await comissoesDe(suspenso.id);
+    assert.equal(liberada.status, 'accrued');
+    assert.equal(new Date(liberada.accrued_at).getTime(), new Date(guardada.accrued_at).getTime());
+  });
+
+  it('a guardada de janela vencida na reativação é perdida; o estorno desfaz a guardada', async () => {
+    const af = await afiliado({ months: 1 });
+    const id = await indicado(af.id, { diasAtras: 20 });
+    await AffiliateService.setStatus(af.id, 'suspended');
+    await pagar(id, { amountCents: 20000, externalId: `pay_held_a_${id}` });
+    await pagar(id, { amountCents: 20000, externalId: `pay_held_b_${id}` });
+    await estornar(id, `pay_held_b_${id}`);
+    const linhas = await comissoesDe(af.id);
+    assert.deepEqual(linhas.map((l) => l.status), ['held', 'reversed']);
+    // A reativação vem 15 dias depois: a janela de 1 mês já fechou.
+    const depois = new Date(Date.now() + 15 * DAY);
+    const r = await AffiliateService.setStatus(af.id, 'active', { now: depois });
+    assert.deepEqual(r.released, { released: 0, forfeited: 1 });
+    assert.equal((await comissoesDe(af.id))[0].status, 'reversed');
   });
 
   it('respeita a taxa e a janela do próprio afiliado', async () => {
@@ -368,6 +403,47 @@ describe('o estorno', () => {
     assert.equal(abatimento.status, 'accrued');
     assert.equal(abatimento.payment_ref, `pay_r2_${id}:refund`);
   });
+
+  it('a aprovação recalcula o total pelas comissões do lote', async () => {
+    const { af, lote } = await comLote();
+    // Um total que não bate (o de um estorno que correu pela metade).
+    await getDb()('affiliate_payouts').where({ id: lote.id }).update({ amount_cents: 999999, commission_count: 7 });
+    const aprovado = await AffiliatePayoutService.approve(lote.id);
+    const soma = (await comissoesDe(af.id)).filter((c) => c.status === 'in_payout')
+      .reduce((t, c) => t + Number(c.amount_cents), 0);
+    assert.equal(Number(aprovado.amount_cents), soma);
+    assert.equal(Number(aprovado.commission_count), 1);
+  });
+
+  for (const ordem of ['estorno antes', 'aprovação antes']) {
+    it(`estorno e aprovação ao mesmo tempo (${ordem}): o aprovado é a soma do que está nele`, async () => {
+      const af = await afiliado();
+      const id = await indicado(af.id, { diasAtras: 60 });
+      await pagar(id, { amountCents: 50000, externalId: `pay_c1_${id}` });
+      await pagar(id, { amountCents: 50000, externalId: `pay_c2_${id}` });
+      const futuro = new Date(Date.now() + 40 * DAY);
+      await AffiliatePayoutService.buildBatches({ period: previousPeriod(futuro), now: futuro });
+      const [lote] = await lotesDe(af.id);
+      const passos = [
+        () => estornar(id, `pay_c1_${id}`),
+        () => AffiliatePayoutService.approve(lote.id)
+      ];
+      if (ordem === 'aprovação antes') passos.reverse();
+      await Promise.all(passos.map((passo) => passo()));
+
+      const depois = await AffiliatePayoutService.findById(lote.id);
+      assert.equal(depois.status, 'approved');
+      const linhas = await comissoesDe(af.id);
+      const noLote = linhas.filter((c) => Number(c.payout_id) === Number(lote.id) && c.status === 'in_payout');
+      assert.equal(Number(depois.amount_cents), noLote.reduce((t, c) => t + Number(c.amount_cents), 0));
+      assert.equal(Number(depois.commission_count), noLote.length);
+      // O estornado ou saiu do lote, ou virou abatimento — nunca os dois, nunca nenhum.
+      const saiu = linhas.some((c) => c.payment_ref === `pay_c1_${id}` && c.status === 'reversed');
+      const abatido = linhas.some((c) => c.kind === 'clawback');
+      assert.equal(saiu !== abatido, true, JSON.stringify(linhas.map((c) => [c.kind, c.status, c.payout_id])));
+      assert.equal(Number(depois.amount_cents), saiu ? 5000 : 10000);
+    });
+  }
 });
 
 describe('o lote mensal', () => {
@@ -485,7 +561,78 @@ describe('o Pix do lote', () => {
     assert.equal(de_novo.status, 200, JSON.stringify(de_novo.body));
     assert.equal(de_novo.body.data.payout.status, 'sent');
     assert.equal(transferencias().length, 2);
-    assert.equal(transferencias()[1].idem, chave);
+    // A recusa 4xx pode estar guardada no gateway com a chave: o reenvio
+    // depois dela usa outra, para não ouvir a mesma recusa de novo.
+    assert.equal(transferencias()[0].idem, chave);
+    assert.notEqual(transferencias()[1].idem, chave);
+  });
+
+  it('banco recusou → reenvio com chave nova → resposta perdida → a confirmação reusa a chave nova', async () => {
+    const { lote } = await comLote();
+    await AffiliatePayoutService.approve(lote.id);
+    await AffiliatePayoutService.send(lote.id);
+    const enviado = await AffiliatePayoutService.findById(lote.id);
+    await entregar({ event: 'TRANSFER_FAILED', transfer: { id: enviado.transfer_id, status: 'FAILED', failReason: 'Conta encerrada' } });
+
+    // O reenvio troca a chave e já tira do lote a transferência recusada.
+    respostaDaTransferencia = [502, { message: 'bad gateway' }];
+    const incerto = await AffiliatePayoutService.send(lote.id);
+    assert.equal(incerto.status, 'failed');
+    assert.equal(incerto.error_code, 'uncertain');
+    assert.equal(incerto.transfer_id, null);
+    assert.equal(incerto.transfer_status, null);
+    assert.notEqual(incerto.idempotency_key, enviado.idempotency_key);
+
+    // A confirmação de que nada saiu reusa a chave do envio incerto — se o
+    // Pix saiu, o gateway devolve o mesmo em vez de mandar outro.
+    respostaDaTransferencia = null;
+    await assert.rejects(AffiliatePayoutService.send(lote.id), { code: 'confirm_not_sent' });
+    const final = await AffiliatePayoutService.send(lote.id, { confirmNotSent: true });
+    assert.equal(final.status, 'sent');
+    const idems = transferencias().map((t) => t.idem);
+    assert.equal(idems.length, 3);
+    assert.notEqual(idems[0], idems[1]);
+    assert.equal(idems[1], idems[2]);
+    assert.equal(final.idempotency_key, idems[2]);
+  });
+
+  it('o webhook TRANSFER_* nunca responde 500 — a consulta de hora em hora acerta', async () => {
+    const original = AffiliatePayoutService.applyTransferWebhook;
+    AffiliatePayoutService.applyTransferWebhook = async () => { throw new Error('banco fora do ar'); };
+    try {
+      const r = await entregar({ event: 'TRANSFER_DONE', transfer: { id: 'tra_qualquer', status: 'DONE' } });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      assert.equal(r.body.code, 'transfer_deferred');
+    } finally {
+      AffiliatePayoutService.applyTransferWebhook = original;
+    }
+  });
+
+  it('a chave Pix trocada depois da aprovação barra o envio até nova aprovação', async () => {
+    const { af, lote } = await comLote();
+    await AffiliatePayoutService.approve(lote.id);
+    const aprovado = await AffiliatePayoutService.findById(lote.id);
+    assert.equal(aprovado.approved_pix_key, af.pix_key);
+    await AffiliateService.update(af.id, { pixKey: 'nova-chave@pix.test', pixKeyType: 'EMAIL' });
+
+    const r = await noConsole(`/api/platform/affiliate-payouts/${lote.id}/send`, { method: 'POST', body: {} });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.code, 'pix_key_changed');
+    assert.equal(transferencias().length, 0);
+    const lista = await noConsole('/api/platform/affiliate-payouts');
+    assert.equal(lista.body.data.payouts.find((p) => p.id === Number(lote.id)).pixKeyChanged, true);
+
+    // A nova aprovação confere a chave nova; aí sai, para ela.
+    const de_novo = await noConsole(`/api/platform/affiliate-payouts/${lote.id}/approve`, { method: 'POST', body: {} });
+    assert.equal(de_novo.status, 200, JSON.stringify(de_novo.body));
+    assert.equal(de_novo.body.data.payout.approvedPixKey, 'nova-chave@pix.test');
+    const enviado = await noConsole(`/api/platform/affiliate-payouts/${lote.id}/send`, { method: 'POST', body: {} });
+    assert.equal(enviado.body.data.payout.status, 'sent');
+    assert.equal(transferencias()[0].payload.pixAddressKey, 'nova-chave@pix.test');
+    // Sem troca de chave, aprovar de novo o aprovado continua recusado.
+    const outro = await comLote();
+    await AffiliatePayoutService.approve(outro.lote.id);
+    await assert.rejects(AffiliatePayoutService.approve(outro.lote.id), { code: 'not_draft' });
   });
 
   it('a resposta perdida exige a confirmação de que nada saiu, e reusa a mesma chave', async () => {
@@ -626,6 +773,10 @@ describe('o portal do afiliado', () => {
     assert.equal(visao.body.data.commissions.length, 1);
     assert.equal(visao.body.data.commissions[0].amountCents, 2000);
     assert.equal(visao.body.data.commissions[0].tenantId, undefined);
+    // A base (o valor da fatura do indicado) não vai ao portal; a taxa e a data, sim.
+    assert.equal(visao.body.data.commissions[0].baseCents, undefined);
+    assert.equal(visao.body.data.commissions[0].rateBp, 1000);
+    assert.ok(visao.body.data.commissions[0].accruedAt);
     const texto = JSON.stringify(visao.body);
     assert.equal(texto.includes(`pay_portal_b_${deB}`), false);
     assert.equal(texto.includes('Provedor Indicado'), false);
@@ -662,5 +813,38 @@ describe('o portal do afiliado', () => {
     await AffiliateService.setStatus(af.id, 'suspended');
     assert.equal((await noPortal('/overview', { cookie: nova })).status, 401);
     assert.equal((await noPortal('/login', { method: 'POST', body: { email: af.email, password: 'outra-senha-12' } })).status, 401);
+  });
+
+  it('a senha segue a política (nem comum, nem o e-mail); trocar o e-mail encerra a sessão', async () => {
+    const af = await afiliado();
+    const { token } = await AffiliateService.issuePasswordLink(af.id);
+    const igualAoEmail = await noPortal('/password', { method: 'POST', body: { token, password: af.email } });
+    assert.equal(igualAoEmail.status, 400);
+    assert.equal(igualAoEmail.body.code, 'weak_password');
+    assert.equal(igualAoEmail.body.problem, 'password_matches_identity');
+    const comum = await noPortal('/password', { method: 'POST', body: { token, password: 'password123' } });
+    assert.equal(comum.status, 400);
+    assert.equal(comum.body.problem, 'password_too_common');
+    // A recusa da política não gasta o link.
+    const cookie = await entrarComo(af, 'uma-senha-boa-77');
+    assert.equal((await noPortal('/overview', { cookie })).status, 200);
+    await AffiliateService.update(af.id, { email: `trocado-${af.id}@afiliados.test` });
+    assert.equal((await noPortal('/overview', { cookie })).status, 401);
+  });
+
+  it('a sessão só vale assinada em HS256', async () => {
+    const af = await afiliado();
+    const cookie = await entrarComo(af, 'senha-do-hs-256');
+    const token = decodeURIComponent(cookie.split('=')[1]);
+    const segredo = process.env.AFFILIATE_JWT_SECRET || crypto
+      .createHmac('sha256', process.env.JWT_SECRET || DEVELOPMENT_FALLBACK)
+      .update('skygenpanel-affiliate-portal-v1')
+      .digest('hex');
+    const { iat, exp, ...payload } = jwt.verify(token, segredo, { algorithms: ['HS256'] });
+    assert.ok(iat && exp);
+    const assinar = (algorithm) => jwt.sign(payload, segredo, { algorithm, expiresIn: 600 });
+    // A mesma sessão, assinada com o mesmo segredo: HS256 entra, HS512 não.
+    assert.equal((await noPortal('/overview', { cookie: `skygp_affiliate_session=${assinar('HS256')}` })).status, 200);
+    assert.equal((await noPortal('/overview', { cookie: `skygp_affiliate_session=${assinar('HS512')}` })).status, 401);
   });
 });

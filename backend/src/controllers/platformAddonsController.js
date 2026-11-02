@@ -89,12 +89,21 @@ function lerMutaveis(body, patch) {
 }
 
 class PlatformAddonsController {
-  /** `GET /api/platform/addons` — o catálogo, com quantos provedores têm cada um ativo. */
+  /**
+   * `GET /api/platform/addons` — o catálogo, com quantos provedores têm cada
+   * um ativo e, no de recurso, quantos PERDERIAM o acesso com a porta ligada
+   * (`gateImpactCount`, o aviso do console antes de ligar `gated`).
+   */
   static async list(req, res) {
     try {
       const [addons, uso] = await Promise.all([Addon.list(), Addon.activeUsage()]);
+      const impacto = await Addon.gateImpact(addons);
       return res.json(createResponse('Add-ons retrieved', {
-        addons: addons.map((addon) => ({ ...presentAddon(addon), activeCount: uso.get(Number(addon.id)) ?? 0 }))
+        addons: addons.map((addon) => ({
+          ...presentAddon(addon),
+          activeCount: uso.get(Number(addon.id)) ?? 0,
+          gateImpactCount: impacto.has(Number(addon.id)) ? impacto.get(Number(addon.id)) : null
+        }))
       }));
     } catch (error) {
       console.error('List add-ons (console) error:', error);

@@ -27,6 +27,7 @@ import {
   variaveisVazias
 } from '../utils/wa/waCobranca.js';
 import { dentroDaJanela, lerJanela, semanaPadraoCobranca } from '../utils/wa/waJanela.js';
+import AddonService from './addonService.js';
 
 /**
  * A régua de cobrança AUTOMÁTICA.
@@ -480,6 +481,9 @@ class WaDunningService {
     const rule = await this.getRule();
     if (!rule.enabled || rule.steps.length === 0) return false;
     if (!dentroDaJanela(rule.window, now)) return false;
+    // Sem o add-on de WhatsApp (0125), quando o catálogo o exige, a régua
+    // automática não sai — a tela já recusa o "Rodar agora" pela porta.
+    if (!(await AddonService.allows('whatsapp'))) return false;
     if (!lastRunAt) return true;
     const last = Date.parse(lastRunAt);
     return !Number.isFinite(last) || now.getTime() - last >= RUN_INTERVAL_MS;
@@ -1077,7 +1081,8 @@ class WaDunningService {
       if (pagas === 0) return { paid: 0, thanked: 0 };
       const rule = await this.getRule();
       let thanked = 0;
-      if (rule.enabled && rule.thanksTemplateId && dentroDaJanela(rule.window, new Date())) {
+      if (rule.enabled && rule.thanksTemplateId && dentroDaJanela(rule.window, new Date())
+        && await AddonService.allows('whatsapp')) {
         const account = await WhatsAppAccount.getForPurpose('billing');
         if (account) thanked = await this.sendThanks({ rule, account, now: new Date(), contract });
       }

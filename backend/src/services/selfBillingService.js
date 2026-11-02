@@ -15,6 +15,7 @@ import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import CardAutopayService from './billing/cardAutopayService.js';
 import AddonService from './addonService.js';
+import TenantAddon from '../models/TenantAddon.js';
 
 /**
  * O provedor cuidando da própria conta: ver os planos, trocar de plano e
@@ -207,34 +208,64 @@ async function reprecificarCobranca(subscription, planoInformado, { keepOverride
   // pode ser um que o console deixou sem preço.
   if (!(precoDoPlano > 0)) return nada;
   const aberta = await cobrancaEmAberto(subscription);
+  if (!aberta) return nada;
+  // As linhas de add-on de DEPOIS (`addonRows`): uma lista pronta, ou uma
+  // função das linhas ativas de agora — relida depois da garra, para duas
+  // ativações ao mesmo tempo (dois add-ons diferentes) não reemitirem a
+  // fatura cada uma com só o seu.
+  const linhasDeAddon = async () => (typeof addonRows === 'function'
+    ? addonRows(await TenantAddon.listActive())
+    : addonRows);
+  // O preço e a conta que a linha `lida` deve ter — ou nulo quando ela fica
+  // como está.
+  //
   // O excedente congelado na linha (0105) vai junto, e por cima do preço do
   // plano: trocar de plano ou de cupom muda o preço, não o uso do período que
   // fecha — e reemitir não pode recontá-lo (ver
   // `ChargeIssuingService.overageForPeriod`). A conta guarda as outras chaves
-  // que tiver (o crédito).
-  // Os add-ons recorrentes do período desta fatura (0125), por cima do plano
-  // e fora do cupom — lidos agora, ou os de DEPOIS de uma mudança ainda não
-  // gravada (`addonRows`, ver `repriceAround`).
-  const adicionais = aberta
-    ? await AddonService.renewalItems({
-      subscription, plan: plano, periodKey: String(aberta.period_end).slice(0, 10), rows: addonRows
-    })
-    : [];
-  const preco = precoDoPlano + BillingCharge.overageCentsOf(aberta)
-    + adicionais.reduce((soma, item) => soma + item.cents, 0);
-  const conta = aberta
-    ? BillingCharge.mergePricingDetail(aberta, {
-      base: precoDoPlano,
-      ...(adicionais.length || BillingCharge.addonsOf(aberta).length ? { addons: adicionais } : {})
-    })
-    : null;
+  // que tiver (o crédito). Os add-ons recorrentes do período desta fatura
+  // (0125), por cima do plano e fora do cupom — lidos agora, ou os de DEPOIS
+  // de uma mudança ainda não gravada (ver `repriceAround`).
+  //
   // O valor mudado à mão pelo console (0078) vence o cupom: quem aplica ou
   // tira um cupom não desfaz o desconto que alguém deu a dedo àquela fatura.
-  // (A troca de plano não passa isto: um plano novo é outra fatura.)
-  if (keepOverride && aberta?.amount_overridden_at) return nada;
-  if (!aberta) return nada;
+  // (A troca de plano não passa isto: um plano novo é outra fatura.) Mas a
+  // mudança de add-on não é ignorada nela: a DIFERENÇA dos add-ons entra por
+  // cima do valor dado à mão, e a marca do valor à mão fica.
+  const alvoPara = async (lida) => {
+    const adicionais = await AddonService.renewalItems({
+      subscription, plan: plano, periodKey: String(lida.period_end).slice(0, 10), rows: await linhasDeAddon()
+    });
+    const totalAdicionais = adicionais.reduce((soma, item) => soma + item.cents, 0);
+    if (keepOverride && lida.amount_overridden_at) {
+      if (addonRows === undefined) return null;
+      const antes = BillingCharge.addonsOf(lida).filter((item) => !item.proration)
+        .reduce((soma, item) => soma + item.cents, 0);
+      const delta = totalAdicionais - antes;
+      if (delta === 0) return null;
+      const base = BillingCharge.baseAmountOf(lida);
+      // Nunca abaixo do piso do gateway por causa do desconto (a não ser que
+      // o valor à mão já estivesse abaixo dele).
+      const piso = Math.min(base, SubscriptionService.PRORATION_MIN_CENTS);
+      return {
+        preco: Math.max(base + delta, piso),
+        conta: BillingCharge.mergePricingDetail(lida, { addons: adicionais }),
+        sobreposta: true
+      };
+    }
+    return {
+      preco: precoDoPlano + BillingCharge.overageCentsOf(lida) + totalAdicionais,
+      conta: BillingCharge.mergePricingDetail(lida, {
+        base: precoDoPlano,
+        ...(adicionais.length || BillingCharge.addonsOf(lida).length ? { addons: adicionais } : {})
+      }),
+      sobreposta: false
+    };
+  };
+  const previsto = await alvoPara(aberta);
+  if (!previsto) return nada;
   // Pelo preço antes do crédito reservado (0106): o abatido não é outro preço.
-  if (BillingCharge.baseAmountOf(aberta) === preco && String(aberta.currency || '').toUpperCase() === moeda) {
+  if (BillingCharge.baseAmountOf(aberta) === previsto.preco && String(aberta.currency || '').toUpperCase() === moeda) {
     // Mesmo valor, nada a reemitir — mas a linha passa a dizer o plano e o
     // cupom de agora (dois planos no mesmo preço, o cupom no piso), que é o
     // que o pagamento dela vai ler. A de valor mudado à mão fica como está.
@@ -259,18 +290,20 @@ async function reprecificarCobranca(subscription, planoInformado, { keepOverride
   const minha = await BillingCharge.claim(aberta.id, { until: garraAte, now: agora, unissued: false });
   if (!minha) throw ocupado();
 
-  // Relida DEPOIS da garra: a leitura de cima pode ser de antes de outra
-  // troca terminar, e decidir por ela cancelaria de novo um id que já não
-  // é o da linha. Se a outra troca já deixou a linha no preço novo (ou a
-  // cobrança fechou no meio), não há o que fazer aqui.
+  // Relida DEPOIS da garra — a linha e as linhas de add-on: a leitura de
+  // cima pode ser de antes de outra troca terminar, e decidir por ela
+  // cancelaria de novo um id que já não é o da linha (ou reemitiria sem o
+  // add-on que a outra acabou de gravar). Se a outra troca já deixou a linha
+  // no preço novo (ou a cobrança fechou no meio), não há o que fazer aqui.
   const linha = await BillingCharge.findById(aberta.id);
-  const jaNoPreco = linha && BillingCharge.baseAmountOf(linha) === preco
+  const alvo = linha && OPEN_CHARGE_STATUSES.includes(linha.status) ? await alvoPara(linha) : null;
+  const jaNoPreco = alvo && BillingCharge.baseAmountOf(linha) === alvo.preco
     && String(linha.currency || '').toUpperCase() === moeda;
-  if (!linha || jaNoPreco || !OPEN_CHARGE_STATUSES.includes(linha.status)
-    || (keepOverride && linha.amount_overridden_at)) {
+  if (!linha || !alvo || jaNoPreco) {
     if (linha) await BillingCharge.release(linha.id);
     return nada;
   }
+  const { preco, conta } = alvo;
 
   if (linha.gateway_charge_id) {
     // A do gateway sai ANTES de o plano mudar, e a falha dela para tudo.
@@ -302,11 +335,18 @@ async function reprecificarCobranca(subscription, planoInformado, { keepOverride
   // entre as duas escritas seria emitida pelo agendador ou por um "pagar
   // agora" com o preço que o estado velho ainda diz. Quem chama a solta em
   // `reemitir` — ou em `soltar`, se a gravação falhar.
+  //
+  // Na de valor mudado à mão, o plano, o cupom e o ciclo gravados ficam (o
+  // valor não é o de plano nenhum), e a marca volta logo depois do reset —
+  // ainda com a garra, então ninguém a emite pelo preço do plano no meio.
   if (!(await BillingCharge.resetForReissue(linha.id, {
-    amountCents: preco, currency: moeda, holdUntil: garraAte, ...precificacao, pricingDetail: conta
+    amountCents: preco, currency: moeda, holdUntil: garraAte, ...(alvo.sobreposta ? {} : precificacao), pricingDetail: conta
   }))) {
     await BillingCharge.release(linha.id);
     throw ocupado();
+  }
+  if (alvo.sobreposta) {
+    await BillingCharge.update(linha.id, { amount_overridden_at: linha.amount_overridden_at });
   }
   return { acao: 'reissued', linhaId: linha.id };
 }

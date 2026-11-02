@@ -5823,6 +5823,10 @@ const hi: Dictionary = {
   'platform.addons.reason': "कारण",
   'platform.addons.grant': "दें",
   'platform.revenue.addonMrr': "+ ऐड-ऑन से {value}",
+  'affiliates.commissionStatus.held': "रोकी गई",
+  'affiliates.payouts.pixKeyChanged': "अनुमोदन के बाद एफ़िलिएट की Pix कुंजी बदल गई: भेजने से पहले फिर से अनुमोदित करें।",
+  'platform.addons.form.gatedImpact': "इसे अनिवार्य करने पर {count} सक्रिय प्रदाता इस सुविधा की पहुँच खो देंगे। जारी रखें?",
+  'platform.addons.form.gatedBackground': "चालू होने पर यह पृष्ठभूमि में भी लागू होता है: बॉट और AI सहायक जवाब नहीं देते, अभियान और भुगतान अनुस्मारक नहीं भेजे जाते और अलर्ट केवल ईमेल और Telegram से जाते हैं। आउटेज और रखरखाव सूचनाएँ जारी रहती हैं।",
 }
 
 export default hi

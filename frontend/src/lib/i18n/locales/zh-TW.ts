@@ -5816,6 +5816,10 @@ const zhTW: Dictionary = {
   'platform.addons.reason': "原因",
   'platform.addons.grant': "贈送",
   'platform.revenue.addonMrr': "+ 附加元件 {value}",
+  'affiliates.commissionStatus.held': "暫扣",
+  'affiliates.payouts.pixKeyChanged': "核准後推廣者的 Pix 金鑰已變更：傳送前請重新核准。",
+  'platform.addons.form.gatedImpact': "設為必要後，{count} 個活躍供應商將無法使用此功能。是否繼續？",
+  'platform.addons.form.gatedBackground': "開啟後在背景同樣生效：機器人與 AI 客服不再回覆，行銷活動與催繳不再傳送，警示僅透過電子郵件與 Telegram 傳送。故障與維護通知照常傳送。",
 }
 
 export default zhTW

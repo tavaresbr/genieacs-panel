@@ -5815,6 +5815,10 @@ const ptBR: Dictionary = {
   'platform.addons.reason': "Motivo",
   'platform.addons.grant': "Conceder",
   'platform.revenue.addonMrr': "+ {value} em add-ons",
+  'affiliates.commissionStatus.held': "Guardada",
+  'affiliates.payouts.pixKeyChanged': "A chave Pix do afiliado mudou depois da aprovação: aprove de novo antes de enviar.",
+  'platform.addons.form.gatedImpact': "{count} provedor(es) ativo(s) perderiam o acesso a este recurso ao ligar a exigência. Continuar?",
+  'platform.addons.form.gatedBackground': "Ligada, vale também no fundo: o bot e o atendimento por IA não respondem, campanhas e régua de cobrança não saem e o alerta vai só por e-mail e Telegram. Avisos de queda e manutenção continuam.",
 }
 
 export default ptBR

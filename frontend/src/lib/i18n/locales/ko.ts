@@ -5822,6 +5822,10 @@ const ko: Dictionary = {
   'platform.addons.reason': "사유",
   'platform.addons.grant': "부여",
   'platform.revenue.addonMrr': "+ 애드온 {value}",
+  'affiliates.commissionStatus.held': "보류",
+  'affiliates.payouts.pixKeyChanged': "승인 후 제휴사의 Pix 키가 변경되었습니다. 보내기 전에 다시 승인하세요.",
+  'platform.addons.form.gatedImpact': "필수로 설정하면 활성 공급자 {count}곳이 이 기능을 사용할 수 없게 됩니다. 계속할까요?",
+  'platform.addons.form.gatedBackground': "켜면 백그라운드에도 적용됩니다: 봇과 AI 상담은 응답하지 않고, 캠페인과 결제 독촉은 발송되지 않으며, 알림은 이메일과 Telegram으로만 갑니다. 장애·점검 안내는 계속 발송됩니다.",
 }
 
 export default ko

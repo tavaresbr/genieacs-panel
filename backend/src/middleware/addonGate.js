@@ -27,9 +27,22 @@ import { authenticateToken } from './auth.js';
  * O 402 não começa com `subscription_`: a casca do app não o confunde com a
  * assinatura bloqueada — é a tela daquele recurso que diz o porquê.
  */
-export function requireAddon(feature) {
+/**
+ * O que mora em `/api/whatsapp` e não é do add-on de WhatsApp: os alertas (o
+ * Telegram e o e-mail vivem na mesma tela), as quedas, as manutenções e o
+ * indique e ganhe. Ficam abertos com a porta ligada.
+ */
+export const WHATSAPP_ADDON_EXEMPT_PATHS = Object.freeze(['/alerts', '/outages', '/maintenances', '/referrals']);
+
+export function requireAddon(feature, { except = [] } = {}) {
+  // Os caminhos (relativos ao ponto de montagem) que a porta deixa passar:
+  // num prefixo que mistura recursos (`/api/whatsapp` leva também o alerta
+  // do Telegram, as quedas e o indique e ganhe), só o que é do add-on fecha.
+  const livres = except.map((caminho) => String(caminho).replace(/\/+$/, ''));
+  const livre = (caminho) => livres.some((base) => caminho === base || caminho.startsWith(`${base}/`));
   return async (req, res, next) => {
     try {
+      if (livres.length && livre(String(req.path || ''))) return next();
       const portas = await AddonService.gatesFor(feature);
       if (!portas.length) return next();
       const conferir = async () => {

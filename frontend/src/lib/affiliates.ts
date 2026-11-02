@@ -9,7 +9,8 @@ import type { TranslationKey } from '@/lib/i18n'
  */
 
 export type AffiliateStatus = 'pending' | 'active' | 'suspended'
-export type AffiliateCommissionStatus = 'accrued' | 'reversed' | 'in_payout' | 'paid'
+/** `held`: a comissão do afiliado suspenso, guardada até a reativação dentro da janela. */
+export type AffiliateCommissionStatus = 'accrued' | 'reversed' | 'in_payout' | 'paid' | 'held'
 export type AffiliatePayoutStatus = 'draft' | 'approved' | 'sending' | 'sent' | 'paid' | 'failed' | 'canceled'
 export type PixKeyType = 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'EVP'
 
@@ -65,7 +66,8 @@ export const COMMISSION_STATUS_KEYS: Record<AffiliateCommissionStatus, Translati
   accrued: 'affiliates.commissionStatus.accrued',
   reversed: 'affiliates.commissionStatus.reversed',
   in_payout: 'affiliates.commissionStatus.in_payout',
-  paid: 'affiliates.commissionStatus.paid'
+  paid: 'affiliates.commissionStatus.paid',
+  held: 'affiliates.commissionStatus.held'
 }
 
 export const PAYOUT_STATUS_KEYS: Record<AffiliatePayoutStatus, TranslationKey> = {
@@ -86,12 +88,20 @@ export function affiliateBadgeClass(status: string) {
 }
 
 /** O que cada lote admite agora — o mesmo que o servidor aceita (`affiliatePayoutService`). */
-export function payoutActions(payout: { status: AffiliatePayoutStatus | string; errorCode?: string | null; amountCents: number }) {
+export function payoutActions(payout: {
+  status: AffiliatePayoutStatus | string
+  errorCode?: string | null
+  amountCents: number
+  pixKeyChanged?: boolean
+}) {
   const s = payout.status
+  // A chave Pix trocada depois da aprovação: o envio espera nova aprovação.
+  const reaprovar = Boolean(payout.pixKeyChanged) && (s === 'approved' || s === 'failed')
   return {
-    approve: s === 'draft' && payout.amountCents > 0,
-    send: s === 'approved',
-    retry: s === 'failed',
+    approve: (s === 'draft' && payout.amountCents > 0) || reaprovar,
+    reapprove: reaprovar,
+    send: s === 'approved' && !reaprovar,
+    retry: s === 'failed' && !reaprovar,
     /** O reenvio (e o cancelamento) do falho incerto pede a confirmação de que nada saiu. */
     needsConfirm: s === 'failed' && payout.errorCode === 'uncertain',
     refresh: s === 'sent',

@@ -5815,6 +5815,10 @@ const es: Dictionary = {
   'platform.addons.reason': "Motivo",
   'platform.addons.grant': "Conceder",
   'platform.revenue.addonMrr': "+ {value} en add-ons",
+  'affiliates.commissionStatus.held': "Retenida",
+  'affiliates.payouts.pixKeyChanged': "La clave Pix del afiliado cambió después de la aprobación: apruebe de nuevo antes de enviar.",
+  'platform.addons.form.gatedImpact': "{count} proveedor(es) activo(s) perderían el acceso a este recurso al activar la exigencia. ¿Continuar?",
+  'platform.addons.form.gatedBackground': "Activada, también vale en segundo plano: el bot y la atención por IA no responden, las campañas y la cobranza automática no se envían y las alertas van solo por correo y Telegram. Los avisos de caída y mantenimiento siguen saliendo.",
 }
 
 export default es

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { getDb, insertReturningId, isUniqueViolation } from '../config/database.js';
 import { affiliateConfig } from './platformProfileService.js';
 import { createTransfer, getTransfer } from './billing/asaasClient.js';
+import { acquireLease } from './schedulerLease.js';
 
 /**
  * O lote mensal de comissões dos afiliados (0124) e o Pix que o paga.
@@ -38,6 +39,12 @@ import { createTransfer, getTransfer } from './billing/asaasClient.js';
 export const PAYOUT_STATUSES = Object.freeze(['draft', 'approved', 'sending', 'sent', 'paid', 'failed', 'canceled']);
 /** Os erros do gateway que garantem que nada foi criado do outro lado. */
 const ERROS_CERTOS = new Set(['refused', 'unauthorized', 'not_configured', 'blocked_host', 'invalid_base_url', 'bad_request']);
+/**
+ * Os que são a RESPOSTA 4xx do próprio gateway (e não uma recusa daqui, antes
+ * de chamar): a resposta pode ficar guardada lá com a chave idempotente, e
+ * reenviar com a mesma chave só repetiria a recusa. O reenvio troca a chave.
+ */
+const ERROS_4XX = new Set(['refused', 'unauthorized']);
 /** `sending` parado há mais que isto é um envio que morreu no meio. */
 const SENDING_STALE_MS = 5 * 60 * 1000;
 /** De quanto em quanto tempo, no máximo, o agendador passa. */
@@ -82,6 +89,16 @@ function novaChave(payoutId) {
   return `aff-${payoutId}-${crypto.randomBytes(8).toString('hex')}`;
 }
 
+/**
+ * Se a chave Pix do afiliado mudou desde a aprovação do lote — o retrato
+ * gravado em `approved_pix_key(_type)`. Mudou, o lote precisa de nova
+ * aprovação: quem aprovou conferiu PARA ONDE o dinheiro ia.
+ */
+export function pixKeyChangedSinceApproval(lote, afiliado) {
+  return (lote?.approved_pix_key ?? null) !== (afiliado?.pix_key ?? null)
+    || (lote?.approved_pix_key_type ?? null) !== (afiliado?.pix_key_type ?? null);
+}
+
 const lotes = () => getDb()('affiliate_payouts');
 
 class AffiliatePayoutService {
@@ -101,7 +118,13 @@ class AffiliatePayoutService {
   static async list({ period = null, status = null } = {}) {
     let consulta = getDb()('affiliate_payouts')
       .leftJoin('affiliates', 'affiliates.id', 'affiliate_payouts.affiliate_id')
-      .select('affiliate_payouts.*', 'affiliates.name as affiliate_name', 'affiliates.email as affiliate_email')
+      .select(
+        'affiliate_payouts.*',
+        'affiliates.name as affiliate_name',
+        'affiliates.email as affiliate_email',
+        'affiliates.pix_key as affiliate_pix_key',
+        'affiliates.pix_key_type as affiliate_pix_key_type'
+      )
       .orderBy('affiliate_payouts.period', 'desc')
       .orderBy('affiliate_payouts.id', 'desc')
       .limit(500);
@@ -126,6 +149,13 @@ class AffiliatePayoutService {
       transferStatus: linha.transfer_status ?? null,
       pixKey: linha.pix_key ?? null,
       pixKeyType: linha.pix_key_type ?? null,
+      // A chave Pix que a aprovação conferiu, e se a do afiliado mudou desde
+      // então (o envio recusa com `pix_key_changed` até nova aprovação).
+      approvedPixKey: linha.approved_pix_key ?? null,
+      approvedPixKeyType: linha.approved_pix_key_type ?? null,
+      pixKeyChanged: Boolean(linha.approved_at) && linha.affiliate_pix_key !== undefined
+        && ['approved', 'failed'].includes(linha.status)
+        && pixKeyChangedSinceApproval(linha, { pix_key: linha.affiliate_pix_key, pix_key_type: linha.affiliate_pix_key_type }),
       approvedBy: linha.approved_by ? Number(linha.approved_by) : null,
       approvedAt: linha.approved_at ?? null,
       sentAt: linha.sent_at ?? null,
@@ -209,19 +239,57 @@ class AffiliatePayoutService {
 
   // ── 2. Aprovação ────────────────────────────────────────────────────
 
+  /**
+   * Aprova o rascunho — e grava o retrato da chave Pix do afiliado
+   * (`approved_pix_key(_type)`): o envio só sai para ela.
+   *
+   * O total é RECALCULADO pelas comissões do lote dentro da mesma transação
+   * que o tira de `draft`: o estorno que corre ao lado (`reverseOnRefund`)
+   * baixa o lote antes de tirar a comissão dele, e qualquer ordem entre os
+   * dois termina com o valor aprovado igual à soma do que está nele.
+   *
+   * Reaprovar: o lote aprovado ou falho cuja chave Pix mudou depois da
+   * aprovação passa por aqui de novo, só para conferir a chave nova — o
+   * estado (e o `uncertain` de uma falha) fica como estava.
+   */
   static async approve(id, { actorUserId = null, now = new Date() } = {}) {
     const lote = await AffiliatePayoutService.findById(id);
     if (!lote) throw new PayoutError('Payout not found', { code: 'not_found', status: 404 });
-    if (lote.status !== 'draft') throw new PayoutError('Only a draft payout can be approved', { code: 'not_draft' });
+    const afiliado = await getDb()('affiliates').where({ id: lote.affiliate_id }).first();
+    if (lote.status !== 'draft') {
+      if (['approved', 'failed'].includes(lote.status) && pixKeyChangedSinceApproval(lote, afiliado)) {
+        const mudou = await lotes().where({ id: lote.id, status: lote.status }).update({
+          approved_by: actorUserId,
+          approved_at: now,
+          approved_pix_key: afiliado?.pix_key ?? null,
+          approved_pix_key_type: afiliado?.pix_key_type ?? null,
+          updated_at: now
+        });
+        if (!mudou) throw new PayoutError('The payout changed meanwhile', { code: 'busy' });
+        return AffiliatePayoutService.findById(lote.id);
+      }
+      throw new PayoutError('Only a draft payout can be approved', { code: 'not_draft' });
+    }
     if (Number(lote.amount_cents) <= 0) throw new PayoutError('A payout of zero or less cannot be approved', { code: 'empty' });
-    const mudou = await lotes().where({ id: lote.id, status: 'draft' }).update({
-      status: 'approved',
-      approved_by: actorUserId,
-      approved_at: now,
-      idempotency_key: lote.idempotency_key ?? novaChave(lote.id),
-      updated_at: now
+    await getDb().transaction(async (trx) => {
+      const mudou = await trx('affiliate_payouts').where({ id: lote.id, status: 'draft' }).update({
+        status: 'approved',
+        approved_by: actorUserId,
+        approved_at: now,
+        approved_pix_key: afiliado?.pix_key ?? null,
+        approved_pix_key_type: afiliado?.pix_key_type ?? null,
+        idempotency_key: lote.idempotency_key ?? novaChave(lote.id),
+        updated_at: now
+      });
+      if (!mudou) throw new PayoutError('The payout changed meanwhile', { code: 'busy' });
+      const soma = await trx('affiliate_commissions').where({ payout_id: lote.id, status: 'in_payout' })
+        .sum({ cents: 'amount_cents' }).count({ n: '*' }).first();
+      const total = Number(soma?.cents ?? 0) || 0;
+      if (total <= 0) throw new PayoutError('A payout of zero or less cannot be approved', { code: 'empty' });
+      await trx('affiliate_payouts').where({ id: lote.id }).update({
+        amount_cents: total, commission_count: Number(soma?.n ?? 0) || 0
+      });
     });
-    if (!mudou) throw new PayoutError('The payout changed meanwhile', { code: 'busy' });
     return AffiliatePayoutService.findById(lote.id);
   }
 
@@ -260,16 +328,28 @@ class AffiliatePayoutService {
     const afiliado = await getDb()('affiliates').where({ id: lote.affiliate_id }).first();
     if (!afiliado?.pix_key || !afiliado?.pix_key_type) throw new PayoutError('The affiliate has no Pix key', { code: 'no_pix_key' });
     if (afiliado.status === 'suspended') throw new PayoutError('The affiliate is suspended', { code: 'affiliate_suspended' });
+    if (pixKeyChangedSinceApproval(lote, afiliado)) {
+      throw new PayoutError('The affiliate\'s Pix key changed after the approval; approve the payout again', { code: 'pix_key_changed' });
+    }
 
-    // A transferência anterior que o BANCO recusou existe no gateway com a
-    // chave velha: o reenvio é outra transferência, com outra chave.
-    const chave = lote.transfer_id && ['FAILED', 'CANCELLED'].includes(String(lote.transfer_status ?? '').toUpperCase())
-      ? novaChave(lote.id)
-      : (lote.idempotency_key ?? novaChave(lote.id));
+    // Quando a chave idempotente TROCA, e quando não:
+    //   - a transferência anterior que o BANCO recusou (`FAILED`/`CANCELLED`)
+    //     existe no gateway com a chave velha: o reenvio é outra
+    //     transferência, com outra chave — e o id e o estado dela saem do lote
+    //     NESTA trava, para uma falha incerta depois não trocar a chave de novo;
+    //   - a recusa 4xx do próprio gateway pode estar guardada lá com a chave:
+    //     reenviar com ela só a repetiria;
+    //   - a falha incerta (`uncertain`) reusa a chave de agora, sempre: se o
+    //     Pix saiu, o gateway devolve o mesmo em vez de mandar outro.
+    const bancoRecusou = lote.transfer_id && ['FAILED', 'CANCELLED'].includes(String(lote.transfer_status ?? '').toUpperCase());
+    const gatewayRecusou = lote.status === 'failed' && ERROS_4XX.has(String(lote.error_code ?? ''));
+    const trocar = !lote.idempotency_key || ((bancoRecusou || gatewayRecusou) && lote.error_code !== 'uncertain');
+    const chave = trocar ? novaChave(lote.id) : lote.idempotency_key;
     const trava = await lotes().where({ id: lote.id, status: lote.status }).update({
       status: 'sending',
       attempts: Number(lote.attempts ?? 0) + 1,
       idempotency_key: chave,
+      ...(bancoRecusou ? { transfer_id: null, transfer_status: null } : {}),
       pix_key: afiliado.pix_key,
       pix_key_type: afiliado.pix_key_type,
       error_code: null,
@@ -441,6 +521,15 @@ class AffiliatePayoutService {
     const resultado = { built: null, refreshed: 0 };
     if (!force && Date.now() - AffiliatePayoutService.lastPassAt < PASS_INTERVAL_MS) return resultado;
     AffiliatePayoutService.lastPassAt = Date.now();
+    // Uma instância por hora, também com várias (a vez em `app_state`, ver
+    // `schedulerLease.js`): duas montariam o mesmo lote (o índice único
+    // segura, mas a disputa vira ruído) e consultariam o gateway em dobro.
+    if (!force && !(await acquireLease('affiliate-payouts', { ttlMs: PASS_INTERVAL_MS - 60_000, now }).catch((error) => {
+      console.warn(`Could not take the affiliate payout lease: ${error.message}`);
+      return false;
+    }))) {
+      return { ...resultado, skipped: 'other_instance' };
+    }
     try {
       if (spDayOfMonth(now) <= 3) {
         resultado.built = await AffiliatePayoutService.buildBatches({ now });

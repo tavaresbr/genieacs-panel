@@ -22,6 +22,7 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { mailConfigured, mailTransport, panelUrlFor } from './mail/index.js';
 import { isValidEmail } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
+import AddonService from './addonService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TELEGRAM_CHAT_PATTERN, TELEGRAM_TOKEN_PATTERN, sendTelegramMessage } from './telegramClient.js';
 import { detectOutages, mapsLink } from './outageDetector.js';
@@ -680,6 +681,10 @@ class WaAlertService {
       const config = await WhatsAppConfigService.getConfig();
       if (!WhatsAppConfigService.isReady(config)) {
         reason = 'not_configured';
+      } else if (!(await AddonService.allows('whatsapp'))) {
+        // Sem o add-on de WhatsApp (0125), quando o catálogo o exige: o
+        // alerta sai pelo e-mail e pelo Telegram, que não dependem dele.
+        reason = 'addon_required';
       } else {
         const account = await WhatsAppAccount.getForPurpose('alerts');
         if (!account) {

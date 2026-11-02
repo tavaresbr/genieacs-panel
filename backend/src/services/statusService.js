@@ -4,6 +4,7 @@ import { IS_SAAS } from '../config/edition.js';
 import Tenant from '../models/Tenant.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { log } from '../utils/logger.js';
+import { acquireLease } from './schedulerLease.js';
 
 /**
  * A página de status da plataforma (0126).
@@ -415,7 +416,12 @@ class StatusService {
     try {
       if (force || now.getTime() - this.lastRunAt >= CHECK_INTERVAL_MS) {
         this.lastRunAt = now.getTime();
-        resumo.checks = await this.runChecks({ now });
+        // Com mais de uma instância, só uma verifica por intervalo (a vez em
+        // `app_state`, ver `schedulerLease.js`); a outra pula — a página lê o
+        // mesmo banco. A vez vence um segundo antes do próximo tique.
+        const minha = force || await acquireLease('status-checks', { ttlMs: CHECK_INTERVAL_MS - 1000, now });
+        if (minha) resumo.checks = await this.runChecks({ now });
+        else resumo.checks = 'other_instance';
       }
       resumo.maintenance = await this.completeEndedMaintenance({ now }).catch((error) => {
         log.warn('status maintenance completion failed', { err: error });
@@ -423,7 +429,8 @@ class StatusService {
       });
       const { default: StatusNotifyService } = await import('./statusNotifyService.js');
       resumo.notify = await StatusNotifyService.processDue({ now });
-      if (now.getTime() - this.lastPruneAt >= DIA) {
+      if (now.getTime() - this.lastPruneAt >= DIA
+        && await acquireLease('status-prune', { ttlMs: DIA - 60_000, now })) {
         this.lastPruneAt = now.getTime();
         resumo.pruned = await this.prune({ now }).catch((error) => {
           log.warn('status prune failed', { err: error });

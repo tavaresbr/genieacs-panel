@@ -354,13 +354,17 @@ class BillingWebhookController {
     // As transferências Pix do programa de afiliados (0124): eventos
     // `TRANSFER_*`, com a transferência no corpo. Só mudam o lote cujo
     // `transfer_id` é o da entrega; a desconhecida é ignorada — 200 sempre.
+    // Inclusive na falha: um 500 faria a Asaas reenviar e, depois de algumas
+    // recusas, PAUSAR a fila inteira do webhook — e com ela os pagamentos dos
+    // provedores. A consulta de hora em hora (`schedulerPass`) acerta o lote.
     if (/^TRANSFER_/.test(String(req.body?.event ?? ''))) {
       try {
         const code = await AffiliatePayoutService.applyTransferWebhook(req.body);
         return res.json({ success: true, code });
       } catch (error) {
-        console.error(`Billing webhook: could not apply ${req.body?.event} to an affiliate payout: ${error.message}`);
-        return res.status(500).json({ success: false, code: 'transfer_failed' });
+        console.error(`Billing webhook: could not apply ${req.body?.event} to an affiliate payout `
+          + `(the hourly refresh reconciles it): ${error.message}`);
+        return res.json({ success: true, code: 'transfer_deferred' });
       }
     }
 

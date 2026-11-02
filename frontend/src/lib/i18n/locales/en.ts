@@ -5817,6 +5817,10 @@ const en = {
   'platform.addons.reason': "Reason",
   'platform.addons.grant': "Grant",
   'platform.revenue.addonMrr': "+ {value} in add-ons",
+  'affiliates.commissionStatus.held': "Held",
+  'affiliates.payouts.pixKeyChanged': "The affiliate's Pix key changed after the approval: approve again before sending.",
+  'platform.addons.form.gatedImpact': "{count} active provider(s) would lose access to this feature when it becomes required. Continue?",
+  'platform.addons.form.gatedBackground': "When on, it also applies in the background: the bot and the AI assistant stop replying, campaigns and the billing cadence stop sending, and alerts go only by email and Telegram. Outage and maintenance notices keep going out.",
 }
 
 export default en

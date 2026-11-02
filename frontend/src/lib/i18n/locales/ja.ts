@@ -5815,6 +5815,10 @@ const ja: Dictionary = {
   'platform.addons.reason': "理由",
   'platform.addons.grant': "付与",
   'platform.revenue.addonMrr': "+ アドオン {value}",
+  'affiliates.commissionStatus.held': "保留",
+  'affiliates.payouts.pixKeyChanged': "承認後にアフィリエイトの Pix キーが変更されました。送金前に再度承認してください。",
+  'platform.addons.form.gatedImpact': "必須にすると、有効なプロバイダー {count} 件がこの機能を利用できなくなります。続行しますか？",
+  'platform.addons.form.gatedBackground': "オンにするとバックグラウンドにも適用されます：ボットと AI アシスタントは応答せず、キャンペーンと支払い督促は送信されず、アラートはメールと Telegram のみになります。障害・メンテナンスのお知らせは引き続き送信されます。",
 }
 
 export default ja

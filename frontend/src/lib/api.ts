@@ -7539,6 +7539,8 @@ export interface AffiliateTotals {
   inPayoutCents: number
   paidCents: number
   reversedCents: number
+  /** As comissões guardadas enquanto o afiliado está suspenso. */
+  heldCents?: number
 }
 
 /** O afiliado como o console o vê. `rateBp`/`months` nulos valem o padrão (`effective*`). */
@@ -7576,7 +7578,8 @@ export interface AffiliateCommissionView {
   tenantId?: number
   providerName: string | null
   kind: 'commission' | 'clawback'
-  baseCents: number
+  /** Só no console: o portal do afiliado não recebe a base. */
+  baseCents?: number
   rateBp: number
   amountCents: number
   status: AffiliateCommissionStatus
@@ -7599,6 +7602,10 @@ export interface AffiliatePayoutView {
   transferStatus: string | null
   pixKey: string | null
   pixKeyType: string | null
+  /** A chave Pix conferida na aprovação, e se a do afiliado mudou depois dela. */
+  approvedPixKey?: string | null
+  approvedPixKeyType?: string | null
+  pixKeyChanged?: boolean
   approvedAt: string | null
   sentAt: string | null
   paidAt: string | null
@@ -7799,6 +7806,8 @@ export interface AddonChangeResult extends TenantAddons {
 /** O catálogo no console, com quantos provedores têm cada um ativo. */
 export interface ConsoleAddonView extends AddonView {
   activeCount: number
+  /** No de recurso: quantos provedores ativos perderiam o acesso com a porta ligada. */
+  gateImpactCount?: number | null
 }
 
 export interface ConsoleTenantAddons {

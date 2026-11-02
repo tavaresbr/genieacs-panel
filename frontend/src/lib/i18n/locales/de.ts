@@ -5819,6 +5819,10 @@ const de: Dictionary = {
   'platform.addons.reason': "Grund",
   'platform.addons.grant': "Gewähren",
   'platform.revenue.addonMrr': "+ {value} aus Add-ons",
+  'affiliates.commissionStatus.held': "Zurückgehalten",
+  'affiliates.payouts.pixKeyChanged': "Der Pix-Schlüssel des Affiliates hat sich nach der Freigabe geändert: vor dem Senden erneut freigeben.",
+  'platform.addons.form.gatedImpact': "{count} aktive(r) Anbieter würde(n) den Zugriff auf diese Funktion verlieren, wenn sie verpflichtend wird. Fortfahren?",
+  'platform.addons.form.gatedBackground': "Aktiviert gilt es auch im Hintergrund: Bot und KI-Assistent antworten nicht, Kampagnen und Mahnläufe werden nicht gesendet und Warnungen gehen nur per E-Mail und Telegram raus. Störungs- und Wartungshinweise laufen weiter.",
 }
 
 export default de

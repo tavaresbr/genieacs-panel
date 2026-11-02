@@ -45,6 +45,11 @@ describe('o programa de afiliados na tela (0124)', () => {
     expect(payoutActions({ status: 'failed', errorCode: 'uncertain', amountCents: 100 })).toMatchObject({ retry: true, needsConfirm: true })
     expect(payoutActions({ status: 'failed', errorCode: 'refused', amountCents: 100 }).needsConfirm).toBe(false)
     expect(payoutActions({ status: 'paid', amountCents: 100 })).toMatchObject({ send: false, retry: false, markPaid: false, cancel: false })
+    // A chave Pix trocada depois da aprovação: só a nova aprovação, sem envio.
+    expect(payoutActions({ status: 'approved', amountCents: 100, pixKeyChanged: true }))
+      .toMatchObject({ approve: true, reapprove: true, send: false })
+    expect(payoutActions({ status: 'failed', amountCents: 100, pixKeyChanged: true }))
+      .toMatchObject({ approve: true, retry: false })
   })
 
   it('tem a aba no dicionário', () => {
