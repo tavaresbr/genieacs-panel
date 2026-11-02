@@ -5,6 +5,7 @@ import {
 } from '../middleware/rateLimit.js';
 import PublicReceiptController from '../controllers/publicReceiptController.js';
 import NpsController from '../controllers/npsController.js';
+import StatusController from '../controllers/statusController.js';
 
 /**
  * A página pública do ápice: sem sessão, só leitura de catálogo e o pedido de
@@ -28,5 +29,8 @@ router.get('/receipt/:token', publicReceiptLimiter, PublicReceiptController.rece
 // CORPO, nunca no caminho: o log de acesso grava o caminho inteiro.
 router.post('/nps/lookup', publicNpsLimiter, NpsController.lookup);
 router.post('/nps/answer', publicNpsLimiter, NpsController.answer);
+// A página de status (0126): só leitura, guardada por 30 s, sem nada de dentro
+// (nem erro, nem versão, nem provedor).
+router.get('/status', publicReadLimiter, StatusController.publicStatus);
 
 export default router;

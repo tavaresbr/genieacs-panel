@@ -1376,5 +1376,20 @@ export default {
   'priceChange.cancelNoticeBody': 'مرحبًا {provider}. تم إلغاء تعديل سعر الخطة {plan} ({cycle}) من {old} إلى {new} الذي كان مقررًا في {date}. يبقى السعر {old}، ولن تتغير أي فاتورة بسببه. لأي استفسار، يكفي الرد على هذه الرسالة.',
   'whatsapp.platformBot.askTaxIdMulti': 'مرحبًا! حفاظًا على أمانك، وقبل إرسال أي بيانات فوترة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'للمتابعة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك. ويمكنك كتابة *atendente* للتحدث مع فريقنا.',
-  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.'
+  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'اللوحة',
+  'status.component.payments': 'المدفوعات',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] عطل: {title}',
+  'status.notice.openedBody': 'مرحبًا {provider}. نواجه مشكلة تؤثر على {components}: {title}. يعمل فريقنا على حلها بالفعل، وسنبلغك عند حلها.',
+  'status.notice.resolvedSubject': '[{product}] تم الحل: {title}',
+  'status.notice.resolvedBody': 'مرحبًا {provider}. تم حل المشكلة التي كانت تؤثر على {components} ({title}). شكرًا لصبرك.',
+  'status.notice.maintenanceSubject': '[{product}] صيانة مجدولة: {title}',
+  'status.notice.maintenanceBody': 'مرحبًا {provider}. سنجري صيانة مجدولة على {components} من {start} إلى {end} (بتوقيت برازيليا): {title}. قد تكون الخدمة غير مستقرة خلال هذه الفترة.',
+  'status.notice.maintenanceDoneSubject': '[{product}] اكتملت الصيانة: {title}',
+  'status.notice.maintenanceDoneBody': 'مرحبًا {provider}. اكتملت الصيانة المجدولة على {components} ({title}).',
+  'status.notice.follow': 'تابعها عبر صفحة الحالة: {link}'
 };

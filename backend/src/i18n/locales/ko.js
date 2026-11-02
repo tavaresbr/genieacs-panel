@@ -1387,5 +1387,20 @@ export default {
   'priceChange.cancelNoticeBody': '안녕하세요, {provider}님. {date}로 예정되었던 {plan} 요금제({cycle})의 {old}에서 {new}로의 가격 조정이 취소되었습니다. 가격은 {old} 그대로이며, 이로 인해 바뀌는 청구서는 없습니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.',
   'whatsapp.platformBot.askTaxIdMulti': '안녕하세요! 보안을 위해 청구 정보를 보내기 전에 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요.',
   'whatsapp.platformBot.askTaxIdMultiAgain': '계속하려면 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요. 원하시면 *atendente*를 입력해 팀과 이야기하세요.',
-  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.'
+  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': '패널',
+  'status.component.payments': '결제',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] 장애: {title}',
+  'status.notice.openedBody': '안녕하세요, {provider}님. {components}에 영향을 주는 문제가 발생했습니다: {title}. 담당 팀이 이미 대응 중이며, 해결되면 알려 드리겠습니다.',
+  'status.notice.resolvedSubject': '[{product}] 해결됨: {title}',
+  'status.notice.resolvedBody': '안녕하세요, {provider}님. {components}에 영향을 주던 문제({title})가 해결되었습니다. 기다려 주셔서 감사합니다.',
+  'status.notice.maintenanceSubject': '[{product}] 예정된 점검: {title}',
+  'status.notice.maintenanceBody': '안녕하세요, {provider}님. {start}부터 {end}까지(브라질리아 시간) {components} 예정된 점검을 진행합니다: {title}. 점검 시간 동안 서비스가 불안정할 수 있습니다.',
+  'status.notice.maintenanceDoneSubject': '[{product}] 점검 완료: {title}',
+  'status.notice.maintenanceDoneBody': '안녕하세요, {provider}님. {components} 예정된 점검({title})이 완료되었습니다.',
+  'status.notice.follow': '상태 페이지에서 확인하세요: {link}'
 };

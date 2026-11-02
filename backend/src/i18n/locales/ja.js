@@ -1384,5 +1384,20 @@ export default {
   'priceChange.cancelNoticeBody': '{provider} 様。{date} に予定していた {plan} プラン（{cycle}）の {old} から {new} への料金改定はキャンセルされました。料金は {old} のままで、これにより変わる請求書はありません。ご不明な点があれば、このメッセージにご返信ください。',
   'whatsapp.platformBot.askTaxIdMulti': 'こんにちは。安全のため、請求データを送る前に、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '続けるには、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。チームと話したい場合は *atendente* と入力してください。',
-  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。'
+  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'パネル',
+  'status.component.payments': '支払い',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] 障害: {title}',
+  'status.notice.openedBody': '{provider} 様。{components} に影響する問題が発生しています: {title}。担当チームが対応中です。解決しましたらお知らせします。',
+  'status.notice.resolvedSubject': '[{product}] 解決済み: {title}',
+  'status.notice.resolvedBody': '{provider} 様。{components} に影響していた問題（{title}）は解決しました。ご理解いただきありがとうございました。',
+  'status.notice.maintenanceSubject': '[{product}] 計画メンテナンス: {title}',
+  'status.notice.maintenanceBody': '{provider} 様。{start} から {end}（ブラジリア時間）まで {components} の計画メンテナンスを実施します: {title}。この間、サービスが不安定になる場合があります。',
+  'status.notice.maintenanceDoneSubject': '[{product}] メンテナンス完了: {title}',
+  'status.notice.maintenanceDoneBody': '{provider} 様。{components} の計画メンテナンス（{title}）は完了しました。',
+  'status.notice.follow': 'ステータスページで確認できます: {link}'
 };

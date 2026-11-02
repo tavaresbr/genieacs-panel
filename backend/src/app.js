@@ -41,6 +41,7 @@ import platformBillingRoutes from './routes/platformBilling.js';
 import platformLeadsRoutes from './routes/platformLeads.js';
 import platformReportsRoutes from './routes/platformReports.js';
 import platformNpsRoutes from './routes/platformNps.js';
+import platformStatusRoutes from './routes/platformStatus.js';
 import publicRoutes from './routes/public.js';
 import platformIntegrationsRoutes from './routes/platformIntegrations.js';
 import userRoutes from './routes/users.js';
@@ -301,13 +302,16 @@ app.use('/api', apiLimiter);
 // whether the database is reachable, and resolving the provider is itself a
 // database read — behind the resolver, an unreachable database would answer a
 // blank 500 instead of naming the thing that is down.
+//
+// Sem a versão (0126): a rota é aberta a qualquer um, e a versão exata é o
+// primeiro passo de quem procura uma falha conhecida. Quem tem sessão a lê em
+// `GET /api/version`; o console, em `/api/platform/deployment`.
 app.get('/api/health', async (req, res) => {
   const database = await testConnection();
   res.status(database ? 200 : 503).json({
     status: database ? 'ok' : 'degraded',
     database: database ? 'ok' : 'unavailable',
-    timestamp: new Date().toISOString(),
-    version: APP_VERSION
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -335,6 +339,13 @@ app.use('/api/auth/signup', authLimiter);
 // visible on every other path under `/api` too, so it is not this route's to
 // fix. The reasoning is in `tenantController.js`.
 app.use('/api/tenant', tenantRoutes);
+
+// A versão do servidor, para quem tem sessão: a aba "Sobre" a compara com a do
+// JavaScript aberto no navegador (o aviso de "recarregue a página"). Saiu do
+// `/api/health`, que é aberto.
+app.get('/api/version', authenticateToken, (req, res) => {
+  res.json({ success: true, data: { version: APP_VERSION } });
+});
 
 // O instalador e o programa do agente do GenieACS, públicos e sem segredo.
 // Abaixo do resolvedor por um motivo só: o instalador sai com a origem do
@@ -388,6 +399,8 @@ if (IS_SAAS) {
   app.use('/api/platform', platformReportsRoutes);
   // A pesquisa de satisfação dos provedores (0123): relatório e envio manual.
   app.use('/api/platform', platformNpsRoutes);
+  // A página de status (0126): verificações, incidentes e manutenções.
+  app.use('/api/platform', platformStatusRoutes);
   // A página pública do ápice — o catálogo e o que o cadastro pergunta antes
   // de existir conta. Mesma regra do console: só no endereço da plataforma.
   app.use('/api/public', platformHostOnly);
@@ -623,7 +636,7 @@ portalApp.use('/api/customer/login', portalLoginLimiter);
 portalApp.use('/api', portalIpLimiter);
 // Ahead of the resolver for the same reason as the panel's.
 portalApp.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'customer-portal', version: APP_VERSION });
+  res.json({ status: 'ok', service: 'customer-portal' });
 });
 portalApp.use('/api', requestLogger());
 portalApp.use('/api', httpMetrics());

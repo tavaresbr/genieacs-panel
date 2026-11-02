@@ -90,6 +90,11 @@ export function DeploymentHealth() {
           <Linha rotulo={t('deployment.edition')}>
             {t(info.edition === 'saas' ? 'deployment.editionSaas' : 'deployment.editionSelfHosted')}
           </Linha>
+          {info.version && (
+            <Linha rotulo={t('settings.about.serverVersion')}>
+              <span className="font-mono">v{info.version}</span>
+            </Linha>
+          )}
           <Linha rotulo={t('deployment.database')}>
             {BANCO[info.database.client] ?? info.database.client}
             {/* De onde veio a conexão. Um deploy apontado para o banco errado é

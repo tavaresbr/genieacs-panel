@@ -1382,5 +1382,20 @@ export default {
   'priceChange.cancelNoticeBody': 'Ciao, {provider}. L’adeguamento del piano {plan} ({cycle}) da {old} a {new}, previsto per il {date}, è stato annullato. Il prezzo resta {old} e nessuna fattura cambia per questo. Per qualsiasi dubbio, rispondi pure a questo messaggio.',
   'whatsapp.platformBot.askTaxIdMulti': 'Ciao! Per la tua sicurezza, prima di inviare dati di fatturazione, indica le ultime 5 cifre del CNPJ o CPF di fatturazione del tuo provider.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Per continuare, indica le ultime 5 cifre del CNPJ o CPF di fatturazione del tuo provider. Se preferisci, scrivi *atendente* per parlare con il nostro team.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Non c’è alcun CNPJ o CPF di fatturazione registrato per i provider di questo numero, quindi non posso confermare la tua identità qui. Inoltrerò la conversazione al nostro team.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Non c’è alcun CNPJ o CPF di fatturazione registrato per i provider di questo numero, quindi non posso confermare la tua identità qui. Inoltrerò la conversazione al nostro team.',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'Pannello',
+  'status.component.payments': 'Pagamenti',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] Incidente: {title}',
+  'status.notice.openedBody': 'Ciao, {provider}. Abbiamo un problema che interessa {components}: {title}. Il nostro team ci sta già lavorando e ti avviseremo quando sarà risolto.',
+  'status.notice.resolvedSubject': '[{product}] Risolto: {title}',
+  'status.notice.resolvedBody': 'Ciao, {provider}. Il problema che interessava {components} ({title}) è stato risolto. Grazie per la pazienza.',
+  'status.notice.maintenanceSubject': '[{product}] Manutenzione programmata: {title}',
+  'status.notice.maintenanceBody': 'Ciao, {provider}. Effettueremo una manutenzione programmata su {components} dal {start} al {end} (ora di Brasília): {title}. Durante la finestra il servizio potrebbe essere instabile.',
+  'status.notice.maintenanceDoneSubject': '[{product}] Manutenzione completata: {title}',
+  'status.notice.maintenanceDoneBody': 'Ciao, {provider}. La manutenzione programmata su {components} ({title}) è stata completata.',
+  'status.notice.follow': 'Seguila sulla pagina di stato: {link}'
 };

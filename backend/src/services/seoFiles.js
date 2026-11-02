@@ -24,7 +24,7 @@ import { FAQ, FEATURES, SEO_PAGES, SITE_NAME, SITE_TAGLINE, STEPS, VENDORS } fro
  * e que fazem sentido para um estranho. `/impersonate` também mora lá e NÃO
  * entra: é o resgate de um bilhete, não uma página.
  */
-export const PUBLIC_PATHS = Object.freeze(['/', '/signup', '/login', '/privacidade']);
+export const PUBLIC_PATHS = Object.freeze(['/', '/signup', '/login', '/privacidade', '/status']);
 
 /**
  * E destas, as que um buscador deve ANUNCIAR. A entrada fica de fora de
@@ -32,7 +32,7 @@ export const PUBLIC_PATHS = Object.freeze(['/', '/signup', '/login', '/privacida
  * onde se volta. Liberada no `robots.txt`, para não parecer bloqueio; só não
  * oferecida no mapa.
  */
-export const SITEMAP_PATHS = Object.freeze(['/', '/signup', '/privacidade']);
+export const SITEMAP_PATHS = Object.freeze(['/', '/signup', '/privacidade', '/status']);
 
 /**
  * O `robots.txt` deste host.

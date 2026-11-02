@@ -1385,5 +1385,20 @@ export default {
   'priceChange.cancelNoticeBody': 'Hallo {provider}, die Preisanpassung des Tarifs {plan} ({cycle}) von {old} auf {new}, geplant zum {date}, wurde storniert. Der Preis bleibt bei {old}, und keine Rechnung ändert sich deswegen. Bei Fragen antworten Sie einfach auf diese Nachricht.',
   'whatsapp.platformBot.askTaxIdMulti': 'Hallo! Zu Ihrer Sicherheit geben Sie bitte vor dem Versand von Abrechnungsdaten die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Um fortzufahren, geben Sie die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein. Wenn Sie möchten, schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'Panel',
+  'status.component.payments': 'Zahlungen',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] Störung: {title}',
+  'status.notice.openedBody': 'Hallo {provider}, wir haben ein Problem, das {components} betrifft: {title}. Unser Team arbeitet bereits daran, und wir melden uns, sobald es behoben ist.',
+  'status.notice.resolvedSubject': '[{product}] Behoben: {title}',
+  'status.notice.resolvedBody': 'Hallo {provider}, das Problem, das {components} betraf ({title}), wurde behoben. Vielen Dank für Ihre Geduld.',
+  'status.notice.maintenanceSubject': '[{product}] Geplante Wartung: {title}',
+  'status.notice.maintenanceBody': 'Hallo {provider}, wir führen eine geplante Wartung an {components} von {start} bis {end} (Brasília-Zeit) durch: {title}. Während dieses Zeitfensters kann der Dienst instabil sein.',
+  'status.notice.maintenanceDoneSubject': '[{product}] Wartung abgeschlossen: {title}',
+  'status.notice.maintenanceDoneBody': 'Hallo {provider}, die geplante Wartung an {components} ({title}) ist abgeschlossen.',
+  'status.notice.follow': 'Verfolgen Sie es auf der Statusseite: {link}'
 };

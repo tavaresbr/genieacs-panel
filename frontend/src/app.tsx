@@ -45,6 +45,8 @@ const ForgotPasswordPage = lazy(() => import('@/pages/forgot-password'))
 const ResetPasswordPage = lazy(() => import('@/pages/reset-password'))
 const VerifyEmailPage = lazy(() => import('@/pages/verify-email'))
 const NpsPage = lazy(() => import('@/pages/nps'))
+// A página de status da plataforma (0126): pública, só no endereço do console.
+const StatusPage = lazy(() => import('@/pages/status'))
 const ReceiptPage = lazy(() => import('@/pages/receipt'))
 
 function PageFallback() {
@@ -341,6 +343,7 @@ function ConsoleRoutes() {
       {/* A pesquisa de satisfação dos provedores (0123): pública, o token no
           fragmento. O link aponta para o endereço da plataforma. */}
       <Route path="/nps" element={<Suspense fallback={<AuthFallback />}><NpsPage /></Suspense>} />
+      <Route path="/status" element={<Suspense fallback={<AuthFallback />}><StatusPage /></Suspense>} />
       {/* O recibo do link do bot do WhatsApp da plataforma: público, o token
           no fragmento, mandado no corpo de um POST. */}
       <Route path="/receipt" element={<Suspense fallback={<AuthFallback />}><ReceiptPage /></Suspense>} />

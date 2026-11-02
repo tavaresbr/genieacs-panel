@@ -1384,5 +1384,20 @@ export default {
   'priceChange.cancelNoticeBody': 'नमस्ते, {provider}। {plan} प्लान ({cycle}) का {old} से {new} वाला मूल्य समायोजन, जो {date} से लागू होना था, रद्द कर दिया गया है। कीमत {old} ही रहेगी, और इसकी वजह से कोई इनवॉइस नहीं बदलेगा। कोई सवाल हो तो बस इस संदेश का जवाब दें।',
   'whatsapp.platformBot.askTaxIdMulti': 'नमस्ते! आपकी सुरक्षा के लिए, बिलिंग डेटा भेजने से पहले अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें।',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'जारी रखने के लिए अपने प्रदाता के बिलिंग CNPJ या CPF के आखिरी 5 अंक दर्ज करें। चाहें तो हमारी टीम से बात करने के लिए *atendente* लिखें।',
-  'whatsapp.platformBot.noTaxIdMulti': 'इस नंबर के प्रदाताओं के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।'
+  'whatsapp.platformBot.noTaxIdMulti': 'इस नंबर के प्रदाताओं के लिए कोई बिलिंग CNPJ या CPF पंजीकृत नहीं है, इसलिए मैं यहाँ आपकी पहचान की पुष्टि नहीं कर सकता। मैं बातचीत हमारी टीम को भेज रहा हूँ।',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'पैनल',
+  'status.component.payments': 'भुगतान',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] घटना: {title}',
+  'status.notice.openedBody': 'नमस्ते, {provider}। {components} को प्रभावित करने वाली एक समस्या है: {title}। हमारी टीम इस पर काम कर रही है, और हल होने पर हम आपको सूचित करेंगे।',
+  'status.notice.resolvedSubject': '[{product}] हल हुआ: {title}',
+  'status.notice.resolvedBody': 'नमस्ते, {provider}। {components} को प्रभावित करने वाली समस्या ({title}) हल हो गई है। धैर्य के लिए धन्यवाद।',
+  'status.notice.maintenanceSubject': '[{product}] निर्धारित रखरखाव: {title}',
+  'status.notice.maintenanceBody': 'नमस्ते, {provider}। हम {start} से {end} (ब्रासीलिया समय) तक {components} पर निर्धारित रखरखाव करेंगे: {title}। इस दौरान सेवा अस्थिर हो सकती है।',
+  'status.notice.maintenanceDoneSubject': '[{product}] रखरखाव पूरा हुआ: {title}',
+  'status.notice.maintenanceDoneBody': 'नमस्ते, {provider}। {components} पर निर्धारित रखरखाव ({title}) पूरा हो गया है।',
+  'status.notice.follow': 'स्थिति पृष्ठ पर देखें: {link}'
 };

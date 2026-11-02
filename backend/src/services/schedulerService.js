@@ -28,6 +28,7 @@ import CancellationService from './cancellationService.js';
 import PlatformAlertService from './platformAlertService.js';
 import NpsService from './npsService.js';
 import PlanPriceChangeService from './planPriceChangeService.js';
+import StatusService from './statusService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -225,6 +226,12 @@ class SchedulerService {
       // provedor, como os alertas — o reajuste é do catálogo. Nunca lança.
       .then(() => PlanPriceChangeService.schedulerPass().catch((error) => {
         console.warn(`Could not run the plan price changes: ${error.message}`);
+      }))
+      // A página de status (0126): as verificações de minuto em minuto, a
+      // manutenção vencida encerrada e o aviso aos provedores. Fora do laço
+      // por provedor — é do serviço, não de um deles. Nunca lança.
+      .then(() => StatusService.schedulerPass().catch((error) => {
+        console.warn(`Could not run the status checks: ${error.message}`);
       }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))

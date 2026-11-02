@@ -1383,5 +1383,20 @@ export default {
   'priceChange.cancelNoticeBody': 'Olá, {provider}. O reajuste do plano {plan} ({cycle}) de {old} para {new}, previsto para {date}, foi cancelado. O valor continua {old}, e nenhuma fatura muda por causa dele. Qualquer dúvida, é só responder esta mensagem.',
   'whatsapp.platformBot.askTaxIdMulti': 'Olá! Para sua segurança, antes de enviar dados de cobrança, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Para continuar, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor. Se preferir, escreva *atendente* para falar com a nossa equipe.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'Painel',
+  'status.component.payments': 'Pagamentos',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] Incidente: {title}',
+  'status.notice.openedBody': 'Olá, {provider}. Estamos com um problema que afeta {components}: {title}. Nossa equipe já está trabalhando nisso, e avisaremos quando estiver resolvido.',
+  'status.notice.resolvedSubject': '[{product}] Resolvido: {title}',
+  'status.notice.resolvedBody': 'Olá, {provider}. O problema que afetava {components} ({title}) foi resolvido. Obrigado pela paciência.',
+  'status.notice.maintenanceSubject': '[{product}] Manutenção programada: {title}',
+  'status.notice.maintenanceBody': 'Olá, {provider}. Faremos uma manutenção programada em {components} de {start} a {end} (horário de Brasília): {title}. Durante a janela o serviço pode ficar instável.',
+  'status.notice.maintenanceDoneSubject': '[{product}] Manutenção concluída: {title}',
+  'status.notice.maintenanceDoneBody': 'Olá, {provider}. A manutenção programada em {components} ({title}) foi concluída.',
+  'status.notice.follow': 'Acompanhe pela página de status: {link}'
 };

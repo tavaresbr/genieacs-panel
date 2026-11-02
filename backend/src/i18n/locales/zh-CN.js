@@ -1384,5 +1384,20 @@ export default {
   'priceChange.cancelNoticeBody': '{provider}，您好。原定于 {date} 生效的 {plan} 套餐（{cycle}）从 {old} 调整为 {new} 的调价已取消。价格仍为 {old}，不会因此更改任何账单。如有疑问，直接回复此消息即可。',
   'whatsapp.platformBot.askTaxIdMulti': '您好！为了您的安全，在发送账单信息之前，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '如需继续，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。您也可以输入 *atendente* 与我们的团队沟通。',
-  'whatsapp.platformBot.noTaxIdMulti': '此号码关联的服务商都没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。'
+  'whatsapp.platformBot.noTaxIdMulti': '此号码关联的服务商都没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': '面板',
+  'status.component.payments': '支付',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] 故障：{title}',
+  'status.notice.openedBody': '{provider}，您好。我们遇到了影响 {components} 的问题：{title}。我们的团队正在处理，解决后会通知您。',
+  'status.notice.resolvedSubject': '[{product}] 已解决：{title}',
+  'status.notice.resolvedBody': '{provider}，您好。影响 {components} 的问题（{title}）已解决。感谢您的耐心。',
+  'status.notice.maintenanceSubject': '[{product}] 计划维护：{title}',
+  'status.notice.maintenanceBody': '{provider}，您好。我们将于 {start} 至 {end}（巴西利亚时间）对 {components} 进行计划维护：{title}。维护期间服务可能不稳定。',
+  'status.notice.maintenanceDoneSubject': '[{product}] 维护已完成：{title}',
+  'status.notice.maintenanceDoneBody': '{provider}，您好。{components} 的计划维护（{title}）已完成。',
+  'status.notice.follow': '请在状态页面查看：{link}'
 };

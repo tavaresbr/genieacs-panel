@@ -193,7 +193,15 @@ class PlatformAudit {
     // provedor já confirmado pelo documento: a segunda via, a situação da
     // assinatura ou o link do recibo. O detalhe diz O QUE saiu (e para qual
     // telefone, mascarado) — nunca o Pix nem a linha digitável.
-    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed'
+    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed',
+    // A página de status (0126): o incidente ou a manutenção aberta, mudada
+    // (título, componentes, impacto, janela, aviso aos provedores), a mensagem
+    // nova na linha do tempo e o encerramento — este também quando é o
+    // sistema que encerra a manutenção que passou do fim.
+    STATUS_INCIDENT_CREATED: 'status.incident_created',
+    STATUS_INCIDENT_UPDATED: 'status.incident_updated',
+    STATUS_INCIDENT_POSTED: 'status.incident_update_posted',
+    STATUS_INCIDENT_RESOLVED: 'status.incident_resolved'
   });
 
   /**

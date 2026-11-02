@@ -1385,5 +1385,20 @@ export default {
   'priceChange.cancelNoticeBody': 'Здравствуйте, {provider}. Изменение цены тарифа {plan} ({cycle}) с {old} на {new}, запланированное на {date}, отменено. Цена остаётся {old}, и ни один счёт из-за него не меняется. Если есть вопросы, просто ответьте на это сообщение.',
   'whatsapp.platformBot.askTaxIdMulti': 'Здравствуйте! В целях безопасности перед отправкой платёжных данных укажите последние 5 цифр платёжного CNPJ или CPF вашего провайдера.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Чтобы продолжить, укажите последние 5 цифр платёжного CNPJ или CPF вашего провайдера. Если хотите, напишите *atendente*, чтобы связаться с нашей командой.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Для провайдеров этого номера не указан платёжный CNPJ или CPF, поэтому я не могу подтвердить вашу личность здесь. Я передам разговор нашей команде.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Для провайдеров этого номера не указан платёжный CNPJ или CPF, поэтому я не могу подтвердить вашу личность здесь. Я передам разговор нашей команде.',
+
+  // A página de status (0126): os componentes e o aviso aos provedores.
+  'status.component.panel': 'Панель',
+  'status.component.payments': 'Платежи',
+  'status.component.whatsapp': 'WhatsApp',
+  'status.component.genieacs': 'GenieACS',
+  'status.notice.openedSubject': '[{product}] Инцидент: {title}',
+  'status.notice.openedBody': 'Здравствуйте, {provider}. У нас проблема, затрагивающая {components}: {title}. Наша команда уже работает над ней, и мы сообщим, когда она будет решена.',
+  'status.notice.resolvedSubject': '[{product}] Решено: {title}',
+  'status.notice.resolvedBody': 'Здравствуйте, {provider}. Проблема, затрагивавшая {components} ({title}), решена. Спасибо за терпение.',
+  'status.notice.maintenanceSubject': '[{product}] Плановое обслуживание: {title}',
+  'status.notice.maintenanceBody': 'Здравствуйте, {provider}. Мы проведём плановое обслуживание {components} с {start} до {end} (время Бразилиа): {title}. В это время сервис может работать нестабильно.',
+  'status.notice.maintenanceDoneSubject': '[{product}] Обслуживание завершено: {title}',
+  'status.notice.maintenanceDoneBody': 'Здравствуйте, {provider}. Плановое обслуживание {components} ({title}) завершено.',
+  'status.notice.follow': 'Следите на странице статуса: {link}'
 };

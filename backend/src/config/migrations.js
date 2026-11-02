@@ -3157,6 +3157,105 @@ const PLATFORM_NPS_TABLES = [
 ];
 
 /**
+ * A página de status da plataforma (0126) — ver `services/statusService.js`.
+ *
+ *   status_checks            uma linha por verificação automática, a cada
+ *                            minuto, de cada componente (panel, payments,
+ *                            whatsapp, genieacs): `ok`, a latência e um
+ *                            detalhe curto que só o console lê. Podada aos
+ *                            90 dias;
+ *   status_daily             a soma do dia (UTC) por componente — total e
+ *                            quantas deram certo. É dela que sai a barra de
+ *                            90 dias, numa consulta de no máximo 4 × 90
+ *                            linhas, em vez de agrupar meio milhão de
+ *                            verificações por dia em três dialetos;
+ *   status_incidents         o incidente ou a manutenção agendada, escritos
+ *                            no console: título, componentes (códigos
+ *                            separados por vírgula), impacto, situação e se os
+ *                            provedores são avisados;
+ *   status_incident_updates  a linha do tempo de cada um: a situação nova e a
+ *                            mensagem pública;
+ *   status_notification_marks  o que já foi avisado a cada provedor, uma linha
+ *                            por (incidente, provedor, evento) — o índice
+ *                            único é a garra que faz o aviso sair UMA vez,
+ *                            como em `plan_price_change_marks`.
+ *
+ * Todas da PLATAFORMA (compartilhadas): falam do serviço, acima dos
+ * provedores, e nenhuma leva nome de provedor para a página pública.
+ */
+const statusChecksTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('component', 16).notNullable();
+  t.boolean('ok').notNullable();
+  t.integer('latency_ms').nullable();
+  t.string('detail', 120).nullable();
+  t.timestamp('checked_at').notNullable().defaultTo(db.fn.now());
+  t.index(['component', 'checked_at'], 'status_checks_component_idx');
+};
+
+const statusDailyTable = () => (t) => {
+  t.increments('id').primary();
+  t.string('component', 16).notNullable();
+  t.string('day', 10).notNullable();
+  t.integer('total').notNullable().defaultTo(0);
+  t.integer('ok_count').notNullable().defaultTo(0);
+  t.unique(['component', 'day'], 'status_daily_uq');
+};
+
+const statusIncidentsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('title', 160).notNullable();
+  t.string('components', 64).notNullable();
+  t.string('impact', 16).notNullable().defaultTo('minor');
+  t.string('status', 16).notNullable().defaultTo('investigating');
+  t.string('kind', 16).notNullable().defaultTo('incident');
+  t.timestamp('starts_at').nullable();
+  t.timestamp('ends_at').nullable();
+  t.timestamp('resolved_at').nullable();
+  t.boolean('notify_providers').notNullable().defaultTo(false);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['status', 'kind'], 'status_incidents_status_idx');
+  t.index(['created_at'], 'status_incidents_created_idx');
+};
+
+const statusIncidentUpdatesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('incident_id').unsigned().notNullable()
+    .references('id').inTable('status_incidents').onDelete('CASCADE');
+  t.string('status', 16).notNullable();
+  t.text('message').notNullable();
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['incident_id'], 'status_incident_updates_incident_idx');
+};
+
+const statusNotificationMarksTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('incident_id').unsigned().notNullable()
+    .references('id').inTable('status_incidents').onDelete('CASCADE');
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('event', 32).notNullable();
+  t.string('status', 16).notNullable().defaultTo('claimed');
+  t.timestamp('claimed_until');
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.string('detail', 255);
+  t.timestamp('done_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['incident_id', 'tenant_id', 'event'], 'status_notification_marks_uq');
+};
+
+const STATUS_PAGE_TABLES = [
+  ['status_checks', statusChecksTable],
+  ['status_daily', statusDailyTable],
+  ['status_incidents', statusIncidentsTable],
+  ['status_incident_updates', statusIncidentUpdatesTable],
+  ['status_notification_marks', statusNotificationMarksTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -3201,7 +3300,8 @@ export const SCHEMA_TABLES = [
   ...PLATFORM_ALERT_TABLES,
   ...WA_MARKETING_OPT_OUT_TABLES,
   ...PLAN_PRICE_CHANGE_TABLES,
-  ...PLATFORM_NPS_TABLES
+  ...PLATFORM_NPS_TABLES,
+  ...STATUS_PAGE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6835,6 +6935,23 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'platform_nps', platformNpsTable(db));
+    }
+  },
+  {
+    /** A página de status da plataforma — ver `STATUS_PAGE_TABLES`. */
+    id: '0126_status_page',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      for (const [name] of STATUS_PAGE_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of STATUS_PAGE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];
