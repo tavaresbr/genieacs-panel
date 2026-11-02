@@ -2134,7 +2134,7 @@ class SgpService {
       vendedor_id: input.vendedorId,
       tecnico_id: input.technicianId,
       splitter_id: input.splitterId,
-      splitter_porta: input.splitterId ? input.splitterPort : '',
+      splitter_port: input.splitterId ? input.splitterPort : '',
       login: input.login,
       senha: input.password,
       os_instalacao: input.installOs ? 1 : '',
