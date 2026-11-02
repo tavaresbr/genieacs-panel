@@ -392,6 +392,9 @@ export default function DevicesPage() {
         <span className="mt-1 block truncate font-mono text-[0.68rem] text-muted-foreground" title={link.clientName || undefined}>
           {link.contract}{link.clientName ? ` · ${link.clientName}` : ''}
         </span>
+        {link.login && (
+          <span className="mt-0.5 block truncate font-mono text-[0.68rem] text-muted-foreground" title={link.login}>{link.login}</span>
+        )}
         {(link.deviceCount ?? 1) > 1 && (
           <span className="mt-1 block text-[0.68rem] text-amber-600 dark:text-amber-400">
             {t('devices.sgp.sharedContract', { count: link.deviceCount ?? 2 })}
