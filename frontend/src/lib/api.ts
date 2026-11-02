@@ -5653,6 +5653,8 @@ export interface WaSubscriberRegistration {
   name: string | null
   document: string | null
   clientId: string | null
+  /** A página do cliente no SGP, ou null quando o SGP não deu o id. */
+  sgpUrl: string | null
 }
 
 /** An SGP subscriber as a WhatsApp contact — one per contract. */

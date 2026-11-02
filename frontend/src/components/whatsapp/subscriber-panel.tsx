@@ -11,6 +11,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { formatBrPhone } from '@/lib/phone'
+import { formatDocument } from '@/lib/document'
 import type { TranslationKey } from '@/lib/i18n'
 
 /**
@@ -569,8 +570,24 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                   <ul className="mt-1 space-y-1">
                     {panel.contracts.registrations.map((registration) => (
                       <li key={registration.key} className="flex items-center justify-between gap-2 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-2 text-sm">
-                        <span className="min-w-0 wrap-break-word font-semibold">
-                          <ContactLink contract={null} registration={registration.key} name={registration.name} className="" />
+                        <span className="min-w-0 wrap-break-word">
+                          <span className="font-semibold">
+                            <ContactLink contract={null} registration={registration.key} name={registration.name} className="" />
+                          </span>
+                          {registration.document && (
+                            <span className="block font-mono text-xs text-muted-foreground">{formatDocument(registration.document)}</span>
+                          )}
+                          {isSafeExternalUrl(registration.sgpUrl) && (
+                            <a
+                              href={registration.sgpUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary underline"
+                            >
+                              <Icon name="external" size={12} />
+                              {t('whatsapp.sgp.openSgp')}
+                            </a>
+                          )}
                         </span>
                         {registration.key === attendance.registration ? (
                           <span className="modern-badge-success shrink-0">{t('whatsapp.sgp.registrationLinked')}</span>

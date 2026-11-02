@@ -128,8 +128,15 @@ class WaSubscriberPanelService {
       : (conversation.contract
         ? await SgpContact.getByContract(conversation.contract)
         : (conversation.sgp_contact_id ? await SgpContact.getById(conversation.sgp_contact_id) : null));
-    const searchDocument = onlyDigits(document) || onlyDigits(link?.document) || onlyDigits(contact?.document);
-    const searchContract = conversation.contract || link?.contract || null;
+    // O que o atendente digitou: CPF tem 11 dígitos e CNPJ 14; um número curto é
+    // o número do contrato, para quem sabe o contrato e não o documento em que
+    // ele está (o contrato pode estar no CPF de outra pessoa, ou no da empresa).
+    const typed = onlyDigits(document);
+    const typedContract = typed && typed.length <= 9 ? typed : null;
+    const searchDocument = typedContract
+      ? ''
+      : (typed || onlyDigits(link?.document) || onlyDigits(contact?.document));
+    const searchContract = typedContract || conversation.contract || link?.contract || null;
 
     // The SGP registrations with no contract (a client signed up but not yet
     // contracted) — the contract lookup cannot see them. Best effort.
@@ -183,10 +190,20 @@ class WaSubscriberPanelService {
    */
   static async registrationsFor(conversation, contact, searchDocument) {
     const found = new Map();
+    // A página do cliente no SGP, para conferir lá o contrato que o painel não vê.
+    const config = await SgpService.getConfig().catch(() => null);
     const add = (row, name, document, clientId) => {
       if (!row) return;
       const key = `c:${row.id}`;
-      if (!found.has(key)) found.set(key, { key, name: name ?? null, document: document ?? null, clientId: clientId ?? null });
+      if (!found.has(key)) {
+        found.set(key, {
+          key,
+          name: name ?? null,
+          document: document ?? null,
+          clientId: clientId ?? null,
+          sgpUrl: config?.enabled ? SgpService.clientPageUrl(config, clientId) : null
+        });
+      }
     };
     if (conversation.sgp_contact_id) {
       const bound = contact?.id === conversation.sgp_contact_id ? contact : await SgpContact.getById(conversation.sgp_contact_id);
