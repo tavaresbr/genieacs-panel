@@ -326,7 +326,7 @@ class ContactController {
   /** `POST /api/contacts/sgp/precadastro` — the client with a contract, through the SGP's pre-registration. */
   static async createPreRegistration(req, res) {
     try {
-      const { profile, sent, filed } = await ContactOnboardingService.createPreRegistration(req.body);
+      const { profile, sent, filed, newContract = false } = await ContactOnboardingService.createPreRegistration(req.body);
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.CONTACT_CREATED,
         subjectType: 'contact',
@@ -334,12 +334,16 @@ class ContactController {
         detail: {
           sgp: true,
           preRegistration: true,
+          ...(newContract ? { newContract: true } : {}),
           filed,
           sgpClientId: sent.clientId,
           preRegistrationId: sent.preRegistrationId
         }
       });
-      return res.status(201).json(createResponse(req.t('contacts.preRegistered'), { ...profile, filed }));
+      return res.status(201).json(createResponse(
+        req.t(newContract ? 'contacts.newContractSent' : 'contacts.preRegistered'),
+        { ...profile, filed, newContract }
+      ));
     } catch (error) {
       return handleError(req, res, error, 'contacts.saveFailed');
     }

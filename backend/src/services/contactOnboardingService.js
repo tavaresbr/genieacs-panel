@@ -239,6 +239,47 @@ class ContactOnboardingService {
       }
     }
 
+    // Already in the SGP: what it holds of the client, for "Novo contrato
+    // para este cliente" — the record's own values (the operator's edits
+    // first), never a paid consultation.
+    let existing = null;
+    if (inSgp.length > 0) {
+      // The record the "Abrir ficha" button opens: the client's values, the
+      // operator's edits first; the contract's address when the client's own
+      // record has none (many installs only send it per contract).
+      const profile = await ContactProfileService.get(inSgp[0].key).catch(() => null);
+      const shown = (field) => profile?.fields?.[field]?.value ?? null;
+      let address = shown('address') || {};
+      if (!address.street && inSgp[0].contract) {
+        const row = await SgpContact.getByContract(inSgp[0].contract);
+        try {
+          address = (typeof row?.address_parts === 'string' ? JSON.parse(row.address_parts) : row?.address_parts) || address;
+        } catch {
+          // An unreadable address is a form typed by hand.
+        }
+      }
+      existing = {
+        source: 'sgp',
+        name: shown('name') || inSgp[0].name || null,
+        tradeName: null,
+        birthDate: shown('birthDate') || null,
+        email: shown('emails')?.[0] ?? null,
+        phone: shown('phones')?.[0] ?? null,
+        address: {
+          street: address.street ?? null,
+          number: address.number ?? null,
+          complement: address.complement ?? null,
+          district: address.district ?? null,
+          city: address.city ?? null,
+          state: address.state ?? null,
+          zip: address.zip ?? null,
+          reference: address.reference ?? null,
+          latitude: address.latitude ?? null,
+          longitude: address.longitude ?? null
+        }
+      };
+    }
+
     // A source that gave a name and no (or half an) address leaves the form
     // with the part the operator least wants to type: complete it.
     if (prefill) prefill.address = await this.completeAddress(prefill.address, { digits, personType, fromReceita: prefill.source === 'receita' });
@@ -250,6 +291,7 @@ class ContactOnboardingService {
       inSgp,
       inPanel,
       prefill,
+      existing,
       prefillError,
       teiahConsulted,
       teiahCached,
@@ -334,7 +376,7 @@ class ContactOnboardingService {
    * first whether the document is already there: a second client with the
    * same CPF is the one mistake these buttons must not make.
    */
-  static async prepareSgpClient(body) {
+  static async prepareSgpClient(body, { newContract = false } = {}) {
     const input = body && typeof body === 'object' ? body : {};
     const document = String(input.document ?? '').replace(/\D/g, '');
     const personType = personTypeOf(document);
@@ -360,7 +402,12 @@ class ContactOnboardingService {
 
     const config = SgpService.requireReady(await SgpService.getConfig());
     const existing = await WaContactService.lookupSgp(document);
-    if (existing.total > 0) {
+    // A new contract is for a client the SGP already has; anything else must
+    // not be there yet, or it would be filed twice.
+    if (newContract && existing.total === 0) {
+      throw new ContactProfileError('contacts.error.notInSgp', { code: 'not_in_sgp', status: 400 });
+    }
+    if (!newContract && existing.total > 0) {
       throw new ContactProfileError('contacts.error.alreadyInSgp', {
         code: 'already_in_sgp',
         status: 409,
@@ -378,7 +425,7 @@ class ContactOnboardingService {
       zip,
       reference: clean(address.reference)
     };
-    return { input, config, document, personType, name, phone, email, address, cleanAddress };
+    return { input, config, document, personType, name, phone, email, address, cleanAddress, existing };
   }
 
   /** Files the client just created in the SGP here, under the SGP's own id. */
@@ -445,9 +492,10 @@ class ContactOnboardingService {
    * contacts sync joins it to what the SGP made of it.
    */
   static async createPreRegistration(body) {
-    const prepared = await this.prepareSgpClient(body);
+    const newContract = body?.newContract === true;
+    const prepared = await this.prepareSgpClient(body, { newContract });
     const {
-      input, config, document, personType, name, phone, email, address, cleanAddress
+      input, config, document, personType, name, phone, email, address, cleanAddress, existing
     } = prepared;
 
     const planId = Number.parseInt(String(input.planId ?? ''), 10);
@@ -511,6 +559,20 @@ class ContactOnboardingService {
       installOs: input.installOs === undefined ? config.preRegInstallOs : input.installOs === true,
       activate: config.preRegActivate
     });
+
+    if (newContract) {
+      // The client is already filed: what the SGP holds now (its new contract
+      // among the rest) is asked again, and the record opened is the client's
+      // own — the address typed for this contract does not overwrite it.
+      let key = existing.contacts[0]?.key ?? null;
+      try {
+        const found = await WaContactService.lookupSgp(document);
+        key = found.contacts[0]?.key ?? key;
+      } catch (error) {
+        console.warn(`SGP lookup after new contract failed: ${error.code || error.message}`);
+      }
+      return { profile: await ContactProfileService.get(key), sent, filed: 'sgp', newContract: true };
+    }
 
     let row = null;
     if (sent.clientId) {

@@ -3934,6 +3934,16 @@ export interface ContactDocumentLookup {
     phone: string | null
     address: ContactAddress
   } | null
+  /** What the SGP holds of a client already there, for "Novo contrato para este cliente". */
+  existing?: {
+    source: 'sgp'
+    birthDate: string | null
+    name: string | null
+    tradeName: string | null
+    email: string | null
+    phone: string | null
+    address: ContactAddress & { latitude?: number | null; longitude?: number | null }
+  } | null
   prefillError: boolean
   /** Whether the TeiaH was asked (the document is nobody's yet and the integration is on). */
   teiahConsulted: boolean
@@ -4060,8 +4070,10 @@ export const contactsAPI = {
     technicianId?: number
     splitterId?: number
     splitterPort?: number
+    /** A new contract for a client the SGP already has. */
+    newContract?: boolean
   }) =>
-    apiClient.post<ContactProfile & { filed: 'sgp' | 'panel' }>('/contacts/sgp/precadastro', data),
+    apiClient.post<ContactProfile & { filed: 'sgp' | 'panel'; newContract?: boolean }>('/contacts/sgp/precadastro', data),
 
   /** The pre-registration lists (plans, due days) the "Novo cliente" form offers. */
   preRegistrationOptions: () =>

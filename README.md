@@ -425,8 +425,10 @@ is deleted with the client.
 With plans configured, **New client** offers **Client with contract**. The panel then sends `POST /api/precadastro/F` or `/J` with the plan, due day, PPPoE login and password. The password is generated and can be edited. The form also:
 
 - pre-selects the plan and due day most active contracts already have;
-- picks the seller (default: the configured one), the work-order technician, and the splitter and port (`tecnico_id`, `splitter_id`, `splitter_porta`). Splitters are listed nearest to the client's address first when both have coordinates;
+- picks the seller (default: the configured one), the work-order technician, and the splitter and port (`tecnico_id`, `splitter_id`, `splitter_port`). Splitters are listed nearest to the client's address first when both have coordinates;
 - checks the PPPoE login against the synced SGP contracts and the panel's accounts. A login in use is refused, and the form suggests the next free variation (`maria.souza2`).
+
+**New contract for an existing client.** When the CPF/CNPJ is already in the SGP, **New client** shows the client's contracts with **New contract for this client**. The form is filled from the SGP record (the operator's edits first; the contract's address when the client record has none), without asking TeiaH. The address stays editable for a second installation point. The panel sends the same `POST /api/precadastro/F|J` with the client's CPF/CNPJ, which the SGP files under the existing client, then refreshes the client from the SGP and opens their record. A document that is not in the SGP is refused (`not_in_sgp`), and a plain registration of a document that is already there is still refused (`already_in_sgp`).
 
 If the SGP answers without a client id (a pre-registration not converted yet), the client is kept in the panel with a note, and the contacts sync joins it later.
 
