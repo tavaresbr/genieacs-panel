@@ -10,6 +10,8 @@ ENV_FILE="${INSTALL_DIR}/backend/.env"
 REPO_BRANCH="${SKYGP_BRANCH:-main}"
 CLI_PATH="${SKYGP_CLI_PATH:-/usr/local/bin/skygenpanel}"
 BACKUP_CLI_PATH="${SKYGP_BACKUP_CLI_PATH:-/usr/local/bin/skygenpanel-backup}"
+AUTOUPDATE_CLI_PATH="${SKYGP_AUTOUPDATE_CLI_PATH:-/usr/local/bin/skygenpanel-autoupdate}"
+UPDATE_LOCK="${SKYGP_UPDATE_LOCK:-/run/skygenpanel-update.lock}"
 NODE_MAJOR_MIN=22
 NODE_MINOR_MIN=22
 
@@ -96,15 +98,61 @@ set_env() {
   fi
 }
 
+# Waits for the panel and the customer portal to answer their health checks.
+# A restart that "succeeded" says only that systemd started a process; this is
+# the panel actually serving, with its database reachable.
+wait_healthy() {
+  local tries=40
+  while [ "$tries" -gt 0 ]; do
+    if node -e "Promise.all([
+        fetch('http://127.0.0.1:$(app_port)/api/health'),
+        fetch('http://127.0.0.1:$(portal_port)/api/health')
+      ]).then((r) => process.exit(r.every((x) => x.ok) ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null; then
+      return 0
+    fi
+    tries=$((tries - 1))
+    sleep 3
+  done
+  return 1
+}
+
+# update [TARGET]
+#   no TARGET   the tip of $REPO_BRANCH, as it always was
+#   vX.Y.Z      that published release (what skygenpanel-autoupdate asks for)
+#   <full sha>  a commit already in this checkout (how a rollback goes back)
 cmd_update() {
-  local legacy_dir cli_temp repo_url active_data_dir active_app_port active_portal_port
+  local target="${1:-}" legacy_dir cli_temp repo_url active_data_dir active_app_port active_portal_port
   need_root
   validate_install_dir
   [ -d "$INSTALL_DIR/.git" ] || die "Not a git checkout: $INSTALL_DIR"
-  log "Fetching latest ($REPO_BRANCH)"
-  git -C "$INSTALL_DIR" fetch --depth 1 origin "$REPO_BRANCH"
-  git -C "$INSTALL_DIR" reset --hard "origin/$REPO_BRANCH"
+  # The automatic updater holds this lock already and says so; anyone else
+  # takes it, so a manual update and a scheduled one never run on top of
+  # each other.
+  if [ -z "${SKYGP_UPDATE_LOCK_HELD:-}" ]; then
+    exec 9>"$UPDATE_LOCK"
+    flock -n 9 || die "Another update is running. Try again when it finishes."
+  fi
+  if [ -z "$target" ]; then
+    log "Fetching latest ($REPO_BRANCH)"
+    git -C "$INSTALL_DIR" fetch --depth 1 origin "$REPO_BRANCH"
+    git -C "$INSTALL_DIR" reset --hard "origin/$REPO_BRANCH"
+  elif [[ "$target" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    log "Fetching release $target"
+    git -C "$INSTALL_DIR" fetch --depth 1 --force origin "+refs/tags/${target}:refs/tags/${target}"
+    git -C "$INSTALL_DIR" reset --hard "${target}^{commit}"
+  elif [[ "$target" =~ ^[0-9a-f]{40}$ ]]; then
+    git -C "$INSTALL_DIR" cat-file -e "${target}^{commit}" 2>/dev/null \
+      || die "Commit $target is not in this checkout."
+    log "Returning to ${target:0:12}"
+    git -C "$INSTALL_DIR" reset --hard "$target"
+  else
+    die "Unknown update target: $target (expected vX.Y.Z or a full commit hash)."
+  fi
   if ! node_runtime_ready; then
+    # The runtime installer re-fetches $REPO_BRANCH, which would silently
+    # replace the release asked for with the tip of the branch.
+    [ -z "$target" ] \
+      || die "Node.js 22.22 or newer is required first. Run 'skygenpanel update' by hand to install it."
     repo_url="$(git -C "$INSTALL_DIR" remote get-url origin)"
     active_data_dir="$(data_dir)"
     active_app_port="$(app_port)"
@@ -146,6 +194,18 @@ cmd_update() {
     systemctl enable --now skygenpanel-backup.timer >/dev/null 2>&1 \
       || warn "Could not enable the backup timer."
   fi
+  # The updater travels the same way, with one difference: its timer is
+  # installed but not enabled. An install updates itself only after someone
+  # runs `skygenpanel auto-update enable` on it. The script goes in by rename,
+  # never in place: it may be the very process running this update.
+  if [ -f "$INSTALL_DIR/deploy/skygenpanel-autoupdate" ]; then
+    [ ! -L "$AUTOUPDATE_CLI_PATH" ] || die "Refusing symbolic-link path: $AUTOUPDATE_CLI_PATH"
+    install -m 0755 "$INSTALL_DIR/deploy/skygenpanel-autoupdate" "${AUTOUPDATE_CLI_PATH}.new.$$"
+    mv -f -- "${AUTOUPDATE_CLI_PATH}.new.$$" "$AUTOUPDATE_CLI_PATH"
+    install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-autoupdate.service" /etc/systemd/system/
+    install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-autoupdate.timer" /etc/systemd/system/
+    systemctl daemon-reload
+  fi
   log "Updating backend dependencies"
   ( cd "$INSTALL_DIR/backend" && npm ci --omit=dev )
   log "Rebuilding frontend"
@@ -155,7 +215,9 @@ cmd_update() {
   chmod 600 "$ENV_FILE"
   log "Restarting service"
   systemctl restart "$SERVICE_NAME"
-  log "Update complete."
+  log "Waiting for the panel to answer"
+  wait_healthy || die "The panel did not come back healthy after the update. See 'skygenpanel logs'."
+  log "Update complete: $(cmd_version)"
 }
 
 cmd_expose() {
@@ -246,6 +308,12 @@ cmd_rotate_key() {
   ( cd "$INSTALL_DIR/backend" && node scripts/rotate-secret-key.js $modo )
 }
 
+cmd_auto_update() {
+  [ -x "$AUTOUPDATE_CLI_PATH" ] \
+    || die "Auto-update is not installed at $AUTOUPDATE_CLI_PATH. Run 'skygenpanel update' once."
+  "$AUTOUPDATE_CLI_PATH" "$@"
+}
+
 # Delegated rather than reimplemented: the timer runs the same script with the
 # same arguments, so an operator who types this by hand and the machine that
 # runs it at 03:17 are doing exactly the same thing. Two copies of "how a backup
@@ -264,7 +332,9 @@ skygenpanel — manage the TR69 Controle service
 Usage: skygenpanel <command> [args]
 
 Commands:
-  update                      Pull latest code, rebuild, and restart
+  update [vX.Y.Z]             Pull latest code (or that release), rebuild, restart
+  auto-update <cmd>           enable | disable | status | check | run — follow new
+                              releases on their own (off until enabled)
   expose                      Bind to 0.0.0.0 (allow network access) + restart
   unexpose                    Bind to 127.0.0.1 (localhost only) + restart
   restart | start | stop      Control the systemd service
@@ -280,7 +350,8 @@ EOF
 }
 
 case "${1:-help}" in
-  update)          cmd_update ;;
+  update)          cmd_update "${2:-}" ;;
+  auto-update)     shift; cmd_auto_update "${@:-status}" ;;
   expose)          cmd_expose ;;
   unexpose)        cmd_unexpose ;;
   restart)         cmd_restart ;;

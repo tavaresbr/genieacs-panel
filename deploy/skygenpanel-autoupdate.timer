@@ -1,0 +1,13 @@
+[Unit]
+Description=Check for a new TR69 Controle release
+
+[Timer]
+# Off until `skygenpanel auto-update enable`: an install updates itself only
+# when someone asked it to.
+OnBootSec=10min
+OnUnitActiveSec=15min
+# Many installs checking the same repository at the same second gain nothing.
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
