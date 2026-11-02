@@ -31,6 +31,8 @@ const SETTINGS_KEY = 'whatsapp_alert_settings';
 /** O resumo diário da IA: o dia (no fuso do provedor) em que já saiu, e a hora a partir da qual sai. */
 const AI_SUMMARY_KEY = 'wa_ai_daily_summary_day';
 const AI_SUMMARY_HOUR = 8;
+/** Há quantos minutos uma mensagem na fila, sem sair, conta como parada. */
+const OUTBOX_STUCK_MINUTES = 15;
 
 /**
  * Where the last scan's stamp lives, beside the settings and read the same way.
@@ -108,7 +110,10 @@ const RULE_KEYS = Object.freeze({
   wa_ai_daily_summary: { firing: 'whatsapp.alerts.aiDailySummary', cleared: null },
   sgp_down: { firing: 'whatsapp.alerts.sgpDown', cleared: null },
   sgp_unauthorized: { firing: 'whatsapp.alerts.sgpUnauthorized', cleared: null },
-  wa_unlock_failed: { firing: 'whatsapp.alerts.unlockFailed', cleared: null }
+  wa_unlock_failed: { firing: 'whatsapp.alerts.unlockFailed', cleared: null },
+  genieacs_down: { firing: 'whatsapp.alerts.genieacsDown', cleared: null },
+  wa_outbox_stuck: { firing: 'whatsapp.alerts.outboxStuck', cleared: null },
+  wa_dunning_failed: { firing: 'whatsapp.alerts.dunningFailed', cleared: null }
 });
 
 /**
@@ -652,7 +657,16 @@ class WaAlertService {
       const esperas = await this.evaluateWaiting(settings, now);
       await this.reconcile({ ...esperas, settings, channels, now, summary, scope: (rule) => rule === 'wa_waiting' });
 
-      const devices = await DeviceService.getDashboardDevices();
+      // Mensagens paradas na fila de saída: também independe da frota.
+      await this.avisarFilaTravada({ now });
+
+      let devices;
+      try {
+        devices = await DeviceService.getDashboardDevices();
+      } catch (error) {
+        await this.avisarGenieAcs(error);
+        throw error;
+      }
       if (!Array.isArray(devices) || devices.length === 0) {
         // An empty fleet read is far more likely to be a broken GenieACS than a
         // provider with no ONTs, and treating it as "nothing is firing" would
@@ -1195,6 +1209,51 @@ class WaAlertService {
    * @returns {Promise<number>} cópias enviadas; 0 se dentro do limite ou sem canal
    */
   static throttleLocks = new Set();
+
+  /**
+   * O GenieACS não respondeu à leitura da frota: sem ele, nenhum alerta de ONT
+   * pode sair, e ninguém percebe porque nada dispara. Um provedor sem
+   * GenieACS configurado não é falha. No máximo um aviso a cada 6 h. Nunca lança.
+   */
+  static async avisarGenieAcs(error) {
+    const texto = String(error?.message || error || '');
+    if (/not configured|não configurad/i.test(texto)) return 0;
+    return this.notifyThrottled({
+      stampKey: 'genieacs_down_alert_at',
+      rule: 'genieacs_down',
+      subject: 'acs',
+      vars: { reason: texto.slice(0, 120), link: await this.settingsLink('general').catch(() => '') }
+    });
+  }
+
+  /**
+   * Mensagens do WhatsApp na fila há mais de `OUTBOX_STUCK_MINUTES` sem sair:
+   * número caído, servidor de WhatsApp parado ou fila travada. Se o WhatsApp é
+   * a causa, só o e-mail e o Telegram levam este aviso. No máximo um a cada 2 h.
+   */
+  static async avisarFilaTravada({ now = Date.now() } = {}) {
+    try {
+      const limite = new Date(now - OUTBOX_STUCK_MINUTES * 60_000);
+      const row = await tdb('wa_messages')
+        .where({ delivery_status: 'queued', is_note: false })
+        .whereNull('external_id')
+        .where('created_at', '<', limite)
+        .count({ n: '*' })
+        .first();
+      const count = Number(row?.n || 0);
+      if (count === 0) return 0;
+      return await this.notifyThrottled({
+        stampKey: 'wa_outbox_stuck_alert_at',
+        rule: 'wa_outbox_stuck',
+        subject: 'outbox',
+        intervalMs: 2 * 3600 * 1000,
+        vars: { count, minutes: OUTBOX_STUCK_MINUTES, link: await this.settingsLink('whatsapp').catch(() => '') }
+      });
+    } catch (error) {
+      console.warn(`WhatsApp outbox check failed: ${error?.message || error}`);
+      return 0;
+    }
+  }
 
   static async notifyThrottled({ stampKey, rule, subject = '', vars = {}, intervalMs = 6 * 3600 * 1000 }) {
     // Ler e gravar o carimbo são dois passos: sem isto, várias falhas ao mesmo

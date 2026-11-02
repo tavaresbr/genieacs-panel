@@ -685,6 +685,54 @@ describe('a IA atendendo', () => {
     });
   });
 
+  describe('avisos de operação para a equipe', () => {
+    let original;
+    let avisos;
+    beforeEach(() => {
+      original = WaAlertService.notifyEvent;
+      avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    });
+    const restaurar = () => { WaAlertService.notifyEvent = original; };
+    const limpar = () => asTenant(() => getDb()('app_state')
+      .whereIn('key', ['genieacs_down_alert_at', 'wa_outbox_stuck_alert_at']).del());
+
+    it('GenieACS sem resposta avisa (6 h); GenieACS não configurado não é falha', async () => {
+      try {
+        await limpar();
+        await asTenant(() => WaAlertService.avisarGenieAcs(new Error('GenieACS URL not configured')));
+        assert.equal(avisos.length, 0);
+        await asTenant(() => WaAlertService.avisarGenieAcs(new Error('GenieACS responded with status: 502')));
+        await asTenant(() => WaAlertService.avisarGenieAcs(new Error('GenieACS responded with status: 502')));
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'genieacs_down');
+        assert.match(WaAlertService.compose({ rule: 'genieacs_down', vars: avisos[0].vars }, false), /GenieACS/);
+      } finally { restaurar(); }
+    });
+
+    it('fila do WhatsApp travada: só mensagens antigas, sem external_id, e um aviso a cada 2 h', async () => {
+      try {
+        await limpar();
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'Oi!' }];
+        await receber(DESCONHECIDO, 'oi');
+        const conversa = await conversaDe(DESCONHECIDO);
+        assert.equal(await asTenant(() => WaAlertService.avisarFilaTravada()), 0, 'sem nada parado, sem aviso');
+        const velha = new Date(Date.now() - 40 * 60_000);
+        await asTenant(() => getDb()('wa_messages').insert({
+          conversation_id: conversa.id, direction: 'out', body: 'preso', is_note: false, delivery_status: 'queued',
+          source: 'campaign', created_at: velha, updated_at: velha, tenant_id: conversa.tenant_id
+        }));
+        await asTenant(() => WaAlertService.avisarFilaTravada());
+        await asTenant(() => WaAlertService.avisarFilaTravada());
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_outbox_stuck');
+        assert.equal(avisos[0].vars.count >= 1, true);
+        assert.match(WaAlertService.compose({ rule: 'wa_outbox_stuck', vars: avisos[0].vars }, false), /paradas na fila/);
+      } finally { restaurar(); }
+    });
+  });
+
   it('a fatura: o texto da IA e o PIX literal do SGP', async () => {
     await limparFio(ASSINANTE);
     roteiro = [{ tool: 'consultar_fatura' }, { content: 'Encontrei sua fatura de R$ 99,90, os dados estão logo abaixo.' }];
