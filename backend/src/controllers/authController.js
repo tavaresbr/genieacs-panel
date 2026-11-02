@@ -7,7 +7,7 @@ import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../conf
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
 import { CONSOLE_AUDIENCE, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
-import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import { createResponse, createErrorResponse, isValidEmail, usernameLengthProblem } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { getDb } from '../config/database.js';
@@ -269,8 +269,9 @@ class AuthController {
       if (name.length < 1 || name.length > SIGNUP_NAME_MAX) {
         return res.status(400).json(createErrorResponse(req.t('auth.signupInvalid')));
       }
-      if (username.length < 3 || username.length > 64) {
-        return res.status(400).json(createErrorResponse(req.t('auth.signupInvalid')));
+      const nomeRuim = usernameLengthProblem(username, 'auth.signupInvalid');
+      if (nomeRuim) {
+        return res.status(400).json(createErrorResponse(req.t(nomeRuim)));
       }
       // A regra da senha nova (10+, fora das comuns, diferente do login); ver
       // `utils/passwordPolicy.js`. O tamanho mantém a frase de antes.

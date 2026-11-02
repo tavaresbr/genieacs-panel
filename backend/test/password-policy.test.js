@@ -15,8 +15,9 @@ const {
   authHeaders, call, getDb, startTestServers, stopTestServers
 } = await import('./helpers/harness.js');
 const {
-  PASSWORD_MIN_LENGTH, isCommonPassword, matchesIdentity, newPasswordProblem
+  PASSWORD_MIN_LENGTH, POLICY_PROBLEM_TEXT_EN, isCommonPassword, matchesIdentity, newPasswordProblem, suppliedPasswordProblem
 } = await import('../src/utils/passwordPolicy.js');
+const { usernameLengthProblem } = await import('../src/utils/helpers.js');
 const { assertCorsOriginsSafe, wantsUpgradeInsecureRequests } = await import('../src/config/runtimeEnv.js');
 
 const DONA = { username: 'dona', password: 'senha-da-dona-1', email: 'dona@exemplo.test' };
@@ -58,6 +59,29 @@ describe('a regra, isolada', () => {
     assert.ok(matchesIdentity('joao.silva', { email: id.email }));
     assert.equal(newPasswordProblem('joao.silva@provedor.test', id)?.code, 'password_matches_identity');
     assert.equal(newPasswordProblem('outra-senha-boa', id), null);
+  });
+});
+
+describe('as conferências de formato', () => {
+  it('a senha de quem já tem conta: só o teto, sem a regra da nova', () => {
+    assert.equal(suppliedPasswordProblem('curta'), null);
+    assert.equal(suppliedPasswordProblem('x'.repeat(128)), null);
+    assert.deepEqual(suppliedPasswordProblem(''), { code: 'password_length', key: 'auth.passwordLength' });
+    assert.deepEqual(suppliedPasswordProblem('x'.repeat(129)), { code: 'password_length', key: 'auth.passwordLength' });
+  });
+
+  it('o nome de usuário: 3 a 64, devolvendo a chave pedida', () => {
+    assert.equal(usernameLengthProblem('abc'), null);
+    assert.equal(usernameLengthProblem('a'.repeat(64)), null);
+    assert.equal(usernameLengthProblem('ab'), 'auth.usernameLength');
+    assert.equal(usernameLengthProblem('a'.repeat(65), 'auth.signupInvalid'), 'auth.signupInvalid');
+  });
+
+  it('o texto fixo da recusa nunca traz a senha', () => {
+    const senha = 'password123';
+    const problema = newPasswordProblem(senha);
+    assert.ok(POLICY_PROBLEM_TEXT_EN[problema.code]);
+    assert.equal(POLICY_PROBLEM_TEXT_EN[problema.code].includes(senha), false);
   });
 });
 

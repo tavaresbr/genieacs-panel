@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { getDb, closePool } from '../src/config/database.js';
-import { newPasswordProblem, PASSWORD_PROBLEM_TEXT_EN } from '../src/utils/passwordPolicy.js';
+import { newPasswordProblem, POLICY_PROBLEM_TEXT_EN } from '../src/utils/passwordPolicy.js';
 
 /**
  * Redefine a senha de um operador direto no banco, sem escopo de provedor.
@@ -62,7 +62,7 @@ async function main() {
   if (senhaRuim) {
     console.error(senhaRuim.code === 'password_length'
       ? 'Password must be at least 10 characters'
-      : PASSWORD_PROBLEM_TEXT_EN[senhaRuim.code]);
+      : POLICY_PROBLEM_TEXT_EN[senhaRuim.code]);
     process.exitCode = 1;
     return;
   }

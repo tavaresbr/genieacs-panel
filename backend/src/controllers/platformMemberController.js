@@ -24,7 +24,7 @@ import {
   sendPasswordSetup
 } from '../services/inviteDelivery.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
-import { newPasswordProblem, PASSWORD_PROBLEM_TEXT_EN } from '../utils/passwordPolicy.js';
+import { newPasswordProblem, POLICY_PROBLEM_TEXT_EN } from '../utils/passwordPolicy.js';
 
 /**
  * Who works for a provider, decided from the control plane.
@@ -383,7 +383,7 @@ class PlatformMemberController {
       const senhaRuim = mandouSenha ? newPasswordProblem(password, { username, email }) : null;
       if (senhaRuim) {
         return res.status(400).json(
-          createErrorResponse(PASSWORD_PROBLEM_TEXT_EN[senhaRuim.code], null, senhaRuim.code)
+          createErrorResponse(POLICY_PROBLEM_TEXT_EN[senhaRuim.code], null, senhaRuim.code)
         );
       }
 
@@ -862,7 +862,7 @@ class PlatformMemberController {
         email: alvo.person?.email
       });
       if (senhaRuim) {
-        return res.status(400).json(createErrorResponse(PASSWORD_PROBLEM_TEXT_EN[senhaRuim.code], null, senhaRuim.code));
+        return res.status(400).json(createErrorResponse(POLICY_PROBLEM_TEXT_EN[senhaRuim.code], null, senhaRuim.code));
       }
       await User.updatePassword(alvo.userId, await bcrypt.hash(password, BCRYPT_ROUNDS));
       await recordMemberAction(

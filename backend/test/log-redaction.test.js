@@ -6,6 +6,7 @@ const {
   REDACTED,
   installTenantTaggedConsole,
   logLine,
+  logSafe,
   redactSecrets,
   redactText,
   setLogSink
@@ -123,5 +124,14 @@ describe('o console embrulhado', () => {
       assert.ok(!impresso.includes(segredo), `vazou ${segredo}: ${impresso}`);
     }
     assert.equal(vistos[0][0], 'SGP request error:');
+  });
+});
+
+describe('o valor de fora dentro de uma linha de log', () => {
+  it('perde a quebra de linha e os caracteres de controle, e é cortado', () => {
+    assert.equal(logSafe('TRANSFER_DONE\r\n2026-01-01 ERROR forjado'), 'TRANSFER_DONE 2026-01-01 ERROR forjado');
+    assert.equal(logSafe('a\u0000b\u001bc\u2028d'), 'a b c d');
+    assert.equal(logSafe('x'.repeat(200), 10), `${'x'.repeat(10)}…`);
+    assert.equal(logSafe(undefined), '');
   });
 });

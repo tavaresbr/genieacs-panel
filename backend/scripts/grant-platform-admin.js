@@ -3,7 +3,7 @@ import { getDb, closePool } from '../src/config/database.js';
 import PlatformAdmin from '../src/models/PlatformAdmin.js';
 import User from '../src/models/User.js';
 import { isValidEmail } from '../src/utils/helpers.js';
-import { newPasswordProblem, PASSWORD_PROBLEM_TEXT_EN } from '../src/utils/passwordPolicy.js';
+import { newPasswordProblem, POLICY_PROBLEM_TEXT_EN } from '../src/utils/passwordPolicy.js';
 
 /**
  * Hands the control plane to somebody on an install that already has users.
@@ -131,7 +131,7 @@ async function main() {
       if (senhaRuim) {
         console.error(senhaRuim.code === 'password_length'
           ? 'Password must come from PLATFORM_ADMIN_PASSWORD or stdin, 10 to 128 characters'
-          : PASSWORD_PROBLEM_TEXT_EN[senhaRuim.code]);
+          : POLICY_PROBLEM_TEXT_EN[senhaRuim.code]);
         process.exitCode = 1;
         return;
       }

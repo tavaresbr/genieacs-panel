@@ -71,6 +71,17 @@ const SENSITIVE_KEY = /^(?:authorization|proxy-authorization|cookie|set-cookie|x
 const SENSITIVE_PAIR = /(["']?\b(?:authorization|cookie|api[-_]?key|apikey|access[-_]?token|refresh[-_]?token|token|password|passwd|senha|secret|client[-_]?secret|pix[-_]?key|chave[-_]?pix|addressKey)["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,&;}"']+)/gi;
 const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi;
 
+/**
+ * Um valor que veio de fora (corpo de webhook, cabeçalho) pronto para ir
+ * DENTRO de uma linha de log: sem quebra de linha nem outro caractere de
+ * controle — que forjariam uma linha nova no log — e cortado em `max`.
+ */
+export function logSafe(value, max = 120) {
+  // eslint-disable-next-line no-control-regex
+  const text = String(value ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ');
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 export function isSensitiveKey(key) {
   return SENSITIVE_KEY.test(String(key));
 }

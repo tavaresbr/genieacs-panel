@@ -847,4 +847,41 @@ describe('o portal do afiliado', () => {
     assert.equal((await noPortal('/overview', { cookie: `skygp_affiliate_session=${assinar('HS256')}` })).status, 200);
     assert.equal((await noPortal('/overview', { cookie: `skygp_affiliate_session=${assinar('HS512')}` })).status, 401);
   });
+
+  it('o cookie é lido só pelo nome: `__proto__` e `constructor` no cabeçalho não mexem em nada', async () => {
+    const { readCookie } = await import('../src/middleware/affiliateAuth.js');
+    assert.equal(readCookie('__proto__=x; constructor=y; skygp_affiliate_session=abc%20d', 'skygp_affiliate_session'), 'abc d');
+    assert.equal(readCookie('__proto__=x; constructor=y', 'skygp_affiliate_session'), undefined);
+    assert.equal(readCookie('', 'skygp_affiliate_session'), undefined);
+    assert.equal(Object.prototype.x, undefined);
+    assert.equal(({}).polluted, undefined);
+
+    const af = await afiliado();
+    const cookie = await entrarComo(af, 'senha-do-proto-1');
+    // Lixo antes do cookie certo não atrapalha; o certo continua valendo.
+    const comLixo = `__proto__=polluted; constructor=prototype; ${cookie}`;
+    assert.equal((await noPortal('/overview', { cookie: comLixo })).status, 200);
+    assert.equal(({}).polluted, undefined);
+    assert.equal((await noPortal('/overview', { cookie: '__proto__=polluted' })).status, 401);
+  });
+
+  it('a impressão no cookie é um HMAC com chave, não o sha256 do hash guardado', async () => {
+    const af = await afiliado();
+    const cookie = await entrarComo(af, 'senha-da-impressao-1');
+    const { pwd, em } = jwt.decode(decodeURIComponent(cookie.split('=')[1]));
+    const guardado = await getDb()('affiliates').where({ id: af.id }).first('password_hash');
+    const semChave = crypto.createHash('sha256').update(String(guardado.password_hash)).digest('base64url').slice(0, 22);
+    assert.equal(typeof pwd, 'string');
+    assert.equal(pwd.length, 22);
+    assert.notEqual(pwd, semChave);
+    assert.equal(typeof em, 'string');
+    assert.equal(em.length, 16);
+  });
+
+  it('o código do afiliado sai do alfabeto, com o prefixo e o tamanho certos', async () => {
+    const { generateAffiliateCode } = await import('../src/services/affiliateService.js');
+    for (let i = 0; i < 200; i += 1) {
+      assert.match(generateAffiliateCode(), /^A-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{7}$/);
+    }
+  });
 });

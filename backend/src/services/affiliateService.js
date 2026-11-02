@@ -60,9 +60,10 @@ export class AffiliateError extends Error {
 
 /** Um código novo, aleatório, com o prefixo que o separa do código dos provedores. */
 export function generateAffiliateCode() {
-  const bytes = crypto.randomBytes(TAMANHO_DO_CODIGO);
+  // `randomInt` e não `byte % 31`: o resto de 256 por 31 favorece as
+  // primeiras letras do alfabeto; `randomInt` sorteia sem esse viés.
   let codigo = 'A-';
-  for (const byte of bytes) codigo += ALFABETO[byte % ALFABETO.length];
+  for (let i = 0; i < TAMANHO_DO_CODIGO; i += 1) codigo += ALFABETO[crypto.randomInt(ALFABETO.length)];
   return codigo;
 }
 

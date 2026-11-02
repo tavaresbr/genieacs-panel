@@ -143,8 +143,25 @@ export function newPasswordProblem(password, identity = {}, { lengthKey = 'auth.
  * As mesmas recusas em inglês fixo, para o plano de controle (console), cujas
  * respostas não passam pelo catálogo de idiomas.
  */
-export const PASSWORD_PROBLEM_TEXT_EN = Object.freeze({
+export const POLICY_PROBLEM_TEXT_EN = Object.freeze({
   password_length: `Password must be between ${PASSWORD_MIN_LENGTH} and ${PASSWORD_MAX_LENGTH} characters`,
   password_too_common: 'This password is too common; choose another one',
   password_matches_identity: 'The password cannot be the same as the username or e-mail'
 });
+
+/**
+ * A senha de quem diz JÁ ter conta (o convite aceito com a conta que existe):
+ * aqui não vale a regra da senha nova — a senha é a de antes, e é aceita como
+ * estiver —, só o teto, que poupa o bcrypt de um corpo gigante.
+ *
+ * Devolve o mesmo `{ code, key }` de `newPasswordProblem`, ou null. É uma
+ * conferência de formato, não de identidade: quem prova a conta é o
+ * `bcrypt.compare` que vem depois, sempre.
+ */
+export function suppliedPasswordProblem(password, { lengthKey = 'auth.passwordLength' } = {}) {
+  const text = typeof password === 'string' ? password : String(password ?? '');
+  if (text.length < 1 || text.length > PASSWORD_MAX_LENGTH) {
+    return { code: 'password_length', key: lengthKey };
+  }
+  return null;
+}

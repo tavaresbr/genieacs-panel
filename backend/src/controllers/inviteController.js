@@ -11,7 +11,7 @@ import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
-import { newPasswordProblem } from '../utils/passwordPolicy.js';
+import { newPasswordProblem, suppliedPasswordProblem } from '../utils/passwordPolicy.js';
 import MfaService, { mfaEnabled } from '../services/mfaService.js';
 import AccountLockout from '../models/AccountLockout.js';
 import {
@@ -202,8 +202,9 @@ class InviteController {
       // Aqui só o teto: a senha pode ser a de uma conta que JÁ existe, e essa
       // é aceita como estiver. A regra da senha nova vale mais abaixo, só
       // para quem está criando conta por este convite.
-      if (password.length < 1 || password.length > 128) {
-        return res.status(400).json(createErrorResponse(req.t('auth.passwordLength')));
+      const senhaForaDoTeto = suppliedPasswordProblem(password);
+      if (senhaForaDoTeto) {
+        return res.status(400).json(createErrorResponse(req.t(senhaForaDoTeto.key)));
       }
 
       const role = normalizeRole(invite.role);

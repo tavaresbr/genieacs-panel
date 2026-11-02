@@ -7,7 +7,7 @@ import {
   AFFILIATE_COOKIE_NAME, affiliateClearCookieOptions, affiliateCookieOptions, signAffiliateSession
 } from '../middleware/affiliateAuth.js';
 import { createErrorResponse, createResponse } from '../utils/helpers.js';
-import { PASSWORD_PROBLEM_TEXT_EN } from '../utils/passwordPolicy.js';
+import { POLICY_PROBLEM_TEXT_EN } from '../utils/passwordPolicy.js';
 
 /**
  * O programa de afiliados (0125): o portal do afiliado e o console.
@@ -77,7 +77,7 @@ class AffiliateController {
         // O código do que falhou na política (`password_length`,
         // `password_too_common`, `password_matches_identity`) vai junto, em
         // `problem`, para a tela dizer o porquê.
-        const texto = PASSWORD_PROBLEM_TEXT_EN[resultado.problem] ?? 'The password must have 10 to 128 characters';
+        const texto = POLICY_PROBLEM_TEXT_EN[resultado.problem] ?? 'The password must have 10 to 128 characters';
         return res.status(400).json({ ...createErrorResponse(texto, null, 'weak_password'), problem: resultado.problem ?? null });
       }
       if (resultado.error) return res.status(400).json(createErrorResponse('This link is no longer valid', null, 'invalid_token'));

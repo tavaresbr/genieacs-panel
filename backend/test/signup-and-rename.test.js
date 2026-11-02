@@ -154,6 +154,13 @@ describe('signing up', () => {
     assert.equal(login.status, 409);
     assert.notEqual(taken.body.message, login.body.message, 'the two fixes differ, so must the words');
     assert.equal((await home('/api/auth/signup', { method: 'POST', body: { ...good, slug: 'curta', password: 'curta' } })).status, 400);
+    // Nenhum campo do corpo pula a regra da senha nova.
+    const atalho = await home('/api/auth/signup', {
+      method: 'POST', body: { ...good, slug: 'atalho', password: 'password123', existing: true, existingAccount: true, skipPolicy: true }
+    });
+    assert.equal(atalho.status, 400);
+    assert.equal(atalho.body.code, 'password_too_common');
+    assert.equal((await home('/api/auth/signup', { method: 'POST', body: { ...good, slug: 'atalho', username: 'ab' } })).status, 400);
     // Nothing half-made: no provider named 'outra', no person named 'outra'.
     assert.equal(await getDb()('tenants').where({ slug: 'outra' }).first(), undefined);
     assert.equal(await getDb()('users').where({ username: 'outra' }).first(), undefined);

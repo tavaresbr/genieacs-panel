@@ -10,6 +10,7 @@ import BillingInvoiceService from '../services/billing/billingInvoiceService.js'
 import CardAutopayService from '../services/billing/cardAutopayService.js';
 import Tenant from '../models/Tenant.js';
 import AffiliatePayoutService from '../services/affiliatePayoutService.js';
+import { logSafe } from '../utils/logger.js';
 
 /**
  * A entrega do gateway de pagamento: o provedor pagou, e o painel volta a
@@ -362,8 +363,8 @@ class BillingWebhookController {
         const code = await AffiliatePayoutService.applyTransferWebhook(req.body);
         return res.json({ success: true, code });
       } catch (error) {
-        console.error(`Billing webhook: could not apply ${req.body?.event} to an affiliate payout `
-          + `(the hourly refresh reconciles it): ${error.message}`);
+        console.error(`Billing webhook: could not apply ${logSafe(req.body?.event, 64)} to an affiliate payout `
+          + `(the hourly refresh reconciles it): ${logSafe(error.message, 300)}`);
         return res.json({ success: true, code: 'transfer_deferred' });
       }
     }
