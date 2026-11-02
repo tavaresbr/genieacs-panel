@@ -288,6 +288,19 @@ describe('acting from the thread', () => {
     assert.equal(liberacoes().length, 0);
   });
 
+  it('finds the contracts when the operator types a contract number instead of a document', async () => {
+    const { status, body } = await painel(fios.estranho, '?document=255');
+    assert.equal(status, 200, JSON.stringify(body));
+    const numeros = body.data.contracts.items.map((c) => c.contract);
+    assert.ok(numeros.includes(SUSPENSO), 'o contrato digitado');
+    assert.ok(numeros.includes(ATIVO), 'e os outros do mesmo cliente');
+    assert.equal(body.data.contracts.searched, true);
+
+    // E um documento de 11 dígitos continua sendo documento.
+    const porCpf = await painel(fios.estranho, `?document=${DOCUMENTO}`);
+    assert.ok(porCpf.body.data.contracts.items.length >= 2);
+  });
+
   it('binds an unknown number after the operator searches by document', async () => {
     const wrong = await agir(fios.estranho, 'bind', { contract: '9999', document: DOCUMENTO });
     assert.equal(wrong.status, 409);
