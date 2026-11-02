@@ -335,7 +335,7 @@ class AuthController {
           // A indicação (0106): `?ref=CÓDIGO` no link de quem indicou. Código
           // inválido e a indicação de si mesmo são ignorados — e uma falha
           // aqui também, num savepoint: a indicação nunca derruba o cadastro.
-          // O afiliado (0125): `?aff=A-CÓDIGO`. Uma atribuição por cadastro —
+          // O afiliado (0126): `?aff=A-CÓDIGO`. Uma atribuição por cadastro —
           // com o afiliado ligado, o `?ref=` do mesmo link não paga outra
           // recompensa. Num savepoint, pela mesma regra da indicação.
           if (body.affiliateCode) {

@@ -160,7 +160,7 @@ async function chamar(caminho, {
         // lado de lá quando alguém pergunta quem abriu a cobrança.
         'User-Agent': 'TR69-Controle',
         // Os cabeçalhos a mais de quem chama (a chave idempotente da
-        // transferência, 0125) vêm ANTES da credencial: nenhum os sobrescreve.
+        // transferência, 0126) vêm ANTES da credencial: nenhum os sobrescreve.
         ...(extraHeaders || {}),
         access_token: chave
       },
@@ -820,7 +820,7 @@ export async function cancelInvoice(invoiceId) {
   return notaDe(await chamar(`/invoices/${idNoCaminho(invoiceId)}/cancel`, { payload: {} }), invoiceId);
 }
 
-// ── As transferências Pix do programa de afiliados (0125) ──────────────
+// ── As transferências Pix do programa de afiliados (0126) ──────────────
 
 /** Os tipos de chave Pix que o gateway aceita em `pixAddressKeyType`. */
 export const PIX_KEY_TYPES = Object.freeze(['CPF', 'CNPJ', 'EMAIL', 'PHONE', 'EVP']);

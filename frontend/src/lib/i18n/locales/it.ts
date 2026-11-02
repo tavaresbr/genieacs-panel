@@ -2697,6 +2697,7 @@ const it: Dictionary = {
   'whatsapp.sgp.search': 'Cerca',
   'whatsapp.sgp.bind': 'Collega il contratto {contract} a questa conversazione',
   'whatsapp.sgp.bindFirst': "Questo contratto non è ancora collegato a questa conversazione. Collegalo per inviare una fattura, sbloccare o aprire un ticket.",
+  'whatsapp.sgp.bindingUnverified': "Collegato solo con il codice fiscale, non verificato. Conferma e collega il contratto per consentire questa azione.",
   'whatsapp.sgp.bound': 'Conversazione collegata al contratto {contract}',
   'whatsapp.sgp.router': 'Accesso al router',
   'whatsapp.sgp.routerUnlinked': 'Nessuna ONT collegata a questo contratto.',
@@ -5569,7 +5570,7 @@ const it: Dictionary = {
   'receiptPage.failed': 'Impossibile aprire la ricevuta ora. Riprova tra un istante.',
   'receiptPage.openTab': 'Apri in una nuova scheda',
   'receiptPage.frameTitle': 'Ricevuta',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'Stato dei servizi',
   'statusPage.subtitle': 'Situazione attuale e disponibilità degli ultimi 90 giorni.',
   'statusPage.failed': 'Impossibile caricare lo stato ora. Riprova tra qualche istante.',
@@ -5653,7 +5654,7 @@ const it: Dictionary = {
   'platform.status.form.notify': 'Avvisa i provider via e-mail e WhatsApp',
   'platform.status.form.notifyHint': 'Incidente: all’apertura e alla risoluzione. Manutenzione: 24 ore prima e al termine.',
   'platform.status.form.submit': 'Pubblica',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'Affiliati',
   'signup.affiliate': 'Ti stai registrando tramite l\'affiliato {code}.',
   'affiliates.title': 'Affiliati',
@@ -5763,7 +5764,7 @@ const it: Dictionary = {
   'affiliatePortal.noCommissions': 'Ancora nessuna commissione.',
   'affiliatePortal.payouts': 'Pagamenti',
   'affiliatePortal.noPayouts': 'Ancora nessun pagamento.',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "Add-on",
   'charges.pricing.addon': "Add-on {name}: {total}",
   'charges.pricing.addonProration': "Add-on {name} (proporzionale): {total}",

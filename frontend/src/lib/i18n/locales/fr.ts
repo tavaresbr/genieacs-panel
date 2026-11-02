@@ -3281,6 +3281,7 @@ const fr: Dictionary = {
   'whatsapp.sgp.search': 'Rechercher',
   'whatsapp.sgp.bind': 'Lier le contrat {contract} à cette conversation',
   'whatsapp.sgp.bindFirst': "Ce contrat n'est pas encore lié à cette conversation. Liez-le pour envoyer une facture, débloquer ou ouvrir un ticket.",
+  'whatsapp.sgp.bindingUnverified': "Lien par document uniquement, non vérifié. Confirmez et liez le contrat pour autoriser cette action.",
   'whatsapp.sgp.bound': 'Conversation liée au contrat {contract}',
   'whatsapp.sgp.router': 'Accès au routeur',
   'whatsapp.sgp.routerUnlinked': 'Aucune ONT n\'est liée à ce contrat.',
@@ -5563,7 +5564,7 @@ const fr: Dictionary = {
   'receiptPage.failed': 'Impossible d’ouvrir le reçu pour le moment. Réessayez dans un instant.',
   'receiptPage.openTab': 'Ouvrir dans un nouvel onglet',
   'receiptPage.frameTitle': 'Reçu',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'État des services',
   'statusPage.subtitle': 'Situation actuelle et disponibilité des 90 derniers jours.',
   'statusPage.failed': 'Impossible de charger l’état pour le moment. Réessayez dans un instant.',
@@ -5647,7 +5648,7 @@ const fr: Dictionary = {
   'platform.status.form.notify': 'Prévenir les fournisseurs par e-mail et WhatsApp',
   'platform.status.form.notifyHint': 'Incident : à l’ouverture et à la résolution. Maintenance : 24 heures avant et à la fin.',
   'platform.status.form.submit': 'Publier',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'Affiliés',
   'signup.affiliate': 'Vous vous inscrivez via l\'affilié {code}.',
   'affiliates.title': 'Affiliés',
@@ -5757,7 +5758,7 @@ const fr: Dictionary = {
   'affiliatePortal.noCommissions': 'Aucune commission pour l\'instant.',
   'affiliatePortal.payouts': 'Versements',
   'affiliatePortal.noPayouts': 'Aucun versement pour l\'instant.',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "Module",
   'charges.pricing.addon': "Module {name} : {total}",
   'charges.pricing.addonProration': "Module {name} (prorata) : {total}",

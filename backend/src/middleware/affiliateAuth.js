@@ -6,7 +6,7 @@ import { DEVELOPMENT_FALLBACK, assertNotPlaceholderSecret, isProduction } from '
 import AffiliateService from '../services/affiliateService.js';
 
 /**
- * A sessão do portal do afiliado (0125), no molde de `portalAuth.js`.
+ * A sessão do portal do afiliado (0126), no molde de `portalAuth.js`.
  *
  * Três coisas a separam de qualquer outra sessão do produto, e é de propósito:
  *

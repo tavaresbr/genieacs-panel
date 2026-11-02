@@ -1,4 +1,5 @@
 import SgpService from './sgpService.js';
+import { mascararSensivel } from '../utils/wa/sensivel.js';
 import WaBotService from './waBotService.js';
 import WaBotConfigService, { chaveParaNovoEndereco, mesmoEnderecoIa } from './waBotConfigService.js';
 import WaConversationService from './waConversationService.js';
@@ -178,13 +179,18 @@ async function historico(conversationId, limite = HISTORICO) {
     .orderBy('id', 'desc')
     .limit(limite)
     .select('direction', 'body', 'attachment_type');
-  return linhas.reverse().map((m) => {
+  const ordem = linhas.reverse();
+  // A última fala do cliente vai inteira: o documento que ele acabou de digitar
+  // é o que `identificar_cliente` precisa ler. As anteriores saem mascaradas.
+  let ultimaDoCliente = -1;
+  ordem.forEach((m, i) => { if (m.direction === 'in') ultimaDoCliente = i; });
+  return ordem.map((m, i) => {
     const texto = String(m.body ?? '').trim();
     const legenda = textoDoAnexo(m);
     const content = m.attachment_type
       ? (texto ? `${legenda} ${texto}` : legenda)
       : texto;
-    return { role: m.direction === 'in' ? 'user' : 'assistant', content: content.slice(0, 2000) };
+    return { role: m.direction === 'in' ? 'user' : 'assistant', content: (i === ultimaDoCliente ? content : mascararSensivel(content)).slice(0, 2000) };
   });
 }
 
@@ -216,7 +222,7 @@ class WaAiService {
    * @returns {Promise<{replied: true, intent: string, from?: string}|null>}
    */
   static async atender({ conversation, texto }) {
-    // O add-on de IA (0126), quando o catálogo o exige: sem ele a mensagem
+    // O add-on de IA (0127), quando o catálogo o exige: sem ele a mensagem
     // segue pelo menu, como com a IA desligada.
     if (!(await AddonService.allows('ai'))) return null;
     let ai;

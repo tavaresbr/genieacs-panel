@@ -1785,6 +1785,15 @@ const WA_CONVERSATION_UNLINK_COLUMNS = [
   ['unlinked_at', (t) => t.timestamp('unlinked_at').nullable()]
 ];
 
+/**
+ * Como a conversa foi vinculada (0125): `document` quando só o CPF/CNPJ digitado
+ * pelo cliente ligou a conversa ao contrato (não verificado), nulo quando foi o
+ * telefone ou um atendente.
+ */
+const WA_CONVERSATION_BOUND_VIA_COLUMNS = [
+  ['bound_via', (t) => t.string('bound_via', 16).nullable()]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -3245,7 +3254,7 @@ const PLATFORM_NPS_TABLES = [
 ];
 
 /**
- * O programa de afiliados (0125) — ver `services/affiliateService.js` e
+ * O programa de afiliados (0126) — ver `services/affiliateService.js` e
  * `services/affiliatePayoutService.js`.
  *
  * `tenants.referred_by_affiliate_id` é o afiliado que trouxe o provedor (o
@@ -3300,7 +3309,7 @@ const affiliatesTable = (db) => (t) => {
 };
 
 /**
- * O lote mensal de um afiliado (0125): um por afiliado e período
+ * O lote mensal de um afiliado (0126): um por afiliado e período
  * (`affiliate_id, period` único — o agendador e o botão do console montam o
  * mesmo lote uma vez só). Nada sai do gateway sem a aprovação gravada aqui.
  *
@@ -3347,7 +3356,7 @@ const affiliatePayoutsTable = (db) => (t) => {
 };
 
 /**
- * A comissão (0125): uma linha por pagamento do provedor indicado
+ * A comissão (0126): uma linha por pagamento do provedor indicado
  * (`payment_ref` único — a referência do pagamento no gateway), gravada NA
  * TRANSAÇÃO do pagamento. `clawback` é o estorno de uma comissão que já foi
  * para um lote: valor negativo, `<referência>:refund`, abatido do próximo.
@@ -3384,7 +3393,7 @@ const affiliateCommissionsTable = (db) => (t) => {
 };
 
 /**
- * O retrato da chave Pix na aprovação, para a base que já rodou a 0125 antes
+ * O retrato da chave Pix na aprovação, para a base que já rodou a 0126 antes
  * de ele existir (o desenvolvimento): a tabela nova já nasce com ele.
  */
 const AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS = [
@@ -3399,7 +3408,7 @@ const AFFILIATE_TABLES = [
 ];
 
 /**
- * A página de status da plataforma (0127) — ver `services/statusService.js`.
+ * A página de status da plataforma (0128) — ver `services/statusService.js`.
  *
  *   status_checks            uma linha por verificação automática, a cada
  *                            minuto, de cada componente (panel, payments,
@@ -3498,7 +3507,7 @@ const STATUS_PAGE_TABLES = [
 ];
 
 /**
- * Os add-ons pagos (0126) — ver `services/addonService.js`.
+ * Os add-ons pagos (0127) — ver `services/addonService.js`.
  *
  * `addons` é o CATÁLOGO, da plataforma, como `plans` e `coupons`:
  *
@@ -7286,6 +7295,22 @@ export const migrations = [
     }
   },
   {
+    /** Como a conversa foi vinculada — ver `WA_CONVERSATION_BOUND_VIA_COLUMNS`. */
+    id: '0125_wa_conversation_bound_via',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_BOUND_VIA_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_BOUND_VIA_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
     /**
      * O programa de afiliados — ver `TENANT_AFFILIATE_COLUMNS` e
      * `AFFILIATE_TABLES`.
@@ -7339,7 +7364,7 @@ export const migrations = [
   },
   {
     /** A página de status da plataforma — ver `STATUS_PAGE_TABLES`. */
-    id: '0127_status_page',
+    id: '0128_status_page',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       for (const [name] of STATUS_PAGE_TABLES) {

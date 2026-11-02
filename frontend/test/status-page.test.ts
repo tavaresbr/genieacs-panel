@@ -7,7 +7,7 @@ import {
 import { PLATFORM_TABS } from '@/lib/platform-overview'
 import en from '@/lib/i18n/locales/en'
 
-/** As peças puras da página de status (0127). */
+/** As peças puras da página de status (0128). */
 describe('a página de status', () => {
   it('tem frase para todo componente, estado, situação e impacto', () => {
     const chaves = [

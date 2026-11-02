@@ -8,7 +8,7 @@
 export const PLATFORM_TABS = [
   'home', 'tenants', 'plans', 'subscriptions', 'delinquency', 'revenue', 'coupons', 'leads',
   'admins', 'audit', 'settings', 'deployment', 'catalogue', 'help', 'affiliates',
-  // A página de status (0127): as verificações e os incidentes.
+  // A página de status (0128): as verificações e os incidentes.
   'status'
 ] as const
 

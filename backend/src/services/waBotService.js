@@ -601,7 +601,7 @@ class WaBotService {
     const { botEnabled } = await WhatsAppConfigService.getConfig();
     if (botEnabled === false) return { replied: false, reason: 'disabled' };
 
-    // O add-on de WhatsApp (0126), quando o catálogo o exige: a porta das
+    // O add-on de WhatsApp (0127), quando o catálogo o exige: a porta das
     // telas não alcança o bot, que responde do webhook. Sem add-on `gated`,
     // nem consulta — o bot de todo mundo segue como era.
     if (!(await AddonService.allows('whatsapp'))) return { replied: false, reason: 'addon_required' };

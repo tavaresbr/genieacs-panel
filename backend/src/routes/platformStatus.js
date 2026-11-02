@@ -3,7 +3,7 @@ import StatusController from '../controllers/statusController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
- * A página de status (0127), vista do console: as verificações com o detalhe,
+ * A página de status (0128), vista do console: as verificações com o detalhe,
  * os incidentes e as manutenções. A página pública mora em `routes/public.js`.
  */
 const router = express.Router();

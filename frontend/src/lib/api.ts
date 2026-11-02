@@ -851,7 +851,7 @@ export const authAPI = {
     planCode?: string; taxId?: string; phone?: string; legalName?: string; city?: string; state?: string
     /** O código do link de indicação (`?ref=`); inválido é ignorado pelo servidor. */
     referralCode?: string
-    /** O código do afiliado (`?aff=A-…`, 0125); inválido é ignorado pelo servidor. */
+    /** O código do afiliado (`?aff=A-…`, 0126); inválido é ignorado pelo servidor. */
     affiliateCode?: string
   }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
@@ -1407,7 +1407,7 @@ export interface CatalogueTenant {
 }
 
 export interface DeploymentInfo {
-  /** A versão do servidor (saiu do `/api/health` aberto na 0127). */
+  /** A versão do servidor (saiu do `/api/health` aberto na 0128). */
   version?: string
   edition: 'saas' | 'selfhosted'
   database: {
@@ -1611,7 +1611,7 @@ export interface ChargePricing {
   overage: OverageItem[]
   overageCents: number
   creditCents: number
-  /** Os add-ons (0126) cobrados nela. Opcional: servidores antigos não mandam. */
+  /** Os add-ons (0127) cobrados nela. Opcional: servidores antigos não mandam. */
   addons?: ChargeAddonItem[]
   addonCents?: number
 }
@@ -5786,6 +5786,8 @@ export interface WaSubscriberAttendance {
   deviceId: string | null
   /** The client with no contract this thread is bound to, by its `c:<id>` key. */
   registration?: string | null
+  /** `document`: linked only by the tax ID the customer typed, not verified. */
+  boundVia?: 'document' | null
 }
 
 /** An SGP client with no contract, found by CPF/CNPJ, that a thread can be bound to. */
@@ -6856,7 +6858,7 @@ export interface RevenueReport {
   from: string
   to: string
   mrrCents: number
-  /** O MRR dos add-ons pagos (0126), fora do `mrrCents` dos planos. Opcional: servidores antigos não mandam. */
+  /** O MRR dos add-ons pagos (0127), fora do `mrrCents` dos planos. Opcional: servidores antigos não mandam. */
   addonMrrCents?: number
   activeCount: number
   receivedCents: number
@@ -7468,7 +7470,7 @@ export const receiptAPI = {
   },
 }
 
-// ── A página de status (0127) ────────────────────────────────────────────
+// ── A página de status (0128) ────────────────────────────────────────────
 
 export type StatusComponentCode = 'panel' | 'payments' | 'whatsapp' | 'genieacs'
 export type StatusComponentState = 'operational' | 'maintenance' | 'degraded' | 'partial_outage' | 'major_outage' | 'unknown'
@@ -7573,7 +7575,7 @@ export const statusAPI = {
   serverVersion: () => apiClient.get<{ version: string }>('/version'),
 }
 
-// ── O programa de afiliados (0125) ──────────────────────────────────────
+// ── O programa de afiliados (0126) ──────────────────────────────────────
 
 export interface AffiliateTotals {
   accruedCents: number
@@ -7768,7 +7770,7 @@ export const affiliatePortalAPI = {
   overview: () => affiliateRequest<AffiliatePortalOverview>('/overview'),
 }
 
-// ── Os add-ons pagos (0126) ─────────────────────────────────────────────
+// ── Os add-ons pagos (0127) ─────────────────────────────────────────────
 
 export type AddonKind = 'feature' | 'limit'
 export type AddonLimitResource = 'operators' | 'subscribers' | 'devices'

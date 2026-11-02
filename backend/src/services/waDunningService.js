@@ -481,7 +481,7 @@ class WaDunningService {
     const rule = await this.getRule();
     if (!rule.enabled || rule.steps.length === 0) return false;
     if (!dentroDaJanela(rule.window, now)) return false;
-    // Sem o add-on de WhatsApp (0126), quando o catálogo o exige, a régua
+    // Sem o add-on de WhatsApp (0127), quando o catálogo o exige, a régua
     // automática não sai — a tela já recusa o "Rodar agora" pela porta.
     if (!(await AddonService.allows('whatsapp'))) return false;
     if (!lastRunAt) return true;

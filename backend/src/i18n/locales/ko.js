@@ -779,6 +779,7 @@ export default {
   'whatsapp.phoneSaved': '전화번호를 저장했습니다',
   'whatsapp.phoneSaveFailed': '전화번호를 저장하지 못했습니다',
   'whatsapp.error.invalidPhone': '사용할 수 있는 전화번호 형식이 아닙니다',
+  'whatsapp.error.bindingUnverified': "이 연결은 고객이 입력한 문서 번호만으로 이루어졌습니다. 전화번호를 저장하기 전에 고객에게 계약을 확인하고 여기서 연결하세요.",
   'whatsapp.error.invalidOptOutCategories': "수신 거부 항목에 유효한 메시지 유형을 선택하세요",
   'whatsapp.error.subscriberNotFound': '해당 계약의 가입자를 찾을 수 없습니다',
   'whatsapp.contactsLoaded': '연락처 {count}건',
@@ -1401,7 +1402,7 @@ export default {
   'auth.passwordMatchesIdentity': '비밀번호는 사용자 이름이나 이메일과 같을 수 없습니다.',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': '패널',
   'status.component.payments': '결제',
   'status.component.whatsapp': 'WhatsApp',
@@ -1415,7 +1416,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] 점검 완료: {title}',
   'status.notice.maintenanceDoneBody': '안녕하세요, {provider}님. {components} 예정된 점검({title})이 완료되었습니다.',
   'status.notice.follow': '상태 페이지에서 확인하세요: {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': '이메일 또는 비밀번호가 올바르지 않습니다',
   'affiliate.loginSuccess': '로그인되었습니다',
   'affiliate.sessionRequired': '제휴 포털에 로그인하세요',

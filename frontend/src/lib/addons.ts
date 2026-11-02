@@ -3,7 +3,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { parseAmountToCents } from '@/lib/utils'
 
 /**
- * As peças puras dos add-ons pagos (0126): o estado de um cartão da tela de
+ * As peças puras dos add-ons pagos (0127): o estado de um cartão da tela de
  * Plano, o que ele oferece fazer e o formulário do catálogo no console. Fora
  * dos componentes para os testes fixarem sem React.
  */

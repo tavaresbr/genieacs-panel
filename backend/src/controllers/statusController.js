@@ -3,7 +3,7 @@ import StatusService, { StatusError } from '../services/statusService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 /**
- * A página de status (0127) — ver `statusService`.
+ * A página de status (0128) — ver `statusService`.
  *
  * Duas portas. A pública (`GET /api/public/status`) é a página `/status`, sem
  * sessão, guardada por 30 s e sem nada de dentro. A do console

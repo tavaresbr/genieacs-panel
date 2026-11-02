@@ -1,7 +1,7 @@
 import { tdb, tinsertReturningId } from '../config/database.js';
 
 /**
- * Os add-ons de UM provedor (0126). Só por `tdb`: quem chama abre o escopo do
+ * Os add-ons de UM provedor (0127). Só por `tdb`: quem chama abre o escopo do
  * provedor antes — o add-on de um nunca aparece, nem é cobrado, no outro.
  *
  * A linha VIVA de um add-on é a `active` com `active_key = addon_id`; o índice

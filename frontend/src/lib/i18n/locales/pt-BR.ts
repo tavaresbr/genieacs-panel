@@ -2691,6 +2691,7 @@ const ptBR: Dictionary = {
   'whatsapp.sgp.search': 'Buscar',
   'whatsapp.sgp.bind': 'Vincular o contrato {contract} a esta conversa',
   'whatsapp.sgp.bindFirst': "Este contrato ainda não é desta conversa. Vincule-o para enviar fatura, liberar em confiança ou abrir chamado.",
+  'whatsapp.sgp.bindingUnverified': "Vínculo só por CPF, não verificado. Confirme e vincule o contrato para liberar esta ação.",
   'whatsapp.sgp.bound': 'Conversa vinculada ao contrato {contract}',
   'whatsapp.sgp.router': 'Acesso ao roteador',
   'whatsapp.sgp.routerUnlinked': 'Nenhuma ONU vinculada a este contrato.',
@@ -5563,7 +5564,7 @@ const ptBR: Dictionary = {
   'receiptPage.failed': 'Não foi possível abrir o recibo agora. Tente de novo em instantes.',
   'receiptPage.openTab': 'Abrir em nova aba',
   'receiptPage.frameTitle': 'Recibo',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'Status dos serviços',
   'statusPage.subtitle': 'Situação de agora e disponibilidade dos últimos 90 dias.',
   'statusPage.failed': 'Não foi possível carregar o status agora. Tente de novo em instantes.',
@@ -5647,7 +5648,7 @@ const ptBR: Dictionary = {
   'platform.status.form.notify': 'Avisar os provedores por e-mail e WhatsApp',
   'platform.status.form.notifyHint': 'Incidente: ao abrir e ao resolver. Manutenção: 24 horas antes e ao concluir.',
   'platform.status.form.submit': 'Publicar',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'Afiliados',
   'signup.affiliate': 'Você está se cadastrando pelo afiliado {code}.',
   'affiliates.title': 'Afiliados',
@@ -5757,7 +5758,7 @@ const ptBR: Dictionary = {
   'affiliatePortal.noCommissions': 'Nenhuma comissão ainda.',
   'affiliatePortal.payouts': 'Pagamentos',
   'affiliatePortal.noPayouts': 'Nenhum pagamento ainda.',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "Add-on",
   'charges.pricing.addon': "Add-on {name}: {total}",
   'charges.pricing.addonProration': "Add-on {name} (proporcional): {total}",

@@ -2693,6 +2693,7 @@ const en = {
   'whatsapp.sgp.search': 'Search',
   'whatsapp.sgp.bind': 'Link contract {contract} to this conversation',
   'whatsapp.sgp.bindFirst': "This contract is not linked to this conversation yet. Link it to send an invoice, unlock, or open a ticket.",
+  'whatsapp.sgp.bindingUnverified': "Linked by tax ID only, not verified. Confirm and link the contract to allow this action.",
   'whatsapp.sgp.bound': 'Conversation linked to contract {contract}',
   'whatsapp.sgp.router': 'Router access',
   'whatsapp.sgp.routerUnlinked': 'No ONT is linked to this contract.',
@@ -5565,7 +5566,7 @@ const en = {
   'receiptPage.failed': 'Could not open the receipt right now. Try again in a moment.',
   'receiptPage.openTab': 'Open in a new tab',
   'receiptPage.frameTitle': 'Receipt',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'Service status',
   'statusPage.subtitle': 'Current status and availability over the last 90 days.',
   'statusPage.failed': 'Could not load the status right now. Try again in a moment.',
@@ -5649,7 +5650,7 @@ const en = {
   'platform.status.form.notify': 'Notify providers by e-mail and WhatsApp',
   'platform.status.form.notifyHint': 'Incident: when opened and when resolved. Maintenance: 24 hours before and when completed.',
   'platform.status.form.submit': 'Publish',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'Affiliates',
   'signup.affiliate': 'You are signing up through affiliate {code}.',
   'affiliates.title': 'Affiliates',
@@ -5759,7 +5760,7 @@ const en = {
   'affiliatePortal.noCommissions': 'No commissions yet.',
   'affiliatePortal.payouts': 'Payouts',
   'affiliatePortal.noPayouts': 'No payouts yet.',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "Add-on",
   'charges.pricing.addon': "Add-on {name}: {total}",
   'charges.pricing.addonProration': "Add-on {name} (proration): {total}",

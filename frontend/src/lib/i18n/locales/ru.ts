@@ -2698,6 +2698,7 @@ const ru: Dictionary = {
   'whatsapp.sgp.search': 'Найти',
   'whatsapp.sgp.bind': 'Привязать договор {contract} к этому диалогу',
   'whatsapp.sgp.bindFirst': "Этот договор ещё не привязан к диалогу. Привяжите его, чтобы отправить счёт, разблокировать или открыть заявку.",
+  'whatsapp.sgp.bindingUnverified': "Привязка только по документу, не проверена. Подтвердите и привяжите договор, чтобы разрешить это действие.",
   'whatsapp.sgp.bound': 'Диалог привязан к договору {contract}',
   'whatsapp.sgp.router': 'Доступ к роутеру',
   'whatsapp.sgp.routerUnlinked': 'К этому договору не привязан ни один ONT.',
@@ -5571,7 +5572,7 @@ const ru: Dictionary = {
   'receiptPage.failed': 'Сейчас не удалось открыть квитанцию. Попробуйте ещё раз через минуту.',
   'receiptPage.openTab': 'Открыть в новой вкладке',
   'receiptPage.frameTitle': 'Квитанция',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'Статус сервисов',
   'statusPage.subtitle': 'Текущее состояние и доступность за последние 90 дней.',
   'statusPage.failed': 'Не удалось загрузить статус. Повторите попытку через минуту.',
@@ -5655,7 +5656,7 @@ const ru: Dictionary = {
   'platform.status.form.notify': 'Уведомить провайдеров по e-mail и WhatsApp',
   'platform.status.form.notifyHint': 'Инцидент: при открытии и при решении. Обслуживание: за 24 часа и по завершении.',
   'platform.status.form.submit': 'Опубликовать',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'Партнёры',
   'signup.affiliate': 'Вы регистрируетесь по ссылке партнёра {code}.',
   'affiliates.title': 'Партнёры',
@@ -5765,7 +5766,7 @@ const ru: Dictionary = {
   'affiliatePortal.noCommissions': 'Комиссий пока нет.',
   'affiliatePortal.payouts': 'Выплаты',
   'affiliatePortal.noPayouts': 'Выплат пока нет.',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "Дополнение",
   'charges.pricing.addon': "Дополнение {name}: {total}",
   'charges.pricing.addonProration': "Дополнение {name} (пропорционально): {total}",

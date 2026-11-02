@@ -310,7 +310,7 @@ app.use('/api', apiLimiter);
 // database read — behind the resolver, an unreachable database would answer a
 // blank 500 instead of naming the thing that is down.
 //
-// Sem a versão (0127): a rota é aberta a qualquer um, e a versão exata é o
+// Sem a versão (0128): a rota é aberta a qualquer um, e a versão exata é o
 // primeiro passo de quem procura uma falha conhecida. Quem tem sessão a lê em
 // `GET /api/version`; o console, em `/api/platform/deployment`.
 app.get('/api/health', async (req, res) => {
@@ -406,15 +406,15 @@ if (IS_SAAS) {
   app.use('/api/platform', platformReportsRoutes);
   // A pesquisa de satisfação dos provedores (0123): relatório e envio manual.
   app.use('/api/platform', platformNpsRoutes);
-  // A página de status (0127): verificações, incidentes e manutenções.
+  // A página de status (0128): verificações, incidentes e manutenções.
   app.use('/api/platform', platformStatusRoutes);
-  // O programa de afiliados (0125): cadastro, aprovação e lotes mensais.
+  // O programa de afiliados (0126): cadastro, aprovação e lotes mensais.
   app.use('/api/platform', platformAffiliatesRoutes);
   // A página pública do ápice — o catálogo e o que o cadastro pergunta antes
   // de existir conta. Mesma regra do console: só no endereço da plataforma.
   app.use('/api/public', platformHostOnly);
   app.use('/api/public', publicRoutes);
-  // O portal do afiliado (0125): sessão própria, no endereço da plataforma.
+  // O portal do afiliado (0126): sessão própria, no endereço da plataforma.
   app.use('/api/affiliate', platformHostOnly);
   app.use('/api/affiliate', affiliatePortalRoutes);
 }
@@ -426,7 +426,7 @@ app.use('/api/asaas', asaasProviderRoutes);
 app.use('/api/teiah', teiahRoutes);
 app.use('/api/focuschat', focusChatRoutes);
 app.use('/api/contacts', contactRoutes);
-// O add-on de WhatsApp (0126), na frente dos quatro roteadores do prefixo.
+// O add-on de WhatsApp (0127), na frente dos quatro roteadores do prefixo.
 // Desligada até o catálogo ter um add-on `gated` com a chave `whatsapp` — ver
 // `middleware/addonGate.js`. Ligada, ela autentica antes (o 401 vem primeiro).
 // O prefixo leva também o que NÃO é WhatsApp — os alertas (que saem também

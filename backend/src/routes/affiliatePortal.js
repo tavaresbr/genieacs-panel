@@ -4,7 +4,7 @@ import { authenticateAffiliate } from '../middleware/affiliateAuth.js';
 import { affiliateLoginLimiter } from '../middleware/rateLimit.js';
 
 /**
- * O portal do afiliado (0125), no endereço da plataforma. Sessão própria
+ * O portal do afiliado (0126), no endereço da plataforma. Sessão própria
  * (`affiliateAuth.js`), e nenhuma rota com parâmetro de caminho: o afiliado
  * só lê o que o id da SESSÃO dele alcança.
  */

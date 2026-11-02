@@ -780,6 +780,7 @@ export default {
   'whatsapp.phoneSaved': 'تم حفظ رقم الهاتف',
   'whatsapp.phoneSaveFailed': 'تعذّر حفظ رقم الهاتف',
   'whatsapp.error.invalidPhone': 'هذا لا يبدو رقم هاتف صالحًا',
+  'whatsapp.error.bindingUnverified': "تم هذا الربط برقم الهوية الذي كتبه العميل فقط. أكّد العقد مع العميل واربطه هنا قبل حفظ الهاتف.",
   'whatsapp.error.invalidOptOutCategories': "اختر أنواع رسائل صالحة لقائمة عدم الإزعاج",
   'whatsapp.error.subscriberNotFound': 'لا يوجد مشترك بهذا العقد',
   'whatsapp.contactsLoaded': '{count} جهة اتصال',
@@ -1390,7 +1391,7 @@ export default {
   'auth.passwordMatchesIdentity': 'لا يمكن أن تكون كلمة المرور مطابقة لاسم المستخدم أو البريد الإلكتروني.',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': 'اللوحة',
   'status.component.payments': 'المدفوعات',
   'status.component.whatsapp': 'WhatsApp',
@@ -1404,7 +1405,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] اكتملت الصيانة: {title}',
   'status.notice.maintenanceDoneBody': 'مرحبًا {provider}. اكتملت الصيانة المجدولة على {components} ({title}).',
   'status.notice.follow': 'تابعها عبر صفحة الحالة: {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
   'affiliate.loginSuccess': 'تم تسجيل الدخول',
   'affiliate.sessionRequired': 'سجّل الدخول إلى بوابة الشركاء',

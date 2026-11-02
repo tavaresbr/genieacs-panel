@@ -101,7 +101,7 @@ export async function startFakeAsaas({ apiKey }) {
       if (req.method === 'GET' && ['/payments', '/customers', '/invoices'].includes(caminho)) {
         return responder(200, { object: 'list', hasMore: false, totalCount: 0, limit: 100, offset: 0, data: [] });
       }
-      // As transferências Pix dos lotes de afiliados (0125): criar devolve
+      // As transferências Pix dos lotes de afiliados (0126): criar devolve
       // `PENDING`, e a consulta diz `DONE` — o "Consultar status" do console
       // fecha o lote como pago. Nenhum dinheiro de verdade passa por aqui.
       if (req.method === 'POST' && caminho === '/transfers') {

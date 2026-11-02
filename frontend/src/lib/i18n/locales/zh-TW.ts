@@ -2691,6 +2691,7 @@ const zhTW: Dictionary = {
   'whatsapp.sgp.search': '搜尋',
   'whatsapp.sgp.bind': '將合約 {contract} 連結到此對話',
   'whatsapp.sgp.bindFirst': "此合約尚未關聯到該對話。請先關聯，才能傳送帳單、解除限制或建立工單。",
+  'whatsapp.sgp.bindingUnverified': "僅憑證件號綁定,未驗證。確認並綁定合約後才可執行此操作。",
   'whatsapp.sgp.bound': '對話已連結到合約 {contract}',
   'whatsapp.sgp.router': '路由器存取',
   'whatsapp.sgp.routerUnlinked': '此合約未連結任何 ONT。',
@@ -5564,7 +5565,7 @@ const zhTW: Dictionary = {
   'receiptPage.failed': '暫時無法開啟收據，請稍後再試。',
   'receiptPage.openTab': '在新分頁中開啟',
   'receiptPage.frameTitle': '收據',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': '服務狀態',
   'statusPage.subtitle': '目前狀態與過去 90 天的可用性。',
   'statusPage.failed': '暫時無法載入狀態，請稍後再試。',
@@ -5648,7 +5649,7 @@ const zhTW: Dictionary = {
   'platform.status.form.notify': '透過電子郵件和 WhatsApp 通知服務商',
   'platform.status.form.notifyHint': '故障：發生時與解決時。維護：提前 24 小時與完成時。',
   'platform.status.form.submit': '發布',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': '推廣夥伴',
   'signup.affiliate': '您正透過推廣夥伴 {code} 註冊。',
   'affiliates.title': '推廣夥伴',
@@ -5758,7 +5759,7 @@ const zhTW: Dictionary = {
   'affiliatePortal.noCommissions': '尚無佣金。',
   'affiliatePortal.payouts': '結算',
   'affiliatePortal.noPayouts': '尚無結算。',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "附加元件",
   'charges.pricing.addon': "附加元件 {name}：{total}",
   'charges.pricing.addonProration': "附加元件 {name}（按比例）：{total}",

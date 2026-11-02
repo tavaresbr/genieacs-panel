@@ -781,6 +781,7 @@ export default {
   'whatsapp.phoneSaved': 'Phone number saved',
   'whatsapp.phoneSaveFailed': 'The phone number could not be saved',
   'whatsapp.error.invalidPhone': 'That does not look like a usable phone number',
+  'whatsapp.error.bindingUnverified': "This link was made only by the tax ID the customer typed. Confirm the contract with the customer and link it here before saving the phone.",
   'whatsapp.error.invalidOptOutCategories': "Pick valid message types for the do-not-disturb entry",
   'whatsapp.error.subscriberNotFound': 'No subscriber with that contract',
   'whatsapp.contactsLoaded': '{count} contact(s)',
@@ -1398,7 +1399,7 @@ export default {
   'auth.passwordMatchesIdentity': 'The password cannot be the same as your username or e-mail.',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': 'Panel',
   'status.component.payments': 'Payments',
   'status.component.whatsapp': 'WhatsApp',
@@ -1412,7 +1413,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Maintenance completed: {title}',
   'status.notice.maintenanceDoneBody': 'Hello, {provider}. The scheduled maintenance on {components} ({title}) has been completed.',
   'status.notice.follow': 'Follow it on the status page: {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': 'Invalid email or password',
   'affiliate.loginSuccess': 'Signed in',
   'affiliate.sessionRequired': 'Sign in to the affiliate portal',

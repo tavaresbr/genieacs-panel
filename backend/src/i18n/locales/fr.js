@@ -798,6 +798,7 @@ export default {
   'whatsapp.phoneSaved': 'Numéro de téléphone enregistré',
   'whatsapp.phoneSaveFailed': 'Le numéro de téléphone n’a pas pu être enregistré',
   'whatsapp.error.invalidPhone': 'Cela ne ressemble pas à un numéro de téléphone utilisable',
+  'whatsapp.error.bindingUnverified': "Ce lien repose uniquement sur le numéro de document saisi par le client. Confirmez le contrat avec le client et liez-le ici avant d'enregistrer le téléphone.",
   'whatsapp.error.invalidOptOutCategories': "Choisissez des types de message valides pour la liste « ne pas déranger »",
   'whatsapp.error.subscriberNotFound': 'Aucun abonné avec ce contrat',
   'whatsapp.contactsLoaded': '{count} contact(s)',
@@ -1394,7 +1395,7 @@ export default {
   'auth.passwordMatchesIdentity': 'Le mot de passe ne peut pas être identique à votre identifiant ou à votre e-mail.',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': 'Panneau',
   'status.component.payments': 'Paiements',
   'status.component.whatsapp': 'WhatsApp',
@@ -1408,7 +1409,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Maintenance terminée : {title}',
   'status.notice.maintenanceDoneBody': 'Bonjour, {provider}. La maintenance programmée sur {components} ({title}) est terminée.',
   'status.notice.follow': 'Suivez-la sur la page d’état : {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': 'E-mail ou mot de passe invalide',
   'affiliate.loginSuccess': 'Connecté',
   'affiliate.sessionRequired': 'Connectez-vous au portail affilié',

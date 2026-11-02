@@ -258,7 +258,7 @@ const PLATFORM_HOST_PATHS = new Set([
  */
 // E a página pública (`/api/public/*`): o catálogo e o cadastro de quem ainda
 // não é provedor. Só no SaaS, onde o ápice é a vitrine. E o portal do
-// afiliado (`/api/affiliate/*`, 0125): quem divulga o produto não é provedor,
+// afiliado (`/api/affiliate/*`, 0126): quem divulga o produto não é provedor,
 // e a sessão dele (cookie próprio) não abre escopo de provedor nenhum.
 const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/', '/api/affiliate/'] : [];
 

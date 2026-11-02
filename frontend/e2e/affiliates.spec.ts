@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { ADMIN_STATE, DEMO_AFFILIATE, consoleTabs, shot } from './support/demo'
 
 /**
- * O programa de afiliados (0125) no navegador: o console cadastra um
+ * O programa de afiliados (0126) no navegador: o console cadastra um
  * afiliado e gera o link de senha, que abre o portal `/afiliados`; o lote do
  * mês anterior da afiliada do seed é montado, aprovado e pago — o Pix vai ao
  * Asaas de mentira (`support/fake-asaas.mjs`, `/transfers`), nunca a um banco.

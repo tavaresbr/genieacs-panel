@@ -224,7 +224,7 @@ async function reprecificarCobranca(subscription, planoInformado, { keepOverride
   // fecha — e reemitir não pode recontá-lo (ver
   // `ChargeIssuingService.overageForPeriod`). A conta guarda as outras chaves
   // que tiver (o crédito). Os add-ons recorrentes do período desta fatura
-  // (0126), por cima do plano e fora do cupom — lidos agora, ou os de DEPOIS
+  // (0127), por cima do plano e fora do cupom — lidos agora, ou os de DEPOIS
   // de uma mudança ainda não gravada (ver `repriceAround`).
   //
   // O valor mudado à mão pelo console (0078) vence o cupom: quem aplica ou
@@ -895,7 +895,7 @@ async function trocarPlano({
     const { usage } = await SubscriptionService.usage({ countDevices });
     // O recurso com preço de excedente no plano novo não barra (0105): o
     // uso acima do teto é cobrado na fatura, e não recusado aqui.
-    // Com o que os add-ons de limite somam (0126): eles valem em qualquer plano.
+    // Com o que os add-ons de limite somam (0127): eles valem em qualquer plano.
     const excesso = SubscriptionService.overLimitFor(
       AddonService.applyLimitBonus(SubscriptionService.limitsOf(plan), await AddonService.limitBonus()),
       usage,
@@ -1462,7 +1462,7 @@ class SelfBillingService {
    * prazo quando o uso cabe nele. O valor mudado à mão pelo console vence
    * (`keepOverride`): essa fatura não é tocada.
    *
-   * `addonRows` (0126): as linhas de `tenant_addons` como vão ficar — a
+   * `addonRows` (0127): as linhas de `tenant_addons` como vão ficar — a
    * ativação, o cancelamento e o gesto do console sobre um add-on mudam o
    * preço da fatura sem mudar a assinatura.
    *

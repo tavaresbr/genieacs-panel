@@ -29,7 +29,7 @@ import 'dotenv/config';
  *   da Alfa com um token cru conhecido (`E2E_NPS_TOKEN`), que o e2e abre em
  *   `/nps#<token>`. Num banco de desenvolvimento o token conhecido não entra:
  *   quem o lesse aqui responderia a pesquisa;
- * - uma afiliada (0125), **Carla Indica**, com senha conhecida (o portal
+ * - uma afiliada (0126), **Carla Indica**, com senha conhecida (o portal
  *   `/afiliados`), que indicou a Delta Link, com duas comissões do mês
  *   anterior — o lote que o console monta, aprova e paga no e2e;
  * - a caixa da plataforma, sem membros (é onde o perfil da plataforma grava).

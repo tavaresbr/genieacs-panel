@@ -330,7 +330,7 @@ export function aggregateRevenue({
     // Normalizado para trinta dias: o anual entra como 1/12 (× 30 / 365).
     const mensal = Math.round((preco * 30) / diasDoPeriodo(sub, plano));
     mrrCents += mensal;
-    // Os add-ons recorrentes (0126), à parte: o MRR por plano continua sendo
+    // Os add-ons recorrentes (0127), à parte: o MRR por plano continua sendo
     // do plano, e o total deles sai em `addonMrrCents`.
     const adicional = Number(addonPrices.get(Number(sub.id)) ?? 0);
     if (adicional > 0) addonMrrCents += Math.round((adicional * 30) / diasDoPeriodo(sub, plano));
@@ -428,7 +428,7 @@ export function aggregateRevenue({
     from: range.from,
     to: range.to,
     mrrCents,
-    // O MRR dos add-ons pagos (0126), fora do `mrrCents` dos planos.
+    // O MRR dos add-ons pagos (0127), fora do `mrrCents` dos planos.
     addonMrrCents,
     activeCount,
     receivedCents,
@@ -479,7 +479,7 @@ export async function buildRevenueReport(range, now = new Date()) {
 
 /**
  * O que os add-ons vivos e pagos de cada assinatura somam por período do
- * ciclo dela (0126) — por id da assinatura. Acima dos provedores, como o
+ * ciclo dela (0127) — por id da assinatura. Acima dos provedores, como o
  * resto do relatório.
  */
 async function precosDosAddons(subscriptions, planos, now) {

@@ -70,7 +70,7 @@ router.post('/tenants/:id/credits', ...guard, PlatformReferralsController.adjust
 router.get('/delinquency', ...guard, PlatformDelinquencyController.list);
 router.post('/delinquency/actions', ...guard, PlatformDelinquencyController.run);
 
-// Os add-ons pagos (0126): o catálogo, e os add-ons de UM provedor — dar de
+// Os add-ons pagos (0127): o catálogo, e os add-ons de UM provedor — dar de
 // graça e revogar, com motivo, nas duas trilhas.
 router.get('/addons', ...guard, PlatformAddonsController.list);
 router.post('/addons', ...guard, PlatformAddonsController.create);

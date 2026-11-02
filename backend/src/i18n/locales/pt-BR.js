@@ -778,6 +778,7 @@ export default {
   'whatsapp.phoneSaved': 'Telefone salvo',
   'whatsapp.phoneSaveFailed': 'Não foi possível salvar o telefone',
   'whatsapp.error.invalidPhone': 'Isso não parece um telefone utilizável',
+  'whatsapp.error.bindingUnverified': "Este vínculo foi feito só pelo CPF digitado pelo cliente. Confirme o contrato com o cliente e vincule-o aqui antes de gravar o telefone.",
   'whatsapp.error.invalidOptOutCategories': "Escolha tipos de comunicação válidos para o não perturbe",
   'whatsapp.error.subscriberNotFound': 'Nenhum assinante com esse contrato',
   'whatsapp.contactsLoaded': '{count} contato(s)',
@@ -1397,7 +1398,7 @@ export default {
   'auth.passwordMatchesIdentity': 'A senha não pode ser igual ao seu usuário ou e-mail.',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': 'Painel',
   'status.component.payments': 'Pagamentos',
   'status.component.whatsapp': 'WhatsApp',
@@ -1411,7 +1412,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Manutenção concluída: {title}',
   'status.notice.maintenanceDoneBody': 'Olá, {provider}. A manutenção programada em {components} ({title}) foi concluída.',
   'status.notice.follow': 'Acompanhe pela página de status: {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': 'E-mail ou senha inválidos',
   'affiliate.loginSuccess': 'Sessão iniciada',
   'affiliate.sessionRequired': 'Entre no portal do afiliado',

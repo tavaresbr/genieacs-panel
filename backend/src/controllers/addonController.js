@@ -6,7 +6,7 @@ import { TranslatableError, translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 /**
- * Os add-ons pagos na tela de Plano do provedor (0126): a vitrine, ativar e
+ * Os add-ons pagos na tela de Plano do provedor (0127): a vitrine, ativar e
  * cancelar na renovação. A regra é de `AddonService`; aqui ficam as duas
  * trilhas — a do provedor ("quem contratou isto?") e a da plataforma, que é
  * onde se reconstrói o que cada cliente paga (`selfService: true`).

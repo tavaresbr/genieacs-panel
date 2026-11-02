@@ -2671,6 +2671,7 @@ const ar: Dictionary = {
   'whatsapp.sgp.search': 'بحث',
   'whatsapp.sgp.bind': 'ربط العقد {contract} بهذه المحادثة',
   'whatsapp.sgp.bindFirst': "هذا العقد غير مرتبط بهذه المحادثة بعد. اربطه لإرسال فاتورة أو الفك أو فتح تذكرة.",
+  'whatsapp.sgp.bindingUnverified': "ربط برقم الهوية فقط، غير موثّق. أكّد العقد واربطه للسماح بهذا الإجراء.",
   'whatsapp.sgp.bound': 'تم ربط المحادثة بالعقد {contract}',
   'whatsapp.sgp.router': 'الوصول إلى الراوتر',
   'whatsapp.sgp.routerUnlinked': 'لا يوجد ONT مرتبط بهذا العقد.',
@@ -5572,7 +5573,7 @@ const ar: Dictionary = {
   'receiptPage.failed': 'تعذّر فتح الإيصال الآن. حاول مرة أخرى بعد قليل.',
   'receiptPage.openTab': 'فتح في علامة تبويب جديدة',
   'receiptPage.frameTitle': 'الإيصال',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'حالة الخدمات',
   'statusPage.subtitle': 'الحالة الحالية ونسبة التوفر خلال آخر 90 يومًا.',
   'statusPage.failed': 'تعذر تحميل الحالة الآن. حاول مرة أخرى بعد قليل.',
@@ -5656,7 +5657,7 @@ const ar: Dictionary = {
   'platform.status.form.notify': 'إشعار المزوّدين بالبريد الإلكتروني وWhatsApp',
   'platform.status.form.notifyHint': 'العطل: عند الفتح وعند الحل. الصيانة: قبل 24 ساعة وعند الاكتمال.',
   'platform.status.form.submit': 'نشر',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'الشركاء',
   'signup.affiliate': 'أنت تسجّل عبر الشريك {code}.',
   'affiliates.title': 'الشركاء',
@@ -5766,7 +5767,7 @@ const ar: Dictionary = {
   'affiliatePortal.noCommissions': 'لا توجد عمولات بعد.',
   'affiliatePortal.payouts': 'الدفعات',
   'affiliatePortal.noPayouts': 'لا توجد دفعات بعد.',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "إضافة",
   'charges.pricing.addon': "الإضافة {name}: {total}",
   'charges.pricing.addonProration': "الإضافة {name} (تناسبي): {total}",

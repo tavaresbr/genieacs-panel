@@ -2671,6 +2671,7 @@ const hi: Dictionary = {
   'whatsapp.sgp.search': 'खोजें',
   'whatsapp.sgp.bind': 'अनुबंध {contract} को इस बातचीत से जोड़ें',
   'whatsapp.sgp.bindFirst': "यह अनुबंध अभी इस बातचीत से जुड़ा नहीं है। बिल भेजने, अनलॉक करने या टिकट खोलने के लिए इसे लिंक करें।",
+  'whatsapp.sgp.bindingUnverified': "केवल दस्तावेज़ से लिंक, सत्यापित नहीं। इस कार्रवाई के लिए अनुबंध की पुष्टि कर लिंक करें।",
   'whatsapp.sgp.bound': 'बातचीत अनुबंध {contract} से जुड़ गई',
   'whatsapp.sgp.router': 'राउटर एक्सेस',
   'whatsapp.sgp.routerUnlinked': 'इस अनुबंध से कोई ONT जुड़ा नहीं है।',
@@ -5571,7 +5572,7 @@ const hi: Dictionary = {
   'receiptPage.failed': 'अभी रसीद नहीं खुल सकी। कुछ देर बाद फिर कोशिश करें।',
   'receiptPage.openTab': 'नए टैब में खोलें',
   'receiptPage.frameTitle': 'रसीद',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'सेवाओं की स्थिति',
   'statusPage.subtitle': 'अभी की स्थिति और पिछले 90 दिनों की उपलब्धता।',
   'statusPage.failed': 'अभी स्थिति लोड नहीं हो सकी। थोड़ी देर में फिर कोशिश करें।',
@@ -5655,7 +5656,7 @@ const hi: Dictionary = {
   'platform.status.form.notify': 'प्रदाताओं को ई-मेल और WhatsApp से सूचित करें',
   'platform.status.form.notifyHint': 'घटना: खुलने पर और हल होने पर। रखरखाव: 24 घंटे पहले और पूरा होने पर।',
   'platform.status.form.submit': 'प्रकाशित करें',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'एफ़िलिएट',
   'signup.affiliate': 'आप एफ़िलिएट {code} के ज़रिए साइन अप कर रहे हैं।',
   'affiliates.title': 'एफ़िलिएट',
@@ -5765,7 +5766,7 @@ const hi: Dictionary = {
   'affiliatePortal.noCommissions': 'अभी कोई कमीशन नहीं।',
   'affiliatePortal.payouts': 'भुगतान',
   'affiliatePortal.noPayouts': 'अभी कोई भुगतान नहीं।',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "ऐड-ऑन",
   'charges.pricing.addon': "ऐड-ऑन {name}: {total}",
   'charges.pricing.addonProration': "ऐड-ऑन {name} (आनुपातिक): {total}",

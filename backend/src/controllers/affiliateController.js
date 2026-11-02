@@ -10,7 +10,7 @@ import { createErrorResponse, createResponse } from '../utils/helpers.js';
 import { POLICY_PROBLEM_TEXT_EN } from '../utils/passwordPolicy.js';
 
 /**
- * O programa de afiliados (0125): o portal do afiliado e o console.
+ * O programa de afiliados (0126): o portal do afiliado e o console.
  *
  * O portal (`/api/affiliate/*`) tem sessão própria (`affiliateAuth.js`) e
  * nenhum parâmetro de caminho: tudo o que ele lê sai do id da sessão. O

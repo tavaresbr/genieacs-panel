@@ -781,6 +781,7 @@ export default {
   'whatsapp.phoneSaved': 'फ़ोन नंबर सहेजा गया',
   'whatsapp.phoneSaveFailed': 'फ़ोन नंबर सहेजा नहीं जा सका',
   'whatsapp.error.invalidPhone': 'यह उपयोग योग्य फ़ोन नंबर नहीं लगता',
+  'whatsapp.error.bindingUnverified': "यह लिंक केवल ग्राहक द्वारा लिखे गए दस्तावेज़ से बना है। फ़ोन सहेजने से पहले ग्राहक से अनुबंध की पुष्टि करें और उसे यहाँ लिंक करें।",
   'whatsapp.error.invalidOptOutCategories': "परेशान न करें प्रविष्टि के लिए मान्य संदेश प्रकार चुनें",
   'whatsapp.error.subscriberNotFound': 'उस अनुबंध वाला कोई ग्राहक नहीं है',
   'whatsapp.contactsLoaded': '{count} संपर्क',
@@ -1398,7 +1399,7 @@ export default {
   'auth.passwordMatchesIdentity': 'पासवर्ड आपके उपयोगकर्ता नाम या ईमेल के समान नहीं हो सकता।',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': 'पैनल',
   'status.component.payments': 'भुगतान',
   'status.component.whatsapp': 'WhatsApp',
@@ -1412,7 +1413,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] रखरखाव पूरा हुआ: {title}',
   'status.notice.maintenanceDoneBody': 'नमस्ते, {provider}। {components} पर निर्धारित रखरखाव ({title}) पूरा हो गया है।',
   'status.notice.follow': 'स्थिति पृष्ठ पर देखें: {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': 'ईमेल या पासवर्ड अमान्य है',
   'affiliate.loginSuccess': 'साइन इन हो गया',
   'affiliate.sessionRequired': 'एफ़िलिएट पोर्टल में साइन इन करें',

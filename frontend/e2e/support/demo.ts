@@ -107,7 +107,7 @@ export const DELTA_OWNER = {
   password: 'Delta-Demo-2026'
 } as const
 
-/** A afiliada do seed (0125), com senha definida, que indicou a Delta. */
+/** A afiliada do seed (0126), com senha definida, que indicou a Delta. */
 export const DEMO_AFFILIATE = {
   name: 'Carla Indica',
   email: 'carla@afiliados-demo.test',

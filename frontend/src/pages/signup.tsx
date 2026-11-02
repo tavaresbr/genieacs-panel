@@ -37,7 +37,7 @@ export default function Signup() {
   // O código do link de indicação (0106). O servidor ignora o inválido e a
   // indicação de si mesmo; aqui só se lê e se mostra.
   const referralCode = referralCodeFromQuery(params.get('ref'))
-  // O código do afiliado (0125, `?aff=A-…`). Com ele, o servidor não paga a
+  // O código do afiliado (0126, `?aff=A-…`). Com ele, o servidor não paga a
   // indicação do `?ref=` do mesmo link: uma atribuição por cadastro.
   const affiliateCode = affiliateCodeFromQuery(params.get('aff'))
   const [form, setForm] = useState({

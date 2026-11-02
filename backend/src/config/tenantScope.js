@@ -185,7 +185,7 @@ export const SCOPED_TABLES = new Set([
   // provedor, como o pedido de cancelamento — o console a lê de cima,
   // declarado, e o link público acha a linha pelo hash do token.
   'platform_nps',
-  // Os add-ons que o provedor contratou (0126): o que ele paga além do plano.
+  // Os add-ons que o provedor contratou (0127): o que ele paga além do plano.
   // Do provedor, como a assinatura — sai no export dele e some com ele.
   'tenant_addons'
 ]);
@@ -263,7 +263,7 @@ export const SHARED_TABLES = new Set([
   // `platform_alerts`; cada provedor só é tocado dentro do próprio escopo.
   'plan_price_changes',
   'plan_price_change_marks',
-  // A página de status (0127): as verificações, a soma do dia, os incidentes
+  // A página de status (0128): as verificações, a soma do dia, os incidentes
   // e o que já foi avisado a cada provedor. Do serviço, acima dos provedores —
   // a página pública as lê sem escopo nenhum, e o aviso é um passo só do
   // agendador, fora do laço por provedor, como `plan_price_change_marks`.
@@ -272,13 +272,13 @@ export const SHARED_TABLES = new Set([
   'status_incidents',
   'status_incident_updates',
   'status_notification_marks',
-  // O programa de afiliados (0125): o afiliado está acima dos provedores, o
+  // O programa de afiliados (0126): o afiliado está acima dos provedores, o
   // lote é dele, e a comissão fala de um afiliado e de um provedor ao mesmo
   // tempo — cada lado a lê pelo próprio id, sempre nomeado.
   'affiliates',
   'affiliate_payouts',
   'affiliate_commissions',
-  // O catálogo de add-ons (0126): da plataforma, como `plans` e `coupons`.
+  // O catálogo de add-ons (0127): da plataforma, como `plans` e `coupons`.
   'addons'
 ]);
 

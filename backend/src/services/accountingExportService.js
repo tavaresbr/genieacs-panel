@@ -25,7 +25,7 @@ import { toCsvWith } from '../utils/csv.js';
  *     a data de criação) — é a competência que o contador lança. A conta do
  *     valor vem aberta: bruto (o preço cheio do plano + o excedente + os
  *     add-ons), o desconto do cupom, o crédito usado, o excedente, os add-ons
- *     (0126 — recorrentes na renovação, proporcionais na pró-rata de ativação;
+ *     (0127 — recorrentes na renovação, proporcionais na pró-rata de ativação;
  *     o cupom não vale neles), o ajuste manual do console e o líquido
  *     (`amount_cents`, o que foi ao gateway). Sempre vale
  *     `bruto − cupom − crédito + ajuste = líquido`. O desconto do cupom é o
@@ -255,7 +255,7 @@ export function chargeBreakdown(charge, { plan = null } = {}) {
   const net = inteiro(charge.amount_cents);
   const credit = BillingCharge.creditReservedOf(charge);
   const overage = BillingCharge.overageCentsOf(charge);
-  // Os add-ons (0126), fora do cupom: entram no bruto como o excedente.
+  // Os add-ons (0127), fora do cupom: entram no bruto como o excedente.
   const addons = BillingCharge.addonCentsOf(charge);
   const detalhe = BillingCharge.pricingDetailOf(charge);
   const baseGravada = detalhe && Number.isFinite(Number(detalhe.base)) && detalhe.base !== null ? inteiro(detalhe.base) : null;
@@ -301,7 +301,7 @@ export const ACCOUNTING_COLUMNS = Object.freeze({
     { header: 'Forma de pagamento', field: 'paymentMethod', type: 'text', width: 18 },
     { header: 'ID no gateway', field: 'gatewayChargeId', type: 'text', width: 22 },
     { header: 'NFS-e', field: 'invoiceNumber', type: 'text' },
-    // Os add-ons (0126) no FIM, e não ao lado do excedente: quem importa a
+    // Os add-ons (0127) no FIM, e não ao lado do excedente: quem importa a
     // planilha por posição de coluna não vê nada mudar de lugar.
     { header: 'Add-ons', field: 'addonCents', type: 'money' }
   ],

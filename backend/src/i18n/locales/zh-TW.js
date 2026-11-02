@@ -780,6 +780,7 @@ export default {
   'whatsapp.phoneSaved': '電話號碼已儲存',
   'whatsapp.phoneSaveFailed': '無法儲存電話號碼',
   'whatsapp.error.invalidPhone': '這不像是一個可用的電話號碼',
+  'whatsapp.error.bindingUnverified': "此綁定僅憑客戶輸入的證件號完成。儲存電話前,請與客戶確認合約並在此綁定。",
   'whatsapp.error.invalidOptOutCategories': "請為免打擾項目選擇有效的訊息類型",
   'whatsapp.error.subscriberNotFound': '找不到使用該合約的用戶',
   'whatsapp.contactsLoaded': '{count} 位聯絡人',
@@ -1398,7 +1399,7 @@ export default {
   'auth.passwordMatchesIdentity': '密碼不能與使用者名稱或電子郵件相同。',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': '面板',
   'status.component.payments': '付款',
   'status.component.whatsapp': 'WhatsApp',
@@ -1412,7 +1413,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] 維護已完成：{title}',
   'status.notice.maintenanceDoneBody': '{provider}，您好。{components} 的計畫維護（{title}）已完成。',
   'status.notice.follow': '請在狀態頁面查看：{link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': '電子郵件或密碼無效',
   'affiliate.loginSuccess': '已登入',
   'affiliate.sessionRequired': '請登入推廣夥伴入口',

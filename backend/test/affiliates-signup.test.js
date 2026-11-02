@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 /**
- * O programa de afiliados (0125): o cadastro com `?aff=A-CÓDIGO` e o portal do
+ * O programa de afiliados (0126): o cadastro com `?aff=A-CÓDIGO` e o portal do
  * afiliado no endereço da plataforma.
  *
  * SaaS com subdomínio, porque o cadastro e o portal só existem ali (ver

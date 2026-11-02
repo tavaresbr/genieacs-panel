@@ -60,7 +60,7 @@ router.get('/conversations/:id', authenticateToken, requirePermission('whatsapp.
 
 // O botão "Sugerir (IA)" do composer: se aparece, e o rascunho em si. A IA
 // lê a conversa e devolve texto para a caixa; nada sai daqui para o cliente.
-// Atrás do add-on `ai` (0126) quando o catálogo o exige.
+// Atrás do add-on `ai` (0127) quando o catálogo o exige.
 router.get('/ai/status', authenticateToken, requirePermission('whatsapp.read'), requireAddon('ai'), WhatsAppMessageController.aiStatus);
 router.post(
   '/conversations/:id/suggest-reply',

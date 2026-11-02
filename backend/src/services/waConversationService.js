@@ -153,7 +153,9 @@ class WaConversationService {
     const [primeiro] = await SgpLink.getByContract(contract);
     return WaConversation.update(conversation.id, {
       contract: String(contract),
-      device_id: primeiro?.device_id ?? null
+      device_id: primeiro?.device_id ?? null,
+      // Só o CPF digitado ligou: não verificado até um atendente confirmar.
+      bound_via: 'document'
     });
   }
 
@@ -345,6 +347,7 @@ class WaConversationService {
       device_id: null,
       sgp_contact_id: null,
       customer_account_id: null,
+      bound_via: null,
       unlinked_at: new Date()
     });
     return updated;
@@ -369,8 +372,8 @@ class WaConversationService {
     const link = links[0] ?? null;
     const account = link?.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
     const updated = await WaConversation.update(conversation.id, link
-      ? { contract: link.contract, device_id: link.device_id ?? null, sgp_contact_id: null, customer_account_id: account?.id ?? null, unlinked_at: null }
-      : { ...this.contactBinding(contact), customer_account_id: null, unlinked_at: null });
+      ? { contract: link.contract, device_id: link.device_id ?? null, sgp_contact_id: null, customer_account_id: account?.id ?? null, bound_via: null, unlinked_at: null }
+      : { ...this.contactBinding(contact), customer_account_id: null, bound_via: null, unlinked_at: null });
 
     const phone = normalizarTelefoneBr(conversation.wa_phone_e164);
     if (savePhone && phone) {

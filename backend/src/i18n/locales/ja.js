@@ -773,6 +773,7 @@ export default {
   'whatsapp.phoneSaved': '電話番号を保存しました',
   'whatsapp.phoneSaveFailed': '電話番号を保存できませんでした',
   'whatsapp.error.invalidPhone': '使用できる電話番号の形式ではないようです',
+  'whatsapp.error.bindingUnverified': "この紐付けはお客様が入力した書類番号だけで行われています。電話番号を保存する前に、お客様に契約を確認し、ここで紐付けてください。",
   'whatsapp.error.invalidOptOutCategories': "配信停止の設定に有効なメッセージの種類を選んでください",
   'whatsapp.error.subscriberNotFound': 'その契約番号の加入者が見つかりません',
   'whatsapp.contactsLoaded': '連絡先 {count} 件',
@@ -1398,7 +1399,7 @@ export default {
   'auth.passwordMatchesIdentity': 'パスワードをユーザー名やメールアドレスと同じにすることはできません。',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': 'パネル',
   'status.component.payments': '支払い',
   'status.component.whatsapp': 'WhatsApp',
@@ -1412,7 +1413,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] メンテナンス完了: {title}',
   'status.notice.maintenanceDoneBody': '{provider} 様。{components} の計画メンテナンス（{title}）は完了しました。',
   'status.notice.follow': 'ステータスページで確認できます: {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': 'メールアドレスまたはパスワードが正しくありません',
   'affiliate.loginSuccess': 'サインインしました',
   'affiliate.sessionRequired': 'アフィリエイトポータルにサインインしてください',

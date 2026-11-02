@@ -13,7 +13,7 @@ import {
 const REFRESH_MS = 60_000
 
 /**
- * A página de status da plataforma (0127), aberta a qualquer um no endereço
+ * A página de status da plataforma (0128), aberta a qualquer um no endereço
  * da plataforma: se cada serviço está no ar agora, a barra de 90 dias de cada
  * um e os incidentes e manutenções como foram escritos para o público.
  *

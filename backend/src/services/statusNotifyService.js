@@ -8,7 +8,7 @@ import { log } from '../utils/logger.js';
 import { instanteMs, parseComponents } from './statusService.js';
 
 /**
- * O aviso aos provedores sobre a página de status (0127): por e-mail e
+ * O aviso aos provedores sobre a página de status (0128): por e-mail e
  * WhatsApp, só nos incidentes com `notify_providers` ligado.
  *
  * Os eventos:

@@ -7,7 +7,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { recordBoth } from './platformBillingController.js';
 
 /**
- * Os add-ons pagos no console (0126): o catálogo (criar, listar com o uso,
+ * Os add-ons pagos no console (0127): o catálogo (criar, listar com o uso,
  * mudar, apagar o que nunca foi contratado) e os add-ons de UM provedor — dar
  * de graça e revogar, os dois com motivo e nas duas trilhas.
  *

@@ -1436,7 +1436,7 @@ class SubscriptionService {
    * a cada minuto para um plano que nem limita ONTs seria carga à toa.
    */
   static async overLimitOf(plan, { countDevices = null } = {}) {
-    // Com os add-ons de limite (0126), que valem em qualquer plano.
+    // Com os add-ons de limite (0127), que valem em qualquer plano.
     const limits = await this.effectiveLimitsOf(plan);
     // O recurso com preço de excedente não barra (`overLimitFor`), e nem é
     // contado: contar ONTs no ACS para uma resposta que não muda nada seria
@@ -1475,7 +1475,7 @@ class SubscriptionService {
 
   /**
    * Os tetos de `plan` para o provedor em escopo: `limitsOf` mais o que os
-   * add-ons de limite dele somam (0126). Importado na hora: `addonService`
+   * add-ons de limite dele somam (0127). Importado na hora: `addonService`
    * importa este arquivo, e o caminho de volta só é preciso aqui.
    */
   static async effectiveLimitsOf(plan) {
@@ -1653,7 +1653,7 @@ class SubscriptionService {
     // medindo: desfeito, a renovação cobra o excedente do período que usou.
     if (isPaused(subscription, now)) return { recorded: false, reason: 'paused' };
     const plano = planoDaFatia;
-    // O teto da fotografia já com os add-ons de limite (0126): quem paga o
+    // O teto da fotografia já com os add-ons de limite (0127): quem paga o
     // add-on não paga excedente pelas unidades que ele cobre.
     const limites = await this.effectiveLimitsOf(plano);
     const precos = this.overagePricesOf(plano);
@@ -1791,7 +1791,7 @@ class SubscriptionService {
    */
   static async usage({ countDevices } = {}) {
     const state = await this.current();
-    // Os tetos com os add-ons de limite (0126) — os que de fato barram.
+    // Os tetos com os add-ons de limite (0127) — os que de fato barram.
     const limits = await this.effectiveLimitsOf(state.plan);
     const [operators, subscribers] = await Promise.all([
       this.operatorCount(),
@@ -2692,7 +2692,7 @@ class SubscriptionService {
     // pró-rata, volta a `active` SEM estender o prazo — é por esta marca.)
     // A de só excedente (0105) é avulsa do mesmo jeito: paga o consumo, não
     // compra período.
-    // E a pró-rata da ativação de um add-on (0126), avulsa do mesmo jeito.
+    // E a pró-rata da ativação de um add-on (0127), avulsa do mesmo jeito.
     const isProration = pedido.kind === 'proration' || pedido.kind === 'overage' || pedido.kind === 'addon';
     // Pagar a menos POR CAUSA do desconto por antecipação é pagar o inteiro:
     // ver `descontoAntecipado`. A multa e os juros, do outro lado, chegam como
@@ -2908,7 +2908,7 @@ class SubscriptionService {
     // O crédito reservado na cobrança que este pagamento quita passa a gasto,
     // na mesma transação do evento (0106). O pago a menos deixa a cobrança em
     // aberto, e a reserva com ela.
-    // O afiliado (0125): TODO pagamento com dinheiro do indicado, dentro da
+    // O afiliado (0126): TODO pagamento com dinheiro do indicado, dentro da
     // janela, rende a comissão — lido aqui, fora da transação, e gravado lá
     // dentro (ver `AffiliateService.prepareCommission`).
     const doAfiliado = amount > 0 ? await AffiliateService.prepareCommission(tenantId, { now }) : null;
@@ -3233,7 +3233,7 @@ class SubscriptionService {
         // crédito que a cobrança dele gastou volta (0106) — na transação da
         // marca do estorno, uma vez só.
         const indicacaoDesfeita = await ReferralService.cancelOnRefund({ trx, tenantId, reference: referencia });
-        // A comissão do afiliado que este pagamento gerou (0125), desfeita na
+        // A comissão do afiliado que este pagamento gerou (0126), desfeita na
         // mesma transação da marca do estorno — uma vez só.
         const comissaoDesfeita = await AffiliateService.reverseOnRefund({ trx, tenantId, reference: referencia });
         const creditoDevolvido = cobrancaPaga ? await TenantCredit.restoreForCharge(cobrancaPaga.id, trx) : 0;

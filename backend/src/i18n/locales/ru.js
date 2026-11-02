@@ -782,6 +782,7 @@ export default {
   'whatsapp.phoneSaved': 'Номер телефона сохранён',
   'whatsapp.phoneSaveFailed': 'Не удалось сохранить номер телефона',
   'whatsapp.error.invalidPhone': 'Это не похоже на пригодный номер телефона',
+  'whatsapp.error.bindingUnverified': "Эта привязка сделана только по документу, введённому клиентом. Подтвердите договор у клиента и привяжите его здесь, прежде чем сохранять телефон.",
   'whatsapp.error.invalidOptOutCategories': "Выберите допустимые типы сообщений для записи «не беспокоить»",
   'whatsapp.error.subscriberNotFound': 'Абонент с таким договором не найден',
   'whatsapp.contactsLoaded': 'Контактов: {count}',
@@ -1399,7 +1400,7 @@ export default {
   'auth.passwordMatchesIdentity': 'Пароль не может совпадать с вашим именем пользователя или адресом электронной почты.',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': 'Панель',
   'status.component.payments': 'Платежи',
   'status.component.whatsapp': 'WhatsApp',
@@ -1413,7 +1414,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] Обслуживание завершено: {title}',
   'status.notice.maintenanceDoneBody': 'Здравствуйте, {provider}. Плановое обслуживание {components} ({title}) завершено.',
   'status.notice.follow': 'Следите на странице статуса: {link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': 'Неверный e-mail или пароль',
   'affiliate.loginSuccess': 'Вход выполнен',
   'affiliate.sessionRequired': 'Войдите в партнёрский портал',

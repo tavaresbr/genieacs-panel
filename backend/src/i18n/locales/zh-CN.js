@@ -781,6 +781,7 @@ export default {
   'whatsapp.phoneSaved': '电话号码已保存',
   'whatsapp.phoneSaveFailed': '无法保存电话号码',
   'whatsapp.error.invalidPhone': '这不像是一个可用的电话号码',
+  'whatsapp.error.bindingUnverified': "此绑定仅凭客户输入的证件号完成。保存电话前,请与客户确认合同并在此绑定。",
   'whatsapp.error.invalidOptOutCategories': "请为免打扰条目选择有效的消息类型",
   'whatsapp.error.subscriberNotFound': '找不到该合同号对应的用户',
   'whatsapp.contactsLoaded': '{count} 个联系人',
@@ -1398,7 +1399,7 @@ export default {
   'auth.passwordMatchesIdentity': '密码不能与用户名或电子邮件相同。',
 
 
-  // A página de status (0127): os componentes e o aviso aos provedores.
+  // A página de status (0128): os componentes e o aviso aos provedores.
   'status.component.panel': '面板',
   'status.component.payments': '支付',
   'status.component.whatsapp': 'WhatsApp',
@@ -1412,7 +1413,7 @@ export default {
   'status.notice.maintenanceDoneSubject': '[{product}] 维护已完成：{title}',
   'status.notice.maintenanceDoneBody': '{provider}，您好。{components} 的计划维护（{title}）已完成。',
   'status.notice.follow': '请在状态页面查看：{link}',
-  // O portal do afiliado (0125).
+  // O portal do afiliado (0126).
   'affiliate.invalidCredentials': '邮箱或密码无效',
   'affiliate.loginSuccess': '已登录',
   'affiliate.sessionRequired': '请登录推广伙伴门户',

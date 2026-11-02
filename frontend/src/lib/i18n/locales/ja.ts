@@ -2690,6 +2690,7 @@ const ja: Dictionary = {
   'whatsapp.sgp.search': '検索',
   'whatsapp.sgp.bind': '契約 {contract} をこの会話に紐付ける',
   'whatsapp.sgp.bindFirst': "この契約はまだこの会話に関連付けられていません。請求書の送信、解除、チケット作成には関連付けが必要です。",
+  'whatsapp.sgp.bindingUnverified': "書類番号のみの紐付けで未確認です。契約を確認して紐付けるとこの操作が可能になります。",
   'whatsapp.sgp.bound': '会話を契約 {contract} に紐付けました',
   'whatsapp.sgp.router': 'ルーターへのアクセス',
   'whatsapp.sgp.routerUnlinked': 'この契約に紐付いたONTはありません。',
@@ -5563,7 +5564,7 @@ const ja: Dictionary = {
   'receiptPage.failed': '現在、領収書を開けませんでした。しばらくしてからもう一度お試しください。',
   'receiptPage.openTab': '新しいタブで開く',
   'receiptPage.frameTitle': '領収書',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': 'サービスの稼働状況',
   'statusPage.subtitle': '現在の状況と過去 90 日間の稼働率。',
   'statusPage.failed': '稼働状況を読み込めませんでした。しばらくしてからもう一度お試しください。',
@@ -5647,7 +5648,7 @@ const ja: Dictionary = {
   'platform.status.form.notify': 'メールと WhatsApp でプロバイダーに通知する',
   'platform.status.form.notifyHint': '障害: 発生時と解決時。メンテナンス: 24 時間前と完了時。',
   'platform.status.form.submit': '公開',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': 'アフィリエイト',
   'signup.affiliate': 'アフィリエイト {code} 経由で登録しています。',
   'affiliates.title': 'アフィリエイト',
@@ -5757,7 +5758,7 @@ const ja: Dictionary = {
   'affiliatePortal.noCommissions': 'まだ手数料はありません。',
   'affiliatePortal.payouts': '支払い',
   'affiliatePortal.noPayouts': 'まだ支払いはありません。',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "アドオン",
   'charges.pricing.addon': "アドオン {name}：{total}",
   'charges.pricing.addonProration': "アドオン {name}（日割り）：{total}",

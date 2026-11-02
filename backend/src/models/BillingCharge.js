@@ -89,7 +89,7 @@ export const CHARGE_KINDS = Object.freeze(['renewal', 'proration', 'overage', 'a
  * (`ChargeIssuingService.emitProration`/`retryProrations`), pagamento que não
  * move `renews_at`, vencida deixa `past_due` (`proration_due_at`).
  */
-// E a pró-rata da ATIVAÇÃO de um add-on no meio do período (0126, `addon`):
+// E a pró-rata da ATIVAÇÃO de um add-on no meio do período (0127, `addon`):
 // avulsa como a da subida, pelo mesmo caminho.
 export const SIDE_CHARGE_KINDS = Object.freeze(['proration', 'overage', 'addon']);
 
@@ -103,7 +103,7 @@ export const isProration = (row) => SIDE_CHARGE_KINDS.includes(row?.kind);
 /** Se a linha é a fatura de só excedente (0105). */
 export const isOverageCharge = (row) => row?.kind === 'overage';
 
-/** Se a linha é a pró-rata da ativação de um add-on (0126). */
+/** Se a linha é a pró-rata da ativação de um add-on (0127). */
 export const isAddonCharge = (row) => row?.kind === 'addon';
 
 /**
@@ -315,7 +315,7 @@ class BillingCharge {
   }
 
   /**
-   * A chave (`period_end`) da pró-rata da ATIVAÇÃO de um add-on (0126): `a` e
+   * A chave (`period_end`) da pró-rata da ATIVAÇÃO de um add-on (0127): `a` e
    * nove dígitos hexadecimais do hash de "qual add-on, em qual período" — o
    * mesmo desenho de `prorationKey`, num espaço de nomes próprio (o prefixo e
    * o texto do hash), para nunca colidir com a da subida de plano. O `a` fica
@@ -451,7 +451,7 @@ class BillingCharge {
     if (!detalhe) return null;
     return {
       ...(isOverageCharge(linha) ? { overage: true, slices: Array.isArray(detalhe.slices) ? detalhe.slices : [] } : {}),
-      // A pró-rata da ativação de um add-on (0126): qual, e o preço cheio dele.
+      // A pró-rata da ativação de um add-on (0127): qual, e o preço cheio dele.
       ...(isAddonCharge(linha) ? {
         addon: { code: detalhe.addonCode ?? null, name: detalhe.addonName ?? null, priceCents: detalhe.priceCents ?? null }
       } : {}),
@@ -740,7 +740,7 @@ class BillingCharge {
   }
 
   /**
-   * Os add-ons cobrados na linha (0126): `[{ code, name, cents }]` — na
+   * Os add-ons cobrados na linha (0127): `[{ code, name, cents }]` — na
    * renovação, os recorrentes do período; na pró-rata de ativação, o valor
    * proporcional (`proration: true`). Vazio sem nenhum. Nunca lança.
    */
@@ -792,7 +792,7 @@ class BillingCharge {
         ...(item.kind ? { kind: item.kind } : {})
       })),
       overageCents: BillingCharge.overageCentsOf(linha),
-      // Os add-ons (0126), por cima do preço do plano — o cupom não vale neles.
+      // Os add-ons (0127), por cima do preço do plano — o cupom não vale neles.
       addons: BillingCharge.addonsOf(linha),
       addonCents: BillingCharge.addonCentsOf(linha),
       creditCents: Number.isFinite(credit) && credit > 0 ? credit : 0
@@ -848,7 +848,7 @@ class BillingCharge {
    */
   static async cancelUnissuedProrations({ reason = 'not_billable', now = new Date() } = {}) {
     const changed = await tdb('billing_charges')
-      // A pró-rata do add-on (0126) segue a da subida: parada por gente, a
+      // A pró-rata do add-on (0127) segue a da subida: parada por gente, a
       // diferença não vai mais ao gateway.
       .whereIn('kind', ['proration', 'addon'])
       .whereIn('status', ['pending', 'failed'])

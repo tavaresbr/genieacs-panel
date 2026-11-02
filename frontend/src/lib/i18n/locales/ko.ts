@@ -2696,6 +2696,7 @@ const ko: Dictionary = {
   'whatsapp.sgp.search': '검색',
   'whatsapp.sgp.bind': '계약 {contract}을(를) 이 대화에 연결',
   'whatsapp.sgp.bindFirst': "이 계약은 아직 이 대화에 연결되지 않았습니다. 청구서 전송, 잠금 해제, 티켓 열기를 하려면 먼저 연결하세요.",
+  'whatsapp.sgp.bindingUnverified': "문서 번호만으로 연결됨, 미확인. 계약을 확인하고 연결하면 이 작업이 가능합니다.",
   'whatsapp.sgp.bound': '대화가 계약 {contract}에 연결되었습니다',
   'whatsapp.sgp.router': '라우터 접속',
   'whatsapp.sgp.routerUnlinked': '이 계약에 연결된 ONT가 없습니다.',
@@ -5570,7 +5571,7 @@ const ko: Dictionary = {
   'receiptPage.failed': '지금은 영수증을 열 수 없습니다. 잠시 후 다시 시도하세요.',
   'receiptPage.openTab': '새 탭에서 열기',
   'receiptPage.frameTitle': '영수증',
-  // A página de status (0127): a página pública /status e a aba Status do console.
+  // A página de status (0128): a página pública /status e a aba Status do console.
   'statusPage.title': '서비스 상태',
   'statusPage.subtitle': '현재 상태와 최근 90일 가용성.',
   'statusPage.failed': '지금은 상태를 불러올 수 없습니다. 잠시 후 다시 시도하세요.',
@@ -5654,7 +5655,7 @@ const ko: Dictionary = {
   'platform.status.form.notify': '이메일과 WhatsApp으로 공급자에게 알리기',
   'platform.status.form.notifyHint': '장애: 발생 시와 해결 시. 점검: 24시간 전과 완료 시.',
   'platform.status.form.submit': '게시',
-  // O programa de afiliados (0125): o console, o portal e o cadastro com ?aff=.
+  // O programa de afiliados (0126): o console, o portal e o cadastro com ?aff=.
   'platform.tabs.affiliates': '제휴 파트너',
   'signup.affiliate': '제휴 파트너 {code}을(를) 통해 가입하고 있습니다.',
   'affiliates.title': '제휴 파트너',
@@ -5764,7 +5765,7 @@ const ko: Dictionary = {
   'affiliatePortal.noCommissions': '아직 수수료가 없습니다.',
   'affiliatePortal.payouts': '지급',
   'affiliatePortal.noPayouts': '아직 지급이 없습니다.',
-  // Os add-ons pagos (0126)
+  // Os add-ons pagos (0127)
   'charges.addon': "애드온",
   'charges.pricing.addon': "애드온 {name}: {total}",
   'charges.pricing.addonProration': "애드온 {name}(일할): {total}",

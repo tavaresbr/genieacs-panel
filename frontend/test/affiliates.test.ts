@@ -4,7 +4,7 @@ import {
 } from '@/lib/affiliates'
 import en from '@/lib/i18n/locales/en'
 
-describe('o programa de afiliados na tela (0125)', () => {
+describe('o programa de afiliados na tela (0126)', () => {
   it('lê o código do link como o servidor, sempre com o prefixo', () => {
     expect(affiliateCodeFromQuery(' a-ab12cd ')).toBe('A-AB12CD')
     expect(affiliateCodeFromQuery('ab12cd')).toBe('A-AB12CD')

@@ -200,9 +200,9 @@ Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **
 | `platform_audit` | a trilha do console sobre os provedores; nenhuma rotina a poda |
 | `platform_alerts` | a fila dos avisos do console; o `payload` é texto sobre fatos de provedores e seu conteúdo não foi auditado campo a campo; nenhuma rotina a poda |
 | `tenants` | nas colunas `billing_*`, o cadastro fiscal do provedor (razão social, CNPJ/CPF, endereço, e-mail, telefone); fica enquanto o provedor existir |
-| `affiliates` | o cadastro do afiliado (nome, CPF/CNPJ, e-mail, chave Pix) e o hash da senha do portal (0125); fica enquanto o programa precisar pagá-lo e prestar contas, e nenhuma rotina o apaga |
-| `affiliate_commissions` | as comissões dos afiliados por pagamento de provedor indicado (0125); registro de dinheiro, nenhuma rotina o poda |
-| `affiliate_payouts` | os lotes mensais pagos aos afiliados, com a chave Pix usada em cada um (0125); registro de dinheiro, nenhuma rotina o poda |
+| `affiliates` | o cadastro do afiliado (nome, CPF/CNPJ, e-mail, chave Pix) e o hash da senha do portal (0126); fica enquanto o programa precisar pagá-lo e prestar contas, e nenhuma rotina o apaga |
+| `affiliate_commissions` | as comissões dos afiliados por pagamento de provedor indicado (0126); registro de dinheiro, nenhuma rotina o poda |
+| `affiliate_payouts` | os lotes mensais pagos aos afiliados, com a chave Pix usada em cada um (0126); registro de dinheiro, nenhuma rotina o poda |
 
 <!-- retention:end -->
 

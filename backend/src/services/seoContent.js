@@ -33,7 +33,7 @@ export const SEO_PAGES = Object.freeze({
     heading: 'Política de privacidade'
   },
   '/login': { noindex: true },
-  // A página de status (0127): se o serviço está no ar, a disponibilidade de
+  // A página de status (0128): se o serviço está no ar, a disponibilidade de
   // 90 dias e os incidentes. É o que se procura quando algo parece fora do ar.
   '/status': {
     title: `Status · ${PRODUCT_NAME}`,

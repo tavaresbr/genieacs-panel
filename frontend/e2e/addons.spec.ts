@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { ADMIN_STATE, DELTA_OWNER, consoleTabs, loginViaForm, shot } from './support/demo'
 
 /**
- * Os add-ons pagos (0126), de ponta a ponta: o console cria um no catálogo, e
+ * Os add-ons pagos (0127), de ponta a ponta: o console cria um no catálogo, e
  * o dono da Delta Link (cobrada por fora — nenhuma fatura vai ao gateway) o
  * vê na tela de Plano com a prévia da pró-rata, ativa e cancela.
  *

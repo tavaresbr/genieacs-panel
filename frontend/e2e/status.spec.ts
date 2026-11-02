@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { ADMIN_STATE, consoleTabs, shot } from './support/demo'
 
 /**
- * A página de status (0127): o console abre um incidente, a página pública
+ * A página de status (0128): o console abre um incidente, a página pública
  * `/status` o mostra em andamento, o console o resolve e ele vai para o
  * histórico.
  */

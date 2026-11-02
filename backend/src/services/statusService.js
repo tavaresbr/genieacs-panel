@@ -7,7 +7,7 @@ import { log } from '../utils/logger.js';
 import { acquireLease } from './schedulerLease.js';
 
 /**
- * A página de status da plataforma (0127).
+ * A página de status da plataforma (0128).
  *
  * Três partes, e cada uma tem uma regra que não se dobra:
  *

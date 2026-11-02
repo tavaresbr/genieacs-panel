@@ -687,7 +687,7 @@ class WaAlertService {
       if (!WhatsAppConfigService.isReady(config)) {
         reason = 'not_configured';
       } else if (!(await AddonService.allows('whatsapp'))) {
-        // Sem o add-on de WhatsApp (0126), quando o catálogo o exige: o
+        // Sem o add-on de WhatsApp (0127), quando o catálogo o exige: o
         // alerta sai pelo e-mail e pelo Telegram, que não dependem dele.
         reason = 'addon_required';
       } else {

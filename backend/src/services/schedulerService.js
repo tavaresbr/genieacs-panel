@@ -230,13 +230,13 @@ class SchedulerService {
       .then(() => PlanPriceChangeService.schedulerPass().catch((error) => {
         console.warn(`Could not run the plan price changes: ${error.message}`);
       }))
-      // A página de status (0127): as verificações de minuto em minuto, a
+      // A página de status (0128): as verificações de minuto em minuto, a
       // manutenção vencida encerrada e o aviso aos provedores. Fora do laço
       // por provedor — é do serviço, não de um deles. Nunca lança.
       .then(() => StatusService.schedulerPass().catch((error) => {
         console.warn(`Could not run the status checks: ${error.message}`);
       }))
-      // Os lotes mensais dos afiliados (0125): nos dias 1 a 3 monta (nunca
+      // Os lotes mensais dos afiliados (0126): nos dias 1 a 3 monta (nunca
       // aprova nem envia), e acompanha os Pix enviados. Acima dos provedores,
       // no máximo uma passada por hora. Nunca lança.
       .then(() => AffiliatePayoutService.schedulerPass().catch((error) => {

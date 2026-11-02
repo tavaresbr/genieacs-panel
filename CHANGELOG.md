@@ -7,6 +7,15 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.22.1] - 2026-11-02
+
+### Maintenance
+
+- Auditoria das ações sensíveis do WhatsApp: liberar, vincular, chamado, telefone, régua, campanha, opt-out, modelos e configuração (`0dc8cdf9`)
+- Let a server follow new releases on its own (`f205caf1`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/9648e04194d4...a2475fdd7354)
+
 ## [1.22.0] - 2026-11-02
 
 ### New

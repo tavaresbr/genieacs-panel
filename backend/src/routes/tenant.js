@@ -111,7 +111,7 @@ router.get('/geocode', authenticateToken, requirePermission('map.write'), Tenant
 router.get('/security', authenticateToken, requirePermission('settings.read'), TenantController.getSecurity);
 router.put('/security', authenticateToken, requirePermission('settings.write'), TenantController.updateSecurity);
 
-// Os add-ons pagos (0126) na tela de Plano: a vitrine com `settings.read`,
+// Os add-ons pagos (0127) na tela de Plano: a vitrine com `settings.read`,
 // como `/plans`; ativar e cancelar com `settings.write`, como a troca de
 // plano. O `:code` é a chave do CATÁLOGO (`addons`, da plataforma) — a linha
 // que muda é sempre a do provedor em escopo, nunca a de um vizinho. DENTRO da
