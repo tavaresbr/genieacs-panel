@@ -128,6 +128,12 @@ class WhatsAppBillingController {
         metaHeader: body.metaHeader,
         metaButtonParam: body.metaButtonParam
       });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_TEMPLATE_CHANGED,
+        subjectType: 'template',
+        subjectId: template?.id != null ? String(template.id) : null,
+        detail: { op: 'create', category: body.category ?? null }
+      });
       return res.status(201).json(createResponse(req.t('whatsapp.templates.created'), template));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.saveFailed');
@@ -174,6 +180,12 @@ class WhatsAppBillingController {
         metaHeader: body.metaHeader,
         metaButtonParam: body.metaButtonParam
       });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_TEMPLATE_CHANGED,
+        subjectType: 'template',
+        subjectId: String(req.params.id),
+        detail: { op: 'update', active: body.active ?? null }
+      });
       return res.json(createResponse(req.t('whatsapp.templates.updated'), template));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.saveFailed');
@@ -192,6 +204,12 @@ class WhatsAppBillingController {
   static async saveMetaNoticeBindings(req, res) {
     try {
       const saved = await WaMetaTemplateService.saveNoticeBindings(req.body ?? {});
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_META_SETTINGS_SAVED,
+        subjectType: 'meta_settings',
+        subjectId: null,
+        detail: { kind: 'notice_bindings' }
+      });
       return res.json(createResponse(req.t('whatsapp.metaTemplates.bindingsSaved'), saved));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.saveFailed');
@@ -220,6 +238,12 @@ class WhatsAppBillingController {
   static async saveMetaPrices(req, res) {
     try {
       const saved = await WaMetaUsageService.savePrices(req.body ?? {});
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_META_SETTINGS_SAVED,
+        subjectType: 'meta_settings',
+        subjectId: null,
+        detail: { kind: 'prices' }
+      });
       return res.json(createResponse(req.t('whatsapp.metaUsage.pricesSaved'), saved));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.saveFailed');
@@ -229,6 +253,12 @@ class WhatsAppBillingController {
   static async deleteTemplate(req, res) {
     try {
       await WaTemplateService.remove(req.params.id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_TEMPLATE_CHANGED,
+        subjectType: 'template',
+        subjectId: String(req.params.id),
+        detail: { op: 'delete' }
+      });
       return res.json(createResponse(req.t('whatsapp.templates.deleted')));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.deleteFailed');
@@ -324,6 +354,12 @@ class WhatsAppBillingController {
       if (!row) {
         return res.status(404).json(createErrorResponse(req.t('common.routeNotFound')));
       }
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_OPT_OUT_CHANGED,
+        subjectType: 'opt_out',
+        subjectId: String(row.id),
+        detail: { revoked: true }
+      });
       return res.json(createResponse(req.t('whatsapp.optOut.revoked'), publicOptOut(row)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.optOut.failed');
@@ -389,6 +425,12 @@ class WhatsAppBillingController {
         req.params.contract,
         req.body?.phone
       );
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CONTRACT_PHONE_SAVED,
+        subjectType: 'contract',
+        subjectId: String(req.params.contract),
+        detail: { contract: String(req.params.contract) }
+      });
       return res.json(createResponse(req.t('whatsapp.phoneSaved'), subscriber));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.phoneSaveFailed');
@@ -526,6 +568,12 @@ class WhatsAppBillingController {
       await WaDunningService.assertCanRun();
       void WaDunningService.run({ manual: true }).catch((error) => {
         console.warn(`[wa] régua: passada manual falhou: ${error.code || error.message}`);
+      });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_DUNNING_RUN,
+        subjectType: 'dunning',
+        subjectId: null,
+        detail: { manual: true }
       });
       return res.status(202).json(createResponse(req.t('whatsapp.dunning.runStarted'), { started: true }));
     } catch (error) {
@@ -672,6 +720,12 @@ class WhatsAppBillingController {
   static async setBroadcastStatus(req, res) {
     try {
       const broadcast = await WaBroadcastService.setStatus(req.params.id, req.body?.status);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_BROADCAST_STATUS,
+        subjectType: 'broadcast',
+        subjectId: String(req.params.id),
+        detail: { status: String(req.body?.status ?? '') }
+      });
       return res.json(createResponse(req.t('whatsapp.broadcast.statusChanged'), broadcast));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.broadcast.statusFailed');
