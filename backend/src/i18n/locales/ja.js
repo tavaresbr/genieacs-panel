@@ -773,6 +773,7 @@ export default {
   'whatsapp.phoneSaved': '電話番号を保存しました',
   'whatsapp.phoneSaveFailed': '電話番号を保存できませんでした',
   'whatsapp.error.invalidPhone': '使用できる電話番号の形式ではないようです',
+  'whatsapp.error.bindingUnverified': "この紐付けはお客様が入力した書類番号だけで行われています。電話番号を保存する前に、お客様に契約を確認し、ここで紐付けてください。",
   'whatsapp.error.invalidOptOutCategories': "配信停止の設定に有効なメッセージの種類を選んでください",
   'whatsapp.error.subscriberNotFound': 'その契約番号の加入者が見つかりません',
   'whatsapp.contactsLoaded': '連絡先 {count} 件',

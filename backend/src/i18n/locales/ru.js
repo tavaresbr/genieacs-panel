@@ -782,6 +782,7 @@ export default {
   'whatsapp.phoneSaved': 'Номер телефона сохранён',
   'whatsapp.phoneSaveFailed': 'Не удалось сохранить номер телефона',
   'whatsapp.error.invalidPhone': 'Это не похоже на пригодный номер телефона',
+  'whatsapp.error.bindingUnverified': "Эта привязка сделана только по документу, введённому клиентом. Подтвердите договор у клиента и привяжите его здесь, прежде чем сохранять телефон.",
   'whatsapp.error.invalidOptOutCategories': "Выберите допустимые типы сообщений для записи «не беспокоить»",
   'whatsapp.error.subscriberNotFound': 'Абонент с таким договором не найден',
   'whatsapp.contactsLoaded': 'Контактов: {count}',

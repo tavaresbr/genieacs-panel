@@ -637,7 +637,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                 </div>
               )}
 
-              {canAct && contract && contract !== attendance.contract && (
+              {canAct && contract && (contract !== attendance.contract || attendance.boundVia === 'document') && (
                 <button
                   type="button"
                   className="modern-button mt-2 w-full"
@@ -650,6 +650,9 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
               )}
               {canAct && unbound && (
                 <p className="mt-1.5 text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.sgp.bindFirst')}</p>
+              )}
+              {canAct && !unbound && attendance.boundVia === 'document' && (
+                <p className="mt-1.5 text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.sgp.bindingUnverified')}</p>
               )}
             </Card>
 

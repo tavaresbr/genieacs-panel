@@ -780,6 +780,7 @@ export default {
   'whatsapp.phoneSaved': '電話號碼已儲存',
   'whatsapp.phoneSaveFailed': '無法儲存電話號碼',
   'whatsapp.error.invalidPhone': '這不像是一個可用的電話號碼',
+  'whatsapp.error.bindingUnverified': "此綁定僅憑客戶輸入的證件號完成。儲存電話前,請與客戶確認合約並在此綁定。",
   'whatsapp.error.invalidOptOutCategories': "請為免打擾項目選擇有效的訊息類型",
   'whatsapp.error.subscriberNotFound': '找不到使用該合約的用戶',
   'whatsapp.contactsLoaded': '{count} 位聯絡人',

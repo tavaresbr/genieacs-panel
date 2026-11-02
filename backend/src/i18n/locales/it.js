@@ -779,6 +779,7 @@ export default {
   'whatsapp.phoneSaved': 'Telefono salvato',
   'whatsapp.phoneSaveFailed': 'Non è stato possibile salvare il telefono',
   'whatsapp.error.invalidPhone': 'Non sembra un telefono utilizzabile',
+  'whatsapp.error.bindingUnverified': "Questo collegamento è stato fatto solo con il codice fiscale digitato dal cliente. Conferma il contratto con il cliente e collegalo qui prima di salvare il telefono.",
   'whatsapp.error.invalidOptOutCategories': "Scegli tipi di comunicazione validi per l’elenco non disturbare",
   'whatsapp.error.subscriberNotFound': 'Nessun abbonato con quel contratto',
   'whatsapp.contactsLoaded': '{count} contatto/i',

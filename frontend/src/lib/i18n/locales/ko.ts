@@ -2696,6 +2696,7 @@ const ko: Dictionary = {
   'whatsapp.sgp.search': '검색',
   'whatsapp.sgp.bind': '계약 {contract}을(를) 이 대화에 연결',
   'whatsapp.sgp.bindFirst': "이 계약은 아직 이 대화에 연결되지 않았습니다. 청구서 전송, 잠금 해제, 티켓 열기를 하려면 먼저 연결하세요.",
+  'whatsapp.sgp.bindingUnverified': "문서 번호만으로 연결됨, 미확인. 계약을 확인하고 연결하면 이 작업이 가능합니다.",
   'whatsapp.sgp.bound': '대화가 계약 {contract}에 연결되었습니다',
   'whatsapp.sgp.router': '라우터 접속',
   'whatsapp.sgp.routerUnlinked': '이 계약에 연결된 ONT가 없습니다.',

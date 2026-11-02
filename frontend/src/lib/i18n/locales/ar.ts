@@ -2671,6 +2671,7 @@ const ar: Dictionary = {
   'whatsapp.sgp.search': 'بحث',
   'whatsapp.sgp.bind': 'ربط العقد {contract} بهذه المحادثة',
   'whatsapp.sgp.bindFirst': "هذا العقد غير مرتبط بهذه المحادثة بعد. اربطه لإرسال فاتورة أو الفك أو فتح تذكرة.",
+  'whatsapp.sgp.bindingUnverified': "ربط برقم الهوية فقط، غير موثّق. أكّد العقد واربطه للسماح بهذا الإجراء.",
   'whatsapp.sgp.bound': 'تم ربط المحادثة بالعقد {contract}',
   'whatsapp.sgp.router': 'الوصول إلى الراوتر',
   'whatsapp.sgp.routerUnlinked': 'لا يوجد ONT مرتبط بهذا العقد.',

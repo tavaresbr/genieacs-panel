@@ -2697,6 +2697,7 @@ const it: Dictionary = {
   'whatsapp.sgp.search': 'Cerca',
   'whatsapp.sgp.bind': 'Collega il contratto {contract} a questa conversazione',
   'whatsapp.sgp.bindFirst': "Questo contratto non è ancora collegato a questa conversazione. Collegalo per inviare una fattura, sbloccare o aprire un ticket.",
+  'whatsapp.sgp.bindingUnverified': "Collegato solo con il codice fiscale, non verificato. Conferma e collega il contratto per consentire questa azione.",
   'whatsapp.sgp.bound': 'Conversazione collegata al contratto {contract}',
   'whatsapp.sgp.router': 'Accesso al router',
   'whatsapp.sgp.routerUnlinked': 'Nessuna ONT collegata a questo contratto.',

@@ -2690,6 +2690,7 @@ const ja: Dictionary = {
   'whatsapp.sgp.search': '検索',
   'whatsapp.sgp.bind': '契約 {contract} をこの会話に紐付ける',
   'whatsapp.sgp.bindFirst': "この契約はまだこの会話に関連付けられていません。請求書の送信、解除、チケット作成には関連付けが必要です。",
+  'whatsapp.sgp.bindingUnverified': "書類番号のみの紐付けで未確認です。契約を確認して紐付けるとこの操作が可能になります。",
   'whatsapp.sgp.bound': '会話を契約 {contract} に紐付けました',
   'whatsapp.sgp.router': 'ルーターへのアクセス',
   'whatsapp.sgp.routerUnlinked': 'この契約に紐付いたONTはありません。',

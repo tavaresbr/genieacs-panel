@@ -782,6 +782,7 @@ export default {
   'whatsapp.phoneSaved': 'Telefonnummer gespeichert',
   'whatsapp.phoneSaveFailed': 'Die Telefonnummer konnte nicht gespeichert werden',
   'whatsapp.error.invalidPhone': 'Das sieht nicht nach einer nutzbaren Telefonnummer aus',
+  'whatsapp.error.bindingUnverified': "Diese Verknüpfung beruht nur auf der vom Kunden eingegebenen Steuernummer. Bestätigen Sie den Vertrag beim Kunden und verknüpfen Sie ihn hier, bevor Sie das Telefon speichern.",
   'whatsapp.error.invalidOptOutCategories': "Wähle gültige Nachrichtentypen für den Nicht-stören-Eintrag",
   'whatsapp.error.subscriberNotFound': 'Kein Teilnehmer mit diesem Vertrag',
   'whatsapp.contactsLoaded': '{count} Kontakt(e)',

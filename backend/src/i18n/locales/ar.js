@@ -780,6 +780,7 @@ export default {
   'whatsapp.phoneSaved': 'تم حفظ رقم الهاتف',
   'whatsapp.phoneSaveFailed': 'تعذّر حفظ رقم الهاتف',
   'whatsapp.error.invalidPhone': 'هذا لا يبدو رقم هاتف صالحًا',
+  'whatsapp.error.bindingUnverified': "تم هذا الربط برقم الهوية الذي كتبه العميل فقط. أكّد العقد مع العميل واربطه هنا قبل حفظ الهاتف.",
   'whatsapp.error.invalidOptOutCategories': "اختر أنواع رسائل صالحة لقائمة عدم الإزعاج",
   'whatsapp.error.subscriberNotFound': 'لا يوجد مشترك بهذا العقد',
   'whatsapp.contactsLoaded': '{count} جهة اتصال',

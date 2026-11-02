@@ -778,6 +778,7 @@ export default {
   'whatsapp.phoneSaved': 'Teléfono guardado',
   'whatsapp.phoneSaveFailed': 'No se pudo guardar el teléfono',
   'whatsapp.error.invalidPhone': 'Eso no parece un teléfono utilizable',
+  'whatsapp.error.bindingUnverified': "Este vínculo se hizo solo con el documento que escribió el cliente. Confirme el contrato con el cliente y vincúlelo aquí antes de guardar el teléfono.",
   'whatsapp.error.invalidOptOutCategories': "Elige tipos de comunicación válidos para la lista de no molestar",
   'whatsapp.error.subscriberNotFound': 'Ningún suscriptor con ese contrato',
   'whatsapp.contactsLoaded': '{count} contacto(s)',

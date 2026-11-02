@@ -5770,6 +5770,8 @@ export interface WaSubscriberAttendance {
   deviceId: string | null
   /** The client with no contract this thread is bound to, by its `c:<id>` key. */
   registration?: string | null
+  /** `document`: linked only by the tax ID the customer typed, not verified. */
+  boundVia?: 'document' | null
 }
 
 /** An SGP client with no contract, found by CPF/CNPJ, that a thread can be bound to. */
