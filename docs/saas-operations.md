@@ -414,6 +414,18 @@ pg_dump "$DATABASE_URL" --format=custom --file="skygp-$(date -u +%F).dump"
 createdb skygp_restore && pg_restore --dbname=skygp_restore --no-owner skygp-2026-09-10.dump
 ```
 
+### Avisos de backup e certificado
+
+O painel pode avisar quem opera a plataforma (destinos em Configurações → Dados do SaaS,
+eventos "Backup atrasado" e "Certificado perto de vencer", desligados por padrão) — mas só
+sabe olhar onde você mandar, por duas variáveis de ambiente:
+
+- `SKYGP_BACKUP_DIR`: o mesmo diretório do `skygenpanel-backup`. Avisa, uma vez por dia, quando
+  o `manifest.json` mais novo tem mais de 36 h ou não existe nenhum. Sem a variável, não confere nada.
+- `SKYGP_CERT_HOSTS`: lista separada por vírgula de `host` ou `host:porta`. Avisa, uma vez por
+  host por dia, quando o certificado vence em menos de 14 dias (ou já venceu). Quem não responde
+  não avisa. Sem a variável, não confere nada.
+
 ### O que o painel agenda sozinho
 
 A tabela acima descreve a edição hospedada, onde o Postgres é gerenciado e o snapshot é do

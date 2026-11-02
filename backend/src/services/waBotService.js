@@ -492,6 +492,16 @@ async function responderLiberacao(link, conversation) {
     // Recusa do SGP (já usada no mês, contrato que não aceita) é resposta,
     // não falha: o assinante sabe o que houve e como falar com alguém.
     if (error?.code === 'unlock_refused') return t('whatsapp.bot.unlockRefused');
+    // Rede e credencial já avisam pelo próprio SGP; aqui é o SGP que respondeu
+    // com erro ao desbloqueio. O cliente foi para um atendente: a equipe também precisa saber.
+    if (!['unreachable', 'timeout', 'unauthorized'].includes(error?.code)) {
+      void import('./waAlertService.js').then(({ default: WaAlertService }) => WaAlertService.notifyThrottled({
+        stampKey: 'wa_unlock_failed_alert_at',
+        rule: 'wa_unlock_failed',
+        subject: String(error?.code || 'error'),
+        vars: { reason: String(error?.code || 'error') }
+      })).catch(() => {});
+    }
     throw error;
   }
   await AuditLog.record({

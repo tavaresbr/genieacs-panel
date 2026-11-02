@@ -257,7 +257,7 @@ class WaAiService {
     } catch (error) {
       const code = error?.code && String(error.code).startsWith('ai_') ? error.code : 'ai_failed';
       console.warn(`[wa] IA: conversa ${conversation.id}: ${code}${code === 'ai_failed' ? ` (${error?.message})` : ''}`);
-      await WaBotConfigService.recordAiError(code, error?.details);
+      await WaBotConfigService.recordAiError(code, error?.details, { automatico: true });
       return null;
     }
   }

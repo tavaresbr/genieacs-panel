@@ -1483,6 +1483,27 @@ class SgpService {
   }
 
   /**
+   * Avisa a equipe (canais dos alertas) que o SGP não responde ou recusou a
+   * credencial do painel. No máximo um aviso a cada 6 h por tipo, e SEM esperar:
+   * quem chamou já está recebendo o erro, e um canal lento não pode atrasá-lo.
+   * Só com a configuração gravada (testes de conexão da tela passam a deles).
+   * Nunca lança.
+   */
+  static avisarFalha(code) {
+    const regra = code === 'unauthorized' ? 'sgp_unauthorized' : 'sgp_down';
+    void import('./waAlertService.js').then(async ({ default: WaAlertService }) => {
+      await WaAlertService.notifyThrottled({
+        stampKey: `${regra}_alert_at`,
+        rule: regra,
+        subject: code,
+        vars: { reason: code, link: await WaAlertService.settingsLink('sgp').catch(() => '') }
+      });
+    }).catch((error) => {
+      console.warn(`SGP: aviso ${regra} não enviado: ${error?.message || error}`);
+    });
+  }
+
+  /**
    * @param {object} [limits] - `listing: true` for the client listing: its own
    *   deadline and body ceiling, and errors that say it was the listing.
    */
@@ -1528,6 +1549,7 @@ class SgpService {
       // reflects — the exact shape this guard exists to close.
       if (error instanceof SgpError) throw error;
       if (error.name === 'AbortError' || controller.signal.aborted) {
+        if (!configOverride) this.avisarFalha('timeout');
         throw new SgpError(listing ? 'sgp.error.contactsListTimeout' : 'sgp.error.timeout', {
           vars: listing ? { seconds: Math.round(timeoutMs / 1000) } : undefined,
           code: 'timeout',
@@ -1540,6 +1562,7 @@ class SgpService {
           status: 502
         });
       }
+      if (!configOverride) this.avisarFalha('unreachable');
       throw new SgpError('sgp.error.unreachable', {
         code: 'unreachable',
         status: 502,
@@ -1558,6 +1581,7 @@ class SgpService {
     }
 
     if (response.status === 401 || response.status === 403) {
+      if (!configOverride) this.avisarFalha('unauthorized');
       throw new SgpError('sgp.error.credentialsRejected', {
         code: 'unauthorized',
         status: 502

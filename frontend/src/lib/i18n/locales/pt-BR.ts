@@ -4455,6 +4455,8 @@ const ptBR: Dictionary = {
   'platform.alerts.event.nfse_error': 'Erro na NFS-e',
   'platform.alerts.event.auto_suspended': 'Suspensão automática',
   'platform.alerts.event.big_overdue': 'Atraso alto (acima do limite)',
+  'platform.alerts.event.backup_stale': 'Backup atrasado',
+  'platform.alerts.event.cert_expiring': 'Certificado perto de vencer',
   'platform.alerts.threshold': 'Limite do atraso alto (R$)',
   'platform.alerts.thresholdHint': 'Avisa quando um provedor passa deste valor em atraso — uma vez por período de atraso.',
   'platform.alerts.thresholdInvalid': 'Informe um valor maior que zero.',

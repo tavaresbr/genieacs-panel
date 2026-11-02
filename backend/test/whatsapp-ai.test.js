@@ -18,6 +18,7 @@ const { default: WaBotConfigService } = await import('../src/services/waBotConfi
 const { default: WaAiService } = await import('../src/services/waAiService.js');
 const { default: WaBotService } = await import('../src/services/waBotService.js');
 const { default: WaAlertService } = await import('../src/services/waAlertService.js');
+const { default: SgpService } = await import('../src/services/sgpService.js');
 
 /**
  * O atendimento por IA: a IA fala dentro das travas do bot, só sabe da conta
@@ -554,6 +555,182 @@ describe('a IA atendendo', () => {
       WaAlertService.notifyEvent = original;
       await asTenant(() => WaBotConfigService.recordAiError(null));
     }
+  });
+
+  describe('avisos da IA para a equipe', () => {
+    let original;
+    let avisos;
+    beforeEach(() => {
+      original = WaAlertService.notifyEvent;
+      avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    });
+    const restaurar = () => { WaAlertService.notifyEvent = original; };
+    const limparCarimbos = () => asTenant(() => getDb()('app_state')
+      .whereIn('key', ['wa_ai_credit_alert_at', 'wa_ai_key_alert_at', 'wa_ai_daily_summary_day']).del());
+
+    it('chave recusada no atendimento automático avisa (6 h); na tela, não', async () => {
+      try {
+        await limparCarimbos();
+        await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized'));
+        assert.equal(avisos.length, 0, 'na tela o operador já vê o erro');
+        await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized', 'HTTP 401', { automatico: true }));
+        await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized', 'HTTP 401', { automatico: true }));
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_ai_key_rejected');
+        assert.match(WaAlertService.compose({ rule: 'wa_ai_key_rejected', vars: avisos[0].vars }, false), /recusada/);
+      } finally { restaurar(); await asTenant(() => WaBotConfigService.recordAiError(null)); }
+    });
+
+    it('crédito voltou: avisa na 1ª resposta boa depois do aviso, e rearma o próximo esgotamento', async () => {
+      try {
+        await limparCarimbos();
+        await asTenant(() => WaBotConfigService.recordAiError(null));
+        assert.equal(avisos.length, 0, 'sem aviso de crédito antes, nada a dizer');
+        await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance'));
+        assert.equal(avisos.at(-1).rule, 'wa_ai_no_credit');
+        await asTenant(() => WaBotConfigService.recordAiError(null));
+        assert.equal(avisos.at(-1).rule, 'wa_ai_credit_back');
+        const antes = avisos.length;
+        await asTenant(() => WaBotConfigService.recordAiError(null));
+        assert.equal(avisos.length, antes, 'só uma vez');
+        await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance'));
+        assert.equal(avisos.at(-1).rule, 'wa_ai_no_credit', 'o carimbo foi limpo: avisa de novo na hora');
+      } finally { restaurar(); await asTenant(() => WaBotConfigService.recordAiError(null)); }
+    });
+
+    it('resumo diário: só com IA ligada e atividade, uma vez por dia, a partir das 8h', async () => {
+      try {
+        await limparCarimbos();
+        const conversa = await conversaDe(ASSINANTE);
+        const ligada = (await asTenant(() => WaBotConfigService.getConfig())).ai.enabled;
+        // Ao meio-dia do fuso (America/Sao_Paulo = UTC-3): 15:00Z.
+        const meioDia = new Date('2026-10-20T15:00:00Z');
+        const cedo = new Date('2026-10-20T10:00:00Z'); // 07:00 local
+        await asTenant(() => getDb()('wa_bot_events').insert([
+          { conversation_id: conversa.id, intent: 'fatura', created_at: new Date(meioDia.getTime() - 3600_000), tenant_id: conversa.tenant_id },
+          { conversation_id: conversa.id, intent: 'lead', created_at: new Date(meioDia.getTime() - 1800_000), tenant_id: conversa.tenant_id },
+          { conversation_id: conversa.id, intent: 'atendente', created_at: new Date(meioDia.getTime() - 900_000), tenant_id: conversa.tenant_id }
+        ]));
+        assert.equal(ligada, true, 'a IA está ligada neste cenário');
+        assert.equal(await asTenant(() => WaAlertService.aiDailySummary({ now: cedo })), 0, 'antes das 8h não sai');
+        assert.equal(avisos.length, 0);
+        await asTenant(() => WaAlertService.aiDailySummary({ now: meioDia }));
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_ai_daily_summary');
+        assert.equal(avisos[0].vars.replies >= 3, true);
+        assert.equal(avisos[0].vars.leads >= 1, true);
+        assert.equal(avisos[0].vars.handoffs >= 1, true);
+        await asTenant(() => WaAlertService.aiDailySummary({ now: meioDia }));
+        assert.equal(avisos.length, 1, 'uma vez por dia');
+      } finally { restaurar(); }
+    });
+  });
+
+  describe('avisos do SGP para a equipe', () => {
+    let original;
+    let avisos;
+    beforeEach(() => {
+      original = WaAlertService.notifyEvent;
+      avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    });
+    const restaurar = () => { WaAlertService.notifyEvent = original; };
+    const esperar = async (condicao) => {
+      for (let i = 0; i < 100 && !condicao(); i += 1) await new Promise((r) => { setTimeout(r, 10); });
+    };
+    const limpar = () => asTenant(() => getDb()('app_state')
+      .whereIn('key', ['sgp_down_alert_at', 'sgp_unauthorized_alert_at', 'wa_unlock_failed_alert_at']).del());
+
+    it('SGP fora do ar / credencial recusada: um aviso por tipo a cada 6 h, sem travar quem chamou', async () => {
+      try {
+        await limpar();
+        await asTenant(async () => {
+          SgpService.avisarFalha('unreachable');
+          SgpService.avisarFalha('timeout');
+          SgpService.avisarFalha('unauthorized');
+        });
+        await esperar(() => avisos.length >= 2);
+        assert.deepEqual(avisos.map((a) => a.rule).sort(), ['sgp_down', 'sgp_unauthorized']);
+        assert.match(WaAlertService.compose({ rule: 'sgp_down', vars: { reason: 'timeout', link: '' } }, false), /SGP/);
+      } finally { restaurar(); }
+    });
+
+    it('desbloqueio que falha por erro do SGP avisa; recusa de regra e rede não', async () => {
+      const guardados = { cfg: WhatsAppConfigService.getConfig, lookup: SgpService.lookupContacts, unlock: SgpService.requestTrustUnlock };
+      try {
+        await limpar();
+        WhatsAppConfigService.getConfig = async () => ({ botUnlockEnabled: true });
+        SgpService.lookupContacts = async () => [{ contract: CONTRACT, blocked: true }];
+        const tentar = async (code) => {
+          SgpService.requestTrustUnlock = async () => { throw Object.assign(new Error(code), { code }); };
+          await asTenant(() => WaBotService.textoLiberacao({ contract: CONTRACT }, { id: 1 })).catch(() => {});
+          await new Promise((r) => { setTimeout(r, 50); });
+        };
+        await tentar('unlock_refused');
+        await tentar('unreachable');
+        assert.equal(avisos.length, 0, 'recusa de regra e rede não geram este aviso');
+        await tentar('http_error');
+        await esperar(() => avisos.length >= 1);
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_unlock_failed');
+        await tentar('sgp_rejected');
+        assert.equal(avisos.length, 1, 'dentro das 6 h não repete');
+      } finally {
+        WhatsAppConfigService.getConfig = guardados.cfg;
+        SgpService.lookupContacts = guardados.lookup;
+        SgpService.requestTrustUnlock = guardados.unlock;
+        restaurar();
+      }
+    });
+  });
+
+  describe('avisos de operação para a equipe', () => {
+    let original;
+    let avisos;
+    beforeEach(() => {
+      original = WaAlertService.notifyEvent;
+      avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    });
+    const restaurar = () => { WaAlertService.notifyEvent = original; };
+    const limpar = () => asTenant(() => getDb()('app_state')
+      .whereIn('key', ['genieacs_down_alert_at', 'wa_outbox_stuck_alert_at']).del());
+
+    it('GenieACS sem resposta avisa (6 h); GenieACS não configurado não é falha', async () => {
+      try {
+        await limpar();
+        await asTenant(() => WaAlertService.avisarGenieAcs(new Error('GenieACS URL not configured')));
+        assert.equal(avisos.length, 0);
+        await asTenant(() => WaAlertService.avisarGenieAcs(new Error('GenieACS responded with status: 502')));
+        await asTenant(() => WaAlertService.avisarGenieAcs(new Error('GenieACS responded with status: 502')));
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'genieacs_down');
+        assert.match(WaAlertService.compose({ rule: 'genieacs_down', vars: avisos[0].vars }, false), /GenieACS/);
+      } finally { restaurar(); }
+    });
+
+    it('fila do WhatsApp travada: só mensagens antigas, sem external_id, e um aviso a cada 2 h', async () => {
+      try {
+        await limpar();
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'Oi!' }];
+        await receber(DESCONHECIDO, 'oi');
+        const conversa = await conversaDe(DESCONHECIDO);
+        assert.equal(await asTenant(() => WaAlertService.avisarFilaTravada()), 0, 'sem nada parado, sem aviso');
+        const velha = new Date(Date.now() - 40 * 60_000);
+        await asTenant(() => getDb()('wa_messages').insert({
+          conversation_id: conversa.id, direction: 'out', body: 'preso', is_note: false, delivery_status: 'queued',
+          source: 'campaign', created_at: velha, updated_at: velha, tenant_id: conversa.tenant_id
+        }));
+        await asTenant(() => WaAlertService.avisarFilaTravada());
+        await asTenant(() => WaAlertService.avisarFilaTravada());
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_outbox_stuck');
+        assert.equal(avisos[0].vars.count >= 1, true);
+        assert.match(WaAlertService.compose({ rule: 'wa_outbox_stuck', vars: avisos[0].vars }, false), /paradas na fila/);
+      } finally { restaurar(); }
+    });
   });
 
   it('a fatura: o texto da IA e o PIX literal do SGP', async () => {

@@ -680,4 +680,53 @@ describe('os ganchos', () => {
     assert.deepEqual(r, { checked: false, reason: 'disabled' });
     assert.equal((await alertsConfig()).events.big_overdue.enabled, false);
   });
+
+  it('backup_stale: sem backup recente avisa uma vez por dia; com backup novo, não', async () => {
+    const fs = await import('node:fs/promises');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    await ligar({ backup_stale: ['email'] });
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'skygp-bkp-'));
+    try {
+      const agora = new Date('2030-03-10T12:00:00Z');
+      assert.deepEqual(await PlatformAlertService.checkBackup({ now: agora, dir: '' }), { checked: false, reason: 'not_configured' });
+      await fs.mkdir(path.join(dir, '2030-03-10T03'));
+      const manifest = path.join(dir, '2030-03-10T03', 'manifest.json');
+      await fs.writeFile(manifest, '{}');
+      await fs.utimes(manifest, agora, new Date(agora.getTime() - 2 * 3_600_000));
+      assert.equal((await PlatformAlertService.checkBackup({ now: agora, dir })).enqueued, 0);
+      // Dois dias depois, o mesmo backup já passou das 36 h.
+      const depois = new Date(agora.getTime() + 2 * DIA);
+      await PlatformAlertService.checkBackup({ now: depois, dir });
+      await PlatformAlertService.checkBackup({ now: new Date(depois.getTime() + 3_600_000), dir });
+      const linhas = await doEvento('backup_stale');
+      assert.equal(linhas.length, 1);
+      assert.equal(JSON.parse(linhas[0].payload).hours >= 36, true);
+      await PlatformAlertService.processDue({ now: new Date() });
+      assert.match(enviados.at(-1).text, /hora\(s\)/);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+      await getDb()('platform_alerts').where({ event: 'backup_stale' }).del();
+    }
+  });
+
+  it('cert_expiring: avisa o host perto de vencer, uma vez por dia', async () => {
+    await ligar({ cert_expiring: ['email'] });
+    const original = PlatformAlertService.certDaysLeft;
+    try {
+      const agora = new Date('2030-03-10T12:00:00Z');
+      PlatformAlertService.certDaysLeft = async (alvo) => (alvo === 'ok.example' ? 60 : 5);
+      assert.deepEqual(await PlatformAlertService.checkCertificates({ now: agora, hosts: '' }), { checked: false, reason: 'not_configured' });
+      await PlatformAlertService.checkCertificates({ now: agora, hosts: 'ok.example, perto.example' });
+      await PlatformAlertService.checkCertificates({ now: agora, hosts: 'ok.example, perto.example' });
+      const linhas = await doEvento('cert_expiring');
+      assert.equal(linhas.length, 1);
+      assert.equal(JSON.parse(linhas[0].payload).host, 'perto.example');
+      await PlatformAlertService.processDue({ now: new Date() });
+      assert.match(enviados.at(-1).text, /perto\.example.*5 dia/);
+    } finally {
+      PlatformAlertService.certDaysLeft = original;
+      await getDb()('platform_alerts').where({ event: 'cert_expiring' }).del();
+    }
+  });
 });

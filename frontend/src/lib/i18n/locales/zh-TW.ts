@@ -4456,6 +4456,8 @@ const zhTW: Dictionary = {
   'platform.alerts.event.nfse_error': 'NFS-e 錯誤',
   'platform.alerts.event.auto_suspended': '自動停用',
   'platform.alerts.event.big_overdue': '高額逾期（超過上限）',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': '高額逾期上限（R$）',
   'platform.alerts.thresholdHint': '當服務商的逾期金額超過此值時提醒——每個逾期週期一次。',
   'platform.alerts.thresholdInvalid': '請輸入大於零的金額。',

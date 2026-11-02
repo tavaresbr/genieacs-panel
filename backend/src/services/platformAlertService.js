@@ -193,9 +193,12 @@ function variaveis(payload) {
 export function renderAlert(linha) {
   const vars = variaveis(lerPayload(linha));
   const evento = linha.event;
+  let corpo = 'body';
+  if (evento === 'backup_stale' && vars.never === true) corpo = 'bodyNever';
+  if (evento === 'cert_expiring' && vars.expired === true) corpo = 'bodyExpired';
   return {
     subject: translate(DEFAULT_LOCALE, `platformAlert.${evento}.subject`, vars),
-    text: translate(DEFAULT_LOCALE, `platformAlert.${evento}.body`, vars)
+    text: translate(DEFAULT_LOCALE, `platformAlert.${evento}.${corpo}`, vars)
   };
 }
 
@@ -767,6 +770,113 @@ class PlatformAlertService {
   }
 
   /**
+   * `backup_stale`: o backup mais novo em `SKYGP_BACKUP_DIR` (um diretório por
+   * passada, cada um com `manifest.json`) tem mais de `BACKUP_STALE_HOURS`.
+   * Sem a variável, ou com o diretório ilegível, não há o que conferir. Um
+   * aviso por dia. Nunca lança.
+   */
+  static BACKUP_STALE_HOURS = 36;
+
+  static async checkBackup({ now = new Date(), config = null, dir = process.env.SKYGP_BACKUP_DIR } = {}) {
+    try {
+      if (!dir) return { checked: false, reason: 'not_configured' };
+      const regras = config ?? await alertsConfig();
+      if (!regras.events.backup_stale?.enabled) return { checked: false, reason: 'disabled' };
+      const fs = await import('node:fs/promises');
+      const path = await import('node:path');
+      let entradas;
+      try {
+        entradas = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        entradas = null;
+      }
+      let ultimo = 0;
+      for (const e of entradas ?? []) {
+        if (!e.isDirectory()) continue;
+        // eslint-disable-next-line no-await-in-loop -- poucos diretórios
+        const st = await fs.stat(path.join(dir, e.name, 'manifest.json')).catch(() => null);
+        if (st && st.mtimeMs > ultimo) ultimo = st.mtimeMs;
+      }
+      const horas = ultimo ? Math.floor((now.getTime() - ultimo) / 3_600_000) : null;
+      if (horas !== null && horas < this.BACKUP_STALE_HOURS) return { checked: true, enqueued: 0 };
+      const dia = now.toISOString().slice(0, 10);
+      const r = await this.enqueue('backup_stale', {
+        dedupeKey: dia,
+        payload: { hours: horas ?? -1, never: horas === null, date: dia },
+        now,
+        config: regras
+      });
+      return { checked: true, enqueued: r.enqueued ? 1 : 0 };
+    } catch (error) {
+      log.warn('backup check failed', { err: error });
+      return { checked: false, reason: 'error' };
+    }
+  }
+
+  /** O certificado de `host[:porta]`: dias até vencer, ou `null` se não deu para ler. */
+  static async certDaysLeft(alvo, { now = new Date(), timeoutMs = 8000 } = {}) {
+    const { default: tls } = await import('node:tls');
+    const [host, porta] = String(alvo).split(':');
+    return new Promise((resolve) => {
+      let feito = false;
+      const fim = (v) => {
+        if (feito) return;
+        feito = true;
+        resolve(v);
+      };
+      const sock = tls.connect({ host, port: Number(porta) || 443, servername: host, rejectUnauthorized: false }, () => {
+        const validTo = sock.getPeerCertificate()?.valid_to;
+        sock.end();
+        const t = validTo ? new Date(validTo).getTime() : NaN;
+        fim(Number.isFinite(t) ? Math.floor((t - now.getTime()) / 86_400_000) : null);
+      });
+      sock.setTimeout(timeoutMs, () => {
+        sock.destroy();
+        fim(null);
+      });
+      sock.on('error', () => fim(null));
+    });
+  }
+
+  /**
+   * `cert_expiring`: os hosts de `SKYGP_CERT_HOSTS` (lista separada por vírgula)
+   * com certificado a menos de `CERT_WARN_DAYS` de vencer. Um aviso por host
+   * por dia. Quem não responde não avisa (o monitoramento de disponibilidade
+   * é outro assunto). Nunca lança.
+   */
+  static CERT_WARN_DAYS = 14;
+  static lastCertCheckAt = 0;
+  static CERT_CHECK_MS = 6 * 3_600_000;
+
+  static async checkCertificates({ now = new Date(), config = null, hosts = process.env.SKYGP_CERT_HOSTS } = {}) {
+    try {
+      const lista = String(hosts ?? '').split(',').map((h) => h.trim()).filter(Boolean);
+      if (!lista.length) return { checked: false, reason: 'not_configured' };
+      const regras = config ?? await alertsConfig();
+      if (!regras.events.cert_expiring?.enabled) return { checked: false, reason: 'disabled' };
+      const dia = now.toISOString().slice(0, 10);
+      let enqueued = 0;
+      for (const alvo of lista) {
+        // eslint-disable-next-line no-await-in-loop -- poucos hosts
+        const dias = await this.certDaysLeft(alvo, { now });
+        if (dias === null || dias >= this.CERT_WARN_DAYS) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const r = await this.enqueue('cert_expiring', {
+          dedupeKey: `${alvo}:${dia}`,
+          payload: { host: alvo.slice(0, 120), days: Math.max(dias, 0), expired: dias < 0, date: dia },
+          now,
+          config: regras
+        });
+        if (r.enqueued) enqueued += 1;
+      }
+      return { checked: true, enqueued };
+    } catch (error) {
+      log.warn('certificate check failed', { err: error });
+      return { checked: false, reason: 'error' };
+    }
+  }
+
+  /**
    * O histórico do console: a fila inteira, a mais nova primeiro, paginada.
    * `from` (inclusive) e `until` (exclusive) são instantes já resolvidos por
    * quem chama. `counts` conta por estado com os MESMOS filtros menos o de
@@ -1276,6 +1386,11 @@ class PlatformAlertService {
     if (now.getTime() - this.lastOverdueCheckAt >= this.OVERDUE_CHECK_MS) {
       this.lastOverdueCheckAt = now.getTime();
       resumo.bigOverdue = await this.checkBigOverdue({ now });
+    }
+    resumo.backup = await this.checkBackup({ now });
+    if (now.getTime() - this.lastCertCheckAt >= this.CERT_CHECK_MS) {
+      this.lastCertCheckAt = now.getTime();
+      resumo.certificates = await this.checkCertificates({ now });
     }
     resumo.monthlyReport = await this.checkMonthlyReport({ now });
     resumo.accounting = await this.checkAccountingExport({ now });

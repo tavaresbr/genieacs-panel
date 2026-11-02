@@ -4455,6 +4455,8 @@ const ja: Dictionary = {
   'platform.alerts.event.nfse_error': 'NFS-e エラー',
   'platform.alerts.event.auto_suspended': '自動停止',
   'platform.alerts.event.big_overdue': '高額延滞（上限超過）',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': '高額延滞の上限（R$）',
   'platform.alerts.thresholdHint': 'プロバイダーの延滞額がこの金額を超えると通知します（延滞期間ごとに 1 回）。',
   'platform.alerts.thresholdInvalid': '0 より大きい金額を入力してください。',
