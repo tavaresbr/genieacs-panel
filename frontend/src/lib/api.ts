@@ -1715,7 +1715,9 @@ export const PLATFORM_ALERT_EVENTS = [
   'referral_signup',
   'nfse_error',
   'auto_suspended',
-  'big_overdue'
+  'big_overdue',
+  'backup_stale',
+  'cert_expiring'
 ] as const
 export type PlatformAlertEvent = typeof PLATFORM_ALERT_EVENTS[number]
 export type PlatformAlertChannel = 'whatsapp' | 'email'

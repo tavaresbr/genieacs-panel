@@ -4461,6 +4461,8 @@ const ko: Dictionary = {
   'platform.alerts.event.nfse_error': 'NFS-e 오류',
   'platform.alerts.event.auto_suspended': '자동 정지',
   'platform.alerts.event.big_overdue': '고액 연체(한도 초과)',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': '고액 연체 한도(R$)',
   'platform.alerts.thresholdHint': '공급자의 연체액이 이 금액을 넘으면 알립니다 — 연체 기간마다 한 번.',
   'platform.alerts.thresholdInvalid': '0보다 큰 금액을 입력하세요.',

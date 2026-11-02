@@ -4462,6 +4462,8 @@ const ru: Dictionary = {
   'platform.alerts.event.nfse_error': 'Ошибка NFS-e',
   'platform.alerts.event.auto_suspended': 'Автоматическая блокировка',
   'platform.alerts.event.big_overdue': 'Большая просрочка (выше порога)',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': 'Порог большой просрочки (R$)',
   'platform.alerts.thresholdHint': 'Оповещает, когда просрочка провайдера превышает эту сумму — один раз за период просрочки.',
   'platform.alerts.thresholdInvalid': 'Введите сумму больше нуля.',

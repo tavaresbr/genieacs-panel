@@ -4456,6 +4456,8 @@ const en = {
   'platform.alerts.event.nfse_error': 'NFS-e error',
   'platform.alerts.event.auto_suspended': 'Automatic suspension',
   'platform.alerts.event.big_overdue': 'High overdue (above the limit)',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': 'High overdue limit (R$)',
   'platform.alerts.thresholdHint': 'Alerts when a provider goes over this amount overdue — once per overdue period.',
   'platform.alerts.thresholdInvalid': 'Enter an amount greater than zero.',

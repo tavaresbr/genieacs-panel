@@ -4454,6 +4454,8 @@ const zhCN: Dictionary = {
   'platform.alerts.event.nfse_error': 'NFS-e 错误',
   'platform.alerts.event.auto_suspended': '自动停用',
   'platform.alerts.event.big_overdue': '高额逾期（超过上限）',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': '高额逾期上限（R$）',
   'platform.alerts.thresholdHint': '当服务商的逾期金额超过此值时提醒——每个逾期周期一次。',
   'platform.alerts.thresholdInvalid': '请输入大于零的金额。',

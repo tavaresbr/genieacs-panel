@@ -4458,6 +4458,8 @@ const de: Dictionary = {
   'platform.alerts.event.nfse_error': 'NFS-e-Fehler',
   'platform.alerts.event.auto_suspended': 'Automatische Sperre',
   'platform.alerts.event.big_overdue': 'Hoher Rückstand (über dem Limit)',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': 'Limit für hohen Rückstand (R$)',
   'platform.alerts.thresholdHint': 'Alarmiert, wenn ein Anbieter diesen Betrag im Rückstand überschreitet — einmal pro Rückstandsperiode.',
   'platform.alerts.thresholdInvalid': 'Geben Sie einen Betrag größer als null ein.',

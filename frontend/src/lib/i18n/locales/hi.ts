@@ -4462,6 +4462,8 @@ const hi: Dictionary = {
   'platform.alerts.event.nfse_error': 'NFS-e त्रुटि',
   'platform.alerts.event.auto_suspended': 'स्वचालित निलंबन',
   'platform.alerts.event.big_overdue': 'अधिक बकाया (सीमा से ऊपर)',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': 'अधिक बकाया की सीमा (R$)',
   'platform.alerts.thresholdHint': 'जब किसी प्रदाता का बकाया इस राशि से ऊपर जाए तब सूचित करता है — हर बकाया अवधि में एक बार।',
   'platform.alerts.thresholdInvalid': 'शून्य से बड़ी राशि दर्ज करें।',

@@ -4463,6 +4463,8 @@ const ar: Dictionary = {
   'platform.alerts.event.nfse_error': 'خطأ في NFS-e',
   'platform.alerts.event.auto_suspended': 'إيقاف تلقائي',
   'platform.alerts.event.big_overdue': 'متأخرات كبيرة (فوق الحد)',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': 'حد المتأخرات الكبيرة (R$)',
   'platform.alerts.thresholdHint': 'ينبّه عندما تتجاوز متأخرات المزوّد هذا المبلغ — مرة واحدة لكل فترة تأخر.',
   'platform.alerts.thresholdInvalid': 'أدخل مبلغًا أكبر من صفر.',

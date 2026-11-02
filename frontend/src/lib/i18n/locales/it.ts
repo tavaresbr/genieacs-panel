@@ -4460,6 +4460,8 @@ const it: Dictionary = {
   'platform.alerts.event.nfse_error': 'Errore NFS-e',
   'platform.alerts.event.auto_suspended': 'Sospensione automatica',
   'platform.alerts.event.big_overdue': 'Arretrato elevato (oltre il limite)',
+  'platform.alerts.event.backup_stale': 'Backup overdue',
+  'platform.alerts.event.cert_expiring': 'Certificate about to expire',
   'platform.alerts.threshold': 'Limite arretrato elevato (R$)',
   'platform.alerts.thresholdHint': 'Avvisa quando un provider supera questo importo di arretrato — una volta per periodo di arretrato.',
   'platform.alerts.thresholdInvalid': 'Inserisci un importo maggiore di zero.',
