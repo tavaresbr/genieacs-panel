@@ -174,7 +174,12 @@ class PlatformAudit {
     // qualquer cliente. Sem estas linhas, a promoção que precede tudo isso
     // seria o único passo sem rastro da cadeia inteira.
     PLATFORM_ADMIN_GRANTED: 'platform_admin.granted',
-    PLATFORM_ADMIN_REVOKED: 'platform_admin.revoked'
+    PLATFORM_ADMIN_REVOKED: 'platform_admin.revoked',
+    // O bot do WhatsApp da plataforma mandou dado de cobrança a um dono de
+    // provedor já confirmado pelo documento: a segunda via, a situação da
+    // assinatura ou o link do recibo. O detalhe diz O QUE saiu (e para qual
+    // telefone, mascarado) — nunca o Pix nem a linha digitável.
+    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed'
   });
 
   /**

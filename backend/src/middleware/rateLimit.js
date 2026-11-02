@@ -622,3 +622,16 @@ export const firmwareUploadLimiter = limiter({
   keyGenerator: ipKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
+
+/**
+ * O recibo pelo link assinado do WhatsApp da plataforma
+ * (`GET /api/public/receipt/:token`). Sem sessão: o token é a credencial, e o
+ * balde existe para que ninguém fique adivinhando tokens de um endereço só. Um
+ * dono abre o recibo uma ou duas vezes; trinta em quinze minutos é folga.
+ */
+export const publicReceiptLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});

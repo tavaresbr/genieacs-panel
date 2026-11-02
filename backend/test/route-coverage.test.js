@@ -83,7 +83,10 @@ const PUBLICAS = new Map([
   ['GET /api/public/plans', 'o catálogo à venda: só planos ativos e marcados como públicos, sem id nem contagem'],
   ['GET /api/public/slug-available', 'a mesma pergunta que o cadastro faz ao gravar, feita antes; responde só livre/ocupado'],
   ['GET /api/public/cnpj', 'o cadastro da Receita, que é público; limite apertado porque sai para uma API de fora'],
-  ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço']
+  ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço'],
+  // O recibo pelo link do bot do WhatsApp da plataforma: o token assinado é a
+  // credencial; prova em platform-owner-bot.test.js.
+  ['GET /api/public/receipt/:token', 'recibo de cobrança PAGA por token HMAC de 7 dias que nomeia provedor e cobrança; toda recusa é o mesmo 404']
 ]);
 
 /**
@@ -203,7 +206,8 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
   ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404'],
   ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe'],
-  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404']
+  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404'],
+  ['GET /api/public/receipt/:token', 'o parâmetro é um token assinado que já nomeia provedor e cobrança, aberto em runInTenant do provedor do token; prova em platform-owner-bot.test.js']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -442,7 +446,14 @@ describe('toda rota endereçada por um parâmetro', () => {
   // (`GET .../subscription/plan-preview`): o que cada modo faria, só leitura,
   // no provedor da URL. Mesmo pedágio: uma linha em `DO_CONSOLE` e mais uma
   // aqui; prova em platform-plan-change.test.js. São 74.
-  const TETO_DE_EXCECOES = 74;
+  //
+  // E o recibo pelo link do WhatsApp da plataforma
+  // (`GET /api/public/receipt/:token`). O parâmetro não é id de linha: é um
+  // token HMAC que já nomeia provedor e cobrança, como o do anexo — o vizinho
+  // não alcança a linha de ninguém sem a assinatura. Não é do console, então
+  // entra também na conta de fora dele (29 → 30, dentro do teto). Prova em
+  // platform-owner-bot.test.js. São 75.
+  const TETO_DE_EXCECOES = 75;
 
 
   /**
