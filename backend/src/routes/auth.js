@@ -7,7 +7,9 @@ import {
   emailChangeLimiter,
   impersonationRedeemLimiter,
   mfaLimiter,
-  passwordResetLimiter
+  passwordChangeLimiter,
+  passwordResetLimiter,
+  usernameChangeLimiter
 } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -50,7 +52,9 @@ router.post('/logout', authenticateToken, AuthController.logout);
 
 router.post('/refresh', AuthController.refreshToken);
 
-router.post('/change-password', authenticateToken, AuthController.changePassword);
+// O limite vem DEPOIS da sessão, para contar por pessoa; ver
+// `passwordChangeLimiter`.
+router.post('/change-password', authenticateToken, passwordChangeLimiter, AuthController.changePassword);
 
 // Login em duas etapas da própria conta. O limite vem DEPOIS da sessão, para
 // contar por pessoa: é ele que segura quem tenta adivinhar os 6 dígitos numa
@@ -61,7 +65,7 @@ router.post('/mfa/enable', authenticateToken, mfaLimiter, AuthController.mfaEnab
 router.post('/mfa/disable', authenticateToken, mfaLimiter, AuthController.mfaDisable);
 router.post('/mfa/recovery-codes', authenticateToken, mfaLimiter, AuthController.mfaRegenerateRecovery);
 
-router.post('/change-username', authenticateToken, AuthController.changeUsername);
+router.post('/change-username', authenticateToken, usernameChangeLimiter, AuthController.changeUsername);
 
 // O e-mail de login da própria pessoa: é por aqui que quem já usa o painel
 // migra. `authenticateToken` e nada mais — é autoatendimento, e prendê-lo atrás

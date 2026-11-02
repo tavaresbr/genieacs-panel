@@ -84,8 +84,20 @@ function accountKey(req) {
     : `ip:${tenantIpKey(req)}`;
 }
 
+/**
+ * O fator dos tetos SÓ no banco de teste (`APP_ENV=test`): os testes no
+ * navegador (`frontend/e2e`) rodam dezenas de telas do mesmo endereço, no
+ * mesmo minuto, e o balde de `/api` de uma pessoa só não é o que eles medem.
+ * Fora do teste a variável é ignorada — nenhum deploy afrouxa um limite por
+ * engano de configuração.
+ */
+const ESCALA = process.env.APP_ENV === 'test' && Number(process.env.RATE_LIMIT_SCALE) > 1
+  ? Math.floor(Number(process.env.RATE_LIMIT_SCALE))
+  : 1;
+
 function limiter(options) {
-  return rateLimit({ ...JSON_HEADERS, ...options });
+  const max = typeof options.max === 'number' ? options.max * ESCALA : options.max;
+  return rateLimit({ ...JSON_HEADERS, ...options, max });
 }
 
 export const apiLimiter = limiter({
@@ -654,4 +666,44 @@ export const publicNpsLimiter = limiter({
   max: 30,
   keyGenerator: ipKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
+ * `POST /api/auth/change-password`: a senha atual pedida aqui é um oráculo na
+ * mão de quem tem só o token (sessão roubada, computador destravado). A trava
+ * por conta (`AccountLockout`) já para os palpites em dez; este balde, por
+ * pessoa e montado DEPOIS da sessão, é o teto de custo — cada chamada roda um
+ * bcrypt — e o que sobra se a trava um dia for afrouxada. Vinte por quarto de
+ * hora fica acima da trava de propósito: quem esbarra nela recebe a resposta
+ * da trava, que diz o que fazer, e não um 429 genérico.
+ */
+export const passwordChangeLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.attempts', 'rate_limited')
+});
+
+/**
+ * `POST /api/auth/change-username`: troca o identificador de login e responde
+ * 409 quando o nome já existe em QUALQUER provedor — o mesmo oráculo do
+ * `emailChangeLimiter`, e o mesmo remédio, só que por pessoa.
+ */
+export const usernameChangeLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
+ * O portal do afiliado (0126): o login e o link de definir senha. Por
+ * endereço — não há provedor no ápice —, apertado como o login do painel; a
+ * trava por conta (`AccountLockout`) segura quem distribui os palpites.
+ */
+export const affiliateLoginLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.attempts', 'rate_limited_login')
 });

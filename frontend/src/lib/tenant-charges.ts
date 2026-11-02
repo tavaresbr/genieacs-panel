@@ -22,7 +22,8 @@ export const CHARGE_STATUS_FILTER_KEYS: Record<string, TranslationKey> = {
 export const CHARGE_KIND_KEYS: Record<string, TranslationKey> = {
   renewal: 'charges.kind.renewal',
   proration: 'charges.proration',
-  overage: 'charges.overage'
+  overage: 'charges.overage',
+  addon: 'charges.addon'
 }
 
 export function chargeKindKey(kind: string | null | undefined): TranslationKey {

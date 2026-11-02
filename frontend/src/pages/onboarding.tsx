@@ -12,6 +12,7 @@ import { useTenant } from '@/contexts/tenant-context'
 import { onboardingDismissKey } from '@/lib/onboarding'
 import { useAuth } from '@/contexts/auth-context'
 import { WhatsAppConnection } from '@/components/whatsapp-connection'
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
 
 /**
  * The first minutes of a provider that just signed up: a welcome, what it is
@@ -630,7 +631,7 @@ export default function Onboarding() {
               <p className="field-hint">{t('onboarding.team.hint')}</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(-1)}>{t('common.back')}</button>
-                <button type="button" className="modern-button" disabled={busy || (colleague.username.trim() !== '' && (colleague.password.length < 8 || !colleague.email.includes('@')))} onClick={() => void saveColleague()}>
+                <button type="button" className="modern-button" disabled={busy || (colleague.username.trim() !== '' && (colleague.password.length < PASSWORD_MIN_LENGTH || !colleague.email.includes('@')))} onClick={() => void saveColleague()}>
                   <Icon name="check" size={17} />
                   {colleague.username.trim() ? t('onboarding.team.addAndFinish') : t('common.next')}
                 </button>

@@ -563,6 +563,19 @@ describe('gastar o bilhete', () => {
     });
     assert.equal(curta.status, 400);
 
+    // A comum e a igual ao login também são recusadas antes do resgate: a
+    // segunda depende da conta, e é conferida por uma espiada no bilhete.
+    const comum = await naCasa('/api/auth/password-reset/confirm', {
+      method: 'POST', body: { token: bilhete, password: 'Password123' }
+    });
+    assert.equal(comum.status, 400);
+    assert.equal(comum.body.code, 'password_too_common');
+    const igual = await naCasa('/api/auth/password-reset/confirm', {
+      method: 'POST', body: { token: bilhete, password: 'dona@exemplo.test' }
+    });
+    assert.equal(igual.status, 400);
+    assert.equal(igual.body.code, 'password_matches_identity');
+
     // Quem digitou uma senha curta não perdeu o link: a conferência de tamanho
     // vem ANTES do resgate, de propósito.
     const outra = await naCasa('/api/auth/password-reset/confirm', {

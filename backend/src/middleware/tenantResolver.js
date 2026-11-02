@@ -257,8 +257,10 @@ const PLATFORM_HOST_PATHS = new Set([
  * family of routes that has no business being resolved by host.
  */
 // E a página pública (`/api/public/*`): o catálogo e o cadastro de quem ainda
-// não é provedor. Só no SaaS, onde o ápice é a vitrine.
-const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/'] : [];
+// não é provedor. Só no SaaS, onde o ápice é a vitrine. E o portal do
+// afiliado (`/api/affiliate/*`, 0126): quem divulga o produto não é provedor,
+// e a sessão dele (cookie próprio) não abre escopo de provedor nenhum.
+const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/', '/api/affiliate/'] : [];
 
 /**
  * Outros nomes do ápice: o domínio de marketing (`tr69.com.br`) servindo a

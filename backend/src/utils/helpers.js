@@ -70,3 +70,17 @@ export function isValidEmail(value) {
   if (dominio.startsWith('.') || dominio.endsWith('.') || dominio.includes('..')) return false;
   return true;
 }
+
+export const USERNAME_MIN_LENGTH = 3;
+export const USERNAME_MAX_LENGTH = 64;
+
+/**
+ * O nome de usuário fora do tamanho (3 a 64), como chave do catálogo — ou
+ * null quando serve. É só formato: o nome não decide nada sozinho, quem
+ * decide se a conta existe é o banco.
+ */
+export function usernameLengthProblem(username, key = 'auth.usernameLength') {
+  const text = String(username ?? '');
+  if (text.length < USERNAME_MIN_LENGTH || text.length > USERNAME_MAX_LENGTH) return key;
+  return null;
+}

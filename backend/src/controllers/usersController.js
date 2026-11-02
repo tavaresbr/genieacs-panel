@@ -7,6 +7,7 @@ import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import MfaService from '../services/mfaService.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import { newPasswordProblem } from '../utils/passwordPolicy.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 
 export { ROLES };
@@ -139,9 +140,11 @@ class UsersController {
           createErrorResponse(req.t('auth.usernameLength'))
         );
       }
-      if (password.length < 8 || password.length > 128) {
+      // A regra da senha nova (ver `utils/passwordPolicy.js`).
+      const senhaRuim = newPasswordProblem(password, { username, email });
+      if (senhaRuim) {
         return res.status(400).json(
-          createErrorResponse(req.t('auth.passwordLength'))
+          createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code)
         );
       }
       if (!email || !isValidEmail(email)) {
@@ -342,9 +345,10 @@ class UsersController {
 
       if (nextPassword !== undefined) {
         const password = String(nextPassword);
-        if (password.length < 8 || password.length > 128) {
+        const senhaRuim = newPasswordProblem(password, { username: user.username, email: user.email });
+        if (senhaRuim) {
           return res.status(400).json(
-            createErrorResponse(req.t('auth.passwordLength'))
+            createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code)
           );
         }
         // A person has one password, for every provider they work for. Setting

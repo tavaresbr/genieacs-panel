@@ -22,6 +22,7 @@ import {
   portalLoginLimiter
 } from './middleware/rateLimit.js';
 import { authenticateToken, requirePermission, requirePlatformAdmin } from './middleware/auth.js';
+import { requireAddon, WHATSAPP_ADDON_EXEMPT_PATHS } from './middleware/addonGate.js';
 import { log, requestLogger } from './utils/logger.js';
 import { httpMetrics } from './utils/metrics.js';
 import { acsAgentOfflineBody, isAgentOffline } from './services/genieacs/agent.js';
@@ -41,6 +42,9 @@ import platformBillingRoutes from './routes/platformBilling.js';
 import platformLeadsRoutes from './routes/platformLeads.js';
 import platformReportsRoutes from './routes/platformReports.js';
 import platformNpsRoutes from './routes/platformNps.js';
+import platformStatusRoutes from './routes/platformStatus.js';
+import platformAffiliatesRoutes from './routes/platformAffiliates.js';
+import affiliatePortalRoutes from './routes/affiliatePortal.js';
 import publicRoutes from './routes/public.js';
 import platformIntegrationsRoutes from './routes/platformIntegrations.js';
 import userRoutes from './routes/users.js';
@@ -68,6 +72,7 @@ import { FIRMWARE_REASSIGN_PATH, FIRMWARE_UPLOAD_PATH, firmwareRawBody } from '.
 import provisioningRoutes from './routes/provisioning.js';
 import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
+import { assertCorsOriginsSafe, wantsUpgradeInsecureRequests } from './config/runtimeEnv.js';
 import { wireNpsWhatsappReply } from './services/npsWhatsappReply.js';
 
 dotenv.config();
@@ -93,6 +98,8 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5890')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
+// `*` desliga a checagem de origem; em produção o processo recusa subir.
+assertCorsOriginsSafe(allowedOrigins);
 
 const helmetOptions = {
   // COOP is ignored on plain HTTP public-IP deployments and OAC can produce
@@ -109,7 +116,8 @@ const helmetOptions = {
       scriptSrc: ["'self'"],
       // The built-in server defaults to HTTP; upgrading relative assets would
       // make browsers request HTTPS from a port that has no TLS listener.
-      upgradeInsecureRequests: null,
+      // Opt-in for deployments behind a TLS proxy: CSP_UPGRADE_INSECURE_REQUESTS=true.
+      upgradeInsecureRequests: wantsUpgradeInsecureRequests() ? [] : null,
       imgSrc: [
         "'self'",
         'data:',
@@ -301,13 +309,16 @@ app.use('/api', apiLimiter);
 // whether the database is reachable, and resolving the provider is itself a
 // database read — behind the resolver, an unreachable database would answer a
 // blank 500 instead of naming the thing that is down.
+//
+// Sem a versão (0128): a rota é aberta a qualquer um, e a versão exata é o
+// primeiro passo de quem procura uma falha conhecida. Quem tem sessão a lê em
+// `GET /api/version`; o console, em `/api/platform/deployment`.
 app.get('/api/health', async (req, res) => {
   const database = await testConnection();
   res.status(database ? 200 : 503).json({
     status: database ? 'ok' : 'degraded',
     database: database ? 'ok' : 'unavailable',
-    timestamp: new Date().toISOString(),
-    version: APP_VERSION
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -335,6 +346,13 @@ app.use('/api/auth/signup', authLimiter);
 // visible on every other path under `/api` too, so it is not this route's to
 // fix. The reasoning is in `tenantController.js`.
 app.use('/api/tenant', tenantRoutes);
+
+// A versão do servidor, para quem tem sessão: a aba "Sobre" a compara com a do
+// JavaScript aberto no navegador (o aviso de "recarregue a página"). Saiu do
+// `/api/health`, que é aberto.
+app.get('/api/version', authenticateToken, (req, res) => {
+  res.json({ success: true, data: { version: APP_VERSION } });
+});
 
 // O instalador e o programa do agente do GenieACS, públicos e sem segredo.
 // Abaixo do resolvedor por um motivo só: o instalador sai com a origem do
@@ -388,10 +406,17 @@ if (IS_SAAS) {
   app.use('/api/platform', platformReportsRoutes);
   // A pesquisa de satisfação dos provedores (0123): relatório e envio manual.
   app.use('/api/platform', platformNpsRoutes);
+  // A página de status (0128): verificações, incidentes e manutenções.
+  app.use('/api/platform', platformStatusRoutes);
+  // O programa de afiliados (0126): cadastro, aprovação e lotes mensais.
+  app.use('/api/platform', platformAffiliatesRoutes);
   // A página pública do ápice — o catálogo e o que o cadastro pergunta antes
   // de existir conta. Mesma regra do console: só no endereço da plataforma.
   app.use('/api/public', platformHostOnly);
   app.use('/api/public', publicRoutes);
+  // O portal do afiliado (0126): sessão própria, no endereço da plataforma.
+  app.use('/api/affiliate', platformHostOnly);
+  app.use('/api/affiliate', affiliatePortalRoutes);
 }
 app.use('/api/users', userRoutes);
 app.use('/api/invites', inviteRoutes);
@@ -401,6 +426,13 @@ app.use('/api/asaas', asaasProviderRoutes);
 app.use('/api/teiah', teiahRoutes);
 app.use('/api/focuschat', focusChatRoutes);
 app.use('/api/contacts', contactRoutes);
+// O add-on de WhatsApp (0127), na frente dos quatro roteadores do prefixo.
+// Desligada até o catálogo ter um add-on `gated` com a chave `whatsapp` — ver
+// `middleware/addonGate.js`. Ligada, ela autentica antes (o 401 vem primeiro).
+// O prefixo leva também o que NÃO é WhatsApp — os alertas (que saem também
+// por e-mail e Telegram), as quedas, as manutenções e o indique e ganhe —, e
+// isso continua aberto para quem não tem o add-on.
+app.use('/api/whatsapp', requireAddon('whatsapp', { except: WHATSAPP_ADDON_EXEMPT_PATHS }));
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);
@@ -623,7 +655,7 @@ portalApp.use('/api/customer/login', portalLoginLimiter);
 portalApp.use('/api', portalIpLimiter);
 // Ahead of the resolver for the same reason as the panel's.
 portalApp.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'customer-portal', version: APP_VERSION });
+  res.json({ status: 'ok', service: 'customer-portal' });
 });
 portalApp.use('/api', requestLogger());
 portalApp.use('/api', httpMetrics());

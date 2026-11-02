@@ -2,6 +2,7 @@ import express from 'express';
 import WhatsAppController from '../controllers/whatsappController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { whatsappTestLimiter } from '../middleware/rateLimit.js';
+import { requireAddon } from '../middleware/addonGate.js';
 
 const router = express.Router();
 
@@ -16,8 +17,9 @@ router.put('/config', authenticateToken, requirePermission('whatsapp.config'), W
 // A aba Chatbot: o que o atendimento automático diz e quando.
 router.get('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getBotConfig);
 router.put('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateBotConfig);
-router.post('/bot-config/ai-test', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.testBotAi);
-router.post('/bot-config/ai-improve-message', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.improveBotMessage);
+// A IA (0127): atrás do add-on `ai` quando o catálogo o exige.
+router.post('/bot-config/ai-test', authenticateToken, requirePermission('whatsapp.config'), requireAddon('ai'), WhatsAppController.testBotAi);
+router.post('/bot-config/ai-improve-message', authenticateToken, requirePermission('whatsapp.config'), requireAddon('ai'), WhatsAppController.improveBotMessage);
 // "Parar promoções": as palavras que o cliente manda e o que o painel responde.
 router.get('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getMarketingOptOutConfig);
 router.put('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMarketingOptOutConfig);

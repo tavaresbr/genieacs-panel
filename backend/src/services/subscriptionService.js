@@ -14,6 +14,7 @@ import { IS_SAAS } from '../config/edition.js';
 import { effectiveChargesConfig, earlyDiscountFor } from './billing/asaasSettingsService.js';
 import TenantCredit from '../models/TenantCredit.js';
 import ReferralService from './referralService.js';
+import AffiliateService from './affiliateService.js';
 import { defaultReminderPolicy, reminderWindows } from './reminderPolicy.js';
 
 /**
@@ -1435,7 +1436,8 @@ class SubscriptionService {
    * a cada minuto para um plano que nem limita ONTs seria carga à toa.
    */
   static async overLimitOf(plan, { countDevices = null } = {}) {
-    const limits = this.limitsOf(plan);
+    // Com os add-ons de limite (0127), que valem em qualquer plano.
+    const limits = await this.effectiveLimitsOf(plan);
     // O recurso com preço de excedente não barra (`overLimitFor`), e nem é
     // contado: contar ONTs no ACS para uma resposta que não muda nada seria
     // carga à toa.
@@ -1469,6 +1471,16 @@ class SubscriptionService {
   /** Os dias que um pagamento compra neste plano (ou a reserva de trinta). */
   static periodDaysOf(plan) {
     return periodoDoPlano(plan);
+  }
+
+  /**
+   * Os tetos de `plan` para o provedor em escopo: `limitsOf` mais o que os
+   * add-ons de limite dele somam (0127). Importado na hora: `addonService`
+   * importa este arquivo, e o caminho de volta só é preciso aqui.
+   */
+  static async effectiveLimitsOf(plan) {
+    const { default: AddonService } = await import('./addonService.js');
+    return AddonService.applyLimitBonus(this.limitsOf(plan), await AddonService.limitBonus());
   }
 
   static limitsOf(plan) {
@@ -1641,7 +1653,9 @@ class SubscriptionService {
     // medindo: desfeito, a renovação cobra o excedente do período que usou.
     if (isPaused(subscription, now)) return { recorded: false, reason: 'paused' };
     const plano = planoDaFatia;
-    const limites = this.limitsOf(plano);
+    // O teto da fotografia já com os add-ons de limite (0127): quem paga o
+    // add-on não paga excedente pelas unidades que ele cobre.
+    const limites = await this.effectiveLimitsOf(plano);
     const precos = this.overagePricesOf(plano);
     const medir = USAGE_RESOURCES.filter((recurso) => limites[recurso] !== null && precos[recurso]);
     if (!medir.length) return { recorded: false, reason: 'no_overage_price' };
@@ -1738,7 +1752,7 @@ class SubscriptionService {
    */
   static async assertCanAddOperator() {
     const { plan } = await this.current();
-    const limit = this.limitsOf(plan).operators;
+    const limit = (await this.effectiveLimitsOf(plan)).operators;
     if (limit === null) return;
     // Com preço de excedente (0105), o operador a mais entra e é cobrado.
     if (this.overagePricesOf(plan).operators) return;
@@ -1759,7 +1773,7 @@ class SubscriptionService {
    */
   static async remainingSubscribers() {
     const { plan } = await this.current();
-    const limit = this.limitsOf(plan).subscribers;
+    const limit = (await this.effectiveLimitsOf(plan)).subscribers;
     if (limit === null) return null;
     // Com preço de excedente (0105), não há teto brando: o assinante a mais
     // é criado e cobrado na fatura.
@@ -1777,7 +1791,8 @@ class SubscriptionService {
    */
   static async usage({ countDevices } = {}) {
     const state = await this.current();
-    const limits = this.limitsOf(state.plan);
+    // Os tetos com os add-ons de limite (0127) — os que de fato barram.
+    const limits = await this.effectiveLimitsOf(state.plan);
     const [operators, subscribers] = await Promise.all([
       this.operatorCount(),
       this.subscriberCount()
@@ -1804,7 +1819,7 @@ class SubscriptionService {
       subscription.pendingPlan.blockedBy = null;
     } else if (subscription?.pendingPlan) {
       subscription.pendingPlan.blockedBy = this.overLimitFor(
-        this.limitsOf(state.pendingPlan), { operators, subscribers, devices }, this.overagePricesOf(state.pendingPlan)
+        await this.effectiveLimitsOf(state.pendingPlan), { operators, subscribers, devices }, this.overagePricesOf(state.pendingPlan)
       );
     }
     return {
@@ -2677,7 +2692,8 @@ class SubscriptionService {
     // pró-rata, volta a `active` SEM estender o prazo — é por esta marca.)
     // A de só excedente (0105) é avulsa do mesmo jeito: paga o consumo, não
     // compra período.
-    const isProration = pedido.kind === 'proration' || pedido.kind === 'overage';
+    // E a pró-rata da ativação de um add-on (0127), avulsa do mesmo jeito.
+    const isProration = pedido.kind === 'proration' || pedido.kind === 'overage' || pedido.kind === 'addon';
     // Pagar a menos POR CAUSA do desconto por antecipação é pagar o inteiro:
     // ver `descontoAntecipado`. A multa e os juros, do outro lado, chegam como
     // pagamento a mais — e a mais já credita, logo acima.
@@ -2892,6 +2908,10 @@ class SubscriptionService {
     // O crédito reservado na cobrança que este pagamento quita passa a gasto,
     // na mesma transação do evento (0106). O pago a menos deixa a cobrança em
     // aberto, e a reserva com ela.
+    // O afiliado (0126): TODO pagamento com dinheiro do indicado, dentro da
+    // janela, rende a comissão — lido aqui, fora da transação, e gravado lá
+    // dentro (ver `AffiliateService.prepareCommission`).
+    const doAfiliado = amount > 0 ? await AffiliateService.prepareCommission(tenantId, { now }) : null;
     const cobrancaComCredito = !underpaid && pedido.chargeId
       && (pedido.fonte === 'charge' || pedido.fonte === 'superseded_charge')
       ? Number(pedido.chargeId) : null;
@@ -2902,6 +2922,18 @@ class SubscriptionService {
           ? await ReferralService.rewardOnPayment({ trx, tenantId, prepared: indicacao, externalId, now })
           : null;
         const creditoGasto = cobrancaComCredito ? await TenantCredit.consumeForCharge(cobrancaComCredito, trx) : 0;
+        // A comissão do afiliado, na mesma transação do evento: a reentrega
+        // do webhook morre no índice único do evento e a leva junto.
+        const comissao = doAfiliado
+          ? await AffiliateService.accrueOnPayment({
+            trx,
+            tenantId,
+            prepared: doAfiliado,
+            paymentRef: externalId ? String(externalId) : `manual:${tenantId}:${now.getTime()}`,
+            baseCents: amount,
+            now
+          })
+          : null;
         // Dentro da transação do evento: a reentrega do mesmo pagamento morre
         // no índice único do evento logo abaixo, e o ciclo gasto aqui volta
         // junto no rollback — o cupom é consumido uma vez por pagamento.
@@ -2972,6 +3004,7 @@ class SubscriptionService {
             // A indicação recompensada por este pagamento, e o crédito que a
             // cobrança paga gastou (0106) — o estorno lê os dois.
             ...(recompensa ?? {}),
+            ...(comissao ?? {}),
             ...(creditoGasto ? { creditConsumed: { chargeId: cobrancaComCredito, cents: creditoGasto } } : {}),
             // O dia e o meio do pagamento, como o gateway os disse — o que a
             // lista de faturas e o recibo do provedor mostram. Só registro:
@@ -3200,6 +3233,9 @@ class SubscriptionService {
         // crédito que a cobrança dele gastou volta (0106) — na transação da
         // marca do estorno, uma vez só.
         const indicacaoDesfeita = await ReferralService.cancelOnRefund({ trx, tenantId, reference: referencia });
+        // A comissão do afiliado que este pagamento gerou (0126), desfeita na
+        // mesma transação da marca do estorno — uma vez só.
+        const comissaoDesfeita = await AffiliateService.reverseOnRefund({ trx, tenantId, reference: referencia });
         const creditoDevolvido = cobrancaPaga ? await TenantCredit.restoreForCharge(cobrancaPaga.id, trx) : 0;
         // O ciclo do cupom que o pagamento gastou volta com o dinheiro — na
         // mesma transação da marca do estorno, então o segundo estorno do
@@ -3230,6 +3266,7 @@ class SubscriptionService {
             ...(patch.cancel_at ? { cancelAtRestored: patch.cancel_at.toISOString() } : {}),
             ...(devolucao ? { couponRestored: { id: Number(gastou.id), code: gastou.code ?? null, ...devolucao } } : {}),
             ...(indicacaoDesfeita ?? {}),
+            ...(comissaoDesfeita ?? {}),
             ...(creditoDevolvido ? { creditRestored: { chargeId: Number(cobrancaPaga.id), cents: creditoDevolvido } } : {})
           }
         }, trx);

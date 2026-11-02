@@ -46,15 +46,27 @@ describe('scripts/reset-password.js', () => {
     assert.match(run.stderr, /RESET_PASSWORD or pipe it on stdin/);
   });
 
-  it('aplica o mínimo de 8 caracteres à senha da variável', () => {
+  it('aplica o mínimo de 10 caracteres à senha da variável', () => {
     const run = rodar(['fulano'], { senha: 'curta' });
     assert.equal(run.status, 1);
-    assert.match(run.stderr, /at least 8/);
+    assert.match(run.stderr, /at least 10/);
   });
 
-  it('aplica o mínimo de 8 caracteres à senha da entrada padrão', () => {
+  it('aplica o mínimo de 10 caracteres à senha da entrada padrão', () => {
     const run = rodar(['--', 'fulano'], { entrada: 'curta\n' });
     assert.equal(run.status, 1);
-    assert.match(run.stderr, /at least 8/);
+    assert.match(run.stderr, /at least 10/);
+  });
+
+  it('recusa uma senha de 9 caracteres, que antes passava', () => {
+    const run = rodar(['fulano'], { senha: 'nove-char' });
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /at least 10/);
+  });
+
+  it('recusa uma senha da lista das comuns', () => {
+    const run = rodar(['fulano'], { senha: 'Password123' });
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /too common/);
   });
 });

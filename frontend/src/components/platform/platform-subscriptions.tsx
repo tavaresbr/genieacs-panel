@@ -439,6 +439,7 @@ function OpenChargeCell({ row }: { row: SubscriptionRow }) {
       <span className="font-mono tabular-nums">{formatMoney(charge.amountCents, charge.currency)}</span>
       {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
       {charge.kind === 'overage' && <span className="modern-badge-info">{t('charges.overage')}</span>}
+      {charge.kind === 'addon' && <span className="modern-badge-info">{t('charges.addon')}</span>}
       <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
         {t('platform.subs.dueOn', { date: formatDay(charge.dueDate) })}
       </span>
@@ -853,6 +854,7 @@ function ChargeItem({
         {charge.kind === 'proration' && <span className="modern-badge-info">{t('charges.proration')}</span>}
         {/* A de só excedente (0105): a fatia mensal do anual, ou a final de quem cancela. */}
         {charge.kind === 'overage' && <span className="modern-badge-info">{t('charges.overage')}</span>}
+        {charge.kind === 'addon' && <span className="modern-badge-info">{t('charges.addon')}</span>}
         <span className="text-muted-foreground">{t('charges.period')}: {formatDay(charge.periodEnd)}</span>
         <span className={late ? 'text-destructive' : 'text-muted-foreground'}>
           {t('charges.dueDate')}: {formatDay(charge.dueDate)}

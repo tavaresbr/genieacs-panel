@@ -15,7 +15,10 @@ import { PlatformSubscriptions } from '@/components/platform/platform-subscripti
 import { PlatformDelinquency } from '@/components/platform/platform-delinquency'
 import { PlatformRevenue } from '@/components/platform/platform-revenue'
 import { PlatformCoupons } from '@/components/platform/platform-coupons'
+import { PlatformAffiliates } from '@/components/platform/platform-affiliates'
+import { PlatformAddons } from '@/components/platform/platform-addons'
 import { PlatformHelp } from '@/components/platform/platform-help'
+import { PlatformStatus } from '@/components/platform/platform-status'
 import { PlatformOverviewTab, type OverviewTarget } from '@/components/platform/platform-overview'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
@@ -543,10 +546,16 @@ export default function PlatformPage() {
             // fabricante, abre-se quando alguma coisa não chegou ou um
             // provedor não está reconhecendo os aparelhos dele.
             ['deployment', 'platform.tabs.deployment'],
+            // A página de status (0128): as verificações automáticas e os
+            // incidentes e manutenções que a página pública mostra. Ao lado
+            // do deploy, que é a outra tela de "o que está no ar".
+            ['status', 'platform.tabs.status'],
             ['catalogue', 'platform.tabs.catalogue'],
             // O manual de cobrança, por último: é o que se abre quando não se
             // sabe em qual das outras abas está a resposta.
-            ['help', 'platform.tabs.help']
+            ['help', 'platform.tabs.help'],
+            // O programa de afiliados (0126): cadastro, aprovação e o lote mensal.
+            ['affiliates', 'platform.tabs.affiliates']
           ] as const).map(([chave, rotulo]) => (
             <button
               key={chave}
@@ -565,6 +574,7 @@ export default function PlatformPage() {
 
         {aba === 'home' && <PlatformOverviewTab onNavigate={irPara} />}
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
+        {aba === 'plans' && <PlatformAddons />}
         {aba === 'subscriptions' && <PlatformSubscriptions plans={plans} estreito={estreito} />}
         {aba === 'delinquency' && <PlatformDelinquency />}
         {aba === 'revenue' && <PlatformRevenue />}
@@ -582,6 +592,8 @@ export default function PlatformPage() {
         {aba === 'deployment' && <DeploymentHealth />}
         {aba === 'catalogue' && <DefaultCatalogueTab />}
         {aba === 'help' && <PlatformHelp />}
+        {aba === 'status' && <PlatformStatus />}
+        {aba === 'affiliates' && <PlatformAffiliates />}
 
         {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
 

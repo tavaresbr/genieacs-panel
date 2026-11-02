@@ -99,3 +99,17 @@ export function consoleTabs(page: Page) {
 export function launchOptions() {
   return process.env.E2E_CHROMIUM_PATH ? { executablePath: process.env.E2E_CHROMIUM_PATH } : {}
 }
+
+/** O dono da Delta Link (cobrada por fora): os add-ons do provedor são ativados nele. */
+export const DELTA_OWNER = {
+  name: 'Delta Link',
+  email: 'dono@delta-link.test',
+  password: 'Delta-Demo-2026'
+} as const
+
+/** A afiliada do seed (0126), com senha definida, que indicou a Delta. */
+export const DEMO_AFFILIATE = {
+  name: 'Carla Indica',
+  email: 'carla@afiliados-demo.test',
+  password: 'Carla-Afiliada-2026'
+} as const

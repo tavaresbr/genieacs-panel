@@ -8,6 +8,7 @@ import WaTagService from './waTagService.js';
 import WaAlertService from './waAlertService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import WaAiClient from './waAiClient.js';
+import AddonService from './addonService.js';
 import { aiProviderOrDefault, isAiProvider } from './waAiAdapters.js';
 import { CATEGORIES, variaveisDaCategoria } from './waTemplateService.js';
 import {
@@ -221,6 +222,9 @@ class WaAiService {
    * @returns {Promise<{replied: true, intent: string, from?: string}|null>}
    */
   static async atender({ conversation, texto }) {
+    // O add-on de IA (0127), quando o catálogo o exige: sem ele a mensagem
+    // segue pelo menu, como com a IA desligada.
+    if (!(await AddonService.allows('ai'))) return null;
     let ai;
     try {
       ai = await WaBotConfigService.aiSettings();

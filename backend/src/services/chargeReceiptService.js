@@ -155,7 +155,7 @@ export function renderReceipt(dados, { locale = DEFAULT_LOCALE, now = new Date()
   const t = translatorFor(idioma);
   const moeda = (cents) => formatarValor(idioma, cents, dados.currency);
   const descricao = [
-    t(`receipt.kind.${['renewal', 'proration', 'overage'].includes(dados.kind) ? dados.kind : 'renewal'}`),
+    t(`receipt.kind.${['renewal', 'proration', 'overage', 'addon'].includes(dados.kind) ? dados.kind : 'renewal'}`),
     dados.planName ? `${t('receipt.plan')} ${dados.planName}` : null
   ].filter(Boolean).join(' — ');
   const periodo = dados.periodEnd && /^\d{4}-\d{2}-\d{2}/.test(String(dados.periodEnd))

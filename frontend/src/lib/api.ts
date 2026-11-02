@@ -9,6 +9,7 @@ import { firmwareUploadHeaders, type FirmwareMeta } from '@/lib/firmware'
 import { formatRelativeTime } from '@/lib/utils'
 import { clearSessionScopedStorage } from '@/lib/session-owner'
 import { crossTabTokenAction } from '@/lib/cross-tab-session'
+import type { AffiliateCommissionStatus, AffiliatePayoutStatus, AffiliateStatus, PixKeyType } from '@/lib/affiliates'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -850,6 +851,8 @@ export const authAPI = {
     planCode?: string; taxId?: string; phone?: string; legalName?: string; city?: string; state?: string
     /** O código do link de indicação (`?ref=`); inválido é ignorado pelo servidor. */
     referralCode?: string
+    /** O código do afiliado (`?aff=A-…`, 0126); inválido é ignorado pelo servidor. */
+    affiliateCode?: string
   }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
 
@@ -1404,6 +1407,8 @@ export interface CatalogueTenant {
 }
 
 export interface DeploymentInfo {
+  /** A versão do servidor (saiu do `/api/health` aberto na 0128). */
+  version?: string
   edition: 'saas' | 'selfhosted'
   database: {
     /** O dialeto em uso. Host, usuário e nome do banco ficam fora de propósito. */
@@ -1606,6 +1611,17 @@ export interface ChargePricing {
   overage: OverageItem[]
   overageCents: number
   creditCents: number
+  /** Os add-ons (0127) cobrados nela. Opcional: servidores antigos não mandam. */
+  addons?: ChargeAddonItem[]
+  addonCents?: number
+}
+
+/** Uma linha de add-on de uma cobrança: o recorrente da renovação, ou a pró-rata da ativação. */
+export interface ChargeAddonItem {
+  code: string
+  name: string | null
+  cents: number
+  proration?: boolean
 }
 
 export interface Plan {
@@ -2021,7 +2037,7 @@ export interface PlanProrationPreview {
 }
 
 /** O tipo de uma cobrança: a da renovação do período, ou a avulsa da subida. */
-export type ChargeKind = 'renewal' | 'proration' | 'overage'
+export type ChargeKind = 'renewal' | 'proration' | 'overage' | 'addon'
 
 /** A conta de uma fatura de pró-rata, para a tela explicar o valor. */
 export interface ChargeProrationDetail {
@@ -2914,7 +2930,7 @@ export interface DelinquencyRow {
   bucket: DelinquencyBucket
   /** A soma das cobranças em aberto JÁ vencidas. */
   amountCents: number
-  amountByKind: { renewal: number; proration: number; overage: number }
+  amountByKind: { renewal: number; proration: number; overage: number; addon?: number }
   /** Todas as em aberto, inclusive as que ainda vão vencer. */
   openCents: number
   currency: string
@@ -6864,6 +6880,8 @@ export interface RevenueReport {
   from: string
   to: string
   mrrCents: number
+  /** O MRR dos add-ons pagos (0127), fora do `mrrCents` dos planos. Opcional: servidores antigos não mandam. */
+  addonMrrCents?: number
   activeCount: number
   receivedCents: number
   refundedCents: number
@@ -7472,4 +7490,453 @@ export const receiptAPI = {
     })
     return { ok: response.ok, status: response.status, html: await response.text() }
   },
+}
+
+// ── A página de status (0128) ────────────────────────────────────────────
+
+export type StatusComponentCode = 'panel' | 'payments' | 'whatsapp' | 'genieacs'
+export type StatusComponentState = 'operational' | 'maintenance' | 'degraded' | 'partial_outage' | 'major_outage' | 'unknown'
+export type StatusIncidentKind = 'incident' | 'maintenance'
+export type StatusIncidentImpact = 'none' | 'minor' | 'major' | 'critical'
+export type StatusIncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved' | 'scheduled' | 'in_progress'
+
+export interface StatusDay {
+  /** O dia UTC, `YYYY-MM-DD`. */
+  date: string
+  /** Porcentagem de verificações que deram certo; nula no dia sem verificação. */
+  uptime: number | null
+}
+
+export interface StatusCheck {
+  ok: boolean
+  latencyMs: number | null
+  detail: string | null
+  checkedAt: string | null
+}
+
+export interface StatusComponent {
+  code: StatusComponentCode
+  status: StatusComponentState
+  /** A disponibilidade dos 90 dias; nula sem verificação. */
+  uptime: number | null
+  days: StatusDay[]
+  /** Só no console: as últimas verificações, da mais nova para a mais velha. */
+  checks?: StatusCheck[]
+}
+
+export interface StatusIncidentUpdate {
+  status: StatusIncidentStatus
+  /** Vazio na manutenção encerrada pelo sistema no fim agendado. */
+  message: string
+  createdAt: string | null
+}
+
+export interface StatusIncident {
+  id: number
+  title: string
+  kind: StatusIncidentKind
+  impact: StatusIncidentImpact
+  status: StatusIncidentStatus
+  components: StatusComponentCode[]
+  startsAt: string | null
+  endsAt: string | null
+  resolvedAt: string | null
+  createdAt: string | null
+  updates: StatusIncidentUpdate[]
+  /** Só no console. */
+  notifyProviders?: boolean
+  /** Só no console: quantos provedores receberam cada aviso. */
+  notified?: Partial<Record<'opened' | 'maintenance' | 'resolved', number>>
+}
+
+export interface PublicStatus {
+  status: StatusComponentState
+  updatedAt: string
+  components: StatusComponent[]
+  activeIncidents: StatusIncident[]
+  scheduledMaintenance: StatusIncident[]
+  history: StatusIncident[]
+}
+
+export interface ConsoleStatus {
+  status: StatusComponentState
+  updatedAt: string
+  components: StatusComponent[]
+  incidents: StatusIncident[]
+}
+
+export interface StatusIncidentInput {
+  kind?: StatusIncidentKind
+  title?: string
+  message?: string
+  components?: StatusComponentCode[]
+  impact?: StatusIncidentImpact
+  status?: StatusIncidentStatus
+  startsAt?: string | null
+  endsAt?: string | null
+  notifyProviders?: boolean
+}
+
+export const statusAPI = {
+  /** A página pública `/status`: sem sessão, guardada por 30 s no servidor. */
+  public: () => apiClient.get<PublicStatus>('/public/status'),
+  /** O console: as verificações com o detalhe e os incidentes recentes. */
+  overview: () => apiClient.get<ConsoleStatus>('/platform/status'),
+  /** Roda as verificações agora. */
+  runChecks: () => apiClient.post<ConsoleStatus>('/platform/status/checks', {}),
+  /** 400 `invalid_*`. */
+  create: (payload: StatusIncidentInput) =>
+    apiClient.post<{ incident: StatusIncident }>('/platform/status/incidents', payload),
+  /** Título, componentes, impacto, janela e aviso. 404, 409 `already_resolved`. */
+  update: (id: number, payload: StatusIncidentInput) =>
+    apiClient.patch<{ incident: StatusIncident }>(`/platform/status/incidents/${id}`, payload),
+  /** Uma mensagem na linha do tempo; `resolved` encerra. 404, 409 `already_resolved`. */
+  postUpdate: (id: number, payload: { status: StatusIncidentStatus; message: string }) =>
+    apiClient.post<{ incident: StatusIncident }>(`/platform/status/incidents/${id}/updates`, payload),
+  /** A versão do servidor, só com sessão (saiu do `/api/health`). */
+  serverVersion: () => apiClient.get<{ version: string }>('/version'),
+}
+
+// ── O programa de afiliados (0126) ──────────────────────────────────────
+
+export interface AffiliateTotals {
+  accruedCents: number
+  inPayoutCents: number
+  paidCents: number
+  reversedCents: number
+  /** As comissões guardadas enquanto o afiliado está suspenso. */
+  heldCents?: number
+}
+
+/** O afiliado como o console o vê. `rateBp`/`months` nulos valem o padrão (`effective*`). */
+export interface AffiliateView {
+  id: number
+  name: string
+  email: string
+  taxId: string | null
+  pixKey: string | null
+  pixKeyType: PixKeyType | null
+  status: AffiliateStatus
+  rateBp: number | null
+  months: number | null
+  effectiveRateBp: number | null
+  effectiveMonths: number | null
+  code: string
+  signupUrl: string | null
+  notes: string | null
+  hasPassword: boolean
+  passwordLinkOpen: boolean
+  approvedAt: string | null
+  createdAt: string | null
+  referredCount: number
+  totals: AffiliateTotals
+}
+
+export interface AffiliateDefaults {
+  rateBp: number
+  months: number
+  payoutMinCents: number
+}
+
+export interface AffiliateCommissionView {
+  id: number
+  tenantId?: number
+  providerName: string | null
+  kind: 'commission' | 'clawback'
+  /** Só no console: o portal do afiliado não recebe a base. */
+  baseCents?: number
+  rateBp: number
+  amountCents: number
+  status: AffiliateCommissionStatus
+  accruedAt: string | null
+  payoutId: number | null
+  paymentRef?: string
+}
+
+export interface AffiliatePayoutView {
+  id: number
+  affiliateId: number
+  affiliateName: string | null
+  affiliateEmail: string | null
+  period: string
+  amountCents: number
+  commissionCount: number
+  status: AffiliatePayoutStatus
+  attempts: number
+  transferId: string | null
+  transferStatus: string | null
+  pixKey: string | null
+  pixKeyType: string | null
+  /** A chave Pix conferida na aprovação, e se a do afiliado mudou depois dela. */
+  approvedPixKey?: string | null
+  approvedPixKeyType?: string | null
+  pixKeyChanged?: boolean
+  approvedAt: string | null
+  sentAt: string | null
+  paidAt: string | null
+  paidManually: boolean
+  paidNote: string | null
+  errorCode: string | null
+  error: string | null
+  createdAt: string | null
+}
+
+export interface AffiliateReferralView {
+  tenantId: number
+  name: string
+  slug: string
+  status: string
+  referredAt: string | null
+  windowEndsAt: string | null
+  commissionCents: number
+}
+
+export interface AffiliateDetail {
+  affiliate: AffiliateView
+  referrals: AffiliateReferralView[]
+  commissions: AffiliateCommissionView[]
+  payouts: AffiliatePayoutView[]
+}
+
+/** O formulário do console: ausente mantém; `rateBp`/`months` nulos voltam ao padrão. */
+export interface AffiliateInput {
+  name?: string
+  email?: string
+  taxId?: string
+  pixKey?: string
+  pixKeyType?: PixKeyType | ''
+  rateBp?: number | null
+  months?: number | null
+  notes?: string
+  code?: string
+  status?: AffiliateStatus
+}
+
+export const affiliatesAPI = {
+  list: () => apiClient.get<{ defaults: AffiliateDefaults; affiliates: AffiliateView[] }>('/platform/affiliates'),
+  detail: (id: number) => apiClient.get<AffiliateDetail>(`/platform/affiliates/${id}`),
+  create: (input: AffiliateInput) => apiClient.post<{ affiliate: AffiliateView }>('/platform/affiliates', input),
+  update: (id: number, input: AffiliateInput) => apiClient.patch<{ affiliate: AffiliateView }>(`/platform/affiliates/${id}`, input),
+  /** O token cru vem UMA vez; o link é `/afiliados#senha=<token>` no endereço da plataforma. */
+  passwordLink: (id: number) =>
+    apiClient.post<{ token: string; expiresAt: string; path: string }>(`/platform/affiliates/${id}/password-link`, {}),
+  /** Os padrões do programa moram no perfil da plataforma (`null` volta ao padrão). */
+  saveDefaults: (patch: { affiliateRateBp?: number | null; affiliateMonths?: number | null; affiliatePayoutMinCents?: number | null }) =>
+    apiClient.put<{ changed: string[] }>('/platform/settings/profile', patch),
+  payouts: (filtro: { period?: string; status?: string } = {}) => {
+    const q = new URLSearchParams()
+    if (filtro.period) q.set('period', filtro.period)
+    if (filtro.status) q.set('status', filtro.status)
+    const texto = q.toString()
+    return apiClient.get<{ payouts: AffiliatePayoutView[] }>(`/platform/affiliate-payouts${texto ? `?${texto}` : ''}`)
+  },
+  build: (period?: string) =>
+    apiClient.post<{ period: string; created: number[]; carried: number[]; skipped: number[] }>('/platform/affiliate-payouts/build', period ? { period } : {}),
+  payoutAction: (id: number, acao: 'approve' | 'send' | 'refresh' | 'mark-paid' | 'cancel', body: { confirmNotSent?: boolean; note?: string } = {}) =>
+    apiClient.post<{ payout: AffiliatePayoutView }>(`/platform/affiliate-payouts/${id}/${acao}`, body),
+}
+
+/** O que o portal do afiliado mostra (`GET /api/affiliate/overview`). */
+export interface AffiliatePortalOverview {
+  profile: {
+    name: string
+    email: string
+    code: string
+    signupUrl: string | null
+    rateBp: number
+    months: number
+    pixKeyType: string | null
+    pixKey: string | null
+  }
+  totals: AffiliateTotals
+  payoutMinCents: number
+  referrals: Array<{ name: string; referredAt: string | null; windowEndsAt: string | null; active: boolean; commissionCents: number }>
+  commissions: AffiliateCommissionView[]
+  payouts: Array<{ period: string; amountCents: number; status: AffiliatePayoutStatus; sentAt: string | null; paidAt: string | null }>
+}
+
+/**
+ * O portal do afiliado: sessão no cookie próprio (httpOnly), e SEM o
+ * `apiClient` — que mandaria o token do painel ou do console guardado neste
+ * navegador. O portal não o aceita, e ele não tem por que sair daqui.
+ */
+async function affiliateRequest<T>(caminho: string, init: RequestInit = {}): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/affiliate${caminho}`, {
+      ...init,
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: {
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        'Accept-Language': getActiveLocale(),
+      },
+    })
+    const tipo = response.headers.get('content-type') || ''
+    const corpo = tipo.includes('application/json') ? await response.json() : { success: false }
+    return response.ok ? corpo : { ...corpo, success: false }
+  } catch (error) {
+    return {
+      success: false,
+      message: translate(getActiveLocale(), 'api.networkError'),
+      error: error instanceof Error ? error.message : undefined,
+    }
+  }
+}
+
+export const affiliatePortalAPI = {
+  login: (email: string, password: string) =>
+    affiliateRequest<{ name: string }>('/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  setPassword: (token: string, password: string) =>
+    affiliateRequest<{ active: boolean }>('/password', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  logout: () => affiliateRequest<null>('/logout', { method: 'POST' }),
+  overview: () => affiliateRequest<AffiliatePortalOverview>('/overview'),
+}
+
+// ── Os add-ons pagos (0127) ─────────────────────────────────────────────
+
+export type AddonKind = 'feature' | 'limit'
+export type AddonLimitResource = 'operators' | 'subscribers' | 'devices'
+
+/** Um add-on do catálogo. */
+export interface AddonView {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  /** O preço por período mensal do plano. */
+  priceCents: number
+  /** O preço por ano no ciclo anual; nulo é doze vezes o mensal. */
+  priceYearlyCents: number | null
+  currency: string
+  kind: AddonKind
+  /** A chave do recurso que ele libera (`whatsapp`, `ai`), no `feature`. */
+  feature: string | null
+  limitResource: AddonLimitResource | null
+  limitAmount: number | null
+  /** Se o recurso passa a exigir o add-on (desligado: vende sem tirar de ninguém). */
+  gated: boolean
+  /** Se quem está em teste usa o recurso sem ele. */
+  trialAccess: boolean
+  active: boolean
+  public: boolean
+  sort: number
+}
+
+/** O add-on que um provedor tem (ou teve). */
+export interface TenantAddonRow {
+  id: number
+  addonId: number
+  code: string | null
+  name: string | null
+  status: 'active' | 'canceled'
+  /** Vale agora: ativo, e com o cancelamento agendado (se há) ainda no futuro. */
+  live: boolean
+  /** Dado pelo console, sem cobrança. */
+  free: boolean
+  source: 'provider' | 'console' | null
+  reason: string | null
+  startedAt: string | null
+  /** O fim do período pago, quando o cancelamento foi pedido. */
+  cancelAt: string | null
+  canceledAt: string | null
+}
+
+/** Um cartão da vitrine da tela de Plano. */
+export interface TenantAddonOption extends AddonView {
+  /** O preço recorrente no ciclo de agora da assinatura. */
+  cycleCents: number
+  subscription: TenantAddonRow | null
+  /** O que ativar cobraria AGORA, ou nulo (nada na hora: teste, atraso). */
+  proration: { amountCents: number; remainingDays: number; skipped?: string } | null
+  available: boolean
+}
+
+export interface TenantAddons {
+  billingCycle: BillingCycle
+  addons: TenantAddonOption[]
+}
+
+export interface AddonChangeResult extends TenantAddons {
+  result: {
+    code: string
+    activated?: boolean
+    reactivated?: boolean
+    already?: boolean
+    scheduled?: boolean
+    effectiveAt?: string | null
+    proration?: PlanChangeProration | null
+  }
+}
+
+/** O catálogo no console, com quantos provedores têm cada um ativo. */
+export interface ConsoleAddonView extends AddonView {
+  activeCount: number
+  /** No de recurso: quantos provedores ativos perderiam o acesso com a porta ligada. */
+  gateImpactCount?: number | null
+}
+
+export interface ConsoleTenantAddons {
+  addons: TenantAddonRow[]
+  catalog: AddonView[]
+}
+
+export type AddonPayload = Partial<{
+  code: string
+  name: string
+  description: string | null
+  priceCents: number
+  priceYearlyCents: number | null
+  kind: AddonKind
+  feature: string
+  limitResource: AddonLimitResource
+  limitAmount: number
+  gated: boolean
+  trialAccess: boolean
+  active: boolean
+  public: boolean
+  sort: number
+}>
+
+export const addonsAPI = {
+  /** A vitrine e o que o provedor tem. */
+  list: () => apiClient.get<TenantAddons>('/tenant/addons'),
+
+  /**
+   * Ativa (ou reativa, desfazendo o cancelamento agendado) o add-on. A
+   * pró-rata do resto do período sai na hora, uma vez só. 404
+   * `addon_not_found`, 409 `not_changeable`/`paid_plan_required`/`busy`,
+   * 502 `gateway_failed` (a fatura em aberto não pôde ser cancelada: nada mudou).
+   */
+  activate: (code: string) =>
+    apiClient.post<AddonChangeResult>(`/tenant/addons/${encodeURIComponent(code)}/activate`, {}),
+
+  /** Cancela na renovação (na hora, sem período pago). 409 `addon_not_active`. */
+  cancel: (code: string) =>
+    apiClient.post<AddonChangeResult>(`/tenant/addons/${encodeURIComponent(code)}/cancel`, {}),
+
+  // ── O console ─────────────────────────────────────────────────────────
+  catalog: () => apiClient.get<{ addons: ConsoleAddonView[] }>('/platform/addons'),
+
+  /** 409 `addon_code_taken`. */
+  create: (payload: AddonPayload) => apiClient.post<{ addon: AddonView }>('/platform/addons', payload),
+
+  /** Código, tipo, recurso e teto são fixos (`addon_immutable`). */
+  update: (id: number, payload: AddonPayload) =>
+    apiClient.requestWithBody<{ addon: AddonView }>('PATCH', `/platform/addons/${id}`, payload),
+
+  /** Só o nunca contratado; o contratado é 409 `addon_in_use` (desative). */
+  remove: (id: number) => apiClient.delete<{ id: number }>(`/platform/addons/${id}`),
+
+  ofTenant: (tenantId: number) =>
+    apiClient.get<ConsoleTenantAddons>(`/platform/tenants/${tenantId}/addons`),
+
+  /** Dá de graça, com motivo (auditado). */
+  grant: (tenantId: number, payload: { code: string; reason: string }) =>
+    apiClient.post<ConsoleTenantAddons>(`/platform/tenants/${tenantId}/addons`, payload),
+
+  /** Tira na hora, sem estorno, com motivo (auditado). 409 `addon_not_active`. */
+  revoke: (tenantId: number, code: string, reason: string) =>
+    apiClient.post<ConsoleTenantAddons>(
+      `/platform/tenants/${tenantId}/addons/${encodeURIComponent(code)}/revoke`, { reason }
+    ),
 }

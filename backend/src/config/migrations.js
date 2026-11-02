@@ -3254,6 +3254,359 @@ const PLATFORM_NPS_TABLES = [
 ];
 
 /**
+ * O programa de afiliados (0126) — ver `services/affiliateService.js` e
+ * `services/affiliatePayoutService.js`.
+ *
+ * `tenants.referred_by_affiliate_id` é o afiliado que trouxe o provedor (o
+ * link `?aff=`), gravado no cadastro, e `referred_at` é o instante em que a
+ * janela da comissão começa a contar. Sem `.references`, pelo motivo de
+ * `referred_by_tenant_id` (0106): acrescentar chave estrangeira a `tenants`
+ * no SQLite é recriá-la.
+ */
+const TENANT_AFFILIATE_COLUMNS = [
+  ['referred_by_affiliate_id', (t) => t.integer('referred_by_affiliate_id').unsigned().nullable()],
+  ['referred_at', (t) => t.timestamp('referred_at').nullable()]
+];
+
+/**
+ * O afiliado: quem divulga o produto sem ser provedor. Identidade própria,
+ * fora de `users` — o login dele é o do portal do afiliado, com cookie e
+ * segredo próprios, e nada do painel nem do console.
+ *
+ *   status       pending (cadastrado, sem aprovação) | active | suspended;
+ *   rate_bp      a taxa própria em pontos-base (1000 = 10%), nula = a padrão;
+ *   months       a janela própria em meses, nula = a padrão;
+ *   code         o código do link (`A-XXXXXXX`), único e distinto do
+ *                código de indicação dos provedores pelo prefixo;
+ *   password_*   o hash bcrypt e o link de definir senha (só o sha256 do
+ *                token; o token cru só existe no link);
+ *   session_version  a versão das sessões do portal: sobe (atômica) quando a
+ *                senha é definida ou trocada, o e-mail muda ou o afiliado é
+ *                suspenso — o cookie leva a versão em que nasceu e deixa de
+ *                valer quando ela não bate mais.
+ *
+ * Da PLATAFORMA (compartilhada): está acima dos provedores.
+ */
+const affiliatesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('name', 160).notNullable();
+  t.string('tax_id', 20).nullable();
+  t.string('email', 160).notNullable();
+  t.string('password_hash', 100).nullable();
+  t.timestamp('password_set_at').nullable();
+  t.string('password_token_hash', 64).nullable();
+  t.timestamp('password_token_expires_at').nullable();
+  t.integer('session_version').notNullable().defaultTo(0);
+  t.string('pix_key', 140).nullable();
+  t.string('pix_key_type', 8).nullable();
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.integer('rate_bp').nullable();
+  t.integer('months').nullable();
+  t.string('code', 16).notNullable();
+  t.string('notes', 500).nullable();
+  t.integer('approved_by').unsigned().nullable();
+  t.timestamp('approved_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['email'], 'affiliates_email_uq');
+  t.unique(['code'], 'affiliates_code_uq');
+  t.index(['status'], 'affiliates_status_idx');
+};
+
+/**
+ * O lote mensal de um afiliado (0126): um por afiliado e período
+ * (`affiliate_id, period` único — o agendador e o botão do console montam o
+ * mesmo lote uma vez só). Nada sai do gateway sem a aprovação gravada aqui.
+ *
+ *   status           draft | approved | sending | sent | paid | failed | canceled;
+ *   idempotency_key  a chave da transferência, fixa por lote (troca só quando
+ *                    a transferência anterior foi recusada PELO BANCO);
+ *   transfer_*       o id e o estado da transferência Pix no gateway;
+ *   error_code       `uncertain` quando a resposta se perdeu: o reenvio exige
+ *                    a confirmação de quem opera de que nada saiu;
+ *   approved_pix_*   o retrato da chave Pix do afiliado na aprovação: o envio
+ *                    recusa (`pix_key_changed`) se a chave mudou depois dela.
+ */
+const affiliatePayoutsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('affiliate_id').unsigned().notNullable()
+    .references('id').inTable('affiliates');
+  t.string('period', 7).notNullable();
+  t.integer('amount_cents').notNullable().defaultTo(0);
+  t.integer('commission_count').notNullable().defaultTo(0);
+  t.string('status', 16).notNullable().defaultTo('draft');
+  t.string('idempotency_key', 64).nullable();
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.string('transfer_id', 64).nullable();
+  t.string('transfer_status', 32).nullable();
+  t.string('pix_key', 140).nullable();
+  t.string('pix_key_type', 8).nullable();
+  t.integer('approved_by').unsigned().nullable();
+  t.timestamp('approved_at').nullable();
+  t.string('approved_pix_key', 140).nullable();
+  t.string('approved_pix_key_type', 8).nullable();
+  t.timestamp('sent_at').nullable();
+  t.timestamp('paid_at').nullable();
+  t.boolean('paid_manually').notNullable().defaultTo(false);
+  t.string('paid_note', 255).nullable();
+  t.timestamp('canceled_at').nullable();
+  t.string('error_code', 32).nullable();
+  t.string('error', 500).nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['affiliate_id', 'period'], 'affiliate_payouts_period_uq');
+  t.unique(['idempotency_key'], 'affiliate_payouts_idem_uq');
+  t.index(['status'], 'affiliate_payouts_status_idx');
+  t.index(['transfer_id'], 'affiliate_payouts_transfer_idx');
+};
+
+/**
+ * A comissão (0126): uma linha por pagamento do provedor indicado
+ * (`payment_ref` único — a referência do pagamento no gateway), gravada NA
+ * TRANSAÇÃO do pagamento. `clawback` é o estorno de uma comissão que já foi
+ * para um lote: valor negativo, `<referência>:refund`, abatido do próximo.
+ *
+ *   status  accrued | reversed | in_payout | paid | held (o afiliado suspenso:
+ *           guardada, volta a `accrued` na reativação dentro da janela).
+ *
+ * `tenant_id` é inteiro simples, sem chave estrangeira, como em
+ * `platform_audit`: a comissão já paga é registro de dinheiro que saiu, e não
+ * pode sumir junto com o provedor apagado. Compartilhada: fala do afiliado e
+ * do provedor, e cada lado a lê pelo seu id.
+ */
+const affiliateCommissionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('affiliate_id').unsigned().notNullable()
+    .references('id').inTable('affiliates');
+  t.integer('tenant_id').unsigned().notNullable();
+  t.string('payment_ref', 160).notNullable();
+  t.string('kind', 16).notNullable().defaultTo('commission');
+  t.integer('base_cents').notNullable();
+  t.integer('rate_bp').notNullable();
+  t.integer('amount_cents').notNullable();
+  t.string('status', 16).notNullable().defaultTo('accrued');
+  t.timestamp('accrued_at').notNullable();
+  t.timestamp('reversed_at').nullable();
+  t.integer('payout_id').unsigned().nullable()
+    .references('id').inTable('affiliate_payouts');
+  t.timestamp('paid_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['payment_ref'], 'affiliate_commissions_ref_uq');
+  t.index(['affiliate_id', 'status'], 'affiliate_commissions_affiliate_idx');
+  t.index(['payout_id'], 'affiliate_commissions_payout_idx');
+  t.index(['tenant_id'], 'affiliate_commissions_tenant_idx');
+};
+
+/**
+ * O retrato da chave Pix na aprovação, para a base que já rodou a 0126 antes
+ * de ele existir (o desenvolvimento): a tabela nova já nasce com ele.
+ */
+const AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS = [
+  ['approved_pix_key', (t) => t.string('approved_pix_key', 140).nullable()],
+  ['approved_pix_key_type', (t) => t.string('approved_pix_key_type', 8).nullable()]
+];
+
+/**
+ * A versão das sessões do afiliado, para a base que já rodou a 0126 antes de
+ * ela existir (o desenvolvimento): a tabela nova já nasce com ela.
+ */
+const AFFILIATE_SESSION_VERSION_COLUMNS = [
+  ['session_version', (t) => t.integer('session_version').notNullable().defaultTo(0)]
+];
+
+const AFFILIATE_TABLES = [
+  ['affiliates', affiliatesTable],
+  ['affiliate_payouts', affiliatePayoutsTable],
+  ['affiliate_commissions', affiliateCommissionsTable]
+];
+
+/**
+ * A página de status da plataforma (0128) — ver `services/statusService.js`.
+ *
+ *   status_checks            uma linha por verificação automática, a cada
+ *                            minuto, de cada componente (panel, payments,
+ *                            whatsapp, genieacs): `ok`, a latência e um
+ *                            detalhe curto que só o console lê. Podada aos
+ *                            90 dias;
+ *   status_daily             a soma do dia (UTC) por componente — total e
+ *                            quantas deram certo. É dela que sai a barra de
+ *                            90 dias, numa consulta de no máximo 4 × 90
+ *                            linhas, em vez de agrupar meio milhão de
+ *                            verificações por dia em três dialetos;
+ *   status_incidents         o incidente ou a manutenção agendada, escritos
+ *                            no console: título, componentes (códigos
+ *                            separados por vírgula), impacto, situação e se os
+ *                            provedores são avisados;
+ *   status_incident_updates  a linha do tempo de cada um: a situação nova e a
+ *                            mensagem pública;
+ *   status_notification_marks  o que já foi avisado a cada provedor, uma linha
+ *                            por (incidente, provedor, evento) — o índice
+ *                            único é a garra que faz o aviso sair UMA vez,
+ *                            como em `plan_price_change_marks`.
+ *
+ * Todas da PLATAFORMA (compartilhadas): falam do serviço, acima dos
+ * provedores, e nenhuma leva nome de provedor para a página pública.
+ */
+const statusChecksTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('component', 16).notNullable();
+  t.boolean('ok').notNullable();
+  t.integer('latency_ms').nullable();
+  t.string('detail', 120).nullable();
+  t.timestamp('checked_at').notNullable().defaultTo(db.fn.now());
+  t.index(['component', 'checked_at'], 'status_checks_component_idx');
+};
+
+const statusDailyTable = () => (t) => {
+  t.increments('id').primary();
+  t.string('component', 16).notNullable();
+  t.string('day', 10).notNullable();
+  t.integer('total').notNullable().defaultTo(0);
+  t.integer('ok_count').notNullable().defaultTo(0);
+  t.unique(['component', 'day'], 'status_daily_uq');
+};
+
+const statusIncidentsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('title', 160).notNullable();
+  t.string('components', 64).notNullable();
+  t.string('impact', 16).notNullable().defaultTo('minor');
+  t.string('status', 16).notNullable().defaultTo('investigating');
+  t.string('kind', 16).notNullable().defaultTo('incident');
+  t.timestamp('starts_at').nullable();
+  t.timestamp('ends_at').nullable();
+  t.timestamp('resolved_at').nullable();
+  t.boolean('notify_providers').notNullable().defaultTo(false);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['status', 'kind'], 'status_incidents_status_idx');
+  t.index(['created_at'], 'status_incidents_created_idx');
+};
+
+const statusIncidentUpdatesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('incident_id').unsigned().notNullable()
+    .references('id').inTable('status_incidents').onDelete('CASCADE');
+  t.string('status', 16).notNullable();
+  t.text('message').notNullable();
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['incident_id'], 'status_incident_updates_incident_idx');
+};
+
+const statusNotificationMarksTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('incident_id').unsigned().notNullable()
+    .references('id').inTable('status_incidents').onDelete('CASCADE');
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('event', 32).notNullable();
+  t.string('status', 16).notNullable().defaultTo('claimed');
+  t.timestamp('claimed_until');
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.string('detail', 255);
+  t.timestamp('done_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['incident_id', 'tenant_id', 'event'], 'status_notification_marks_uq');
+};
+
+const STATUS_PAGE_TABLES = [
+  ['status_checks', statusChecksTable],
+  ['status_daily', statusDailyTable],
+  ['status_incidents', statusIncidentsTable],
+  ['status_incident_updates', statusIncidentUpdatesTable],
+  ['status_notification_marks', statusNotificationMarksTable]
+];
+
+/**
+ * Os add-ons pagos (0127) — ver `services/addonService.js`.
+ *
+ * `addons` é o CATÁLOGO, da plataforma, como `plans` e `coupons`:
+ *
+ *   code                o código estável (`whatsapp`, `ia`, `ont-1000`), o que
+ *                       a URL e a fatura nomeiam;
+ *   price_cents         o preço por período MENSAL do plano;
+ *   price_yearly_cents  o preço por ANO no ciclo anual (0104) — nulo é doze
+ *                       vezes o mensal;
+ *   kind                feature | limit;
+ *   feature             a chave do recurso que o add-on libera (`whatsapp`,
+ *                       `ai`), no `feature`;
+ *   limit_resource,
+ *   limit_amount        no `limit`: quanto o add-on soma a um teto do plano
+ *                       (`operators`, `subscribers`, `devices`);
+ *   gated               se o recurso PASSA A EXIGIR o add-on. Desligado por
+ *                       padrão: o catálogo pode vender o add-on sem tirar o
+ *                       recurso de quem já o usa — `requireAddon` só recusa
+ *                       com um add-on ATIVO e `gated` para aquela chave;
+ *   trial_access        se quem está em teste usa o recurso sem o add-on;
+ *   active, public      se ainda se vende, e se aparece na tela do provedor;
+ *   sort                a ordem dos cartões.
+ *
+ * `tenant_addons` é o que cada provedor tem — escopada, dinheiro de UM
+ * provedor, como `subscriptions`:
+ *
+ *   status      active | canceled;
+ *   active_key  o `addon_id` enquanto ativo, nulo depois: o índice único
+ *               `(tenant_id, active_key)` é o que faz o duplo clique dar UMA
+ *               linha (nulos não colidem nos três bancos — o histórico fica);
+ *   started_at  quando começou a valer;
+ *   cancel_at   o fim do período pago, quando o cancelamento foi pedido: vale
+ *               até lá, e a renovação que começa ali já sai sem ele;
+ *   canceled_at quando deixou de valer de fato;
+ *   free        dado pelo console, sem cobrança;
+ *   source      provider | console.
+ */
+const addonsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('code', 32).notNullable();
+  t.string('name', 64).notNullable();
+  t.string('description', 500).nullable();
+  t.integer('price_cents').unsigned().notNullable().defaultTo(0);
+  t.integer('price_yearly_cents').unsigned().nullable();
+  t.string('currency', 3).notNullable().defaultTo('BRL');
+  t.string('kind', 8).notNullable().defaultTo('feature');
+  t.string('feature', 32).nullable();
+  t.string('limit_resource', 16).nullable();
+  t.integer('limit_amount').unsigned().nullable();
+  t.boolean('gated').notNullable().defaultTo(false);
+  t.boolean('trial_access').notNullable().defaultTo(true);
+  t.boolean('active').notNullable().defaultTo(true);
+  t.boolean('public').notNullable().defaultTo(true);
+  t.integer('sort').notNullable().defaultTo(0);
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['code'], 'addons_code_uq');
+};
+
+const tenantAddonsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('addon_id').unsigned().notNullable()
+    .references('id').inTable('addons').onDelete('CASCADE');
+  t.string('status', 16).notNullable().defaultTo('active');
+  t.integer('active_key').unsigned().nullable();
+  t.timestamp('started_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('cancel_at').nullable();
+  t.timestamp('canceled_at').nullable();
+  t.boolean('free').notNullable().defaultTo(false);
+  t.string('source', 16).notNullable().defaultTo('provider');
+  t.string('reason', 255).nullable();
+  t.integer('created_by').unsigned().nullable();
+  t.integer('canceled_by').unsigned().nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'active_key'], 'tenant_addons_active_uq');
+  t.index(['tenant_id', 'status'], 'tenant_addons_status_idx');
+};
+
+const ADDON_TABLES = [
+  ['addons', addonsTable],
+  ['tenant_addons', tenantAddonsTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -3299,7 +3652,10 @@ export const SCHEMA_TABLES = [
   ...WA_MARKETING_OPT_OUT_TABLES,
   ...PLAN_PRICE_CHANGE_TABLES,
   ...PLATFORM_NPS_TABLES,
-  ...ASAAS_IMPORT_TABLES
+  ...ASAAS_IMPORT_TABLES,
+  ...AFFILIATE_TABLES,
+  ...ADDON_TABLES,
+  ...STATUS_PAGE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6965,6 +7321,82 @@ export const migrations = [
       await db.schema.alterTable('wa_conversations', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /**
+     * O programa de afiliados — ver `TENANT_AFFILIATE_COLUMNS` e
+     * `AFFILIATE_TABLES`.
+     */
+    id: '0126_affiliates',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if ((await missingColumns(db, 'tenants', TENANT_AFFILIATE_COLUMNS)).length) return false;
+      for (const [nome] of AFFILIATE_TABLES) {
+        if (!(await db.schema.hasTable(nome))) return false;
+      }
+      if ((await missingColumns(db, 'affiliate_payouts', AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS)).length) return false;
+      if ((await missingColumns(db, 'affiliates', AFFILIATE_SESSION_VERSION_COLUMNS)).length) return false;
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltam = await missingColumns(db, 'tenants', TENANT_AFFILIATE_COLUMNS);
+      if (faltam.length) {
+        await db.schema.alterTable('tenants', (t) => {
+          for (const add of faltam) add(t);
+        });
+      }
+      for (const [nome, construtor] of AFFILIATE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- três tabelas, em ordem
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+      const semRetrato = await missingColumns(db, 'affiliate_payouts', AFFILIATE_PAYOUT_SNAPSHOT_COLUMNS);
+      if (semRetrato.length) {
+        await db.schema.alterTable('affiliate_payouts', (t) => {
+          for (const add of semRetrato) add(t);
+        });
+      }
+      const semVersao = await missingColumns(db, 'affiliates', AFFILIATE_SESSION_VERSION_COLUMNS);
+      if (semVersao.length) {
+        await db.schema.alterTable('affiliates', (t) => {
+          for (const add of semVersao) add(t);
+        });
+      }
+    }
+  },
+  {
+    /** Os add-ons pagos — ver `ADDON_TABLES`. */
+    id: '0127_addons',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      for (const [name] of ADDON_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of ADDON_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
+    /** A página de status da plataforma — ver `STATUS_PAGE_TABLES`. */
+    id: '0128_status_page',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      for (const [name] of STATUS_PAGE_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of STATUS_PAGE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];

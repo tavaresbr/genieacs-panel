@@ -23,9 +23,11 @@ import { toCsvWith } from '../utils/csv.js';
  *
  *   - **Cobranças**: cada cobrança com VENCIMENTO no período (sem vencimento,
  *     a data de criação) — é a competência que o contador lança. A conta do
- *     valor vem aberta: bruto (o preço cheio do plano + o excedente), o
- *     desconto do cupom, o crédito usado, o excedente, o ajuste manual do
- *     console e o líquido (`amount_cents`, o que foi ao gateway). Sempre vale
+ *     valor vem aberta: bruto (o preço cheio do plano + o excedente + os
+ *     add-ons), o desconto do cupom, o crédito usado, o excedente, os add-ons
+ *     (0127 — recorrentes na renovação, proporcionais na pró-rata de ativação;
+ *     o cupom não vale neles), o ajuste manual do console e o líquido
+ *     (`amount_cents`, o que foi ao gateway). Sempre vale
  *     `bruto − cupom − crédito + ajuste = líquido`. O desconto do cupom é o
  *     preço de HOJE do plano menos o preço gravado na linha (`pricing_detail.base`)
  *     — o preço de tabela da época não é gravado, a mesma aproximação do
@@ -198,7 +200,9 @@ const STATUS_LABELS = Object.freeze({
   canceled: 'Cancelada'
 });
 
-const KIND_LABELS = Object.freeze({ renewal: 'Renovação', proration: 'Pró-rata' });
+const KIND_LABELS = Object.freeze({
+  renewal: 'Renovação', proration: 'Pró-rata', overage: 'Excedente', addon: 'Add-on (pró-rata)'
+});
 
 const METHOD_LABELS = Object.freeze({
   PIX: 'Pix',
@@ -251,17 +255,27 @@ export function chargeBreakdown(charge, { plan = null } = {}) {
   const net = inteiro(charge.amount_cents);
   const credit = BillingCharge.creditReservedOf(charge);
   const overage = BillingCharge.overageCentsOf(charge);
+  // Os add-ons (0127), fora do cupom: entram no bruto como o excedente.
+  const addons = BillingCharge.addonCentsOf(charge);
   const detalhe = BillingCharge.pricingDetailOf(charge);
   const baseGravada = detalhe && Number.isFinite(Number(detalhe.base)) && detalhe.base !== null ? inteiro(detalhe.base) : null;
-  const base = baseGravada ?? (net + credit - overage);
+  const base = baseGravada ?? (net + credit - overage - addons);
   let coupon = 0;
   if (charge.coupon_id && plan && (charge.kind ?? 'renewal') === 'renewal') {
     const cheio = SubscriptionService.cyclePriceCents({ billing_cycle: charge.billing_cycle ?? 'monthly' }, plan);
     coupon = Math.max(0, cheio - base);
   }
-  const gross = base + coupon + overage;
-  const adjustment = net + credit - base - overage;
-  return { grossCents: gross, couponDiscountCents: coupon, creditCents: credit, overageCents: overage, adjustmentCents: adjustment, netCents: net };
+  const gross = base + coupon + overage + addons;
+  const adjustment = net + credit - base - overage - addons;
+  return {
+    grossCents: gross,
+    couponDiscountCents: coupon,
+    creditCents: credit,
+    overageCents: overage,
+    addonCents: addons,
+    adjustmentCents: adjustment,
+    netCents: net
+  };
 }
 
 /** As colunas de cada aba: o cabeçalho, o campo da linha e o tipo do valor. */
@@ -286,7 +300,10 @@ export const ACCOUNTING_COLUMNS = Object.freeze({
     { header: 'Pago em', field: 'paidAtMs', type: 'datetime' },
     { header: 'Forma de pagamento', field: 'paymentMethod', type: 'text', width: 18 },
     { header: 'ID no gateway', field: 'gatewayChargeId', type: 'text', width: 22 },
-    { header: 'NFS-e', field: 'invoiceNumber', type: 'text' }
+    { header: 'NFS-e', field: 'invoiceNumber', type: 'text' },
+    // Os add-ons (0127) no FIM, e não ao lado do excedente: quem importa a
+    // planilha por posição de coluna não vê nada mudar de lugar.
+    { header: 'Add-ons', field: 'addonCents', type: 'money' }
   ],
   pagamentos: [
     { header: 'Registrado em', field: 'atMs', type: 'datetime' },
@@ -537,6 +554,7 @@ export function buildAccountingExport({
     couponDiscountCents: soma('couponDiscountCents'),
     creditCents: soma('creditCents'),
     overageCents: soma('overageCents'),
+    addonCents: soma('addonCents'),
     adjustmentCents: soma('adjustmentCents'),
     netCents: soma('netCents'),
     paymentsCount: linhasPagamento.length,
@@ -560,6 +578,7 @@ export function buildAccountingExport({
     { label: 'Descontos de cupom', value: { money: totals.couponDiscountCents } },
     { label: 'Créditos usados', value: { money: totals.creditCents } },
     { label: 'Excedente', value: { money: totals.overageCents } },
+    { label: 'Add-ons', value: { money: totals.addonCents } },
     { label: 'Ajustes manuais', value: { money: totals.adjustmentCents } },
     { label: 'Valor líquido cobrado', value: { money: totals.netCents } },
     { label: 'Pagamentos recebidos', value: totals.paymentsCount },

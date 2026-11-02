@@ -237,6 +237,27 @@ describe('aceitar', () => {
     assert.deepEqual(vinculos.map((v) => v.role), ['tech', 'viewer']);
   });
 
+  it('a regra da senha nova não se pula por um campo do corpo: quem decide é o banco', async () => {
+    const { token } = await convidar(ALFA, alfaAdminToken, { role: 'viewer' });
+    // Conta que NÃO existe, com o corpo dizendo que existe: a regra vale igual.
+    const bandeiras = { existing: true, existingAccount: true, accountExists: true, skipPolicy: true };
+    for (const password of ['curta-1', 'password123']) {
+      const r = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+        method: 'POST', body: { token, username: 'sem-atalho', password, email: 'sem-atalho@exemplo.test', ...bandeiras }
+      });
+      assert.equal(r.status, 400, `${password}: ${JSON.stringify(r.body)}`);
+      assert.ok(['password_length', 'password_too_common'].includes(r.body.code), JSON.stringify(r.body));
+    }
+    assert.equal(await getDb()('users').where({ username: 'sem-atalho' }).first(), undefined);
+    // O teto vale também para quem diz já ter conta, antes de qualquer bcrypt.
+    const gigante = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token, username: 'plantao-novo', password: 'x'.repeat(129) }
+    });
+    assert.equal(gigante.status, 400);
+    // E o convite segue de pé.
+    assert.equal((await callAs(ALFA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token } })).status, 200);
+  });
+
   it('não anexa duas vezes', async () => {
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'admin' });
     const { status } = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {

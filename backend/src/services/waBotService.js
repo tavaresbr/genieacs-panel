@@ -12,6 +12,7 @@ import MaintenanceService from './maintenanceService.js';
 import WaTagService from './waTagService.js';
 import BillingStatusService from './billingStatusService.js';
 import PlatformOwnerBotService from './platformOwnerBotService.js';
+import AddonService from './addonService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -638,6 +639,11 @@ class WaBotService {
     // Desligado na tela do WhatsApp: o provedor atende tudo à mão.
     const { botEnabled } = await WhatsAppConfigService.getConfig();
     if (botEnabled === false) return { replied: false, reason: 'disabled' };
+
+    // O add-on de WhatsApp (0127), quando o catálogo o exige: a porta das
+    // telas não alcança o bot, que responde do webhook. Sem add-on `gated`,
+    // nem consulta — o bot de todo mundo segue como era.
+    if (!(await AddonService.allows('whatsapp'))) return { replied: false, reason: 'addon_required' };
 
     // An opt-out is already recorded by the inbound handler and confirmed
     // elsewhere. Routing "SAIR" through the intent table would answer a request

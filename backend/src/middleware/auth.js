@@ -130,6 +130,9 @@ function generateTokens(user, membership) {
 function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET, {
+      // Fixado no que `jwt.sign` usa (HS256, o padrão): um token assinado com
+      // outro algoritmo é recusado em vez de negociado.
+      algorithms: ['HS256'],
       issuer: 'skygenpanel',
       audience: [PANEL_AUDIENCE, PLATFORM_AUDIENCE, CONSOLE_AUDIENCE]
     });

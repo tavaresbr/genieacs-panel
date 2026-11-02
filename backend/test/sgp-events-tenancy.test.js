@@ -86,11 +86,13 @@ before(async () => {
   // Each provider turns delivery on with its own secret, through its own
   // configuration — which lives in the scoped `app_state`, and is the reason
   // the endpoint could not read a second provider's secret before.
+  // Without the signed-timestamp requirement, which a new integration now
+  // starts with: these deliveries are signed over the body alone.
   await runInTenant(alfa, () => SgpService.saveConfig({
-    webhookEnabled: true, webhookSecret: SECRET_ALFA
+    webhookEnabled: true, webhookSecret: SECRET_ALFA, webhookRequireTimestamp: false
   }));
   await runInTenant(beta, () => SgpService.saveConfig({
-    webhookEnabled: true, webhookSecret: SECRET_BETA
+    webhookEnabled: true, webhookSecret: SECRET_BETA, webhookRequireTimestamp: false
   }));
 
   const setup = await call(`${panelUrl}/api/auth/setup`, {

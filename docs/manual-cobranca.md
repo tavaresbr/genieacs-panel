@@ -159,6 +159,36 @@ Na fatura, o provedor vê a linha "Excedente (recurso): unidades × preço = tot
 - **Subir de plano** vale na hora. Com um período pago correndo, sai uma fatura de **pró-rata** com a diferença dos dias que faltam. Se essa fatura vencer sem pagamento, o painel do provedor fica só para leitura.
 - **Descer de plano** com a assinatura em dia fica **agendado para a renovação**. No teste ou em atraso, vale na hora.
 
+### Add-ons
+
+Na aba **Planos**, abaixo do catálogo, o bloco **Add-ons** vende recursos (WhatsApp, IA) e aumentos de limite (mais operadores, assinantes ou ONTs) por cima do plano:
+
+- **Código** e **tipo** não mudam depois de criados. O preço muda e vale da **próxima** fatura de cada provedor.
+- **Preço anual** vazio: no plano anual o add-on custa **12 × o mensal**.
+- **Exigido para o recurso**: desligado por padrão. Ligado (num add-on ativo), quem não tem o add-on perde o acesso ao recurso; **Em teste pode usar** deixa os provedores em teste usarem sem ele. Antes de salvar, o console avisa **quantos provedores ativos perderiam o acesso** e pede confirmação. Nunca perdem: a caixa da plataforma e os provedores **isentos de cobrança**.
+- O que a exigência do **WhatsApp** fecha: as telas do WhatsApp, das campanhas e da régua de cobrança — e também o que roda no fundo: o **bot** deixa de responder, as **campanhas** (inclusive as agendadas) e a **régua de cobrança** automática (e o agradecimento de pagamento) param, e o **alerta** deixa de sair por WhatsApp (continua por e-mail e Telegram). Tudo volta sozinho quando o add-on é contratado.
+- O que ela **não** fecha: a tela de **alertas** (que também configura e-mail e Telegram), **quedas**, **manutenções** e **indique e ganhe**. Os avisos de queda e de manutenção aos assinantes continuam saindo — são avisos de serviço, não um recurso vendido à parte.
+- A exigência da **IA** fecha as rotas da IA e o **atendimento por IA** no bot: sem o add-on, a mensagem segue pelo menu, como com a IA desligada.
+- Add-on de limite **soma** ao teto do plano (num recurso sem teto, nada muda).
+
+Como é cobrado:
+
+- **Na renovação**: cada add-on ativo entra na fatura como uma linha própria, **por cima** do preço do plano. **O cupom vale só sobre o plano**, nunca sobre os add-ons.
+- **Ativar no meio do período** cobra na hora uma fatura de **pró-rata** do add-on pelos dias que faltam (abaixo de R$ 5,00 não sai fatura). A fatura da renovação que já tinha saído é reemitida com o add-on.
+- **Cancelar** vale na renovação: o add-on segue ativo até lá, e a fatura seguinte já sai sem ele. Reativar antes disso não cobra de novo.
+- Fatura com **valor mudado à mão** no console: ativar ou cancelar um add-on não desfaz o desconto — a **diferença** do add-on entra por cima do valor dado à mão, e a fatura continua marcada como valor à mão.
+- Add-ons exigem plano pago.
+
+No console, em **Provedores → Plano**, você vê os add-ons de cada provedor e pode **Conceder de graça** ou **Revogar** (vale na hora, sem estorno), sempre com o motivo, que vai para as duas trilhas de auditoria. A exportação contábil traz a coluna **Add-ons**, e o relatório de receita, o MRR dos add-ons à parte.
+
+### Afiliados: as regras do dinheiro
+
+- **Afiliado suspenso não perde comissão**: o pagamento do indicado gera a comissão como **guardada** (`held`), que não entra em lote. Reativado **dentro da janela** da indicação (12 meses, ou a janela própria do afiliado), ela volta a valer com a data de origem e entra no próximo lote. Reativado depois da janela, a guardada é perdida — a suspensão adia, não estica a janela. O estorno do pagamento desfaz a guardada.
+- **A aprovação confere a chave Pix**: o lote guarda a chave aprovada. Se o afiliado trocar a chave depois, o envio é recusado (**chave Pix mudou**) até alguém aprovar o lote de novo.
+- **A aprovação recalcula o total** pelas comissões que estão no lote; um estorno que chega depois da aprovação vira **abatimento** no lote seguinte.
+- **Reenvio**: depois de recusa do banco ou do gateway, o reenvio usa uma chave de idempotência nova; depois de uma resposta perdida, usa a mesma (e exige confirmar no gateway que nada saiu).
+- O portal do afiliado mostra o valor, a taxa e a data de cada comissão — não o valor da fatura do provedor indicado.
+
 ## Cupons
 
 Na aba **Cupons**, clique em **Novo cupom**:

@@ -7,7 +7,7 @@ import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../conf
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
 import { CONSOLE_AUDIENCE, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
-import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import { createResponse, createErrorResponse, isValidEmail, usernameLengthProblem } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { getDb } from '../config/database.js';
@@ -29,6 +29,8 @@ import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { translate } from '../i18n/index.js';
 import { DEFAULT_LOCALE } from '../i18n/config.js';
 import ReferralService from '../services/referralService.js';
+import { newPasswordProblem } from '../utils/passwordPolicy.js';
+import AffiliateService from '../services/affiliateService.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -267,8 +269,15 @@ class AuthController {
       if (name.length < 1 || name.length > SIGNUP_NAME_MAX) {
         return res.status(400).json(createErrorResponse(req.t('auth.signupInvalid')));
       }
-      if (username.length < 3 || username.length > 64 || password.length < 8 || password.length > 128) {
-        return res.status(400).json(createErrorResponse(req.t('auth.signupInvalid')));
+      const nomeRuim = usernameLengthProblem(username, 'auth.signupInvalid');
+      if (nomeRuim) {
+        return res.status(400).json(createErrorResponse(req.t(nomeRuim)));
+      }
+      // A regra da senha nova (10+, fora das comuns, diferente do login); ver
+      // `utils/passwordPolicy.js`. O tamanho mantém a frase de antes.
+      const senhaRuim = newPasswordProblem(password, { username, email }, { lengthKey: 'auth.signupInvalid' });
+      if (senhaRuim) {
+        return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
       }
       if (!email || !isValidEmail(email)) {
         return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
@@ -312,6 +321,7 @@ class AuthController {
       let tenantId;
       let userId;
       let referredBy = null;
+      let affiliateId = null;
       try {
         await getDb().transaction(async (trx) => {
           tenantId = await Tenant.create({ slug, name }, trx);
@@ -325,7 +335,20 @@ class AuthController {
           // A indicação (0106): `?ref=CÓDIGO` no link de quem indicou. Código
           // inválido e a indicação de si mesmo são ignorados — e uma falha
           // aqui também, num savepoint: a indicação nunca derruba o cadastro.
-          if (body.referralCode) {
+          // O afiliado (0126): `?aff=A-CÓDIGO`. Uma atribuição por cadastro —
+          // com o afiliado ligado, o `?ref=` do mesmo link não paga outra
+          // recompensa. Num savepoint, pela mesma regra da indicação.
+          if (body.affiliateCode) {
+            try {
+              affiliateId = await trx.transaction((sp) => AffiliateService.attachAtSignup({
+                trx: sp, tenantId, code: body.affiliateCode, email, taxId
+              }));
+            } catch (error) {
+              console.warn(`Signup: the affiliate code was ignored: ${String(error?.message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300)}`);
+              affiliateId = null;
+            }
+          }
+          if (body.referralCode && !affiliateId) {
             try {
               referredBy = await trx.transaction((sp) => ReferralService.attachAtSignup({
                 trx: sp, tenantId, code: body.referralCode, email, taxId
@@ -362,7 +385,9 @@ class AuthController {
       await PlatformAudit.record({
         action: PlatformAudit.ACTIONS.TENANT_CREATED,
         tenant,
-        detail: { via: 'signup', ownerUserId: userId, ...(referredBy ? { referredBy } : {}) },
+        detail: {
+          via: 'signup', ownerUserId: userId, ...(referredBy ? { referredBy } : {}), ...(affiliateId ? { affiliateId } : {})
+        },
         ip: req.ip ?? null
       });
       // O alerta da indicação para quem opera a plataforma (0112): um por
@@ -929,17 +954,17 @@ class AuthController {
         );
       }
 
-      if (String(password).length < 8 || String(password).length > 128) {
-        return res.status(400).json(
-          createErrorResponse(req.t('auth.passwordLength'))
-        );
-      }
-
       // Conta NOVA nasce com e-mail, sem exceção — e a primeira de todas menos
       // ainda: é a única do install que não tem quem a conserte depois, porque
       // é ela quem cadastra as outras. Contas sem endereço existem só como
       // herança de antes desta versão.
       const email = User.normalizeEmail(req.body?.email);
+
+      const senhaRuim = newPasswordProblem(String(password), { username: normalizedUsername, email });
+      if (senhaRuim) {
+        return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
+      }
+
       if (!email || !isValidEmail(email)) {
         return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
       }
@@ -1183,18 +1208,23 @@ class AuthController {
         );
       }
 
-      if (String(newPassword).length < 8 || String(newPassword).length > 128) {
-        return res.status(400).json(
-          createErrorResponse(req.t('auth.newPasswordLength'))
-        );
-      }
-      
       const user = await User.findById(userId);
       
       if (!user) {
         return res.status(404).json(
           createErrorResponse(req.t('auth.userNotFound'))
         );
+      }
+
+      // A regra vale para a senha NOVA; a atual, conferida abaixo, é aceita
+      // como estiver — inclusive a de 8 caracteres de antes desta regra.
+      const senhaRuim = newPasswordProblem(
+        String(newPassword),
+        { username: user.username, email: user.email },
+        { lengthKey: 'auth.newPasswordLength' }
+      );
+      if (senhaRuim) {
+        return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
       }
 
       // A senha atual pedida aqui é um oráculo nas mãos de quem tem só o
@@ -1514,8 +1544,26 @@ class AuthController {
       if (!token || !novaSenha) {
         return res.status(400).json(createErrorResponse(req.t('auth.passwordResetRequired')));
       }
-      if (novaSenha.length < 8 || novaSenha.length > 128) {
-        return res.status(400).json(createErrorResponse(req.t('auth.newPasswordLength')));
+      // Tamanho e lista de comuns ANTES do resgate: a recusa não pode gastar
+      // o bilhete, senão quem errou a regra teria de pedir outro e-mail.
+      const senhaRuim = newPasswordProblem(novaSenha, {}, { lengthKey: 'auth.newPasswordLength' });
+      if (senhaRuim) {
+        return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
+      }
+      // A comparação com o login da conta também vem antes, por uma espiada
+      // que não consome o bilhete. Bilhete ruim aqui só pula a checagem — o
+      // resgate abaixo é quem responde por ele, com a recusa de sempre.
+      const espiado = await AuthTicket.peek({
+        token,
+        purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
+        tenantId: req.hostTenantId ?? null
+      });
+      if (espiado) {
+        const dono = await User.findById(espiado.user_id);
+        const igual = newPasswordProblem(novaSenha, { username: dono?.username, email: espiado.email });
+        if (igual) {
+          return res.status(400).json(createErrorResponse(req.t(igual.key), null, igual.code));
+        }
       }
 
       // Vencido, já usado, inexistente, de outro host e de um endereço que não
