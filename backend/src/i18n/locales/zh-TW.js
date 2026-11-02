@@ -1407,5 +1407,19 @@ export default {
   'affiliate.invalidCredentials': '電子郵件或密碼無效',
   'affiliate.loginSuccess': '已登入',
   'affiliate.sessionRequired': '請登入推廣夥伴入口',
-  'affiliate.sessionExpired': '您的推廣夥伴工作階段已過期，請重新登入'
+  'affiliate.sessionExpired': '您的推廣夥伴工作階段已過期，請重新登入',
+  'receipt.kind.addon': '附加元件（啟用按比例計費）',
+  'addons.retrieved': '已載入附加元件',
+  'addons.retrieveFailed': '無法載入附加元件',
+  'addons.changeFailed': '無法變更附加元件',
+  'addons.activated': '附加元件 {name} 已啟用',
+  'addons.reactivated': '附加元件 {name} 已重新啟用：已撤銷排定的取消',
+  'addons.alreadyActive': '附加元件 {name} 已經啟用',
+  'addons.cancelScheduled': '附加元件 {name} 將在續約時取消',
+  'addons.canceled': '附加元件 {name} 已取消',
+  'addons.notFound': '找不到附加元件',
+  'addons.notActive': '此附加元件未啟用',
+  'addons.notChangeable': '目前的訂閱不允許變更附加元件',
+  'addons.paidPlanRequired': '附加元件需要付費方案',
+  'addons.required': '此功能需要附加元件。請在方案頁面啟用。'
 };

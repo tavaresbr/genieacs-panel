@@ -1405,5 +1405,19 @@ export default {
   'affiliate.invalidCredentials': 'E-mail o password non validi',
   'affiliate.loginSuccess': 'Accesso effettuato',
   'affiliate.sessionRequired': 'Accedi al portale affiliati',
-  'affiliate.sessionExpired': 'La sessione affiliato è scaduta; accedi di nuovo'
+  'affiliate.sessionExpired': 'La sessione affiliato è scaduta; accedi di nuovo',
+  'receipt.kind.addon': 'Add-on (proporzionale di attivazione)',
+  'addons.retrieved': 'Add-on caricati',
+  'addons.retrieveFailed': 'Impossibile caricare gli add-on',
+  'addons.changeFailed': 'Impossibile modificare l\'add-on',
+  'addons.activated': 'Add-on {name} attivato',
+  'addons.reactivated': 'Add-on {name} riattivato: l\'annullamento programmato è stato revocato',
+  'addons.alreadyActive': 'L\'add-on {name} è già attivo',
+  'addons.cancelScheduled': 'L\'add-on {name} verrà annullato al rinnovo',
+  'addons.canceled': 'Add-on {name} annullato',
+  'addons.notFound': 'Add-on non trovato',
+  'addons.notActive': 'Questo add-on non è attivo',
+  'addons.notChangeable': 'L\'abbonamento non consente di modificare gli add-on in questo momento',
+  'addons.paidPlanRequired': 'Gli add-on richiedono un piano a pagamento',
+  'addons.required': 'Questa funzione richiede un add-on. Attivalo nella pagina Piano.'
 };

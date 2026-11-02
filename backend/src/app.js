@@ -22,6 +22,7 @@ import {
   portalLoginLimiter
 } from './middleware/rateLimit.js';
 import { authenticateToken, requirePermission, requirePlatformAdmin } from './middleware/auth.js';
+import { requireAddon } from './middleware/addonGate.js';
 import { log, requestLogger } from './utils/logger.js';
 import { httpMetrics } from './utils/metrics.js';
 import { acsAgentOfflineBody, isAgentOffline } from './services/genieacs/agent.js';
@@ -425,6 +426,10 @@ app.use('/api/asaas', asaasProviderRoutes);
 app.use('/api/teiah', teiahRoutes);
 app.use('/api/focuschat', focusChatRoutes);
 app.use('/api/contacts', contactRoutes);
+// O add-on de WhatsApp (0125), na frente dos quatro roteadores do prefixo.
+// Desligada até o catálogo ter um add-on `gated` com a chave `whatsapp` — ver
+// `middleware/addonGate.js`. Ligada, ela autentica antes (o 401 vem primeiro).
+app.use('/api/whatsapp', requireAddon('whatsapp'));
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);

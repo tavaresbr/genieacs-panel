@@ -179,7 +179,10 @@ export const SCOPED_TABLES = new Set([
   // A pesquisa de satisfação do provedor (0123): a nota que ELE nos deu. Do
   // provedor, como o pedido de cancelamento — o console a lê de cima,
   // declarado, e o link público acha a linha pelo hash do token.
-  'platform_nps'
+  'platform_nps',
+  // Os add-ons que o provedor contratou (0125): o que ele paga além do plano.
+  // Do provedor, como a assinatura — sai no export dele e some com ele.
+  'tenant_addons'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -269,7 +272,9 @@ export const SHARED_TABLES = new Set([
   // tempo — cada lado a lê pelo próprio id, sempre nomeado.
   'affiliates',
   'affiliate_payouts',
-  'affiliate_commissions'
+  'affiliate_commissions',
+  // O catálogo de add-ons (0125): da plataforma, como `plans` e `coupons`.
+  'addons'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

@@ -1407,5 +1407,19 @@ export default {
   'affiliate.invalidCredentials': '邮箱或密码无效',
   'affiliate.loginSuccess': '已登录',
   'affiliate.sessionRequired': '请登录推广伙伴门户',
-  'affiliate.sessionExpired': '您的推广伙伴会话已过期，请重新登录'
+  'affiliate.sessionExpired': '您的推广伙伴会话已过期，请重新登录',
+  'receipt.kind.addon': '附加组件（激活按比例计费）',
+  'addons.retrieved': '已加载附加组件',
+  'addons.retrieveFailed': '无法加载附加组件',
+  'addons.changeFailed': '无法更改附加组件',
+  'addons.activated': '附加组件 {name} 已启用',
+  'addons.reactivated': '附加组件 {name} 已重新启用：已撤销计划的取消',
+  'addons.alreadyActive': '附加组件 {name} 已经启用',
+  'addons.cancelScheduled': '附加组件 {name} 将在续订时取消',
+  'addons.canceled': '附加组件 {name} 已取消',
+  'addons.notFound': '未找到附加组件',
+  'addons.notActive': '此附加组件未启用',
+  'addons.notChangeable': '当前订阅不允许更改附加组件',
+  'addons.paidPlanRequired': '附加组件需要付费套餐',
+  'addons.required': '此功能需要附加组件。请在套餐页面启用。'
 };

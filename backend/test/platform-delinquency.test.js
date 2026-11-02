@@ -257,7 +257,7 @@ describe('a lista de quem deve', () => {
     const b = rows.find((row) => row.tenant.id === beta);
     assert.equal(b.status, 'past_due');
     assert.equal(b.amountCents, 12500);
-    assert.deepEqual(b.amountByKind, { renewal: 10000, proration: 2500, overage: 0 });
+    assert.deepEqual(b.amountByKind, { renewal: 10000, proration: 2500, overage: 0, addon: 0 });
     assert.equal(b.openCents, 22500);
     assert.equal(b.overdueCharges, 2);
     assert.equal(b.daysOverdue, 20);
@@ -273,7 +273,7 @@ describe('a lista de quem deve', () => {
     const g = rows.find((row) => row.tenant.id === gama);
     assert.equal(g.status, 'suspended');
     assert.equal(g.suspendedReason, 'auto_nonpayment');
-    assert.deepEqual(g.amountByKind, { renewal: 10000, proration: 0, overage: 1234 });
+    assert.deepEqual(g.amountByKind, { renewal: 10000, proration: 0, overage: 1234, addon: 0 });
     assert.equal(g.daysOverdue, 40, 'desde o prazo que venceu, mesmo já suspenso');
     assert.equal(g.bucket, '30+');
     assert.equal(g.autoSuspendAt, null, 'já suspenso');

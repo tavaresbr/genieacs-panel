@@ -1407,5 +1407,19 @@ export default {
   'affiliate.invalidCredentials': 'ईमेल या पासवर्ड अमान्य है',
   'affiliate.loginSuccess': 'साइन इन हो गया',
   'affiliate.sessionRequired': 'एफ़िलिएट पोर्टल में साइन इन करें',
-  'affiliate.sessionExpired': 'आपका एफ़िलिएट सत्र समाप्त हो गया; फिर से साइन इन करें'
+  'affiliate.sessionExpired': 'आपका एफ़िलिएट सत्र समाप्त हो गया; फिर से साइन इन करें',
+  'receipt.kind.addon': 'ऐड-ऑन (सक्रियण का आनुपातिक शुल्क)',
+  'addons.retrieved': 'ऐड-ऑन लोड हुए',
+  'addons.retrieveFailed': 'ऐड-ऑन लोड नहीं हो सके',
+  'addons.changeFailed': 'ऐड-ऑन बदला नहीं जा सका',
+  'addons.activated': 'ऐड-ऑन {name} सक्रिय किया गया',
+  'addons.reactivated': 'ऐड-ऑन {name} फिर से सक्रिय: निर्धारित रद्दीकरण हटा दिया गया',
+  'addons.alreadyActive': 'ऐड-ऑन {name} पहले से सक्रिय है',
+  'addons.cancelScheduled': 'ऐड-ऑन {name} नवीनीकरण पर रद्द हो जाएगा',
+  'addons.canceled': 'ऐड-ऑन {name} रद्द किया गया',
+  'addons.notFound': 'ऐड-ऑन नहीं मिला',
+  'addons.notActive': 'यह ऐड-ऑन सक्रिय नहीं है',
+  'addons.notChangeable': 'सदस्यता अभी ऐड-ऑन बदलने की अनुमति नहीं देती',
+  'addons.paidPlanRequired': 'ऐड-ऑन के लिए सशुल्क प्लान आवश्यक है',
+  'addons.required': 'इस सुविधा के लिए ऐड-ऑन आवश्यक है। इसे प्लान पेज पर सक्रिय करें।'
 };

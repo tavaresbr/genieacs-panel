@@ -176,7 +176,7 @@ describe('contabilidade: a montagem', () => {
 
   it('a conta sem `pricing_detail` é o próprio valor', () => {
     assert.deepEqual(chargeBreakdown({ amount_cents: 5000 }), {
-      grossCents: 5000, couponDiscountCents: 0, creditCents: 0, overageCents: 0, adjustmentCents: 0, netCents: 5000
+      grossCents: 5000, couponDiscountCents: 0, creditCents: 0, overageCents: 0, addonCents: 0, adjustmentCents: 0, netCents: 5000
     });
   });
 

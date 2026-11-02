@@ -216,7 +216,14 @@ class PlatformAudit {
     AFFILIATE_PAYOUT_SEND_FAILED: 'affiliate.payout_send_failed',
     AFFILIATE_PAYOUT_REFRESHED: 'affiliate.payout_refreshed',
     AFFILIATE_PAYOUT_PAID: 'affiliate.payout_paid',
-    AFFILIATE_PAYOUT_CANCELED: 'affiliate.payout_canceled'
+    AFFILIATE_PAYOUT_CANCELED: 'affiliate.payout_canceled',
+    // Os add-ons pagos (0125): o catálogo mexido pelo console, e o add-on de
+    // um provedor ativado, cancelado, dado de graça ou revogado — pelo próprio
+    // provedor (`selfService: true`) ou pelo console, com o motivo.
+    ADDON_CREATED: 'addon.created',
+    ADDON_UPDATED: 'addon.updated',
+    ADDON_DELETED: 'addon.deleted',
+    TENANT_ADDON_CHANGED: 'tenant.addon_changed'
   });
 
   /**

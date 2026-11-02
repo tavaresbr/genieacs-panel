@@ -1407,5 +1407,19 @@ export default {
   'affiliate.invalidCredentials': 'メールアドレスまたはパスワードが正しくありません',
   'affiliate.loginSuccess': 'サインインしました',
   'affiliate.sessionRequired': 'アフィリエイトポータルにサインインしてください',
-  'affiliate.sessionExpired': 'アフィリエイトのセッションが期限切れです。もう一度サインインしてください'
+  'affiliate.sessionExpired': 'アフィリエイトのセッションが期限切れです。もう一度サインインしてください',
+  'receipt.kind.addon': 'アドオン（有効化の日割り）',
+  'addons.retrieved': 'アドオンを読み込みました',
+  'addons.retrieveFailed': 'アドオンを読み込めませんでした',
+  'addons.changeFailed': 'アドオンを変更できませんでした',
+  'addons.activated': 'アドオン {name} を有効化しました',
+  'addons.reactivated': 'アドオン {name} を再有効化しました：予定されていた解約を取り消しました',
+  'addons.alreadyActive': 'アドオン {name} はすでに有効です',
+  'addons.cancelScheduled': 'アドオン {name} は更新時に解約されます',
+  'addons.canceled': 'アドオン {name} を解約しました',
+  'addons.notFound': 'アドオンが見つかりません',
+  'addons.notActive': 'このアドオンは有効ではありません',
+  'addons.notChangeable': '現在のサブスクリプションではアドオンを変更できません',
+  'addons.paidPlanRequired': 'アドオンには有料プランが必要です',
+  'addons.required': 'この機能にはアドオンが必要です。プランページで有効にしてください。'
 };

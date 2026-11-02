@@ -1404,5 +1404,19 @@ export default {
   'affiliate.invalidCredentials': 'Correo o contraseña no válidos',
   'affiliate.loginSuccess': 'Sesión iniciada',
   'affiliate.sessionRequired': 'Inicie sesión en el portal de afiliados',
-  'affiliate.sessionExpired': 'Su sesión de afiliado expiró; inicie sesión de nuevo'
+  'affiliate.sessionExpired': 'Su sesión de afiliado expiró; inicie sesión de nuevo',
+  'receipt.kind.addon': 'Add-on (proporcional de la activación)',
+  'addons.retrieved': 'Add-ons cargados',
+  'addons.retrieveFailed': 'No se pudieron cargar los add-ons',
+  'addons.changeFailed': 'No se pudo cambiar el add-on',
+  'addons.activated': 'Add-on {name} activado',
+  'addons.reactivated': 'Add-on {name} reactivado: se deshizo la cancelación programada',
+  'addons.alreadyActive': 'El add-on {name} ya está activo',
+  'addons.cancelScheduled': 'El add-on {name} se cancelará en la renovación',
+  'addons.canceled': 'Add-on {name} cancelado',
+  'addons.notFound': 'Add-on no encontrado',
+  'addons.notActive': 'Este add-on no está activo',
+  'addons.notChangeable': 'La suscripción no permite cambiar add-ons ahora',
+  'addons.paidPlanRequired': 'Los add-ons requieren un plan de pago',
+  'addons.required': 'Este recurso requiere un add-on. Actívelo en la página Plan.'
 };

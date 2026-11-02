@@ -164,7 +164,9 @@ export function PlatformRevenue() {
             <h2 id="revenue-kpi-title" className="section-heading mb-3">{t('platform.revenue.summaryTitle')}</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6" aria-busy={loading}>
               <Kpi label={t('platform.revenue.mrr')} value={formatMoney(report.mrrCents, MOEDA)}
-                hint={t('platform.revenue.mrrHint', { count: report.activeCount })} />
+                hint={(report.addonMrrCents ?? 0) > 0
+                  ? `${t('platform.revenue.mrrHint', { count: report.activeCount })} · ${t('platform.revenue.addonMrr', { value: formatMoney(report.addonMrrCents ?? 0, MOEDA) })}`
+                  : t('platform.revenue.mrrHint', { count: report.activeCount })} />
               <Kpi label={t('platform.revenue.received')} value={formatMoney(report.receivedCents, MOEDA)}
                 hint={t('platform.revenue.netHint', { value: formatMoney(netCents(report), MOEDA) })} />
               <Kpi label={t('platform.revenue.refunded')} value={formatMoney(report.refundedCents, MOEDA)}

@@ -16,6 +16,7 @@ import { PlatformDelinquency } from '@/components/platform/platform-delinquency'
 import { PlatformRevenue } from '@/components/platform/platform-revenue'
 import { PlatformCoupons } from '@/components/platform/platform-coupons'
 import { PlatformAffiliates } from '@/components/platform/platform-affiliates'
+import { PlatformAddons } from '@/components/platform/platform-addons'
 import { PlatformHelp } from '@/components/platform/platform-help'
 import { PlatformStatus } from '@/components/platform/platform-status'
 import { PlatformOverviewTab, type OverviewTarget } from '@/components/platform/platform-overview'
@@ -573,6 +574,7 @@ export default function PlatformPage() {
 
         {aba === 'home' && <PlatformOverviewTab onNavigate={irPara} />}
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
+        {aba === 'plans' && <PlatformAddons />}
         {aba === 'subscriptions' && <PlatformSubscriptions plans={plans} estreito={estreito} />}
         {aba === 'delinquency' && <PlatformDelinquency />}
         {aba === 'revenue' && <PlatformRevenue />}

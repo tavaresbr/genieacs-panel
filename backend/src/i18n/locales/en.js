@@ -1407,5 +1407,19 @@ export default {
   'affiliate.invalidCredentials': 'Invalid email or password',
   'affiliate.loginSuccess': 'Signed in',
   'affiliate.sessionRequired': 'Sign in to the affiliate portal',
-  'affiliate.sessionExpired': 'Your affiliate session has expired; sign in again'
+  'affiliate.sessionExpired': 'Your affiliate session has expired; sign in again',
+  'receipt.kind.addon': 'Add-on (activation proration)',
+  'addons.retrieved': 'Add-ons retrieved',
+  'addons.retrieveFailed': 'Could not load the add-ons',
+  'addons.changeFailed': 'Could not change the add-on',
+  'addons.activated': 'Add-on {name} activated',
+  'addons.reactivated': 'Add-on {name} reactivated: the scheduled cancellation was undone',
+  'addons.alreadyActive': 'Add-on {name} is already active',
+  'addons.cancelScheduled': 'Add-on {name} will be canceled at renewal',
+  'addons.canceled': 'Add-on {name} canceled',
+  'addons.notFound': 'Add-on not found',
+  'addons.notActive': 'This add-on is not active',
+  'addons.notChangeable': 'The subscription does not allow changing add-ons right now',
+  'addons.paidPlanRequired': 'Add-ons require a paid plan',
+  'addons.required': 'This feature requires an add-on. Activate it on the Plan page.'
 };

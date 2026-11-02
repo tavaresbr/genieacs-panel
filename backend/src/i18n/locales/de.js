@@ -1408,5 +1408,19 @@ export default {
   'affiliate.invalidCredentials': 'Ungültige E-Mail oder ungültiges Passwort',
   'affiliate.loginSuccess': 'Angemeldet',
   'affiliate.sessionRequired': 'Melden Sie sich im Partnerportal an',
-  'affiliate.sessionExpired': 'Ihre Partnersitzung ist abgelaufen; melden Sie sich erneut an'
+  'affiliate.sessionExpired': 'Ihre Partnersitzung ist abgelaufen; melden Sie sich erneut an',
+  'receipt.kind.addon': 'Add-on (anteilige Aktivierung)',
+  'addons.retrieved': 'Add-ons geladen',
+  'addons.retrieveFailed': 'Add-ons konnten nicht geladen werden',
+  'addons.changeFailed': 'Das Add-on konnte nicht geändert werden',
+  'addons.activated': 'Add-on {name} aktiviert',
+  'addons.reactivated': 'Add-on {name} reaktiviert: die geplante Kündigung wurde aufgehoben',
+  'addons.alreadyActive': 'Das Add-on {name} ist bereits aktiv',
+  'addons.cancelScheduled': 'Das Add-on {name} wird zur Verlängerung gekündigt',
+  'addons.canceled': 'Add-on {name} gekündigt',
+  'addons.notFound': 'Add-on nicht gefunden',
+  'addons.notActive': 'Dieses Add-on ist nicht aktiv',
+  'addons.notChangeable': 'Das Abonnement erlaubt derzeit keine Änderung der Add-ons',
+  'addons.paidPlanRequired': 'Add-ons erfordern einen kostenpflichtigen Tarif',
+  'addons.required': 'Diese Funktion erfordert ein Add-on. Aktivieren Sie es auf der Seite Tarif.'
 };

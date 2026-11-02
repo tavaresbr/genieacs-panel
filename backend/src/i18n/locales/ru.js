@@ -1408,5 +1408,19 @@ export default {
   'affiliate.invalidCredentials': 'Неверный e-mail или пароль',
   'affiliate.loginSuccess': 'Вход выполнен',
   'affiliate.sessionRequired': 'Войдите в партнёрский портал',
-  'affiliate.sessionExpired': 'Сессия партнёра истекла; войдите снова'
+  'affiliate.sessionExpired': 'Сессия партнёра истекла; войдите снова',
+  'receipt.kind.addon': 'Дополнение (пропорционально при активации)',
+  'addons.retrieved': 'Дополнения загружены',
+  'addons.retrieveFailed': 'Не удалось загрузить дополнения',
+  'addons.changeFailed': 'Не удалось изменить дополнение',
+  'addons.activated': 'Дополнение {name} активировано',
+  'addons.reactivated': 'Дополнение {name} снова активно: запланированная отмена снята',
+  'addons.alreadyActive': 'Дополнение {name} уже активно',
+  'addons.cancelScheduled': 'Дополнение {name} будет отменено при продлении',
+  'addons.canceled': 'Дополнение {name} отменено',
+  'addons.notFound': 'Дополнение не найдено',
+  'addons.notActive': 'Это дополнение не активно',
+  'addons.notChangeable': 'Подписка сейчас не позволяет менять дополнения',
+  'addons.paidPlanRequired': 'Дополнения требуют платного тарифа',
+  'addons.required': 'Для этой функции нужно дополнение. Подключите его на странице «Тариф».'
 };

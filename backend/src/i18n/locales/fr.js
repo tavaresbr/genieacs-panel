@@ -1403,5 +1403,19 @@ export default {
   'affiliate.invalidCredentials': 'E-mail ou mot de passe invalide',
   'affiliate.loginSuccess': 'Connecté',
   'affiliate.sessionRequired': 'Connectez-vous au portail affilié',
-  'affiliate.sessionExpired': 'Votre session affilié a expiré ; reconnectez-vous'
+  'affiliate.sessionExpired': 'Votre session affilié a expiré ; reconnectez-vous',
+  'receipt.kind.addon': 'Module complémentaire (prorata d\'activation)',
+  'addons.retrieved': 'Modules complémentaires chargés',
+  'addons.retrieveFailed': 'Impossible de charger les modules complémentaires',
+  'addons.changeFailed': 'Impossible de modifier le module complémentaire',
+  'addons.activated': 'Module {name} activé',
+  'addons.reactivated': 'Module {name} réactivé : l\'annulation programmée a été annulée',
+  'addons.alreadyActive': 'Le module {name} est déjà actif',
+  'addons.cancelScheduled': 'Le module {name} sera annulé au renouvellement',
+  'addons.canceled': 'Module {name} annulé',
+  'addons.notFound': 'Module complémentaire introuvable',
+  'addons.notActive': 'Ce module complémentaire n\'est pas actif',
+  'addons.notChangeable': 'L\'abonnement ne permet pas de modifier les modules complémentaires pour le moment',
+  'addons.paidPlanRequired': 'Les modules complémentaires exigent un forfait payant',
+  'addons.required': 'Cette fonctionnalité exige un module complémentaire. Activez-le sur la page Forfait.'
 };

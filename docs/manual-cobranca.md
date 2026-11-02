@@ -159,6 +159,24 @@ Na fatura, o provedor vê a linha "Excedente (recurso): unidades × preço = tot
 - **Subir de plano** vale na hora. Com um período pago correndo, sai uma fatura de **pró-rata** com a diferença dos dias que faltam. Se essa fatura vencer sem pagamento, o painel do provedor fica só para leitura.
 - **Descer de plano** com a assinatura em dia fica **agendado para a renovação**. No teste ou em atraso, vale na hora.
 
+### Add-ons
+
+Na aba **Planos**, abaixo do catálogo, o bloco **Add-ons** vende recursos (WhatsApp, IA) e aumentos de limite (mais operadores, assinantes ou ONTs) por cima do plano:
+
+- **Código** e **tipo** não mudam depois de criados. O preço muda e vale da **próxima** fatura de cada provedor.
+- **Preço anual** vazio: no plano anual o add-on custa **12 × o mensal**.
+- **Exigido para o recurso**: desligado por padrão. Ligado (num add-on ativo), quem não tem o add-on perde o acesso ao recurso; **Em teste pode usar** deixa os provedores em teste usarem sem ele.
+- Add-on de limite **soma** ao teto do plano (num recurso sem teto, nada muda).
+
+Como é cobrado:
+
+- **Na renovação**: cada add-on ativo entra na fatura como uma linha própria, **por cima** do preço do plano. **O cupom vale só sobre o plano**, nunca sobre os add-ons.
+- **Ativar no meio do período** cobra na hora uma fatura de **pró-rata** do add-on pelos dias que faltam (abaixo de R$ 5,00 não sai fatura). A fatura da renovação que já tinha saído é reemitida com o add-on.
+- **Cancelar** vale na renovação: o add-on segue ativo até lá, e a fatura seguinte já sai sem ele. Reativar antes disso não cobra de novo.
+- Add-ons exigem plano pago.
+
+No console, em **Provedores → Plano**, você vê os add-ons de cada provedor e pode **Conceder de graça** ou **Revogar** (vale na hora, sem estorno), sempre com o motivo, que vai para as duas trilhas de auditoria. A exportação contábil traz a coluna **Add-ons**, e o relatório de receita, o MRR dos add-ons à parte.
+
 ## Cupons
 
 Na aba **Cupons**, clique em **Novo cupom**:

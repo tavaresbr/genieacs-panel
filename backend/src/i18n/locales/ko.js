@@ -1410,5 +1410,19 @@ export default {
   'affiliate.invalidCredentials': '이메일 또는 비밀번호가 올바르지 않습니다',
   'affiliate.loginSuccess': '로그인되었습니다',
   'affiliate.sessionRequired': '제휴 포털에 로그인하세요',
-  'affiliate.sessionExpired': '제휴 세션이 만료되었습니다. 다시 로그인하세요'
+  'affiliate.sessionExpired': '제휴 세션이 만료되었습니다. 다시 로그인하세요',
+  'receipt.kind.addon': '애드온(활성화 일할 금액)',
+  'addons.retrieved': '애드온을 불러왔습니다',
+  'addons.retrieveFailed': '애드온을 불러올 수 없습니다',
+  'addons.changeFailed': '애드온을 변경할 수 없습니다',
+  'addons.activated': '애드온 {name}이(가) 활성화되었습니다',
+  'addons.reactivated': '애드온 {name}이(가) 다시 활성화되었습니다: 예약된 해지가 취소되었습니다',
+  'addons.alreadyActive': '애드온 {name}은(는) 이미 활성 상태입니다',
+  'addons.cancelScheduled': '애드온 {name}은(는) 갱신 시 해지됩니다',
+  'addons.canceled': '애드온 {name}이(가) 해지되었습니다',
+  'addons.notFound': '애드온을 찾을 수 없습니다',
+  'addons.notActive': '이 애드온은 활성 상태가 아닙니다',
+  'addons.notChangeable': '현재 구독에서는 애드온을 변경할 수 없습니다',
+  'addons.paidPlanRequired': '애드온은 유료 요금제가 필요합니다',
+  'addons.required': '이 기능에는 애드온이 필요합니다. 요금제 페이지에서 활성화하세요.'
 };

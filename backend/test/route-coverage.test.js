@@ -244,7 +244,18 @@ const POR_ID = new Map([
   // A página de status (0126): id de `status_incidents`, tabela da plataforma,
   // sem vizinho a alcançar.
   ['PATCH /api/platform/status/incidents/:id', 'plano de controle; prova em platform-status.test.js — incidente que não existe é 404, e quem não é da plataforma também'],
-  ['POST /api/platform/status/incidents/:id/updates', 'plano de controle; prova em platform-status.test.js — incidente que não existe é 404, e o resolvido responde 409']
+  ['POST /api/platform/status/incidents/:id/updates', 'plano de controle; prova em platform-status.test.js — incidente que não existe é 404, e o resolvido responde 409'],
+  // Os add-ons pagos (0125). As duas do provedor levam o CÓDIGO do catálogo
+  // (`addons`, tabela da plataforma, igual para todos) — não um id de linha:
+  // a linha que muda é sempre a de `tenant_addons` do provedor em escopo. A
+  // prova de que ativar/cancelar no alfa não toca o beta está em addons.test.js.
+  ['POST /api/tenant/addons/:code/activate', 'chave natural do catálogo (addons, da plataforma); a linha gravada é do provedor em escopo — prova em addons.test.js'],
+  ['POST /api/tenant/addons/:code/cancel', 'chave natural do catálogo (addons, da plataforma); só cancela a linha do provedor em escopo — prova em addons.test.js'],
+  ['PATCH /api/platform/addons/:id', 'plano de controle; id de tabela do catálogo (addons) — prova em addons.test.js'],
+  ['DELETE /api/platform/addons/:id', 'plano de controle; id de tabela do catálogo (addons), só o nunca contratado — prova em addons.test.js'],
+  ['GET /api/platform/tenants/:id/addons', 'plano de controle; prova em addons.test.js — lê só o provedor da URL, e a caixa da plataforma é 404'],
+  ['POST /api/platform/tenants/:id/addons', 'plano de controle; prova em addons.test.js — dá o add-on só ao provedor da URL'],
+  ['POST /api/platform/tenants/:id/addons/:code/revoke', 'plano de controle; prova em addons.test.js — revoga só no provedor da URL']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -520,12 +531,22 @@ describe('toda rota endereçada por um parâmetro', () => {
   // (`affiliates`, `affiliate_payouts`), sem provedor a alcançar. Mesmo
   // pedágio, oito vezes: oito linhas em `DO_CONSOLE` e oito aqui; prova em
   // affiliates.test.js.
+  //
+  // E as sete dos add-ons pagos (0125). Cinco do console — o `PATCH` e o
+  // `DELETE` de `/addons/:id` (tabela do catálogo, como `plans`) e as três de
+  // `/tenants/:id/addons` (provedor visto de cima): cinco linhas em
+  // `DO_CONSOLE` e cinco aqui. E as duas do PROVEDOR
+  // (`/api/tenant/addons/:code/activate|cancel`), endereçadas pelo código do
+  // catálogo — chave natural igual para todos, como `/api/settings/:key`; a
+  // linha que elas gravam é sempre a do provedor em escopo. Por isso elas
+  // também sobem o teto de fora do console (30 → 32). Prova em addons.test.js.
+  //
   // E as duas da página de status (0126): mudar um incidente e postar na
   // linha do tempo dele (`/status/incidents/:id` e `.../updates`). Id de
   // `status_incidents`, tabela da PLATAFORMA, sem provedor nenhum para vazar.
   // Mesmo pedágio, duas vezes: duas linhas em `DO_CONSOLE` e duas aqui; prova
-  // em platform-status.test.js. São 89.
-  const TETO_DE_EXCECOES = 89;
+  // em platform-status.test.js. São 96.
+  const TETO_DE_EXCECOES = 96;
 
 
   /**
@@ -598,14 +619,25 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/affiliate-payouts/:id/mark-paid',
     'POST /api/platform/affiliate-payouts/:id/cancel',
     'PATCH /api/platform/status/incidents/:id',
-    'POST /api/platform/status/incidents/:id/updates'
+    'POST /api/platform/status/incidents/:id/updates',
+    'PATCH /api/platform/addons/:id',
+    'DELETE /api/platform/addons/:id',
+    'GET /api/platform/tenants/:id/addons',
+    'POST /api/platform/tenants/:id/addons',
+    'POST /api/platform/tenants/:id/addons/:code/revoke'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só
   // pode cair. Uma rota nova endereçada por id de linha de provedor não tem
   // como ser declarada sem alguém derrubar outra — que era a intenção desde o
   // começo.
-  const TETO_FORA_DO_CONSOLE = 30;
+  //
+  // Subiu de 30 para 32 com os add-ons (0125): as duas rotas do provedor
+  // endereçadas pelo CÓDIGO do catálogo (ver o comentário de
+  // `TETO_DE_EXCECOES`). Não é id de linha de provedor — é a chave de uma
+  // tabela da plataforma —, e a varredura, que prova o id do vizinho dando
+  // 404, não tem o que provar ali; a prova de isolamento está em addons.test.js.
+  const TETO_FORA_DO_CONSOLE = 32;
 
   it('deixa de fora só as que têm motivo, e não mais do que hoje', () => {
     const naoVarridas = comParametro
