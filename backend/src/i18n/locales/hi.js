@@ -887,6 +887,7 @@ export default {
   'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp फिर से जुड़ा: नंबर {account} फिर से काम कर रहा है',
   'whatsapp.alerts.metaQualityDropped': "आधिकारिक नंबर {account} की स्थिति Meta पर खराब हुई: {changes}. सेटिंग्स › WhatsApp देखें{link}",
   'whatsapp.alerts.lead': 'New sign-up interest (AI): {name} — plan: {plan}, area: {area}, WhatsApp {phone}. The conversation is tagged Venda.',
+  'whatsapp.alerts.aiNoCredit': 'The support AI ran out of credit at {provider}: customers are falling back to the menu. Top up on the AI provider\'s site and check Settings › Chatbot{link}',
   'whatsapp.alerts.metaQualityChange': "गुणवत्ता {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "दैनिक सीमा {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "स्थिति {to}",
