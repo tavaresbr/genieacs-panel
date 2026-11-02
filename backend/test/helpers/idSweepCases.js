@@ -742,6 +742,17 @@ export const casos = [
     tabela: 'sgp_links',
     coluna: 'contract'
   },
+  // As faturas do Asaas leem o banco (a última importação), sem ir a lugar
+  // nenhum: com o contrato do vizinho a ficha não existe (404 `not_found`); com
+  // o próprio a rota responde.
+  {
+    chave: 'sgpContract',
+    label: 'GET /api/contacts/:key/asaas-invoices',
+    method: 'GET',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/asaas-invoices`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
   // O boleto pelo WhatsApp pede os títulos ao SGP, como a rota acima: no
   // controle passa da busca da ficha e para no SGP.
   {

@@ -1,5 +1,8 @@
 import DeviceService from './deviceService.js';
 import SgpService from './sgpService.js';
+import InvoiceSourceService, { mergeOpenInvoices } from './invoiceSourceService.js';
+import AsaasInvoiceService from './asaasInvoiceService.js';
+import AsaasCustomer from '../models/AsaasCustomer.js';
 import WaConversationService from './waConversationService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
@@ -300,15 +303,37 @@ async function linkDoPortal() {
   return portalPublicUrl || null;
 }
 
-/** A fatura em aberto mais antiga, como o SGP a mandou (ou `null` sem nenhuma). */
+/**
+ * A fatura em aberto mais antiga entre as fontes do provedor (ou `null`).
+ *
+ * O SGP é a fonte do contrato e fala primeiro; a conta Asaas, quando o provedor
+ * deixou o bot consultá-la, acrescenta o que o SGP não tem (ver
+ * `mergeOpenInvoices`). Uma fatura do Asaas só sai daqui depois de relida ao
+ * vivo — se o Asaas diz que já foi paga, a próxima é a escolhida.
+ */
 async function faturaAberta(link) {
   const { invoices } = await SgpService.listInvoices({ contract: link.contract, onlyOpen: true });
   await BillingStatusService.record(link.contract, invoices);
-  // `true` for the reminder flag: the dunning rule refuses a not-yet-due
-  // invoice because a dunning message has nothing to charge for. Here the
-  // customer ASKED, and "you have one due on the 10th" is the answer.
-  const { fatura } = maisAntigaEmAberto(invoices, new Date(), true);
-  return fatura || null;
+  const asaas = await InvoiceSourceService.asaasInvoicesForContract(link.contract);
+  return maisAntigaDe(mergeOpenInvoices(invoices, asaas));
+}
+
+/** A mais antiga das abertas, completada se for do Asaas; tenta a seguinte se a lida ao vivo já não estiver aberta. */
+async function maisAntigaDe(faturas) {
+  let restantes = [...faturas];
+  for (let tentativa = 0; tentativa < 5; tentativa += 1) {
+    // `true` for the reminder flag: the dunning rule refuses a not-yet-due
+    // invoice because a dunning message has nothing to charge for. Here the
+    // customer ASKED, and "you have one due on the 10th" is the answer.
+    const { fatura } = maisAntigaEmAberto(restantes, new Date(), true);
+    if (!fatura) return null;
+    if (fatura.source !== 'asaas') return fatura;
+    // eslint-disable-next-line no-await-in-loop -- uma por vez: a seguinte só se pede se esta já não estava aberta
+    const pronta = await AsaasInvoiceService.completeForBot(fatura);
+    if (pronta) return pronta;
+    restantes = restantes.filter((f) => f !== fatura);
+  }
+  return null;
 }
 
 /** The oldest open invoice, spelled out. */
@@ -348,7 +373,11 @@ async function responderFatura(link) {
  * @returns {Promise<string[]>}
  */
 async function faturaEmPartes(link) {
-  const fatura = await faturaAberta(link);
+  return partesDaFatura(await faturaAberta(link));
+}
+
+/** As mensagens de uma fatura já escolhida (ou a resposta de "sem fatura em aberto"). */
+async function partesDaFatura(fatura) {
   if (!fatura) return [await WaBotConfigService.message('noOpenInvoice')];
 
   const codigos = [
@@ -875,7 +904,12 @@ class WaBotService {
     if (!isValidCpf(digitos) && !isValidCnpj(digitos)) return falhou('whatsapp.bot.invalidDocument');
 
     const contratos = await SgpService.lookupContacts({ document: digitos });
-    if (contratos.length === 0) return falhou('whatsapp.bot.documentNotFound');
+    if (contratos.length === 0) {
+      // Sem contrato no SGP: o cliente pode existir só na conta Asaas do provedor.
+      const doAsaas = await this.responderSoAsaas(conversation, digitos);
+      if (doAsaas) return doAsaas;
+      return falhou('whatsapp.bot.documentNotFound');
+    }
     if (contratos.length === 1) return this.vincular(conversation, contratos[0].contract);
 
     // Só contrato e rótulo: o documento que o assinante digitou não é guardado.
@@ -902,6 +936,46 @@ class WaBotService {
       }));
     });
     return linhas.join('\n');
+  }
+
+  /**
+   * O CPF/CNPJ que o SGP não conhece mas a conta Asaas do provedor conhece: o
+   * assinante recebe a fatura dele ali mesmo.
+   *
+   * A conversa NÃO é ligada a ninguém — ligar é por contrato, e este cliente
+   * não tem. O passo é zerado e a próxima pergunta pede o documento de novo;
+   * é o limite desta primeira versão, dito aqui para não parecer esquecimento.
+   *
+   * Devolve `null` quando não é caso do Asaas (integração desligada, bot sem
+   * consulta, ou documento desconhecido lá também): a identificação segue como
+   * "não encontrado". Uma falha do Asaas também cai nesse `null` — um
+   * assinante que existe no Asaas e não foi atendido por ele ouve "não
+   * encontrei", e tem o atendente a um pedido de distância.
+   */
+  static async responderSoAsaas(conversation, digitos) {
+    try {
+      if (!(await AsaasInvoiceService.botEnabled())) return null;
+      const clientes = await AsaasCustomer.listByDocument(digitos);
+      if (clientes.length === 0) return null;
+
+      const abertas = await AsaasInvoiceService.openByDocument(digitos);
+      const fatura = await maisAntigaDe(abertas);
+      await this.gravarPasso(conversation, {
+        bot_step: null,
+        bot_step_data: null,
+        bot_step_at: null,
+        bot_doc_attempts: 0,
+        bot_doc_window_at: null
+      });
+      for (const mensagem of await partesDaFatura(fatura)) {
+        // eslint-disable-next-line no-await-in-loop
+        await this.responderCom(conversation, mensagem);
+      }
+      return { replied: true, intent: fatura ? 'fatura' : 'noOpenInvoice' };
+    } catch (error) {
+      console.warn('waBot asaas:', error?.message || error);
+      return null;
+    }
   }
 
   /** Liga a conversa ao contrato, zera o passo e as tentativas, e manda o menu. */

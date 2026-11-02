@@ -36,6 +36,7 @@ class AsaasProviderController {
         apiKey: body.apiKey,
         importCustomers: body.importCustomers,
         importCharges: body.importCharges,
+        botLookup: body.botLookup,
         syncEnabled: body.syncEnabled,
         syncIntervalHours: body.syncIntervalHours
       });

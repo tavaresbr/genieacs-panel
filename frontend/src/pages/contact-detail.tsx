@@ -582,6 +582,8 @@ function InvoicesCard({ contactKey, contracts, whatsappPhone, settleMethods }: {
   const { can } = useAuth()
   const toast = useToast()
   const [groups, setGroups] = useState<{ contract: string; invoices: SgpInvoice[] }[] | null>(null)
+  // As do Asaas moram no CPF e não num contrato; vêm do banco (última importação).
+  const [asaas, setAsaas] = useState<{ enabled: boolean; invoices: SgpInvoice[] } | null>(null)
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
   const [settling, setSettling] = useState<(SgpInvoice & { contract: string }) | null>(null)
@@ -592,13 +594,15 @@ function InvoicesCard({ contactKey, contracts, whatsappPhone, settleMethods }: {
 
   const load = async () => {
     setLoading(true)
-    const res = await contactsAPI.invoices(contactKey)
+    const [res, asaasRes] = await Promise.all([contactsAPI.invoices(contactKey), contactsAPI.asaasInvoices(contactKey)])
     setLoading(false)
     if (!res.success || !res.data) {
       toast.error(res.message || t('contacts.profile.invoicesFailed'))
       return
     }
     setGroups(res.data)
+    // O Asaas é um complemento: se falhar, a lista do SGP aparece do mesmo jeito.
+    setAsaas(asaasRes.success && asaasRes.data ? asaasRes.data : null)
   }
 
   const all = groups?.flatMap((group) => group.invoices.map((invoice) => ({ ...invoice, contract: group.contract }))) ?? []
@@ -706,6 +710,34 @@ function InvoicesCard({ contactKey, contracts, whatsappPhone, settleMethods }: {
             })}
           </div>
         </>
+      )}
+      {groups !== null && asaas?.enabled && (
+        <section className="mt-5 border-t border-border pt-4" data-testid="asaas-invoices">
+          <h3 className="text-sm font-semibold">{t('contacts.profile.asaasInvoices')}</h3>
+          {asaas.invoices.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">{t('contacts.profile.asaasInvoicesEmpty')}</p>
+          ) : (
+            <ul className="mt-1 divide-y divide-border">
+              {asaas.invoices.map((invoice) => (
+                <li key={invoice.id ?? invoice.link ?? invoice.dueDate} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                  <span>
+                    <span className="font-semibold">{formatBrl(invoice.amount, intlLocale)}</span>
+                    <span className="ms-2 text-muted-foreground">{t('contacts.profile.dueOn', { date: formatSgpDate(invoice.dueDate, intlLocale) })}</span>
+                    {invoice.status === 'OVERDUE' && (
+                      <span className="modern-badge-warning ms-2">{t('contacts.profile.asaasOverdue')}</span>
+                    )}
+                  </span>
+                  {invoice.link && (
+                    <a className="modern-button-secondary" href={invoice.link} target="_blank" rel="noreferrer noopener">
+                      <Icon name="external" size={14} /> {t('contacts.profile.asaasOpen')}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">{t('contacts.profile.asaasInvoicesHint')}</p>
+        </section>
       )}
       {sending && <SendInvoiceModal contactKey={contactKey} invoiceId={sending} onClose={() => setSending(null)} />}
       {settling && settleMethods && (
