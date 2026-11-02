@@ -17,3 +17,16 @@ export function mascararSensivel(texto) {
     .replace(CNPJ, '[documento omitido]')
     .replace(CPF, '[documento omitido]');
 }
+
+/**
+ * O nome que o cliente pôs no WhatsApp, para entrar no prompt da IA como dado:
+ * sem caracteres de controle ou de direção de texto, numa linha, curto.
+ */
+export function nomeSeguro(nome) {
+  return String(nome ?? '')
+    .replace(/[\p{C}\u202A-\u202E\u2066-\u2069\u200E\u200F]/gu, ' ')
+    .replace(/["`]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40);
+}

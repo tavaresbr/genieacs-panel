@@ -265,6 +265,8 @@ const PAUSA_ATENDENTE_MS = 4 * 60 * 60 * 1000;
  * bot passa para um atendente, com a mesma pausa do "atendente".
  */
 const PASSO_VALIDADE_MS = 30 * 60 * 1000;
+/** O "sim" que libera o desbloqueio vale pouco: quem responde depois não é a mesma conversa. */
+const PASSO_LIBERACAO_VALIDADE_MS = 5 * 60 * 1000;
 const TENTATIVAS_DOCUMENTO = 3;
 const JANELA_TENTATIVAS_MS = 60 * 60 * 1000;
 /** Quantos contratos cabem na lista de escolha: um dígito por opção. */
@@ -526,7 +528,8 @@ async function responderLiberacao(link, conversation) {
 function passoAtivo(conversation) {
   if (!conversation?.bot_step || !conversation.bot_step_at) return null;
   const desde = new Date(conversation.bot_step_at).getTime();
-  return Date.now() - desde < PASSO_VALIDADE_MS ? conversation.bot_step : null;
+  const validade = conversation.bot_step === PASSO_LIBERACAO ? PASSO_LIBERACAO_VALIDADE_MS : PASSO_VALIDADE_MS;
+  return Date.now() - desde < validade ? conversation.bot_step : null;
 }
 
 class WaBotService {
@@ -554,6 +557,7 @@ class WaBotService {
   static TENTATIVAS_DOCUMENTO = TENTATIVAS_DOCUMENTO;
 
   static PASSO_VALIDADE_MS = PASSO_VALIDADE_MS;
+  static PASSO_LIBERACAO_VALIDADE_MS = PASSO_LIBERACAO_VALIDADE_MS;
 
   static PASSO_LIBERACAO = PASSO_LIBERACAO;
 
