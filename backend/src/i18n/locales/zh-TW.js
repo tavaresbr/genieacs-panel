@@ -1289,5 +1289,7 @@ export default {
   'subscription.pendingChange': '已有一個方案變更排定在 {date}。請確認要取代它。',
   'subscription.reasonRequired': '請填寫原因：強制立即變更或略過額度檢查時必須填寫。',
   'subscription.noRenewal': '目前沒有已付費的週期：無法將變更排定在續約時。',
-  'subscription.invalidMode': '變更模式必須是 auto、now 或 renewal。'
+  'subscription.invalidMode': '變更模式必須是 auto、now 或 renewal。',
+  'platformAlert.accounting_export.subject': "會計匯出：{month}",
+  'platformAlert.accounting_export.body': "附件為 {month} 的會計匯出（{format}）：帳單、收款、退款、抵扣額、NFS-e 發票與彙總。\n\n帳單：{count} 筆 · 淨額：{net}\n收款：{received} · 退款：{refunded}\n\n日期為巴西利亞時間，金額單位為雷亞爾。"
 };

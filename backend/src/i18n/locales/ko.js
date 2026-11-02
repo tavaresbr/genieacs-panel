@@ -1292,5 +1292,7 @@ export default {
   'subscription.pendingChange': '{date}에 이미 요금제 변경이 예약되어 있습니다. 교체할지 확인해 주세요.',
   'subscription.reasonRequired': '사유를 입력하세요. 지금 변경을 강제하거나 한도 확인을 건너뛰려면 필수입니다.',
   'subscription.noRenewal': '진행 중인 결제 기간이 없어 갱신 시점으로 변경을 예약할 수 없습니다.',
-  'subscription.invalidMode': '변경 모드는 auto, now 또는 renewal이어야 합니다.'
+  'subscription.invalidMode': '변경 모드는 auto, now 또는 renewal이어야 합니다.',
+  'platformAlert.accounting_export.subject': "회계 내보내기: {month}",
+  'platformAlert.accounting_export.body': "{month} 회계 내보내기({format})를 첨부합니다: 청구, 입금, 환불, 크레딧, NFS-e 및 요약.\n\n청구: {count}건 · 순액: {net}\n입금: {received} · 환불: {refunded}\n\n날짜는 브라질리아 시간, 금액은 헤알입니다."
 };

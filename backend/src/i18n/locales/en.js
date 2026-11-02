@@ -1289,5 +1289,7 @@ export default {
   'subscription.pendingChange': 'A plan change is already scheduled for {date}. Confirm that you want to replace it.',
   'subscription.reasonRequired': 'Enter a reason: it is required to force the change now or to skip the limit check.',
   'subscription.noRenewal': 'There is no paid period running: the change cannot be scheduled for the renewal.',
-  'subscription.invalidMode': 'The change mode must be auto, now or renewal.'
+  'subscription.invalidMode': 'The change mode must be auto, now or renewal.',
+  'platformAlert.accounting_export.subject': "Accounting export: {month}",
+  'platformAlert.accounting_export.body': "Attached is the accounting export for {month} ({format}): charges, payments, refunds, credits, service invoices (NFS-e) and the summary.\n\nCharges: {count} · Net amount: {net}\nReceived: {received} · Refunded: {refunded}\n\nDates in Brasília time and amounts in reais."
 };

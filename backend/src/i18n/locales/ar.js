@@ -1281,5 +1281,7 @@ export default {
   'subscription.pendingChange': 'يوجد بالفعل تغيير خطة مجدول في {date}. أكّد أنك تريد استبداله.',
   'subscription.reasonRequired': 'أدخل السبب: إنه مطلوب لفرض التغيير الآن أو لتخطي التحقق من الحدود.',
   'subscription.noRenewal': 'لا توجد فترة مدفوعة جارية: لا يمكن جدولة التغيير عند التجديد.',
-  'subscription.invalidMode': 'يجب أن يكون وضع التغيير auto أو now أو renewal.'
+  'subscription.invalidMode': 'يجب أن يكون وضع التغيير auto أو now أو renewal.',
+  'platformAlert.accounting_export.subject': "تصدير محاسبي: {month}",
+  'platformAlert.accounting_export.body': "مرفق التصدير المحاسبي لشهر {month} ({format}): الفواتير والمدفوعات والمبالغ المستردة والأرصدة وفواتير الخدمة NFS-e والملخص.\n\nالفواتير: {count} · المبلغ الصافي: {net}\nالمستلم: {received} · المسترد: {refunded}\n\nالتواريخ بتوقيت برازيليا والمبالغ بالريال."
 };

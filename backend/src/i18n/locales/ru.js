@@ -1290,5 +1290,7 @@ export default {
   'subscription.pendingChange': 'Смена тарифа уже запланирована на {date}. Подтвердите, что хотите её заменить.',
   'subscription.reasonRequired': 'Укажите причину: она обязательна, чтобы применить смену сейчас или пропустить проверку лимитов.',
   'subscription.noRenewal': 'Нет текущего оплаченного периода: смену нельзя запланировать на продление.',
-  'subscription.invalidMode': 'Режим смены должен быть auto, now или renewal.'
+  'subscription.invalidMode': 'Режим смены должен быть auto, now или renewal.',
+  'platformAlert.accounting_export.subject': "Бухгалтерская выгрузка: {month}",
+  'platformAlert.accounting_export.body': "Во вложении бухгалтерская выгрузка за {month} ({format}): счета, платежи, возвраты, кредиты, NFS-e и сводка.\n\nСчетов: {count} · Сумма нетто: {net}\nПолучено: {received} · Возвращено: {refunded}\n\nДаты по времени Бразилиа, суммы в реалах."
 };

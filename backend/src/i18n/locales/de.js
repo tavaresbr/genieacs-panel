@@ -1290,5 +1290,7 @@ export default {
   'subscription.pendingChange': 'Für den {date} ist bereits ein Tarifwechsel geplant. Bestätigen Sie, dass Sie ihn ersetzen möchten.',
   'subscription.reasonRequired': 'Geben Sie einen Grund an: Er ist erforderlich, um den Wechsel sofort zu erzwingen oder die Limitprüfung zu überspringen.',
   'subscription.noRenewal': 'Es läuft kein bezahlter Zeitraum: Der Wechsel kann nicht zur Verlängerung geplant werden.',
-  'subscription.invalidMode': 'Der Wechselmodus muss auto, now oder renewal sein.'
+  'subscription.invalidMode': 'Der Wechselmodus muss auto, now oder renewal sein.',
+  'platformAlert.accounting_export.subject': "Buchhaltungsexport: {month}",
+  'platformAlert.accounting_export.body': "Anbei der Buchhaltungsexport für {month} ({format}): Rechnungen, Zahlungen, Erstattungen, Gutschriften, NFS-e und die Zusammenfassung.\n\nRechnungen: {count} · Nettobetrag: {net}\nEingegangen: {received} · Erstattet: {refunded}\n\nDaten in Brasília-Zeit und Beträge in Real."
 };

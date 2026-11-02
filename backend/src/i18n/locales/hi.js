@@ -1289,5 +1289,7 @@ export default {
   'subscription.pendingChange': '{date} के लिए एक प्लान बदलाव पहले से निर्धारित है। पुष्टि करें कि आप उसे बदलना चाहते हैं।',
   'subscription.reasonRequired': 'कारण दर्ज करें: बदलाव को अभी लागू करने या सीमा जाँच छोड़ने के लिए यह आवश्यक है।',
   'subscription.noRenewal': 'कोई भुगतान की गई अवधि चल नहीं रही है: बदलाव को नवीनीकरण पर निर्धारित नहीं किया जा सकता।',
-  'subscription.invalidMode': 'बदलाव का मोड auto, now या renewal होना चाहिए।'
+  'subscription.invalidMode': 'बदलाव का मोड auto, now या renewal होना चाहिए।',
+  'platformAlert.accounting_export.subject': "लेखा निर्यात: {month}",
+  'platformAlert.accounting_export.body': "{month} का लेखा निर्यात ({format}) संलग्न है: बिल, भुगतान, रिफंड, क्रेडिट, NFS-e और सारांश।\n\nबिल: {count} · शुद्ध राशि: {net}\nप्राप्त: {received} · रिफंड: {refunded}\n\nतिथियाँ ब्रासीलिया समय में और राशियाँ रियाल में।"
 };

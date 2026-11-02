@@ -1287,5 +1287,7 @@ export default {
   'subscription.pendingChange': 'È già programmato un cambio di piano per il {date}. Conferma di volerlo sostituire.',
   'subscription.reasonRequired': 'Indica il motivo: è obbligatorio per forzare il cambio adesso o per saltare il controllo dei limiti.',
   'subscription.noRenewal': 'Non c\'è un periodo pagato in corso: il cambio non può essere programmato al rinnovo.',
-  'subscription.invalidMode': 'La modalità del cambio deve essere auto, now o renewal.'
+  'subscription.invalidMode': 'La modalità del cambio deve essere auto, now o renewal.',
+  'platformAlert.accounting_export.subject': "Esportazione contabile: {month}",
+  'platformAlert.accounting_export.body': "In allegato l'esportazione contabile di {month} ({format}): addebiti, pagamenti, rimborsi, crediti, NFS-e e il riepilogo.\n\nAddebiti: {count} · Importo netto: {net}\nIncassato: {received} · Rimborsato: {refunded}\n\nDate nell'orario di Brasília e importi in real."
 };

@@ -1286,5 +1286,7 @@ export default {
   'subscription.pendingChange': 'Ya hay un cambio de plan programado para el {date}. Confirma que quieres reemplazarlo.',
   'subscription.reasonRequired': 'Indica el motivo: es obligatorio para forzar el cambio ahora o para omitir la verificación de límites.',
   'subscription.noRenewal': 'No hay un período pagado en curso: el cambio no se puede programar para la renovación.',
-  'subscription.invalidMode': 'El modo del cambio debe ser auto, now o renewal.'
+  'subscription.invalidMode': 'El modo del cambio debe ser auto, now o renewal.',
+  'platformAlert.accounting_export.subject': "Exportación contable: {month}",
+  'platformAlert.accounting_export.body': "Adjuntamos la exportación contable de {month} ({format}): cobros, pagos, reembolsos, créditos, NFS-e y el resumen.\n\nCobros: {count} · Valor neto: {net}\nRecibido: {received} · Reembolsado: {refunded}\n\nFechas en horario de Brasilia y valores en reales."
 };

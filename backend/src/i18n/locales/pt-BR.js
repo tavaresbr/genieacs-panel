@@ -1288,5 +1288,7 @@ export default {
   'subscription.pendingChange': 'Já há uma troca de plano agendada para {date}. Confirme que quer substituí-la.',
   'subscription.reasonRequired': 'Informe o motivo: ele é obrigatório para forçar a troca agora ou para pular a checagem de limite.',
   'subscription.noRenewal': 'Não há um período pago correndo: a troca não pode ser agendada para a renovação.',
-  'subscription.invalidMode': 'O modo da troca deve ser auto, now ou renewal.'
+  'subscription.invalidMode': 'O modo da troca deve ser auto, now ou renewal.',
+  'platformAlert.accounting_export.subject': "Exportação contábil: {month}",
+  'platformAlert.accounting_export.body': "Segue em anexo a exportação contábil de {month} ({format}): cobranças, pagamentos, estornos, créditos, NFS-e e o resumo.\n\nCobranças: {count} · Valor líquido: {net}\nRecebido: {received} · Estornado: {refunded}\n\nDatas no horário de Brasília e valores em reais."
 };

@@ -292,6 +292,7 @@ export async function readProfile() {
     alerts: alertasDe(stored),
     reminderPolicy: reminderPolicyOf(stored),
     reminderPolicyDefault: defaultReminderPolicy(),
+    accounting: contabilidadeDe(stored),
     canSave: Boolean(platformId),
     updatedAt: stored.updatedAt ?? null
   };
@@ -463,6 +464,14 @@ export async function saveProfile(patch = {}) {
       mudou.push('reminderPolicy');
     }
   }
+  // A exportação para a contabilidade: um bloco só, mesclado ao gravado.
+  if ('accounting' in patch && patch.accounting !== undefined) {
+    const valor = normalizarContabilidade(patch.accounting, stored.accounting);
+    if (JSON.stringify(valor) !== JSON.stringify(contabilidadeDe(stored))) {
+      novo.accounting = valor;
+      mudou.push('accounting');
+    }
+  }
   // O aviso tem de cair ANTES da suspensão: com ele igual ou maior, sairia no
   // vencimento (ou antes dele) dizendo "vai ser suspenso" a quem nem atrasou.
   const politica = politicaDe(novo);
@@ -499,7 +508,68 @@ export async function reminderPolicyConfig() {
   return reminderPolicyOf(stored);
 }
 
+/**
+ * A exportação para a contabilidade (`accountingExportService`): o envio
+ * mensal ao contador — ligado ou não, o e-mail dele e o formato (`xlsx` ou
+ * `csv`). Sai no dia 1º, à hora do relatório mensal, com o mês que acabou.
+ * Desligado por padrão.
+ */
+export const ACCOUNTING_FORMATS = Object.freeze(['xlsx', 'csv']);
+const ACCOUNTING_EMAIL_MAX = 160;
+
+/** A configuração da contabilidade como vale: a gravada, completada pelo padrão. */
+function contabilidadeDe(stored) {
+  const gravado = stored?.accounting && typeof stored.accounting === 'object' ? stored.accounting : {};
+  const email = typeof gravado.email === 'string' && gravado.email.trim() ? gravado.email.trim() : null;
+  return {
+    enabled: gravado.enabled === true && Boolean(email),
+    email,
+    format: ACCOUNTING_FORMATS.includes(gravado.format) ? gravado.format : 'xlsx'
+  };
+}
+
+/** Um `accounting` recebido, mesclado ao gravado. Ausente mantém; lança no inválido. */
+function normalizarContabilidade(bruto, atual) {
+  if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) {
+    throw new PlatformProfileError('accounting must be an object', { field: 'accounting' });
+  }
+  const novo = contabilidadeDe({ accounting: atual });
+  // `enabled` gravado como veio: `contabilidadeDe` desliga quem não tem e-mail.
+  novo.enabled = atual?.enabled === true;
+  if (bruto.enabled !== undefined) {
+    if (typeof bruto.enabled !== 'boolean') throw new PlatformProfileError('Invalid accounting.enabled', { field: 'accounting' });
+    novo.enabled = bruto.enabled;
+  }
+  if (bruto.email !== undefined) {
+    const texto = bruto.email === null ? '' : String(bruto.email).trim();
+    if (texto && (!isValidEmail(texto) || texto.length > ACCOUNTING_EMAIL_MAX)) {
+      throw new PlatformProfileError('Invalid accounting email address', { field: 'accounting', code: 'invalid_email' });
+    }
+    novo.email = texto || null;
+  }
+  if (bruto.format !== undefined) {
+    if (!ACCOUNTING_FORMATS.includes(bruto.format)) {
+      throw new PlatformProfileError('accounting.format must be xlsx or csv', { field: 'accounting', code: 'invalid_format' });
+    }
+    novo.format = bruto.format;
+  }
+  // Ligado sem e-mail não chega a ninguém.
+  if (novo.enabled && !novo.email) {
+    throw new PlatformProfileError('accounting needs an email to be enabled', { field: 'accounting', code: 'email_required' });
+  }
+  return novo;
+}
+
+/**
+ * A contabilidade como o agendador e o "Enviar agora" a leem, sem o cache.
+ * Nunca lança — com o banco fora, vale o padrão (desligado).
+ */
+export async function accountingConfig() {
+  const { stored } = await lerGuardado({ fresh: true }).catch(() => ({ stored: {} }));
+  return contabilidadeDe(stored);
+}
+
 export default {
   readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, referralRewardCents, retentionConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS,
-  alertsConfig, ALERT_EVENTS, ALERT_CHANNELS, reminderPolicyConfig
+  alertsConfig, ALERT_EVENTS, ALERT_CHANNELS, reminderPolicyConfig, accountingConfig
 };

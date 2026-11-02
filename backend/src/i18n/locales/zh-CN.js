@@ -1289,5 +1289,7 @@ export default {
   'subscription.pendingChange': '已有一个计划变更安排在 {date}。请确认要替换它。',
   'subscription.reasonRequired': '请填写原因：强制立即变更或跳过限额检查时必须填写。',
   'subscription.noRenewal': '当前没有已付费的周期：无法将变更安排在续订时。',
-  'subscription.invalidMode': '变更模式必须是 auto、now 或 renewal。'
+  'subscription.invalidMode': '变更模式必须是 auto、now 或 renewal。',
+  'platformAlert.accounting_export.subject': "会计导出：{month}",
+  'platformAlert.accounting_export.body': "附件为 {month} 的会计导出（{format}）：账单、收款、退款、抵扣额、NFS-e 发票和汇总。\n\n账单：{count} 笔 · 净额：{net}\n收款：{received} · 退款：{refunded}\n\n日期为巴西利亚时间，金额单位为雷亚尔。"
 };

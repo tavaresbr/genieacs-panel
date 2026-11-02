@@ -1678,6 +1678,8 @@ export interface PlatformProfile {
   /** A régua de cobrança (0121): a que vale, e a padrão (a do "Restaurar padrão"). */
   reminderPolicy?: ReminderPolicy
   reminderPolicyDefault?: ReminderPolicy
+  /** A exportação para a contabilidade: o envio mensal ao contador. */
+  accounting?: PlatformAccountingConfig
   /** Falso quando não há caixa da plataforma onde gravar. */
   canSave: boolean
   updatedAt: string | null
@@ -2426,6 +2428,7 @@ export const platformAPI = {
       & Partial<Record<keyof PlatformBillingPolicy | keyof PlatformReferralPolicy, number | null>>
       & { alerts?: PlatformAlertsUpdate }
       & { reminderPolicy?: ReminderPolicy | null }
+      & { accounting?: Partial<Omit<PlatformAccountingConfig, 'email'>> & { email?: string | null } }
   ) =>
     apiClient.put<PlatformProfile & { changed: string[] }>('/platform/settings/profile', payload),
 
@@ -6902,7 +6905,7 @@ export type PlatformAlertStatus = 'pending' | 'sent' | 'failed' | 'skipped'
 export const PLATFORM_ALERT_STATUSES: readonly PlatformAlertStatus[] = ['pending', 'sent', 'failed', 'skipped']
 
 /** Os eventos do histórico: os configuráveis, o resumo diário e o teste. */
-export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test' | 'monthly_report'
+export type PlatformAlertHistoryEvent = PlatformAlertEvent | 'digest' | 'test' | 'monthly_report' | 'accounting_export'
 
 export interface PlatformAlertHistoryItem {
   id: number
@@ -7124,4 +7127,27 @@ export interface ConsolePlanChangeOutcome {
     reason?: string
     chargeId?: number
   } | null
+}
+
+// ── A exportação para a contabilidade ─────────────────────────────────────
+
+/** O envio mensal ao contador (Configurações → Contabilidade). */
+export interface PlatformAccountingConfig {
+  enabled: boolean
+  email: string | null
+  format: 'xlsx' | 'csv'
+}
+
+export const accountingAPI = {
+  /**
+   * O arquivo (caminho de `accountingExportPath`): o XLSX com as seis abas, ou
+   * uma aba em CSV. 400 `invalid_date`/`invalid_format`/`invalid_sheet`.
+   */
+  download: (path: string) => apiClient.getBlob(path),
+  /**
+   * Manda agora a exportação de `month` (padrão: o mês anterior) ao e-mail do
+   * contador. 409 `no_destination`; 502 `send_failed`; 400 `invalid_date`.
+   */
+  sendNow: (month?: string) =>
+    apiClient.post<{ month: string; format: 'xlsx' | 'csv' }>('/platform/reports/accounting/send', month ? { month } : {}),
 }

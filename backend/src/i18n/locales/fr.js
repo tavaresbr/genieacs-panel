@@ -1285,5 +1285,7 @@ export default {
   'subscription.pendingChange': 'Un changement de forfait est déjà programmé pour le {date}. Confirmez que vous voulez le remplacer.',
   'subscription.reasonRequired': 'Indiquez le motif : il est obligatoire pour forcer le changement maintenant ou pour ignorer la vérification des limites.',
   'subscription.noRenewal': 'Aucune période payée n\'est en cours : le changement ne peut pas être programmé au renouvellement.',
-  'subscription.invalidMode': 'Le mode du changement doit être auto, now ou renewal.'
+  'subscription.invalidMode': 'Le mode du changement doit être auto, now ou renewal.',
+  'platformAlert.accounting_export.subject': "Export comptable : {month}",
+  'platformAlert.accounting_export.body': "Ci-joint l'export comptable de {month} ({format}) : facturations, paiements, remboursements, crédits, NFS-e et le récapitulatif.\n\nFacturations : {count} · Montant net : {net}\nReçu : {received} · Remboursé : {refunded}\n\nDates à l'heure de Brasília et montants en reais."
 };

@@ -22,6 +22,9 @@ router.get('/reports/cancellations', ...guard, CancellationController.report);
 // As métricas mês a mês (gráficos da Receita) e o "Enviar relatório agora".
 router.get('/metrics/monthly', ...guard, PlatformReportsController.monthlyMetrics);
 router.post('/metrics/monthly-report/send', ...guard, PlatformReportsController.sendMonthlyReport);
+// A exportação para a contabilidade: o arquivo, e o "Enviar agora" ao contador.
+router.get('/reports/accounting', ...guard, PlatformReportsController.accountingExport);
+router.post('/reports/accounting/send', ...guard, PlatformReportsController.sendAccounting);
 // O painel inicial do console (aba Início): a foto de agora, num pedido só.
 router.get('/overview', ...guard, PlatformOverviewController.overview);
 

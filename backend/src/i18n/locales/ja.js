@@ -1289,5 +1289,7 @@ export default {
   'subscription.pendingChange': '{date} にプラン変更がすでに予約されています。置き換えてよいか確認してください。',
   'subscription.reasonRequired': '理由を入力してください。今すぐ変更を強制する場合や上限チェックをスキップする場合に必須です。',
   'subscription.noRenewal': '支払い済みの期間がありません。更新時に変更を予約できません。',
-  'subscription.invalidMode': '変更モードは auto、now、renewal のいずれかである必要があります。'
+  'subscription.invalidMode': '変更モードは auto、now、renewal のいずれかである必要があります。',
+  'platformAlert.accounting_export.subject': "会計エクスポート: {month}",
+  'platformAlert.accounting_export.body': "{month} の会計エクスポート ({format}) を添付します: 請求、入金、返金、クレジット、NFS-e、サマリー。\n\n請求: {count} 件 · 純額: {net}\n入金: {received} · 返金: {refunded}\n\n日時はブラジリア時間、金額はレアルです。"
 };

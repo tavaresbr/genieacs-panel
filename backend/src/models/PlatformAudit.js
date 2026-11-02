@@ -68,6 +68,12 @@ class PlatformAudit {
     // O "Enviar relatório agora" do relatório mensal. O detalhe diz o mês, os
     // canais e o resultado de cada um, nunca o destino.
     PLATFORM_MONTHLY_REPORT_SENT: 'platform.monthly_report_sent',
+    // A exportação para a contabilidade: quem baixou o quê (período, formato,
+    // aba) e o "Enviar agora" ao contador (mês, formato, resultado). Nunca o
+    // e-mail do contador. Linha própria porque a planilha leva o faturamento
+    // inteiro, com o CNPJ de cada provedor, para fora do deploy.
+    PLATFORM_ACCOUNTING_EXPORTED: 'platform.accounting_exported',
+    PLATFORM_ACCOUNTING_SENT: 'platform.accounting_sent',
     // O "Enviar e-mail de teste" do SMTP do deploy. O detalhe diz se saiu e,
     // se não, o código do motivo — nunca o destino nem o texto do erro.
     PLATFORM_MAIL_TEST: 'platform.mail_test',
