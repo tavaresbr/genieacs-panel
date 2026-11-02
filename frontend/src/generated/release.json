@@ -1,34 +1,22 @@
 {
-  "version": "1.22.0",
-  "build": 1458,
-  "sourceCommit": "5dc0f292f97f",
+  "version": "1.22.1",
+  "build": 1463,
+  "sourceCommit": "a2475fdd7354",
   "releasedAt": "2026-11-02",
-  "basedOnTag": "v1.21.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/148a0376ec7b...5dc0f292f97f",
+  "basedOnTag": "v1.22.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/9648e04194d4...a2475fdd7354",
   "changes": [
     {
-      "shortHash": "103732d7",
+      "shortHash": "0dc8cdf9",
       "date": "2026-11-02",
-      "title": "Importação de clientes e cobranças do Asaas (fase 2)",
-      "category": "New"
-    },
-    {
-      "shortHash": "a289cece",
-      "date": "2026-11-02",
-      "title": "Avisa a equipe quando o crédito da IA acaba",
-      "category": "New"
-    },
-    {
-      "shortHash": "7ed3b694",
-      "date": "2026-11-02",
-      "title": "Segurança: o robô e a IA respeitam a conversa que o atendente desvinculou",
+      "title": "Auditoria das ações sensíveis do WhatsApp: liberar, vincular, chamado, telefone, régua, campanha, opt-out, modelos e configuração",
       "category": "Maintenance"
     },
     {
-      "shortHash": "b9e35a86",
+      "shortHash": "f205caf1",
       "date": "2026-11-02",
-      "title": "Conferir cobranças sumidas pelos ids vistos, não por timestamp",
-      "category": "Fixed"
+      "title": "Let a server follow new releases on its own",
+      "category": "Maintenance"
     }
   ]
 }
