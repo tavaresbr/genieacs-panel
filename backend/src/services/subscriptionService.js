@@ -14,6 +14,7 @@ import { IS_SAAS } from '../config/edition.js';
 import { effectiveChargesConfig, earlyDiscountFor } from './billing/asaasSettingsService.js';
 import TenantCredit from '../models/TenantCredit.js';
 import ReferralService from './referralService.js';
+import AffiliateService from './affiliateService.js';
 import { defaultReminderPolicy, reminderWindows } from './reminderPolicy.js';
 
 /**
@@ -2892,6 +2893,10 @@ class SubscriptionService {
     // O crédito reservado na cobrança que este pagamento quita passa a gasto,
     // na mesma transação do evento (0106). O pago a menos deixa a cobrança em
     // aberto, e a reserva com ela.
+    // O afiliado (0124): TODO pagamento com dinheiro do indicado, dentro da
+    // janela, rende a comissão — lido aqui, fora da transação, e gravado lá
+    // dentro (ver `AffiliateService.prepareCommission`).
+    const doAfiliado = amount > 0 ? await AffiliateService.prepareCommission(tenantId, { now }) : null;
     const cobrancaComCredito = !underpaid && pedido.chargeId
       && (pedido.fonte === 'charge' || pedido.fonte === 'superseded_charge')
       ? Number(pedido.chargeId) : null;
@@ -2902,6 +2907,18 @@ class SubscriptionService {
           ? await ReferralService.rewardOnPayment({ trx, tenantId, prepared: indicacao, externalId, now })
           : null;
         const creditoGasto = cobrancaComCredito ? await TenantCredit.consumeForCharge(cobrancaComCredito, trx) : 0;
+        // A comissão do afiliado, na mesma transação do evento: a reentrega
+        // do webhook morre no índice único do evento e a leva junto.
+        const comissao = doAfiliado
+          ? await AffiliateService.accrueOnPayment({
+            trx,
+            tenantId,
+            prepared: doAfiliado,
+            paymentRef: externalId ? String(externalId) : `manual:${tenantId}:${now.getTime()}`,
+            baseCents: amount,
+            now
+          })
+          : null;
         // Dentro da transação do evento: a reentrega do mesmo pagamento morre
         // no índice único do evento logo abaixo, e o ciclo gasto aqui volta
         // junto no rollback — o cupom é consumido uma vez por pagamento.
@@ -2972,6 +2989,7 @@ class SubscriptionService {
             // A indicação recompensada por este pagamento, e o crédito que a
             // cobrança paga gastou (0106) — o estorno lê os dois.
             ...(recompensa ?? {}),
+            ...(comissao ?? {}),
             ...(creditoGasto ? { creditConsumed: { chargeId: cobrancaComCredito, cents: creditoGasto } } : {}),
             // O dia e o meio do pagamento, como o gateway os disse — o que a
             // lista de faturas e o recibo do provedor mostram. Só registro:
@@ -3200,6 +3218,9 @@ class SubscriptionService {
         // crédito que a cobrança dele gastou volta (0106) — na transação da
         // marca do estorno, uma vez só.
         const indicacaoDesfeita = await ReferralService.cancelOnRefund({ trx, tenantId, reference: referencia });
+        // A comissão do afiliado que este pagamento gerou (0124), desfeita na
+        // mesma transação da marca do estorno — uma vez só.
+        const comissaoDesfeita = await AffiliateService.reverseOnRefund({ trx, tenantId, reference: referencia });
         const creditoDevolvido = cobrancaPaga ? await TenantCredit.restoreForCharge(cobrancaPaga.id, trx) : 0;
         // O ciclo do cupom que o pagamento gastou volta com o dinheiro — na
         // mesma transação da marca do estorno, então o segundo estorno do
@@ -3230,6 +3251,7 @@ class SubscriptionService {
             ...(patch.cancel_at ? { cancelAtRestored: patch.cancel_at.toISOString() } : {}),
             ...(devolucao ? { couponRestored: { id: Number(gastou.id), code: gastou.code ?? null, ...devolucao } } : {}),
             ...(indicacaoDesfeita ?? {}),
+            ...(comissaoDesfeita ?? {}),
             ...(creditoDevolvido ? { creditRestored: { chargeId: Number(cobrancaPaga.id), cents: creditoDevolvido } } : {})
           }
         }, trx);

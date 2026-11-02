@@ -1403,5 +1403,10 @@ export default {
   'status.notice.maintenanceBody': 'Hallo {provider}, wir führen eine geplante Wartung an {components} von {start} bis {end} (Brasília-Zeit) durch: {title}. Während dieses Zeitfensters kann der Dienst instabil sein.',
   'status.notice.maintenanceDoneSubject': '[{product}] Wartung abgeschlossen: {title}',
   'status.notice.maintenanceDoneBody': 'Hallo {provider}, die geplante Wartung an {components} ({title}) ist abgeschlossen.',
-  'status.notice.follow': 'Verfolgen Sie es auf der Statusseite: {link}'
+  'status.notice.follow': 'Verfolgen Sie es auf der Statusseite: {link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'Ungültige E-Mail oder ungültiges Passwort',
+  'affiliate.loginSuccess': 'Angemeldet',
+  'affiliate.sessionRequired': 'Melden Sie sich im Partnerportal an',
+  'affiliate.sessionExpired': 'Ihre Partnersitzung ist abgelaufen; melden Sie sich erneut an'
 };

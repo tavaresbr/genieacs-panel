@@ -61,7 +61,13 @@ export const BILLING_POLICY_FIELDS = Object.freeze({
   // pausa. Zero desliga a oferta correspondente.
   retentionDiscountPercent: { default: 20, min: 0, max: 90 },
   retentionDiscountMonths: { default: 3, min: 0, max: 24 },
-  retentionPauseMaxMonths: { default: 2, min: 0, max: 12 }
+  retentionPauseMaxMonths: { default: 2, min: 0, max: 12 },
+  // O programa de afiliados (0124): a taxa padrão da comissão em pontos-base
+  // (1000 = 10%), por quantos meses depois do cadastro do indicado ela vale,
+  // e o mínimo do lote mensal — abaixo dele, o saldo fica para o mês seguinte.
+  affiliateRateBp: { default: 1000, min: 0, max: 10000 },
+  affiliateMonths: { default: 12, min: 1, max: 120 },
+  affiliatePayoutMinCents: { default: 5000, min: 0, max: 10_000_000 }
 });
 
 /**
@@ -569,7 +575,22 @@ export async function accountingConfig() {
   return contabilidadeDe(stored);
 }
 
+/**
+ * O programa de afiliados como a comissão e o lote o leem (0124):
+ * `{ rateBp, months, payoutMinCents }`. Sem cache, como `referralRewardCents`
+ * — é dinheiro. Nunca lança: sem caixa ou com o banco fora, vale o padrão.
+ */
+export async function affiliateConfig() {
+  const { stored } = await lerGuardado({ fresh: true }).catch(() => ({ stored: {} }));
+  const politica = politicaDe(stored);
+  return {
+    rateBp: politica.affiliateRateBp,
+    months: politica.affiliateMonths,
+    payoutMinCents: politica.affiliatePayoutMinCents
+  };
+}
+
 export default {
   readProfile, saveProfile, invalidatePlatformProfile, autoSuspendConfig, referralRewardCents, retentionConfig, PROFILE_FIELDS, BILLING_POLICY_FIELDS,
-  alertsConfig, ALERT_EVENTS, ALERT_CHANNELS, reminderPolicyConfig, accountingConfig
+  alertsConfig, ALERT_EVENTS, ALERT_CHANNELS, reminderPolicyConfig, accountingConfig, affiliateConfig
 };

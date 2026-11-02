@@ -10,6 +10,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
 import { referralCodeFromQuery } from '@/lib/referrals'
 import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
+import { affiliateCodeFromQuery } from '@/lib/affiliates'
 
 /** O nome do provedor como subdomínio: minúsculas, sem acento, hífens. */
 function slugFromName(value: string) {
@@ -36,6 +37,9 @@ export default function Signup() {
   // O código do link de indicação (0106). O servidor ignora o inválido e a
   // indicação de si mesmo; aqui só se lê e se mostra.
   const referralCode = referralCodeFromQuery(params.get('ref'))
+  // O código do afiliado (0124, `?aff=A-…`). Com ele, o servidor não paga a
+  // indicação do `?ref=` do mesmo link: uma atribuição por cadastro.
+  const affiliateCode = affiliateCodeFromQuery(params.get('aff'))
   const [form, setForm] = useState({
     providerName: '', slug: '', username: '', email: '', password: '', confirm: '',
     planCode: params.get('plano') ?? params.get('plan') ?? '', taxId: '', phone: ''
@@ -122,6 +126,7 @@ export default function Signup() {
         providerName: form.providerName.trim(), slug: form.slug, username: form.username.trim(), email: form.email.trim(), password: form.password,
         planCode: form.planCode || undefined,
         referralCode: referralCode || undefined,
+        affiliateCode: affiliateCode || undefined,
         taxId: taxId || undefined,
         phone: telefone || undefined,
         legalName: cnpj.state === 'found' ? cnpj.legalName : undefined,
@@ -179,7 +184,9 @@ export default function Signup() {
                 <p className="page-kicker">{t('signup.kicker')}</p>
                 <h1 className="text-2xl font-bold text-foreground">{t('signup.title')}</h1>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{t('signup.subtitle')}</p>
-                {referralCode && (
+                {affiliateCode ? (
+                  <p className="alert-info mt-3 text-sm leading-6">{t('signup.affiliate', { code: affiliateCode })}</p>
+                ) : referralCode && (
                   <p className="alert-info mt-3 text-sm leading-6">{t('signup.referred', { code: referralCode })}</p>
                 )}
               </div>

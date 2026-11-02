@@ -100,7 +100,9 @@ export async function baseUrl() {
  * (idem). O job trata todos como falha, mas o `last_error` da linha guarda qual
  * — e é o que alguém vai ler.
  */
-async function chamar(caminho, { method = 'POST', payload = null, credencial = null } = {}) {
+async function chamar(caminho, {
+  method = 'POST', payload = null, credencial = null, extraHeaders = null
+} = {}) {
   // `credencial` é a conta de um PROVEDOR (`{ apiKey, baseUrl }`): o cliente
   // serve às duas contas — a da plataforma, que cobra os provedores, e a de
   // cada provedor, que cobra os assinantes dele. Sem ela vale a da plataforma.
@@ -157,6 +159,9 @@ async function chamar(caminho, { method = 'POST', payload = null, credencial = n
         // O painel se identifica: o gateway registra isso e é o que aparece do
         // lado de lá quando alguém pergunta quem abriu a cobrança.
         'User-Agent': 'TR69-Controle',
+        // Os cabeçalhos a mais de quem chama (a chave idempotente da
+        // transferência, 0124) vêm ANTES da credencial: nenhum os sobrescreve.
+        ...(extraHeaders || {}),
         access_token: chave
       },
       body: corpo,
@@ -718,8 +723,96 @@ export async function cancelInvoice(invoiceId) {
   return notaDe(await chamar(`/invoices/${idNoCaminho(invoiceId)}/cancel`, { payload: {} }), invoiceId);
 }
 
+// ── As transferências Pix do programa de afiliados (0124) ──────────────
+
+/** Os tipos de chave Pix que o gateway aceita em `pixAddressKeyType`. */
+export const PIX_KEY_TYPES = Object.freeze(['CPF', 'CNPJ', 'EMAIL', 'PHONE', 'EVP']);
+
+/**
+ * O erro com a chave Pix tirada da mensagem. O gateway devolve o corpo do
+ * erro, e um corpo que repete a chave do destino iria parar no log e na linha
+ * do lote. A chave da API nunca está no corpo (vai só no cabeçalho), mas a
+ * regra é a mesma: o que vira texto passa por aqui.
+ */
+function semSegredo(error, segredos) {
+  if (!(error instanceof AsaasError)) {
+    return new AsaasError(`could not reach the gateway: ${String(error?.message ?? error)}`, { code: 'unreachable' });
+  }
+  let mensagem = String(error.message ?? '');
+  for (const segredo of segredos) {
+    const texto = String(segredo ?? '').trim();
+    if (texto.length >= 4) mensagem = mensagem.split(texto).join('***');
+  }
+  if (mensagem === error.message) return error;
+  const limpo = new AsaasError(mensagem, { status: error.status, code: error.code, errors: [] });
+  return limpo;
+}
+
+/** A transferência como o painel a guarda. */
+function transferenciaDe(resposta, fallbackId = null) {
+  const valor = Number(resposta?.value);
+  return {
+    id: resposta?.id ? String(resposta.id) : fallbackId,
+    status: resposta?.status ? String(resposta.status).toUpperCase().slice(0, 32) : null,
+    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null,
+    failReason: resposta?.failReason ? String(resposta.failReason).slice(0, 300) : null
+  };
+}
+
+/**
+ * Manda um Pix da conta da plataforma — `POST /transfers`.
+ *
+ * Só o lote APROVADO no console chama isto (`AffiliatePayoutService.send`),
+ * e a chave idempotente do lote vai junto, no cabeçalho e no
+ * `externalReference`: o clique duplo morre antes (a trava do lote), e a
+ * chave é a segunda cerca. Sem retentativa aqui, pela regra do arquivo.
+ *
+ * @returns {Promise<{ id: string|null, status: string|null, valueCents: number|null, failReason: string|null }>}
+ */
+export async function createTransfer({
+  valueCents, pixKey, pixKeyType, description = null, idempotencyKey
+}) {
+  const centavos = Number(valueCents);
+  if (!Number.isInteger(centavos) || centavos <= 0) throw new AsaasError('transfer value must be positive', { code: 'bad_request' });
+  const tipo = String(pixKeyType ?? '').toUpperCase();
+  if (!PIX_KEY_TYPES.includes(tipo)) throw new AsaasError('invalid Pix key type', { code: 'bad_request' });
+  const chave = String(pixKey ?? '').trim();
+  if (!chave) throw new AsaasError('no Pix key', { code: 'bad_request' });
+  const idem = String(idempotencyKey ?? '').trim();
+  if (!idem) throw new AsaasError('a transfer needs an idempotency key', { code: 'bad_request' });
+  try {
+    const resposta = await chamar('/transfers', {
+      payload: {
+        value: paraReais(centavos),
+        operationType: 'PIX',
+        pixAddressKey: chave,
+        pixAddressKeyType: tipo,
+        ...(description ? { description: String(description).slice(0, 140) } : {}),
+        externalReference: idem
+      },
+      extraHeaders: { 'Idempotency-Key': idem }
+    });
+    if (!resposta?.id) throw new AsaasError('gateway answered a transfer without an id', { code: 'bad_response' });
+    return transferenciaDe(resposta);
+  } catch (error) {
+    throw semSegredo(error, [chave]);
+  }
+}
+
+/** A transferência como o gateway a vê agora — `GET /transfers/{id}`. */
+export async function getTransfer(transferId) {
+  const id = String(transferId ?? '').trim();
+  if (!id) throw new AsaasError('no gateway transfer id', { code: 'bad_request' });
+  try {
+    return transferenciaDe(await chamar(`/transfers/${encodeURIComponent(id)}`, { method: 'GET' }), id);
+  } catch (error) {
+    throw semSegredo(error, []);
+  }
+}
+
 export default {
   createCharge, chargeTermsFor, cancelCharge, getCharge, getPixQrCode, getIdentificationField, getPaymentCard, findChargesByReference, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
   createCustomer, testConnection, apiKey, baseUrl, AsaasError,
-  createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment
+  createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment,
+  createTransfer, getTransfer
 };

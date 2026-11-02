@@ -1394,5 +1394,10 @@ export default {
   'status.notice.maintenanceBody': 'مرحبًا {provider}. سنجري صيانة مجدولة على {components} من {start} إلى {end} (بتوقيت برازيليا): {title}. قد تكون الخدمة غير مستقرة خلال هذه الفترة.',
   'status.notice.maintenanceDoneSubject': '[{product}] اكتملت الصيانة: {title}',
   'status.notice.maintenanceDoneBody': 'مرحبًا {provider}. اكتملت الصيانة المجدولة على {components} ({title}).',
-  'status.notice.follow': 'تابعها عبر صفحة الحالة: {link}'
+  'status.notice.follow': 'تابعها عبر صفحة الحالة: {link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+  'affiliate.loginSuccess': 'تم تسجيل الدخول',
+  'affiliate.sessionRequired': 'سجّل الدخول إلى بوابة الشركاء',
+  'affiliate.sessionExpired': 'انتهت جلسة الشريك؛ سجّل الدخول مرة أخرى'
 };

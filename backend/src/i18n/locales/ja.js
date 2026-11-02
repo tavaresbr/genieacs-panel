@@ -1402,5 +1402,10 @@ export default {
   'status.notice.maintenanceBody': '{provider} 様。{start} から {end}（ブラジリア時間）まで {components} の計画メンテナンスを実施します: {title}。この間、サービスが不安定になる場合があります。',
   'status.notice.maintenanceDoneSubject': '[{product}] メンテナンス完了: {title}',
   'status.notice.maintenanceDoneBody': '{provider} 様。{components} の計画メンテナンス（{title}）は完了しました。',
-  'status.notice.follow': 'ステータスページで確認できます: {link}'
+  'status.notice.follow': 'ステータスページで確認できます: {link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'メールアドレスまたはパスワードが正しくありません',
+  'affiliate.loginSuccess': 'サインインしました',
+  'affiliate.sessionRequired': 'アフィリエイトポータルにサインインしてください',
+  'affiliate.sessionExpired': 'アフィリエイトのセッションが期限切れです。もう一度サインインしてください'
 };

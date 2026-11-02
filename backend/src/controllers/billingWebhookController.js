@@ -9,6 +9,7 @@ import { effectiveWebhookToken } from '../services/billing/asaasSettingsService.
 import BillingInvoiceService from '../services/billing/billingInvoiceService.js';
 import CardAutopayService from '../services/billing/cardAutopayService.js';
 import Tenant from '../models/Tenant.js';
+import AffiliatePayoutService from '../services/affiliatePayoutService.js';
 
 /**
  * A entrega do gateway de pagamento: o provedor pagou, e o painel volta a
@@ -348,6 +349,19 @@ class BillingWebhookController {
     if (/^INVOICE_/.test(String(req.body?.event ?? ''))) {
       const code = await BillingInvoiceService.applyWebhook(req.body);
       return res.json({ success: true, code });
+    }
+
+    // As transferências Pix do programa de afiliados (0124): eventos
+    // `TRANSFER_*`, com a transferência no corpo. Só mudam o lote cujo
+    // `transfer_id` é o da entrega; a desconhecida é ignorada — 200 sempre.
+    if (/^TRANSFER_/.test(String(req.body?.event ?? ''))) {
+      try {
+        const code = await AffiliatePayoutService.applyTransferWebhook(req.body);
+        return res.json({ success: true, code });
+      } catch (error) {
+        console.error(`Billing webhook: could not apply ${req.body?.event} to an affiliate payout: ${error.message}`);
+        return res.status(500).json({ success: false, code: 'transfer_failed' });
+      }
     }
 
     const leitura = AsaasBillingProvider.interpretar(req.body);

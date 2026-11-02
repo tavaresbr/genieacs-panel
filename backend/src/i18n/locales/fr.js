@@ -1398,5 +1398,10 @@ export default {
   'status.notice.maintenanceBody': 'Bonjour, {provider}. Nous effectuerons une maintenance programmée sur {components} du {start} au {end} (heure de Brasília) : {title}. Le service peut être instable pendant cette fenêtre.',
   'status.notice.maintenanceDoneSubject': '[{product}] Maintenance terminée : {title}',
   'status.notice.maintenanceDoneBody': 'Bonjour, {provider}. La maintenance programmée sur {components} ({title}) est terminée.',
-  'status.notice.follow': 'Suivez-la sur la page d’état : {link}'
+  'status.notice.follow': 'Suivez-la sur la page d’état : {link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'E-mail ou mot de passe invalide',
+  'affiliate.loginSuccess': 'Connecté',
+  'affiliate.sessionRequired': 'Connectez-vous au portail affilié',
+  'affiliate.sessionExpired': 'Votre session affilié a expiré ; reconnectez-vous'
 };

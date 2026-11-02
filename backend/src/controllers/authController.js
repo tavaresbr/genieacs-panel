@@ -30,6 +30,7 @@ import { translate } from '../i18n/index.js';
 import { DEFAULT_LOCALE } from '../i18n/config.js';
 import ReferralService from '../services/referralService.js';
 import { newPasswordProblem } from '../utils/passwordPolicy.js';
+import AffiliateService from '../services/affiliateService.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -319,6 +320,7 @@ class AuthController {
       let tenantId;
       let userId;
       let referredBy = null;
+      let affiliateId = null;
       try {
         await getDb().transaction(async (trx) => {
           tenantId = await Tenant.create({ slug, name }, trx);
@@ -332,7 +334,20 @@ class AuthController {
           // A indicação (0106): `?ref=CÓDIGO` no link de quem indicou. Código
           // inválido e a indicação de si mesmo são ignorados — e uma falha
           // aqui também, num savepoint: a indicação nunca derruba o cadastro.
-          if (body.referralCode) {
+          // O afiliado (0124): `?aff=A-CÓDIGO`. Uma atribuição por cadastro —
+          // com o afiliado ligado, o `?ref=` do mesmo link não paga outra
+          // recompensa. Num savepoint, pela mesma regra da indicação.
+          if (body.affiliateCode) {
+            try {
+              affiliateId = await trx.transaction((sp) => AffiliateService.attachAtSignup({
+                trx: sp, tenantId, code: body.affiliateCode, email, taxId
+              }));
+            } catch (error) {
+              console.warn(`Signup: the affiliate code was ignored: ${error.message}`);
+              affiliateId = null;
+            }
+          }
+          if (body.referralCode && !affiliateId) {
             try {
               referredBy = await trx.transaction((sp) => ReferralService.attachAtSignup({
                 trx: sp, tenantId, code: body.referralCode, email, taxId
@@ -369,7 +384,9 @@ class AuthController {
       await PlatformAudit.record({
         action: PlatformAudit.ACTIONS.TENANT_CREATED,
         tenant,
-        detail: { via: 'signup', ownerUserId: userId, ...(referredBy ? { referredBy } : {}) },
+        detail: {
+          via: 'signup', ownerUserId: userId, ...(referredBy ? { referredBy } : {}), ...(affiliateId ? { affiliateId } : {})
+        },
         ip: req.ip ?? null
       });
       // O alerta da indicação para quem opera a plataforma (0112): um por

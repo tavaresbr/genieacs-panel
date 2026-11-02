@@ -1403,5 +1403,10 @@ export default {
   'status.notice.maintenanceBody': 'Здравствуйте, {provider}. Мы проведём плановое обслуживание {components} с {start} до {end} (время Бразилиа): {title}. В это время сервис может работать нестабильно.',
   'status.notice.maintenanceDoneSubject': '[{product}] Обслуживание завершено: {title}',
   'status.notice.maintenanceDoneBody': 'Здравствуйте, {provider}. Плановое обслуживание {components} ({title}) завершено.',
-  'status.notice.follow': 'Следите на странице статуса: {link}'
+  'status.notice.follow': 'Следите на странице статуса: {link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'Неверный e-mail или пароль',
+  'affiliate.loginSuccess': 'Вход выполнен',
+  'affiliate.sessionRequired': 'Войдите в партнёрский портал',
+  'affiliate.sessionExpired': 'Сессия партнёра истекла; войдите снова'
 };

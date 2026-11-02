@@ -1402,5 +1402,10 @@ export default {
   'status.notice.maintenanceBody': 'नमस्ते, {provider}। हम {start} से {end} (ब्रासीलिया समय) तक {components} पर निर्धारित रखरखाव करेंगे: {title}। इस दौरान सेवा अस्थिर हो सकती है।',
   'status.notice.maintenanceDoneSubject': '[{product}] रखरखाव पूरा हुआ: {title}',
   'status.notice.maintenanceDoneBody': 'नमस्ते, {provider}। {components} पर निर्धारित रखरखाव ({title}) पूरा हो गया है।',
-  'status.notice.follow': 'स्थिति पृष्ठ पर देखें: {link}'
+  'status.notice.follow': 'स्थिति पृष्ठ पर देखें: {link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': 'ईमेल या पासवर्ड अमान्य है',
+  'affiliate.loginSuccess': 'साइन इन हो गया',
+  'affiliate.sessionRequired': 'एफ़िलिएट पोर्टल में साइन इन करें',
+  'affiliate.sessionExpired': 'आपका एफ़िलिएट सत्र समाप्त हो गया; फिर से साइन इन करें'
 };

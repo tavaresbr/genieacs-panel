@@ -42,6 +42,8 @@ import platformLeadsRoutes from './routes/platformLeads.js';
 import platformReportsRoutes from './routes/platformReports.js';
 import platformNpsRoutes from './routes/platformNps.js';
 import platformStatusRoutes from './routes/platformStatus.js';
+import platformAffiliatesRoutes from './routes/platformAffiliates.js';
+import affiliatePortalRoutes from './routes/affiliatePortal.js';
 import publicRoutes from './routes/public.js';
 import platformIntegrationsRoutes from './routes/platformIntegrations.js';
 import userRoutes from './routes/users.js';
@@ -405,10 +407,15 @@ if (IS_SAAS) {
   app.use('/api/platform', platformNpsRoutes);
   // A página de status (0126): verificações, incidentes e manutenções.
   app.use('/api/platform', platformStatusRoutes);
+  // O programa de afiliados (0124): cadastro, aprovação e lotes mensais.
+  app.use('/api/platform', platformAffiliatesRoutes);
   // A página pública do ápice — o catálogo e o que o cadastro pergunta antes
   // de existir conta. Mesma regra do console: só no endereço da plataforma.
   app.use('/api/public', platformHostOnly);
   app.use('/api/public', publicRoutes);
+  // O portal do afiliado (0124): sessão própria, no endereço da plataforma.
+  app.use('/api/affiliate', platformHostOnly);
+  app.use('/api/affiliate', affiliatePortalRoutes);
 }
 app.use('/api/users', userRoutes);
 app.use('/api/invites', inviteRoutes);

@@ -1402,5 +1402,10 @@ export default {
   'status.notice.maintenanceBody': '{provider}，您好。我们将于 {start} 至 {end}（巴西利亚时间）对 {components} 进行计划维护：{title}。维护期间服务可能不稳定。',
   'status.notice.maintenanceDoneSubject': '[{product}] 维护已完成：{title}',
   'status.notice.maintenanceDoneBody': '{provider}，您好。{components} 的计划维护（{title}）已完成。',
-  'status.notice.follow': '请在状态页面查看：{link}'
+  'status.notice.follow': '请在状态页面查看：{link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': '邮箱或密码无效',
+  'affiliate.loginSuccess': '已登录',
+  'affiliate.sessionRequired': '请登录推广伙伴门户',
+  'affiliate.sessionExpired': '您的推广伙伴会话已过期，请重新登录'
 };

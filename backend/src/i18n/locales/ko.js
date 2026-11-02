@@ -1405,5 +1405,10 @@ export default {
   'status.notice.maintenanceBody': '안녕하세요, {provider}님. {start}부터 {end}까지(브라질리아 시간) {components} 예정된 점검을 진행합니다: {title}. 점검 시간 동안 서비스가 불안정할 수 있습니다.',
   'status.notice.maintenanceDoneSubject': '[{product}] 점검 완료: {title}',
   'status.notice.maintenanceDoneBody': '안녕하세요, {provider}님. {components} 예정된 점검({title})이 완료되었습니다.',
-  'status.notice.follow': '상태 페이지에서 확인하세요: {link}'
+  'status.notice.follow': '상태 페이지에서 확인하세요: {link}',
+  // O portal do afiliado (0124).
+  'affiliate.invalidCredentials': '이메일 또는 비밀번호가 올바르지 않습니다',
+  'affiliate.loginSuccess': '로그인되었습니다',
+  'affiliate.sessionRequired': '제휴 포털에 로그인하세요',
+  'affiliate.sessionExpired': '제휴 세션이 만료되었습니다. 다시 로그인하세요'
 };

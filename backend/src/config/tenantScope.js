@@ -263,7 +263,13 @@ export const SHARED_TABLES = new Set([
   'status_daily',
   'status_incidents',
   'status_incident_updates',
-  'status_notification_marks'
+  'status_notification_marks',
+  // O programa de afiliados (0124): o afiliado está acima dos provedores, o
+  // lote é dele, e a comissão fala de um afiliado e de um provedor ao mesmo
+  // tempo — cada lado a lê pelo próprio id, sempre nomeado.
+  'affiliates',
+  'affiliate_payouts',
+  'affiliate_commissions'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */
