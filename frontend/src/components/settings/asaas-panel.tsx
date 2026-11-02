@@ -29,6 +29,7 @@ export function AsaasPanel() {
     importCustomers: true,
     importCharges: true,
     botLookup: false,
+    allowWriteCustomers: false,
     syncEnabled: false,
     syncIntervalHours: 24
   })
@@ -43,6 +44,7 @@ export function AsaasPanel() {
       importCustomers: next.importCustomers,
       importCharges: next.importCharges,
       botLookup: next.botLookup,
+      allowWriteCustomers: next.allowWriteCustomers,
       syncEnabled: next.syncEnabled,
       syncIntervalHours: next.syncIntervalHours
     })
@@ -284,6 +286,18 @@ export function AsaasPanel() {
             <span className="text-sm">
               <span className="block font-semibold">{t('settings.asaas.import.botLookup')}</span>
               <span className="text-muted-foreground">{t('settings.asaas.import.botLookupHint')}</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 sm:col-span-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={importForm.allowWriteCustomers}
+              onChange={(event) => setImportForm((current) => ({ ...current, allowWriteCustomers: event.target.checked }))}
+            />
+            <span className="text-sm">
+              <span className="block font-semibold">{t('settings.asaas.import.allowWrite')}</span>
+              <span className="text-muted-foreground">{t('settings.asaas.import.allowWriteHint')}</span>
             </span>
           </label>
           <label className="flex items-start gap-3">

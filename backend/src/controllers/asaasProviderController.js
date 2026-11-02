@@ -37,6 +37,7 @@ class AsaasProviderController {
         importCustomers: body.importCustomers,
         importCharges: body.importCharges,
         botLookup: body.botLookup,
+        allowWriteCustomers: body.allowWriteCustomers,
         syncEnabled: body.syncEnabled,
         syncIntervalHours: body.syncIntervalHours
       });

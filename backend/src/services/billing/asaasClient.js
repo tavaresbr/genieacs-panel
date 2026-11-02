@@ -645,6 +645,27 @@ function diaDe(valor) {
 /** O tamanho de página que o gateway aceita no máximo. */
 export const MAX_PAGE_SIZE = 100;
 
+/** Um cliente do gateway como o painel o guarda. */
+function clienteDe(item) {
+  return {
+    id: String(item.id).slice(0, 32),
+    name: textoDe(item.name, 255),
+    document: textoDe(item.cpfCnpj, 32),
+    email: textoDe(item.email, 255),
+    phone: textoDe(item.phone, 32),
+    mobilePhone: textoDe(item.mobilePhone, 32),
+    postalCode: textoDe(item.postalCode, 16),
+    address: textoDe(item.address, 255),
+    addressNumber: textoDe(item.addressNumber, 32),
+    complement: textoDe(item.complement, 255),
+    province: textoDe(item.province, 255),
+    city: textoDe(item.cityName ?? item.city, 255),
+    state: textoDe(item.state, 8),
+    externalReference: textoDe(item.externalReference, 128),
+    deleted: item.deleted === true
+  };
+}
+
 /**
  * Uma página de clientes da conta — `GET /customers?offset=&limit=`.
  *
@@ -665,23 +686,7 @@ export async function listCustomersPage({ offset = 0, limit = MAX_PAGE_SIZE } = 
   return {
     rows: lista
       .filter((item) => item && item.id)
-      .map((item) => ({
-        id: String(item.id).slice(0, 32),
-        name: textoDe(item.name, 255),
-        document: textoDe(item.cpfCnpj, 32),
-        email: textoDe(item.email, 255),
-        phone: textoDe(item.phone, 32),
-        mobilePhone: textoDe(item.mobilePhone, 32),
-        postalCode: textoDe(item.postalCode, 16),
-        address: textoDe(item.address, 255),
-        addressNumber: textoDe(item.addressNumber, 32),
-        complement: textoDe(item.complement, 255),
-        province: textoDe(item.province, 255),
-        city: textoDe(item.cityName ?? item.city, 255),
-        state: textoDe(item.state, 8),
-        externalReference: textoDe(item.externalReference, 128),
-        deleted: item.deleted === true
-      })),
+      .map(clienteDe),
     hasMore: resposta?.hasMore === true,
     totalCount: Number.isFinite(Number(resposta?.totalCount)) ? Number(resposta.totalCount) : null
   };
@@ -737,13 +742,32 @@ export async function listChargesPage({ status, offset = 0, limit = MAX_PAGE_SIZ
  *
  * @returns {Promise<{customerId: string}>}
  */
-export async function createCustomer(payload) {
-  const resposta = await chamar('/customers', { payload });
+export async function createCustomer(payload, credencial = null) {
+  const resposta = await chamar('/customers', { payload, credencial });
   const customerId = String(resposta?.id ?? '').trim();
   if (!customerId) {
     throw new AsaasError('gateway created a customer without an id', { code: 'bad_response' });
   }
-  return { customerId };
+  // `customer`: o cadastro como o gateway o devolveu, para quem cria na conta
+  // de um provedor guardá-lo sem outra ida ao gateway.
+  return { customerId, customer: clienteDe({ ...resposta, id: customerId }) };
+}
+
+/**
+ * Os clientes da conta com este CPF/CNPJ — `GET /customers?cpfCnpj=`. É a
+ * checagem que antecede criar um: dois cadastros com o mesmo documento é o erro
+ * que o botão "Criar no Asaas" não pode cometer.
+ *
+ * @returns {Promise<Array<object>>} os não removidos
+ */
+export async function findCustomersByDocument(document, credencial = null) {
+  const digitos = String(document ?? '').replace(/\D/g, '');
+  if (!digitos) return [];
+  const resposta = await chamar(`/customers?${new URLSearchParams({ cpfCnpj: digitos, limit: '10' })}`, { method: 'GET', credencial });
+  return (Array.isArray(resposta?.data) ? resposta.data : [])
+    .filter((item) => item && item.id)
+    .map(clienteDe)
+    .filter((cliente) => !cliente.deleted);
 }
 
 /**
@@ -817,6 +841,6 @@ export async function cancelInvoice(invoiceId) {
 
 export default {
   createCharge, chargeTermsFor, cancelCharge, getCharge, getPixQrCode, getIdentificationField, getPaymentCard, findChargesByReference, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
-  createCustomer, listCustomersPage, listChargesPage, testConnection, apiKey, baseUrl, AsaasError,
+  createCustomer, findCustomersByDocument, listCustomersPage, listChargesPage, testConnection, apiKey, baseUrl, AsaasError,
   createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment
 };

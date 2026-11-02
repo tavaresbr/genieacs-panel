@@ -5,6 +5,8 @@ import WaContactService from './waContactService.js';
 import ContactProfileService, { ContactProfileError } from './contactProfileService.js';
 import { lookupCnpj } from './cnpjLookupService.js';
 import TeiahService from './teiahService.js';
+import AsaasCustomer from '../models/AsaasCustomer.js';
+import AsaasProviderService from './asaasProviderService.js';
 import { lookupCep } from './addressLookupService.js';
 import { isValidCnpj, isValidCpf } from '../utils/taxId.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
@@ -179,6 +181,15 @@ class ContactOnboardingService {
     let deceased = false;
     const known = inSgp.length > 0 || Boolean(inPanel);
 
+    // O mesmo CPF/CNPJ na conta Asaas do provedor (o que a importação trouxe) e
+    // se o painel pode criar o cliente lá: a tela oferece "Cadastrar também no
+    // Asaas" só quando pode e quando ainda não existe.
+    const asaasConfig = await AsaasProviderService.getConfig();
+    const inAsaas = AsaasProviderService.isReady(asaasConfig)
+      ? (await AsaasCustomer.listByDocument(digits)).map((row) => ({ asaasId: row.asaas_id, name: row.name }))
+      : [];
+    const asaasWritable = AsaasProviderService.isReady(asaasConfig) && asaasConfig.allowWriteCustomers;
+
     // Nobody here knows this document: the TeiaH, when the provider has it,
     // fills the form — a CPF has no other source.
     if (!known && TeiahService.isReady(await TeiahService.getConfig())) {
@@ -249,6 +260,8 @@ class ContactOnboardingService {
       sgpChecked,
       inSgp,
       inPanel,
+      inAsaas,
+      asaasWritable,
       prefill,
       prefillError,
       teiahConsulted,

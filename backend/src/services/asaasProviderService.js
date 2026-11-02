@@ -62,6 +62,7 @@ const DEFAULTS = Object.freeze({
   importCustomers: true,
   importCharges: true,
   botLookup: false,
+  allowWriteCustomers: false,
   syncEnabled: false,
   syncIntervalHours: SYNC_INTERVAL_HOURS.default,
   accountName: null,
@@ -133,6 +134,8 @@ class AsaasProviderService {
       importCharges: stored.importCharges !== false,
       // Desligado por padrão: ligar muda o que o bot responde aos assinantes.
       botLookup: stored.botLookup === true,
+      // Escrever na conta do provedor é opt-in, como o chamado do SGP: desligado.
+      allowWriteCustomers: stored.allowWriteCustomers === true,
       syncEnabled: stored.syncEnabled === true,
       syncIntervalHours: clampInterval(stored.syncIntervalHours, SYNC_INTERVAL_HOURS.default),
       accountName: stored.accountName ? String(stored.accountName) : null,
@@ -193,6 +196,7 @@ class AsaasProviderService {
       importCustomers: patch.importCustomers === undefined ? current.importCustomers : patch.importCustomers === true,
       importCharges: patch.importCharges === undefined ? current.importCharges : patch.importCharges === true,
       botLookup: patch.botLookup === undefined ? current.botLookup : patch.botLookup === true,
+      allowWriteCustomers: patch.allowWriteCustomers === undefined ? current.allowWriteCustomers : patch.allowWriteCustomers === true,
       syncEnabled: patch.syncEnabled === undefined ? current.syncEnabled : patch.syncEnabled === true,
       syncIntervalHours: patch.syncIntervalHours === undefined
         ? current.syncIntervalHours
@@ -259,6 +263,12 @@ class AsaasProviderService {
       blocked_host: ['asaas.error.unreachable', 502],
       gateway_error: ['asaas.error.gatewayDown', 502]
     };
+    // O motivo que o próprio Asaas deu (em português: "CPF/CNPJ inválido") vale
+    // mais que "recusou o pedido" — é o que o operador precisa para corrigir.
+    const reason = error.code === 'refused' ? error.errors?.[0]?.description : null;
+    if (reason) {
+      return new AsaasProviderError('asaas.error.refusedWith', { code: error.code, status: 400, vars: { reason } });
+    }
     const [key, status] = byCode[error.code] || ['asaas.error.refused', 502];
     // 401 do Asaas não é "sessão do painel expirada": o painel usa o status
     // para isso, então a recusa da chave sobe como 400.
