@@ -1292,5 +1292,11 @@ export default {
   'subscription.pendingChange': '{date}에 이미 요금제 변경이 예약되어 있습니다. 교체할지 확인해 주세요.',
   'subscription.reasonRequired': '사유를 입력하세요. 지금 변경을 강제하거나 한도 확인을 건너뛰려면 필수입니다.',
   'subscription.noRenewal': '진행 중인 결제 기간이 없어 갱신 시점으로 변경을 예약할 수 없습니다.',
-  'subscription.invalidMode': '변경 모드는 auto, now 또는 renewal이어야 합니다.'
+  'subscription.invalidMode': '변경 모드는 auto, now 또는 renewal이어야 합니다.',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '{product} 사용은 어떠신가요?',
+  'nps.askBody': '{provider}님, 안녕하세요!\n\n0점에서 10점 중, 다른 사업자의 동료에게 {product}를 추천할 가능성은 어느 정도인가요?\n\n클릭 한 번으로 답해 주세요(1분도 걸리지 않습니다): {link}\n\n점수와 의견은 플랫폼을 운영하는 팀에 바로 전달됩니다.',
+  'nps.askWhatsappHint': '원하시면 여기에 0부터 10까지 숫자만 보내 주셔도 됩니다.',
+  'nps.whatsappThanks': '감사합니다! {score}점을 받았습니다. 이유를 알려 주시려면 설문 링크로 답해 주세요.'
 };

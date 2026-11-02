@@ -1289,5 +1289,11 @@ export default {
   'subscription.pendingChange': 'A plan change is already scheduled for {date}. Confirm that you want to replace it.',
   'subscription.reasonRequired': 'Enter a reason: it is required to force the change now or to skip the limit check.',
   'subscription.noRenewal': 'There is no paid period running: the change cannot be scheduled for the renewal.',
-  'subscription.invalidMode': 'The change mode must be auto, now or renewal.'
+  'subscription.invalidMode': 'The change mode must be auto, now or renewal.',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'How is {product} working for you?',
+  'nps.askBody': 'Hello, {provider}!\n\nOn a scale from 0 to 10, how likely are you to recommend {product} to a colleague at another provider?\n\nAnswer in one click (it takes less than a minute): {link}\n\nYour score and comment go straight to the team that runs the platform.',
+  'nps.askWhatsappHint': 'If you prefer, just reply here with the number, from 0 to 10.',
+  'nps.whatsappThanks': 'Thank you! We received your score of {score}. If you want to tell us why, just answer through the survey link.'
 };

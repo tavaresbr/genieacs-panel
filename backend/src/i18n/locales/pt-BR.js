@@ -1288,5 +1288,11 @@ export default {
   'subscription.pendingChange': 'Já há uma troca de plano agendada para {date}. Confirme que quer substituí-la.',
   'subscription.reasonRequired': 'Informe o motivo: ele é obrigatório para forçar a troca agora ou para pular a checagem de limite.',
   'subscription.noRenewal': 'Não há um período pago correndo: a troca não pode ser agendada para a renovação.',
-  'subscription.invalidMode': 'O modo da troca deve ser auto, now ou renewal.'
+  'subscription.invalidMode': 'O modo da troca deve ser auto, now ou renewal.',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'Como está sendo usar o {product}?',
+  'nps.askBody': 'Olá, {provider}!\n\nDe 0 a 10, quanto você recomendaria o {product} a um colega de outro provedor?\n\nResponda em um clique (leva menos de um minuto): {link}\n\nSua nota e seu comentário vão direto para a equipe que cuida da plataforma.',
+  'nps.askWhatsappHint': 'Se preferir, responda aqui mesmo só com o número, de 0 a 10.',
+  'nps.whatsappThanks': 'Obrigado! Recebemos sua nota {score}. Se quiser contar o porquê, é só responder pelo link da pesquisa.'
 };

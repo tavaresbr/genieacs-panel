@@ -81,7 +81,9 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
   const [statuses, setStatuses] = useState<SubscriptionConsoleStatus[]>([])
   const [onlyOpenCharge, setOnlyOpenCharge] = useState(false)
   const [onlyExempt, setOnlyExempt] = useState(false)
-  const [search, setSearch] = useState('')
+  // `?q=` abre a tela já filtrada: é o link "Ver assinatura" dos detratores
+  // da Satisfação (0123).
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('q') ?? '')
 
   const load = useCallback(async () => {
     setLoading(true)

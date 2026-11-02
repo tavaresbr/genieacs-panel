@@ -7006,7 +7006,7 @@ export interface PlatformOverviewTrial {
 }
 
 export type PlatformOverviewBlock =
-  'revenue' | 'delinquency' | 'alerts' | 'cancellations' | 'renewals' | 'trials' | 'newTenants'
+  'revenue' | 'delinquency' | 'alerts' | 'cancellations' | 'renewals' | 'trials' | 'newTenants' | 'risk'
 
 /** Cada bloco é `null` quando falhou no servidor (e o nome vem em `errors`). */
 export interface PlatformOverview {
@@ -7031,6 +7031,8 @@ export interface PlatformOverview {
   renewals: { total: number; items: PlatformOverviewRenewal[] } | null
   trials: { total: number; items: PlatformOverviewTrial[] } | null
   newTenants: (PlatformOverviewDelta & { month: string; count: number }) | null
+  /** Os detratores do NPS (0123) e quantos deles têm sinal de risco. Opcional: servidor antigo. */
+  risk?: { detractors: number; atRisk: number } | null
   errors: PlatformOverviewBlock[]
 }
 
@@ -7124,4 +7126,92 @@ export interface ConsolePlanChangeOutcome {
     reason?: string
     chargeId?: number
   } | null
+}
+
+// ── A pesquisa de satisfação dos provedores (NPS, 0123) ──────────────────
+
+export type NpsWave = 'd30' | 'd90' | 'manual'
+export type NpsRiskSignal = 'overdue' | 'card_refused' | 'cancellation' | 'paused'
+
+/** O que a página pública (`/nps#token`) vê da pesquisa. */
+export interface NpsPublicView {
+  status: 'pending' | 'answered'
+  score: number | null
+  comment: string | null
+  product: string
+  /** Até quando a nota ainda pode mudar (7 dias da primeira resposta). */
+  editableUntil: string | null
+  canAnswer: boolean
+}
+
+export interface NpsSummary {
+  total: number
+  promoters: number
+  passives: number
+  detractors: number
+  /** De -100 a 100; nulo sem resposta. */
+  nps: number | null
+  /** `distribution[n]`: quantos deram a nota n (0 a 10). */
+  distribution: number[]
+  sent: number
+  answered: number
+  responseRate: number | null
+}
+
+export interface NpsTrendMonth {
+  month: string
+  responses: number
+  nps: number | null
+  promoters: number
+  passives: number
+  detractors: number
+}
+
+export interface NpsTenantRef {
+  id: number
+  name: string | null
+  slug: string | null
+}
+
+export interface NpsComment {
+  id: number
+  tenant: NpsTenantRef
+  score: number
+  comment: string
+  wave: NpsWave
+  answeredAt: string | null
+}
+
+export interface NpsDetractor {
+  tenant: NpsTenantRef
+  score: number
+  comment: string | null
+  answeredAt: string
+  wave: NpsWave
+  signals: NpsRiskSignal[]
+  atRisk: boolean
+}
+
+export interface NpsReport {
+  from: string | null
+  summary: NpsSummary
+  trend: NpsTrendMonth[]
+  comments: NpsComment[]
+  detractors: NpsDetractor[]
+  atRisk: number
+  providers: (NpsTenantRef & { lastAskedAt: string | null })[]
+}
+
+export const npsAPI = {
+  /** A página pública: o token vai no CORPO (fora do log). 404 `not_found`, 410 `expired`. */
+  lookup: (token: string) => apiClient.post<NpsPublicView>('/public/nps/lookup', { token }),
+  /** 400 `invalid_score`, 404, 410, 409 `already_answered` (passou a semana de edição). */
+  answer: (token: string, payload: { score: number; comment?: string }) =>
+    apiClient.post<NpsPublicView>('/public/nps/answer', { ...payload, token }),
+  /** O relatório do console, desde `from` (YYYY-MM-DD) ou tudo. */
+  report: (from?: string) =>
+    apiClient.get<NpsReport>(`/platform/reports/nps${from ? `?from=${encodeURIComponent(from)}` : ''}`),
+  /** "Enviar pesquisa". 409 `recent` | `no_destination` | `no_link`; 502 `send_failed`. */
+  send: (tenantId: number) =>
+    apiClient.post<{ id: number; channels: string[] }>(`/platform/tenants/${tenantId}/nps`, {}),
 }

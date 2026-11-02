@@ -1281,5 +1281,11 @@ export default {
   'subscription.pendingChange': 'يوجد بالفعل تغيير خطة مجدول في {date}. أكّد أنك تريد استبداله.',
   'subscription.reasonRequired': 'أدخل السبب: إنه مطلوب لفرض التغيير الآن أو لتخطي التحقق من الحدود.',
   'subscription.noRenewal': 'لا توجد فترة مدفوعة جارية: لا يمكن جدولة التغيير عند التجديد.',
-  'subscription.invalidMode': 'يجب أن يكون وضع التغيير auto أو now أو renewal.'
+  'subscription.invalidMode': 'يجب أن يكون وضع التغيير auto أو now أو renewal.',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'كيف هي تجربتك مع {product}؟',
+  'nps.askBody': 'مرحبًا {provider}!\n\nمن 0 إلى 10، ما مدى احتمال أن توصي بـ {product} لزميل في مزوّد آخر؟\n\nأجب بنقرة واحدة (أقل من دقيقة): {link}\n\nتصل درجتك وتعليقك مباشرة إلى الفريق المسؤول عن المنصة.',
+  'nps.askWhatsappHint': 'إن شئت، يمكنك الرد هنا بالرقم فقط، من 0 إلى 10.',
+  'nps.whatsappThanks': 'شكرًا! تلقينا درجتك {score}. إن أردت إخبارنا بالسبب، أجب عبر رابط الاستطلاع.'
 };

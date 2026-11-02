@@ -1289,5 +1289,11 @@ export default {
   'subscription.pendingChange': '已有一個方案變更排定在 {date}。請確認要取代它。',
   'subscription.reasonRequired': '請填寫原因：強制立即變更或略過額度檢查時必須填寫。',
   'subscription.noRenewal': '目前沒有已付費的週期：無法將變更排定在續約時。',
-  'subscription.invalidMode': '變更模式必須是 auto、now 或 renewal。'
+  'subscription.invalidMode': '變更模式必須是 auto、now 或 renewal。',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '您使用 {product} 的感受如何？',
+  'nps.askBody': '{provider}，您好！\n\n在 0 到 10 分之間，您有多大可能向其他業者的同行推薦 {product}？\n\n一鍵作答（不到一分鐘）：{link}\n\n您的評分與意見會直接送達負責平台的團隊。',
+  'nps.askWhatsappHint': '如果方便，也可以直接在這裡回覆 0 到 10 的數字。',
+  'nps.whatsappThanks': '謝謝！我們已收到您的評分 {score}。如想告訴我們原因，請透過問卷連結作答。'
 };

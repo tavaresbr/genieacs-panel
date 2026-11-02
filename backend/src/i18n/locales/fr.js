@@ -1285,5 +1285,11 @@ export default {
   'subscription.pendingChange': 'Un changement de forfait est déjà programmé pour le {date}. Confirmez que vous voulez le remplacer.',
   'subscription.reasonRequired': 'Indiquez le motif : il est obligatoire pour forcer le changement maintenant ou pour ignorer la vérification des limites.',
   'subscription.noRenewal': 'Aucune période payée n\'est en cours : le changement ne peut pas être programmé au renouvellement.',
-  'subscription.invalidMode': 'Le mode du changement doit être auto, now ou renewal.'
+  'subscription.invalidMode': 'Le mode du changement doit être auto, now ou renewal.',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': 'Comment se passe votre utilisation de {product} ?',
+  'nps.askBody': 'Bonjour {provider} !\n\nSur une échelle de 0 à 10, quelle est la probabilité que vous recommandiez {product} à un collègue d’un autre fournisseur ?\n\nRépondez en un clic (moins d’une minute) : {link}\n\nVotre note et votre commentaire vont directement à l’équipe qui gère la plateforme.',
+  'nps.askWhatsappHint': 'Si vous préférez, répondez ici simplement avec le chiffre, de 0 à 10.',
+  'nps.whatsappThanks': 'Merci ! Nous avons bien reçu votre note de {score}. Pour nous dire pourquoi, répondez via le lien de l’enquête.'
 };

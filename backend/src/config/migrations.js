@@ -3032,6 +3032,54 @@ const WA_MARKETING_COLUMN_TABLES = [
 ];
 
 /**
+ * A pesquisa de satisfação dos provedores (0123) — o NPS de 0 a 10 que a
+ * plataforma pede a quem paga por ela. Ver `services/npsService.js`.
+ *
+ *   wave         d30 | d90 (o agendador, 30 e 90 dias depois do início da
+ *                assinatura paga) ou manual (o console, "Enviar pesquisa");
+ *   wave_key     a mesma `wave` nas automáticas e NULO na manual: o índice
+ *                único `(tenant_id, wave_key)` é o que faz cada etapa
+ *                automática sair UMA vez por provedor, e nulos não colidem nos
+ *                três bancos — a manual pode repetir;
+ *   channel      por onde a pergunta saiu (`email`, `whatsapp` ou os dois,
+ *                separados por vírgula);
+ *   token_hash   o sha256 do token do link público. O token cru só existe na
+ *                mensagem; o sufixo é o que o tira do export do provedor;
+ *   score        0 a 10, nulo enquanto ninguém respondeu;
+ *   comment      o comentário opcional, até 1000 caracteres;
+ *   answer_channel  link | whatsapp, por onde veio a nota;
+ *   status       pending | answered | expired (30 dias sem resposta);
+ *   created_by   quem mandou a manual, pelo console.
+ *
+ * Escopada, como `cancellation_requests`: é a opinião de UM provedor sobre
+ * nós, sai no export dele e some com ele. O console a lê de cima, declarado.
+ */
+const platformNpsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('wave', 8).notNullable();
+  t.string('wave_key', 8).nullable();
+  t.string('channel', 16).nullable();
+  t.string('token_hash', 64).notNullable();
+  t.integer('score').nullable();
+  t.text('comment').nullable();
+  t.string('answer_channel', 16).nullable();
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.timestamp('asked_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('answered_at').nullable();
+  t.integer('created_by').unsigned().nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['token_hash'], 'platform_nps_token_uq');
+  t.unique(['tenant_id', 'wave_key'], 'platform_nps_wave_uq');
+  t.index(['status', 'asked_at'], 'platform_nps_status_idx');
+};
+
+const PLATFORM_NPS_TABLES = [
+  ['platform_nps', platformNpsTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -3074,7 +3122,8 @@ export const SCHEMA_TABLES = [
   ...REFERRAL_TABLES,
   ...CANCELLATION_TABLES,
   ...PLATFORM_ALERT_TABLES,
-  ...WA_MARKETING_OPT_OUT_TABLES
+  ...WA_MARKETING_OPT_OUT_TABLES,
+  ...PLATFORM_NPS_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6679,6 +6728,18 @@ export const migrations = [
           t.unique(['tenant_id', 'due_at', 'step_key'], 'subscription_reminder_sends_step_key_uq');
         });
       }
+    }
+  },
+  {
+    /** A pesquisa de satisfação dos provedores — ver `platformNpsTable`. */
+    id: '0123_platform_nps',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('platform_nps');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'platform_nps', platformNpsTable(db));
     }
   }
 ];

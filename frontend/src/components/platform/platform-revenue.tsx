@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
 import { PlatformCancellations } from '@/components/platform/platform-cancellations'
+import { PlatformSatisfaction } from '@/components/platform/platform-satisfaction'
 import { PlatformRevenueCharts } from '@/components/platform/platform-revenue-charts'
 import {
   lastTwelveMonths,
@@ -246,6 +247,9 @@ export function PlatformRevenue() {
 
       {/* Os pedidos de cancelamento (0107), desde o início do período da aba. */}
       <PlatformCancellations from={range.from} />
+
+      {/* A satisfação dos provedores (NPS, 0123), desde o início do período. */}
+      <PlatformSatisfaction from={range.from} />
     </div>
   )
 }

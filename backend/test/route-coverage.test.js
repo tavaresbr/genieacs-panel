@@ -83,7 +83,12 @@ const PUBLICAS = new Map([
   ['GET /api/public/plans', 'o catálogo à venda: só planos ativos e marcados como públicos, sem id nem contagem'],
   ['GET /api/public/slug-available', 'a mesma pergunta que o cadastro faz ao gravar, feita antes; responde só livre/ocupado'],
   ['GET /api/public/cnpj', 'o cadastro da Receita, que é público; limite apertado porque sai para uma API de fora'],
-  ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço']
+  ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço'],
+  // A pesquisa de satisfação dos provedores (0123). O token do link é a
+  // credencial, vai no CORPO e é conferido pelo hash; token desconhecido é 404
+  // sem nada. Prova em platform-nps.test.js.
+  ['POST /api/public/nps/lookup', 'a pesquisa do link: o token no corpo é a credencial; devolve só a nota e o nome do produto'],
+  ['POST /api/public/nps/answer', 'a resposta da pesquisa: só grava a nota na linha que o hash do token acha, e só dentro dos prazos']
 ]);
 
 /**
@@ -203,7 +208,8 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/credits', 'plano de controle; prova em referrals.test.js — o ajuste fica no provedor da URL, e a caixa da plataforma é 404'],
   ['DELETE /api/platform/tenants/:id/subscription/cancellation', 'plano de controle; prova em cancellation-retention.test.js — desfaz só o do provedor da URL, e a caixa da plataforma responde 404'],
   ['POST /api/platform/alerts/:id/resend', 'plano de controle; prova em platform-alerts-history.test.js — id de tabela da plataforma (platform_alerts), 404 para quem não existe'],
-  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404']
+  ['GET /api/platform/tenants/:id/subscription/plan-preview', 'plano de controle; prova em platform-plan-change.test.js — só lê, no provedor da URL, e a caixa da plataforma responde 404'],
+  ['POST /api/platform/tenants/:id/nps', 'plano de controle; prova em platform-nps.test.js — manda só ao provedor da URL, e a caixa da plataforma e quem não existe respondem 404']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -292,6 +298,12 @@ describe('toda rota sem sessão', () => {
       // é tabela da plataforma, sem `tenant_id` — não há cadastro de provedor
       // nenhum ao alcance dela.
       'POST /api/public/leads',
+      // A pesquisa de satisfação (0123): `answer` grava a nota na linha de
+      // `platform_nps` que o hash do token acha — de UM provedor, o do token —,
+      // e `lookup` não escreve nada: é POST pelo mesmo motivo da prévia do
+      // convite, o token fora do caminho.
+      'POST /api/public/nps/answer',
+      'POST /api/public/nps/lookup',
       'POST /api/sgp/events/webhook',
       'POST /api/whatsapp-webhook'
     ]);
@@ -442,7 +454,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // (`GET .../subscription/plan-preview`): o que cada modo faria, só leitura,
   // no provedor da URL. Mesmo pedágio: uma linha em `DO_CONSOLE` e mais uma
   // aqui; prova em platform-plan-change.test.js. São 74.
-  const TETO_DE_EXCECOES = 74;
+  //
+  // E o "Enviar pesquisa" de satisfação pelo console (`POST .../nps`, 0123):
+  // grava uma linha em `platform_nps` NO ESCOPO do provedor da URL e manda a
+  // pesquisa só aos contatos dele. Mesmo pedágio: uma linha em `DO_CONSOLE` e
+  // mais uma aqui; prova em platform-nps.test.js. São 75.
+  const TETO_DE_EXCECOES = 75;
 
 
   /**
@@ -501,7 +518,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/credits',
     'DELETE /api/platform/tenants/:id/subscription/cancellation',
     'POST /api/platform/alerts/:id/resend',
-    'GET /api/platform/tenants/:id/subscription/plan-preview'
+    'GET /api/platform/tenants/:id/subscription/plan-preview',
+    'POST /api/platform/tenants/:id/nps'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

@@ -1289,5 +1289,11 @@ export default {
   'subscription.pendingChange': '{date} にプラン変更がすでに予約されています。置き換えてよいか確認してください。',
   'subscription.reasonRequired': '理由を入力してください。今すぐ変更を強制する場合や上限チェックをスキップする場合に必須です。',
   'subscription.noRenewal': '支払い済みの期間がありません。更新時に変更を予約できません。',
-  'subscription.invalidMode': '変更モードは auto、now、renewal のいずれかである必要があります。'
+  'subscription.invalidMode': '変更モードは auto、now、renewal のいずれかである必要があります。',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '{product} の使い心地はいかがですか？',
+  'nps.askBody': '{provider} 様\n\n0〜10 の尺度で、{product} を他のプロバイダーの同業者に勧める可能性はどのくらいですか？\n\nワンクリックで回答できます（1 分かかりません）：{link}\n\nいただいたスコアとコメントは、プラットフォームを運営するチームに直接届きます。',
+  'nps.askWhatsappHint': 'よろしければ、ここに 0〜10 の数字だけを返信していただいても構いません。',
+  'nps.whatsappThanks': 'ありがとうございます！スコア {score} を受け取りました。理由を教えていただける場合は、アンケートのリンクからご回答ください。'
 };

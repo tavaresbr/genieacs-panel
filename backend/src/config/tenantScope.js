@@ -175,7 +175,11 @@ export const SCOPED_TABLES = new Set([
   'credit_allocations',
   // Os pedidos de cancelamento do provedor (0107): o motivo que ele deu e o
   // que aceitou. Do provedor, como a assinatura de que falam.
-  'cancellation_requests'
+  'cancellation_requests',
+  // A pesquisa de satisfação do provedor (0123): a nota que ELE nos deu. Do
+  // provedor, como o pedido de cancelamento — o console a lê de cima,
+  // declarado, e o link público acha a linha pelo hash do token.
+  'platform_nps'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

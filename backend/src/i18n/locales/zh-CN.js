@@ -1289,5 +1289,11 @@ export default {
   'subscription.pendingChange': '已有一个计划变更安排在 {date}。请确认要替换它。',
   'subscription.reasonRequired': '请填写原因：强制立即变更或跳过限额检查时必须填写。',
   'subscription.noRenewal': '当前没有已付费的周期：无法将变更安排在续订时。',
-  'subscription.invalidMode': '变更模式必须是 auto、now 或 renewal。'
+  'subscription.invalidMode': '变更模式必须是 auto、now 或 renewal。',
+
+  // A pesquisa de satisfação dos provedores (0123).
+  'nps.askSubject': '您使用 {product} 的感受如何？',
+  'nps.askBody': '{provider}，您好！\n\n在 0 到 10 分之间，您有多大可能向其他运营商的同行推荐 {product}？\n\n一键作答（不到一分钟）：{link}\n\n您的评分和意见会直接送达负责平台的团队。',
+  'nps.askWhatsappHint': '如果方便，也可以直接在这里回复 0 到 10 的数字。',
+  'nps.whatsappThanks': '谢谢！我们已收到您的评分 {score}。如想告诉我们原因，请通过问卷链接作答。'
 };
