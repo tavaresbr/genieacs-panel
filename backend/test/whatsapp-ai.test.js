@@ -556,6 +556,76 @@ describe('a IA atendendo', () => {
     }
   });
 
+  describe('avisos da IA para a equipe', () => {
+    let original;
+    let avisos;
+    beforeEach(() => {
+      original = WaAlertService.notifyEvent;
+      avisos = [];
+      WaAlertService.notifyEvent = async (aviso) => { avisos.push(aviso); return 1; };
+    });
+    const restaurar = () => { WaAlertService.notifyEvent = original; };
+    const limparCarimbos = () => asTenant(() => getDb()('app_state')
+      .whereIn('key', ['wa_ai_credit_alert_at', 'wa_ai_key_alert_at', 'wa_ai_daily_summary_day']).del());
+
+    it('chave recusada no atendimento automático avisa (6 h); na tela, não', async () => {
+      try {
+        await limparCarimbos();
+        await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized'));
+        assert.equal(avisos.length, 0, 'na tela o operador já vê o erro');
+        await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized', 'HTTP 401', { automatico: true }));
+        await asTenant(() => WaBotConfigService.recordAiError('ai_unauthorized', 'HTTP 401', { automatico: true }));
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_ai_key_rejected');
+        assert.match(WaAlertService.compose({ rule: 'wa_ai_key_rejected', vars: avisos[0].vars }, false), /recusada/);
+      } finally { restaurar(); await asTenant(() => WaBotConfigService.recordAiError(null)); }
+    });
+
+    it('crédito voltou: avisa na 1ª resposta boa depois do aviso, e rearma o próximo esgotamento', async () => {
+      try {
+        await limparCarimbos();
+        await asTenant(() => WaBotConfigService.recordAiError(null));
+        assert.equal(avisos.length, 0, 'sem aviso de crédito antes, nada a dizer');
+        await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance'));
+        assert.equal(avisos.at(-1).rule, 'wa_ai_no_credit');
+        await asTenant(() => WaBotConfigService.recordAiError(null));
+        assert.equal(avisos.at(-1).rule, 'wa_ai_credit_back');
+        const antes = avisos.length;
+        await asTenant(() => WaBotConfigService.recordAiError(null));
+        assert.equal(avisos.length, antes, 'só uma vez');
+        await asTenant(() => WaBotConfigService.recordAiError('ai_no_balance'));
+        assert.equal(avisos.at(-1).rule, 'wa_ai_no_credit', 'o carimbo foi limpo: avisa de novo na hora');
+      } finally { restaurar(); await asTenant(() => WaBotConfigService.recordAiError(null)); }
+    });
+
+    it('resumo diário: só com IA ligada e atividade, uma vez por dia, a partir das 8h', async () => {
+      try {
+        await limparCarimbos();
+        const conversa = await conversaDe(ASSINANTE);
+        const ligada = (await asTenant(() => WaBotConfigService.getConfig())).ai.enabled;
+        // Ao meio-dia do fuso (America/Sao_Paulo = UTC-3): 15:00Z.
+        const meioDia = new Date('2026-10-20T15:00:00Z');
+        const cedo = new Date('2026-10-20T10:00:00Z'); // 07:00 local
+        await asTenant(() => getDb()('wa_bot_events').insert([
+          { conversation_id: conversa.id, intent: 'fatura', created_at: new Date(meioDia.getTime() - 3600_000), tenant_id: conversa.tenant_id },
+          { conversation_id: conversa.id, intent: 'lead', created_at: new Date(meioDia.getTime() - 1800_000), tenant_id: conversa.tenant_id },
+          { conversation_id: conversa.id, intent: 'atendente', created_at: new Date(meioDia.getTime() - 900_000), tenant_id: conversa.tenant_id }
+        ]));
+        assert.equal(ligada, true, 'a IA está ligada neste cenário');
+        assert.equal(await asTenant(() => WaAlertService.aiDailySummary({ now: cedo })), 0, 'antes das 8h não sai');
+        assert.equal(avisos.length, 0);
+        await asTenant(() => WaAlertService.aiDailySummary({ now: meioDia }));
+        assert.equal(avisos.length, 1);
+        assert.equal(avisos[0].rule, 'wa_ai_daily_summary');
+        assert.equal(avisos[0].vars.replies >= 3, true);
+        assert.equal(avisos[0].vars.leads >= 1, true);
+        assert.equal(avisos[0].vars.handoffs >= 1, true);
+        await asTenant(() => WaAlertService.aiDailySummary({ now: meioDia }));
+        assert.equal(avisos.length, 1, 'uma vez por dia');
+      } finally { restaurar(); }
+    });
+  });
+
   it('a fatura: o texto da IA e o PIX literal do SGP', async () => {
     await limparFio(ASSINANTE);
     roteiro = [{ tool: 'consultar_fatura' }, { content: 'Encontrei sua fatura de R$ 99,90, os dados estão logo abaixo.' }];
