@@ -168,6 +168,33 @@ describe('webhook secret', () => {
   });
 });
 
+describe('webhook replay protection default', () => {
+  it('requires a signed timestamp on a NEW integration', async () => {
+    const config = await call(`${panelUrl}/api/sgp/config`, { headers: authHeaders(token) });
+    assert.equal(config.status, 200);
+    assert.equal(config.body.data.webhookRequireTimestamp, true);
+  });
+
+  it('keeps a stored configuration from before the default as it was (off)', async () => {
+    const original = await asTenant(() => AppState.get('sgp_integration_config'));
+    const legado = JSON.parse(original);
+    delete legado.webhookRequireTimestamp;
+    try {
+      await asTenant(() => AppState.upsert('sgp_integration_config', JSON.stringify(legado)));
+      await asTenant(() => SgpService.invalidateConfigCache());
+      const config = await asTenant(() => SgpService.getConfig());
+      assert.equal(config.webhookRequireTimestamp, false);
+      // E uma configuração gravada com o campo explícito é respeitada.
+      await asTenant(() => AppState.upsert('sgp_integration_config', JSON.stringify({ ...legado, webhookRequireTimestamp: true })));
+      await asTenant(() => SgpService.invalidateConfigCache());
+      assert.equal((await asTenant(() => SgpService.getConfig())).webhookRequireTimestamp, true);
+    } finally {
+      await asTenant(() => AppState.upsert('sgp_integration_config', original));
+      await asTenant(() => SgpService.invalidateConfigCache());
+    }
+  });
+});
+
 describe('webhook delivery', () => {
   it('answers 404 while event delivery is disabled', async () => {
     const body = JSON.stringify({ evento: 'pagamento_confirmado', contrato: '4321' });
@@ -176,10 +203,13 @@ describe('webhook delivery', () => {
   });
 
   it('rejects a delivery that is not signed with the shared secret', async () => {
+    // A integração nova nasce exigindo carimbo de tempo; os casos abaixo
+    // exercitam a assinatura sem ele, então a exigência sai aqui e volta no
+    // teste do carimbo vencido.
     await call(`${panelUrl}/api/sgp/config`, {
       method: 'PUT',
       headers: authHeaders(token),
-      body: { webhookEnabled: true }
+      body: { webhookEnabled: true, webhookRequireTimestamp: false }
     });
     const body = JSON.stringify({ evento: 'pagamento_confirmado', contrato: '4321' });
     assert.equal((await postWebhook(body)).status, 401);
