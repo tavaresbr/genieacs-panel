@@ -1384,5 +1384,19 @@ export default {
   'priceChange.cancelNoticeBody': '{provider}，您好。原定於 {date} 生效的 {plan} 方案（{cycle}）從 {old} 調整為 {new} 的調價已取消。價格仍為 {old}，不會因此變更任何帳單。如有疑問，直接回覆此訊息即可。',
   'whatsapp.platformBot.askTaxIdMulti': '您好！為了您的安全，在傳送帳單資料之前，請輸入您所屬服務商的帳單 CNPJ 或 CPF 的後 5 位數字。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '如需繼續，請輸入您所屬服務商的帳單 CNPJ 或 CPF 的後 5 位數字。您也可以輸入 *atendente* 與我們的團隊溝通。',
-  'whatsapp.platformBot.noTaxIdMulti': '此號碼關聯的服務商都沒有登記帳單 CNPJ 或 CPF，因此無法在這裡確認您的身分。我會將對話轉給我們的團隊。'
+  'whatsapp.platformBot.noTaxIdMulti': '此號碼關聯的服務商都沒有登記帳單 CNPJ 或 CPF，因此無法在這裡確認您的身分。我會將對話轉給我們的團隊。',
+  'receipt.kind.addon': '附加元件（啟用按比例計費）',
+  'addons.retrieved': '已載入附加元件',
+  'addons.retrieveFailed': '無法載入附加元件',
+  'addons.changeFailed': '無法變更附加元件',
+  'addons.activated': '附加元件 {name} 已啟用',
+  'addons.reactivated': '附加元件 {name} 已重新啟用：已撤銷排定的取消',
+  'addons.alreadyActive': '附加元件 {name} 已經啟用',
+  'addons.cancelScheduled': '附加元件 {name} 將在續約時取消',
+  'addons.canceled': '附加元件 {name} 已取消',
+  'addons.notFound': '找不到附加元件',
+  'addons.notActive': '此附加元件未啟用',
+  'addons.notChangeable': '目前的訂閱不允許變更附加元件',
+  'addons.paidPlanRequired': '附加元件需要付費方案',
+  'addons.required': '此功能需要附加元件。請在方案頁面啟用。'
 };

@@ -1384,5 +1384,19 @@ export default {
   'priceChange.cancelNoticeBody': '{provider} 様。{date} に予定していた {plan} プラン（{cycle}）の {old} から {new} への料金改定はキャンセルされました。料金は {old} のままで、これにより変わる請求書はありません。ご不明な点があれば、このメッセージにご返信ください。',
   'whatsapp.platformBot.askTaxIdMulti': 'こんにちは。安全のため、請求データを送る前に、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '続けるには、ご利用のプロバイダーの請求先 CNPJ または CPF の最後の 5 桁を入力してください。チームと話したい場合は *atendente* と入力してください。',
-  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。'
+  'whatsapp.platformBot.noTaxIdMulti': 'この番号のプロバイダーには請求先 CNPJ または CPF が登録されていないため、ここでは本人確認ができません。会話をチームに引き継ぎます。',
+  'receipt.kind.addon': 'アドオン（有効化の日割り）',
+  'addons.retrieved': 'アドオンを読み込みました',
+  'addons.retrieveFailed': 'アドオンを読み込めませんでした',
+  'addons.changeFailed': 'アドオンを変更できませんでした',
+  'addons.activated': 'アドオン {name} を有効化しました',
+  'addons.reactivated': 'アドオン {name} を再有効化しました：予定されていた解約を取り消しました',
+  'addons.alreadyActive': 'アドオン {name} はすでに有効です',
+  'addons.cancelScheduled': 'アドオン {name} は更新時に解約されます',
+  'addons.canceled': 'アドオン {name} を解約しました',
+  'addons.notFound': 'アドオンが見つかりません',
+  'addons.notActive': 'このアドオンは有効ではありません',
+  'addons.notChangeable': '現在のサブスクリプションではアドオンを変更できません',
+  'addons.paidPlanRequired': 'アドオンには有料プランが必要です',
+  'addons.required': 'この機能にはアドオンが必要です。プランページで有効にしてください。'
 };

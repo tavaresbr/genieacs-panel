@@ -1,5 +1,5 @@
 import BillingCharge, {
-  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, RETENTION_CANCEL_MARKER, isProration, isOverageCharge, isoDateOf
+  OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER, RETENTION_CANCEL_MARKER, isProration, isOverageCharge, isAddonCharge, isoDateOf
 } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -18,6 +18,7 @@ import CardAutopayService from './billing/cardAutopayService.js';
 import TenantCredit from '../models/TenantCredit.js';
 import { reminderPolicyConfig } from './platformProfileService.js';
 import { maxBeforeDays } from './reminderPolicy.js';
+import AddonService from './addonService.js';
 
 /**
  * A régua de emissão: quem cobra o provedor, e quando.
@@ -88,6 +89,17 @@ export function overageDescription(parcelas) {
   const total = parcelas.reduce((soma, item) => soma + Number(item.cents || 0), 0);
   const partes = parcelas.map((item) => `${item.units} ${NOME_DO_RECURSO[item.resource] ?? item.resource} × ${reais(item.unitCents)}`);
   return ` + excedente ${reais(total)} (${partes.join('; ')})`;
+}
+
+/**
+ * O resumo dos add-ons que vai na descrição da fatura (0125):
+ * " + add-ons R$ 78,00 (WhatsApp R$ 49,00; IA R$ 29,00)". Vazio sem nenhum.
+ */
+export function addonDescription(itens) {
+  if (!Array.isArray(itens) || !itens.length) return '';
+  const total = itens.reduce((soma, item) => soma + Number(item.cents || 0), 0);
+  const partes = itens.map((item) => `${item.name || item.code} ${reais(item.cents)}`);
+  return ` + add-ons ${reais(total)} (${partes.join('; ')})`;
 }
 
 /** Todas as cobranças do provedor em escopo (as do excedente se leem pela conta de cada uma). */
@@ -1114,7 +1126,20 @@ class ChargeIssuingService {
     const excedente = await this.overageForPeriod({ subscription, plan, periodo, existente });
     const precoDoPlano = preco;
     preco += excedente.reduce((soma, item) => soma + item.cents, 0);
-    const conta = BillingCharge.mergePricingDetail(existente, { base: precoDoPlano, overage: excedente });
+    // Os add-ons do período que esta fatura paga (0125), recorrentes, também
+    // DEPOIS do cupom — ele vale só sobre o plano. No ciclo da fatura (o
+    // anual cobra o preço anual do add-on). Lidos agora, como o preço do plano.
+    const adicionais = await AddonService.renewalItems({
+      subscription: assinaturaDoPeriodo, plan: planoDoPeriodo, periodKey: periodo
+    });
+    preco += adicionais.reduce((soma, item) => soma + item.cents, 0);
+    // A chave `addons` só quando há (ou havia) add-on: a conta de quem não
+    // tem nenhum continua como era.
+    const conta = BillingCharge.mergePricingDetail(existente, {
+      base: precoDoPlano,
+      overage: excedente,
+      ...(adicionais.length || BillingCharge.addonsOf(existente).length ? { addons: adicionais } : {})
+    });
     if (!existente && adiarCartao) return { issued: false, reason: 'card_deferred', charge: null };
     if (existente) {
       // Reaberta pelo clique, com o preço de agora — ver o comentário do método.
@@ -1351,7 +1376,9 @@ class ChargeIssuingService {
         // O excedente (0105) vai resumido na descrição: quem paga vê do que é o
         // valor a mais. A de valor mudado à mão (0078) não leva — o valor dela
         // não é a conta.
-        + (existente?.amount_overridden_at ? '' : overageDescription(excedente)),
+        + (existente?.amount_overridden_at ? '' : overageDescription(excedente))
+        // E os add-ons (0125), pelo mesmo motivo.
+        + (existente?.amount_overridden_at ? '' : addonDescription(adicionais)),
       // O formato que o webhook espera de volta, com o período junto: é por
       // ele que a entrega acha o provedor sem depender do cadastro do cliente
       // no gateway estar ligado a quem se pensa.
@@ -1555,6 +1582,72 @@ class ChargeIssuingService {
   }
 
   /**
+   * Abre e emite a pró-rata da ATIVAÇÃO de um add-on (0125) que JÁ foi
+   * gravada — o mesmo desenho de `createProration`, com a chave do add-on
+   * (`BillingCharge.addonProrationKey`): o índice único deduplica o segundo
+   * clique, e a ativação repetida no mesmo período depois de a primeira
+   * fatura ter fechado ganha a chave seguinte. `quote` é a de
+   * `AddonService.prorationQuote`. Nunca lança por causa do gateway.
+   */
+  static async createAddonProration({ tenant, subscription, quote, now = new Date() }) {
+    if (!quote?.eligible) return { issued: false, reason: 'not_eligible' };
+    if (quote.skipped) return { issued: false, reason: quote.skipped };
+    if (!tenant || tenant.kind === 'platform') return { issued: false, reason: 'platform_tenant' };
+    const provider = providerFor(tenant.billing_gateway);
+    if (!provider || !tenant.billing_customer_ref) return { issued: false, reason: 'not_linked' };
+    if (!provider.canIssue) return { issued: false, reason: 'provider_cannot_issue' };
+
+    const periodEnd = this.periodKey(new Date(quote.renewsAt));
+    let key = null;
+    for (let seq = 0; seq < 50; seq += 1) {
+      const candidata = BillingCharge.addonProrationKey({ addonId: quote.addonId, periodEnd, seq });
+      // eslint-disable-next-line no-await-in-loop -- quase sempre uma leitura
+      const dona = await BillingCharge.addonProrationByKey(candidata);
+      if (!dona || OPEN_CHARGE_STATUSES.includes(dona.status)) {
+        key = candidata;
+        break;
+      }
+    }
+    if (!key) return { issued: false, reason: 'duplicate' };
+    let chargeId;
+    try {
+      chargeId = await BillingCharge.openProration({
+        key,
+        kind: 'addon',
+        subscriptionId: subscription?.id ?? null,
+        amountCents: quote.amountCents,
+        currency: quote.currency || 'BRL',
+        provider: provider.name,
+        dueDate: this.isoDate(now.getTime() + this.PRORATION_DUE_DAYS * 86_400_000),
+        claimUntil: new Date(now.getTime() + this.CLAIM_MS),
+        planId: subscription?.plan_id ?? null,
+        billingCycle: quote.billingCycle ?? null,
+        // A conta: só o add-on, proporcional — nada de plano nem de cupom.
+        pricingDetail: { base: 0, addons: [{ code: quote.addonCode, name: quote.addonName, cents: quote.amountCents, proration: true }] },
+        detail: {
+          addonId: quote.addonId,
+          addonCode: quote.addonCode,
+          addonName: quote.addonName,
+          priceCents: quote.priceCents,
+          remainingSeconds: quote.remainingSeconds,
+          periodSeconds: quote.periodSeconds,
+          remainingDays: quote.remainingDays,
+          periodEnd,
+          renewsAt: quote.renewsAt,
+          at: now.toISOString()
+        }
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        console.warn(`Add-on proration ${key} of provider ${tenant.id} already exists; not charging the same activation twice`);
+        return { issued: false, reason: 'duplicate', charge: await BillingCharge.addonProrationByKey(key) };
+      }
+      throw error;
+    }
+    return this.emitProration({ tenant, provider, chargeId, now });
+  }
+
+  /**
    * Leva ao gateway uma fatura de pró-rata que esta passada JÁ garrou.
    *
    * A mesma dança da renovação (`issueCurrent`): a isenção relida logo antes
@@ -1612,10 +1705,12 @@ class ChargeIssuingService {
 
     const detalhe = BillingCharge.prorationDetailOf(linha);
     const doExcedente = isOverageCharge(linha);
-    const planoId = doExcedente ? linha.plan_id : detalhe?.toPlanId;
+    // A pró-rata da ativação de um add-on (0125): referência e descrição próprias.
+    const doAddon = isAddonCharge(linha);
+    const planoId = doExcedente || doAddon ? linha.plan_id : detalhe?.toPlanId;
     const plano = planoId ? await Plan.findById(planoId) : null;
     const nomeDoPlano = plano?.name || plano?.code || '';
-    const referencia = `tenant:${tenant.id}:${doExcedente ? 'overage' : 'proration'}:${linha.id}`;
+    const referencia = `tenant:${tenant.id}:${doExcedente ? 'overage' : (doAddon ? 'addon' : 'proration')}:${linha.id}`;
 
     // O cartão salvo (0100), pela mesma decisão da renovação: com a cobrança
     // automática utilizável, a pró-rata sai no cartão e o gateway a cobra na
@@ -1682,7 +1777,9 @@ class ChargeIssuingService {
         ? `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(excedente${detalhe?.periodEnd
           ? ` até ${String(detalhe.periodEnd).slice(0, 10).split('-').reverse().join('/')}` : ''})`
           + overageDescription(BillingCharge.frozenOverageOf(linha) ?? []).replace(/^ \+ excedente [^(]*/, ' ')
-        : `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(pró-rata)`,
+        : doAddon
+          ? `${tenant.name || PRODUCT_NAME} — add-on ${detalhe?.addonName || detalhe?.addonCode || ''} (pró-rata)`
+          : `${tenant.name || PRODUCT_NAME} — ${nomeDoPlano ? `${nomeDoPlano} ` : ''}(pró-rata)`,
       reference: referencia,
       ...(comCartao ?? {})
     });

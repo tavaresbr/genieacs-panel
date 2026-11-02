@@ -1384,5 +1384,19 @@ export default {
   'priceChange.cancelNoticeBody': '{provider}，您好。原定于 {date} 生效的 {plan} 套餐（{cycle}）从 {old} 调整为 {new} 的调价已取消。价格仍为 {old}，不会因此更改任何账单。如有疑问，直接回复此消息即可。',
   'whatsapp.platformBot.askTaxIdMulti': '您好！为了您的安全，在发送账单信息之前，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。',
   'whatsapp.platformBot.askTaxIdMultiAgain': '如需继续，请输入您所属服务商的账单 CNPJ 或 CPF 的后 5 位数字。您也可以输入 *atendente* 与我们的团队沟通。',
-  'whatsapp.platformBot.noTaxIdMulti': '此号码关联的服务商都没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。'
+  'whatsapp.platformBot.noTaxIdMulti': '此号码关联的服务商都没有登记账单 CNPJ 或 CPF，因此无法在这里确认您的身份。我会把对话转给我们的团队。',
+  'receipt.kind.addon': '附加组件（激活按比例计费）',
+  'addons.retrieved': '已加载附加组件',
+  'addons.retrieveFailed': '无法加载附加组件',
+  'addons.changeFailed': '无法更改附加组件',
+  'addons.activated': '附加组件 {name} 已启用',
+  'addons.reactivated': '附加组件 {name} 已重新启用：已撤销计划的取消',
+  'addons.alreadyActive': '附加组件 {name} 已经启用',
+  'addons.cancelScheduled': '附加组件 {name} 将在续订时取消',
+  'addons.canceled': '附加组件 {name} 已取消',
+  'addons.notFound': '未找到附加组件',
+  'addons.notActive': '此附加组件未启用',
+  'addons.notChangeable': '当前订阅不允许更改附加组件',
+  'addons.paidPlanRequired': '附加组件需要付费套餐',
+  'addons.required': '此功能需要附加组件。请在套餐页面启用。'
 };

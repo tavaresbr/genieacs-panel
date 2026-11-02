@@ -6,6 +6,7 @@ import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import Tenant from '../models/Tenant.js';
 import SubscriptionService from './subscriptionService.js';
+import { addonCyclePriceCents, isLive } from './addonService.js';
 import { toCsvWith } from '../utils/csv.js';
 
 /**
@@ -291,7 +292,7 @@ function diasDoPeriodo(sub, plan) {
  *   de preço, a conta erra pela diferença.
  */
 export function aggregateRevenue({
-  range, now = new Date(), tenants, subscriptions, plans, prices, charges, events
+  range, now = new Date(), tenants, subscriptions, plans, prices, charges, events, addonPrices = new Map()
 }) {
   const hoje = diaUtc(now.getTime());
   const provedores = new Set(tenants.map((t) => Number(t.id)));
@@ -317,6 +318,7 @@ export function aggregateRevenue({
   };
 
   let mrrCents = 0;
+  let addonMrrCents = 0;
   let activeCount = 0;
   for (const sub of assinaturaPorProvedor.values()) {
     if (SubscriptionService.effectiveStatus(sub, now).status !== 'active') continue;
@@ -328,6 +330,10 @@ export function aggregateRevenue({
     // Normalizado para trinta dias: o anual entra como 1/12 (× 30 / 365).
     const mensal = Math.round((preco * 30) / diasDoPeriodo(sub, plano));
     mrrCents += mensal;
+    // Os add-ons recorrentes (0125), à parte: o MRR por plano continua sendo
+    // do plano, e o total deles sai em `addonMrrCents`.
+    const adicional = Number(addonPrices.get(Number(sub.id)) ?? 0);
+    if (adicional > 0) addonMrrCents += Math.round((adicional * 30) / diasDoPeriodo(sub, plano));
     activeCount += 1;
     const linha = linhaDoPlano(plano.id);
     linha.activeCount += 1;
@@ -422,6 +428,8 @@ export function aggregateRevenue({
     from: range.from,
     to: range.to,
     mrrCents,
+    // O MRR dos add-ons pagos (0125), fora do `mrrCents` dos planos.
+    addonMrrCents,
     activeCount,
     receivedCents,
     refundedCents,
@@ -466,7 +474,32 @@ export async function buildRevenueReport(range, now = new Date()) {
   for (const sub of dados.subscriptions) {
     prices.set(Number(sub.id), await precoEfetivo(sub, planos.get(Number(sub.plan_id))));
   }
-  return aggregateRevenue({ range, now, prices, ...dados });
+  return aggregateRevenue({ range, now, prices, addonPrices: await precosDosAddons(dados.subscriptions, planos, now), ...dados });
+}
+
+/**
+ * O que os add-ons vivos e pagos de cada assinatura somam por período do
+ * ciclo dela (0125) — por id da assinatura. Acima dos provedores, como o
+ * resto do relatório.
+ */
+async function precosDosAddons(subscriptions, planos, now) {
+  // tenant-scope-exempt: relatório do plano de controle, acima dos provedores.
+  const linhas = await runUnscoped('the console revenue report reads every provider\'s add-ons', () => getDb()('tenant_addons')
+    .where({ status: 'active' })
+    .select('tenant_id', 'addon_id', 'status', 'cancel_at', 'free'));
+  if (!linhas.length) return new Map();
+  const catalogo = new Map((await getDb()('addons').select()).map((addon) => [Number(addon.id), addon]));
+  const porProvedor = new Map(subscriptions.map((sub) => [Number(sub.tenant_id), sub]));
+  const saida = new Map();
+  for (const linha of linhas) {
+    if (linha.free || !isLive(linha, now)) continue;
+    const sub = porProvedor.get(Number(linha.tenant_id));
+    const addon = catalogo.get(Number(linha.addon_id));
+    if (!sub || !addon) continue;
+    const ciclo = SubscriptionService.cycleOf(sub, planos.get(Number(sub.plan_id)));
+    saida.set(Number(sub.id), (saida.get(Number(sub.id)) ?? 0) + addonCyclePriceCents(addon, ciclo));
+  }
+  return saida;
 }
 
 /** As colunas da planilha de cobranças do período. */

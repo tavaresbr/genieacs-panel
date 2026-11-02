@@ -1376,5 +1376,19 @@ export default {
   'priceChange.cancelNoticeBody': 'مرحبًا {provider}. تم إلغاء تعديل سعر الخطة {plan} ({cycle}) من {old} إلى {new} الذي كان مقررًا في {date}. يبقى السعر {old}، ولن تتغير أي فاتورة بسببه. لأي استفسار، يكفي الرد على هذه الرسالة.',
   'whatsapp.platformBot.askTaxIdMulti': 'مرحبًا! حفاظًا على أمانك، وقبل إرسال أي بيانات فوترة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'للمتابعة، أدخل آخر 5 أرقام من رقم CNPJ أو CPF الخاص بفوترة مزودك. ويمكنك كتابة *atendente* للتحدث مع فريقنا.',
-  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.'
+  'whatsapp.platformBot.noTaxIdMulti': 'لا يوجد رقم CNPJ أو CPF للفوترة مسجل لمزودي هذا الرقم، لذا لا يمكنني تأكيد هويتك هنا. سأحوّل المحادثة إلى فريقنا.',
+  'receipt.kind.addon': 'إضافة (تناسبي عند التفعيل)',
+  'addons.retrieved': 'تم تحميل الإضافات',
+  'addons.retrieveFailed': 'تعذر تحميل الإضافات',
+  'addons.changeFailed': 'تعذر تغيير الإضافة',
+  'addons.activated': 'تم تفعيل الإضافة {name}',
+  'addons.reactivated': 'أُعيد تفعيل الإضافة {name}: أُلغي الإلغاء المجدول',
+  'addons.alreadyActive': 'الإضافة {name} مفعّلة بالفعل',
+  'addons.cancelScheduled': 'سيتم إلغاء الإضافة {name} عند التجديد',
+  'addons.canceled': 'تم إلغاء الإضافة {name}',
+  'addons.notFound': 'الإضافة غير موجودة',
+  'addons.notActive': 'هذه الإضافة غير مفعّلة',
+  'addons.notChangeable': 'الاشتراك لا يسمح بتغيير الإضافات الآن',
+  'addons.paidPlanRequired': 'الإضافات تتطلب خطة مدفوعة',
+  'addons.required': 'هذه الميزة تتطلب إضافة. فعّلها في صفحة الخطة.'
 };

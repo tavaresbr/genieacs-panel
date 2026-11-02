@@ -14,6 +14,7 @@ import { AsaasCustomerError, ensureAsaasCustomer } from './billing/asaasCustomer
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import CardAutopayService from './billing/cardAutopayService.js';
+import AddonService from './addonService.js';
 
 /**
  * O provedor cuidando da própria conta: ver os planos, trocar de plano e
@@ -183,7 +184,7 @@ async function noPrecoDoPrazo(subscription, plano) {
  * mesma coisa com a mesma linha, e três cópias desta dança com o gateway
  * seriam três lugares para uma delas esquecer a garra.
  */
-async function reprecificarCobranca(subscription, planoInformado, { keepOverride = false } = {}) {
+async function reprecificarCobranca(subscription, planoInformado, { keepOverride = false, addonRows = undefined } = {}) {
   const nada = { acao: 'none', linhaId: null };
   // No preço do prazo vivo (0122): com um reajuste agendado para este
   // vencimento, a fatura reemitida já sai pelo valor novo.
@@ -211,8 +212,22 @@ async function reprecificarCobranca(subscription, planoInformado, { keepOverride
   // fecha — e reemitir não pode recontá-lo (ver
   // `ChargeIssuingService.overageForPeriod`). A conta guarda as outras chaves
   // que tiver (o crédito).
-  const preco = precoDoPlano + BillingCharge.overageCentsOf(aberta);
-  const conta = aberta ? BillingCharge.mergePricingDetail(aberta, { base: precoDoPlano }) : null;
+  // Os add-ons recorrentes do período desta fatura (0125), por cima do plano
+  // e fora do cupom — lidos agora, ou os de DEPOIS de uma mudança ainda não
+  // gravada (`addonRows`, ver `repriceAround`).
+  const adicionais = aberta
+    ? await AddonService.renewalItems({
+      subscription, plan: plano, periodKey: String(aberta.period_end).slice(0, 10), rows: addonRows
+    })
+    : [];
+  const preco = precoDoPlano + BillingCharge.overageCentsOf(aberta)
+    + adicionais.reduce((soma, item) => soma + item.cents, 0);
+  const conta = aberta
+    ? BillingCharge.mergePricingDetail(aberta, {
+      base: precoDoPlano,
+      ...(adicionais.length || BillingCharge.addonsOf(aberta).length ? { addons: adicionais } : {})
+    })
+    : null;
   // O valor mudado à mão pelo console (0078) vence o cupom: quem aplica ou
   // tira um cupom não desfaz o desconto que alguém deu a dedo àquela fatura.
   // (A troca de plano não passa isto: um plano novo é outra fatura.)
@@ -840,8 +855,11 @@ async function trocarPlano({
     const { usage } = await SubscriptionService.usage({ countDevices });
     // O recurso com preço de excedente no plano novo não barra (0105): o
     // uso acima do teto é cobrado na fatura, e não recusado aqui.
+    // Com o que os add-ons de limite somam (0125): eles valem em qualquer plano.
     const excesso = SubscriptionService.overLimitFor(
-      SubscriptionService.limitsOf(plan), usage, SubscriptionService.overagePricesOf(plan)
+      AddonService.applyLimitBonus(SubscriptionService.limitsOf(plan), await AddonService.limitBonus()),
+      usage,
+      SubscriptionService.overagePricesOf(plan)
     );
     if (excesso && admin?.skipLimitCheck) {
       limitCheck = 'skipped';
@@ -1404,16 +1422,20 @@ class SelfBillingService {
    * prazo quando o uso cabe nele. O valor mudado à mão pelo console vence
    * (`keepOverride`): essa fatura não é tocada.
    *
+   * `addonRows` (0125): as linhas de `tenant_addons` como vão ficar — a
+   * ativação, o cancelamento e o gesto do console sobre um add-on mudam o
+   * preço da fatura sem mudar a assinatura.
+   *
    * @returns {Promise<{ result: any, charge: 'none'|'reissued', reissue?: object }>}
    */
-  static async repriceAround({ depois, tenant, escrever, countDevices = null }) {
+  static async repriceAround({ depois, tenant, escrever, countDevices = null, addonRows = undefined }) {
     // Parada por gente (`suspended`): a emissão não reemitiria, e cancelar a
     // fatura dela agora a deixaria sem link. Grava só; o preço novo vale na
     // próxima emissão, quando ela voltar.
     if (!ESTADOS_VIVOS.has(depois?.status)) return { result: await escrever(), charge: 'none' };
     const { plano, assinatura, bloqueio } = await planoDaFatura(depois, { countDevices });
     const cobranca = plano
-      ? await reprecificarCobranca(assinatura, plano, { keepOverride: true })
+      ? await reprecificarCobranca(assinatura, plano, { keepOverride: true, addonRows })
       : { acao: 'none', linhaId: null };
     let result;
     try {

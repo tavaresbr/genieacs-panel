@@ -67,7 +67,7 @@ export function cobrancaEmAberto(charges: TenantChargeView[]) {
 /** A fatura de pró-rata ainda pagável, se houver — a do aviso `proration_overdue`. */
 export function cobrancaDeProrata(charges: TenantChargeView[]) {
   // A de só excedente (0105) é avulsa como a pró-rata, e vencida bloqueia igual.
-  return cobrancaEmAberto(charges.filter((c) => c.kind === 'proration' || c.kind === 'overage'))
+  return cobrancaEmAberto(charges.filter((c) => c.kind === 'proration' || c.kind === 'overage' || c.kind === 'addon'))
 }
 
 /**
@@ -217,7 +217,7 @@ export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) 
                   {formatMoney(charge.amountCents, charge.currency)}
                   {/* O tipo: a mensalidade, a avulsa da subida no meio do
                       período ou a de só excedente. */}
-                  <span className={charge.kind === 'proration' || charge.kind === 'overage' ? 'modern-badge-info' : 'modern-badge'}>
+                  <span className={charge.kind === 'proration' || charge.kind === 'overage' || charge.kind === 'addon' ? 'modern-badge-info' : 'modern-badge'}>
                     {t(chargeKindKey(charge.kind))}
                   </span>
                   {/* O crédito de indicação (ou do console) abatido nela (0106). */}

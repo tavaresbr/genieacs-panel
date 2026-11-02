@@ -313,7 +313,7 @@ export function PlatformDelinquency() {
 
 function DelinquencyTableRow({ row, checked, onToggle }: { row: DelinquencyRow; checked: boolean; onToggle: () => void }) {
   const { t, formatDateTime } = useTranslation()
-  const partes = (['renewal', 'proration', 'overage'] as const).filter((kind) => row.amountByKind[kind] > 0)
+  const partes = (['renewal', 'proration', 'overage', 'addon'] as const).filter((kind) => (row.amountByKind[kind] ?? 0) > 0)
   return (
     <tr>
       <td>

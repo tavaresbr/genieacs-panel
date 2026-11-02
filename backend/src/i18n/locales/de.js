@@ -1385,5 +1385,19 @@ export default {
   'priceChange.cancelNoticeBody': 'Hallo {provider}, die Preisanpassung des Tarifs {plan} ({cycle}) von {old} auf {new}, geplant zum {date}, wurde storniert. Der Preis bleibt bei {old}, und keine Rechnung ändert sich deswegen. Bei Fragen antworten Sie einfach auf diese Nachricht.',
   'whatsapp.platformBot.askTaxIdMulti': 'Hallo! Zu Ihrer Sicherheit geben Sie bitte vor dem Versand von Abrechnungsdaten die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Um fortzufahren, geben Sie die letzten 5 Ziffern der Abrechnungs-CNPJ oder -CPF Ihres Anbieters ein. Wenn Sie möchten, schreiben Sie *atendente*, um mit unserem Team zu sprechen.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Für die Anbieter dieser Nummer ist keine Abrechnungs-CNPJ oder -CPF hinterlegt, daher kann ich Ihre Identität hier nicht bestätigen. Ich leite Ihr Gespräch an unser Team weiter.',
+  'receipt.kind.addon': 'Add-on (anteilige Aktivierung)',
+  'addons.retrieved': 'Add-ons geladen',
+  'addons.retrieveFailed': 'Add-ons konnten nicht geladen werden',
+  'addons.changeFailed': 'Das Add-on konnte nicht geändert werden',
+  'addons.activated': 'Add-on {name} aktiviert',
+  'addons.reactivated': 'Add-on {name} reaktiviert: die geplante Kündigung wurde aufgehoben',
+  'addons.alreadyActive': 'Das Add-on {name} ist bereits aktiv',
+  'addons.cancelScheduled': 'Das Add-on {name} wird zur Verlängerung gekündigt',
+  'addons.canceled': 'Add-on {name} gekündigt',
+  'addons.notFound': 'Add-on nicht gefunden',
+  'addons.notActive': 'Dieses Add-on ist nicht aktiv',
+  'addons.notChangeable': 'Das Abonnement erlaubt derzeit keine Änderung der Add-ons',
+  'addons.paidPlanRequired': 'Add-ons erfordern einen kostenpflichtigen Tarif',
+  'addons.required': 'Diese Funktion erfordert ein Add-on. Aktivieren Sie es auf der Seite Tarif.'
 };

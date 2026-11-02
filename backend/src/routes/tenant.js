@@ -1,6 +1,7 @@
 import express from 'express';
 import TenantController from '../controllers/tenantController.js';
 import CancellationController from '../controllers/cancellationController.js';
+import AddonController from '../controllers/addonController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -109,5 +110,14 @@ router.get('/geocode', authenticateToken, requirePermission('map.write'), Tenant
 // controlador — a matriz não tem capacidade só do dono.
 router.get('/security', authenticateToken, requirePermission('settings.read'), TenantController.getSecurity);
 router.put('/security', authenticateToken, requirePermission('settings.write'), TenantController.updateSecurity);
+
+// Os add-ons pagos (0125) na tela de Plano: a vitrine com `settings.read`,
+// como `/plans`; ativar e cancelar com `settings.write`, como a troca de
+// plano. O `:code` é a chave do CATÁLOGO (`addons`, da plataforma) — a linha
+// que muda é sempre a do provedor em escopo, nunca a de um vizinho. DENTRO da
+// porta da assinatura: quem está atrasado lê, mas não contrata.
+router.get('/addons', authenticateToken, requirePermission('settings.read'), AddonController.list);
+router.post('/addons/:code/activate', authenticateToken, requirePermission('settings.write'), AddonController.activate);
+router.post('/addons/:code/cancel', authenticateToken, requirePermission('settings.write'), AddonController.cancel);
 
 export default router;

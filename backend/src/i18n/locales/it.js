@@ -1382,5 +1382,19 @@ export default {
   'priceChange.cancelNoticeBody': 'Ciao, {provider}. L’adeguamento del piano {plan} ({cycle}) da {old} a {new}, previsto per il {date}, è stato annullato. Il prezzo resta {old} e nessuna fattura cambia per questo. Per qualsiasi dubbio, rispondi pure a questo messaggio.',
   'whatsapp.platformBot.askTaxIdMulti': 'Ciao! Per la tua sicurezza, prima di inviare dati di fatturazione, indica le ultime 5 cifre del CNPJ o CPF di fatturazione del tuo provider.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Per continuare, indica le ultime 5 cifre del CNPJ o CPF di fatturazione del tuo provider. Se preferisci, scrivi *atendente* per parlare con il nostro team.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Non c’è alcun CNPJ o CPF di fatturazione registrato per i provider di questo numero, quindi non posso confermare la tua identità qui. Inoltrerò la conversazione al nostro team.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Non c’è alcun CNPJ o CPF di fatturazione registrato per i provider di questo numero, quindi non posso confermare la tua identità qui. Inoltrerò la conversazione al nostro team.',
+  'receipt.kind.addon': 'Add-on (proporzionale di attivazione)',
+  'addons.retrieved': 'Add-on caricati',
+  'addons.retrieveFailed': 'Impossibile caricare gli add-on',
+  'addons.changeFailed': 'Impossibile modificare l\'add-on',
+  'addons.activated': 'Add-on {name} attivato',
+  'addons.reactivated': 'Add-on {name} riattivato: l\'annullamento programmato è stato revocato',
+  'addons.alreadyActive': 'L\'add-on {name} è già attivo',
+  'addons.cancelScheduled': 'L\'add-on {name} verrà annullato al rinnovo',
+  'addons.canceled': 'Add-on {name} annullato',
+  'addons.notFound': 'Add-on non trovato',
+  'addons.notActive': 'Questo add-on non è attivo',
+  'addons.notChangeable': 'L\'abbonamento non consente di modificare gli add-on in questo momento',
+  'addons.paidPlanRequired': 'Gli add-on richiedono un piano a pagamento',
+  'addons.required': 'Questa funzione richiede un add-on. Attivalo nella pagina Piano.'
 };

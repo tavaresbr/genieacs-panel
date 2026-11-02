@@ -1387,5 +1387,19 @@ export default {
   'priceChange.cancelNoticeBody': '안녕하세요, {provider}님. {date}로 예정되었던 {plan} 요금제({cycle})의 {old}에서 {new}로의 가격 조정이 취소되었습니다. 가격은 {old} 그대로이며, 이로 인해 바뀌는 청구서는 없습니다. 궁금한 점이 있으면 이 메시지에 답장해 주세요.',
   'whatsapp.platformBot.askTaxIdMulti': '안녕하세요! 보안을 위해 청구 정보를 보내기 전에 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요.',
   'whatsapp.platformBot.askTaxIdMultiAgain': '계속하려면 이용 중인 제공업체의 청구용 CNPJ 또는 CPF 마지막 5자리를 입력해 주세요. 원하시면 *atendente*를 입력해 팀과 이야기하세요.',
-  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.'
+  'whatsapp.platformBot.noTaxIdMulti': '이 번호의 제공업체에 등록된 청구용 CNPJ 또는 CPF가 없어 여기서 본인 확인을 할 수 없습니다. 대화를 저희 팀에 전달하겠습니다.',
+  'receipt.kind.addon': '애드온(활성화 일할 금액)',
+  'addons.retrieved': '애드온을 불러왔습니다',
+  'addons.retrieveFailed': '애드온을 불러올 수 없습니다',
+  'addons.changeFailed': '애드온을 변경할 수 없습니다',
+  'addons.activated': '애드온 {name}이(가) 활성화되었습니다',
+  'addons.reactivated': '애드온 {name}이(가) 다시 활성화되었습니다: 예약된 해지가 취소되었습니다',
+  'addons.alreadyActive': '애드온 {name}은(는) 이미 활성 상태입니다',
+  'addons.cancelScheduled': '애드온 {name}은(는) 갱신 시 해지됩니다',
+  'addons.canceled': '애드온 {name}이(가) 해지되었습니다',
+  'addons.notFound': '애드온을 찾을 수 없습니다',
+  'addons.notActive': '이 애드온은 활성 상태가 아닙니다',
+  'addons.notChangeable': '현재 구독에서는 애드온을 변경할 수 없습니다',
+  'addons.paidPlanRequired': '애드온은 유료 요금제가 필요합니다',
+  'addons.required': '이 기능에는 애드온이 필요합니다. 요금제 페이지에서 활성화하세요.'
 };

@@ -1380,5 +1380,19 @@ export default {
   'priceChange.cancelNoticeBody': 'Bonjour, {provider}. Le réajustement du plan {plan} ({cycle}) de {old} à {new}, prévu le {date}, a été annulé. Le prix reste à {old}, et aucune facture ne change à cause de lui. Pour toute question, répondez simplement à ce message.',
   'whatsapp.platformBot.askTaxIdMulti': 'Bonjour ! Pour votre sécurité, avant tout envoi de données de facturation, indiquez les 5 derniers chiffres du CNPJ ou CPF de facturation de votre fournisseur.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Pour continuer, indiquez les 5 derniers chiffres du CNPJ ou CPF de facturation de votre fournisseur. Si vous préférez, écrivez *atendente* pour parler à notre équipe.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Aucun CNPJ ou CPF de facturation n’est enregistré pour les fournisseurs de ce numéro : je ne peux donc pas confirmer votre identité ici. Je transmets votre conversation à notre équipe.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Aucun CNPJ ou CPF de facturation n’est enregistré pour les fournisseurs de ce numéro : je ne peux donc pas confirmer votre identité ici. Je transmets votre conversation à notre équipe.',
+  'receipt.kind.addon': 'Module complémentaire (prorata d\'activation)',
+  'addons.retrieved': 'Modules complémentaires chargés',
+  'addons.retrieveFailed': 'Impossible de charger les modules complémentaires',
+  'addons.changeFailed': 'Impossible de modifier le module complémentaire',
+  'addons.activated': 'Module {name} activé',
+  'addons.reactivated': 'Module {name} réactivé : l\'annulation programmée a été annulée',
+  'addons.alreadyActive': 'Le module {name} est déjà actif',
+  'addons.cancelScheduled': 'Le module {name} sera annulé au renouvellement',
+  'addons.canceled': 'Module {name} annulé',
+  'addons.notFound': 'Module complémentaire introuvable',
+  'addons.notActive': 'Ce module complémentaire n\'est pas actif',
+  'addons.notChangeable': 'L\'abonnement ne permet pas de modifier les modules complémentaires pour le moment',
+  'addons.paidPlanRequired': 'Les modules complémentaires exigent un forfait payant',
+  'addons.required': 'Cette fonctionnalité exige un module complémentaire. Activez-le sur la page Forfait.'
 };

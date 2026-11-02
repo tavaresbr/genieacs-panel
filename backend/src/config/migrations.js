@@ -3157,6 +3157,93 @@ const PLATFORM_NPS_TABLES = [
 ];
 
 /**
+ * Os add-ons pagos (0125) — ver `services/addonService.js`.
+ *
+ * `addons` é o CATÁLOGO, da plataforma, como `plans` e `coupons`:
+ *
+ *   code                o código estável (`whatsapp`, `ia`, `ont-1000`), o que
+ *                       a URL e a fatura nomeiam;
+ *   price_cents         o preço por período MENSAL do plano;
+ *   price_yearly_cents  o preço por ANO no ciclo anual (0104) — nulo é doze
+ *                       vezes o mensal;
+ *   kind                feature | limit;
+ *   feature             a chave do recurso que o add-on libera (`whatsapp`,
+ *                       `ai`), no `feature`;
+ *   limit_resource,
+ *   limit_amount        no `limit`: quanto o add-on soma a um teto do plano
+ *                       (`operators`, `subscribers`, `devices`);
+ *   gated               se o recurso PASSA A EXIGIR o add-on. Desligado por
+ *                       padrão: o catálogo pode vender o add-on sem tirar o
+ *                       recurso de quem já o usa — `requireAddon` só recusa
+ *                       com um add-on ATIVO e `gated` para aquela chave;
+ *   trial_access        se quem está em teste usa o recurso sem o add-on;
+ *   active, public      se ainda se vende, e se aparece na tela do provedor;
+ *   sort                a ordem dos cartões.
+ *
+ * `tenant_addons` é o que cada provedor tem — escopada, dinheiro de UM
+ * provedor, como `subscriptions`:
+ *
+ *   status      active | canceled;
+ *   active_key  o `addon_id` enquanto ativo, nulo depois: o índice único
+ *               `(tenant_id, active_key)` é o que faz o duplo clique dar UMA
+ *               linha (nulos não colidem nos três bancos — o histórico fica);
+ *   started_at  quando começou a valer;
+ *   cancel_at   o fim do período pago, quando o cancelamento foi pedido: vale
+ *               até lá, e a renovação que começa ali já sai sem ele;
+ *   canceled_at quando deixou de valer de fato;
+ *   free        dado pelo console, sem cobrança;
+ *   source      provider | console.
+ */
+const addonsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('code', 32).notNullable();
+  t.string('name', 64).notNullable();
+  t.string('description', 500).nullable();
+  t.integer('price_cents').unsigned().notNullable().defaultTo(0);
+  t.integer('price_yearly_cents').unsigned().nullable();
+  t.string('currency', 3).notNullable().defaultTo('BRL');
+  t.string('kind', 8).notNullable().defaultTo('feature');
+  t.string('feature', 32).nullable();
+  t.string('limit_resource', 16).nullable();
+  t.integer('limit_amount').unsigned().nullable();
+  t.boolean('gated').notNullable().defaultTo(false);
+  t.boolean('trial_access').notNullable().defaultTo(true);
+  t.boolean('active').notNullable().defaultTo(true);
+  t.boolean('public').notNullable().defaultTo(true);
+  t.integer('sort').notNullable().defaultTo(0);
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['code'], 'addons_code_uq');
+};
+
+const tenantAddonsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('addon_id').unsigned().notNullable()
+    .references('id').inTable('addons').onDelete('CASCADE');
+  t.string('status', 16).notNullable().defaultTo('active');
+  t.integer('active_key').unsigned().nullable();
+  t.timestamp('started_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('cancel_at').nullable();
+  t.timestamp('canceled_at').nullable();
+  t.boolean('free').notNullable().defaultTo(false);
+  t.string('source', 16).notNullable().defaultTo('provider');
+  t.string('reason', 255).nullable();
+  t.integer('created_by').unsigned().nullable();
+  t.integer('canceled_by').unsigned().nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'active_key'], 'tenant_addons_active_uq');
+  t.index(['tenant_id', 'status'], 'tenant_addons_status_idx');
+};
+
+const ADDON_TABLES = [
+  ['addons', addonsTable],
+  ['tenant_addons', tenantAddonsTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -3201,7 +3288,8 @@ export const SCHEMA_TABLES = [
   ...PLATFORM_ALERT_TABLES,
   ...WA_MARKETING_OPT_OUT_TABLES,
   ...PLAN_PRICE_CHANGE_TABLES,
-  ...PLATFORM_NPS_TABLES
+  ...PLATFORM_NPS_TABLES,
+  ...ADDON_TABLES
 ].map(([name]) => name);
 
 /**
@@ -6835,6 +6923,23 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'platform_nps', platformNpsTable(db));
+    }
+  },
+  {
+    /** Os add-ons pagos — ver `ADDON_TABLES`. */
+    id: '0125_addons',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      for (const [name] of ADDON_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of ADDON_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];

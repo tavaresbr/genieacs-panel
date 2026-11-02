@@ -1383,5 +1383,19 @@ export default {
   'priceChange.cancelNoticeBody': 'Olá, {provider}. O reajuste do plano {plan} ({cycle}) de {old} para {new}, previsto para {date}, foi cancelado. O valor continua {old}, e nenhuma fatura muda por causa dele. Qualquer dúvida, é só responder esta mensagem.',
   'whatsapp.platformBot.askTaxIdMulti': 'Olá! Para sua segurança, antes de enviar dados de cobrança, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor.',
   'whatsapp.platformBot.askTaxIdMultiAgain': 'Para continuar, informe os 5 últimos dígitos do CNPJ ou CPF de cobrança do seu provedor. Se preferir, escreva *atendente* para falar com a nossa equipe.',
-  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.'
+  'whatsapp.platformBot.noTaxIdMulti': 'Não há CNPJ ou CPF de cobrança cadastrado para os provedores deste número, então não consigo confirmar sua identidade por aqui. Vou passar sua conversa para a nossa equipe.',
+  'receipt.kind.addon': 'Add-on (proporcional da ativação)',
+  'addons.retrieved': 'Add-ons carregados',
+  'addons.retrieveFailed': 'Não foi possível carregar os add-ons',
+  'addons.changeFailed': 'Não foi possível alterar o add-on',
+  'addons.activated': 'Add-on {name} ativado',
+  'addons.reactivated': 'Add-on {name} reativado: o cancelamento agendado foi desfeito',
+  'addons.alreadyActive': 'O add-on {name} já está ativo',
+  'addons.cancelScheduled': 'O add-on {name} será cancelado na renovação',
+  'addons.canceled': 'Add-on {name} cancelado',
+  'addons.notFound': 'Add-on não encontrado',
+  'addons.notActive': 'Este add-on não está ativo',
+  'addons.notChangeable': 'A assinatura não permite mudar add-ons agora',
+  'addons.paidPlanRequired': 'Add-ons exigem um plano pago',
+  'addons.required': 'Este recurso exige um add-on. Ative-o na página Plano.'
 };

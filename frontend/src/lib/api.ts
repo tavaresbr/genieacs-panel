@@ -1606,6 +1606,17 @@ export interface ChargePricing {
   overage: OverageItem[]
   overageCents: number
   creditCents: number
+  /** Os add-ons (0125) cobrados nela. Opcional: servidores antigos não mandam. */
+  addons?: ChargeAddonItem[]
+  addonCents?: number
+}
+
+/** Uma linha de add-on de uma cobrança: o recorrente da renovação, ou a pró-rata da ativação. */
+export interface ChargeAddonItem {
+  code: string
+  name: string | null
+  cents: number
+  proration?: boolean
 }
 
 export interface Plan {
@@ -2019,7 +2030,7 @@ export interface PlanProrationPreview {
 }
 
 /** O tipo de uma cobrança: a da renovação do período, ou a avulsa da subida. */
-export type ChargeKind = 'renewal' | 'proration' | 'overage'
+export type ChargeKind = 'renewal' | 'proration' | 'overage' | 'addon'
 
 /** A conta de uma fatura de pró-rata, para a tela explicar o valor. */
 export interface ChargeProrationDetail {
@@ -2912,7 +2923,7 @@ export interface DelinquencyRow {
   bucket: DelinquencyBucket
   /** A soma das cobranças em aberto JÁ vencidas. */
   amountCents: number
-  amountByKind: { renewal: number; proration: number; overage: number }
+  amountByKind: { renewal: number; proration: number; overage: number; addon?: number }
   /** Todas as em aberto, inclusive as que ainda vão vencer. */
   openCents: number
   currency: string
@@ -6799,6 +6810,8 @@ export interface RevenueReport {
   from: string
   to: string
   mrrCents: number
+  /** O MRR dos add-ons pagos (0125), fora do `mrrCents` dos planos. Opcional: servidores antigos não mandam. */
+  addonMrrCents?: number
   activeCount: number
   receivedCents: number
   refundedCents: number
@@ -7407,4 +7420,151 @@ export const receiptAPI = {
     })
     return { ok: response.ok, status: response.status, html: await response.text() }
   },
+}
+
+// ── Os add-ons pagos (0125) ─────────────────────────────────────────────
+
+export type AddonKind = 'feature' | 'limit'
+export type AddonLimitResource = 'operators' | 'subscribers' | 'devices'
+
+/** Um add-on do catálogo. */
+export interface AddonView {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  /** O preço por período mensal do plano. */
+  priceCents: number
+  /** O preço por ano no ciclo anual; nulo é doze vezes o mensal. */
+  priceYearlyCents: number | null
+  currency: string
+  kind: AddonKind
+  /** A chave do recurso que ele libera (`whatsapp`, `ai`), no `feature`. */
+  feature: string | null
+  limitResource: AddonLimitResource | null
+  limitAmount: number | null
+  /** Se o recurso passa a exigir o add-on (desligado: vende sem tirar de ninguém). */
+  gated: boolean
+  /** Se quem está em teste usa o recurso sem ele. */
+  trialAccess: boolean
+  active: boolean
+  public: boolean
+  sort: number
+}
+
+/** O add-on que um provedor tem (ou teve). */
+export interface TenantAddonRow {
+  id: number
+  addonId: number
+  code: string | null
+  name: string | null
+  status: 'active' | 'canceled'
+  /** Vale agora: ativo, e com o cancelamento agendado (se há) ainda no futuro. */
+  live: boolean
+  /** Dado pelo console, sem cobrança. */
+  free: boolean
+  source: 'provider' | 'console' | null
+  reason: string | null
+  startedAt: string | null
+  /** O fim do período pago, quando o cancelamento foi pedido. */
+  cancelAt: string | null
+  canceledAt: string | null
+}
+
+/** Um cartão da vitrine da tela de Plano. */
+export interface TenantAddonOption extends AddonView {
+  /** O preço recorrente no ciclo de agora da assinatura. */
+  cycleCents: number
+  subscription: TenantAddonRow | null
+  /** O que ativar cobraria AGORA, ou nulo (nada na hora: teste, atraso). */
+  proration: { amountCents: number; remainingDays: number; skipped?: string } | null
+  available: boolean
+}
+
+export interface TenantAddons {
+  billingCycle: BillingCycle
+  addons: TenantAddonOption[]
+}
+
+export interface AddonChangeResult extends TenantAddons {
+  result: {
+    code: string
+    activated?: boolean
+    reactivated?: boolean
+    already?: boolean
+    scheduled?: boolean
+    effectiveAt?: string | null
+    proration?: PlanChangeProration | null
+  }
+}
+
+/** O catálogo no console, com quantos provedores têm cada um ativo. */
+export interface ConsoleAddonView extends AddonView {
+  activeCount: number
+}
+
+export interface ConsoleTenantAddons {
+  addons: TenantAddonRow[]
+  catalog: AddonView[]
+}
+
+export type AddonPayload = Partial<{
+  code: string
+  name: string
+  description: string | null
+  priceCents: number
+  priceYearlyCents: number | null
+  kind: AddonKind
+  feature: string
+  limitResource: AddonLimitResource
+  limitAmount: number
+  gated: boolean
+  trialAccess: boolean
+  active: boolean
+  public: boolean
+  sort: number
+}>
+
+export const addonsAPI = {
+  /** A vitrine e o que o provedor tem. */
+  list: () => apiClient.get<TenantAddons>('/tenant/addons'),
+
+  /**
+   * Ativa (ou reativa, desfazendo o cancelamento agendado) o add-on. A
+   * pró-rata do resto do período sai na hora, uma vez só. 404
+   * `addon_not_found`, 409 `not_changeable`/`paid_plan_required`/`busy`,
+   * 502 `gateway_failed` (a fatura em aberto não pôde ser cancelada: nada mudou).
+   */
+  activate: (code: string) =>
+    apiClient.post<AddonChangeResult>(`/tenant/addons/${encodeURIComponent(code)}/activate`, {}),
+
+  /** Cancela na renovação (na hora, sem período pago). 409 `addon_not_active`. */
+  cancel: (code: string) =>
+    apiClient.post<AddonChangeResult>(`/tenant/addons/${encodeURIComponent(code)}/cancel`, {}),
+
+  // ── O console ─────────────────────────────────────────────────────────
+  catalog: () => apiClient.get<{ addons: ConsoleAddonView[] }>('/platform/addons'),
+
+  /** 409 `addon_code_taken`. */
+  create: (payload: AddonPayload) => apiClient.post<{ addon: AddonView }>('/platform/addons', payload),
+
+  /** Código, tipo, recurso e teto são fixos (`addon_immutable`). */
+  update: (id: number, payload: AddonPayload) =>
+    apiClient.requestWithBody<{ addon: AddonView }>('PATCH', `/platform/addons/${id}`, payload),
+
+  /** Só o nunca contratado; o contratado é 409 `addon_in_use` (desative). */
+  remove: (id: number) => apiClient.delete<{ id: number }>(`/platform/addons/${id}`),
+
+  ofTenant: (tenantId: number) =>
+    apiClient.get<ConsoleTenantAddons>(`/platform/tenants/${tenantId}/addons`),
+
+  /** Dá de graça, com motivo (auditado). */
+  grant: (tenantId: number, payload: { code: string; reason: string }) =>
+    apiClient.post<ConsoleTenantAddons>(`/platform/tenants/${tenantId}/addons`, payload),
+
+  /** Tira na hora, sem estorno, com motivo (auditado). 409 `addon_not_active`. */
+  revoke: (tenantId: number, code: string, reason: string) =>
+    apiClient.post<ConsoleTenantAddons>(
+      `/platform/tenants/${tenantId}/addons/${encodeURIComponent(code)}/revoke`, { reason }
+    ),
 }
