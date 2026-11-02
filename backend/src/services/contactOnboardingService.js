@@ -8,6 +8,7 @@ import TeiahService from './teiahService.js';
 import { lookupCep } from './addressLookupService.js';
 import { isValidCnpj, isValidCpf } from '../utils/taxId.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { tdb } from '../config/database.js';
 
 /**
  * The "Novo cliente" flow: a CPF/CNPJ first, then the record, then — when the
@@ -39,7 +40,97 @@ export function personTypeOf(document) {
   return null;
 }
 
+/** A plan name compared loosely: no accents, no case, single spaces. */
+function looseName(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/** The day a due-day label or value names: "Dia 10" → 10, "10" → 10. */
+function dayOf(value) {
+  const match = String(value ?? '').match(/\d{1,2}/);
+  if (!match) return null;
+  const day = Number(match[0]);
+  return day >= 1 && day <= 31 ? day : null;
+}
+
+/** The login a PPPoE account would get from what the operator typed. */
+function loginBase(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
 class ContactOnboardingService {
+  /**
+   * What the "Cliente com contrato" form picks from: the lists configured in
+   * Settings → SGP, and the plan and due day most active contracts already
+   * have, so the usual choice is the one pre-selected.
+   */
+  static async preRegistrationOptions() {
+    const config = await SgpService.getConfig();
+    const options = {
+      ready: SgpService.isReady(config),
+      plans: config.preRegPlans,
+      dueDays: config.preRegDueDays,
+      sellers: config.preRegSellers,
+      technicians: config.preRegTechnicians,
+      splitters: config.preRegSplitters,
+      defaultSellerId: config.preRegVendedorId,
+      installOs: config.preRegInstallOs,
+      suggestedPlanId: null,
+      suggestedDueDayId: null
+    };
+    if (config.preRegPlans.length === 0 && config.preRegDueDays.length === 0) return options;
+    try {
+      const rows = await tdb('sgp_contacts')
+        .whereNotNull('contract')
+        .where({ state: 'active' })
+        .select('plan', 'due_day');
+      const planIds = new Map(config.preRegPlans.map((plan) => [looseName(plan.name), plan.id]));
+      const dayIds = new Map();
+      for (const entry of config.preRegDueDays) {
+        const day = dayOf(entry.label);
+        if (day !== null && !dayIds.has(day)) dayIds.set(day, entry.id);
+      }
+      const planCount = new Map();
+      const dayCount = new Map();
+      for (const row of rows) {
+        const planId = planIds.get(looseName(row.plan));
+        if (planId) planCount.set(planId, (planCount.get(planId) || 0) + 1);
+        const dayId = dayIds.get(dayOf(row.due_day));
+        if (dayId) dayCount.set(dayId, (dayCount.get(dayId) || 0) + 1);
+      }
+      const top = (counts) => [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      options.suggestedPlanId = top(planCount);
+      options.suggestedDueDayId = top(dayCount);
+    } catch (error) {
+      console.warn(`Pre-registration suggestion failed: ${error.message}`);
+    }
+    return options;
+  }
+
+  /**
+   * Whether a PPPoE login is already someone's — in the SGP contracts the
+   * panel synced, or in the panel's own accounts — and, when it is, the first
+   * free variation (`maria.souza2`, `maria.souza3`…).
+   */
+  static async checkLogin(value) {
+    const login = loginBase(value);
+    if (!login || /\s/.test(login) || login.length > 64) throw invalid('login');
+    const base = login.replace(/\d+$/, '') || login;
+    const candidates = [login, ...Array.from({ length: 49 }, (_, i) => `${base}${i + 2}`)];
+    const [contracts, accounts] = await Promise.all([
+      tdb('sgp_contacts').whereNotNull('login').whereRaw('lower(login) like ?', [`${base}%`]).select('login'),
+      tdb('customer_accounts').whereNotNull('pppoe_username')
+        .whereRaw('lower(pppoe_username) like ?', [`${base}%`]).select('pppoe_username')
+    ]);
+    const taken = new Set([
+      ...contracts.map((row) => loginBase(row.login)),
+      ...accounts.map((row) => loginBase(row.pppoe_username))
+    ]);
+    if (!taken.has(login)) return { login, taken: false, suggestion: null };
+    return { login, taken: true, suggestion: candidates.find((candidate) => !taken.has(candidate)) ?? null };
+  }
+
   /**
    * What the panel knows about a document before anything is typed:
    * - `inSgp`: the SGP's clients under it (already filed in the contacts list
@@ -365,6 +456,36 @@ class ContactOnboardingService {
     if (!config.preRegDueDays.some((day) => day.id === dueDayId)) throw invalid('dueDayId');
     const login = clean(input.login, 64);
     if (login && /\s/.test(login)) throw invalid('login');
+    // Picked from a list when the list exists; an id nobody listed is refused.
+    const listed = (value, list, field) => {
+      if (value === undefined || value === null || value === '') return null;
+      const id = Number.parseInt(String(value), 10);
+      if (!Number.isInteger(id) || id <= 0) throw invalid(field);
+      if (list.length > 0 && !list.some((entry) => entry.id === id)) throw invalid(field);
+      return id;
+    };
+    const sellerId = listed(input.sellerId, config.preRegSellers, 'sellerId') ?? config.preRegVendedorId;
+    const technicianId = listed(input.technicianId, config.preRegTechnicians, 'technicianId');
+    const splitterId = listed(input.splitterId, config.preRegSplitters, 'splitterId');
+    let splitterPort = null;
+    if (splitterId && input.splitterPort !== undefined && input.splitterPort !== null && input.splitterPort !== '') {
+      const splitter = config.preRegSplitters.find((entry) => entry.id === splitterId);
+      splitterPort = Number.parseInt(String(input.splitterPort), 10);
+      if (!Number.isInteger(splitterPort) || splitterPort < 1 || splitterPort > (splitter?.ports ?? 128)) {
+        throw invalid('splitterPort');
+      }
+    }
+    if (login) {
+      // Checked again here: two operators may type the same login at once.
+      const check = await this.checkLogin(login);
+      if (check.taken) {
+        throw new ContactProfileError('contacts.error.loginTaken', {
+          code: 'login_taken',
+          status: 409,
+          vars: { suggestion: check.suggestion || '' }
+        });
+      }
+    }
     const password = String(input.password ?? '').trim().slice(0, 64);
 
     const sent = await SgpService.createPreRegistration({
@@ -381,7 +502,10 @@ class ContactOnboardingService {
       dueDayId,
       popId: config.preRegPopId,
       portadorId: config.preRegPortadorId,
-      vendedorId: config.preRegVendedorId,
+      vendedorId: sellerId,
+      technicianId,
+      splitterId,
+      splitterPort,
       login,
       password,
       installOs: input.installOs === undefined ? config.preRegInstallOs : input.installOs === true,

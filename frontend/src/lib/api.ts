@@ -3493,6 +3493,36 @@ export interface GenieAcsAuthPayload {
   secret?: string
 }
 
+/** One entry of an SGP pre-registration list (POP, carrier, seller, technician). */
+export interface SgpCatalogItem { id: number; label: string }
+/** A splitter (CTO) from the SGP, with its position and port count when sent. */
+export interface SgpSplitter extends SgpCatalogItem { lat?: number; lng?: number; ports?: number }
+
+export type SgpCatalogKind = 'plano' | 'vencimento' | 'pop' | 'portador' | 'vendedor' | 'tecnico' | 'splitter'
+
+export interface SgpCatalogImport {
+  endpoint: string
+  results: Record<SgpCatalogKind, {
+    ok: boolean
+    count: number
+    items: { id: number; name?: string; label?: string; lat?: number; lng?: number; ports?: number }[]
+    error?: string
+  }>
+}
+
+export interface PreRegistrationOptions {
+  ready: boolean
+  plans: { id: number; name: string }[]
+  dueDays: { id: number; label: string }[]
+  sellers?: SgpCatalogItem[]
+  technicians?: SgpCatalogItem[]
+  splitters?: SgpSplitter[]
+  defaultSellerId?: number | null
+  installOs: boolean
+  suggestedPlanId?: number | null
+  suggestedDueDayId?: number | null
+}
+
 export interface SgpConfig {
   enabled: boolean
   baseUrl: string
@@ -3512,6 +3542,8 @@ export interface SgpConfig {
     invoiceSettle?: string
     /** Pre-registration, `F`/`J` appended. */
     preRegistration?: string
+    /** Where the pre-registration lists are read; `{kind}` is plano, vencimento, pop… */
+    preRegistrationList?: string
   }
   tokenConfigured: boolean
   ready: boolean
@@ -3540,6 +3572,11 @@ export interface SgpConfig {
   preRegPopId: number | null
   preRegPortadorId: number | null
   preRegVendedorId: number | null
+  preRegPops?: SgpCatalogItem[]
+  preRegPortadores?: SgpCatalogItem[]
+  preRegSellers?: SgpCatalogItem[]
+  preRegTechnicians?: SgpCatalogItem[]
+  preRegSplitters?: SgpSplitter[]
   preRegInstallOs: boolean
   preRegActivate: boolean
   contactsSyncEnabled: boolean
@@ -4009,13 +4046,21 @@ export const contactsAPI = {
     login?: string
     password?: string
     installOs?: boolean
+    sellerId?: number
+    technicianId?: number
+    splitterId?: number
+    splitterPort?: number
   }) =>
     apiClient.post<ContactProfile & { filed: 'sgp' | 'panel' }>('/contacts/sgp/precadastro', data),
 
   /** The pre-registration lists (plans, due days) the "Novo cliente" form offers. */
   preRegistrationOptions: () =>
-    apiClient.get<{ plans: { id: number; name: string }[]; dueDays: { id: number; label: string }[]; installOs: boolean }>(
-      '/contacts/sgp/precadastro/options'
+    apiClient.get<PreRegistrationOptions>('/contacts/sgp/precadastro/options'),
+
+  /** Whether a PPPoE login is already in use, and the first free variation. */
+  checkPreRegistrationLogin: (login: string) =>
+    apiClient.get<{ login: string; taken: boolean; suggestion: string | null }>(
+      `/contacts/sgp/precadastro/login?login=${encodeURIComponent(login)}`
     ),
 
   /** The contacts as a CSV, with the list's search and state filter. */
@@ -4316,6 +4361,10 @@ export const sgpAPI = {
 
   testContacts: () =>
     apiClient.post<SgpContactsTestResult>('/sgp/contacts/test'),
+
+  /** Tries the SGP's pre-registration list routes; saves nothing. */
+  importPreRegistration: () =>
+    apiClient.post<SgpCatalogImport>('/sgp/precadastro/import'),
 
   getLinks: () =>
     apiClient.get<{ links: SgpLinkRow[] }>('/sgp/links'),

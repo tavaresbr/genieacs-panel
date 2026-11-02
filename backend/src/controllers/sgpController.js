@@ -75,6 +75,11 @@ class SgpController {
         preRegPopId: body.preRegPopId,
         preRegPortadorId: body.preRegPortadorId,
         preRegVendedorId: body.preRegVendedorId,
+        preRegPops: body.preRegPops,
+        preRegPortadores: body.preRegPortadores,
+        preRegSellers: body.preRegSellers,
+        preRegTechnicians: body.preRegTechnicians,
+        preRegSplitters: body.preRegSplitters,
         preRegInstallOs: body.preRegInstallOs,
         preRegActivate: body.preRegActivate
         // `webhookSecret` is deliberately not accepted here: it is only ever
@@ -176,6 +181,20 @@ class SgpController {
       return res.json(createResponse(req.t('sgp.contactsTested', { count: result.received }), result));
     } catch (error) {
       return handleError(req, res, error, 'sgp.contactsSyncFailed');
+    }
+  }
+
+  /**
+   * `POST /api/sgp/precadastro/import` — tries the SGP's catalogue routes and
+   * answers what each one gave. Saves nothing: the admin reviews and saves.
+   */
+  static async importPreRegistration(req, res) {
+    try {
+      const result = await SgpService.importPreRegistrationCatalogs();
+      const imported = Object.values(result.results).filter((entry) => entry.ok).length;
+      return res.json(createResponse(req.t('sgp.preRegImported', { imported, total: Object.keys(result.results).length }), result));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.preRegImportFailed');
     }
   }
 

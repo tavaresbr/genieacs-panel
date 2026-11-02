@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { contactsAPI, type ContactDocumentLookup } from '@/lib/api'
+import { contactsAPI, type ContactDocumentLookup, type PreRegistrationOptions } from '@/lib/api'
+import { formatDistance, sortSplitters } from '@/lib/pre-registration'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -85,12 +86,13 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   // With a contract (the SGP's pre-registration): the lists come from
   // Settings → SGP, and the option shows only once a plan is configured there.
   const [withContract, setWithContract] = useState(false)
-  const [preRegOptions, setPreRegOptions] = useState<{
-    plans: { id: number; name: string }[]
-    dueDays: { id: number; label: string }[]
-    installOs: boolean
-  } | null>(null)
-  const [contract, setContract] = useState({ planId: '', dueDayId: '', login: '', password: '', installOs: true })
+  const [preRegOptions, setPreRegOptions] = useState<PreRegistrationOptions | null>(null)
+  const [contract, setContract] = useState({
+    planId: '', dueDayId: '', login: '', password: '', installOs: true,
+    sellerId: '', technicianId: '', splitterId: '', splitterPort: ''
+  })
+  // The last login checked against the SGP contracts and the panel's accounts.
+  const [loginCheck, setLoginCheck] = useState<{ login: string; taken: boolean; suggestion: string | null } | null>(null)
   const [saving, setSaving] = useState(false)
   const [cepLooking, setCepLooking] = useState(false)
 
@@ -106,8 +108,16 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
     if (!canCreateInSgp || preRegOptions) return
     void contactsAPI.preRegistrationOptions().then((res) => {
       if (!res.success || !res.data) return
-      setPreRegOptions(res.data)
-      setContract((current) => ({ ...current, installOs: res.data?.installOs !== false }))
+      const options = res.data
+      setPreRegOptions(options)
+      // The usual plan and due day (most active contracts) and the default seller, pre-selected.
+      setContract((current) => ({
+        ...current,
+        installOs: options.installOs !== false,
+        planId: current.planId || (options.suggestedPlanId ? String(options.suggestedPlanId) : ''),
+        dueDayId: current.dueDayId || (options.suggestedDueDayId ? String(options.suggestedDueDayId) : ''),
+        sellerId: current.sellerId || (options.defaultSellerId ? String(options.defaultSellerId) : '')
+      }))
     })
   }, [canCreateInSgp, preRegOptions])
 
@@ -124,7 +134,24 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
     crypto.getRandomValues(bytes)
     return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('')
   }
-  const missingContract = toPreRegister && (!contract.planId || !contract.dueDayId)
+  const loginTyped = contract.login.trim().toLowerCase()
+  useEffect(() => {
+    if (!toPreRegister || !loginTyped) return
+    const timer = window.setTimeout(() => {
+      void contactsAPI.checkPreRegistrationLogin(loginTyped).then((res) => {
+        if (res.success && res.data) setLoginCheck(res.data)
+      })
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [toPreRegister, loginTyped])
+  const loginTaken = Boolean(loginTyped) && loginCheck?.login === loginTyped && loginCheck.taken
+
+  const splitters = useMemo(
+    () => sortSplitters(preRegOptions?.splitters ?? [], form.latitude, form.longitude),
+    [preRegOptions?.splitters, form.latitude, form.longitude]
+  )
+  const chosenSplitter = splitters.find((splitter) => String(splitter.id) === contract.splitterId)
+  const missingContract = toPreRegister && (!contract.planId || !contract.dueDayId || loginTaken)
 
   const open = (key: string) => navigate(`/contacts/${encodeURIComponent(key)}`)
 
@@ -230,7 +257,11 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
         dueDayId: Number(contract.dueDayId),
         login: contract.login.trim(),
         password: contract.password,
-        installOs: contract.installOs
+        installOs: contract.installOs,
+        ...(contract.sellerId ? { sellerId: Number(contract.sellerId) } : {}),
+        ...(contract.technicianId ? { technicianId: Number(contract.technicianId) } : {}),
+        ...(contract.splitterId ? { splitterId: Number(contract.splitterId) } : {}),
+        ...(contract.splitterId && contract.splitterPort ? { splitterPort: Number(contract.splitterPort) } : {})
       })
       : toSgp
       ? await contactsAPI.createInSgp({
@@ -513,7 +544,11 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                         onChange={(event) => setContract((current) => ({ ...current, planId: event.target.value }))}
                       >
                         <option value="">—</option>
-                        {preRegOptions.plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+                        {preRegOptions.plans.map((plan) => (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.name}{plan.id === preRegOptions.suggestedPlanId ? ` · ${t('contacts.new.mostUsed')}` : ''}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -525,7 +560,11 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                         onChange={(event) => setContract((current) => ({ ...current, dueDayId: event.target.value }))}
                       >
                         <option value="">—</option>
-                        {preRegOptions.dueDays.map((day) => <option key={day.id} value={day.id}>{day.label}</option>)}
+                        {preRegOptions.dueDays.map((day) => (
+                          <option key={day.id} value={day.id}>
+                            {day.label}{day.id === preRegOptions.suggestedDueDayId ? ` · ${t('contacts.new.mostUsed')}` : ''}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -535,8 +574,26 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                         className="modern-input font-mono"
                         autoComplete="off"
                         value={contract.login}
+                        aria-invalid={loginTaken || undefined}
                         onChange={(event) => setContract((current) => ({ ...current, login: event.target.value.replace(/\s/g, '') }))}
                       />
+                      {loginTaken && (
+                        <p className="mt-1 text-xs text-[hsl(var(--status-warning))]" data-testid="new-contact-login-taken">
+                          {t('contacts.new.loginTaken')}
+                          {loginCheck?.suggestion && (
+                            <>
+                              {' '}
+                              <button
+                                type="button"
+                                className="font-semibold underline"
+                                onClick={() => setContract((current) => ({ ...current, login: loginCheck.suggestion ?? current.login }))}
+                              >
+                                {t('contacts.new.useLogin', { login: loginCheck.suggestion })}
+                              </button>
+                            </>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="field-label" htmlFor="new-contact-password">{t('contacts.new.password')}</label>
@@ -548,6 +605,82 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                         onChange={(event) => setContract((current) => ({ ...current, password: event.target.value }))}
                       />
                     </div>
+                    {Boolean(preRegOptions.sellers?.length) && (
+                      <div>
+                        <label className="field-label" htmlFor="new-contact-seller">{t('contacts.new.seller')}</label>
+                        <select
+                          id="new-contact-seller"
+                          className="modern-input"
+                          value={contract.sellerId}
+                          onChange={(event) => setContract((current) => ({ ...current, sellerId: event.target.value }))}
+                        >
+                          <option value="">—</option>
+                          {preRegOptions.sellers?.map((seller) => <option key={seller.id} value={seller.id}>{seller.label}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {Boolean(preRegOptions.technicians?.length) && (
+                      <div>
+                        <label className="field-label" htmlFor="new-contact-technician">{t('contacts.new.technician')}</label>
+                        <select
+                          id="new-contact-technician"
+                          className="modern-input"
+                          value={contract.technicianId}
+                          onChange={(event) => setContract((current) => ({ ...current, technicianId: event.target.value }))}
+                        >
+                          <option value="">—</option>
+                          {preRegOptions.technicians?.map((tech) => <option key={tech.id} value={tech.id}>{tech.label}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {splitters.length > 0 && (
+                      <>
+                        <div>
+                          <label className="field-label" htmlFor="new-contact-splitter">{t('contacts.new.splitter')}</label>
+                          <select
+                            id="new-contact-splitter"
+                            className="modern-input"
+                            value={contract.splitterId}
+                            onChange={(event) => setContract((current) => ({ ...current, splitterId: event.target.value, splitterPort: '' }))}
+                          >
+                            <option value="">—</option>
+                            {splitters.map((splitter) => (
+                              <option key={splitter.id} value={splitter.id}>
+                                {splitter.label}{splitter.distance !== null ? ` · ${formatDistance(splitter.distance)}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                          {splitters[0]?.distance !== null && splitters[0]?.distance !== undefined && (
+                            <p className="mt-1 text-xs text-muted-foreground">{t('contacts.new.splitterByDistance')}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="field-label" htmlFor="new-contact-splitter-port">{t('contacts.new.splitterPort')}</label>
+                          {chosenSplitter?.ports ? (
+                            <select
+                              id="new-contact-splitter-port"
+                              className="modern-input"
+                              value={contract.splitterPort}
+                              onChange={(event) => setContract((current) => ({ ...current, splitterPort: event.target.value }))}
+                            >
+                              <option value="">—</option>
+                              {Array.from({ length: chosenSplitter.ports }, (_, index) => index + 1).map((port) => (
+                                <option key={port} value={port}>{port}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              id="new-contact-splitter-port"
+                              className="modern-input font-mono"
+                              inputMode="numeric"
+                              disabled={!contract.splitterId}
+                              value={contract.splitterPort}
+                              onChange={(event) => setContract((current) => ({ ...current, splitterPort: event.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                            />
+                          )}
+                        </div>
+                      </>
+                    )}
                     <label className="flex items-center gap-2 text-sm sm:col-span-2">
                       <input
                         type="checkbox"
