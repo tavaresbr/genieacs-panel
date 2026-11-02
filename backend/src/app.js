@@ -68,6 +68,7 @@ import { FIRMWARE_REASSIGN_PATH, FIRMWARE_UPLOAD_PATH, firmwareRawBody } from '.
 import provisioningRoutes from './routes/provisioning.js';
 import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
+import { assertCorsOriginsSafe, wantsUpgradeInsecureRequests } from './config/runtimeEnv.js';
 import { wireNpsWhatsappReply } from './services/npsWhatsappReply.js';
 
 dotenv.config();
@@ -93,6 +94,8 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5890')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
+// `*` desliga a checagem de origem; em produção o processo recusa subir.
+assertCorsOriginsSafe(allowedOrigins);
 
 const helmetOptions = {
   // COOP is ignored on plain HTTP public-IP deployments and OAC can produce
@@ -109,7 +112,8 @@ const helmetOptions = {
       scriptSrc: ["'self'"],
       // The built-in server defaults to HTTP; upgrading relative assets would
       // make browsers request HTTPS from a port that has no TLS listener.
-      upgradeInsecureRequests: null,
+      // Opt-in for deployments behind a TLS proxy: CSP_UPGRADE_INSECURE_REQUESTS=true.
+      upgradeInsecureRequests: wantsUpgradeInsecureRequests() ? [] : null,
       imgSrc: [
         "'self'",
         'data:',

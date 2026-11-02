@@ -137,6 +137,7 @@ export async function authenticatePortalCustomer(req, res, next) {
       });
     }
     const decoded = jwt.verify(token, portalSecret, {
+      algorithms: ['HS256'],
       issuer: 'skygenpanel',
       audience: 'skygenpanel-customer-portal'
     });
