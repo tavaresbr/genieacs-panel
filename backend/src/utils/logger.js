@@ -46,11 +46,111 @@ function emit(level, line) {
   stream.write(`${line}\n`);
 }
 
+/**
+ * O que nunca sai num log: credenciais e chaves, onde quer que apareçam.
+ *
+ * Duas frentes. Por NOME de campo — um objeto com `authorization`, `cookie`,
+ * `password`, `token`, `apikey`, `secret`, chave Pix… tem o valor trocado por
+ * `[REDACTED]` (só valores texto ou estruturas; um `tokenVersion: 3` ou um
+ * `webhookSecretConfigured: true` não é segredo e fica). E por FORMA dentro de
+ * texto — a mensagem de um erro de biblioteca costuma trazer o cabeçalho ou a
+ * query inteira: `Bearer eyJ…`, `?access_token=…`, `"password":"…"`.
+ *
+ * O erro de um cliente HTTP (axios) é o caso que motivou: o objeto carrega
+ * `config.headers.Authorization`, `config.data` com o corpo enviado e
+ * `response.data` com o que voltou, e um `console.error(err)` imprimia tudo.
+ * Nada é alterado no objeto original — quem loga recebe uma cópia limpa, e o
+ * erro segue intacto para quem ainda vai tratá-lo.
+ */
+export const REDACTED = '[REDACTED]';
+
+const SENSITIVE_KEY = /^(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|x-auth-token|apikey|api[-_]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|token|auth[-_]?token|bearer|password|passwd|senha|current[-_]?password|new[-_]?password|secret|client[-_]?secret|webhook[-_]?secret|secret[-_]?key|private[-_]?key|access[-_]?key|pix[-_]?key|chave[-_]?pix|chavepix|address[-_]?key|totp[-_]?secret|mfa[-_]?secret|asaas-access-token|x-sgp-signature|x-signature|x-hub-signature-256|x-webhook-signature)$/i;
+
+// `chave=valor` e `"chave": "valor"` dentro de texto. O nome da chave fica;
+// só o valor some.
+const SENSITIVE_PAIR = /(["']?\b(?:authorization|cookie|api[-_]?key|apikey|access[-_]?token|refresh[-_]?token|token|password|passwd|senha|secret|client[-_]?secret|pix[-_]?key|chave[-_]?pix|addressKey)["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,&;}"']+)/gi;
+const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi;
+
+export function isSensitiveKey(key) {
+  return SENSITIVE_KEY.test(String(key));
+}
+
+/** O texto com credenciais visíveis mascaradas. */
+export function redactText(text) {
+  if (typeof text !== 'string' || text === '') return text;
+  return text.replace(BEARER, `$1 ${REDACTED}`).replace(SENSITIVE_PAIR, `$1${REDACTED}`);
+}
+
+/** Valor que, sob uma chave sensível, é trocado: texto e estruturas, não flags nem contadores. */
+function hidesUnderSensitiveKey(value) {
+  return value !== null && value !== undefined && typeof value !== 'boolean' && typeof value !== 'number';
+}
+
+const MAX_DEPTH = 6;
+
+function redactValue(value, depth, seen) {
+  if (typeof value === 'string') return redactText(value);
+  if (value === null || typeof value !== 'object') return value;
+  // Buffers, datas e afins: não há campo a limpar.
+  if (Buffer.isBuffer(value) || value instanceof Date || ArrayBuffer.isView(value)) return value;
+  if (seen.has(value)) return '[Circular]';
+  if (depth >= MAX_DEPTH) return '[Object]';
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) return value.map((item) => redactValue(item, depth + 1, seen));
+
+    // A cópia mantém o protótipo, para o `console` continuar mostrando
+    // `AxiosError`/`AxiosHeaders` e a pilha como sempre mostrou.
+    const proto = Object.getPrototypeOf(value);
+    const plain = proto === Object.prototype || proto === null || value instanceof Error
+      || proto?.constructor?.name === 'AxiosHeaders' || proto?.constructor?.name === 'Headers';
+    if (!plain) {
+      // Instância de outra classe (o `request` do axios, um socket, um Map):
+      // copiar campo a campo é caro e sem sentido. No topo ela passa como
+      // veio — é o objeto que alguém pediu para ver —; lá dentro vira
+      // etiqueta, que é o que o `console` mostraria pela profundidade.
+      return depth === 0 ? value : `[${proto?.constructor?.name || 'Object'}]`;
+    }
+    const out = Object.create(proto);
+    if (value instanceof Error) {
+      // `message` e `stack` não são enumeráveis; vão explicitamente.
+      const hidden = (v) => ({ value: v, enumerable: false, writable: true, configurable: true });
+      Object.defineProperty(out, 'message', hidden(redactText(String(value.message ?? ''))));
+      if (value.stack) Object.defineProperty(out, 'stack', hidden(redactText(String(value.stack))));
+      if (value.cause !== undefined) Object.defineProperty(out, 'cause', hidden(redactValue(value.cause, depth + 1, seen)));
+    }
+    for (const key of Object.keys(value)) {
+      let item;
+      try { item = value[key]; } catch { continue; }
+      out[key] = isSensitiveKey(key) && hidesUnderSensitiveKey(item)
+        ? REDACTED
+        : redactValue(item, depth + 1, seen);
+    }
+    return out;
+  } catch {
+    return '[Unloggable]';
+  } finally {
+    seen.delete(value);
+  }
+}
+
+/**
+ * Uma cópia de `value` sem credenciais, pronta para ir a um log. Nunca lança e
+ * nunca mexe no original.
+ */
+export function redactSecrets(value) {
+  try {
+    return redactValue(value, 0, new WeakSet());
+  } catch {
+    return '[Unloggable]';
+  }
+}
+
 function describeError(error) {
-  if (!(error instanceof Error)) return { err: String(error) };
-  const out = { err: error.message, errName: error.name };
+  if (!(error instanceof Error)) return { err: redactText(String(error)) };
+  const out = { err: redactText(error.message), errName: error.name };
   if (error.code) out.errCode = error.code;
-  if (error.stack) out.stack = error.stack;
+  if (error.stack) out.stack = redactText(error.stack);
   return out;
 }
 
@@ -66,7 +166,9 @@ function normalizeFields(fields) {
   const out = {};
   for (const [key, value] of Object.entries(fields || {})) {
     if (value instanceof Error) Object.assign(out, describeError(value));
-    else if (value !== undefined) out[key] = value;
+    else if (value === undefined) continue;
+    else if (isSensitiveKey(key) && hidesUnderSensitiveKey(value)) out[key] = REDACTED;
+    else out[key] = redactSecrets(value);
   }
   return out;
 }
@@ -84,13 +186,13 @@ export function logLine(level, msg, fields = {}) {
   const data = normalizeFields(fields);
 
   if (format() === 'json') {
-    emit(level, JSON.stringify({ time, level, tenant_id: tenant, msg, ...data }));
+    emit(level, JSON.stringify({ time, level, tenant_id: tenant, msg: redactText(String(msg)), ...data }));
     return;
   }
 
   const { stack, ...rest } = data;
   const pairs = Object.entries(rest).map(([key, value]) => `${key}=${quote(value)}`);
-  const head = `${time} ${level.toUpperCase().padEnd(5)} tenant=${tenant ?? '-'} ${msg}`;
+  const head = `${time} ${level.toUpperCase().padEnd(5)} tenant=${tenant ?? '-'} ${redactText(String(msg))}`;
   const line = pairs.length ? `${head} ${pairs.join(' ')}` : head;
   emit(level, stack ? `${line}\n${stack}` : line);
 }
@@ -120,8 +222,12 @@ export function installTenantTaggedConsole(target = console) {
   for (const method of ['log', 'info', 'warn', 'error', 'debug']) {
     const original = target[method].bind(target);
     target[method] = (...args) => {
+      // Cada argumento passa pela redação: é por aqui que sai o
+      // `console.error('…', error)` das centenas de rotas, e o erro de um
+      // cliente HTTP leva o cabeçalho `Authorization` e o corpo enviado.
+      const limpos = args.map(redactSecrets);
       const tenant = tenantInScope();
-      return tenant === null ? original(...args) : original(`[tenant=${tenant}]`, ...args);
+      return tenant === null ? original(...limpos) : original(`[tenant=${tenant}]`, ...limpos);
     };
   }
   Object.defineProperty(target, WRAPPED, { value: true, enumerable: false });
