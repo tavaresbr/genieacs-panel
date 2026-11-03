@@ -21,7 +21,9 @@ const {
 } = await import('./helpers/harness.js');
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
-const { generateTokens } = await import('../src/middleware/auth.js');
+const { PANEL_AUDIENCE } = await import('../src/middleware/auth.js');
+const { default: RefreshToken } = await import('../src/models/RefreshToken.js');
+const { cookieHeaders } = await import('./helpers/sessionCookies.js');
 const bcrypt = (await import('bcryptjs')).default;
 
 const DONA = { username: 'dona', email: 'dona@isp.com', password: 'senha-da-dona-1' };
@@ -110,26 +112,26 @@ describe('com a chave ligada, o aceite de convite', () => {
 
 describe('com a chave ligada, o refresh', () => {
   /**
-   * Uma sessão aberta ANTES da virada. O token é cunhado direto, porque é
+   * Uma sessão aberta ANTES da virada. A família é aberta direto, porque é
    * exatamente o cenário: a pessoa entrou quando o nome ainda servia, a chave
    * virou, e o refresh dela chega agora.
    */
   it('recusa renovar a sessão de uma conta sem e-mail', async () => {
     await asTenant(() => TenantUser.create({ tenantId, userId: legadoId, role: 'tech' }));
     const user = await asTenant(() => User.findById(legadoId));
-    const { refreshToken } = generateTokens(user, { tenant_id: tenantId, role: 'tech' });
+    const { raw } = await RefreshToken.startFamily({ user, audience: PANEL_AUDIENCE, tenantId });
 
-    const r = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', body: { refreshToken } });
-    assert.equal(r.status, 403);
+    const r = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', headers: cookieHeaders(raw) });
+    assert.equal(r.status, 401);
     await asTenant(() => TenantUser.remove(tenantId, legadoId));
   });
 
   it('renova a de quem tem e-mail', async () => {
     await asTenant(() => TenantUser.create({ tenantId, userId: migradoId, role: 'tech' }));
     const user = await asTenant(() => User.findById(migradoId));
-    const { refreshToken } = generateTokens(user, { tenant_id: tenantId, role: 'tech' });
+    const { raw } = await RefreshToken.startFamily({ user, audience: PANEL_AUDIENCE, tenantId });
 
-    const r = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', body: { refreshToken } });
+    const r = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', headers: cookieHeaders(raw) });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     await asTenant(() => TenantUser.remove(tenantId, migradoId));
   });

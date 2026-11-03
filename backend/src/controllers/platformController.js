@@ -24,7 +24,18 @@ import { catalogueSizes, catalogueSource, propagateCatalogue, seedDefaults } fro
 import Vendor from '../models/Vendor.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { slugProblem } from '../utils/slug.js';
+import OnboardingService from '../services/onboardingService.js';
 import { tenantMediaRoot } from '../services/waMediaService.js';
+import { effectiveConfig as externalBackupConfig } from '../services/backup/externalBackupSettings.js';
+
+/** O backup externo está pronto para rodar? Nunca lança: falha de leitura é "não". */
+async function externalBackupConfigured() {
+  try {
+    return (await externalBackupConfig()).configured;
+  } catch {
+    return false;
+  }
+}
 
 const NAME_MAX_LENGTH = 128;
 
@@ -267,7 +278,11 @@ class PlatformController {
       metricsToken: String(process.env.METRICS_TOKEN || '').length >= 32,
       billingWebhookToken: gateway.webhookTokenConfigured,
       billingGateway: gateway.apiKeyConfigured,
-      rls: rlsEnabled(client)
+      rls: rlsEnabled(client),
+      // O backup externo cifrado (Integrações → Backup externo): conexão S3 e
+      // chave pública gravadas. Sem ele, o único backup é o do disco do
+      // próprio servidor — que some junto com ele.
+      externalBackup: await externalBackupConfigured()
     };
   }
 
@@ -434,6 +449,27 @@ class PlatformController {
       return res.status(500).json(
         createErrorResponse('Failed to list providers', error.message)
       );
+    }
+  }
+
+  /**
+   * `GET /api/platform/tenants/onboarding` — quanto cada provedor andou nos
+   * primeiros passos, para o console achar quem travou.
+   *
+   * Rota à parte da lista, e não um campo dela: a conta lê várias tabelas de
+   * cada provedor, e a lista não pode esperar por isso. Sai do mesmo
+   * `OnboardingService.status()` do checklist do provedor, no modo leve (sem
+   * perguntar ao GenieACS de ninguém), lido no escopo de cada um, poucos por
+   * vez e com cache curto.
+   */
+  static async onboardingSummaries(req, res) {
+    try {
+      const tenants = await Tenant.list();
+      const summaries = await OnboardingService.summaries(tenants);
+      return res.json(createResponse('Onboarding summaries retrieved', { summaries }));
+    } catch (error) {
+      console.error('Onboarding summaries error:', error);
+      return res.status(500).json(createErrorResponse('Failed to read onboarding progress', error.message));
     }
   }
 

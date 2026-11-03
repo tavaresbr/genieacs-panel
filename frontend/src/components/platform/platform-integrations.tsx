@@ -8,6 +8,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { copyToClipboard, formatRelativeTime } from '@/lib/utils'
 import { absoluteWebhookUrl } from '@/lib/webhook-url'
+import { ExternalBackupCard } from '@/components/platform/external-backup-card'
 import { parsePercent } from '@/lib/subscription-console'
 import {
   CHARGE_TERMS_LIMITS, chargeTermsFormOf, chargeTermsPayload, type ChargeTermsField, type ChargeTermsForm
@@ -32,6 +33,7 @@ export function PlatformIntegrations() {
   return (
     <div className="grid grid-cols-1 gap-6">
       <AsaasCard />
+      <ExternalBackupCard />
     </div>
   )
 }

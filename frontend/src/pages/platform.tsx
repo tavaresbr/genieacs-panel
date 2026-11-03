@@ -25,6 +25,7 @@ import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantGenieAcs } from '@/components/platform/tenant-genieacs'
 import { TenantMembers } from '@/components/platform/tenant-members'
 import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { OnboardingBadge, OnboardingStuckFilter, useOnboardingSummaries } from '@/components/platform/tenant-onboarding'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -120,6 +121,11 @@ export default function PlatformPage() {
   useEffect(() => {
     void loadTenants()
   }, [loadTenants])
+
+  // O progresso dos primeiros passos, à parte da lista; e o filtro dos travados.
+  const onboarding = useOnboardingSummaries(aba === 'tenants', tenants)
+  const [soTravados, setSoTravados] = useState(false)
+  const visiveis = soTravados ? tenants.filter((tenant) => onboarding.get(tenant.id)?.stuck) : tenants
 
   /**
    * Abre o painel pedido na linha pedida, e fecha quando já era esse o painel
@@ -596,6 +602,9 @@ export default function PlatformPage() {
         {aba === 'affiliates' && <PlatformAffiliates />}
 
         {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
+        {aba === 'tenants' && !creating && (
+          <OnboardingStuckFilter summaries={onboarding} active={soTravados} onChange={setSoTravados} />
+        )}
 
         {aba === 'tenants' && creating && (
           <div className="modern-card mb-6 p-5 sm:p-6">
@@ -644,10 +653,10 @@ export default function PlatformPage() {
               <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
             ) : error !== null ? (
               <p className="modern-card py-8 text-center text-sm text-destructive">{error || t('platform.loadFailed')}</p>
-            ) : tenants.length === 0 ? (
-              <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t('platform.empty')}</p>
+            ) : visiveis.length === 0 ? (
+              <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t(soTravados ? 'platform.onboarding.noneStuck' : 'platform.empty')}</p>
             ) : (
-              tenants.map((tenant) => (
+              visiveis.map((tenant) => (
                 <article key={tenant.id} className="modern-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -659,6 +668,7 @@ export default function PlatformPage() {
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                     {planoDe(tenant)}
                     <span className="text-muted-foreground">{t('platform.operators', { count: tenant.operators })}</span>
+                    <OnboardingBadge summary={onboarding.get(tenant.id)} />
                   </div>
                   <div className="mt-4 border-t border-border pt-4">{acoesDe(tenant)}</div>
                   {expandedId === tenant.id && (
@@ -680,24 +690,25 @@ export default function PlatformPage() {
                 <th>{t('common.status')}</th>
                 <th>{t('platform.subscription.plan')}</th>
                 <th>{t('platform.members')}</th>
+                <th>{t('platform.onboarding.column')}</th>
                 <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td>
+                  <td colSpan={7} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td>
                 </tr>
               ) : error !== null ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-destructive">{error || t('platform.loadFailed')}</td>
+                  <td colSpan={7} className="py-8 text-center text-destructive">{error || t('platform.loadFailed')}</td>
                 </tr>
-              ) : tenants.length === 0 ? (
+              ) : visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">{t('platform.empty')}</td>
+                  <td colSpan={7} className="py-8 text-center text-muted-foreground">{t(soTravados ? 'platform.onboarding.noneStuck' : 'platform.empty')}</td>
                 </tr>
               ) : (
-                tenants.map((tenant) => {
+                visiveis.map((tenant) => {
                   const expanded = expandedId === tenant.id
                   return (
                     <Fragment key={tenant.id}>
@@ -709,11 +720,12 @@ export default function PlatformPage() {
                         <td className="text-sm text-muted-foreground">
                           {t('platform.operators', { count: tenant.operators })}
                         </td>
+                        <td><OnboardingBadge summary={onboarding.get(tenant.id)} /></td>
                         <td>{acoesDe(tenant)}</td>
                       </tr>
                       {expanded && (
                         <tr>
-                          <td colSpan={6}>{painelDe(tenant)}</td>
+                          <td colSpan={7}>{painelDe(tenant)}</td>
                         </tr>
                       )}
                     </Fragment>

@@ -6,7 +6,10 @@ import User from '../models/User.js';
 import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
-import { CONSOLE_AUDIENCE, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
+import { CONSOLE_AUDIENCE, PANEL_AUDIENCE, decodeOwnSessionToken, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
+import RefreshToken, { describeUserAgent } from '../models/RefreshToken.js';
+import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from '../middleware/sessionCookie.js';
+import { openConsoleSession, openPanelSession } from '../services/panelSessionService.js';
 import { createResponse, createErrorResponse, isValidEmail, usernameLengthProblem } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
@@ -195,8 +198,8 @@ async function destinosDoLogin(user) {
 }
 
 /** A resposta de quem entrou no console: sem provedor e sem papel, como a sessão. */
-function respostaDoConsole(req, res, user) {
-  const consoleTokens = generateConsoleTokens(user);
+async function respostaDoConsole(req, res, user) {
+  const token = await openConsoleSession(req, res, user);
   // Sem `marcarAtividade`: aquilo marca atividade DE UM PROVEDOR, e esta
   // sessão não tem um.
   return res.json(
@@ -215,8 +218,8 @@ function respostaDoConsole(req, res, user) {
         createdAt: user.created_at,
         updatedAt: user.updated_at
       },
-      token: consoleTokens.accessToken,
-      refreshToken: consoleTokens.refreshToken
+      // O refresh não vem no corpo: está no cookie `HttpOnly` (0129).
+      token
     })
   );
 }
@@ -780,7 +783,7 @@ class AuthController {
       if (!(await gastarCodigo())) return codigoInvalido();
       // A sessão sai: a prova terminou, e a contagem de tentativas some.
       await AccountLockout.clear(tentativa.subject);
-      const { accessToken, refreshToken } = generateTokens(user, membership);
+      const accessToken = await openPanelSession(req, res, user, membership);
       await marcarAtividade(membership.tenant_id);
       // Entrar com um código de recuperação deixa linha na trilha do provedor
       // em que a sessão abriu: é o sinal de que o celular sumiu, e o dono quer
@@ -818,8 +821,8 @@ class AuthController {
             createdAt: user.created_at,
             updatedAt: user.updated_at
           },
-          token: accessToken,
-          refreshToken
+          // Só o token de acesso: o refresh foi para o cookie (0129).
+          token: accessToken
         })
       );
     } catch (error) {
@@ -856,13 +859,24 @@ class AuthController {
    * — console para o console, o provedor e o papel já hidratados para o painel.
    * A personificação não chega aqui: `/api/auth/` é escrita recusada a ela.
    */
-  static async mfaFreshTokens(req) {
+  static async mfaFreshTokens(req, res) {
     const user = await User.findById(req.user.userId);
     if (!user) return {};
-    const { accessToken, refreshToken } = req.user.platform
-      ? generateConsoleTokens(user)
-      : generateTokens(user, { tenant_id: req.user.tenantId, role: req.user.role });
-    return { token: accessToken, refreshToken };
+    // A família DESTA sessão passa para a versão nova e segue viva, com o mesmo
+    // cookie; as outras ficam na versão antiga e caem na próxima renovação. Um
+    // token de antes desta versão (sem família) ganha uma família nova aqui.
+    if (req.user.sessionId) {
+      await RefreshToken.adoptVersion(req.user.sessionId, user.id, user.token_version);
+      const opcoes = { sessionId: req.user.sessionId };
+      const { accessToken } = req.user.platform
+        ? generateConsoleTokens(user, opcoes)
+        : generateTokens(user, { tenant_id: req.user.tenantId, role: req.user.role }, opcoes);
+      return { token: accessToken };
+    }
+    const token = req.user.platform
+      ? await openConsoleSession(req, res, user)
+      : await openPanelSession(req, res, user, { tenant_id: req.user.tenantId, role: req.user.role });
+    return { token };
   }
 
   static async mfaStatus(req, res) {
@@ -888,7 +902,7 @@ class AuthController {
         action: AuditLog.ACTIONS.USER_MFA_ENABLED, subjectType: 'user', subjectId: String(req.user.userId)
       });
       return res.json(createResponse(req.t('auth.mfaEnabled'), {
-        ...result, ...(await AuthController.mfaFreshTokens(req))
+        ...result, ...(await AuthController.mfaFreshTokens(req, res))
       }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA enable');
@@ -902,7 +916,7 @@ class AuthController {
         action: AuditLog.ACTIONS.USER_MFA_DISABLED, subjectType: 'user', subjectId: String(req.user.userId)
       });
       return res.json(createResponse(req.t('auth.mfaDisabled'), {
-        enabled: false, ...(await AuthController.mfaFreshTokens(req))
+        enabled: false, ...(await AuthController.mfaFreshTokens(req, res))
       }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA disable');
@@ -916,7 +930,7 @@ class AuthController {
         action: AuditLog.ACTIONS.USER_MFA_RECOVERY_REGENERATED, subjectType: 'user', subjectId: String(req.user.userId)
       });
       return res.json(createResponse(req.t('auth.mfaRecoveryRegenerated'), {
-        ...result, ...(await AuthController.mfaFreshTokens(req))
+        ...result, ...(await AuthController.mfaFreshTokens(req, res))
       }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA recovery codes');
@@ -982,9 +996,9 @@ class AuthController {
         password: hashedPassword,
         email
       });
-      const user = { id: userId, username: normalizedUsername };
+      const user = { id: userId, username: normalizedUsername, token_version: 0 };
 
-      const { accessToken, refreshToken } = generateTokens(user, { tenant_id: tenantId, role });
+      const accessToken = await openPanelSession(req, res, user, { tenant_id: tenantId, role });
 
       return res.status(201).json(
         createResponse(req.t('auth.adminCreated'), {
@@ -999,8 +1013,7 @@ class AuthController {
             // into the session from here without asking again.
             isPlatformAdmin: await holdsControlPlane(userId)
           },
-          token: accessToken,
-          refreshToken
+          token: accessToken
         })
       );
     } catch (error) {
@@ -1086,114 +1099,371 @@ class AuthController {
     }
   }
 
+  /**
+   * "Sair" encerra ESTE aparelho, e só ele (0129). Antes subia o
+   * `token_version` e derrubava a pessoa em todo lugar; "sair de todos" é
+   * agora `POST /api/auth/sessions/revoke-all`.
+   *
+   * Qual família encerrar vem, nesta ordem:
+   *
+   * 1. do `sid` do token de acesso que a tela manda — mesmo vencido: a
+   *    assinatura prova de quem é, e encerrar é a direção segura. É o que
+   *    resolve a saída que chega atrasada: a tela já esqueceu o token e outra
+   *    pessoa entrou na mesma aba, e o cookie agora é da sessão NOVA — revogar
+   *    pelo cookie derrubaria quem acabou de entrar;
+   * 2. do cookie, quando não há token.
+   *
+   * A sessão que vem do refresh ANTIGO sobe o `token_version`, como o "Sair"
+   * de antes: o token de acesso de antes desta versão (sem `sid`), e a família
+   * convertida dele (`RefreshToken.isLegacyFamily`). O JWT sem estado de onde
+   * ela veio pode ter ficado em outra aba, ou numa cópia, e só a versão o
+   * derruba — o custo é sair de todos os aparelhos, uma vez, na transição.
+   *
+   * O cookie só é apagado quando é da família encerrada (ou não serve mais).
+   * Sempre 200: sair de uma sessão que já não existe é ter saído.
+   */
   static async logout(req, res) {
-    await User.revokeSessions(req.user.userId);
-    return res.json(
-      createResponse(req.t('auth.logoutSuccess'))
-    );
+    return AuthController.logoutKind(req, res, 'panel');
   }
 
+  static async consoleLogout(req, res) {
+    return AuthController.logoutKind(req, res, 'console');
+  }
+
+  static async logoutKind(req, res, kind) {
+    try {
+      const header = req.headers.authorization;
+      const bearer = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null;
+      const decoded = bearer ? decodeOwnSessionToken(bearer) : null;
+      // A personificação não sai por aqui: a conta é de quem personifica, e o
+      // cookie do navegador é a sessão dela no console (ou no painel). A aba
+      // da personificação só esquece o próprio token.
+      if (decoded?.impersonation) {
+        return res.status(403).json({
+          success: false, message: req.t('auth.impersonationReadOnly'), code: 'impersonation_read_only'
+        });
+      }
+      const raw = readRefreshCookie(req, kind);
+      const row = raw ? await RefreshToken.findByRaw(raw) : null;
+      const sid = typeof decoded?.sid === 'string' ? decoded.sid : null;
+      if (sid) {
+        if (await RefreshToken.isLegacyFamily(sid, decoded.userId)) {
+          await AuthController.endLegacySession(decoded.userId, decoded.tokenVersion);
+        }
+        await RefreshToken.revokeOwnFamily(decoded.userId, sid);
+        if (!row || row.family_id === sid || row.revoked_at) clearRefreshCookie(req, res, kind);
+      } else if (decoded) {
+        // Um token de acesso de antes da 0129 (sem `sid`): não há família a
+        // encerrar, e o refresh que o acompanha é o JWT sem estado.
+        await AuthController.endLegacySession(decoded.userId, decoded.tokenVersion);
+        if (row) await RefreshToken.revokeFamily(row.family_id);
+        clearRefreshCookie(req, res, kind);
+      } else {
+        if (row && !row.revoked_at && await RefreshToken.isLegacyFamily(row.family_id, row.user_id)) {
+          await AuthController.endLegacySession(row.user_id, row.token_version);
+        }
+        if (row) await RefreshToken.revokeFamily(row.family_id);
+        clearRefreshCookie(req, res, kind);
+      }
+      return res.json(createResponse(req.t('auth.logoutSuccess')));
+    } catch (error) {
+      console.error('Logout error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * O "Sair" de uma sessão do refresh antigo: sobe o `token_version` (o JWT
+   * sem estado morre) e encerra as famílias da pessoa — mas só se quem pede
+   * está na versão ATUAL dela. Um token de uma versão já morta não serve para
+   * derrubar as sessões de hoje.
+   */
+  static async endLegacySession(userId, tokenVersion) {
+    const user = await User.findById(userId);
+    if (!user || Number(user.token_version || 0) !== Number(tokenVersion || 0)) return false;
+    await User.revokeSessions(user.id);
+    await RefreshToken.revokeAllForUser(user.id);
+    return true;
+  }
+
+  /** O 401 de toda renovação recusada: o cookie sai junto, e a tela vai ao login. */
+  static refreshRefused(req, res, kind, code = 'refresh_invalid') {
+    clearRefreshCookie(req, res, kind);
+    return res.status(401).json({
+      ...createErrorResponse(req.t(code === 'refresh_required' ? 'auth.refreshTokenRequired' : 'auth.refreshSessionInvalid')),
+      code
+    });
+  }
+
+  /**
+   * Reuso: um refresh já trocado voltou depois da folga. A família já foi
+   * revogada pelo modelo; aqui fica a linha na trilha — do provedor, para a
+   * sessão de painel (o dono quer saber que um aparelho da equipe vazou); da
+   * plataforma, para a do console.
+   */
+  static async recordReuse(req, row, user) {
+    const detail = { family: String(row.family_id).slice(0, 8), userAgent: describeUserAgent(req.get('user-agent')) };
+    if (row.audience === CONSOLE_AUDIENCE) {
+      await PlatformAudit.record({
+        action: PlatformAudit.ACTIONS.SESSION_REFRESH_REUSE,
+        actorUserId: user?.id ?? row.user_id,
+        actorUsername: user?.username ?? null,
+        detail,
+        ip: req.ip ?? null
+      });
+      return;
+    }
+    if (!row.tenant_id) return;
+    await runInTenant(Number(row.tenant_id), () => AuditLog.record({
+      action: AuditLog.ACTIONS.SESSION_REFRESH_REUSE,
+      actorUserId: user?.id ?? row.user_id,
+      actorUsername: user?.username ?? null,
+      subjectType: 'user',
+      subjectId: String(row.user_id),
+      detail,
+      ip: req.ip ?? null
+    })).catch(() => false);
+  }
+
+  /**
+   * Renova a sessão do painel pelo cookie (0129). Por uma versão, também aceita
+   * o refresh ANTIGO no corpo — o JWT sem estado que o frontend anterior
+   * guardava no `localStorage` — e o converte numa família nova com cookie; o
+   * frontend novo faz isso uma vez, na primeira carga, e apaga o JWT.
+   *
+   * 401 para toda recusa (cookie ausente, inválido, vencido, revogado, reuso):
+   * aqui não há sessão a renovar, e a tela vai ao login. O 403 `invalid_token`
+   * continua sendo o das rotas comuns, que é o que dispara a renovação.
+   */
   static async refreshToken(req, res) {
     try {
-      const { refreshToken } = req.body;
-      
-      if (!refreshToken) {
-        return res.status(400).json(
-          createErrorResponse(req.t('auth.refreshTokenRequired'))
-        );
-      }
-      if (typeof refreshToken !== 'string' || refreshToken.length > 4096) {
-        return res.status(403).json(createErrorResponse(req.t('auth.invalidRefreshToken')));
-      }
-      
-      const decoded = verifyToken(refreshToken);
-      
-      if (!decoded) {
-        return res.status(403).json(
-          createErrorResponse(req.t('auth.invalidRefreshToken'))
-        );
-      }
-      
-      if (!decoded.tokenType || decoded.tokenType !== 'refresh') {
-        return res.status(403).json(
-          createErrorResponse(req.t('auth.invalidTokenType'))
-        );
-      }
-      
-      const user = await User.findById(decoded.userId);
-      
-      if (!user) {
-        return res.status(404).json(
-          createErrorResponse(req.t('auth.userNotFound'))
-        );
-      }
-
-      if (Number(user.token_version || 0) !== Number(decoded.tokenVersion || 0)) {
-        return res.status(403).json(
-          createErrorResponse(req.t('auth.refreshSessionInvalid'))
-        );
-      }
-
-      // A chave `LOGIN_REQUIRES_EMAIL`, lida aqui também. Sem isto, virá-la só
-      // trancava quem ainda não tinha sessão: quem já estava dentro renovava
-      // por sete dias. Assim a chave passa a valer na próxima renovação — dentro
-      // da vida do token de acesso — e a pessoa cai na tela de login, onde a
-      // regra que a trancou é a mesma que ela vai ler.
-      if (!canHoldSession(user)) {
-        return res.status(403).json(
-          createErrorResponse(req.t('auth.refreshSessionInvalid'))
-        );
-      }
-
-      // O refresh do console, reconhecido pela AUDIÊNCIA e não por um campo:
-      // um token de painel não pode renovar como console nem o contrário, e a
-      // audiência é a única parte que o `jwt.verify` já provou.
-      //
-      // Relê o cadastro da plataforma, como a hidratação faz: o refresh prova
-      // presença, nunca estende autoridade. E só serve no ápice — fora dele
-      // esta sessão não vale, então renová-la ali seria emitir um token para um
-      // endereço onde ele é recusado.
-      if (decoded.aud === CONSOLE_AUDIENCE) {
-        if (!req.platformHost || !(await PlatformAdmin.has(user.id))) {
-          return res.status(403).json(
-            createErrorResponse(req.t('auth.refreshSessionInvalid'))
-          );
+      const raw = readRefreshCookie(req, 'panel');
+      if (!raw) {
+        const legacy = req.body?.refreshToken;
+        if (legacy !== undefined && legacy !== null && legacy !== '') {
+          return await AuthController.migrateLegacyRefresh(req, res, legacy);
         }
-        const renovado = generateConsoleTokens(user);
-        return res.json(
-          createResponse(req.t('auth.tokenRefreshed'), {
-            token: renovado.accessToken,
-            refreshToken: renovado.refreshToken
-          })
-        );
+        return AuthController.refreshRefused(req, res, 'panel', 'refresh_required');
       }
-
-      // The same provider the session was already running in, re-read from the
-      // table so a membership ended since the refresh token was minted ends the
-      // session at its next hour rather than at its next week. A refresh token
-      // from before this change names no provider and is resolved the same way
-      // an old access token is: through the sole membership, or refused.
-      const membership = await resolveMembership(user.id, decoded.tenantId);
-      if (!membership) {
-        return res.status(403).json(
-          createErrorResponse(req.t('auth.refreshSessionInvalid'))
-        );
-      }
-
-      const { accessToken, refreshToken: newRefreshToken } = generateTokens(user, membership);
-      await marcarAtividade(membership.tenant_id);
-
-      return res.json(
-        createResponse(req.t('auth.tokenRefreshed'), {
-          token: accessToken,
-          refreshToken: newRefreshToken
-        })
-      );
+      return await AuthController.rotateCookie(req, res, raw, 'panel');
     } catch (error) {
       console.error('Refresh token error:', error);
-      return res.status(500).json(
-        createErrorResponse(req.t('common.internalError'), error.message)
-      );
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * A renovação do console: o mesmo mecanismo, com o cookie e o `Path` dele.
+   * Só no endereço da plataforma, onde ele existe (`platformHostOnly` na rota);
+   * num deploy sem domínio-base o console divide o endereço com os painéis,
+   * como `tokenMatchesHost` já aceita.
+   */
+  static async consoleRefreshToken(req, res) {
+    try {
+      const raw = readRefreshCookie(req, 'console');
+      if (!raw) return AuthController.refreshRefused(req, res, 'console', 'refresh_required');
+      return await AuthController.rotateCookie(req, res, raw, 'console');
+    } catch (error) {
+      console.error('Console refresh error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /** O console só renova onde ele vale — ver `tokenMatchesHost`. */
+  static consoleAllowedHere(req) {
+    if (req.platformHost) return true;
+    return !usesTenantSubdomains();
+  }
+
+  /**
+   * O que a renovação devolve, depois de o refresh ter sido aceito: o token de
+   * acesso da mesma família, conferindo de novo tudo o que a sessão exige
+   * (cadastro da plataforma, vínculo com o provedor, `LOGIN_REQUIRES_EMAIL`).
+   * O refresh prova presença; nunca estende autoridade.
+   */
+  static async accessFor(req, user, row) {
+    if (!canHoldSession(user)) return null;
+    if (row.audience === CONSOLE_AUDIENCE) {
+      if (!AuthController.consoleAllowedHere(req) || !(await PlatformAdmin.has(user.id))) return null;
+      return { token: generateConsoleTokens(user, { sessionId: row.family_id }).accessToken, platform: true };
+    }
+    if (row.audience !== PANEL_AUDIENCE) return null;
+    // Uma sessão de painel não renova no endereço da plataforma.
+    if (req.platformHost) return null;
+    // O mesmo provedor em que a sessão já estava, relido da tabela: um vínculo
+    // encerrado desde o login encerra a sessão na próxima renovação.
+    const membership = await openMembership(user.id, row.tenant_id);
+    if (!membership) return null;
+    // O cookie é do host em que nasceu; num deploy com subdomínio ele não
+    // viaja para outro provedor. A conferência fica pelo caso de um host
+    // reaproveitado (o slug trocado de dono).
+    if (!hostMatchesTenant(req, membership.tenant_id)) return null;
+    await marcarAtividade(membership.tenant_id);
+    return { token: generateTokens(user, membership, { sessionId: row.family_id }).accessToken, platform: false };
+  }
+
+  static async rotateCookie(req, res, raw, kind) {
+    const row = await RefreshToken.findByRaw(raw);
+    const audience = kind === 'console' ? CONSOLE_AUDIENCE : PANEL_AUDIENCE;
+    // Um cookie do painel não renova o console, nem o contrário: a linha diz
+    // de qual audiência ele é, e o nome do cookie tem que concordar.
+    if (!row || row.audience !== audience) return AuthController.refreshRefused(req, res, kind);
+    const user = await User.findById(row.user_id);
+    if (!user) {
+      await RefreshToken.revokeFamily(row.family_id);
+      return AuthController.refreshRefused(req, res, kind);
+    }
+    const girou = await RefreshToken.rotate({ raw, row, user, context: RefreshToken.context(req) });
+    if (!girou.ok) {
+      if (girou.reason === 'reuse') {
+        await AuthController.recordReuse(req, girou.row ?? row, user);
+        return AuthController.refreshRefused(req, res, kind, 'refresh_reuse');
+      }
+      return AuthController.refreshRefused(req, res, kind);
+    }
+    const acesso = await AuthController.accessFor(req, user, girou.row ?? row);
+    if (!acesso) {
+      await RefreshToken.revokeFamily(row.family_id);
+      return AuthController.refreshRefused(req, res, kind);
+    }
+    setRefreshCookie(req, res, kind, girou.raw);
+    return res.json(createResponse(req.t('auth.tokenRefreshed'), {
+      token: acesso.token,
+      ...(acesso.platform ? { platform: true } : {})
+    }));
+  }
+
+  /**
+   * A transição de uma versão: o refresh JWT do frontend anterior, no corpo.
+   * Conferido como sempre foi (assinatura, audiência, versão da pessoa) e
+   * convertido numa família nova — ver `RefreshToken.adoptLegacy`. Na versão
+   * seguinte este caminho sai, e o corpo deixa de ser aceito.
+   */
+  static async migrateLegacyRefresh(req, res, legacy) {
+    if (typeof legacy !== 'string' || legacy.length > 4096) {
+      return AuthController.refreshRefused(req, res, 'panel');
+    }
+    const decoded = verifyToken(legacy);
+    if (!decoded || decoded.tokenType !== 'refresh') return AuthController.refreshRefused(req, res, 'panel');
+    const user = await User.findById(decoded.userId);
+    if (!user || Number(user.token_version || 0) !== Number(decoded.tokenVersion || 0)) {
+      return AuthController.refreshRefused(req, res, 'panel');
+    }
+    const isConsole = decoded.aud === CONSOLE_AUDIENCE;
+    if (!isConsole && decoded.aud !== PANEL_AUDIENCE) return AuthController.refreshRefused(req, res, 'panel');
+    const kind = isConsole ? 'console' : 'panel';
+
+    let tenantId = null;
+    if (!isConsole) {
+      // Um refresh de antes do multi-provedor não nomeia provedor: resolvido
+      // pelo vínculo único, como sempre foi, ou recusado.
+      const membership = await resolveMembership(user.id, decoded.tenantId);
+      if (!membership) return AuthController.refreshRefused(req, res, 'panel');
+      tenantId = Number(membership.tenant_id);
+    }
+    // A família herda o vencimento do JWT: a conversão não dá sete dias novos.
+    const expiresAt = Number.isFinite(Number(decoded.exp)) ? new Date(Number(decoded.exp) * 1000) : null;
+    const adotado = await RefreshToken.adoptLegacy({
+      legacyToken: legacy, user, audience: isConsole ? CONSOLE_AUDIENCE : PANEL_AUDIENCE,
+      tenantId, context: RefreshToken.context(req), expiresAt
+    });
+    if (adotado.expired) return AuthController.refreshRefused(req, res, kind);
+    // Já migrado antes: a linha do JWT existe e está rotacionada. Dentro da
+    // folga, a rotação devolve o mesmo sucessor; depois dela, é reuso.
+    if (adotado.existing) return AuthController.rotateCookie(req, res, legacy, kind);
+
+    const row = await RefreshToken.findByRaw(adotado.raw);
+    const acesso = row ? await AuthController.accessFor(req, user, row) : null;
+    if (!acesso) {
+      if (row) await RefreshToken.revokeFamily(row.family_id);
+      return AuthController.refreshRefused(req, res, kind);
+    }
+    setRefreshCookie(req, res, kind, adotado.raw);
+    clearRefreshCookie(req, res, kind === 'console' ? 'panel' : 'console');
+    return res.json(createResponse(req.t('auth.tokenRefreshed'), {
+      token: acesso.token,
+      ...(acesso.platform ? { platform: true } : {})
+    }));
+  }
+
+  /**
+   * As sessões abertas da pessoa — uma por aparelho (família), de todos os
+   * provedores dela e do console. A personificação não lista: a conta é de
+   * quem personifica, e o painel de um cliente não é lugar de mexer nela.
+   */
+  static async listSessions(req, res) {
+    try {
+      if (req.user.impersonation) {
+        return res.status(403).json({
+          success: false, message: req.t('auth.impersonationReadOnly'), code: 'impersonation_read_only'
+        });
+      }
+      const linhas = await RefreshToken.listForUser(req.user.userId, req.user.tokenVersion);
+      const ids = [...new Set(linhas.map((l) => l.tenant_id).filter(Boolean).map(Number))];
+      const nomes = new Map();
+      if (ids.length) {
+        // tenant-scope-exempt: `tenants` é compartilhada; só os nomes dos
+        // provedores das sessões DESTA pessoa.
+        const provedores = await getDb()('tenants').whereIn('id', ids).select('id', 'name');
+        for (const p of provedores) nomes.set(Number(p.id), p.name);
+      }
+      const atual = req.user.sessionId ?? null;
+      const sessoes = linhas.map((l) => ({
+        id: l.family_id,
+        kind: l.audience === CONSOLE_AUDIENCE ? 'console' : 'panel',
+        tenantName: l.tenant_id ? (nomes.get(Number(l.tenant_id)) ?? null) : null,
+        device: describeUserAgent(l.user_agent),
+        userAgent: l.user_agent ?? null,
+        ip: l.ip ?? null,
+        createdAt: l.family_created_at ?? l.created_at,
+        lastUsedAt: l.last_used_at ?? l.created_at,
+        current: atual !== null && l.family_id === atual
+      }));
+      sessoes.sort((a, b) => Number(b.current) - Number(a.current));
+      return res.json(createResponse(null, { sessions: sessoes }));
+    } catch (error) {
+      console.error('List sessions error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * "Encerrar" uma sessão da lista. Só a família da PRÓPRIA pessoa: a de
+   * outra, ou uma que não existe, é o mesmo 404 — o id não confirma nada.
+   */
+  static async revokeSession(req, res) {
+    try {
+      const id = String(req.params.id || '');
+      const changed = await RefreshToken.revokeOwnFamily(req.user.userId, id);
+      if (!changed) {
+        return res.status(404).json(createErrorResponse(req.t('auth.sessionNotFound')));
+      }
+      const current = req.user.sessionId === id;
+      if (current) {
+        clearRefreshCookie(req, res, req.user.platform ? 'console' : 'panel');
+      }
+      return res.json(createResponse(req.t('auth.sessionRevoked'), { current }));
+    } catch (error) {
+      console.error('Revoke session error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * "Sair de todos": sobe o `token_version` (todo token de acesso aberto cai na
+   * próxima requisição, inclusive os de antes desta versão) e revoga todas as
+   * famílias. Este aparelho sai junto.
+   */
+  static async revokeAllSessions(req, res) {
+    try {
+      await User.revokeSessions(req.user.userId);
+      await RefreshToken.revokeAllForUser(req.user.userId);
+      clearRefreshCookie(req, res, 'panel');
+      clearRefreshCookie(req, res, 'console');
+      return res.json(createResponse(req.t('auth.sessionsRevokedAll')));
+    } catch (error) {
+      console.error('Revoke all sessions error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
     }
   }
 

@@ -12,11 +12,13 @@ import { attachLocale } from './middleware/locale.js';
 import { isPlatformHost, platformHostOnly, resolveTenant } from './middleware/tenantResolver.js';
 import { llmsFor, robotsFor, sitemapFor } from './services/seoFiles.js';
 import { loadPublicPlans, renderSeo } from './services/seoHead.js';
+import { buildManifest } from './services/pwaManifest.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
   attachmentUploadLimiter,
   authLimiter,
+  refreshLimiter,
   firmwareUploadLimiter,
   portalIpLimiter,
   portalLoginLimiter
@@ -73,6 +75,7 @@ import { BRANDING_UPLOAD_PATHS, brandingRawBody } from './services/platformBrand
 import { FIRMWARE_REASSIGN_PATH, FIRMWARE_UPLOAD_PATH, firmwareRawBody } from './services/firmwareStore.js';
 import provisioningRoutes from './routes/provisioning.js';
 import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
+import pushRoutes from './routes/push.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
 import { assertCorsOriginsSafe, wantsUpgradeInsecureRequests } from './config/runtimeEnv.js';
 import { wireNpsWhatsappReply } from './services/npsWhatsappReply.js';
@@ -336,7 +339,8 @@ app.use('/api', requestLogger());
 app.use('/api', httpMetrics());
 app.use('/api', resolveTenant);
 app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/refresh', authLimiter);
+app.use('/api/auth/refresh', refreshLimiter);
+app.use('/api/auth/console/refresh', refreshLimiter);
 app.use('/api/auth/setup', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 
@@ -445,6 +449,8 @@ app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);
 app.use('/api/whatsapp', whatsappBillingRoutes);
 app.use('/api/provisioning', provisioningRoutes);
+// As notificações push do app do provedor (0130): só a pessoa logada.
+app.use('/api/push', pushRoutes);
 
 app.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: req.t('common.routeNotFound') });
@@ -499,6 +505,24 @@ app.get('/llms.txt', async (req, res) => {
 });
 
 /**
+ * O manifest do app do provedor (PWA, 0130) — ver `services/pwaManifest.js`.
+ * Pelas mesmas três razões do `robots.txt` acima: fora de `/api`, acima de
+ * `serveFrontend` e escrito aqui. `no-cache`, e não a hora de cache da raiz:
+ * o nome e o ícone mudam quando o console troca a marca, e o navegador só
+ * atualiza o app instalado quando relê o manifest.
+ */
+app.get('/manifest.webmanifest', async (req, res, next) => {
+  try {
+    const manifest = await buildManifest({ host: hostDoPedido(req) });
+    res.type('application/manifest+json; charset=utf-8');
+    res.set('Cache-Control', 'no-cache');
+    return res.send(JSON.stringify(manifest));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
  * O `index.html` do painel com a troca de SEO (`services/seoHead.js`): título,
  * canonical, dados estruturados e o texto da vitrine no ápice; `noindex` em
  * qualquer outro host. O arquivo é lido do disco só quando muda.
@@ -531,7 +555,10 @@ function serveFrontend(target, htmlFile) {
     setHeaders(res, filePath) {
       if (filePath.includes(`${path.sep}assets${path.sep}`)) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      } else if (filePath.endsWith('.html')) {
+      } else if (filePath.endsWith('.html') || path.basename(filePath) === 'sw.js') {
+        // O service worker (0130) também: com a hora de cache da raiz, uma
+        // versão nova do painel levaria até uma hora para chegar a quem já
+        // tem o app aberto — e é o SW que decide o que o app carrega.
         res.setHeader('Cache-Control', 'no-cache');
       }
     }

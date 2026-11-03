@@ -1,6 +1,9 @@
 [Unit]
 Description=TR69 Controle backup (database, attachments, key fingerprint)
 After=network.target skygenpanel.service
+# A failed run is not left to the journal alone: the failure unit records it
+# where the panel reads it and raises the `backup_failed` platform alert.
+OnFailure=skygenpanel-backup-failure.service
 
 [Service]
 Type=oneshot
@@ -11,6 +14,11 @@ Type=oneshot
 User=root
 WorkingDirectory=/opt/skygenpanel/backend
 ExecStart=/usr/local/bin/skygenpanel-backup run
+# Then the encrypted external copy, when the console configured one with the
+# host as the runner (Integrations → External backup). Not configured, or the
+# panel doing it itself, exits 0. A failed upload fails the unit, and
+# OnFailure= above raises the alert.
+ExecStart=/usr/local/bin/skygenpanel-backup upload --if-configured
 # The same hardening as the panel unit, plus the destination. ProtectSystem=full
 # rather than strict: the dump tools want /tmp and the destination, and both are
 # named below.

@@ -88,7 +88,10 @@ export const ALERT_EVENTS = Object.freeze([
   'auto_suspended',
   'big_overdue',
   'backup_stale',
-  'cert_expiring'
+  'cert_expiring',
+  // O backup externo falhou (o envio do painel, o do host pelo `OnFailure=`
+  // do systemd, ou a verificação semanal) — ver `backup/externalBackupService.js`.
+  'backup_failed'
 ]);
 export const ALERT_CHANNELS = Object.freeze(['whatsapp', 'email']);
 export const ALERT_DEFAULTS = Object.freeze({

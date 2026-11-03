@@ -813,6 +813,64 @@ class PlatformAlertService {
     }
   }
 
+  /**
+   * `backup_failed` pelo marcador do host: o `OnFailure=` do
+   * `skygenpanel-backup.service` roda `skygenpanel-backup notify-failure`, que
+   * grava `SKYGP_BACKUP_DIR/.last-failure` antes de tentar avisar pelo banco.
+   * Este passo é a rede de baixo — o aviso direto pode não ter alcançado o
+   * banco, que é às vezes justamente o que falhou. Vale o marcador mais novo
+   * que o último manifesto; a chave de deduplicação é a mesma do aviso direto
+   * (`backup:host:<dia>`), então os dois caminhos dão UM alerta. Nunca lança.
+   */
+  static async checkBackupFailure({ now = new Date(), config = null, dir = process.env.SKYGP_BACKUP_DIR } = {}) {
+    try {
+      if (!dir) return { checked: false, reason: 'not_configured' };
+      const regras = config ?? await alertsConfig();
+      if (!regras.events.backup_failed?.enabled) return { checked: false, reason: 'disabled' };
+      const fs = await import('node:fs/promises');
+      const path = await import('node:path');
+      const marcador = path.join(dir, '.last-failure');
+      // Um descritor só para o marcador: a data (`fstat`) e o motivo vêm do
+      // MESMO arquivo, e não de um caminho trocado entre a consulta e a leitura.
+      const fh = await fs.open(marcador, 'r').catch(() => null);
+      if (!fh) return { checked: true, enqueued: 0 };
+      let st;
+      let conteudo = null;
+      try {
+        st = await fh.stat();
+        conteudo = await fh.readFile('utf8').catch(() => null);
+      } finally {
+        await fh.close().catch(() => {});
+      }
+      let ultimo = 0;
+      for (const e of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])) {
+        if (!e.isDirectory()) continue;
+        // eslint-disable-next-line no-await-in-loop -- poucos diretórios
+        const m = await fs.stat(path.join(dir, e.name, 'manifest.json')).catch(() => null);
+        if (m && m.mtimeMs > ultimo) ultimo = m.mtimeMs;
+      }
+      if (ultimo > st.mtimeMs) return { checked: true, enqueued: 0 };
+      let motivo = 'skygenpanel-backup.service failed';
+      try {
+        const lido = JSON.parse(conteudo ?? '');
+        if (typeof lido?.reason === 'string' && lido.reason.trim()) motivo = lido.reason.trim();
+      } catch {
+        // Um marcador ilegível ainda é uma falha: vale o motivo padrão.
+      }
+      const dia = saoPauloClock(new Date(st.mtimeMs)).day;
+      const r = await this.enqueue('backup_failed', {
+        dedupeKey: `backup:host:${dia}`,
+        payload: { stage: 'backup', source: 'host', error: motivo, date: dia },
+        now,
+        config: regras
+      });
+      return { checked: true, enqueued: r.enqueued ? 1 : 0 };
+    } catch (error) {
+      log.warn('backup failure check failed', { err: error });
+      return { checked: false, reason: 'error' };
+    }
+  }
+
   /** O certificado de `host[:porta]`: dias até vencer, ou `null` se não deu para ler. */
   static async certDaysLeft(alvo, { now = new Date(), timeoutMs = 8000 } = {}) {
     const { default: tls } = await import('node:tls');
@@ -1388,6 +1446,7 @@ class PlatformAlertService {
       resumo.bigOverdue = await this.checkBigOverdue({ now });
     }
     resumo.backup = await this.checkBackup({ now });
+    resumo.backupFailure = await this.checkBackupFailure({ now });
     if (now.getTime() - this.lastCertCheckAt >= this.CERT_CHECK_MS) {
       this.lastCertCheckAt = now.getTime();
       resumo.certificates = await this.checkCertificates({ now });

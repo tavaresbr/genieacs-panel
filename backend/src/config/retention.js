@@ -201,6 +201,19 @@ export const WINDOWS = Object.freeze([
     spares: 'bloqueios ainda em vigor',
     personalData: 'o identificador de quem errou a senha',
     source: 'models/AccountLockout.js'
+  },
+  {
+    id: 'refresh-tokens',
+    label: 'Sessões por aparelho (refresh)',
+    tables: ['refresh_tokens'],
+    defaultDays: TICKET_GRACE_DAYS,
+    minDays: null,
+    maxDays: null,
+    configuredBy: 'fixed',
+    clock: 'expires_at',
+    spares: 'sessões ainda dentro dos sete dias',
+    personalData: 'hash do refresh token, navegador (user agent curto) e IP de cada aparelho conectado',
+    source: 'models/RefreshToken.js'
   }
 ]);
 

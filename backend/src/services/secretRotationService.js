@@ -113,6 +113,14 @@ const COLUNAS = Object.freeze([
     prefixo: 'card_token',
     versao: 'card_token_key_version',
     contexto: 'skygenpanel-subscription-card-token-v1'
+  },
+  {
+    // O aparelho inscrito no push (0130): endpoint e chaves da inscrição,
+    // juntos num envelope — ver `pushService`.
+    tabela: 'push_subscriptions',
+    prefixo: 'secret',
+    versao: 'secret_key_version',
+    contexto: 'skygenpanel-push-subscription-v1'
   }
 ]);
 
@@ -200,6 +208,21 @@ const BLOBS = Object.freeze([
     chave: 'wa_bot_config',
     caminho: ['ai', 'apiKey'],
     contexto: 'skygenpanel-wa-ai-key-v1'
+  },
+  {
+    // A chave privada VAPID do push do provedor (0130) — ver `pushService`.
+    chave: 'push_vapid_keys',
+    caminho: ['privateKey'],
+    contexto: 'skygenpanel-push-vapid-v1'
+  },
+  {
+    // A conexão do backup externo (endpoint, bucket, prefixo, access key e
+    // secret do S3), num envelope só, na caixa da plataforma — ver
+    // `backup/externalBackupSettings.js`. A chave pública do backup mora no
+    // mesmo blob em claro e não entra aqui: não é segredo.
+    chave: 'external_backup_config',
+    caminho: ['connection'],
+    contexto: 'skygenpanel-external-backup-v1'
   }
 ]);
 

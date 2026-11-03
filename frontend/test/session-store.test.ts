@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { storedSession } from '@/lib/api'
+import { legacyStoredRefreshToken, storedSession } from '@/lib/api'
 
 /**
- * A precedência entre as duas gavetas onde uma sessão pode estar.
+ * O que ainda mora em storage depois de 0129.
  *
- * O que está em jogo é o console da plataforma: ele abre o painel de um
- * provedor numa ABA NOVA e continua aberto atrás. Numa instalação de host
- * único as duas abas dividem o mesmo `localStorage`, então a sessão de
- * personificação vive no `sessionStorage`, que é por aba — e numa aba dessas
- * as duas gavetas estão cheias ao mesmo tempo. Quem tem de ganhar é a da aba.
+ * O token de acesso de uma sessão comum vive só na memória do `ApiClient`, e o
+ * refresh num cookie `HttpOnly`. Em storage sobra a personificação, na gaveta
+ * POR ABA (`sessionStorage`): o console abre o painel de um provedor numa aba
+ * nova e continua aberto atrás, e numa instalação de host único as duas abas
+ * dividem a origem. E sobra, por uma versão, o refresh ANTIGO do
+ * `localStorage`, que a primeira carga migra para o cookie.
  *
  * Ambiente `node`, sem DOM: o que estas funções leem são os dois storages e o
  * `window`, e é isso que o teste finge, como os outros deste diretório fazem.
@@ -37,31 +38,31 @@ afterEach(() => {
 })
 
 describe('a sessão guardada no navegador', () => {
-  it('é a do navegador quando só ela existe', () => {
+  it('não é o token antigo do localStorage: esse não vale mais como sessão', () => {
     navegador({}, { token: 'do-operador', refreshToken: 'renova' })
-    expect(storedSession()).toEqual({
-      token: 'do-operador',
-      refreshToken: 'renova',
-      tabScoped: false
-    })
+    expect(storedSession()).toEqual({ token: null, tabScoped: false })
   })
 
-  it('é a da aba quando as duas existem, e sem refresh token', () => {
+  it('é a da aba quando há personificação', () => {
     navegador({ token: 'da-personificacao' }, { token: 'do-console', refreshToken: 'renova' })
-    expect(storedSession()).toEqual({
-      token: 'da-personificacao',
-      refreshToken: null,
-      tabScoped: true
-    })
+    expect(storedSession()).toEqual({ token: 'da-personificacao', tabScoped: true })
   })
 
   it('não é nenhuma quando nada foi guardado', () => {
     navegador({}, {})
-    expect(storedSession()).toEqual({ token: null, refreshToken: null, tabScoped: false })
+    expect(storedSession()).toEqual({ token: null, tabScoped: false })
   })
 
   it('não tenta ler storage nenhum fora do navegador', () => {
     vi.stubGlobal('window', undefined)
-    expect(storedSession()).toEqual({ token: null, refreshToken: null, tabScoped: false })
+    expect(storedSession()).toEqual({ token: null, tabScoped: false })
+    expect(legacyStoredRefreshToken()).toBeNull()
+  })
+})
+
+describe('o refresh antigo, da versão anterior', () => {
+  it('é lido para a migração única', () => {
+    navegador({}, { token: 'velho', refreshToken: 'renova-velho' })
+    expect(legacyStoredRefreshToken()).toBe('renova-velho')
   })
 })

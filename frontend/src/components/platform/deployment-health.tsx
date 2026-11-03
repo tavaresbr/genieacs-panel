@@ -33,7 +33,8 @@ const CONFIGURADO: Array<{
   { chave: 'metricsToken', rotulo: 'deployment.metrics', ausente: 'deployment.metricsAbsent' },
   { chave: 'billingWebhookToken', rotulo: 'deployment.webhook', ausente: 'deployment.webhookAbsent' },
   { chave: 'billingGateway', rotulo: 'deployment.gateway', ausente: 'deployment.gatewayAbsent' },
-  { chave: 'rls', rotulo: 'deployment.rls', ausente: 'deployment.rlsAbsent' }
+  { chave: 'rls', rotulo: 'deployment.rls', ausente: 'deployment.rlsAbsent' },
+  { chave: 'externalBackup', rotulo: 'deployment.externalBackup', ausente: 'deployment.externalBackupAbsent' }
 ]
 
 /** O nome do dialeto como um humano o chama, e não como o knex o chama. */

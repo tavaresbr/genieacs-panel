@@ -1,6 +1,6 @@
 import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -209,5 +209,56 @@ describe('a poda', () => {
     // backup bom.
     assert.throws(() => rodar('run', { DATABASE_URL: 'postgres://u:p@127.0.0.1:1/x' }));
     assert.deepEqual(copias(), []);
+  });
+
+  it('notify-failure (o OnFailure= do systemd) grava o marcador ao lado dos backups, mesmo sem o banco', () => {
+    fs.rmSync(destino, { recursive: true, force: true });
+    // O install de mentira não tem o script do backup externo: o aviso pelo
+    // banco falha, e o marcador — que o painel lê — fica de pé do mesmo jeito.
+    execFileSync('/bin/bash', [SCRIPT, 'notify-failure', 'pg_dump "morreu" \\ de novo'], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, SKYGP_DIR: install, SKYGP_BACKUP_DIR: destino },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const marcador = JSON.parse(fs.readFileSync(path.join(destino, '.last-failure'), 'utf8'));
+    assert.equal(marcador.reason, 'pg_dump morreu  de novo');
+    assert.match(marcador.at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    // E o marcador não vira "uma cópia" para a poda nem para o verify.
+    assert.deepEqual(copias(), []);
+  });
+
+  it('notify-failure tira os caracteres de controle do motivo antes de montar o JSON', () => {
+    fs.rmSync(destino, { recursive: true, force: true });
+    const r = spawnSync('/bin/bash', [SCRIPT, 'notify-failure', 'linha 1\nlinha 2\t\u001b[31mvermelho\u007f\r"fim"\\'], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, SKYGP_DIR: install, SKYGP_BACKUP_DIR: destino }
+    });
+    assert.equal(r.status, 0, r.stderr);
+    const bruto = fs.readFileSync(path.join(destino, '.last-failure'), 'utf8');
+    assert.equal(bruto.trimEnd().split('\n').length, 1, 'o marcador tem mais de uma linha');
+    // eslint-disable-next-line no-control-regex -- é o que não pode estar lá
+    assert.doesNotMatch(bruto.trimEnd(), /[\u0000-\u001f\u007f]/);
+    assert.equal(JSON.parse(bruto).reason, 'linha 1linha 2[31mvermelhofim');
+    // O aviso no log também sai numa linha só.
+    assert.ok(r.stderr.split('\n').some((l) => l.includes('backup failure recorded: linha 1linha 2')), r.stderr);
+
+    // Só controle: vale o motivo padrão.
+    fs.rmSync(destino, { recursive: true, force: true });
+    execFileSync('/bin/bash', [SCRIPT, 'notify-failure', '\n\t'], {
+      encoding: 'utf8', env: { PATH: process.env.PATH, SKYGP_DIR: install, SKYGP_BACKUP_DIR: destino }, stdio: ['ignore', 'pipe', 'pipe']
+    });
+    assert.equal(JSON.parse(fs.readFileSync(path.join(destino, '.last-failure'), 'utf8')).reason, 'skygenpanel-backup.service failed');
+  });
+
+  it('o service chama o envio externo depois do run e tem OnFailure=', () => {
+    const unidade = fs.readFileSync(path.join(RAIZ, '..', 'deploy', 'skygenpanel-backup.service'), 'utf8');
+    assert.match(unidade, /^OnFailure=skygenpanel-backup-failure\.service$/m);
+    const execs = unidade.match(/^ExecStart=.*$/gm);
+    assert.deepEqual(execs, [
+      'ExecStart=/usr/local/bin/skygenpanel-backup run',
+      'ExecStart=/usr/local/bin/skygenpanel-backup upload --if-configured'
+    ]);
+    const falha = fs.readFileSync(path.join(RAIZ, '..', 'deploy', 'skygenpanel-backup-failure.service'), 'utf8');
+    assert.match(falha, /^ExecStart=\/usr\/local\/bin\/skygenpanel-backup notify-failure/m);
   });
 });

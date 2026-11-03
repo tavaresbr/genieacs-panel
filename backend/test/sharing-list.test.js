@@ -67,7 +67,8 @@ const NAO_E_DESTINO = {
   'business.facebook.com': 'link de configuração que o usuário abre',
   'platform.claude.com': 'link "Comprar créditos" que o usuário abre; o painel não envia nada',
   'platform.openai.com': 'link "Comprar créditos" que o usuário abre; o painel não envia nada',
-  'open.bigmodel.cn': 'link "Comprar créditos" que o usuário abre; o painel não envia nada'
+  'open.bigmodel.cn': 'link "Comprar créditos" que o usuário abre; o painel não envia nada',
+  's3.us-west-004.backblazeb2.com': 'endereço de exemplo no texto de ajuda do backup externo; o destino real é o endpoint que quem opera digita'
 };
 
 function arquivosDe(dir, pular) {

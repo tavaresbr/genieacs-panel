@@ -126,6 +126,8 @@ Both listeners bind to `127.0.0.1` by default. This is suitable for a reverse pr
 | `skygenpanel reset-mfa <user>` | Turn off two-step login for someone who lost their phone and recovery codes, and end their sessions |
 | `skygenpanel backup` | Take a backup now: database, WhatsApp attachments, and the fingerprint of the encryption keys |
 | `skygenpanel backup verify` | Report how old the newest backup is and whether the keys still match the ones it was taken with |
+| `skygenpanel backup upload` | Encrypt the newest backup with the public key set in the console and send it to the external S3-compatible bucket |
+| `skygenpanel backup restore --from-s3 latest --private-key <file>` | Test-restore an external backup into a temporary database (never production) and check it |
 | `skygenpanel rotate-key [--dry-run]` | Rewrite every stored secret with the live `SECRET_BOX_KEY`; `--dry-run` counts them per key version without writing |
 
 The installer also schedules `skygenpanel-backup.timer` to run daily at 03:17 (with a
@@ -143,6 +145,30 @@ the ones your newest backup was taken with. `SKYGP_BACKUP_INCLUDE_SECRETS=1` put
 `.env` in the backup directory in the clear — only do that if the destination is itself
 encrypted, since the backup would then carry the master key and the database password
 alongside the data.
+
+### External encrypted backup
+
+A backup that lives on the same disk is not a backup. In the console, **Integrations →
+External backup** sends one encrypted copy a day to any S3-compatible bucket (AWS,
+Backblaze B2, Wasabi, Cloudflare R2, MinIO):
+
+1. Fill in the endpoint (empty for AWS), region, bucket, prefix and credentials, and press
+   **Test connection**. They are stored encrypted; the secret never comes back to the screen.
+2. Press **Generate key pair**. The pair is generated **in your browser**: download the
+   private key, store it outside the server (password manager plus an offline copy, next
+   to `SECRET_BOX_KEY` and `JWT_SECRET`), confirm, and only the public key is saved. The
+   server can encrypt backups but never decrypt them — and without the private key no
+   backup can be restored, by anyone.
+3. Choose who takes the backup: the **panel** (Docker/SaaS: it dumps the database itself at
+   the chosen hour) or the **host** (the systemd timer runs `skygenpanel-backup upload`
+   after the local backup), plus how many daily and weekly copies to keep.
+
+A failed run raises the **External backup failed** alert (`OnFailure=` on the host unit),
+and a weekly check downloads the newest file and verifies its checksum and structure. The
+full restore test needs the private key:
+`skygenpanel backup restore --from-s3 latest --private-key <file>` decrypts into a
+temporary directory and opens the database in a temporary place. Step-by-step restore and
+key custody: [docs/saas-operations.md](docs/saas-operations.md#backup-externo-cifrado-s3-compatível).
 
 ## Cloudflare Tunnel
 

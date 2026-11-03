@@ -57,7 +57,12 @@ const PUBLICAS = new Map([
   ['POST /api/auth/setup', 'cria a primeira conta do provedor; recusa se já houver uma'],
   ['POST /api/auth/signup', 'um ISP se cadastra; só na edição SaaS e só onde há domínio-base'],
   ['POST /api/auth/login', 'a porta de entrada'],
-  ['POST /api/auth/refresh', 'renova a sessão com o refresh token, que é a credencial aqui'],
+  ['POST /api/auth/refresh', 'renova a sessão com o refresh token, que é a credencial aqui: o cookie HttpOnly (0129), guardado só como hash, com rotação e reuso que revoga a família; guarda de Origin e X-Requested-With; prova em session-cookies.test.js'],
+  // As outras três que o cookie do refresh autentica (0129). Prova em
+  // session-cookies.test.js.
+  ['POST /api/auth/logout', 'encerra a família DESTE aparelho: a do sid do token (mesmo vencido, assinatura conferida) ou a do cookie; só revoga, nunca emite, e tem a guarda de CSRF'],
+  ['POST /api/auth/console/refresh', 'o refresh do console pelo cookie DELE (outro nome, Path /api/auth/console), só no endereço da plataforma; mesma rotação e guarda do painel'],
+  ['POST /api/auth/console/logout', 'a saída do console pelo cookie dele; só revoga a família, com a guarda de CSRF'],
   ['POST /api/invites/token/preview', 'o token do convite É a credencial, vai no corpo e é conferido por hash'],
   ['POST /api/invites/token/accept', 'idem, e a senha da pessoa é conferida quando a conta já existe'],
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
@@ -315,6 +320,10 @@ describe('toda rota sem sessão', () => {
       // token (comparação em tempo constante contra todos os candidatos; token
       // repetido entre dois provedores é recusado, nunca atribuído).
       'POST /api/asaas-webhook',
+      // O console pelo cookie dele (0129): a saída só revoga a família do
+      // aparelho; a renovação gira o token, como o refresh do painel.
+      'POST /api/auth/console/logout',
+      'POST /api/auth/console/refresh',
       // A confirmação do endereço: escreve o carimbo em `users`, que é cadastro
       // compartilhado, e só na conta que o bilhete nomeia.
       'POST /api/auth/email/verify/confirm',
@@ -323,12 +332,17 @@ describe('toda rota sem sessão', () => {
       // provedor. Quem a autoriza é o bilhete, cunhado pelo console.
       'POST /api/auth/impersonate/redeem',
       'POST /api/auth/login',
+      // Sair só REVOGA a família do próprio aparelho em `refresh_tokens` (da
+      // pessoa, não de provedor), pelo sid do token ou pelo cookie (0129).
+      'POST /api/auth/logout',
       // As duas metades do "esqueci minha senha". A primeira escreve uma linha
       // na trilha DO PROVEDOR do host — e só depois de conferir que a pessoa
       // trabalha nele. A segunda escreve a senha em `users`, que é cadastro
       // compartilhado, e só para a conta que o bilhete nomeia.
       'POST /api/auth/password-reset',
       'POST /api/auth/password-reset/confirm',
+      // O refresh escreve a rotação em `refresh_tokens`, da pessoa que o
+      // cookie nomeia — e a linha de reuso na trilha do provedor DA SESSÃO.
       'POST /api/auth/refresh',
       'POST /api/auth/setup',
       'POST /api/auth/signup',
@@ -717,6 +731,9 @@ describe('a varredura de ids', () => {
       // `users` é do deploy e não do provedor: quem responde 404 ali é o
       // vínculo em `tenant_users`, com prova própria em users-tenancy.test.js.
       if (caso.tabela === 'users') continue;
+      // `refresh_tokens` também é da PESSOA (0129): quem responde 404 é o dono
+      // da família conferido no UPDATE, com prova em session-cookies.test.js.
+      if (caso.tabela === 'refresh_tokens') continue;
       assert.ok(SCOPED_TABLES.has(caso.tabela),
         `${caso.label}: ${caso.tabela} não está na lista de tabelas escopadas`);
     }
@@ -781,9 +798,15 @@ describe('a allowlist do endereço da plataforma', () => {
   it('acrescenta a porta do console, e só ela', () => {
     assert.deepEqual(listaDe('CONSOLE_HOST_PATHS').sort(), [
       '/api/auth/change-password',
+      // O cookie do console e a lista de sessões (0129): `refresh_tokens` e
+      // `tenants` são compartilhadas, nenhuma toca `tdb`.
+      '/api/auth/console/logout',
+      '/api/auth/console/refresh',
       '/api/auth/login',
       '/api/auth/logout',
       '/api/auth/refresh',
+      '/api/auth/sessions',
+      '/api/auth/sessions/revoke-all',
       '/api/auth/setup-status',
       '/api/auth/user'
     ]);
@@ -818,7 +841,10 @@ describe('a allowlist do endereço da plataforma', () => {
     // pedido de demonstração — nenhuma grava em trilha de provedor.
     // `/api/affiliate/` é o portal do afiliado (0126): grava só em
     // `affiliates` e na trava por conta, nunca em trilha de provedor.
-    assert.deepEqual(listaDe('PLATFORM_HOST_PREFIXES'), ['/api/platform/', '/api/public/', '/api/affiliate/']);
+    // `/api/auth/sessions/` é o "Encerrar" de uma sessão da própria conta
+    // (0129): revoga uma família em `refresh_tokens`, da pessoa, e não grava
+    // trilha nenhuma — o resto de `/api/auth/` continua fora.
+    assert.deepEqual(listaDe('PLATFORM_HOST_PREFIXES'), ['/api/platform/', '/api/public/', '/api/affiliate/', '/api/auth/sessions/']);
   });
 });
 

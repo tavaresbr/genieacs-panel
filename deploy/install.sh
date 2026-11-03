@@ -279,7 +279,7 @@ PORTAL_JWT_SECRET=${PORTAL_JWT_SECRET}
 SECRET_BOX_KEY=${SECRET_BOX_KEY}
 # This installer produces a single-provider install.
 EDITION=selfhosted
-JWT_EXPIRES_IN=1h
+JWT_EXPIRES_IN=15m
 REFRESH_TOKEN_EXPIRES_IN=7d
 CORS_ORIGINS=http://localhost:${APP_PORT}
 DATA_DIR=${DATA_DIR}
@@ -369,6 +369,9 @@ log "Installing backup timer (daily, ${BACKUP_DIR})"
 install -m 0755 "$INSTALL_DIR/deploy/skygenpanel-backup" "$BACKUP_CLI_PATH"
 install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup.service" /etc/systemd/system/
 install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup.timer" /etc/systemd/system/
+# The OnFailure= target of the backup unit: records the failure where the panel
+# reads it and raises the `backup_failed` alert.
+install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup-failure.service" /etc/systemd/system/
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 

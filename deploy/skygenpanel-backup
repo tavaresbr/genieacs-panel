@@ -308,14 +308,75 @@ cmd_verify() {
   log "the encryption keys still match the ones that backup was taken with"
 }
 
+# The external copy: the newest backup directory, packed, encrypted with the
+# PUBLIC key configured in the console (Integrations → External backup) and
+# sent to the S3-compatible bucket configured there, then the remote retention.
+# Everything is done by the panel's own code (backend/scripts/backup-external.js)
+# so the host and the Docker edition produce the same file.
+#
+# `--if-configured` is how the timer calls it: nothing configured, the external
+# backup switched off, or the panel itself set to be the one that uploads
+# (runner = panel) all exit 0 — the local backup that just succeeded is not a
+# failure because a bucket was never set up.
+cmd_upload() {
+  local origem="$PWD"
+  cd "$INSTALL_DIR/backend" \
+    && SKYGP_CALLER_CWD="$origem" SKYGP_BACKUP_DIR="$DEST_ROOT" node scripts/backup-external.js upload "$@"
+}
+
+# Called by systemd's OnFailure= (skygenpanel-backup-failure.service). Two
+# routes, on purpose: a marker file next to the backups, which the panel's
+# alert pass reads (platformAlertService.checkBackupFailure), and a direct
+# enqueue of the `backup_failed` alert through the panel's database. The
+# database may be exactly what failed, so the marker is written first and the
+# enqueue is allowed to fail. Both use the same deduplication key: one alert.
+#
+# The reason comes from systemd (or whoever calls this), so it is cleaned
+# before anything is built from it: control characters (newline, tab, ESC,
+# DEL...) are dropped everywhere — a raw one inside a JSON string makes the
+# marker unparseable, and in the log it could fake extra lines — and quotes
+# and backslashes are dropped from the JSON value, which printf does not
+# escape.
+cmd_notify_failure() {
+  local motivo="${1:-skygenpanel-backup.service failed}"
+  motivo="$(printf '%s' "$motivo" | LC_ALL=C tr -d '\000-\037\177')"
+  [ -n "$motivo" ] || motivo="skygenpanel-backup.service failed"
+  if mkdir -p -- "$DEST_ROOT" 2>/dev/null; then
+    printf '{"at":"%s","reason":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      "$(printf '%s' "$motivo" | LC_ALL=C tr -d '\000-\037\177"\\' | head -c 300)" > "$DEST_ROOT/.last-failure" \
+      || warn "Could not write the failure marker in $DEST_ROOT"
+  fi
+  ( cd "$INSTALL_DIR/backend" && node scripts/backup-external.js notify-failure --reason "$motivo" ) >/dev/null 2>&1 \
+    || warn "Could not record the failure in the panel database; the marker file is the only trace."
+  warn "backup failure recorded: $motivo"
+}
+
+# The full restore test, by whoever holds the PRIVATE key. Never touches the
+# production database: it decrypts into a temporary directory, checks every
+# file against the manifest and opens the database in a temporary place.
+cmd_restore() {
+  # Relative paths (--private-key ./key.pem) are resolved against where the
+  # operator typed the command, not against backend/.
+  local origem="$PWD"
+  cd "$INSTALL_DIR/backend" && SKYGP_CALLER_CWD="$origem" node scripts/backup-external.js restore "$@"
+}
+
 usage() {
   cat <<EOF
 skygenpanel-backup — copy the database, the attachments and the key fingerprint
 
-Usage: skygenpanel-backup [run|verify]
+Usage: skygenpanel-backup [run|verify|upload|restore|notify-failure]
 
   run       Take a backup now (default). Runs from the systemd timer.
   verify    Report the age of the newest backup and whether the keys still match.
+  upload [dir] [--if-configured]
+            Encrypt the newest backup (or dir) and send it to the external
+            S3-compatible bucket configured in the console, then prune it.
+  restore --from-s3 <key|latest> --private-key <file> [--keep]
+  restore --file <backup.tar.skygpbk> --private-key <file> [--keep]
+            Decrypt and restore into a TEMPORARY database, then check it.
+  notify-failure [reason]
+            Record a failed run (systemd OnFailure=) and raise the alert.
 
 Environment:
   SKYGP_BACKUP_DIR              destination (default /var/backups/skygenpanel)
@@ -328,6 +389,9 @@ EOF
 case "${1:-run}" in
   run)             cmd_run ;;
   verify)          cmd_verify ;;
+  upload)          shift; cmd_upload "$@" ;;
+  restore)         shift; cmd_restore "$@" ;;
+  notify-failure)  shift; cmd_notify_failure "$@" ;;
   help|-h|--help)  usage ;;
   *)               warn "Unknown command: $1"; usage; exit 1 ;;
 esac

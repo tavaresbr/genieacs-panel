@@ -10,9 +10,13 @@ import { roleHas } from '../config/permissions.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
 import { hostMatchesTenant, usesTenantSubdomains } from './tenantResolver.js';
 import { canHoldSession } from '../config/login.js';
+import RefreshToken from '../models/RefreshToken.js';
 
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+// Quinze minutos (era uma hora): o token de acesso passou a morar só na
+// memória da aba, e quem o renova é o cookie do refresh (0129). Vida curta é o
+// que limita um token de acesso vazado; renovar custa uma chamada a cada quarto
+// de hora, que a aba faz sozinha.
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 
 /**
  * As duas audiências do painel, e por que são duas.
@@ -86,45 +90,36 @@ const JWT_SECRET = (() => {
  * same person can be an administrator at the ISP they own and an ordinary
  * operator at one they consult for, and `requirePermission` reads what is here.
  *
- * The refresh token carries `tenantId` as well, because it has to be able to
- * mint the same thing again: without it a refresh would have to guess the
- * provider back, which is the guess this whole change exists to remove.
+ * The refresh row (`refresh_tokens.tenant_id`) carries the provider as well,
+ * because it has to be able to mint the same thing again: without it a refresh
+ * would have to guess the provider back, which is the guess this whole change
+ * exists to remove.
  */
-function generateTokens(user, membership) {
+function generateTokens(user, membership, { sessionId } = {}) {
   const tenantId = Number(membership?.tenant_id ?? membership?.tenantId);
   const role = membership?.role;
   if (!Number.isInteger(tenantId) || tenantId <= 0 || !role) {
     throw new Error('generateTokens needs the membership the session is for');
   }
 
-  const commonOptions = {
-    issuer: 'skygenpanel',
-    audience: PANEL_AUDIENCE
-  };
+  // Só o de acesso. O refresh deixou de ser um JWT sem estado: é o valor opaco
+  // do cookie, guardado como hash em `refresh_tokens` (0129) — ver
+  // `services/panelSessionService.js`. `sid` é a família da sessão, e é por ela
+  // que "Sair" e "Encerrar" valem já na próxima requisição.
   const accessToken = jwt.sign(
     {
       userId: user.id,
       username: user.username,
       tenantId,
       role,
-      tokenVersion: Number(user.token_version || 0)
+      tokenVersion: Number(user.token_version || 0),
+      ...(sessionId ? { sid: String(sessionId) } : {})
     },
     JWT_SECRET,
-    { ...commonOptions, expiresIn: JWT_EXPIRES_IN }
+    { issuer: 'skygenpanel', audience: PANEL_AUDIENCE, expiresIn: JWT_EXPIRES_IN }
   );
 
-  const refreshToken = jwt.sign(
-    {
-      userId: user.id,
-      tenantId,
-      tokenType: 'refresh',
-      tokenVersion: Number(user.token_version || 0)
-    },
-    JWT_SECRET,
-    { ...commonOptions, expiresIn: REFRESH_TOKEN_EXPIRES_IN }
-  );
-
-  return { accessToken, refreshToken };
+  return { accessToken };
 }
 
 function verifyToken(token) {
@@ -136,6 +131,29 @@ function verifyToken(token) {
       issuer: 'skygenpanel',
       audience: [PANEL_AUDIENCE, PLATFORM_AUDIENCE, CONSOLE_AUDIENCE]
     });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O token de acesso de quem está SAINDO, aceito mesmo vencido.
+ *
+ * Só para o logout (0129): a assinatura prova de quem é a sessão, e o que se
+ * faz com ela é encerrar a família — a direção segura. Recusar o vencido
+ * deixaria a família viva justamente quando a pessoa clicou em "Sair" depois
+ * de 15 min parada. Nunca serve para autorizar outra coisa.
+ */
+function decodeOwnSessionToken(token) {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      issuer: 'skygenpanel',
+      audience: [PANEL_AUDIENCE, PLATFORM_AUDIENCE, CONSOLE_AUDIENCE],
+      ignoreExpiration: true
+    });
+    if (!decoded || decoded.tokenType || !Number.isInteger(Number(decoded.userId))) return null;
+    return decoded;
   } catch {
     return null;
   }
@@ -210,34 +228,20 @@ function generateImpersonationToken(platformUser, tenantId) {
  * provedores e faturamento, e expulsá-lo de hora em hora não protege nada — a
  * alternativa, um token de acesso longo, é que seria pior.
  */
-function generateConsoleTokens(user) {
-  const commonOptions = {
-    issuer: 'skygenpanel',
-    audience: CONSOLE_AUDIENCE
-  };
+function generateConsoleTokens(user, { sessionId } = {}) {
   const accessToken = jwt.sign(
     {
       userId: user.id,
       username: user.username,
       platform: true,
-      tokenVersion: Number(user.token_version || 0)
+      tokenVersion: Number(user.token_version || 0),
+      ...(sessionId ? { sid: String(sessionId) } : {})
     },
     JWT_SECRET,
-    { ...commonOptions, expiresIn: JWT_EXPIRES_IN }
+    { issuer: 'skygenpanel', audience: CONSOLE_AUDIENCE, expiresIn: JWT_EXPIRES_IN }
   );
 
-  const refreshToken = jwt.sign(
-    {
-      userId: user.id,
-      platform: true,
-      tokenType: 'refresh',
-      tokenVersion: Number(user.token_version || 0)
-    },
-    JWT_SECRET,
-    { ...commonOptions, expiresIn: REFRESH_TOKEN_EXPIRES_IN }
-  );
-
-  return { accessToken, refreshToken };
+  return { accessToken };
 }
 
 /**
@@ -364,7 +368,17 @@ async function hydrateAuthenticatedUser(decoded) {
   }
 
   if (forma === 'personificacao') return hydrateImpersonation(user, decoded);
-  if (forma === 'console') return hydrateConsole(user);
+
+  // A família do refresh (0129). "Sair" neste aparelho e "Encerrar" na tela de
+  // sessões revogam a família — e o token de acesso dela para de valer aqui,
+  // na requisição seguinte, em vez de seguir valendo pelos 15 min que ainda
+  // tem. Token sem `sid` é o de antes desta versão (vence em uma hora) ou o
+  // da personificação, que não tem refresh.
+  if (decoded.sid !== undefined) {
+    if (typeof decoded.sid !== 'string' || !(await RefreshToken.familyActive(decoded.sid, user.id))) return null;
+  }
+
+  if (forma === 'console') return hydrateConsole(user, decoded);
 
   const membership = await resolveSessionMembership(user.id, decoded.tenantId);
   if (!membership) return null;
@@ -375,6 +389,9 @@ async function hydrateAuthenticatedUser(decoded) {
     role: membership.role,
     tenantId: Number(membership.tenant_id),
     tokenVersion: Number(user.token_version || 0),
+    // A família do refresh desta sessão (0129): o "este aparelho" da lista de
+    // sessões, e o que a ativação do 2FA mantém viva.
+    sessionId: typeof decoded.sid === 'string' ? decoded.sid : null,
     // O provedor exige o 2FA e esta pessoa ainda não ativou. Lido a cada
     // requisição, e não gravado no token: o dono liga a exigência e quem já
     // estava dentro é parado na próxima chamada, não quando o token vencer.
@@ -440,7 +457,7 @@ function mfaEnrollmentRefusal(req, session) {
  * `requirePermission` recusá-la em vez de consultar a matriz com um papel
  * inventado.
  */
-async function hydrateConsole(user) {
+async function hydrateConsole(user, decoded) {
   if (!(await PlatformAdmin.has(user.id))) return null;
   if (!canHoldSession(user)) return null;
 
@@ -450,7 +467,8 @@ async function hydrateConsole(user) {
     role: null,
     tenantId: null,
     platform: true,
-    tokenVersion: Number(user.token_version || 0)
+    tokenVersion: Number(user.token_version || 0),
+    sessionId: typeof decoded?.sid === 'string' ? decoded.sid : null
   };
 }
 
@@ -819,11 +837,13 @@ async function requirePlatformAdmin(req, res, next) {
 }
 
 export {
+  PANEL_AUDIENCE,
   generateTokens,
   generateImpersonationToken,
   generateConsoleTokens,
   CONSOLE_AUDIENCE,
   verifyToken,
+  decodeOwnSessionToken,
   resolveMembership,
   openMembership,
   authenticateToken,

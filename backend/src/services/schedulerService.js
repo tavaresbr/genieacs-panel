@@ -17,6 +17,7 @@ import AuditLog from '../models/AuditLog.js';
 import Setting from '../models/Setting.js';
 import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
+import RefreshToken from '../models/RefreshToken.js';
 import Lead from '../models/Lead.js';
 import { leadRetentionDays } from '../utils/leadRetention.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
@@ -33,6 +34,7 @@ import PlanPriceChangeService from './planPriceChangeService.js';
 import StatusService from './statusService.js';
 import AffiliatePayoutService from './affiliatePayoutService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
+import ExternalBackupService from './backup/externalBackupService.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
@@ -242,6 +244,13 @@ class SchedulerService {
       .then(() => AffiliatePayoutService.schedulerPass().catch((error) => {
         console.warn(`Could not run the affiliate payouts: ${error.message}`);
       }))
+      // O backup externo cifrado (Integrações → Backup externo): à hora
+      // escolhida, sob a vez `external-backup`, e a verificação semanal. Só
+      // COMEÇA a passada — o dump roda em segundo plano, sem segurar o tick.
+      // Nunca lança.
+      .then(() => ExternalBackupService.schedulerPass().catch((error) => {
+        console.warn(`Could not run the external backup: ${error.message}`);
+      }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))
       .then(() => (prune ? this.pruneLeads() : undefined))
@@ -272,6 +281,11 @@ class SchedulerService {
     });
     await ImpersonationTicket.prune().catch((error) => {
       console.warn(`Could not prune impersonation tickets: ${error.message}`);
+    });
+    // As sessões por aparelho vencidas ou encerradas (0129), pelo mesmo
+    // argumento: tabela compartilhada, fora do laço por provedor.
+    await RefreshToken.prune().catch((error) => {
+      console.warn(`Could not prune refresh tokens: ${error.message}`);
     });
   }
 

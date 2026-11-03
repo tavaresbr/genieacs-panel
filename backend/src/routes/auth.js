@@ -2,6 +2,8 @@ import express from 'express';
 import { IS_SAAS } from '../config/edition.js';
 import AuthController from '../controllers/authController.js';
 import { requirePermission, requirePlatformAdmin, authenticateToken } from '../middleware/auth.js';
+import { sessionCsrfGuard } from '../middleware/sessionCookie.js';
+import { platformHostOnly } from '../middleware/tenantResolver.js';
 import {
   authTicketRedeemLimiter,
   emailChangeLimiter,
@@ -48,9 +50,26 @@ router.post('/email/verify/confirm', authTicketRedeemLimiter, AuthController.con
 
 router.get('/user', authenticateToken, AuthController.getCurrentUser);
 
-router.post('/logout', authenticateToken, AuthController.logout);
+// As rotas que o cookie do refresh autentica (0129). A guarda de CSRF vem
+// primeiro — `Origin`/`Sec-Fetch-Site` e o `X-Requested-With: skygenpanel` —,
+// porque aqui a credencial viaja sozinha com o navegador. "Sair" encerra só
+// este aparelho; ver o controlador.
+router.post('/logout', sessionCsrfGuard, AuthController.logout);
+router.post('/refresh', sessionCsrfGuard, AuthController.refreshToken);
 
-router.post('/refresh', AuthController.refreshToken);
+// O console tem cookie e `Path` próprios (`/api/auth/console`), e só existe no
+// endereço da plataforma onde ele existe — `platformHostOnly`, como o resto do
+// console.
+router.post('/console/refresh', platformHostOnly, sessionCsrfGuard, AuthController.consoleRefreshToken);
+router.post('/console/logout', platformHostOnly, sessionCsrfGuard, AuthController.consoleLogout);
+
+// "Sessões ativas" (Minha conta): os aparelhos desta pessoa, "Encerrar" um e
+// "Sair de todos". Autenticadas pelo token de acesso, como o resto da conta, e
+// com a mesma guarda de CSRF das rotas do cookie. A personificação não chega:
+// escrita em `/api/auth/` é recusada a ela, e a lista também (controlador).
+router.get('/sessions', sessionCsrfGuard, authenticateToken, AuthController.listSessions);
+router.post('/sessions/revoke-all', sessionCsrfGuard, authenticateToken, AuthController.revokeAllSessions);
+router.post('/sessions/:id/revoke', sessionCsrfGuard, authenticateToken, AuthController.revokeSession);
 
 // O limite vem DEPOIS da sessão, para contar por pessoa; ver
 // `passwordChangeLimiter`.

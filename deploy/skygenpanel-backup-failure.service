@@ -1,0 +1,17 @@
+[Unit]
+Description=Record a failed TR69 Controle backup and raise the alert
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/skygenpanel/backend
+# Writes /var/backups/skygenpanel/.last-failure (read by the panel's alert
+# pass) and enqueues the `backup_failed` platform alert through the panel's
+# database. See `skygenpanel-backup notify-failure`.
+ExecStart=/usr/local/bin/skygenpanel-backup notify-failure "skygenpanel-backup.service failed on %H"
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+ReadWritePaths=/var/backups/skygenpanel

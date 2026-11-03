@@ -240,6 +240,24 @@ class SettingsController {
   }
 
   /**
+   * A etapa do assistente em que o provedor está, para retomar dali — noutra
+   * máquina, ou depois de fechar a aba no meio. Só as etapas que existem.
+   */
+  static async saveOnboardingStep(req, res) {
+    const step = req.body?.step;
+    if (!OnboardingService.isWizardStep(step)) {
+      return res.status(400).json(createErrorResponse(req.t('settings.onboardingInvalid'), null, 'invalid_onboarding_step'));
+    }
+    try {
+      await OnboardingService.saveWizardStep(step);
+      return res.json(createResponse(req.t('settings.updated'), { step }));
+    } catch (error) {
+      console.error('Onboarding step error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
    * `GET /api/settings/genieacs-suggestion` — o endereço de ACS que a
    * plataforma sugere a ESTE provedor, ou nada.
    *

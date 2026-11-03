@@ -1,6 +1,7 @@
 import express from 'express';
 import PlatformIntegrationsController from '../controllers/platformIntegrationsController.js';
 import PlatformSettingsController from '../controllers/platformSettingsController.js';
+import PlatformBackupController from '../controllers/platformBackupController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 import { BRANDING_KINDS } from '../services/platformBrandingService.js';
 
@@ -39,5 +40,15 @@ router.post('/settings/reminder-policy/test', ...guard, PlatformSettingsControll
 
 // O provedor como cliente na conta Asaas da plataforma: cria lá e liga aqui.
 router.post('/tenants/:id/gateway/asaas-customer', ...guard, PlatformIntegrationsController.createAsaasCustomer);
+
+// Integrações → Backup externo: o S3 compatível, a chave pública (a privada
+// nunca mora no servidor), o "fazer agora" e a verificação.
+router.get('/integrations/backup', ...guard, PlatformBackupController.get);
+router.put('/integrations/backup', ...guard, PlatformBackupController.update);
+router.post('/integrations/backup/public-key', ...guard, PlatformBackupController.setPublicKey);
+router.post('/integrations/backup/keypair', ...guard, PlatformBackupController.generateKeyPair);
+router.post('/integrations/backup/test', ...guard, PlatformBackupController.test);
+router.post('/integrations/backup/run', ...guard, PlatformBackupController.run);
+router.post('/integrations/backup/verify', ...guard, PlatformBackupController.verify);
 
 export default router;

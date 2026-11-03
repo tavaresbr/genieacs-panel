@@ -31,9 +31,15 @@ describe('GET /api/settings', () => {
       method: 'POST', headers: authHeaders(token), body: { what: 'wizard' }
     });
     assert.equal(dismiss.status, 200);
+    // A etapa em que o assistente parou também é marca interna, não ajuste.
+    const step = await call(`${panelUrl}/api/settings/onboarding/step`, {
+      method: 'PUT', headers: authHeaders(token), body: { step: 'sgp' }
+    });
+    assert.equal(step.status, 200);
     const list = await call(`${panelUrl}/api/settings`, { headers: authHeaders(token) });
     assert.equal(list.status, 200);
     assert.ok(!('onboardingWizardDoneAt' in list.body.data));
+    assert.ok(!('onboardingWizardStep' in list.body.data));
     assert.ok('autoGenerateCustomerId' in list.body.data);
     for (const [key, value] of Object.entries(list.body.data)) {
       const res = await call(`${panelUrl}/api/settings/${key}`, {

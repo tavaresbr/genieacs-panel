@@ -9,6 +9,7 @@ const {
 } = await import('../src/utils/totp.js');
 const { hashRecoveryCode, normalizeRecoveryCode } = await import('../src/services/mfaService.js');
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
+const { cookieFrom, cookieHeaders } = await import('./helpers/sessionCookies.js');
 
 /**
  * Login em duas etapas com app autenticador.
@@ -23,6 +24,9 @@ const SENHA = 'operator-password-1';
 
 let panelUrl;
 let token;
+// O cookie do refresh da sessão do setup (0129): a família que a ativação do
+// 2FA tem que manter viva.
+let cookie;
 
 before(async () => {
   ({ panelUrl } = await startTestServers());
@@ -31,6 +35,7 @@ before(async () => {
     body: { username: USUARIO, password: SENHA, email: 'operator@exemplo.test' }
   });
   token = setup.body.data.token;
+  cookie = cookieFrom(setup.response);
 });
 
 after(async () => {
@@ -125,19 +130,28 @@ describe('ativar', () => {
   it('código certo liga e devolve dez códigos de recuperação, uma vez', async () => {
     const antes = await getDb()('audit_log').where({ action: AuditLog.ACTIONS.USER_MFA_ENABLED }).count({ n: '*' });
     const velho = token;
+    // Outro aparelho, logado antes da ativação: a família dele tem que cair.
+    const outroAparelho = cookieFrom((await login()).response);
     const { status, body } = await post('/api/auth/mfa/enable', { code: agora() });
     assert.equal(status, 200, JSON.stringify(body));
     recuperacao = body.data.recoveryCodes;
 
     // Ativar é mudar credencial: a sessão aberta antes cai, e a aba de quem
     // ativou segue com os tokens novos que a resposta traz.
-    assert.ok(body.data.token && body.data.refreshToken, 'a ativação não devolveu sessão nova');
+    assert.ok(body.data.token, 'a ativação não devolveu sessão nova');
+    assert.equal(body.data.refreshToken, undefined, 'o refresh não sai mais no corpo');
     assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(velho) })).status, 403,
       'a sessão de antes da ativação continuou valendo');
     token = body.data.token;
     assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(token) })).status, 200);
-    const renovou = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', body: { refreshToken: body.data.refreshToken } });
+    // A família desta sessão passou para a versão nova: o mesmo cookie renova.
+    const renovou = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', headers: cookieHeaders(cookie) });
     assert.equal(renovou.status, 200, JSON.stringify(renovou.body));
+    cookie = cookieFrom(renovou.response);
+    token = renovou.body.data.token;
+    // A do outro aparelho ficou na versão antiga e não renova mais.
+    const outro = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', headers: cookieHeaders(outroAparelho) });
+    assert.equal(outro.status, 401, 'o outro aparelho sobreviveu à ativação do 2FA');
     assert.equal(recuperacao.length, 10);
     assert.equal(new Set(recuperacao).size, 10);
     const depois = await getDb()('audit_log').where({ action: AuditLog.ACTIONS.USER_MFA_ENABLED }).count({ n: '*' });

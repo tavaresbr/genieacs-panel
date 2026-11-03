@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { Icon } from '@/components/ui/icon'
-import { storedSession, whatsappAPI } from '@/lib/api'
+import { apiClient, whatsappAPI } from '@/lib/api'
 import { sessionOwner } from '@/lib/session-owner'
 import {
   focusedConversation,
@@ -29,13 +29,13 @@ const ligado = (owner: string | null) => suportado() && readNotifyPref(owner) &&
 
 /**
  * O dono da sessão desta aba e se o vigia vale para ela. A aba de
- * personificação fica de fora: a sessão é da aba (`storedSession`), e o
+ * personificação fica de fora: a sessão é da aba (`isTabScoped`), e o
  * `user.impersonation` confirma mesmo antes de a gaveta ser lida de novo.
  */
 function useNotifierSession() {
   const { user } = useAuth()
   const owner = sessionOwner(user)
-  const tabScoped = Boolean(user?.impersonation) || storedSession().tabScoped
+  const tabScoped = Boolean(user?.impersonation) || apiClient.isTabScoped()
   return { owner, active: notifierActive({ owner, tabScoped }) }
 }
 

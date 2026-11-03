@@ -27,6 +27,7 @@ import AddonService from './addonService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TELEGRAM_CHAT_PATTERN, TELEGRAM_TOKEN_PATTERN, sendTelegramMessage } from './telegramClient.js';
 import { detectOutages, mapsLink } from './outageDetector.js';
+import PushService from './pushService.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
 /** O resumo diário da IA: o dia (no fuso do provedor) em que já saiu, e a hora a partir da qual sai. */
@@ -1176,6 +1177,11 @@ class WaAlertService {
   static async notify({ channels, condition, cleared }) {
     const body = this.compose(condition, cleared);
     if (!body) return 0;
+    // O push do app (0130): um canal A MAIS, para quem ligou o evento no
+    // aparelho. Fora da conta de cópias de propósito — o cooldown e a
+    // recuperação seguem valendo pelos canais de sempre, e um aviso no
+    // celular de alguém não é o provedor "avisado". Nunca lança.
+    await PushService.notifyAlert({ rule: condition.rule, cleared: Boolean(cleared), vars: condition.vars });
     const { digestMinutes } = await this.getSettings();
     if (digestMinutes > 0) {
       // Entra na fila do resumo. Conta como avisada (um por canal pronto) para o

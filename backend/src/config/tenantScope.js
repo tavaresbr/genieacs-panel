@@ -187,7 +187,12 @@ export const SCOPED_TABLES = new Set([
   'platform_nps',
   // Os add-ons que o provedor contratou (0127): o que ele paga além do plano.
   // Do provedor, como a assinatura — sai no export dele e some com ele.
-  'tenant_addons'
+  'tenant_addons',
+  // Os aparelhos da equipe inscritos no push e o que cada pessoa quer
+  // receber (0130). O endpoint é a credencial do aparelho, e o aviso de um
+  // provedor não pode chegar ao celular de quem só trabalha no outro.
+  'push_subscriptions',
+  'push_preferences'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -279,7 +284,12 @@ export const SHARED_TABLES = new Set([
   'affiliate_payouts',
   'affiliate_commissions',
   // O catálogo de add-ons (0127): da plataforma, como `plans` e `coupons`.
-  'addons'
+  'addons',
+  // As sessões por aparelho (0129): da PESSOA, como `users` e
+  // `account_lockouts`. O refresh chega sem sessão em escopo — o cookie é a
+  // credencial, e é a linha que diz de quem e de qual provedor ela é; a
+  // sessão do console nem tem provedor. Toda leitura nomeia o hash ou a pessoa.
+  'refresh_tokens'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

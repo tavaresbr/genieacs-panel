@@ -25,8 +25,11 @@ import {
  * 5. `backend/scripts/seed-demo.js`, com o mesmo ambiente do backend — e o
  *    token do link do recibo da Alfa, cunhado pelo `receiptLinkToken.js` do
  *    backend com o mesmo `JWT_SECRET` (`E2E_RECEIPT_TOKEN`);
- * 6. o login das duas contas pela tela, guardado em `e2e/.auth/` para os
- *    cenários que começam já dentro.
+ * 6. o login das duas contas pela tela, conferindo que a sessão ficou no
+ *    cookie `HttpOnly` (0129) e não no `localStorage`. O estado vai para
+ *    `e2e/.auth/` só para depuração: os cenários que começam já dentro entram
+ *    cada um com uma sessão nova (`sessionFor`), porque o refresh gira a cada
+ *    uso e um cookie compartilhado entre cenários seria reuso.
  *
  * Cada variável que o backend lê vai explícita, inclusive vazia: o `dotenv`
  * não sobrescreve o que já está posto, e um `backend/.env` de desenvolvimento
@@ -217,7 +220,14 @@ export default async function globalSetup(_config: FullConfig) {
       const context = await browser.newContext({ baseURL, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' })
       const page = await context.newPage()
       await loginViaForm(page, conta)
-      await context.storageState({ path: arquivo })
+      // Desde 0129 a sessão é o cookie `HttpOnly` do refresh, e o token de
+      // acesso fica só na memória da aba: nada de token no `localStorage`.
+      const estado = await context.storageState({ path: arquivo })
+      if (!estado.cookies.some((c) => c.name === 'skg_rt' && c.httpOnly)) {
+        throw new Error(`the login of ${conta.email} did not leave the HttpOnly refresh cookie`)
+      }
+      const vazou = estado.origins.some((o) => o.localStorage.some((i) => i.name === 'token' || i.name === 'refreshToken'))
+      if (vazou) throw new Error(`the login of ${conta.email} left a token in localStorage`)
       await context.close()
     }
   } finally {
