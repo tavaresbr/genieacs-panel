@@ -698,6 +698,30 @@ export async function listCustomersPage({ offset = 0, limit = MAX_PAGE_SIZE } = 
 }
 
 /**
+ * Uma cobrança do gateway como o painel a guarda — a mesma leitura serve à
+ * listagem e à entrega do webhook, para as duas nunca discordarem de um campo.
+ * O valor sai em centavos, pelo mesmo ponto único de conversão das cobranças.
+ */
+export function cobrancaDe(item) {
+  const valor = Number(item.value);
+  return {
+    id: String(item.id).slice(0, 32),
+    customerId: textoDe(item.customer, 32),
+    status: textoDe(item.status, 32)?.toUpperCase() ?? null,
+    billingType: textoDe(item.billingType, 32)?.toUpperCase() ?? null,
+    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null,
+    dueDate: diaDe(item.dueDate),
+    paymentDate: diaDe(item.paymentDate ?? item.confirmedDate),
+    description: textoDe(item.description, 500),
+    invoiceUrl: textoDe(item.invoiceUrl, 512),
+    bankSlipUrl: textoDe(item.bankSlipUrl, 512),
+    invoiceNumber: textoDe(item.invoiceNumber, 32),
+    externalReference: textoDe(item.externalReference, 128),
+    deleted: item.deleted === true
+  };
+}
+
+/**
  * Uma página de cobranças da conta — `GET /payments?status=&offset=&limit=`.
  * Um status por chamada: é como o gateway filtra. O valor sai em centavos,
  * pelo mesmo ponto único de conversão das cobranças.
@@ -715,24 +739,7 @@ export async function listChargesPage({ status, offset = 0, limit = MAX_PAGE_SIZ
   return {
     rows: lista
       .filter((item) => item && item.id)
-      .map((item) => {
-        const valor = Number(item.value);
-        return {
-          id: String(item.id).slice(0, 32),
-          customerId: textoDe(item.customer, 32),
-          status: textoDe(item.status, 32)?.toUpperCase() ?? null,
-          billingType: textoDe(item.billingType, 32)?.toUpperCase() ?? null,
-          valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null,
-          dueDate: diaDe(item.dueDate),
-          paymentDate: diaDe(item.paymentDate ?? item.confirmedDate),
-          description: textoDe(item.description, 500),
-          invoiceUrl: textoDe(item.invoiceUrl, 512),
-          bankSlipUrl: textoDe(item.bankSlipUrl, 512),
-          invoiceNumber: textoDe(item.invoiceNumber, 32),
-          externalReference: textoDe(item.externalReference, 128),
-          deleted: item.deleted === true
-        };
-      }),
+      .map(cobrancaDe),
     hasMore: resposta?.hasMore === true
   };
 }

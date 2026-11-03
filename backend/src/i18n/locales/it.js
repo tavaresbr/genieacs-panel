@@ -100,6 +100,8 @@ export default {
   'asaas.error.nameRequired': 'The client needs a name to be created in Asaas',
   'contacts.createdInAsaas': 'Client created in Asaas',
   'contacts.linkedToAsaas': 'Client already existed in Asaas and was linked',
+  'asaas.webhookTokenRotated': 'New webhook token generated. Paste it into Asaas now: it is shown only once',
+  'asaas.error.webhookTokenRequired': 'Generate the webhook token before turning real-time payments on',
   'rateLimit.telegramTest': 'Troppi test di Telegram, attendi un minuto',
   'rateLimit.platformExport': 'Troppe esportazioni, rallenta',
   'rateLimit.sgpSync': 'Troppe sincronizzazioni della rete. Riprova più tardi.',

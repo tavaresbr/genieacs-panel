@@ -36,6 +36,10 @@ class AsaasCharge {
     return existing ? 'updated' : 'created';
   }
 
+  static async getByAsaasId(asaasId) {
+    return (await tdb('asaas_charges').where({ asaas_id: String(asaasId) }).first()) || null;
+  }
+
   /** Todas as cobranças que o painel tem como em aberto (id interno e id do gateway). */
   static async listOpen() {
     return tdb('asaas_charges')

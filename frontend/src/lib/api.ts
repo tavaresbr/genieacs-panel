@@ -4339,6 +4339,10 @@ export interface AsaasProviderConfig {
   importCharges: boolean
   botLookup: boolean
   allowWriteCustomers: boolean
+  webhookEnabled: boolean
+  webhookTokenConfigured: boolean
+  /** O caminho (sem o domínio) que o Asaas deve chamar. */
+  webhookPath: string
   syncEnabled: boolean
   syncIntervalHours: number
   accountName: string | null
@@ -4382,10 +4386,15 @@ export const asaasProviderAPI = {
     importCharges?: boolean
     botLookup?: boolean
     allowWriteCustomers?: boolean
+    webhookEnabled?: boolean
     syncEnabled?: boolean
     syncIntervalHours?: number
   }) =>
     apiClient.put<AsaasProviderConfig>('/asaas/config', config),
+
+  /** Gera um token novo para o webhook; o valor volta uma única vez. */
+  rotateWebhookToken: () =>
+    apiClient.post<AsaasProviderConfig & { webhookToken: string }>('/asaas/webhook/token', {}),
 
   getImport: () =>
     apiClient.get<AsaasImportStatus>('/asaas/import'),

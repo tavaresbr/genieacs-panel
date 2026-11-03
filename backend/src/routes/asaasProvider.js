@@ -12,6 +12,7 @@ const router = express.Router();
 
 router.get('/config', authenticateToken, requirePermission('asaas.config'), AsaasProviderController.getConfig);
 router.put('/config', authenticateToken, requirePermission('asaas.config'), AsaasProviderController.updateConfig);
+router.post('/webhook/token', authenticateToken, requirePermission('asaas.config'), asaasAdminLimiter, AsaasProviderController.rotateWebhookToken);
 router.post('/test', authenticateToken, requirePermission('asaas.config'), asaasAdminLimiter, AsaasProviderController.testConnection);
 
 // As rotas da importação ficam com `asaas.config`, como a conexão: ainda não há

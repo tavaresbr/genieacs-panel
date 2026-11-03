@@ -1,6 +1,8 @@
 import AppState from '../models/AppState.js';
+import crypto from 'node:crypto';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { ASAAS_WEBHOOK_PATH } from '../config/asaasWebhookPath.js';
 import { BASE_URLS, ENVIRONMENTS } from './billing/asaasSettingsService.js';
 import { AsaasError, testConnection as asaasTestConnection } from './billing/asaasClient.js';
 
@@ -30,6 +32,9 @@ const SECRET_CONTEXT = 'skygenpanel-asaas-provider-key-v1';
 const CACHE_TTL_MS = 30_000;
 
 const box = createSecretBox(SECRET_CONTEXT);
+// Contexto próprio: o texto cifrado de um segredo nunca decifra como o outro.
+const WEBHOOK_SECRET_CONTEXT = 'skygenpanel-asaas-provider-webhook-v1';
+const webhookBox = createSecretBox(WEBHOOK_SECRET_CONTEXT);
 
 /** As chaves do Asaas: `$aact_prod_…` em produção, `$aact_hmlg_…` no sandbox. */
 const KEY_FAMILY = Object.freeze({ production: '_prod_', sandbox: '_hmlg_' });
@@ -63,12 +68,28 @@ const DEFAULTS = Object.freeze({
   importCharges: true,
   botLookup: false,
   allowWriteCustomers: false,
+  webhookEnabled: false,
+  webhookToken: null,
   syncEnabled: false,
   syncIntervalHours: SYNC_INTERVAL_HOURS.default,
   accountName: null,
   lastTestAt: null,
   updatedAt: null
 });
+
+function encryptWebhook(value) {
+  return value ? { v: 1, ...webhookBox.encrypt(value) } : null;
+}
+
+function decryptWebhook(envelope) {
+  if (!envelope || typeof envelope !== 'object') return null;
+  try {
+    const { v, ...payload } = envelope;
+    return webhookBox.decrypt(payload) || null;
+  } catch {
+    return null;
+  }
+}
 
 function encrypt(value) {
   return value ? { v: 1, ...box.encrypt(value) } : null;
@@ -136,6 +157,8 @@ class AsaasProviderService {
       botLookup: stored.botLookup === true,
       // Escrever na conta do provedor é opt-in, como o chamado do SGP: desligado.
       allowWriteCustomers: stored.allowWriteCustomers === true,
+      webhookEnabled: stored.webhookEnabled === true,
+      webhookToken: decryptWebhook(stored.webhookToken),
       syncEnabled: stored.syncEnabled === true,
       syncIntervalHours: clampInterval(stored.syncIntervalHours, SYNC_INTERVAL_HOURS.default),
       accountName: stored.accountName ? String(stored.accountName) : null,
@@ -148,8 +171,14 @@ class AsaasProviderService {
   /** O que o navegador recebe: nunca a chave, só se ela existe. */
   static async getPublicConfig() {
     const config = await this.getConfig();
-    const { apiKey, ...rest } = config;
-    return { ...rest, apiKeyConfigured: Boolean(apiKey), ready: this.isReady(config) };
+    const { apiKey, webhookToken, ...rest } = config;
+    return {
+      ...rest,
+      apiKeyConfigured: Boolean(apiKey),
+      webhookTokenConfigured: Boolean(webhookToken),
+      webhookPath: ASAAS_WEBHOOK_PATH,
+      ready: this.isReady(config)
+    };
   }
 
   static isReady(config) {
@@ -188,6 +217,11 @@ class AsaasProviderService {
       throw new AsaasProviderError('asaas.error.configIncomplete', { code: 'incomplete_config' });
     }
 
+    const webhookEnabled = patch.webhookEnabled === undefined ? current.webhookEnabled : patch.webhookEnabled === true;
+    if (webhookEnabled && !current.webhookToken) {
+      throw new AsaasProviderError('asaas.error.webhookTokenRequired', { code: 'webhook_token_required' });
+    }
+
     const keyChanged = apiKey !== current.apiKey || environment !== current.environment;
     await AppState.upsert(CONFIG_KEY, JSON.stringify({
       enabled,
@@ -197,6 +231,9 @@ class AsaasProviderService {
       importCharges: patch.importCharges === undefined ? current.importCharges : patch.importCharges === true,
       botLookup: patch.botLookup === undefined ? current.botLookup : patch.botLookup === true,
       allowWriteCustomers: patch.allowWriteCustomers === undefined ? current.allowWriteCustomers : patch.allowWriteCustomers === true,
+      webhookEnabled,
+      // O token só muda pelo `rotateWebhookToken`; aqui ele é preservado.
+      webhookToken: encryptWebhook(current.webhookToken),
       syncEnabled: patch.syncEnabled === undefined ? current.syncEnabled : patch.syncEnabled === true,
       syncIntervalHours: patch.syncIntervalHours === undefined
         ? current.syncIntervalHours
@@ -247,6 +284,30 @@ class AsaasProviderService {
       this.invalidateConfigCache();
     }
     return { accountName: result.accountName, environment: env };
+  }
+
+  /**
+   * Gera um token novo para a entrega do webhook e o devolve — a ÚNICA vez que
+   * ele sai do servidor. O anterior deixa de valer na hora: quem girou precisa
+   * colar o novo no painel do Asaas, e é por isso que a tela o mostra uma vez só.
+   */
+  static async rotateWebhookToken() {
+    const current = await this.getConfig();
+    const token = crypto.randomBytes(32).toString('hex');
+    const raw = await AppState.get(CONFIG_KEY);
+    let stored = {};
+    if (raw) {
+      try { stored = JSON.parse(raw) || {}; } catch { stored = {}; }
+    }
+    await AppState.upsert(CONFIG_KEY, JSON.stringify({
+      ...stored,
+      webhookToken: encryptWebhook(token),
+      // Girar não liga sozinho: ligar é decisão do provedor, depois de colar o token lá.
+      webhookEnabled: current.webhookEnabled,
+      updatedAt: new Date().toISOString()
+    }));
+    this.invalidateConfigCache();
+    return { token, config: await this.getPublicConfig() };
   }
 
   /**
