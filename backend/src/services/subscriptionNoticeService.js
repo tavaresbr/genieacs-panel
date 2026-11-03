@@ -16,6 +16,7 @@ import Plan from '../models/Plan.js';
 import { tdb } from '../config/database.js';
 import { autoSuspendConfig, reminderPolicyConfig } from './platformProfileService.js';
 import { renderReminderTemplate } from './reminderPolicy.js';
+import PushService from './pushService.js';
 
 /**
  * Os lembretes que chegam ANTES do bloqueio — e depois dele.
@@ -236,6 +237,10 @@ class SubscriptionNoticeService {
     }
 
     await SubscriptionReminderSend.markSent(garra, { channels: canais, at: now });
+    // O push do app (0130), DEPOIS da marca: a etapa já é desta passada, então
+    // o aviso no celular sai uma vez só, como o e-mail. A mais e fora dos
+    // `canais` gravados — nunca lança, e não decide se a etapa saiu.
+    await PushService.notifyInvoice({ step: pendente.step, expired: Boolean(pendente.expired), dueAt });
     return {
       sent: true,
       step: pendente.step,

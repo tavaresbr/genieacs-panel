@@ -11,6 +11,7 @@ import { SubscriptionNotice } from '@/components/subscription-notice'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { WhatsAppDisconnectedBanner } from '@/components/whatsapp/disconnected-banner'
 import { WhatsAppMessageNotifier } from '@/components/whatsapp/message-notifier'
+import { PwaUpdatePrompt } from '@/components/pwa-update-prompt'
 import { ConsoleHeader } from '@/components/console-header'
 import { MfaEnrollmentScreen } from '@/components/mfa-enrollment-screen'
 import { mustEnroll } from '@/lib/mfa-enrollment'
@@ -30,6 +31,7 @@ const AuditPage = lazy(() => import('@/pages/audit'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
 const ContactsPage = lazy(() => import('@/pages/contacts'))
 const SiteMapPage = lazy(() => import('@/pages/site-map'))
+const AccountPage = lazy(() => import('@/pages/account'))
 const ContactDetailPage = lazy(() => import('@/pages/contact-detail'))
 const PlatformPage = lazy(() => import('@/pages/platform'))
 const LoginPage = lazy(() => import('@/pages/login'))
@@ -186,6 +188,8 @@ function ProtectedShell() {
             <Outlet />
           </OnboardingGate>
         </Suspense>
+        {/* Versão nova do app (service worker esperando): a pessoa escolhe a hora. */}
+        <PwaUpdatePrompt />
       </main>
     </div>
   )
@@ -415,6 +419,9 @@ function ProviderRoutes() {
                       X", e um `viewer` precisa dela tanto quanto um `owner`. A
                       tela lista só o que a sessão abre. */}
                   <Route path="/sitemap" element={<SiteMapPage />} />
+                  {/* Minha conta (0130): da pessoa, sem capacidade — o técnico
+                      liga ali os avisos no celular. */}
+                  <Route path="/account" element={<AccountPage />} />
                   <Route element={<PlatformRoute />}>
                     <Route path="/platform" element={<PlatformPage />} />
                   </Route>

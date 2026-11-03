@@ -345,7 +345,15 @@ function SidebarContent({
             </>
           )}
         </button>
-        <div className={`mb-2 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}>
+        {/* O nome abre Minha conta (0130): os avisos deste aparelho, para todo papel. */}
+        <Link
+          to="/account"
+          onClick={closeMobile}
+          aria-label={t('account.open')}
+          title={isCollapsed ? t('account.open') : undefined}
+          data-testid="sidebar-account-link"
+          className={`mb-2 flex items-center rounded-md transition-colors hover:bg-white/8 ${isCollapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}
+        >
           <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#d97706] text-sm font-bold text-[#1f251f]">
             {initial}
           </div>
@@ -360,7 +368,7 @@ function SidebarContent({
               </div>
             </div>
           )}
-        </div>
+        </Link>
         <LanguageSwitcher variant="dark" compact={isCollapsed} className="mb-1 w-full" />
         <div className={`grid gap-1 ${isCollapsed ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <button

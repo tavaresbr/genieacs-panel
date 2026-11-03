@@ -187,7 +187,12 @@ export const SCOPED_TABLES = new Set([
   'platform_nps',
   // Os add-ons que o provedor contratou (0127): o que ele paga além do plano.
   // Do provedor, como a assinatura — sai no export dele e some com ele.
-  'tenant_addons'
+  'tenant_addons',
+  // Os aparelhos da equipe inscritos no push e o que cada pessoa quer
+  // receber (0130). O endpoint é a credencial do aparelho, e o aviso de um
+  // provedor não pode chegar ao celular de quem só trabalha no outro.
+  'push_subscriptions',
+  'push_preferences'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

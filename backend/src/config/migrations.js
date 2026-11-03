@@ -3607,6 +3607,67 @@ const ADDON_TABLES = [
 ];
 
 /**
+ * As notificações push do app do provedor (0130) — ver `services/pushService.js`.
+ *
+ *   push_subscriptions  um aparelho (navegador) de uma pessoa da equipe, num
+ *                       provedor. O endereço que o serviço de push do
+ *                       navegador entrega (`endpoint`) e as duas chaves da
+ *                       inscrição vão CIFRADOS, juntos, num envelope do
+ *                       secretBox (`secret_*`): o endpoint é a credencial de
+ *                       quem quiser mandar aviso àquele aparelho. O
+ *                       `endpoint_hash` (sha256) é a chave única — um
+ *                       aparelho é UMA linha, de quem se inscreveu por último;
+ *                       `failures` e `next_attempt_at` são o recuo depois de
+ *                       erro, e a linha some no 404/410 do serviço de push;
+ *                       `locale` é o idioma do painel quando a pessoa se
+ *                       inscreveu, para o aviso sair na língua dela;
+ *   push_preferences    o liga/desliga por evento de cada pessoa NAQUELE
+ *                       provedor (JSON curto em `events`). Sem linha, valem
+ *                       os padrões de `PUSH_EVENTS`.
+ *
+ * As duas escopadas: a mesma pessoa em dois provedores tem aparelhos e
+ * escolhas separados em cada um.
+ */
+const pushSubscriptionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.string('endpoint_hash', 64).notNullable();
+  t.text('secret_ciphertext').notNullable();
+  t.string('secret_iv', 32).notNullable();
+  t.string('secret_tag', 32).notNullable();
+  t.integer('secret_key_version').notNullable().defaultTo(1);
+  t.string('user_agent', 255).nullable();
+  t.string('locale', 16).nullable();
+  t.integer('failures').notNullable().defaultTo(0);
+  t.timestamp('next_attempt_at').nullable();
+  t.timestamp('last_ok_at').nullable();
+  t.timestamp('last_error_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['endpoint_hash'], 'push_subscriptions_endpoint_uq');
+  t.index(['tenant_id', 'user_id'], 'push_subscriptions_user_idx');
+};
+
+const pushPreferencesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.string('events', 500).notNullable().defaultTo('{}');
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'user_id'], 'push_preferences_user_uq');
+};
+
+const PUSH_TABLES = [
+  ['push_subscriptions', pushSubscriptionsTable],
+  ['push_preferences', pushPreferencesTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -3655,7 +3716,8 @@ export const SCHEMA_TABLES = [
   ...ASAAS_IMPORT_TABLES,
   ...AFFILIATE_TABLES,
   ...ADDON_TABLES,
-  ...STATUS_PAGE_TABLES
+  ...STATUS_PAGE_TABLES,
+  ...PUSH_TABLES
 ].map(([name]) => name);
 
 /**
@@ -7395,6 +7457,23 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       for (const [name, builder] of STATUS_PAGE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
+    /** As notificações push do app do provedor — ver `PUSH_TABLES`. */
+    id: '0130_push_subscriptions',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      for (const [name] of PUSH_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of PUSH_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
     }
