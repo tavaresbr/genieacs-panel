@@ -4605,6 +4605,8 @@ const fr: Dictionary = {
   'contacts.profile.asaasOpen': 'Open invoice',
   'settings.asaas.import.allowWrite': 'Allow creating clients in Asaas',
   'settings.asaas.import.allowWriteHint': 'Writes to your Asaas account: adds the client when you register one in the panel. Off by default.',
+  'settings.asaas.import.billing': 'Dunning and campaigns also charge Asaas invoices',
+  'settings.asaas.import.billingHint': 'Adds Asaas invoices to the WhatsApp dunning rule and billing campaigns — including clients that exist only in Asaas. Sends messages to more people, so it is off by default.',
   'contacts.new.alsoAsaas': 'Also register in Asaas',
   'contacts.new.alsoAsaasHint': 'Creates the client in your Asaas account too, matched by CPF/CNPJ. If Asaas refuses, the client stays saved here and can be sent later from its page.',
   'contacts.new.inAsaas': 'Already in Asaas',

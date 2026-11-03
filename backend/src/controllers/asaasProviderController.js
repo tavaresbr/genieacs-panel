@@ -39,6 +39,7 @@ class AsaasProviderController {
         botLookup: body.botLookup,
         allowWriteCustomers: body.allowWriteCustomers,
         webhookEnabled: body.webhookEnabled,
+        billingEnabled: body.billingEnabled,
         syncEnabled: body.syncEnabled,
         syncIntervalHours: body.syncIntervalHours
       });

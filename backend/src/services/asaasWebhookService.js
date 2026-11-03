@@ -46,7 +46,24 @@ function tokensIguais(a, b) {
   return crypto.timingSafeEqual(da, db);
 }
 
+/** O que o Asaas chama de dinheiro recebido: só estes agradecem o pagamento. */
+const PAID_STATUSES = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
+
 class AsaasWebhookService {
+  /**
+   * Retira da fila de cobrança as mensagens da fatura que acabou de fechar.
+   * Nunca lança: o status já foi gravado, e a régua também confere a cada
+   * passada — esta é só a pressa, para não cobrar quem acabou de pagar.
+   */
+  static async settleDunning(invoiceKey, { paid }) {
+    try {
+      const { default: WaDunningService } = await import('./waDunningService.js');
+      await WaDunningService.settleByInvoiceKey(invoiceKey, { paid });
+    } catch (error) {
+      console.warn(`Asaas webhook: could not settle the dunning queue: ${error.message}`);
+    }
+  }
+
   /** Os provedores ativos com a entrega ligada e um token. */
   static async deliveryCandidates() {
     const tenants = await getDb()('tenants').where({ status: 'active' }).orderBy('id', 'asc');
@@ -100,6 +117,7 @@ class AsaasWebhookService {
       if (event === 'PAYMENT_DELETED') {
         if (!existing) return { handled: false, reason: 'unknown_charge' };
         await AsaasCharge.markDeleted(charge.id);
+        await this.settleDunning(charge.id, { paid: false });
         return { handled: true };
       }
 
@@ -118,6 +136,10 @@ class AsaasWebhookService {
         document: customer?.document ?? existing?.document ?? null,
         seenAt: new Date()
       });
+      // Fechada: a mensagem de cobrança dela que ainda está na fila sai agora.
+      if (!OPEN_STATUSES.includes(charge.status)) {
+        await this.settleDunning(charge.id, { paid: PAID_STATUSES.includes(charge.status) });
+      }
       return { handled: true };
     });
   }

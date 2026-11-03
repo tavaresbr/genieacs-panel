@@ -289,6 +289,23 @@ describe('CPF que só existe no Asaas', () => {
   });
 });
 
+describe('contrato que só tem vínculo de ONT (sem contato sincronizado)', () => {
+  it('acha o CPF no vínculo e soma a fatura do Asaas', async () => {
+    await getDb()('sgp_contacts').where({ contract: '8001' }).del();
+    await getDb()('sgp_links').where({ contract: '8001' }).del();
+    const agora = new Date();
+    await getDb()('sgp_links').insert({
+      device_id: 'ont-so-vinculo', contract: '8001', client_name: 'Maria Souza', document: DOC_SGP, state: 'active',
+      link_mode: 'auto', created_at: agora, updated_at: agora
+    });
+    await semearAsaas(DOC_SGP, [{ id: 'pay_vinc', cents: 5000, due: '2026-09-01' }]);
+    const { default: InvoiceSourceService } = await import('../src/services/invoiceSourceService.js');
+    const faturas = await asTenant(() => InvoiceSourceService.asaasInvoicesForContract('8001'));
+    assert.deepEqual(faturas.map((f) => f.id), ['pay_vinc']);
+    await getDb()('sgp_links').where({ contract: '8001' }).del();
+  });
+});
+
 describe('a ficha do cliente', () => {
   beforeEach(async () => {
     await getDb()('sgp_contacts').where({ contract: '8001' }).del();

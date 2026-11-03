@@ -68,6 +68,7 @@ const DEFAULTS = Object.freeze({
   importCharges: true,
   botLookup: false,
   allowWriteCustomers: false,
+  billingEnabled: false,
   webhookEnabled: false,
   webhookToken: null,
   syncEnabled: false,
@@ -157,6 +158,8 @@ class AsaasProviderService {
       botLookup: stored.botLookup === true,
       // Escrever na conta do provedor é opt-in, como o chamado do SGP: desligado.
       allowWriteCustomers: stored.allowWriteCustomers === true,
+      // A régua e as campanhas cobrarem o Asaas manda mensagem a mais gente: desligado.
+      billingEnabled: stored.billingEnabled === true,
       webhookEnabled: stored.webhookEnabled === true,
       webhookToken: decryptWebhook(stored.webhookToken),
       syncEnabled: stored.syncEnabled === true,
@@ -231,6 +234,7 @@ class AsaasProviderService {
       importCharges: patch.importCharges === undefined ? current.importCharges : patch.importCharges === true,
       botLookup: patch.botLookup === undefined ? current.botLookup : patch.botLookup === true,
       allowWriteCustomers: patch.allowWriteCustomers === undefined ? current.allowWriteCustomers : patch.allowWriteCustomers === true,
+      billingEnabled: patch.billingEnabled === undefined ? current.billingEnabled : patch.billingEnabled === true,
       webhookEnabled,
       // O token só muda pelo `rotateWebhookToken`; aqui ele é preservado.
       webhookToken: encryptWebhook(current.webhookToken),

@@ -4339,6 +4339,7 @@ export interface AsaasProviderConfig {
   importCharges: boolean
   botLookup: boolean
   allowWriteCustomers: boolean
+  billingEnabled: boolean
   webhookEnabled: boolean
   webhookTokenConfigured: boolean
   /** O caminho (sem o domínio) que o Asaas deve chamar. */
@@ -4386,6 +4387,7 @@ export const asaasProviderAPI = {
     importCharges?: boolean
     botLookup?: boolean
     allowWriteCustomers?: boolean
+    billingEnabled?: boolean
     webhookEnabled?: boolean
     syncEnabled?: boolean
     syncIntervalHours?: number

@@ -30,6 +30,7 @@ export function AsaasPanel() {
     importCharges: true,
     botLookup: false,
     allowWriteCustomers: false,
+    billingEnabled: false,
     syncEnabled: false,
     syncIntervalHours: 24
   })
@@ -48,6 +49,7 @@ export function AsaasPanel() {
       importCharges: next.importCharges,
       botLookup: next.botLookup,
       allowWriteCustomers: next.allowWriteCustomers,
+      billingEnabled: next.billingEnabled,
       syncEnabled: next.syncEnabled,
       syncIntervalHours: next.syncIntervalHours
     })
@@ -332,6 +334,18 @@ export function AsaasPanel() {
             <span className="text-sm">
               <span className="block font-semibold">{t('settings.asaas.import.allowWrite')}</span>
               <span className="text-muted-foreground">{t('settings.asaas.import.allowWriteHint')}</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 sm:col-span-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={importForm.billingEnabled}
+              onChange={(event) => setImportForm((current) => ({ ...current, billingEnabled: event.target.checked }))}
+            />
+            <span className="text-sm">
+              <span className="block font-semibold">{t('settings.asaas.import.billing')}</span>
+              <span className="text-muted-foreground">{t('settings.asaas.import.billingHint')}</span>
             </span>
           </label>
           <label className="flex items-start gap-3">

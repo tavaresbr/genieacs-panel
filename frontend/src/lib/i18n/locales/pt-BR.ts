@@ -4605,6 +4605,8 @@ const ptBR: Dictionary = {
   'contacts.profile.asaasOpen': 'Abrir fatura',
   'settings.asaas.import.allowWrite': 'Permitir criar clientes no Asaas',
   'settings.asaas.import.allowWriteHint': 'Escreve na sua conta Asaas: cria o cliente quando você o cadastra no painel. Desligado por padrão.',
+  'settings.asaas.import.billing': 'A régua e as campanhas também cobram as faturas do Asaas',
+  'settings.asaas.import.billingHint': 'Soma as faturas do Asaas à régua de cobrança por WhatsApp e às campanhas de cobrança — inclusive de clientes que só existem no Asaas. Manda mensagem a mais gente, por isso vem desligado.',
   'contacts.new.alsoAsaas': 'Cadastrar também no Asaas',
   'contacts.new.alsoAsaasHint': 'Cria o cliente na sua conta Asaas também, casado pelo CPF/CNPJ. Se o Asaas recusar, o cliente fica salvo aqui e pode ser enviado depois pela página dele.',
   'contacts.new.inAsaas': 'Já existe no Asaas',

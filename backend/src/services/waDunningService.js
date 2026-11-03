@@ -5,6 +5,8 @@ import WaOptOut from '../models/WaOptOut.js';
 import WaTemplate from '../models/WaTemplate.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import SgpService, { SgpError } from './sgpService.js';
+import AsaasCharge, { OPEN_STATUSES } from '../models/AsaasCharge.js';
+import { isAsaasContract } from './asaasBillingSource.js';
 import WaBillingService from './waBillingService.js';
 import WaSendService from './waSendService.js';
 import WaMetaTemplateService from './waMetaTemplateService.js';
@@ -55,6 +57,9 @@ import AddonService from './addonService.js';
  * corrigido à mão, o ritmo das chamadas ao SGP (`WaBillingService`) e a fila
  * de saída com teto por minuto e novas tentativas (`waOutboxWorker.js`).
  */
+
+/** O que o Asaas chama de dinheiro recebido: só estes agradecem o pagamento. */
+const PAID_STATUSES = Object.freeze(['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH']);
 
 const CONFIG_KEY = 'wa_dunning_rule';
 const LAST_RUN_KEY = 'wa_dunning_last_run';
@@ -818,14 +823,17 @@ class WaDunningService {
     if (!number) throw new WaError('whatsapp.error.noDestination', { code: 'no_destination', status: 409 });
     // O cadastro trocou de número: a conversa antiga sai do contrato e a
     // cobrança abre (ou reusa) a do número novo, que ganha o contrato abaixo.
-    if (subscriber.contract) await WaConversationService.retireStaleBindings(subscriber.contract);
+    // O contrato sintético do cliente só-Asaas não é contrato do SGP: a conversa
+    // não se prende a ele (o bot leria o SGP com uma chave que o SGP não conhece).
+    const bindable = subscriber.contract && !isAsaasContract(subscriber.contract);
+    if (bindable) await WaConversationService.retireStaleBindings(subscriber.contract);
     const conversation = await WaConversation.ensure({
       accountId: account.id,
       externalThreadId: `${number}@s.whatsapp.net`,
       waPhone: number,
       pushName: subscriber.clientName || null
     });
-    if (subscriber.contract && !conversation.contract) {
+    if (bindable && !conversation.contract) {
       await WaConversation.update(conversation.id, { contract: subscriber.contract });
     }
     // 'campaign' e não um valor novo: é o que diz ao teto do bot que esta
@@ -886,17 +894,44 @@ class WaDunningService {
       .select('id', 'invoice_key', 'message_id', 'status');
     if (pendentes.length === 0) return 0;
 
-    let invoices;
-    try {
-      ({ invoices } = await SgpService.listInvoices({ contract: key, onlyOpen: false }));
-    } catch (error) {
-      if (error instanceof SgpError) return 0;
-      throw error;
+    // As faturas do Asaas decidem pelo status que o painel tem delas (o webhook
+    // e a importação o mantêm): paga some da fila como "recebemos seu pagamento";
+    // cancelada ou estornada some da fila SEM agradecer — o mesmo cuidado que a
+    // lista completa do SGP tem logo abaixo.
+    const doAsaas = new Map((await AsaasCharge.getByAsaasIds(pendentes.map((row) => row.invoice_key)))
+      .map((charge) => [charge.asaas_id, charge]));
+    const alvoAsaas = [];
+    for (const row of pendentes) {
+      const charge = doAsaas.get(row.invoice_key);
+      if (!charge || (OPEN_STATUSES.includes(charge.status) && !charge.deleted)) continue;
+      if (charge.deleted || !PAID_STATUSES.includes(charge.status)) {
+        // eslint-disable-next-line no-await-in-loop -- poucas linhas por contrato
+        await this.cancelWithReason(row, 'canceled', now);
+      } else {
+        alvoAsaas.push(row);
+      }
     }
-    const pagas = new Set(invoices.filter((f) => f.paid).map(chaveDaFatura));
-    const alvo = pendentes.filter((row) => pagas.has(row.invoice_key));
-    if (alvo.length === 0) return 0;
 
+    let alvo = [...alvoAsaas];
+    // O cliente só-Asaas não tem contrato no SGP: nada a perguntar a ele.
+    const doSgp = pendentes.filter((row) => !doAsaas.has(row.invoice_key));
+    if (!isAsaasContract(key) && doSgp.length > 0) {
+      let invoices;
+      try {
+        ({ invoices } = await SgpService.listInvoices({ contract: key, onlyOpen: false }));
+      } catch (error) {
+        if (error instanceof SgpError) return alvoAsaas.length ? this.finishPayments(alvoAsaas, now) : 0;
+        throw error;
+      }
+      const pagas = new Set(invoices.filter((f) => f.paid).map(chaveDaFatura));
+      alvo = [...alvo, ...doSgp.filter((row) => pagas.has(row.invoice_key))];
+    }
+    if (alvo.length === 0) return 0;
+    return this.finishPayments(alvo, now);
+  }
+
+  /** Dá as faturas como pagas e retira da fila o que ainda não saiu. */
+  static async finishPayments(alvo, now) {
     for (const row of alvo) {
       // eslint-disable-next-line no-await-in-loop -- poucas linhas por contrato
       await this.cancelQueued(row, now);
@@ -911,6 +946,24 @@ class WaDunningService {
       ...(retirada ? { status: 'canceled', reason: 'paid', message_id: null } : {}),
       updated_at: now
     });
+  }
+
+  /**
+   * O webhook do Asaas avisou do pagamento de uma fatura: as mensagens de
+   * cobrança dela que ainda não saíram da fila são retiradas na hora, sem
+   * esperar a próxima passada. Devolve quantas linhas foram atendidas.
+   */
+  static async settleByInvoiceKey(invoiceKey, { paid = true, now = new Date() } = {}) {
+    const rows = await tdb('wa_dunning_sends')
+      .where({ invoice_key: String(invoiceKey), kind: 'step' })
+      .whereNull('paid_at')
+      .select('id', 'invoice_key', 'message_id', 'status');
+    for (const row of rows) {
+      // eslint-disable-next-line no-await-in-loop -- poucas linhas por fatura
+      if (paid) await this.cancelQueued(row, now);
+      else await this.cancelWithReason(row, 'canceled', now);
+    }
+    return rows.length;
   }
 
   /** Apaga a mensagem da fila, se ela ainda não saiu. */

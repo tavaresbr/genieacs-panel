@@ -82,7 +82,7 @@ async function semear() {
     'wa_broadcasts', 'whatsapp_accounts', 'sgp_events', 'sgp_links',
     'device_samples', 'device_sample_hours', 'device_swaps',
     'customer_wifi_credentials', 'mapping_edges', 'mapping_nodes',
-    'asaas_charges', 'asaas_customers',
+    'asaas_charges', 'asaas_customers', 'wa_dunning_sends',
     'audit_log', 'customer_accounts'
   ]) {
     await db(tabela).del();
@@ -120,6 +120,12 @@ async function semear() {
     await tinsertReturningId('asaas_charges', {
       asaas_id: `pay_${slug}`, customer_asaas_id: `cus_${slug}`, document: '52998224725',
       status: 'PENDING', value_cents: 9990, due_date: '2026-11-10'
+    });
+    // A régua cobrou o cliente do Asaas pelo contrato SINTÉTICO, num telefone que
+    // não é de ninguém aqui: só a chave `asaas:<id>` leva a pessoa a esta linha.
+    await tinsertReturningId('wa_dunning_sends', {
+      kind: 'step', step_offset: 1, contract: `asaas:cus_${slug}`, invoice_key: `pay_${slug}`,
+      due_date: '2026-10-01', amount: 99.9, client_name: `Fulana do ${slug}`, phone_e164: '5599900000000', status: 'queued'
     });
     await tinsertReturningId('sgp_events', {
       dedupe_key: `evento-${slug}`,
@@ -284,6 +290,15 @@ describe('a conta Asaas do provedor', () => {
     assert.equal((await apagar()).status, 200);
     assert.equal(await cru('asaas_customers', { tenant_id: meu }), undefined);
     assert.equal(await cru('asaas_charges', { tenant_id: meu }), undefined);
+  });
+
+  it('e o que a régua gravou pelo contrato sintético `asaas:<id>`, mesmo em telefone de ninguém', async () => {
+    assert.ok(await cru('wa_dunning_sends', { tenant_id: meu, contract: 'asaas:cus_meu' }), 'o fixture precisa ter a linha da régua');
+    assert.equal((await apagar()).status, 200);
+    const depois = await cru('wa_dunning_sends', { tenant_id: meu, contract: 'asaas:cus_meu' });
+    assert.ok(!depois || (depois.client_name === null && depois.phone_e164 !== '5599900000000'),
+      'a pessoa não pode continuar na linha da régua');
+    assert.ok(await cru('wa_dunning_sends', { tenant_id: vizinho, contract: 'asaas:cus_vizinho' }), 'a do vizinho fica');
   });
 
   it('e o cliente e a cobrança do vizinho, com o mesmo CPF, ficam', async () => {

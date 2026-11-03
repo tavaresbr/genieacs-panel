@@ -74,6 +74,35 @@ class AsaasCharge {
       .orderBy('due_date', 'asc');
   }
 
+  /** Os ids (do gateway) dos clientes que têm cobrança em aberto. */
+  static async openCustomerIds() {
+    const rows = await tdb('asaas_charges')
+      .where({ deleted: false })
+      .whereIn('status', OPEN_STATUSES)
+      .whereNotNull('customer_asaas_id')
+      .distinct('customer_asaas_id');
+    return rows.map((row) => row.customer_asaas_id);
+  }
+
+  /** As cobranças em aberto de UM cliente do gateway, da mais antiga à mais nova. */
+  static async listOpenByCustomer(customerAsaasId) {
+    return tdb('asaas_charges')
+      .where({ customer_asaas_id: String(customerAsaasId), deleted: false })
+      .whereIn('status', OPEN_STATUSES)
+      .orderBy('due_date', 'asc');
+  }
+
+  /** O que o painel tem dessas cobranças (para conferir o pagamento de uma mensagem já enfileirada). */
+  static async getByAsaasIds(ids) {
+    const wanted = [...new Set(ids.map(String))];
+    const rows = [];
+    for (let i = 0; i < wanted.length; i += 200) {
+      // eslint-disable-next-line no-await-in-loop -- poucos blocos
+      rows.push(...await tdb('asaas_charges').whereIn('asaas_id', wanted.slice(i, i + 200)));
+    }
+    return rows;
+  }
+
   static async countOpen() {
     const [row] = await tdb('asaas_charges')
       .where({ deleted: false })
