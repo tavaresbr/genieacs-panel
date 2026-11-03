@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ADMIN_STATE, DELTA_OWNER, RENEWING_PROVIDER, consoleTabs, loginViaForm, shot } from './support/demo'
+import { ADMIN, DELTA_OWNER, RENEWING_PROVIDER, consoleTabs, loginViaForm, sessionFor, shot } from './support/demo'
 
 /**
  * Os primeiros passos do provedor, dos dois lados.
@@ -31,7 +31,7 @@ test('o Início de um provedor novo mostra o checklist com o percentual e o pró
 })
 
 test.describe('no console', () => {
-  test.use({ storageState: ADMIN_STATE })
+  test.use({ storageState: sessionFor(ADMIN) })
 
   test('a lista de Provedores mostra o onboarding de cada um e filtra os travados', async ({ page }) => {
     await page.goto('/platform')

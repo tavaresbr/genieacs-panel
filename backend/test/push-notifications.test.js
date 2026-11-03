@@ -31,7 +31,8 @@ process.env.FRONTEND_DIR = buildDir;
 const {
   authHeaders, call, getDb, insertReturningId, runInTenant, startTestServers, stopTestServers
 } = await import('./helpers/harness.js');
-const { generateTokens } = await import('../src/middleware/auth.js');
+const { generateTokens, PANEL_AUDIENCE } = await import('../src/middleware/auth.js');
+const { default: RefreshToken } = await import('../src/models/RefreshToken.js');
 const {
   default: PushService, buildPayload, endpointHash, isAllowedEndpoint, preferencesOf, VAPID_KEY
 } = await import('../src/services/pushService.js');
@@ -57,8 +58,11 @@ async function pessoa(nome, tenantId, role) {
   });
   await getDb()('tenant_users').insert({ tenant_id: tenantId, user_id: id, role });
   const user = await getDb()('users').where({ id }).first();
-  const { accessToken } = generateTokens(user, { tenant_id: tenantId, role });
-  pessoas[nome] = { id, tenantId, role, token: accessToken };
+  // Uma sessão de verdade (0129): o token de acesso carrega o `sid` da
+  // família, e a família tem que estar viva a cada requisição.
+  const { familyId } = await RefreshToken.startFamily({ user, audience: PANEL_AUDIENCE, tenantId });
+  const { accessToken } = generateTokens(user, { tenant_id: tenantId, role }, { sessionId: familyId });
+  pessoas[nome] = { id, tenantId, role, token: accessToken, sid: familyId };
   return pessoas[nome];
 }
 

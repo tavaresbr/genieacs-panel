@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { PROVIDER_STATE, shot } from './support/demo'
+import { PROVIDER, sessionFor, shot } from './support/demo'
 
 /**
  * O app do provedor (PWA, 0130), no build de produção que o setup serve: o
@@ -32,7 +32,7 @@ test('o painel liga o manifest, e o backend o serve sem cache', async ({ page, r
 })
 
 test.describe('dentro do painel', () => {
-  test.use({ storageState: PROVIDER_STATE })
+  test.use({ storageState: sessionFor(PROVIDER) })
 
   test('o service worker registra no build de produção, e a API não passa por ele', async ({ page }) => {
     await page.goto('/dashboard')
