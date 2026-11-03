@@ -1491,5 +1491,7 @@ export default {
   'auth.csrfHeaderRequired': 'Anfrage abgelehnt: Der Sicherheits-Header des Panels fehlt',
   'auth.sessionNotFound': 'Sitzung nicht gefunden',
   'auth.sessionRevoked': 'Sitzung beendet',
-  'auth.sessionsRevokedAll': 'Alle Sitzungen wurden beendet'
+  'auth.sessionsRevokedAll': 'Alle Sitzungen wurden beendet',
+  'platformAlert.backup_failed.subject': 'Externes Backup fehlgeschlagen',
+  'platformAlert.backup_failed.body': 'Das externe Backup ist fehlgeschlagen (Schritt: {stage}, ausgeführt von: {source}): {error}. Prüfen Sie Integrationen → Externes Backup in der Konsole.'
 };

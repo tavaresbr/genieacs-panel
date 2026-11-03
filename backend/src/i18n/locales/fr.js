@@ -1486,5 +1486,7 @@ export default {
   'auth.csrfHeaderRequired': 'Requête refusée : l’en-tête de sécurité du panneau est absent',
   'auth.sessionNotFound': 'Session introuvable',
   'auth.sessionRevoked': 'Session fermée',
-  'auth.sessionsRevokedAll': 'Toutes les sessions ont été fermées'
+  'auth.sessionsRevokedAll': 'Toutes les sessions ont été fermées',
+  'platformAlert.backup_failed.subject': 'Échec de la sauvegarde externe',
+  'platformAlert.backup_failed.body': 'La sauvegarde externe a échoué (étape : {stage}, exécutée par : {source}) : {error}. Vérifiez Intégrations → Sauvegarde externe dans la console.'
 };

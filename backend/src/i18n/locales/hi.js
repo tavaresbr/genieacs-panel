@@ -1490,5 +1490,7 @@ export default {
   'auth.csrfHeaderRequired': 'अनुरोध अस्वीकृत: पैनल का सुरक्षा हेडर मौजूद नहीं है',
   'auth.sessionNotFound': 'सत्र नहीं मिला',
   'auth.sessionRevoked': 'सत्र समाप्त किया गया',
-  'auth.sessionsRevokedAll': 'सभी सत्र समाप्त कर दिए गए'
+  'auth.sessionsRevokedAll': 'सभी सत्र समाप्त कर दिए गए',
+  'platformAlert.backup_failed.subject': 'बाहरी बैकअप विफल',
+  'platformAlert.backup_failed.body': 'बाहरी बैकअप विफल हुआ (चरण: {stage}, चलाने वाला: {source}): {error}. कंसोल में इंटीग्रेशन → बाहरी बैकअप देखें।'
 };

@@ -1489,5 +1489,7 @@ export default {
   'auth.csrfHeaderRequired': 'Requisição recusada: falta o cabeçalho de segurança do painel',
   'auth.sessionNotFound': 'Sessão não encontrada',
   'auth.sessionRevoked': 'Sessão encerrada',
-  'auth.sessionsRevokedAll': 'Todas as sessões foram encerradas'
+  'auth.sessionsRevokedAll': 'Todas as sessões foram encerradas',
+  'platformAlert.backup_failed.subject': 'Backup externo falhou',
+  'platformAlert.backup_failed.body': 'O backup externo falhou (etapa: {stage}, executado por: {source}): {error}. Confira Integrações → Backup externo no console.'
 };

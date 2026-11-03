@@ -43,6 +43,10 @@ services:
       TRUST_PROXY: "1"
       DATABASE_URL: postgres://${POSTGRES_USER:-skygp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-skygp}
       LOG_FORMAT: json
+      # O backup externo monta o dump e o arquivo cifrado aqui antes do envio
+      # — no volume, e não na camada do contêiner, que não foi feita para
+      # guardar um dump inteiro.
+      SKYGP_BACKUP_TMP: /var/lib/skygenpanel/backup-tmp
     ports:
       - "127.0.0.1:5890:5890"
       - "127.0.0.1:5891:5891"

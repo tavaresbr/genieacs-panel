@@ -1487,5 +1487,7 @@ export default {
   'auth.csrfHeaderRequired': 'Solicitud rechazada: falta el encabezado de seguridad del panel',
   'auth.sessionNotFound': 'Sesión no encontrada',
   'auth.sessionRevoked': 'Sesión cerrada',
-  'auth.sessionsRevokedAll': 'Se cerraron todas las sesiones'
+  'auth.sessionsRevokedAll': 'Se cerraron todas las sesiones',
+  'platformAlert.backup_failed.subject': 'Falló la copia de seguridad externa',
+  'platformAlert.backup_failed.body': 'La copia de seguridad externa falló (etapa: {stage}, ejecutada por: {source}): {error}. Revise Integraciones → Copia externa en la consola.'
 };

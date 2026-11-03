@@ -207,6 +207,15 @@ const BLOBS = Object.freeze([
     chave: 'push_vapid_keys',
     caminho: ['privateKey'],
     contexto: 'skygenpanel-push-vapid-v1'
+  },
+  {
+    // A conexão do backup externo (endpoint, bucket, prefixo, access key e
+    // secret do S3), num envelope só, na caixa da plataforma — ver
+    // `backup/externalBackupSettings.js`. A chave pública do backup mora no
+    // mesmo blob em claro e não entra aqui: não é segredo.
+    chave: 'external_backup_config',
+    caminho: ['connection'],
+    contexto: 'skygenpanel-external-backup-v1'
   }
 ]);
 

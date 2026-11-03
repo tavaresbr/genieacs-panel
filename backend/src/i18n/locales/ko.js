@@ -1493,5 +1493,7 @@ export default {
   'auth.csrfHeaderRequired': '요청이 거부되었습니다: 패널 보안 헤더가 없습니다',
   'auth.sessionNotFound': '세션을 찾을 수 없습니다',
   'auth.sessionRevoked': '세션이 종료되었습니다',
-  'auth.sessionsRevokedAll': '모든 세션이 종료되었습니다'
+  'auth.sessionsRevokedAll': '모든 세션이 종료되었습니다',
+  'platformAlert.backup_failed.subject': '외부 백업 실패',
+  'platformAlert.backup_failed.body': '외부 백업이 실패했습니다(단계: {stage}, 실행 주체: {source}): {error}. 콘솔의 통합 → 외부 백업을 확인하세요.'
 };

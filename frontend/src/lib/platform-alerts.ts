@@ -26,7 +26,8 @@ export const ALERT_EVENT_LABELS: Record<PlatformAlertEvent, TranslationKey> = {
   auto_suspended: 'platform.alerts.event.auto_suspended',
   big_overdue: 'platform.alerts.event.big_overdue',
   backup_stale: 'platform.alerts.event.backup_stale',
-  cert_expiring: 'platform.alerts.event.cert_expiring'
+  cert_expiring: 'platform.alerts.event.cert_expiring',
+  backup_failed: 'platform.alerts.event.backup_failed'
 }
 
 /** Liga ou desliga um canal, na ordem fixa (WhatsApp, e-mail). */

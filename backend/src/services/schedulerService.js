@@ -34,6 +34,7 @@ import PlanPriceChangeService from './planPriceChangeService.js';
 import StatusService from './statusService.js';
 import AffiliatePayoutService from './affiliatePayoutService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
+import ExternalBackupService from './backup/externalBackupService.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
@@ -242,6 +243,13 @@ class SchedulerService {
       // no máximo uma passada por hora. Nunca lança.
       .then(() => AffiliatePayoutService.schedulerPass().catch((error) => {
         console.warn(`Could not run the affiliate payouts: ${error.message}`);
+      }))
+      // O backup externo cifrado (Integrações → Backup externo): à hora
+      // escolhida, sob a vez `external-backup`, e a verificação semanal. Só
+      // COMEÇA a passada — o dump roda em segundo plano, sem segurar o tick.
+      // Nunca lança.
+      .then(() => ExternalBackupService.schedulerPass().catch((error) => {
+        console.warn(`Could not run the external backup: ${error.message}`);
       }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))

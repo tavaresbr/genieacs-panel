@@ -1490,5 +1490,7 @@ export default {
   'auth.csrfHeaderRequired': '请求被拒绝：缺少面板安全标头',
   'auth.sessionNotFound': '未找到会话',
   'auth.sessionRevoked': '会话已结束',
-  'auth.sessionsRevokedAll': '所有会话均已结束'
+  'auth.sessionsRevokedAll': '所有会话均已结束',
+  'platformAlert.backup_failed.subject': '外部备份失败',
+  'platformAlert.backup_failed.body': '外部备份失败（步骤：{stage}，执行方：{source}）：{error}。请检查控制台中的“集成 → 外部备份”。'
 };

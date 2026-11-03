@@ -1491,5 +1491,7 @@ export default {
   'auth.csrfHeaderRequired': 'Запрос отклонён: отсутствует заголовок безопасности панели',
   'auth.sessionNotFound': 'Сеанс не найден',
   'auth.sessionRevoked': 'Сеанс завершён',
-  'auth.sessionsRevokedAll': 'Все сеансы завершены'
+  'auth.sessionsRevokedAll': 'Все сеансы завершены',
+  'platformAlert.backup_failed.subject': 'Внешнее резервное копирование не удалось',
+  'platformAlert.backup_failed.body': 'Внешнее резервное копирование не удалось (этап: {stage}, выполнял: {source}): {error}. Проверьте «Интеграции → Внешнее резервное копирование» в консоли.'
 };

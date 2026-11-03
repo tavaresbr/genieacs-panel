@@ -1490,5 +1490,7 @@ export default {
   'auth.csrfHeaderRequired': 'Request refused: the panel security header is missing',
   'auth.sessionNotFound': 'Session not found',
   'auth.sessionRevoked': 'Session ended',
-  'auth.sessionsRevokedAll': 'All sessions have been ended'
+  'auth.sessionsRevokedAll': 'All sessions have been ended',
+  'platformAlert.backup_failed.subject': 'External backup failed',
+  'platformAlert.backup_failed.body': 'The external backup failed (step: {stage}, run by: {source}): {error}. Check Integrations → External backup in the console.'
 };

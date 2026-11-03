@@ -1482,5 +1482,7 @@ export default {
   'auth.csrfHeaderRequired': 'تم رفض الطلب: ترويسة أمان اللوحة مفقودة',
   'auth.sessionNotFound': 'الجلسة غير موجودة',
   'auth.sessionRevoked': 'تم إنهاء الجلسة',
-  'auth.sessionsRevokedAll': 'تم إنهاء جميع الجلسات'
+  'auth.sessionsRevokedAll': 'تم إنهاء جميع الجلسات',
+  'platformAlert.backup_failed.subject': 'فشل النسخ الاحتياطي الخارجي',
+  'platformAlert.backup_failed.body': 'فشل النسخ الاحتياطي الخارجي (المرحلة: {stage}، المنفِّذ: {source}): {error}. راجع التكاملات ← النسخ الاحتياطي الخارجي في وحدة التحكم.'
 };

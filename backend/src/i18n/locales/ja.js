@@ -1490,5 +1490,7 @@ export default {
   'auth.csrfHeaderRequired': 'リクエストを拒否しました: パネルのセキュリティヘッダーがありません',
   'auth.sessionNotFound': 'セッションが見つかりません',
   'auth.sessionRevoked': 'セッションを終了しました',
-  'auth.sessionsRevokedAll': 'すべてのセッションを終了しました'
+  'auth.sessionsRevokedAll': 'すべてのセッションを終了しました',
+  'platformAlert.backup_failed.subject': '外部バックアップに失敗しました',
+  'platformAlert.backup_failed.body': '外部バックアップに失敗しました（段階: {stage}、実行元: {source}）: {error}。コンソールの「連携 → 外部バックアップ」を確認してください。'
 };

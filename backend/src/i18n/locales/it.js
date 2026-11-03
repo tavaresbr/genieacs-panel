@@ -1488,5 +1488,7 @@ export default {
   'auth.csrfHeaderRequired': 'Richiesta rifiutata: manca l’intestazione di sicurezza del pannello',
   'auth.sessionNotFound': 'Sessione non trovata',
   'auth.sessionRevoked': 'Sessione terminata',
-  'auth.sessionsRevokedAll': 'Tutte le sessioni sono state terminate'
+  'auth.sessionsRevokedAll': 'Tutte le sessioni sono state terminate',
+  'platformAlert.backup_failed.subject': 'Backup esterno non riuscito',
+  'platformAlert.backup_failed.body': 'Il backup esterno non è riuscito (fase: {stage}, eseguito da: {source}): {error}. Controlla Integrazioni → Backup esterno nella console.'
 };
