@@ -2,7 +2,7 @@ import express from 'express';
 import ContactController from '../controllers/contactController.js';
 import { IMPORT_MAX_BYTES } from '../services/contactSheetService.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { sgpAdminLimiter, whatsappSendLimiter, whatsappTestLimiter } from '../middleware/rateLimit.js';
+import { asaasAdminLimiter, sgpAdminLimiter, whatsappSendLimiter, whatsappTestLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -137,6 +137,17 @@ router.get(
   requirePermission('contacts.read'),
   sgpAdminLimiter,
   ContactController.invoices
+);
+// A única escrita na conta Asaas do provedor: criar o cliente do contato lá.
+// `asaas.act` é de quem responde pelo provedor, e a opção precisa estar ligada
+// na aba Asaas; o limitador é o das outras idas ao gateway.
+router.post(
+  '/:key/asaas',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('asaas.act'),
+  asaasAdminLimiter,
+  ContactController.createInAsaas
 );
 // Lê o banco (a última importação do Asaas), não o gateway: sem limitador de SGP.
 router.get(

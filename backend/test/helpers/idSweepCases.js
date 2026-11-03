@@ -772,6 +772,17 @@ export const casos = [
     tabela: 'sgp_links',
     coluna: 'contract'
   },
+  // Criar o cliente no Asaas: o contato é procurado antes de olhar a integração,
+  // então a chave do vizinho dá 404; no controle a rota passa da ficha e para
+  // na integração que não está ligada (409).
+  {
+    chave: 'sgpContract',
+    label: 'POST /api/contacts/:key/asaas',
+    method: 'POST',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/asaas`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
   // "Receber": a ficha é procurada antes de tudo, então a chave do vizinho dá
   // 404; no controle a rota passa da ficha e para na baixa não configurada.
   {

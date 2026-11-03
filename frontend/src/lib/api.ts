@@ -4109,6 +4109,10 @@ export interface ContactDocumentLookup {
   sgpChecked: boolean
   inSgp: { key: string; name: string | null; contract: string | null; state: string }[]
   inPanel: { key: string; name: string | null } | null
+  /** O mesmo CPF/CNPJ na conta Asaas do provedor, como a última importação deixou. */
+  inAsaas: { asaasId: string; name: string | null }[]
+  /** O painel pode criar o cliente no Asaas (integração ligada e a escrita permitida). */
+  asaasWritable: boolean
   /** The TeiaH's record (or, for a company, the Receita's), for a document nobody has yet. */
   prefill: {
     source: 'teiah' | 'receita'
@@ -4240,6 +4244,12 @@ export const contactsAPI = {
       `/contacts/lookup/cep?cep=${encodeURIComponent(cep.replace(/\D/g, ''))}`
     ),
 
+  /** O cliente do contato criado (ou ligado, se já existia) na conta Asaas do provedor. */
+  createInAsaas: (key: string) =>
+    apiClient.post<{ created: boolean; customer: { asaasId: string; name: string | null } }>(
+      `/contacts/${encodeURIComponent(key)}/asaas`, {}
+    ),
+
   /** Creates the client in the SGP, then files it here under the SGP's id. */
   createInSgp: (data: ContactCreateInSgp) =>
     apiClient.post<ContactProfile>('/contacts/sgp', data),
@@ -4304,7 +4314,16 @@ export const contactsAPI = {
 
   /** As faturas em aberto do cliente na conta Asaas do provedor, como a última importação as deixou. */
   asaasInvoices: (key: string) =>
-    apiClient.get<{ enabled: boolean; invoices: SgpInvoice[] }>(`/contacts/${encodeURIComponent(key)}/asaas-invoices`),
+    apiClient.get<{
+      enabled: boolean
+      invoices: SgpInvoice[]
+      /** A integração com o Asaas está ligada e com chave. */
+      connected: boolean
+      /** O cliente do Asaas com o CPF/CNPJ deste contato, quando a importação o trouxe. */
+      customer: { asaasId: string; name: string | null } | null
+      /** "Criar no Asaas" pode aparecer: escrita permitida, documento válido e cliente ainda não existe lá. */
+      canCreate: boolean
+    }>(`/contacts/${encodeURIComponent(key)}/asaas-invoices`),
 
   /** The suggested WhatsApp text for one open invoice; nothing is sent. */
   invoiceMessage: (key: string, invoiceId: string) =>
@@ -4484,6 +4503,12 @@ export interface AsaasProviderConfig {
   importCustomers: boolean
   importCharges: boolean
   botLookup: boolean
+  allowWriteCustomers: boolean
+  billingEnabled: boolean
+  webhookEnabled: boolean
+  webhookTokenConfigured: boolean
+  /** O caminho (sem o domínio) que o Asaas deve chamar. */
+  webhookPath: string
   syncEnabled: boolean
   syncIntervalHours: number
   accountName: string | null
@@ -4526,10 +4551,17 @@ export const asaasProviderAPI = {
     importCustomers?: boolean
     importCharges?: boolean
     botLookup?: boolean
+    allowWriteCustomers?: boolean
+    billingEnabled?: boolean
+    webhookEnabled?: boolean
     syncEnabled?: boolean
     syncIntervalHours?: number
   }) =>
     apiClient.put<AsaasProviderConfig>('/asaas/config', config),
+
+  /** Gera um token novo para o webhook; o valor volta uma única vez. */
+  rotateWebhookToken: () =>
+    apiClient.post<AsaasProviderConfig & { webhookToken: string }>('/asaas/webhook/token', {}),
 
   getImport: () =>
     apiClient.get<AsaasImportStatus>('/asaas/import'),
@@ -5974,7 +6006,7 @@ export interface WaSubscriberAttendance {
   /** The client with no contract this thread is bound to, by its `c:<id>` key. */
   registration?: string | null
   /** `document`: linked only by the tax ID the customer typed, not verified. */
-  boundVia?: 'document' | null
+  boundVia?: 'document' | 'operator' | null
 }
 
 /** An SGP client with no contract, found by CPF/CNPJ, that a thread can be bound to. */

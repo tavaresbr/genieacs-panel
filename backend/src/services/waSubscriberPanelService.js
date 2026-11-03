@@ -404,8 +404,9 @@ class WaSubscriberPanelService {
     await WaConversation.update(conversation.id, {
       contract: clean,
       device_id: first?.device_id ?? null,
-      // O atendente confirmou: deixa de ser um vínculo só por CPF.
-      bound_via: null,
+      // O atendente vinculou e confirmou: deixa de ser só por CPF, e a regra do
+      // "cliente trocou de número" (`retireStaleBindings`) não o desfaz.
+      bound_via: 'operator',
       unlinked_at: null
     });
     return this.build(conversation.id, { contract: clean });

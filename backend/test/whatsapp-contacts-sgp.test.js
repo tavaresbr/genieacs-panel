@@ -30,6 +30,7 @@ const CADASTRO = [
   { contrato: 'S-300', razaoSocial: 'Maria Duas Casas', cpfcnpj: '55566677788', contratoStatus: 'Ativo', celular: '5593981113333' },
   { contrato: 'S-301', razaoSocial: 'Maria Duas Casas', cpfcnpj: '55566677788', contratoStatus: 'Suspenso', celular: '5593981113333' },
   // Este já tem ONT no painel.
+  { contrato: '449', razaoSocial: 'Emerson Teste', cpfcnpj: '02404107267', contratoStatus: 'Suspenso' },
   { contrato: 'C-ONT', razaoSocial: 'Com ONT', cpfcnpj: '44455566677', contratoStatus: 'Ativo', celular: '5511944445555' }
 ];
 
@@ -214,6 +215,30 @@ describe('buscar no SGP um cliente sem contrato', () => {
     await buscar('44444444444');
     const linhas = await asTenant(() => getDb()('sgp_contacts').where({ document: '44444444444' }));
     assert.equal(linhas.length, 1);
+  });
+});
+
+describe('vincular à mão um número que a régua já cobrou como do contrato', () => {
+  it('o vínculo do atendente fica; não é desfeito como conversa de número antigo', async () => {
+    const { default: SgpContact } = await import('../src/models/SgpContact.js');
+    const { tinsert } = await import('../src/config/database.js');
+    await hook(eventoV2({ id: 'MSG-VINC-449', remoteJid: '5593992070418@s.whatsapp.net' }));
+    const fio = await asTenant(() => WaConversation.getByThread(accountId, '5593992070418@s.whatsapp.net'));
+    // O cadastro tem outro número, e a régua já cobrou neste.
+    await asTenant(() => SgpContact.upsertFromSgp({ contract: '449', document: '02404107267', client_name: 'Emerson Teste', phone_e164: '5593981110000' }));
+    await asTenant(() => tinsert('wa_dunning_sends', {
+      kind: 'step', step_offset: 0, contract: '449', invoice_key: 'k-449', status: 'queued', phone_e164: '5593992070418'
+    }));
+
+    const feito = await call(`${panelUrl}/api/whatsapp/conversations/${fio.id}/subscriber/bind`, {
+      method: 'POST', headers: authHeaders(token), body: { contract: '449', document: '02404107267' }
+    });
+    assert.equal(feito.status, 200, JSON.stringify(feito.body));
+    assert.equal(feito.body.data.attendance.contract, '449', 'o vínculo foi desfeito na hora');
+    assert.equal(feito.body.data.contracts.selected, '449');
+    const depois = await asTenant(() => getDb()('wa_conversations').where({ id: fio.id }).first());
+    assert.equal(depois.contract, '449');
+    assert.equal(depois.bound_via, 'operator');
   });
 });
 

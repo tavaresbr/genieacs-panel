@@ -197,6 +197,13 @@ const BLOBS = Object.freeze([
     contexto: 'skygenpanel-asaas-provider-key-v1'
   },
   {
+    // O token do webhook da conta Asaas do provedor, no mesmo blob da chave de
+    // API mas em OUTRO contexto: re-cifrar com a caixa errada destruiria um dos dois.
+    chave: 'asaas_provider_config',
+    caminho: ['webhookToken'],
+    contexto: 'skygenpanel-asaas-provider-webhook-v1'
+  },
+  {
     // A chave da API de IA do atendimento (Claude, OpenAI-compatível…).
     chave: 'wa_bot_config',
     caminho: ['ai', 'apiKey'],

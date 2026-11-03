@@ -29,12 +29,17 @@ export function AsaasPanel() {
     importCustomers: true,
     importCharges: true,
     botLookup: false,
+    allowWriteCustomers: false,
+    billingEnabled: false,
     syncEnabled: false,
     syncIntervalHours: 24
   })
   const [importSaving, setImportSaving] = useState(false)
   const [importStatus, setImportStatus] = useState<AsaasImportStatus | null>(null)
   const [starting, setStarting] = useState(false)
+  // O token novo só existe aqui, na memória, até a tela ser fechada.
+  const [newToken, setNewToken] = useState<string | null>(null)
+  const [rotating, setRotating] = useState(false)
 
   const applyConfig = useCallback((next: AsaasProviderConfig) => {
     setConfig(next)
@@ -43,6 +48,8 @@ export function AsaasPanel() {
       importCustomers: next.importCustomers,
       importCharges: next.importCharges,
       botLookup: next.botLookup,
+      allowWriteCustomers: next.allowWriteCustomers,
+      billingEnabled: next.billingEnabled,
       syncEnabled: next.syncEnabled,
       syncIntervalHours: next.syncIntervalHours
     })
@@ -153,6 +160,37 @@ export function AsaasPanel() {
     } finally {
       setStarting(false)
     }
+  }
+
+  const rotateToken = async () => {
+    if (config?.webhookTokenConfigured && !window.confirm(t('settings.asaas.webhook.generateConfirm'))) return
+    setRotating(true)
+    try {
+      const res = await asaasProviderAPI.rotateWebhookToken()
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('settings.asaas.saveFailed'))
+        return
+      }
+      const { webhookToken, ...next } = res.data
+      setNewToken(webhookToken)
+      setConfig(next)
+      toast.success(res.message || t('settings.asaas.webhook.generate'))
+    } finally {
+      setRotating(false)
+    }
+  }
+
+  const toggleWebhook = async (enabled: boolean) => {
+    const res = await asaasProviderAPI.updateConfig({ webhookEnabled: enabled })
+    if (!res.success || !res.data) {
+      toast.error(res.message || t('settings.asaas.saveFailed'))
+      return
+    }
+    setConfig(res.data)
+  }
+
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text).then(() => toast.success(t('settings.asaas.webhook.copied')))
   }
 
   if (!canConfigure) return null
@@ -286,6 +324,30 @@ export function AsaasPanel() {
               <span className="text-muted-foreground">{t('settings.asaas.import.botLookupHint')}</span>
             </span>
           </label>
+          <label className="flex items-start gap-3 sm:col-span-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={importForm.allowWriteCustomers}
+              onChange={(event) => setImportForm((current) => ({ ...current, allowWriteCustomers: event.target.checked }))}
+            />
+            <span className="text-sm">
+              <span className="block font-semibold">{t('settings.asaas.import.allowWrite')}</span>
+              <span className="text-muted-foreground">{t('settings.asaas.import.allowWriteHint')}</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 sm:col-span-2">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={importForm.billingEnabled}
+              onChange={(event) => setImportForm((current) => ({ ...current, billingEnabled: event.target.checked }))}
+            />
+            <span className="text-sm">
+              <span className="block font-semibold">{t('settings.asaas.import.billing')}</span>
+              <span className="text-muted-foreground">{t('settings.asaas.import.billingHint')}</span>
+            </span>
+          </label>
           <label className="flex items-start gap-3">
             <input
               type="checkbox"
@@ -360,6 +422,62 @@ export function AsaasPanel() {
             ))}
           </dl>
         )}
+      </div>
+    )}
+
+    {config?.ready && (
+      <div className="modern-card max-w-3xl p-5 sm:p-6" data-testid="asaas-webhook-panel">
+        <h2 className="section-heading">{t('settings.asaas.webhook.title')}</h2>
+        <p className="section-description mb-4">{t('settings.asaas.webhook.description')}</p>
+        <p className="mb-4 text-xs text-muted-foreground">{t('settings.asaas.webhook.steps')}</p>
+
+        <label className="field-label" htmlFor="asaas-webhook-url">{t('settings.asaas.webhook.url')}</label>
+        <div className="flex gap-2">
+          <input
+            id="asaas-webhook-url"
+            readOnly
+            className="modern-input font-mono"
+            value={`${window.location.origin}${config.webhookPath}`}
+          />
+          <button type="button" className="modern-button-secondary" onClick={() => copy(`${window.location.origin}${config.webhookPath}`)}>
+            {t('settings.asaas.webhook.copy')}
+          </button>
+        </div>
+
+        <p className="field-label mt-4">{t('settings.asaas.webhook.token')}</p>
+        {newToken ? (
+          <div className="rounded-md border border-border bg-muted/30 p-3">
+            <p className="mb-2 text-xs text-muted-foreground">{t('settings.asaas.webhook.shownOnce')}</p>
+            <div className="flex gap-2">
+              <input readOnly className="modern-input font-mono" value={newToken} onFocus={(event) => event.target.select()} />
+              <button type="button" className="modern-button-secondary" onClick={() => copy(newToken)}>
+                {t('settings.asaas.webhook.copy')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t(config.webhookTokenConfigured ? 'settings.asaas.webhook.tokenSaved' : 'settings.asaas.webhook.tokenNone')}
+          </p>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <button type="button" className="modern-button-secondary" disabled={rotating} onClick={() => void rotateToken()}>
+            {t(config.webhookTokenConfigured ? 'settings.asaas.webhook.regenerate' : 'settings.asaas.webhook.generate')}
+          </button>
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              checked={config.webhookEnabled}
+              disabled={!config.webhookTokenConfigured}
+              onChange={(event) => void toggleWebhook(event.target.checked)}
+            />
+            {t('settings.asaas.webhook.enable')}
+          </label>
+          {!config.webhookTokenConfigured && (
+            <span className="text-xs text-muted-foreground">{t('settings.asaas.webhook.needToken')}</span>
+          )}
+        </div>
       </div>
     )}
     </div>

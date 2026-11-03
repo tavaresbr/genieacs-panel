@@ -150,7 +150,23 @@ export async function alcanceDoAssinante(account) {
       if (documentosCliente.length) q.orWhereIn('document', documentosCliente);
     }).orderBy('id')
     : [];
-  const telefones = [...vinculos, ...contatos].flatMap((v) => [v.phone_e164, v.phone_manual]).filter(Boolean);
+  // O mesmo CPF/CNPJ na conta Asaas do provedor: o cliente e as cobranças dele.
+  // Casam pelo documento — o Asaas não tem contrato —, e a cobrança leva o
+  // documento copiado para a linha justamente para este alcance.
+  const documentosDaPessoa = [...new Set([...documentosCliente, ...clientes.map((c) => c.document)].filter(Boolean))];
+  const asaasClientes = documentosDaPessoa.length
+    ? await tdb('asaas_customers').whereIn('document', documentosDaPessoa).orderBy('id')
+    : [];
+  const asaasCobrancas = documentosDaPessoa.length
+    ? await tdb('asaas_charges').whereIn('document', documentosDaPessoa).orderBy('id')
+    : [];
+
+  // O cliente só-Asaas é assinante da régua pelo CONTRATO SINTÉTICO `asaas:<id>`
+  // e pelo telefone do cadastro dele: é por estes dois que o dossiê e a exclusão
+  // alcançam o que a régua e as campanhas gravaram.
+  const contratosAsaas = asaasClientes.map((c) => `asaas:${c.asaas_id}`);
+  const telefones = [...vinculos, ...contatos].flatMap((v) => [v.phone_e164, v.phone_manual])
+    .concat(asaasClientes.map((c) => c.phone_e164)).filter(Boolean);
 
   const contatoIds = contatos.map((c) => c.id);
   const conjuntoContratos = new Set(contratos);
@@ -226,23 +242,12 @@ export async function alcanceDoAssinante(account) {
       .orderBy('id')
     : [];
 
-  // O mesmo CPF/CNPJ na conta Asaas do provedor: o cliente e as cobranças dele.
-  // Casam pelo documento — o Asaas não tem contrato —, e a cobrança leva o
-  // documento copiado para a linha justamente para este alcance.
-  const documentosDaPessoa = [...new Set([...documentosCliente, ...clientes.map((c) => c.document)].filter(Boolean))];
-  const asaasClientes = documentosDaPessoa.length
-    ? await tdb('asaas_customers').whereIn('document', documentosDaPessoa).orderBy('id')
-    : [];
-  const asaasCobrancas = documentosDaPessoa.length
-    ? await tdb('asaas_charges').whereIn('document', documentosDaPessoa).orderBy('id')
-    : [];
-
   return {
     deviceIds,
     posses,
     naPosse,
     emPosseAgora: [...emPosseAgora],
-    contratos,
+    contratos: [...contratos, ...contratosAsaas],
     telefones: [...new Set(telefones)],
     vinculos,
     contatos,

@@ -66,6 +66,8 @@ import whatsappBillingRoutes from './routes/whatsappBilling.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import billingWebhookRoutes from './routes/billingWebhook.js';
 import { BILLING_WEBHOOK_PATH } from './config/billingWebhookPath.js';
+import asaasWebhookRoutes from './routes/asaasWebhook.js';
+import { ASAAS_WEBHOOK_PATH } from './config/asaasWebhookPath.js';
 import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
@@ -298,6 +300,11 @@ app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);
 // o caminho alcançasse falharia com a sentinela — que é a guarda que se quer.
 // O provedor sai do CORPO, e o `runInTenant` do controlador é o que credita.
 app.use(BILLING_WEBHOOK_PATH, billingWebhookRoutes);
+
+// A entrega do webhook da conta Asaas de cada PROVEDOR: mesma razão e mesmo
+// lugar. O provedor sai do TOKEN do cabeçalho, e o controlador abre o escopo
+// dele — nada escopado é lido antes disso.
+app.use(ASAAS_WEBHOOK_PATH, asaasWebhookRoutes);
 
 // Same reasoning, same place in the stack: the Evolution server fetches a
 // media file to send it, carrying a signed, short-lived token in its own query

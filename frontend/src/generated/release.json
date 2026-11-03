@@ -1,105 +1,33 @@
 {
-  "version": "1.24.0",
-  "build": 1500,
-  "sourceCommit": "70a272adb8bb",
+  "version": "1.25.0",
+  "build": 1508,
+  "sourceCommit": "d188d364de6c",
   "releasedAt": "2026-11-03",
-  "basedOnTag": "v1.23.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5777ee1b2692...70a272adb8bb",
+  "basedOnTag": "v1.24.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/8cc534ff8ba2...d188d364de6c",
   "changes": [
     {
-      "shortHash": "7690e680",
+      "shortHash": "2cdfd0af",
       "date": "2026-11-02",
-      "title": "Segurança: recusa CORS_ORIGINS=* em produção, CSP opt-in de upgrade e JWT com algoritmo fixo",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "0214f9c3",
-      "date": "2026-11-02",
-      "title": "Segurança: política de senha nova (10+, sem comuns, diferente do login) e limitador da troca de senha",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b6b78a58",
-      "date": "2026-11-02",
-      "title": "Segurança: webhook do SGP exige carimbo de tempo por padrão nas integrações novas",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "0ef1a613",
-      "date": "2026-11-02",
-      "title": "Segurança: redação de credenciais no logger e no console embrulhado",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "01cd5b3b",
-      "date": "2026-11-02",
-      "title": "Varredura de segredos (gitleaks) e CodeQL, não bloqueantes",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "8b7008be",
-      "date": "2026-11-02",
-      "title": "Relatório da auditoria de segurança (rodada D)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "6596180b",
-      "date": "2026-11-02",
-      "title": "Página de status da plataforma (0126)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ef75d6e8",
-      "date": "2026-11-02",
-      "title": "Programa de afiliados com comissão recorrente e lote mensal por Pix (0124)",
+      "title": "Cadastro de cliente também no Asaas (fase 4)",
       "category": "New"
     },
     {
-      "shortHash": "4ecb2ee0",
-      "date": "2026-11-02",
-      "title": "Add-ons pagos (0125) — catálogo, direito, cobrança e telas",
+      "shortHash": "c896ce96",
+      "date": "2026-11-03",
+      "title": "Webhook de pagamento da conta do provedor (fase 5a)",
       "category": "New"
     },
     {
-      "shortHash": "09b47eb7",
-      "date": "2026-11-02",
-      "title": "Correções da revisão — porta, cobrança e Pix",
-      "category": "Fixed"
+      "shortHash": "0735a1c6",
+      "date": "2026-11-03",
+      "title": "Régua e campanhas cobram também o Asaas (fase 5b)",
+      "category": "New"
     },
     {
-      "shortHash": "3f62be28",
-      "date": "2026-11-02",
-      "title": "Afiliados, add-ons e página de status no navegador",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f5a69e87",
-      "date": "2026-11-02",
-      "title": "Gitleaks ignora a senha de teste do password-policy.test.js",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "7bee45b0",
-      "date": "2026-11-02",
-      "title": "Segurança: corrige os 13 alertas do CodeQL no PR de afiliados",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "2b9654ee",
-      "date": "2026-11-02",
-      "title": "Segurança: webhook só por header ou ?t=, nome do cliente tratado como dado na IA, 'sim' da liberação vale 5 min",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "086ed44e",
-      "date": "2026-11-02",
-      "title": "Segurança: sessão do afiliado por versão e logs sem quebra de linha (CodeQL)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "bf647c4c",
-      "date": "2026-11-02",
-      "title": "Logs com JSON.stringify e ação de auditoria sem 'password' no nome",
+      "shortHash": "64b3950f",
+      "date": "2026-11-03",
+      "title": "Vincular à mão não é mais desfeito na hora pela regra de número antigo",
       "category": "Maintenance"
     }
   ]

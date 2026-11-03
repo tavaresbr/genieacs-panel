@@ -68,6 +68,7 @@ const PUBLICAS = new Map([
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor; duas credenciais, o token da instância e o bilhete da sonda de configuração, que só devolve o nonce recebido'],
   ['POST /api/billing-webhook', 'entrega do gateway de pagamento, montada antes do resolvedor e autenticada pelo token do deploy'],
+  ['POST /api/asaas-webhook', 'entrega do Asaas da conta de um provedor, montada antes do resolvedor; o token do cabeçalho É a credencial e diz de qual provedor é — token repetido entre provedores é recusado; prova em asaas-webhook.test.js'],
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
   ['POST /api/auth/impersonate/redeem', 'o bilhete do console É a credencial: uso único, um minuto de vida, conferido por hash e contra o provedor do host'],
   ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal'],
@@ -314,6 +315,11 @@ describe('toda rota sem sessão', () => {
       // token nomeia — e na trava por conta.
       'POST /api/affiliate/login',
       'POST /api/affiliate/password',
+      // A entrega do Asaas da conta de UM provedor. Escreve só em
+      // `asaas_charges` dele, e o provedor é o resultado da conferência do
+      // token (comparação em tempo constante contra todos os candidatos; token
+      // repetido entre dois provedores é recusado, nunca atribuído).
+      'POST /api/asaas-webhook',
       // O console pelo cookie dele (0129): a saída só revoga a família do
       // aparelho; a renovação gira o token, como o refresh do painel.
       'POST /api/auth/console/logout',
@@ -873,6 +879,9 @@ describe('a ordem das montagens em app.js', () => {
       // ela levaria 404 antes do controlador e o pagamento de um cliente
       // ficaria na fila de reentrega do gateway até alguém reparar.
       'app.use(BILLING_WEBHOOK_PATH, billingWebhookRoutes);',
+      // A do Asaas de cada provedor: mesma razão — o endereço colado no painel
+      // do Asaas não nomeia provedor, que sai do TOKEN do cabeçalho.
+      'app.use(ASAAS_WEBHOOK_PATH, asaasWebhookRoutes);',
       "app.use('/api/whatsapp-media', whatsappMediaRoutes);"
     ]);
   });
