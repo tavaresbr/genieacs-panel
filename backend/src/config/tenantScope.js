@@ -279,7 +279,12 @@ export const SHARED_TABLES = new Set([
   'affiliate_payouts',
   'affiliate_commissions',
   // O catálogo de add-ons (0127): da plataforma, como `plans` e `coupons`.
-  'addons'
+  'addons',
+  // As sessões por aparelho (0129): da PESSOA, como `users` e
+  // `account_lockouts`. O refresh chega sem sessão em escopo — o cookie é a
+  // credencial, e é a linha que diz de quem e de qual provedor ela é; a
+  // sessão do console nem tem provedor. Toda leitura nomeia o hash ou a pessoa.
+  'refresh_tokens'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

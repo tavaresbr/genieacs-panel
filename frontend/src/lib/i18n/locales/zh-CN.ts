@@ -5866,6 +5866,25 @@ const zhCN: Dictionary = {
   'affiliates.payouts.pixKeyChanged': "批准后推广员的 Pix 密钥已更改：发送前请重新批准。",
   'platform.addons.form.gatedImpact': "设为必需后，{count} 个活跃服务商将无法使用此功能。是否继续？",
   'platform.addons.form.gatedBackground': "开启后在后台同样生效：机器人和 AI 客服不再回复，营销活动和催缴不再发送，告警仅通过邮件和 Telegram 发送。故障和维护通知照常发送。",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': '活动会话',
+  'settings.sessions.description': '此帐户已登录的设备。菜单中的“退出登录”只结束此设备；在这里可以结束其中任何一个，或一次结束全部。',
+  'settings.sessions.revokeAll': '从所有设备退出',
+  'settings.sessions.revoke': '结束',
+  'settings.sessions.current': '此设备',
+  'settings.sessions.console': '控制台',
+  'settings.sessions.unknownDevice': '未知浏览器',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': '{when}使用',
+  'settings.sessions.since': '自{when}起',
+  'settings.sessions.empty': '没有打开的会话。',
+  'settings.sessions.loadFailed': '无法加载会话。',
+  'settings.sessions.revoked': '会话已结束。',
+  'settings.sessions.revokedAll': '所有会话均已结束。',
+  'settings.sessions.revokeFailed': '无法结束会话。',
+  'settings.sessions.confirmCurrent': '这是此设备的会话。结束后将返回登录页面。是否继续？',
+  'settings.sessions.confirmAll': '结束此帐户的所有会话（包括此设备）？您需要在每台设备上重新登录。',
+  'audit.action.sessionRefreshReuse': '因刷新令牌被重复使用而结束会话',
 }
 
 export default zhCN

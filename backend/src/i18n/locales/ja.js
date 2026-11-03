@@ -1448,5 +1448,10 @@ export default {
   'addons.notActive': 'このアドオンは有効ではありません',
   'addons.notChangeable': '現在のサブスクリプションではアドオンを変更できません',
   'addons.paidPlanRequired': 'アドオンには有料プランが必要です',
-  'addons.required': 'この機能にはアドオンが必要です。プランページで有効にしてください。'
+  'addons.required': 'この機能にはアドオンが必要です。プランページで有効にしてください。',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'リクエストを拒否しました: パネルのセキュリティヘッダーがありません',
+  'auth.sessionNotFound': 'セッションが見つかりません',
+  'auth.sessionRevoked': 'セッションを終了しました',
+  'auth.sessionsRevokedAll': 'すべてのセッションを終了しました'
 };

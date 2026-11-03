@@ -1448,5 +1448,10 @@ export default {
   'addons.notActive': '此附加组件未启用',
   'addons.notChangeable': '当前订阅不允许更改附加组件',
   'addons.paidPlanRequired': '附加组件需要付费套餐',
-  'addons.required': '此功能需要附加组件。请在套餐页面启用。'
+  'addons.required': '此功能需要附加组件。请在套餐页面启用。',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': '请求被拒绝：缺少面板安全标头',
+  'auth.sessionNotFound': '未找到会话',
+  'auth.sessionRevoked': '会话已结束',
+  'auth.sessionsRevokedAll': '所有会话均已结束'
 };

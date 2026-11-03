@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 // @ts-expect-error -- módulo JS puro, sem tipos.
 import { FAKE_BOLETO_LINE, FAKE_PIX_PAYLOAD } from './support/fake-asaas.mjs'
-import { PROVIDER, PROVIDER_STATE, loginViaForm, shot } from './support/demo'
+import { PROVIDER, loginViaForm, shot, sessionFor } from './support/demo'
 
 /**
  * O painel de um provedor (Alfa Fibra, em dia, no mensal do Essencial), na
@@ -16,7 +16,7 @@ test('o dono do provedor entra pela tela de login', async ({ page }) => {
 })
 
 test.describe('Plano', () => {
-  test.use({ storageState: PROVIDER_STATE })
+  test.use({ storageState: sessionFor(PROVIDER) })
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/plan')

@@ -1,59 +1,50 @@
 /**
- * O que uma aba faz quando OUTRA aba do mesmo navegador mexe no token.
+ * As abas do mesmo navegador acompanhando a sessão umas das outras (0129).
  *
- * O `localStorage` é do navegador inteiro, mas cada aba guarda o token também
- * em memória (`ApiClient`). Sem ouvir o evento `storage`, uma aba seguia
- * falando com o servidor como o provedor A depois de outra aba sair, ou entrar
- * como o provedor B — e mostrava os dados de um com o nome do outro.
+ * O token de acesso mora só na memória de cada aba, e o refresh no cookie
+ * `HttpOnly`, que é do navegador inteiro. Não há mais `localStorage` com token
+ * para o evento `storage` avisar, então as abas conversam por um
+ * `BroadcastChannel`, e o que viaja nele é só o FATO — "saí", "entrei" —,
+ * nunca um token.
  *
- * - `ignore`: não é o token, não mudou, ou a sessão desta aba é só dela (a
- *   personificação mora no `sessionStorage` e não segue o navegador).
- * - `logout`: a outra aba saiu; esta sai junto.
- * - `adopt`: a mesma sessão (mesmo usuário, mesmo provedor) renovada na outra
- *   aba; esta pega o token novo em silêncio, sem recarregar a cada refresh.
- * - `reload`: outra sessão — ou um token que não dá para ler. Recarregar é o
- *   jeito limpo de a aba largar tudo o que montou para a sessão anterior.
+ * - `ignore`: a mensagem não é nossa, ou a sessão desta aba é só dela (a
+ *   personificação mora no `sessionStorage` e não segue o navegador);
+ * - `logout`: outra aba saiu, e o cookie foi junto; esta sai também;
+ * - `reload`: outra aba ENTROU — talvez como outra pessoa ou em outro
+ *   provedor, e o cookie agora é o dela. Recarregar é o jeito limpo de esta
+ *   aba largar o que montou para a sessão anterior e voltar pela nova.
  */
-export type CrossTabTokenAction = 'ignore' | 'adopt' | 'logout' | 'reload'
+export type CrossTabAction = 'ignore' | 'logout' | 'reload'
 
-/**
- * Quem o token diz que é: o usuário e o provedor (ou o console). Lido do
- * payload sem verificar a assinatura — não é para confiar no token, quem
- * confia é o servidor; é só para saber se a sessão continua a mesma.
- */
-export function tokenIdentity(token: string | null | undefined): string | null {
-  if (!token) return null
-  const partes = token.split('.')
-  if (partes.length !== 3 || !partes[1]) return null
-  try {
-    const b64 = partes[1].replace(/-/g, '+').replace(/_/g, '/')
-    const json = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
-    const payload: unknown = JSON.parse(json)
-    if (!payload || typeof payload !== 'object') return null
-    const { userId, tenantId, platform } = payload as { userId?: unknown; tenantId?: unknown; platform?: unknown }
-    if (typeof userId !== 'number' && typeof userId !== 'string') return null
-    const escopo = typeof tenantId === 'number' || typeof tenantId === 'string'
-      ? `t${tenantId}`
-      : platform === true ? 'platform' : '-'
-    return `${escopo}:${userId}`
-  } catch {
-    return null
-  }
+export const SESSION_CHANNEL = 'skygenpanel-session'
+
+export type SessionMessage = { type: 'login' } | { type: 'logout' }
+
+export function crossTabAction(message: unknown, ctx: { tabScoped: boolean }): CrossTabAction {
+  if (ctx.tabScoped) return 'ignore'
+  if (!message || typeof message !== 'object') return 'ignore'
+  const tipo = (message as { type?: unknown }).type
+  if (tipo === 'logout') return 'logout'
+  if (tipo === 'login') return 'reload'
+  return 'ignore'
 }
 
-export function crossTabTokenAction(ctx: {
-  key: string | null
-  newValue: string | null
-  current: string | null
-  tabScoped: boolean
-}): CrossTabTokenAction {
-  // `key` nulo é um `localStorage.clear()` na outra aba: o token foi junto.
-  if (ctx.key !== 'token' && ctx.key !== null) return 'ignore'
-  if (ctx.tabScoped) return 'ignore'
-  if (ctx.newValue === ctx.current) return 'ignore'
-  if (ctx.newValue === null) return 'logout'
-  const antes = tokenIdentity(ctx.current)
-  const depois = tokenIdentity(ctx.newValue)
-  if (antes !== null && antes === depois) return 'adopt'
-  return 'reload'
+/**
+ * O canal, ou nada onde o navegador não o tem (testes sem DOM, navegadores
+ * muito antigos): aí cada aba segue sozinha, que é o pior caso aceitável — a
+ * próxima renovação dela é recusada e ela vai ao login.
+ */
+export function openSessionChannel(onMessage: (message: unknown) => void): { post: (m: SessionMessage) => void } {
+  if (typeof BroadcastChannel === 'undefined') return { post: () => {} }
+  try {
+    const canal = new BroadcastChannel(SESSION_CHANNEL)
+    canal.onmessage = (event) => onMessage(event.data)
+    return {
+      post: (m) => {
+        try { canal.postMessage(m) } catch { /* canal fechado: nada a avisar */ }
+      }
+    }
+  } catch {
+    return { post: () => {} }
+  }
 }

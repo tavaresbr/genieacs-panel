@@ -5870,6 +5870,25 @@ const de: Dictionary = {
   'affiliates.payouts.pixKeyChanged': "Der Pix-Schlüssel des Affiliates hat sich nach der Freigabe geändert: vor dem Senden erneut freigeben.",
   'platform.addons.form.gatedImpact': "{count} aktive(r) Anbieter würde(n) den Zugriff auf diese Funktion verlieren, wenn sie verpflichtend wird. Fortfahren?",
   'platform.addons.form.gatedBackground': "Aktiviert gilt es auch im Hintergrund: Bot und KI-Assistent antworten nicht, Kampagnen und Mahnläufe werden nicht gesendet und Warnungen gehen nur per E-Mail und Telegram raus. Störungs- und Wartungshinweise laufen weiter.",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Aktive Sitzungen',
+  'settings.sessions.description': 'Die Geräte, auf denen dieses Konto angemeldet ist. „Abmelden“ im Menü beendet nur dieses Gerät; hier können Sie jedes beenden oder alle auf einmal.',
+  'settings.sessions.revokeAll': 'Überall abmelden',
+  'settings.sessions.revoke': 'Beenden',
+  'settings.sessions.current': 'Dieses Gerät',
+  'settings.sessions.console': 'Konsole',
+  'settings.sessions.unknownDevice': 'Unbekannter Browser',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'genutzt {when}',
+  'settings.sessions.since': 'seit {when}',
+  'settings.sessions.empty': 'Keine offenen Sitzungen.',
+  'settings.sessions.loadFailed': 'Die Sitzungen konnten nicht geladen werden.',
+  'settings.sessions.revoked': 'Sitzung beendet.',
+  'settings.sessions.revokedAll': 'Alle Sitzungen wurden beendet.',
+  'settings.sessions.revokeFailed': 'Die Sitzung konnte nicht beendet werden.',
+  'settings.sessions.confirmCurrent': 'Dies ist die Sitzung auf diesem Gerät. Wenn Sie sie beenden, gelangen Sie zur Anmeldung zurück. Fortfahren?',
+  'settings.sessions.confirmAll': 'ALLE Sitzungen dieses Kontos beenden, auch die auf diesem Gerät? Sie müssen sich auf jedem Gerät erneut anmelden.',
+  'audit.action.sessionRefreshReuse': 'Sitzung wegen Wiederverwendung des Aktualisierungstokens beendet',
 }
 
 export default de

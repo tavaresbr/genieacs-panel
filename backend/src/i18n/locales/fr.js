@@ -1444,5 +1444,10 @@ export default {
   'addons.notActive': 'Ce module complémentaire n\'est pas actif',
   'addons.notChangeable': 'L\'abonnement ne permet pas de modifier les modules complémentaires pour le moment',
   'addons.paidPlanRequired': 'Les modules complémentaires exigent un forfait payant',
-  'addons.required': 'Cette fonctionnalité exige un module complémentaire. Activez-le sur la page Forfait.'
+  'addons.required': 'Cette fonctionnalité exige un module complémentaire. Activez-le sur la page Forfait.',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Requête refusée : l’en-tête de sécurité du panneau est absent',
+  'auth.sessionNotFound': 'Session introuvable',
+  'auth.sessionRevoked': 'Session fermée',
+  'auth.sessionsRevokedAll': 'Toutes les sessions ont été fermées'
 };

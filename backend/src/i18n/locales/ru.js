@@ -1449,5 +1449,10 @@ export default {
   'addons.notActive': 'Это дополнение не активно',
   'addons.notChangeable': 'Подписка сейчас не позволяет менять дополнения',
   'addons.paidPlanRequired': 'Дополнения требуют платного тарифа',
-  'addons.required': 'Для этой функции нужно дополнение. Подключите его на странице «Тариф».'
+  'addons.required': 'Для этой функции нужно дополнение. Подключите его на странице «Тариф».',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Запрос отклонён: отсутствует заголовок безопасности панели',
+  'auth.sessionNotFound': 'Сеанс не найден',
+  'auth.sessionRevoked': 'Сеанс завершён',
+  'auth.sessionsRevokedAll': 'Все сеансы завершены'
 };

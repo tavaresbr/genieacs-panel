@@ -1449,5 +1449,10 @@ export default {
   'addons.notActive': 'Dieses Add-on ist nicht aktiv',
   'addons.notChangeable': 'Das Abonnement erlaubt derzeit keine Änderung der Add-ons',
   'addons.paidPlanRequired': 'Add-ons erfordern einen kostenpflichtigen Tarif',
-  'addons.required': 'Diese Funktion erfordert ein Add-on. Aktivieren Sie es auf der Seite Tarif.'
+  'addons.required': 'Diese Funktion erfordert ein Add-on. Aktivieren Sie es auf der Seite Tarif.',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Anfrage abgelehnt: Der Sicherheits-Header des Panels fehlt',
+  'auth.sessionNotFound': 'Sitzung nicht gefunden',
+  'auth.sessionRevoked': 'Sitzung beendet',
+  'auth.sessionsRevokedAll': 'Alle Sitzungen wurden beendet'
 };

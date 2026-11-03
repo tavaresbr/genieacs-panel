@@ -8,7 +8,7 @@ import { offlineMessageKey } from '@/lib/genieacs-agent'
 import { firmwareUploadHeaders, type FirmwareMeta } from '@/lib/firmware'
 import { formatRelativeTime } from '@/lib/utils'
 import { clearSessionScopedStorage } from '@/lib/session-owner'
-import { crossTabTokenAction } from '@/lib/cross-tab-session'
+import { crossTabAction, openSessionChannel } from '@/lib/cross-tab-session'
 import type { AffiliateCommissionStatus, AffiliatePayoutStatus, AffiliateStatus, PixKeyType } from '@/lib/affiliates'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
@@ -239,31 +239,83 @@ export function filenameFromDisposition(header: string | null): string | undefin
 }
 
 /**
- * A sessão guardada neste navegador, e em qual das duas gavetas ela está.
+ * A sessão que esta ABA guarda sozinha — a personificação —, ou nada.
  *
- * `sessionStorage` é POR ABA; `localStorage` é do navegador inteiro. Uma
- * sessão de personificação mora na primeira: ela nasce e morre na aba que o
- * console abriu, e é isso que deixa o console seguir aberto atrás com a
- * própria sessão intacta — inclusive numa instalação de host único, onde o
- * painel do provedor divide o origin com ele.
- *
- * A gaveta da aba ganha da outra porque é a mais específica: numa aba de
- * personificação as duas estão cheias, e quem manda ali é o bilhete que abriu
- * a aba, não a sessão que o navegador já tinha.
- *
- * Sem refresh token junto do token de aba, nunca: a personificação não tem um,
- * e devolver o do operador — que está na outra gaveta — renovaria a sessão de
- * leitura como se fosse comum.
+ * Desde 0129 o token de acesso de uma sessão comum mora só na memória do
+ * `ApiClient`, e o refresh num cookie `HttpOnly` que script nenhum lê. O que
+ * sobra em storage é a personificação: ela nasce e morre na aba que o console
+ * abriu (`sessionStorage`, POR ABA), sem refresh — e é isso que deixa o console
+ * seguir aberto atrás com a própria sessão intacta, inclusive numa instalação
+ * de host único, onde o painel do provedor divide a origem com ele.
  */
-export function storedSession(): { token: string | null; refreshToken: string | null; tabScoped: boolean } {
-  if (typeof window === 'undefined') return { token: null, refreshToken: null, tabScoped: false }
-  const daAba = sessionStorage.getItem('token')
-  if (daAba) return { token: daAba, refreshToken: null, tabScoped: true }
-  return {
-    token: localStorage.getItem('token'),
-    refreshToken: localStorage.getItem('refreshToken'),
-    tabScoped: false
+export function storedSession(): { token: string | null; tabScoped: boolean } {
+  if (typeof window === 'undefined') return { token: null, tabScoped: false }
+  try {
+    const daAba = sessionStorage.getItem('token')
+    if (daAba) return { token: daAba, tabScoped: true }
+  } catch {
+    // Storage bloqueado: sem personificação nesta aba.
   }
+  return { token: null, tabScoped: false }
+}
+
+/**
+ * O refresh ANTIGO, de antes de 0129, que o frontend anterior deixou no
+ * `localStorage`. Lido uma vez, na primeira carga, para migrar a sessão para o
+ * cookie sem pedir login de novo — e apagado em seguida (`restoreSession`).
+ */
+export function legacyStoredRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return localStorage.getItem('refreshToken')
+  } catch {
+    return null
+  }
+}
+
+function forgetLegacyTokens() {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
+  } catch {
+    // Sem storage não há o que apagar.
+  }
+}
+
+/**
+ * Qual sessão este navegador tinha da última vez — painel ou console —, só
+ * para decidir qual refresh tentar PRIMEIRO ao carregar. Não é credencial e não
+ * decide nada: o cookie que existir é que responde.
+ */
+const SESSION_KIND_KEY = 'skg_session_kind'
+export type SessionKind = 'panel' | 'console'
+
+function readKindHint(): SessionKind | null {
+  try {
+    const v = typeof window === 'undefined' ? null : localStorage.getItem(SESSION_KIND_KEY)
+    return v === 'console' || v === 'panel' ? v : null
+  } catch {
+    return null
+  }
+}
+
+function writeKindHint(kind: SessionKind | null) {
+  try {
+    if (typeof window === 'undefined') return
+    if (kind) localStorage.setItem(SESSION_KIND_KEY, kind)
+    else localStorage.removeItem(SESSION_KIND_KEY)
+  } catch {
+    // Sem storage, a próxima carga tenta o painel primeiro.
+  }
+}
+
+/** O cabeçalho que a guarda de CSRF das rotas do cookie exige (0129). */
+export const CSRF_HEADERS: Record<string, string> = { 'X-Requested-With': 'skygenpanel' }
+
+const REFRESH_ENDPOINTS: Record<SessionKind, string> = {
+  panel: '/auth/refresh',
+  console: '/auth/console/refresh'
 }
 
 /**
@@ -284,59 +336,84 @@ async function gzipText(text: string): Promise<Blob | null> {
 
 class ApiClient {
   private baseURL: string
+  /** O token de acesso: só aqui, na memória desta aba (0129). */
   private token: string | null = null
-  private refreshToken: string | null = null
+  /** De qual sessão é o token — decide qual refresh chamar. */
+  private kind: SessionKind | null = null
   private refreshPromise: Promise<boolean> | null = null
   /**
    * Quantas vezes a sessão desta aba mudou de dono.
    *
    * Um refresh que sai antes de um logout/login e volta depois não pode
-   * gravar nada: os tokens dele são da sessão anterior, e `setTokens` os
-   * colocaria por cima da nova — o provedor A de volta na aba onde o B acabou
-   * de entrar. Sobe em `clearTokens`, `setTabTokens` e `beginSession`; nunca no
+   * gravar nada: o token dele é da sessão anterior, e `setTokens` o colocaria
+   * por cima da nova — o provedor A de volta na aba onde o B acabou de entrar.
+   * Sobe em `clearTokens`, `setTabTokens` e `beginSession`; nunca no
    * `setTokens` que o próprio refresh chama.
    */
   private sessionEpoch = 0
   /** Se a sessão desta aba é só dela — ver `storedSession`. */
   private tabScoped = false
+  private channel: { post: (m: { type: 'login' } | { type: 'logout' }) => void }
 
   constructor(baseURL: string) {
     this.baseURL = baseURL
     const guardada = storedSession()
     this.token = guardada.token
-    this.refreshToken = guardada.refreshToken
     this.tabScoped = guardada.tabScoped
-    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      window.addEventListener('storage', (e) => this.handleStorageEvent(e))
-    }
+    this.channel = openSessionChannel((m) => this.handleSessionMessage(m))
   }
 
   /**
-   * Outra aba mexeu no token do navegador. Esta acompanha — ver
-   * `crossTabTokenAction`. Pública para os testes, que não têm DOM.
+   * Outra aba saiu ou entrou. Esta acompanha — ver `crossTabAction`. Pública
+   * para os testes, que não têm DOM.
    */
-  handleStorageEvent(e: Pick<StorageEvent, 'key' | 'newValue'>) {
-    const acao = crossTabTokenAction({
-      key: e.key,
-      newValue: e.newValue,
-      current: this.token,
-      tabScoped: this.tabScoped
-    })
+  handleSessionMessage(message: unknown) {
+    const acao = crossTabAction(message, { tabScoped: this.tabScoped })
     if (acao === 'logout') {
-      this.clearTokens()
-    } else if (acao === 'adopt' && e.newValue) {
-      // A mesma sessão renovada na outra aba: o token novo e o refresh token
-      // que veio junto. Sem `beginSession` — não é sessão nova, e sem gravar —
-      // a outra aba já gravou.
-      this.token = e.newValue
-      try {
-        this.refreshToken = localStorage.getItem('refreshToken') ?? this.refreshToken
-      } catch {
-        // Sem storage, segue com o refresh token que tinha.
-      }
-    } else if (acao === 'reload') {
+      this.clearTokens({ broadcast: false })
+    } else if (acao === 'reload' && typeof window !== 'undefined') {
       window.location.reload()
     }
+  }
+
+  /** O token de acesso desta aba, para quem precisa saber se há sessão. */
+  getToken(): string | null {
+    return this.token
+  }
+
+  hasSession(): boolean {
+    return Boolean(this.token)
+  }
+
+  isTabScoped(): boolean {
+    return this.tabScoped
+  }
+
+  getSessionKind(): SessionKind | null {
+    return this.kind
+  }
+
+  /**
+   * Ao carregar a página: põe de volta o token de acesso, que não sobrevive a
+   * um F5 porque mora só na memória.
+   *
+   * - a personificação já está no `sessionStorage` da aba, e não tem refresh;
+   * - um refresh do frontend ANTERIOR no `localStorage` é migrado uma vez: vai
+   *   no corpo do `/auth/refresh`, que o troca por uma família nova com cookie,
+   *   e é apagado daqui de qualquer jeito;
+   * - o resto é o cookie: `POST /auth/refresh` (ou o do console).
+   */
+  async restoreSession(): Promise<boolean> {
+    if (this.tabScoped) return Boolean(this.token)
+    if (this.token) return true
+    const antigo = legacyStoredRefreshToken()
+    if (antigo) {
+      forgetLegacyTokens()
+      const migrou = await this.refreshVia(REFRESH_ENDPOINTS.panel, { refreshToken: antigo })
+      if (migrou) return true
+    }
+    forgetLegacyTokens()
+    return this.refreshAccessToken({ logoutOnFailure: false })
   }
 
   private async request<T>(
@@ -351,6 +428,9 @@ class ApiClient {
       // The panel answers in the operator's chosen language, which is not
       // necessarily the browser's, so the backend is told explicitly.
       'Accept-Language': getActiveLocale(),
+      // A guarda de CSRF das rotas do cookie (0129) exige este cabeçalho; nas
+      // outras ele não muda nada, e mandar sempre poupa cada chamada de saber.
+      ...CSRF_HEADERS,
       ...options.headers as Record<string, string>,
     }
 
@@ -380,7 +460,7 @@ class ApiClient {
         response.status === 403 &&
         data.code === 'invalid_token' &&
         retryAfterRefresh &&
-        !['/auth/refresh', '/auth/login', '/auth/setup'].includes(endpoint)
+        !['/auth/refresh', '/auth/console/refresh', '/auth/login', '/auth/setup', '/auth/logout', '/auth/console/logout'].includes(endpoint)
       ) {
         const refreshed = await this.refreshAccessToken()
         if (refreshed) {
@@ -472,31 +552,54 @@ class ApiClient {
     }
   }
 
-  private async refreshAccessToken(): Promise<boolean> {
-    if (!this.refreshToken) return false
+  /**
+   * Um `POST` a uma rota de refresh. Devolve se trouxe token; quem decide o
+   * que fazer com a recusa é quem chamou. O cookie vai sozinho (mesma origem).
+   */
+  private async refreshVia(endpoint: string, body?: unknown): Promise<boolean> {
+    const epoch = this.sessionEpoch
+    try {
+      const response = await fetch(`${this.baseURL}/api${endpoint}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept-Language': getActiveLocale(), ...CSRF_HEADERS },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      const data = await response.json().catch(() => null)
+      // A sessão mudou enquanto a resposta vinha: ela é de outra sessão.
+      if (epoch !== this.sessionEpoch) return false
+      if (!response.ok || !data?.success || !data.data?.token) return false
+      this.setTokens(data.data.token)
+      this.kind = data.data.platform ? 'console' : 'panel'
+      writeKindHint(this.kind)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Renova o token de acesso pelo cookie. Sem refresh na personificação: ela
+   * não tem um, e o cookie do navegador é a sessão de OUTRA pessoa (quem
+   * personifica) — renovar por ele trocaria a sessão da aba por baixo.
+   */
+  private async refreshAccessToken({ logoutOnFailure = true }: { logoutOnFailure?: boolean } = {}): Promise<boolean> {
+    if (this.tabScoped) return false
     if (this.refreshPromise) return this.refreshPromise
 
     const epoch = this.sessionEpoch
+    const tentativas: SessionKind[] = this.kind
+      ? [this.kind]
+      : readKindHint() === 'console' ? ['console', 'panel'] : ['panel', 'console']
     this.refreshPromise = (async () => {
       try {
-        const response = await fetch(`${this.baseURL}/api/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: this.refreshToken }),
-        })
-        const data = await response.json()
-        // A sessão mudou enquanto a resposta vinha: ela é de outra sessão, e
-        // nem renovar nem derrubar cabe a ela.
-        if (epoch !== this.sessionEpoch) return false
-        if (!response.ok || !data.success || !data.data?.token || !data.data?.refreshToken) {
-          this.clearTokens()
-          return false
+        for (const kind of tentativas) {
+          if (await this.refreshVia(REFRESH_ENDPOINTS[kind])) return true
+          if (epoch !== this.sessionEpoch) return false
         }
-        this.setTokens(data.data.token, data.data.refreshToken)
-        return true
-      } catch {
         if (epoch !== this.sessionEpoch) return false
-        this.clearTokens()
+        if (logoutOnFailure) this.clearTokens({ broadcast: false })
+        else writeKindHint(null)
         return false
       } finally {
         // Só a própria: com a sessão trocada, o lugar já foi esvaziado por
@@ -572,7 +675,7 @@ class ApiClient {
     endpoint: string,
     retryAfterRefresh = true
   ): Promise<{ success: boolean; blob?: Blob; filename?: string; code?: string; message?: string }> {
-    const headers: Record<string, string> = { 'Accept-Language': getActiveLocale() }
+    const headers: Record<string, string> = { 'Accept-Language': getActiveLocale(), ...CSRF_HEADERS }
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`
     try {
       const response = await fetch(`${this.baseURL}/api${endpoint}`, { headers })
@@ -632,9 +735,10 @@ class ApiClient {
    * Um POST em nome de uma sessão específica, e não da que a aba tiver agora.
    *
    * É o que o logout usa: o aviso de saída sai depois de a aba já ter
-   * esquecido os tokens — e, com um login rápido, de já ter os de outra
-   * sessão, que um `/auth/logout` comum revogaria no lugar da certa. Sem
-   * refresh no meio: um token vencido aqui não tem o que renovar.
+   * esquecido o token — e, com um login rápido, de já ter o de outra sessão.
+   * O servidor encerra a família do `sid` DESTE token (mesmo vencido), e não a
+   * do cookie, que a essa altura pode ser da sessão nova. Sem refresh no meio:
+   * um token vencido aqui não tem o que renovar.
    */
   async postAs<T>(token: string, endpoint: string, data?: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
@@ -665,74 +769,79 @@ class ApiClient {
     })
   }
 
-  setTokens(token: string, refreshToken?: string) {
+  /** O token renovado da MESMA sessão: só a memória, sem mexer na contagem. */
+  setTokens(token: string) {
     this.token = token
-    if (refreshToken !== undefined) {
-      this.refreshToken = refreshToken
-    }
-    if (typeof window !== 'undefined') {
-      // Na gaveta do escopo que esta aba já tem: um refresh de sessão de
-      // personificação não pode vazar para o `localStorage` do navegador.
-      const gaveta = this.tabScoped ? sessionStorage : localStorage
-      gaveta.setItem('token', token)
-      if (refreshToken !== undefined) {
-        gaveta.setItem('refreshToken', refreshToken)
-      }
-    }
   }
 
   /**
-   * Grava os tokens de uma sessão NOVA — login, convite aceito, setup, MFA.
+   * Guarda o token de uma sessão NOVA — login, convite aceito, setup.
    *
-   * É `setTokens` com uma diferença: avisa que a sessão mudou, para que um
-   * refresh da sessão anterior ainda no ar seja descartado quando voltar.
-   * O refresh em si continua chamando `setTokens`, que não mexe na contagem.
+   * É `setTokens` com duas diferenças: avisa que a sessão mudou, para que um
+   * refresh da sessão anterior ainda no ar seja descartado quando voltar; e
+   * avisa as outras abas, que estavam com a sessão de antes (o cookie é do
+   * navegador inteiro e acabou de ser trocado).
    */
-  beginSession(token: string, refreshToken?: string) {
+  beginSession(token: string, kind: SessionKind = 'panel') {
     this.sessionEpoch++
     this.refreshPromise = null
-    this.setTokens(token, refreshToken)
+    this.token = token
+    this.kind = kind
+    writeKindHint(kind)
+    forgetLegacyTokens()
+    this.channel.post({ type: 'login' })
   }
 
   /**
    * Adota uma sessão que vive SÓ nesta aba.
    *
    * É o que a personificação usa. Não passa por `clearTokens` de propósito:
-   * ali a limpeza apagaria o `localStorage`, que numa instalação de host único
-   * é o mesmo do console — a aba de trás perderia a sessão justamente por
-   * causa da aba nova. O refresh token é zerado aqui, que era o serviço que a
-   * limpeza prestava.
+   * ali a saída avisaria as outras abas, e numa instalação de host único a de
+   * trás é o console — ela perderia a sessão justamente por causa da aba nova.
    */
   setTabTokens(token: string) {
     this.sessionEpoch++
     this.refreshPromise = null
     this.tabScoped = true
     this.token = token
-    this.refreshToken = null
+    this.kind = null
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('token', token)
-      sessionStorage.removeItem('refreshToken')
+      try {
+        sessionStorage.setItem('token', token)
+        sessionStorage.removeItem('refreshToken')
+      } catch {
+        // Sem storage, a personificação vive até o F5.
+      }
       // A aba nova herdou o `sessionStorage` da aba do console.
       clearSessionScopedStorage()
     }
   }
 
-  clearTokens() {
+  /**
+   * Esquece a sessão desta aba. `broadcast` avisa as outras abas de que o
+   * cookie saiu (é o "Sair" daqui); o aviso que CHEGA de outra aba não ecoa.
+   */
+  clearTokens({ broadcast = true }: { broadcast?: boolean } = {}) {
     // Uma sessão de aba se apaga só da gaveta da aba: sair da personificação —
     // ou ela expirar — não pode derrubar a sessão do console na aba de trás.
     const eraDaAba = this.tabScoped
     this.sessionEpoch++
     this.refreshPromise = null
     this.token = null
-    this.refreshToken = null
+    this.kind = null
     this.tabScoped = false
     if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('token')
-      sessionStorage.removeItem('refreshToken')
+      try {
+        sessionStorage.removeItem('token')
+        sessionStorage.removeItem('refreshToken')
+      } catch {
+        // Sem storage não há o que apagar.
+      }
       clearSessionScopedStorage()
       if (!eraDaAba) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
+        forgetLegacyTokens()
+        writeKindHint(null)
+        if (broadcast) this.channel.post({ type: 'logout' })
       }
       window.dispatchEvent(new Event('auth:unauthorized'))
     }
@@ -770,16 +879,17 @@ export interface MfaSetup {
 }
 
 /**
- * A sessão nova que ativar, desligar ou trocar os códigos do 2FA devolve.
+ * O token novo que ativar, desligar ou trocar os códigos do 2FA devolve.
  *
  * Mudar o segundo fator derruba toda sessão aberta antes (o servidor sobe o
- * `token_version`), inclusive o token desta aba. A resposta traz o par novo, e
- * `comSessaoNova` o guarda antes de devolver — sem isso a próxima chamada da
- * tela do 2FA levaria a pessoa ao login, com os códigos ainda por anotar.
+ * `token_version`), inclusive o token desta aba. A resposta traz o token novo
+ * da MESMA sessão — o cookie do refresh segue o mesmo, passado para a versão
+ * nova (0129) —, e `comSessaoNova` o guarda antes de devolver: sem isso a
+ * próxima chamada da tela do 2FA levaria a pessoa ao login, com os códigos
+ * ainda por anotar.
  */
 export interface MfaFreshSession {
   token?: string
-  refreshToken?: string
 }
 
 export interface MfaRecoveryCodes extends MfaFreshSession {
@@ -788,8 +898,25 @@ export interface MfaRecoveryCodes extends MfaFreshSession {
 
 async function comSessaoNova<T extends MfaFreshSession>(pedido: Promise<ApiResponse<T>>): Promise<ApiResponse<T>> {
   const res = await pedido
-  if (res.success && res.data?.token) apiClient.beginSession(res.data.token, res.data.refreshToken)
+  if (res.success && res.data?.token) apiClient.setTokens(res.data.token)
   return res
+}
+
+/** Uma sessão aberta, como `GET /api/auth/sessions` a devolve. */
+export interface ActiveSession {
+  /** A família do refresh: o que "Encerrar" manda. */
+  id: string
+  kind: SessionKind
+  /** O provedor da sessão de painel; nulo no console. */
+  tenantName: string | null
+  /** "Chrome · Windows", ou nulo quando o navegador não se identificou. */
+  device: string | null
+  userAgent: string | null
+  ip: string | null
+  createdAt: string
+  lastUsedAt: string
+  /** Esta é a sessão desta aba. */
+  current: boolean
 }
 
 export interface LoginDestinations {
@@ -841,9 +968,23 @@ export const authAPI = {
   getCurrentUser: () =>
     apiClient.get('/auth/user'),
 
-  /** Com `token`, revoga aquela sessão mesmo que a aba já tenha esquecido dela. */
-  logout: (token?: string) =>
-    token ? apiClient.postAs(token, '/auth/logout') : apiClient.post('/auth/logout'),
+  /**
+   * "Sair" deste aparelho (0129): encerra só a família desta sessão. Com
+   * `token`, a família daquele token, mesmo que a aba já tenha esquecido dele;
+   * `kind` diz qual cookie apagar (o do painel ou o do console).
+   */
+  logout: (token?: string, kind: SessionKind = 'panel') => {
+    const rota = kind === 'console' ? '/auth/console/logout' : '/auth/logout'
+    return token ? apiClient.postAs(token, rota) : apiClient.post(rota)
+  },
+
+  /** As sessões abertas desta pessoa, uma por aparelho — "Sessões ativas". */
+  sessions: () => apiClient.get<{ sessions: ActiveSession[] }>('/auth/sessions'),
+  /** "Encerrar" uma delas; `current` diz se era esta. */
+  revokeSession: (id: string) =>
+    apiClient.post<{ current: boolean }>(`/auth/sessions/${encodeURIComponent(id)}/revoke`, {}),
+  /** "Sair de todos": todos os aparelhos, inclusive este. */
+  revokeAllSessions: () => apiClient.post('/auth/sessions/revoke-all', {}),
 
   /** SaaS only; answers 404 on a self-hosted install, where the route is not mounted. */
   signup: (payload: {
@@ -867,9 +1008,6 @@ export const authAPI = {
     apiClient.post<{ user: User; tenant: { slug: string; name: string }; token: string }>(
       '/auth/impersonate/redeem', { ticket }
     ),
-
-  refreshToken: (refreshToken: string) =>
-    apiClient.post('/auth/refresh', { refreshToken }),
 
   changePassword: (currentPassword: string, newPassword: string) =>
     apiClient.post('/auth/change-password', { currentPassword, newPassword }),

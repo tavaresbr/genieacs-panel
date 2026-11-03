@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import type { LoginDestination, LoginDestinations } from '@/lib/api'
 import { sessionKind } from '@/lib/shell'
-import { apiClient, authAPI, settingsAPI, storedSession, whatsappAPI } from '@/lib/api'
+import { apiClient, authAPI, settingsAPI, whatsappAPI } from '@/lib/api'
 import { destinosDaResposta } from '@/lib/login-destinations'
 import { contaBloqueadaNaResposta, mfaStepDaResposta, type MfaStep } from '@/lib/login-mfa'
 import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
@@ -39,10 +39,12 @@ interface AuthContextType {
     identifier: string, password: string, destino?: LoginDestination, totpCode?: string
   ) => Promise<boolean | LoginDestinations | MfaStep | 'locked'>
   completeSetup: (username: string, password: string, email: string) => Promise<boolean>
-  /** Para quem chega com a sessão já pronta: o convite aceito e a personificação resgatada. */
+  /**
+   * Para quem chega com a sessão já pronta: o convite aceito e a personificação
+   * resgatada. O refresh, quando há, já está no cookie (0129).
+   */
   adoptSession: (
     token: string,
-    refreshToken: string | undefined,
     user: User,
     options?: { tabOnly?: boolean }
   ) => void
@@ -93,8 +95,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // na mão. Quem adotou manda: o que esta verificação leu fala de um token
       // que não é mais o desta aba.
       if (adotada.current) { setLoading(false); return }
-      const { token } = storedSession()
-      if (token) {
+      // O token de acesso não sobrevive a um F5 (mora só na memória, 0129):
+      // quem o devolve é o cookie do refresh — ou, na primeira carga depois da
+      // atualização, o refresh antigo do `localStorage`, migrado uma vez.
+      let temSessao = false
+      try {
+        temSessao = await apiClient.restoreSession()
+      } catch (error) {
+        console.error('Session restore failed:', error)
+      }
+      if (adotada.current) { setLoading(false); return }
+      if (temSessao) {
         try {
           const res = await authAPI.getCurrentUser()
           if (adotada.current) { setLoading(false); return }
@@ -157,14 +168,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const escolher = destinosDaResposta(res)
       if (escolher) return escolher
       if (res.success && res.data) {
-        const { token, refreshToken, user } = res.data as {
+        const { token, user } = res.data as {
           token: string
-          refreshToken: string
           user: User
         }
         // Entrar em outro provedor não passa por `clearTokens`.
         clearSessionScopedStorage()
-        apiClient.beginSession(token, refreshToken)
+        apiClient.beginSession(token, sessionKind(user) === 'console' ? 'console' : 'panel')
 
         setUser(user)
         setIsAuthenticated(true)
@@ -190,12 +200,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const res = await authAPI.setupAdmin(username, password, email)
       if (res.success && res.data) {
-        const { token, refreshToken, user } = res.data as {
+        const { token, user } = res.data as {
           token: string
-          refreshToken: string
           user: User
         }
-        apiClient.beginSession(token, refreshToken)
+        apiClient.beginSession(token, 'panel')
         setUser(user)
         setIsAuthenticated(true)
         setNeedsSetup(false)
@@ -218,20 +227,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * contexto, navegar —, e repetir isso é como uma delas acaba esquecendo de
    * uma parte.
    *
-   * `refreshToken` é opcional porque a personificação não tem um, e passar
-   * `undefined` para `setTokens` MANTERIA o anterior. Por isso a limpeza vem
-   * antes: sem ela, um refresh token de operador sobreviveria por baixo de uma
-   * sessão de personificação e a renovaria como sessão comum.
+   * O convite chega com o refresh já no cookie (a resposta o pôs); a
+   * personificação não tem refresh nenhum, e por isso nunca renova pelo cookie
+   * do navegador — que é a sessão de quem personifica (ver `refreshAccessToken`).
    *
    * `tabOnly` é a personificação: a sessão fica só nesta aba, sem tocar no que
    * o navegador já guardava. O console abre o painel do provedor numa aba nova
-   * e, numa instalação de host único, as duas dividem o mesmo `localStorage` —
-   * sem isso a aba nova trocaria a sessão do console pela do provedor e
-   * quebraria em silêncio a aba que se queria preservar.
+   * e, numa instalação de host único, as duas dividem o mesmo cookie — sem
+   * isso a aba nova trocaria a sessão do console pela do provedor e quebraria
+   * em silêncio a aba que se queria preservar.
    */
   const adoptSession = (
     token: string,
-    refreshToken: string | undefined,
     next: User,
     options?: { tabOnly?: boolean }
   ) => {
@@ -239,8 +246,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (options?.tabOnly) {
       apiClient.setTabTokens(token)
     } else {
-      apiClient.clearTokens()
-      apiClient.beginSession(token, refreshToken)
+      clearSessionScopedStorage()
+      apiClient.beginSession(token, sessionKind(next) === 'console' ? 'console' : 'panel')
     }
     setUser(next)
     setIsAuthenticated(true)
@@ -253,13 +260,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // falha aqui não segura a saída. O aviso de saída espera por ele porque
     // revoga a sessão, e a disponibilidade enviada depois seria recusada; vai
     // com o token desta sessão na mão, já que a aba o esquece logo abaixo.
-    const token = storedSession().token
+    //
+    // "Sair" encerra só ESTE aparelho (0129): a família desta sessão. A
+    // personificação não chama o servidor — o cookie do navegador é a sessão
+    // de quem personifica, e sair da aba de atendimento não a encerra.
+    const token = apiClient.getToken()
+    const kind = apiClient.getSessionKind() ?? (sessionKind(user) === 'console' ? 'console' : 'panel')
+    const daAba = apiClient.isTabScoped()
     const indisponivel = roleHas(user?.role, 'whatsapp.send')
       ? whatsappAPI.setAvailability(false).catch(() => null)
       : Promise.resolve(null)
-    void indisponivel
-      .then(() => authAPI.logout(token ?? undefined))
-      .catch(() => {})
+    if (!daAba) {
+      void indisponivel
+        .then(() => authAPI.logout(token ?? undefined, kind))
+        .catch(() => {})
+    }
     apiClient.clearTokens()
     setUser(null)
     setIsAuthenticated(false)
@@ -284,7 +299,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const can = (permission: Permission) => roleHas(user?.role, permission)
 
   const refreshUser = async () => {
-    if (!storedSession().token) return
+    if (!apiClient.hasSession()) return
     try {
       const res = await authAPI.getCurrentUser()
       if (res.success && res.data) setUser(res.data as User)

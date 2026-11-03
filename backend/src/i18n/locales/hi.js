@@ -1448,5 +1448,10 @@ export default {
   'addons.notActive': 'यह ऐड-ऑन सक्रिय नहीं है',
   'addons.notChangeable': 'सदस्यता अभी ऐड-ऑन बदलने की अनुमति नहीं देती',
   'addons.paidPlanRequired': 'ऐड-ऑन के लिए सशुल्क प्लान आवश्यक है',
-  'addons.required': 'इस सुविधा के लिए ऐड-ऑन आवश्यक है। इसे प्लान पेज पर सक्रिय करें।'
+  'addons.required': 'इस सुविधा के लिए ऐड-ऑन आवश्यक है। इसे प्लान पेज पर सक्रिय करें।',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'अनुरोध अस्वीकृत: पैनल का सुरक्षा हेडर मौजूद नहीं है',
+  'auth.sessionNotFound': 'सत्र नहीं मिला',
+  'auth.sessionRevoked': 'सत्र समाप्त किया गया',
+  'auth.sessionsRevokedAll': 'सभी सत्र समाप्त कर दिए गए'
 };

@@ -5873,6 +5873,25 @@ const ko: Dictionary = {
   'affiliates.payouts.pixKeyChanged': "승인 후 제휴사의 Pix 키가 변경되었습니다. 보내기 전에 다시 승인하세요.",
   'platform.addons.form.gatedImpact': "필수로 설정하면 활성 공급자 {count}곳이 이 기능을 사용할 수 없게 됩니다. 계속할까요?",
   'platform.addons.form.gatedBackground': "켜면 백그라운드에도 적용됩니다: 봇과 AI 상담은 응답하지 않고, 캠페인과 결제 독촉은 발송되지 않으며, 알림은 이메일과 Telegram으로만 갑니다. 장애·점검 안내는 계속 발송됩니다.",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': '활성 세션',
+  'settings.sessions.description': '이 계정이 로그인된 기기입니다. 메뉴의 "로그아웃"은 이 기기만 종료합니다. 여기서는 어느 기기든, 또는 모두를 한 번에 종료할 수 있습니다.',
+  'settings.sessions.revokeAll': '모든 기기에서 로그아웃',
+  'settings.sessions.revoke': '종료',
+  'settings.sessions.current': '이 기기',
+  'settings.sessions.console': '콘솔',
+  'settings.sessions.unknownDevice': '알 수 없는 브라우저',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': '{when} 사용',
+  'settings.sessions.since': '{when}부터',
+  'settings.sessions.empty': '열린 세션이 없습니다.',
+  'settings.sessions.loadFailed': '세션을 불러올 수 없습니다.',
+  'settings.sessions.revoked': '세션이 종료되었습니다.',
+  'settings.sessions.revokedAll': '모든 세션이 종료되었습니다.',
+  'settings.sessions.revokeFailed': '세션을 종료할 수 없습니다.',
+  'settings.sessions.confirmCurrent': '이 기기의 세션입니다. 종료하면 로그인 화면으로 돌아갑니다. 계속하시겠습니까?',
+  'settings.sessions.confirmAll': '이 기기를 포함해 이 계정의 모든 세션을 종료하시겠습니까? 각 기기에서 다시 로그인해야 합니다.',
+  'audit.action.sessionRefreshReuse': '갱신 토큰 재사용으로 세션이 종료됨',
 }
 
 export default ko

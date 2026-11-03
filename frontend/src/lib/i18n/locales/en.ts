@@ -5868,6 +5868,25 @@ const en = {
   'affiliates.payouts.pixKeyChanged': "The affiliate's Pix key changed after the approval: approve again before sending.",
   'platform.addons.form.gatedImpact': "{count} active provider(s) would lose access to this feature when it becomes required. Continue?",
   'platform.addons.form.gatedBackground': "When on, it also applies in the background: the bot and the AI assistant stop replying, campaigns and the billing cadence stop sending, and alerts go only by email and Telegram. Outage and maintenance notices keep going out.",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Active sessions',
+  'settings.sessions.description': 'The devices where this account is signed in. "Sign out", in the menu, ends only this device; here you can end any of them, or all at once.',
+  'settings.sessions.revokeAll': 'Sign out everywhere',
+  'settings.sessions.revoke': 'End',
+  'settings.sessions.current': 'This device',
+  'settings.sessions.console': 'Console',
+  'settings.sessions.unknownDevice': 'Unknown browser',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'used {when}',
+  'settings.sessions.since': 'since {when}',
+  'settings.sessions.empty': 'No open sessions.',
+  'settings.sessions.loadFailed': 'Could not load the sessions.',
+  'settings.sessions.revoked': 'Session ended.',
+  'settings.sessions.revokedAll': 'All sessions have been ended.',
+  'settings.sessions.revokeFailed': 'Could not end the session.',
+  'settings.sessions.confirmCurrent': 'This is the session on this device. Ending it takes you back to the sign-in page. Continue?',
+  'settings.sessions.confirmAll': 'End ALL sessions of this account, including this device? You will need to sign in again on each one.',
+  'audit.action.sessionRefreshReuse': 'Session ended because a refresh token was reused',
 }
 
 export default en

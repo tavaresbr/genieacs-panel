@@ -5872,6 +5872,25 @@ const it: Dictionary = {
   'affiliates.payouts.pixKeyChanged': "La chiave Pix dell'affiliato è cambiata dopo l'approvazione: approva di nuovo prima di inviare.",
   'platform.addons.form.gatedImpact': "{count} fornitore/i attivo/i perderebbero l'accesso a questa funzione rendendola obbligatoria. Continuare?",
   'platform.addons.form.gatedBackground': "Attiva, vale anche in background: il bot e l'assistente IA non rispondono, campagne e solleciti di pagamento non partono e gli avvisi vanno solo via e-mail e Telegram. Gli avvisi di guasto e manutenzione continuano.",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Sessioni attive',
+  'settings.sessions.description': 'I dispositivi su cui questo account ha effettuato l’accesso. «Esci», nel menu, chiude solo questo dispositivo; qui puoi chiuderne uno qualsiasi, o tutti insieme.',
+  'settings.sessions.revokeAll': 'Esci da tutti',
+  'settings.sessions.revoke': 'Chiudi',
+  'settings.sessions.current': 'Questo dispositivo',
+  'settings.sessions.console': 'Console',
+  'settings.sessions.unknownDevice': 'Browser sconosciuto',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'usata {when}',
+  'settings.sessions.since': 'dal {when}',
+  'settings.sessions.empty': 'Nessuna sessione aperta.',
+  'settings.sessions.loadFailed': 'Impossibile caricare le sessioni.',
+  'settings.sessions.revoked': 'Sessione chiusa.',
+  'settings.sessions.revokedAll': 'Tutte le sessioni sono state chiuse.',
+  'settings.sessions.revokeFailed': 'Impossibile chiudere la sessione.',
+  'settings.sessions.confirmCurrent': 'Questa è la sessione di questo dispositivo. Chiuderla ti riporta all’accesso. Continuare?',
+  'settings.sessions.confirmAll': 'Chiudere TUTTE le sessioni di questo account, inclusa quella di questo dispositivo? Dovrai accedere di nuovo su ciascuno.',
+  'audit.action.sessionRefreshReuse': 'Sessione chiusa per riutilizzo del token di rinnovo',
 }
 
 export default it

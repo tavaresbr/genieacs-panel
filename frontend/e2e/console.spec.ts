@@ -1,8 +1,7 @@
 import fs from 'node:fs'
 import { expect, test } from '@playwright/test'
 import {
-  ADMIN, ADMIN_STATE, DELINQUENT_PROVIDER, RENEWING_PROVIDER, SCREENSHOTS_DIR, SUSPENDED_PROVIDER, consoleTabs,
-  loginViaForm, openConsole, shot
+  ADMIN, DELINQUENT_PROVIDER, RENEWING_PROVIDER, SCREENSHOTS_DIR, SUSPENDED_PROVIDER, consoleTabs, loginViaForm, openConsole, shot, sessionFor
 } from './support/demo'
 
 /**
@@ -26,7 +25,7 @@ test.describe('login', () => {
 })
 
 test.describe('console', () => {
-  test.use({ storageState: ADMIN_STATE })
+  test.use({ storageState: sessionFor(ADMIN) })
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/platform')

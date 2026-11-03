@@ -112,8 +112,8 @@ export interface User {
 
 export interface LoginResponse {
   user: User
+  /** Só o token de acesso: o refresh vai num cookie `HttpOnly` (0129). */
   token: string
-  refreshToken: string
 }
 
 // Device Types

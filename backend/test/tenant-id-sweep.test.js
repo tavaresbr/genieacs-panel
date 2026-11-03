@@ -52,6 +52,8 @@ const { tinsertReturningId } = await import('../src/config/database.js');
 
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
+const { default: RefreshToken } = await import('../src/models/RefreshToken.js');
+const { PANEL_AUDIENCE } = await import('../src/middleware/auth.js');
 
 /**
  * Requisição com `Host` escolhido — `fetch` não faz isto: `Host` é header
@@ -354,6 +356,14 @@ before(async () => {
   ids.alfa = await semear(alfa, 'alfa');
   ids.beta = await semear(beta, 'beta');
 
+  // As sessões (0129): a família é da pessoa, então a do alfa é de alguém do
+  // alfa, e a de controle é do PRÓPRIO operador do beta — é a única que ele
+  // pode encerrar.
+  const alvoAlfa = await getDb()('users').where({ id: ids.alfa.user }).first();
+  const operadorBeta = await getDb()('users').where({ id: betaUserId }).first();
+  ids.alfa.session = (await RefreshToken.startFamily({ user: alvoAlfa, audience: PANEL_AUDIENCE, tenantId: alfa })).familyId;
+  ids.beta.session = (await RefreshToken.startFamily({ user: operadorBeta, audience: PANEL_AUDIENCE, tenantId: beta })).familyId;
+
   // A integração do WhatsApp ligada NO BETA, de propósito. Sem ela as rotas de
   // instância param em `requireConfig` antes de olhar o id, e um 400 dizendo
   // "não configurado" provaria só que o beta não configurou nada. Ligada, o
@@ -391,7 +401,7 @@ describe('o operador do beta pedindo, no host do beta, o id do alfa', () => {
 
       const { status, body } = await callAs(PAINEL_BETA, `${panelUrl}${caso.path(id)}`, {
         method: caso.method,
-        headers: { Authorization: `Bearer ${betaToken}` },
+        headers: { Authorization: `Bearer ${betaToken}`, ...(caso.headers ?? {}) },
         body: corpo(caso, ids.alfa)
       });
 
@@ -427,7 +437,7 @@ describe('a mesma pergunta com o id do próprio beta', () => {
 
       const { status, body } = await callAs(PAINEL_BETA, `${panelUrl}${caso.path(id)}`, {
         method: caso.method,
-        headers: { Authorization: `Bearer ${betaToken}` },
+        headers: { Authorization: `Bearer ${betaToken}`, ...(caso.headers ?? {}) },
         body: corpo(caso, ids.beta)
       });
 

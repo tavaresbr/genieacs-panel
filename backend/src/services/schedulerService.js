@@ -17,6 +17,7 @@ import AuditLog from '../models/AuditLog.js';
 import Setting from '../models/Setting.js';
 import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
+import RefreshToken from '../models/RefreshToken.js';
 import Lead from '../models/Lead.js';
 import { leadRetentionDays } from '../utils/leadRetention.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
@@ -272,6 +273,11 @@ class SchedulerService {
     });
     await ImpersonationTicket.prune().catch((error) => {
       console.warn(`Could not prune impersonation tickets: ${error.message}`);
+    });
+    // As sessões por aparelho vencidas ou encerradas (0129), pelo mesmo
+    // argumento: tabela compartilhada, fora do laço por provedor.
+    await RefreshToken.prune().catch((error) => {
+      console.warn(`Could not prune refresh tokens: ${error.message}`);
     });
   }
 

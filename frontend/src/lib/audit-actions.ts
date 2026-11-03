@@ -82,6 +82,8 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'operator.password_link_issued': 'audit.action.operatorPasswordLinkIssued',
   'operator.password_set': 'audit.action.operatorPasswordSet',
   'operator.sessions_revoked': 'audit.action.operatorSessionsRevoked',
+  // O reuso de um refresh já girado (0129): a família inteira foi encerrada.
+  'session.refresh_reuse': 'audit.action.sessionRefreshReuse',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.bot_trust_unlock': 'audit.action.whatsappBotTrustUnlock',
   'whatsapp.meta_template_status': 'audit.action.whatsappMetaTemplateStatus',

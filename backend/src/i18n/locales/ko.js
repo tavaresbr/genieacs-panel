@@ -1451,5 +1451,10 @@ export default {
   'addons.notActive': '이 애드온은 활성 상태가 아닙니다',
   'addons.notChangeable': '현재 구독에서는 애드온을 변경할 수 없습니다',
   'addons.paidPlanRequired': '애드온은 유료 요금제가 필요합니다',
-  'addons.required': '이 기능에는 애드온이 필요합니다. 요금제 페이지에서 활성화하세요.'
+  'addons.required': '이 기능에는 애드온이 필요합니다. 요금제 페이지에서 활성화하세요.',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': '요청이 거부되었습니다: 패널 보안 헤더가 없습니다',
+  'auth.sessionNotFound': '세션을 찾을 수 없습니다',
+  'auth.sessionRevoked': '세션이 종료되었습니다',
+  'auth.sessionsRevokedAll': '모든 세션이 종료되었습니다'
 };

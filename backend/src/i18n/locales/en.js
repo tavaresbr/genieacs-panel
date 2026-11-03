@@ -1448,5 +1448,10 @@ export default {
   'addons.notActive': 'This add-on is not active',
   'addons.notChangeable': 'The subscription does not allow changing add-ons right now',
   'addons.paidPlanRequired': 'Add-ons require a paid plan',
-  'addons.required': 'This feature requires an add-on. Activate it on the Plan page.'
+  'addons.required': 'This feature requires an add-on. Activate it on the Plan page.',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Request refused: the panel security header is missing',
+  'auth.sessionNotFound': 'Session not found',
+  'auth.sessionRevoked': 'Session ended',
+  'auth.sessionsRevokedAll': 'All sessions have been ended'
 };

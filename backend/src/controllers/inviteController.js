@@ -9,7 +9,7 @@ import { acceptsIdentifier } from '../config/login.js';
 import { getDb } from '../config/database.js';
 import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
-import { generateTokens } from '../middleware/auth.js';
+import { openPanelSession } from '../services/panelSessionService.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import { newPasswordProblem, suppliedPasswordProblem } from '../utils/passwordPolicy.js';
 import MfaService, { mfaEnabled } from '../services/mfaService.js';
@@ -339,7 +339,8 @@ class InviteController {
         ip: req.ip ?? null
       });
 
-      const { accessToken, refreshToken } = generateTokens(user, membership);
+      // A família do refresh nasce aqui, com o cookie (0129).
+      const accessToken = await openPanelSession(req, res, user, membership);
 
       return res.status(201).json(createResponse(req.t('invite.accepted'), {
         user: {
@@ -357,8 +358,7 @@ class InviteController {
           createdAt: user.created_at,
           updatedAt: user.updated_at
         },
-        token: accessToken,
-        refreshToken
+        token: accessToken
       }));
     } catch (error) {
       console.error('Accept invite error:', error);

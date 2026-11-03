@@ -5866,6 +5866,25 @@ const es: Dictionary = {
   'affiliates.payouts.pixKeyChanged': "La clave Pix del afiliado cambió después de la aprobación: apruebe de nuevo antes de enviar.",
   'platform.addons.form.gatedImpact': "{count} proveedor(es) activo(s) perderían el acceso a este recurso al activar la exigencia. ¿Continuar?",
   'platform.addons.form.gatedBackground': "Activada, también vale en segundo plano: el bot y la atención por IA no responden, las campañas y la cobranza automática no se envían y las alertas van solo por correo y Telegram. Los avisos de caída y mantenimiento siguen saliendo.",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Sesiones activas',
+  'settings.sessions.description': 'Los dispositivos donde esta cuenta tiene sesión iniciada. "Salir", en el menú, cierra solo este dispositivo; aquí puedes cerrar cualquiera de ellos, o todos a la vez.',
+  'settings.sessions.revokeAll': 'Salir de todos',
+  'settings.sessions.revoke': 'Cerrar',
+  'settings.sessions.current': 'Este dispositivo',
+  'settings.sessions.console': 'Consola',
+  'settings.sessions.unknownDevice': 'Navegador desconocido',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'usada {when}',
+  'settings.sessions.since': 'desde {when}',
+  'settings.sessions.empty': 'No hay sesiones abiertas.',
+  'settings.sessions.loadFailed': 'No se pudieron cargar las sesiones.',
+  'settings.sessions.revoked': 'Sesión cerrada.',
+  'settings.sessions.revokedAll': 'Se cerraron todas las sesiones.',
+  'settings.sessions.revokeFailed': 'No se pudo cerrar la sesión.',
+  'settings.sessions.confirmCurrent': 'Esta es la sesión de este dispositivo. Cerrarla te lleva de vuelta al inicio de sesión. ¿Continuar?',
+  'settings.sessions.confirmAll': '¿Cerrar TODAS las sesiones de esta cuenta, incluida la de este dispositivo? Tendrás que iniciar sesión de nuevo en cada uno.',
+  'audit.action.sessionRefreshReuse': 'Sesión cerrada por reutilización del token de renovación',
 }
 
 export default es

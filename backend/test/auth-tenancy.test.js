@@ -9,6 +9,7 @@ import {
   startTestServers,
   stopTestServers
 } from './helpers/harness.js';
+import { cookieFrom, cookieHeaders } from './helpers/sessionCookies.js';
 
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
 
@@ -169,8 +170,10 @@ describe('who works for whom', () => {
       'the access token has to carry the provider, not just the response');
     assert.equal(claims.role, 'viewer');
 
-    // And the refresh token has to be able to mint the same thing again.
-    assert.equal(Number(jwt.decode(body.data.refreshToken).tenantId), Number(alfa));
+    // And the refresh has to be able to mint the same thing again: the row
+    // behind the cookie (0129) carries the provider.
+    const linha = await getDb()('refresh_tokens').where({ family_id: claims.sid }).first();
+    assert.equal(Number(linha.tenant_id), Number(alfa));
   });
 
   it('gives the membership its role, not the one on the person', async () => {
@@ -366,7 +369,7 @@ describe('refreshing a session', () => {
 
     const { status, body } = await call(`${panelUrl}/api/auth/refresh`, {
       method: 'POST',
-      body: { refreshToken: signedIn.body.data.refreshToken }
+      headers: cookieHeaders(cookieFrom(signedIn.response))
     });
     assert.equal(status, 200);
     assert.equal(Number(jwt.decode(body.data.token).tenantId), Number(beta));

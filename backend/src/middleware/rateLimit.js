@@ -115,6 +115,22 @@ export const authLimiter = limiter({
 });
 
 /**
+ * A renovação pelo cookie (0129), num balde próprio e mais folgado que o do
+ * login. Ela não é palpite de senha — o refresh é um segredo de 256 bits, e o
+ * reuso já derruba a família —, mas acontece a cada carga de página e a cada
+ * quarto de hora em cada aba aberta. No balde do login (20 em 15 min por
+ * endereço), um escritório inteiro atrás de um NAT esgotava o balde e era
+ * jogado na tela de login. O limite aqui é contra enxurrada, não contra
+ * adivinhação.
+ */
+export const refreshLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
  * Login is unauthenticated, so the customer ID from the request body is the
  * only per-customer signal available. Pairing it with the source address keeps
  * one visitor's failures from locking out the rest of the customer base.

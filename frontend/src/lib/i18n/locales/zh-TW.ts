@@ -5867,6 +5867,25 @@ const zhTW: Dictionary = {
   'affiliates.payouts.pixKeyChanged': "核准後推廣者的 Pix 金鑰已變更：傳送前請重新核准。",
   'platform.addons.form.gatedImpact': "設為必要後，{count} 個活躍供應商將無法使用此功能。是否繼續？",
   'platform.addons.form.gatedBackground': "開啟後在背景同樣生效：機器人與 AI 客服不再回覆，行銷活動與催繳不再傳送，警示僅透過電子郵件與 Telegram 傳送。故障與維護通知照常傳送。",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': '使用中的工作階段',
+  'settings.sessions.description': '此帳戶已登入的裝置。選單中的「登出」只會結束此裝置；在這裡可以結束其中任何一個，或一次結束全部。',
+  'settings.sessions.revokeAll': '從所有裝置登出',
+  'settings.sessions.revoke': '結束',
+  'settings.sessions.current': '此裝置',
+  'settings.sessions.console': '主控台',
+  'settings.sessions.unknownDevice': '未知的瀏覽器',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': '{when}使用',
+  'settings.sessions.since': '自{when}起',
+  'settings.sessions.empty': '沒有開啟的工作階段。',
+  'settings.sessions.loadFailed': '無法載入工作階段。',
+  'settings.sessions.revoked': '工作階段已結束。',
+  'settings.sessions.revokedAll': '所有工作階段均已結束。',
+  'settings.sessions.revokeFailed': '無法結束工作階段。',
+  'settings.sessions.confirmCurrent': '這是此裝置的工作階段。結束後會回到登入頁面。要繼續嗎？',
+  'settings.sessions.confirmAll': '要結束此帳戶的所有工作階段（包括此裝置）嗎？您需要在每台裝置上重新登入。',
+  'audit.action.sessionRefreshReuse': '因重新整理權杖被重複使用而結束工作階段',
 }
 
 export default zhTW

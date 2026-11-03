@@ -429,7 +429,11 @@ describe('a sessão de personificação', () => {
   it('não desloga — que derrubaria as sessões de quem personifica, não as do cliente', async () => {
     const token = await personificar();
     const antes = await getDb()('users').where({ id: plataformaUserId }).first();
-    const { status, body } = await noBeta('/api/auth/logout', { method: 'POST', headers: bearer(token) });
+    // Com o cabeçalho que a tela manda (0129): o que recusa é a personificação,
+    // não a guarda de CSRF.
+    const { status, body } = await noBeta('/api/auth/logout', {
+      method: 'POST', headers: { ...bearer(token), 'X-Requested-With': 'skygenpanel' }
+    });
     assert.equal(status, 403);
     assert.equal(body.code, 'impersonation_read_only');
     const depois = await getDb()('users').where({ id: plataformaUserId }).first();
@@ -446,7 +450,9 @@ describe('a sessão de personificação', () => {
     const antes = await getDb()('users').where({ id: plataformaUserId }).first();
     for (const caminho of ['/API/Auth/logout', '/Api/AUTH/change-username', '/api/Auth/mfa/setup']) {
       const res = await noBeta(caminho, {
-        method: 'POST', headers: bearer(token), body: { username: 'sequestrado', password: 'x' }
+        method: 'POST',
+        headers: { ...bearer(token), 'X-Requested-With': 'skygenpanel' },
+        body: { username: 'sequestrado', password: 'x' }
       });
       assert.equal(res.status, 403, `${caminho}: ${JSON.stringify(res.body)}`);
       assert.equal(res.body.code, 'impersonation_read_only', caminho);

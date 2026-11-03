@@ -5874,6 +5874,25 @@ const ru: Dictionary = {
   'affiliates.payouts.pixKeyChanged': "Ключ Pix партнёра изменился после одобрения: одобрите снова перед отправкой.",
   'platform.addons.form.gatedImpact': "{count} активных провайдеров потеряют доступ к этой функции, если она станет обязательной. Продолжить?",
   'platform.addons.form.gatedBackground': "Во включённом состоянии действует и в фоне: бот и ИИ-ассистент не отвечают, кампании и напоминания об оплате не отправляются, а оповещения идут только по e-mail и Telegram. Уведомления о сбоях и работах продолжают отправляться.",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Активные сеансы',
+  'settings.sessions.description': 'Устройства, на которых выполнен вход в эту учётную запись. «Выйти» в меню завершает только это устройство; здесь можно завершить любое из них или все сразу.',
+  'settings.sessions.revokeAll': 'Выйти везде',
+  'settings.sessions.revoke': 'Завершить',
+  'settings.sessions.current': 'Это устройство',
+  'settings.sessions.console': 'Консоль',
+  'settings.sessions.unknownDevice': 'Неизвестный браузер',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'использован {when}',
+  'settings.sessions.since': 'с {when}',
+  'settings.sessions.empty': 'Открытых сеансов нет.',
+  'settings.sessions.loadFailed': 'Не удалось загрузить сеансы.',
+  'settings.sessions.revoked': 'Сеанс завершён.',
+  'settings.sessions.revokedAll': 'Все сеансы завершены.',
+  'settings.sessions.revokeFailed': 'Не удалось завершить сеанс.',
+  'settings.sessions.confirmCurrent': 'Это сеанс на этом устройстве. После завершения вы вернётесь на страницу входа. Продолжить?',
+  'settings.sessions.confirmAll': 'Завершить ВСЕ сеансы этой учётной записи, включая это устройство? Придётся снова войти на каждом из них.',
+  'audit.action.sessionRefreshReuse': 'Сеанс завершён из-за повторного использования токена обновления',
 }
 
 export default ru

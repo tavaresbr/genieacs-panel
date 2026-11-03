@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ADMIN_STATE, consoleTabs, shot } from './support/demo'
+import { consoleTabs, shot, ADMIN, sessionFor } from './support/demo'
 
 /**
  * A página de status (0128): o console abre um incidente, a página pública
@@ -11,7 +11,7 @@ test.describe.configure({ mode: 'serial' })
 const TITULO = 'Lentidão no painel (teste no navegador)'
 
 test.describe('Status', () => {
-  test.use({ storageState: ADMIN_STATE })
+  test.use({ storageState: sessionFor(ADMIN) })
 
   test('abrir um incidente, vê-lo na página pública e resolver', async ({ page, context }) => {
     await page.goto('/platform')

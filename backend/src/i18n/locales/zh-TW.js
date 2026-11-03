@@ -1448,5 +1448,10 @@ export default {
   'addons.notActive': '此附加元件未啟用',
   'addons.notChangeable': '目前的訂閱不允許變更附加元件',
   'addons.paidPlanRequired': '附加元件需要付費方案',
-  'addons.required': '此功能需要附加元件。請在方案頁面啟用。'
+  'addons.required': '此功能需要附加元件。請在方案頁面啟用。',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': '請求被拒絕：缺少面板安全標頭',
+  'auth.sessionNotFound': '找不到工作階段',
+  'auth.sessionRevoked': '工作階段已結束',
+  'auth.sessionsRevokedAll': '所有工作階段均已結束'
 };

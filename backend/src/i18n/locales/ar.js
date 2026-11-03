@@ -1440,5 +1440,10 @@ export default {
   'addons.notActive': 'هذه الإضافة غير مفعّلة',
   'addons.notChangeable': 'الاشتراك لا يسمح بتغيير الإضافات الآن',
   'addons.paidPlanRequired': 'الإضافات تتطلب خطة مدفوعة',
-  'addons.required': 'هذه الميزة تتطلب إضافة. فعّلها في صفحة الخطة.'
+  'addons.required': 'هذه الميزة تتطلب إضافة. فعّلها في صفحة الخطة.',
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'تم رفض الطلب: ترويسة أمان اللوحة مفقودة',
+  'auth.sessionNotFound': 'الجلسة غير موجودة',
+  'auth.sessionRevoked': 'تم إنهاء الجلسة',
+  'auth.sessionsRevokedAll': 'تم إنهاء جميع الجلسات'
 };
