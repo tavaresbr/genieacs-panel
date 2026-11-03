@@ -49,6 +49,8 @@ function allowMetricsScraper(req, res, next) {
 }
 
 router.get('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.listTenants);
+// O progresso dos primeiros passos de cada provedor (percentual e "travado").
+router.get('/tenants/onboarding', authenticateToken, requirePlatformAdmin, PlatformController.onboardingSummaries);
 router.post('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.create);
 router.patch('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.update);
 router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.remove);

@@ -1401,7 +1401,13 @@ type TabId = (typeof TABS)[number][0]
 export default function WhatsAppPage() {
   const { t } = useTranslation()
   const { can, user } = useAuth()
-  const [tab, setTab] = useState<TabId>('inbox')
+  // `?tab=alerts` (e as outras): o checklist do Início aponta para uma aba.
+  // Só uma aba que esta pessoa vê; qualquer outra coisa abre a caixa de entrada.
+  const [tab, setTab] = useState<TabId>(() => {
+    const wanted = new URLSearchParams(window.location.search).get('tab')
+    const found = TABS.find(([id, , permission]) => id === wanted && can(permission))
+    return found ? found[0] : 'inbox'
+  })
   const [alertsView, setAlertsView] = useState<AlertView>('results')
   // The thread Contacts handed over, and a counter that remounts the inbox for
   // each hand-over so it opens that thread even when it was already on screen.

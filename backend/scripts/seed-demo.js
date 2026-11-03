@@ -143,7 +143,10 @@ const DEMO_PROVIDERS = Object.freeze([
     name: 'Delta Link',
     owner: { username: 'delta.dono', email: 'dono@delta-link.test', password: 'Delta-Demo-2026' },
     taxId: '12345678000195',
-    gateway: 'manual'
+    gateway: 'manual',
+    // O único com o checklist dos primeiros passos à vista: é nele que o e2e
+    // confere o card do Início (percentual e próximo passo).
+    keepChecklist: true
   }
 ]);
 
@@ -205,7 +208,7 @@ async function garantirProvedor(spec) {
   // abriria nele, e a demonstração é do que vem depois.
   await runInTenant(tenant.id, async () => {
     await OnboardingService.dismiss('wizard');
-    await OnboardingService.dismiss('checklist');
+    if (!spec.keepChecklist) await OnboardingService.dismiss('checklist');
   });
   return { tenant, usuario, novo };
 }

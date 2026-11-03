@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { mapSettingsAPI, settingsAPI, sgpAPI, tenantAPI, usersAPI, whatsappAPI, type GenieAcsAuthType, type TenantBilling, type WhatsAppConfig } from '@/lib/api'
+import { asaasProviderAPI, mapSettingsAPI, settingsAPI, sgpAPI, subscriptionAPI, tenantAPI, usersAPI, whatsappAPI, type AsaasEnvironment, type GenieAcsAuthType, type OnboardingWizardStep, type TenantBilling, type WhatsAppConfig } from '@/lib/api'
 import { canGeocode, geocodeFields } from '@/lib/provider-location'
 import { Icon } from '@/components/ui/icon'
 import { LocationPicker, wrapLongitude } from '@/components/location-picker'
@@ -26,15 +26,21 @@ import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
  * is the one thing a panel cannot do anything without. Skippable, and the skip
  * is remembered per provider in the browser: an operator who wants to set
  * things up from the settings page is not nagged into a wizard.
+ *
+ * A etapa em que a pessoa está é gravada no provedor (`settings`): fechar a aba
+ * no meio, ou abrir noutra máquina, retoma dali. Cada etapa que tem como ser
+ * conferida (ACS, SGP, Asaas, WhatsApp) tem o seu botão de teste.
  */
 
-type Step = 'welcome' | 'identity' | 'acs' | 'sgp' | 'whatsapp' | 'team' | 'done'
+type Step = OnboardingWizardStep
 
 /** O que ficou feito nesta passagem pelo assistente, para o resumo final. */
 interface Saved {
   acs: boolean
   sgp: boolean
+  asaas: boolean
   whatsapp: boolean
+  billing: boolean
   colleague: boolean
 }
 
@@ -63,19 +69,81 @@ export default function Onboarding() {
   // 403 ao salvar é um passo que não deveria aparecer.
   const canSgp = can('sgp.config')
   const canWhatsapp = can('whatsapp.config')
+  const canAsaas = can('asaas.config')
   const canBilling = can('settings.write')
   const canMapWrite = can('map.write')
   const steps = useMemo<Step[]>(() => [
     'welcome', 'identity', 'acs',
     ...(canSgp ? ['sgp' as const] : []),
+    ...(canAsaas ? ['asaas' as const] : []),
     ...(canWhatsapp ? ['whatsapp' as const] : []),
+    ...(canBilling ? ['billing' as const] : []),
     'team', 'done'
-  ], [canSgp, canWhatsapp])
+  ], [canSgp, canAsaas, canWhatsapp, canBilling])
   const go = (delta: 1 | -1) => {
     const next = steps[steps.indexOf(step) + delta]
     if (next) setStep(next)
   }
-  const [saved, setSaved] = useState<Saved>({ acs: false, sgp: false, whatsapp: false, colleague: false })
+  const [saved, setSaved] = useState<Saved>({ acs: false, sgp: false, asaas: false, whatsapp: false, billing: false, colleague: false })
+
+  /**
+   * Retomar: a etapa gravada no provedor, se ainda for uma das que esta pessoa
+   * vê. Só depois de lida é que as trocas de etapa passam a ser gravadas — do
+   * contrário a primeira renderização ('welcome') apagaria a etapa guardada.
+   */
+  const resumed = useRef(false)
+  useEffect(() => {
+    let cancelled = false
+    void settingsAPI.onboardingStatus().then((res) => {
+      if (cancelled) return
+      const wanted = res.success ? res.data?.wizardStep ?? null : null
+      if (wanted && wanted !== 'done' && steps.includes(wanted)) setStep(wanted)
+    }).catch(() => {}).finally(() => { if (!cancelled) resumed.current = true })
+    return () => { cancelled = true }
+    // Uma vez, na chegada: as permissões que montam `steps` já vêm da sessão.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (!resumed.current) return
+    void settingsAPI.saveOnboardingStep(step).catch(() => {})
+  }, [step])
+
+  // Asaas: ambiente e chave. A chave guardada nunca volta do servidor; o campo
+  // vazio com a integração pronta é "manter a que está lá".
+  const [asaas, setAsaas] = useState<{ environment: AsaasEnvironment; apiKey: string }>({ environment: 'sandbox', apiKey: '' })
+  const [asaasReady, setAsaasReady] = useState(false)
+  const [asaasTest, setAsaasTest] = useState<string | null>(null)
+  useEffect(() => {
+    if (step !== 'asaas') return
+    let cancelled = false
+    void asaasProviderAPI.getConfig().then((res) => {
+      if (cancelled || !res.success || !res.data) return
+      const config = res.data
+      setAsaas((a) => ({ ...a, environment: config.environment }))
+      if (config.ready) {
+        setAsaasReady(true)
+        setSaved((s) => ({ ...s, asaas: true }))
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [step])
+
+  // O contato de cobrança: o e-mail e o telefone para onde a PLATAFORMA manda
+  // as faturas da assinatura deste provedor — os mesmos campos do cadastro
+  // fiscal em Configurações > Geral, pela mesma rota.
+  const [billingContact, setBillingContact] = useState({ email: '', phone: '' })
+  useEffect(() => {
+    if (step !== 'billing') return
+    let cancelled = false
+    void subscriptionAPI.current().then((res) => {
+      if (cancelled || !res.success || !res.data?.billing) return
+      const { email, phone } = res.data.billing
+      setBillingContact((c) => ({ email: c.email || email || '', phone: c.phone || phone || '' }))
+      if ((email ?? '').trim() || (phone ?? '').trim()) setSaved((s) => ({ ...s, billing: true }))
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [step])
+  const [waTest, setWaTest] = useState<string | null>(null)
 
   const [sgp, setSgp] = useState({ baseUrl: '', app: '', token: '' })
   const [sgpReady, setSgpReady] = useState(false)
@@ -209,6 +277,71 @@ export default function Onboarding() {
       toast.error(error instanceof Error && error.message ? error.message : t('settings.saveError'))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const testAsaas = async () => {
+    setBusy(true)
+    setAsaasTest(null)
+    try {
+      const key = asaas.apiKey.trim()
+      const res = await asaasProviderAPI.test({ environment: asaas.environment, ...(key ? { apiKey: key } : {}) })
+      setAsaasTest(res.success
+        ? t('onboarding.asaas.testOk', { account: res.data?.accountName || '-' })
+        : (res.message || t('onboarding.asaas.testFailed')))
+    } catch (error) {
+      setAsaasTest(error instanceof Error && error.message ? error.message : t('onboarding.asaas.testFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveAsaas = async () => {
+    const key = asaas.apiKey.trim()
+    // Já pronta e nada digitado: só segue.
+    if (asaasReady && !key) { go(1); return }
+    if (!key) { toast.error(t('onboarding.asaas.keyRequired')); return }
+    setBusy(true)
+    try {
+      const res = await asaasProviderAPI.updateConfig({ enabled: true, environment: asaas.environment, apiKey: key })
+      if (!res.success) { toast.error(res.message || t('settings.saveError')); return }
+      setSaved((s) => ({ ...s, asaas: true }))
+      go(1)
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : t('settings.saveError'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveBilling = async () => {
+    const email = billingContact.email.trim()
+    const phone = billingContact.phone.trim()
+    if (!email && !phone) { go(1); return }
+    setBusy(true)
+    try {
+      const res = await tenantAPI.updateBilling({ email: email || null, phone: phone || null })
+      if (!res.success) { toast.error(res.message || t('billing.saveFailed')); return }
+      setSaved((s) => ({ ...s, billing: true }))
+      go(1)
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : t('billing.saveFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** O teste do WhatsApp: há um número conectado agora? */
+  const testWhatsapp = async () => {
+    setWaTest(null)
+    try {
+      const res = await whatsappAPI.listAccounts()
+      const contas = res.success && res.data ? res.data : []
+      setWaTest(contas.some((conta) => conta.status === 'connected')
+        ? t('onboarding.whatsapp.testOk')
+        : t(contas.length ? 'onboarding.whatsapp.testNotConnected' : 'onboarding.whatsapp.testNoNumber'))
+    } catch {
+      setWaTest(t('onboarding.whatsapp.testNoNumber'))
     }
   }
 
@@ -554,6 +687,80 @@ export default function Onboarding() {
             </>
           )}
 
+          {step === 'asaas' && (
+            <>
+              {asaasReady && (
+                <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-4">
+                  <Icon name="check" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-success))]" />
+                  <p className="text-sm leading-6">{t('onboarding.asaas.alreadyConfigured')}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label htmlFor="ob-asaas-env" className="field-label">{t('onboarding.asaas.environment')}</label>
+                  <select
+                    id="ob-asaas-env"
+                    className="modern-input w-full"
+                    value={asaas.environment}
+                    onChange={(e) => setAsaas((a) => ({ ...a, environment: e.target.value as AsaasEnvironment }))}
+                  >
+                    <option value="sandbox">{t('onboarding.asaas.sandbox')}</option>
+                    <option value="production">{t('onboarding.asaas.production')}</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="ob-asaas-key" className="field-label">{t('onboarding.asaas.apiKey')}</label>
+                  <input
+                    id="ob-asaas-key"
+                    type="password"
+                    className="modern-input w-full"
+                    autoComplete="new-password"
+                    placeholder={asaasReady ? t('onboarding.asaas.keyStored') : ''}
+                    value={asaas.apiKey}
+                    onChange={(e) => setAsaas((a) => ({ ...a, apiKey: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <p className="field-hint">{t('onboarding.asaas.hint')}</p>
+              <div>
+                <button type="button" className="modern-button-secondary" disabled={busy || (!asaas.apiKey.trim() && !asaasReady)} onClick={() => void testAsaas()}>
+                  {t('onboarding.test')}
+                </button>
+                {asaasTest && <p className="field-hint">{asaasTest}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(-1)}>{t('common.back')}</button>
+                <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(1)}>{t('onboarding.skipStep')}</button>
+                <button type="button" className="modern-button" disabled={busy} onClick={() => void saveAsaas()}>
+                  {busy ? t('common.saving') : t('common.next')}
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === 'billing' && (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="ob-billing-email" className="field-label">{t('billing.email')}</label>
+                  <input id="ob-billing-email" type="email" className="modern-input w-full" maxLength={160} autoComplete="email" value={billingContact.email} onChange={(e) => setBillingContact((c) => ({ ...c, email: e.target.value }))} />
+                </div>
+                <div>
+                  <label htmlFor="ob-billing-phone" className="field-label">{t('billing.phone')}</label>
+                  <input id="ob-billing-phone" type="tel" className="modern-input w-full" maxLength={32} autoComplete="tel" value={billingContact.phone} onChange={(e) => setBillingContact((c) => ({ ...c, phone: e.target.value }))} />
+                </div>
+              </div>
+              <p className="field-hint">{t('onboarding.billing.hint')}</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(-1)}>{t('common.back')}</button>
+                <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(1)}>{t('onboarding.skipStep')}</button>
+                <button type="button" className="modern-button" disabled={busy} onClick={() => void saveBilling()}>
+                  {busy ? t('common.saving') : t('common.next')}
+                </button>
+              </div>
+            </>
+          )}
+
           {step === 'whatsapp' && (
             <>
               {waProblem && <p className="field-hint">{t('onboarding.whatsapp.notAvailable')}</p>}
@@ -565,6 +772,12 @@ export default function Onboarding() {
                 </div>
               )}
               {waConfig && <WhatsAppConnection config={waConfig} compact />}
+              {waConfig && (
+                <div>
+                  <button type="button" className="modern-button-secondary" onClick={() => void testWhatsapp()}>{t('onboarding.test')}</button>
+                  {waTest && <p className="field-hint">{waTest}</p>}
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="modern-button-secondary" onClick={() => go(-1)}>{t('common.back')}</button>
                 <button type="button" className="modern-button-secondary" onClick={() => go(1)}>{t('onboarding.skipStep')}</button>
@@ -580,7 +793,9 @@ export default function Onboarding() {
                   ['onboarding.done.item.name', Boolean(currentName.trim())],
                   ['onboarding.done.item.acs', saved.acs || acsManaged],
                   ...(canSgp ? [['onboarding.done.item.sgp', saved.sgp] as const] : []),
+                  ...(canAsaas ? [['onboarding.done.item.asaas', saved.asaas] as const] : []),
                   ...(canWhatsapp ? [['onboarding.done.item.whatsapp', saved.whatsapp] as const] : []),
+                  ...(canBilling ? [['onboarding.done.item.billing', saved.billing] as const] : []),
                   ['onboarding.done.item.team', saved.colleague]
                 ] as const).map(([key, ok]) => (
                   <li key={key} className="flex items-center justify-between gap-3 py-2.5">

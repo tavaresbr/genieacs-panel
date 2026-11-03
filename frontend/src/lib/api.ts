@@ -3476,15 +3476,39 @@ export const settingsAPI = {
   /** Marca, no provedor, que o assistente foi concluído/pulado ou o checklist ocultado. */
   dismissOnboarding: (what: 'wizard' | 'checklist') =>
     apiClient.post('/settings/onboarding/dismiss', { what }),
+
+  /** Grava a etapa em que o assistente está, para retomar dali. */
+  saveOnboardingStep: (step: OnboardingWizardStep) =>
+    apiClient.put<{ step: OnboardingWizardStep }>('/settings/onboarding/step', { step }),
 }
 
-export type OnboardingItemKey = 'genieacs' | 'firstDevice' | 'provisioning' | 'sgp' | 'whatsapp' | 'team'
+export type OnboardingItemKey =
+  | 'genieacs' | 'genieacsOnline' | 'firstDevice' | 'provisioning' | 'sgp' | 'asaas'
+  | 'whatsapp' | 'whatsappConnected' | 'alerts' | 'billingContact' | 'team'
+
+export type OnboardingWizardStep =
+  | 'welcome' | 'identity' | 'acs' | 'sgp' | 'asaas' | 'whatsapp' | 'billing' | 'team' | 'done'
+
+export interface OnboardingItem {
+  key: OnboardingItemKey
+  done: boolean
+  /** `false`: não vale para este provedor (o agente, numa conexão direta) — fora do percentual. */
+  applicable: boolean
+  /** A tela onde o item se resolve. */
+  href: string
+}
 
 /** Conferido no que o provedor TEM, não numa marca clicada. */
 export interface OnboardingStatus {
   wizardDone: boolean
   checklistDismissed: boolean
-  items: Array<{ key: OnboardingItemKey; done: boolean }>
+  /** A etapa do assistente em que o provedor parou, ou nulo. */
+  wizardStep: OnboardingWizardStep | null
+  items: OnboardingItem[]
+  /** Dos itens aplicáveis, quantos % estão feitos. */
+  percent: number
+  /** O primeiro item aplicável pendente, ou nulo com tudo feito. */
+  nextStep: OnboardingItemKey | null
 }
 
 /** O que a rota de sugestão devolve. Nunca um endereço que o painel recusaria ao salvar. */
@@ -7939,4 +7963,21 @@ export const addonsAPI = {
     apiClient.post<ConsoleTenantAddons>(
       `/platform/tenants/${tenantId}/addons/${encodeURIComponent(code)}/revoke`, { reason }
     ),
+}
+
+/** O progresso dos primeiros passos de um provedor, como o console o vê. */
+export interface OnboardingSummary {
+  tenantId: number
+  percent: number
+  done: number
+  total: number
+  nextStep: OnboardingItemKey | null
+  /** Abaixo de 50% depois de 7 dias de vida. */
+  stuck: boolean
+}
+
+export const onboardingConsoleAPI = {
+  /** Um resumo por provedor; lido à parte da lista, que não espera por ele. */
+  summaries: () =>
+    apiClient.get<{ summaries: OnboardingSummary[] }>('/platform/tenants/onboarding'),
 }

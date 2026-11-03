@@ -47,6 +47,9 @@ router.post('/genieacs-connection/agent-token', authenticateToken, requirePermis
 // administra; marcar "já vi" é `settings.write`, como gravar qualquer ajuste.
 router.get('/onboarding', authenticateToken, requirePermission('settings.read'), SettingsController.getOnboardingStatus);
 router.post('/onboarding/dismiss', authenticateToken, requirePermission('settings.write'), SettingsController.dismissOnboarding);
+// A etapa em que o assistente parou, para retomar. Gravar é `settings.write`,
+// como o "já vi" acima; a leitura vem junto do GET `/onboarding`.
+router.put('/onboarding/step', authenticateToken, requirePermission('settings.write'), SettingsController.saveOnboardingStep);
 
 // Como está a sincronização de IDs de cliente. Antes de `/:key`, pela mesma
 // razão das rotas acima.
