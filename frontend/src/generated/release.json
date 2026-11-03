@@ -1,34 +1,46 @@
 {
-  "version": "1.25.0",
-  "build": 1508,
-  "sourceCommit": "d188d364de6c",
+  "version": "1.26.0",
+  "build": 1521,
+  "sourceCommit": "1da71839064e",
   "releasedAt": "2026-11-03",
-  "basedOnTag": "v1.24.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/8cc534ff8ba2...d188d364de6c",
+  "basedOnTag": "v1.25.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/f16b687b911e...1da71839064e",
   "changes": [
     {
-      "shortHash": "2cdfd0af",
-      "date": "2026-11-02",
-      "title": "Cadastro de cliente também no Asaas (fase 4)",
+      "shortHash": "9f8350e9",
+      "date": "2026-11-03",
+      "title": "Checklist completo com percentual, assistente retomável e progresso no console",
       "category": "New"
     },
     {
-      "shortHash": "c896ce96",
+      "shortHash": "edd19b05",
       "date": "2026-11-03",
-      "title": "Webhook de pagamento da conta do provedor (fase 5a)",
-      "category": "New"
-    },
-    {
-      "shortHash": "0735a1c6",
-      "date": "2026-11-03",
-      "title": "Régua e campanhas cobram também o Asaas (fase 5b)",
-      "category": "New"
-    },
-    {
-      "shortHash": "64b3950f",
-      "date": "2026-11-03",
-      "title": "Vincular à mão não é mais desfeito na hora pela regra de número antigo",
+      "title": "App do provedor (PWA) com notificações push (0130)",
       "category": "Maintenance"
+    },
+    {
+      "shortHash": "7a40d812",
+      "date": "2026-11-03",
+      "title": "Login com cookie seguro e sessões por aparelho (0129)",
+      "category": "New"
+    },
+    {
+      "shortHash": "28798d48",
+      "date": "2026-11-03",
+      "title": "Backup externo cifrado em S3 compatível e teste de restauração",
+      "category": "New"
+    },
+    {
+      "shortHash": "d1fdcec9",
+      "date": "2026-11-03",
+      "title": "Adapta testes de push e e2e do PWA/onboarding ao login por cookie",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "633f1d29",
+      "date": "2026-11-03",
+      "title": "PR #464 CodeQL alerts and review findings",
+      "category": "Fixed"
     }
   ]
 }

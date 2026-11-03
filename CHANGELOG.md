@@ -7,6 +7,25 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.26.0] - 2026-11-03
+
+### New
+
+- Checklist completo com percentual, assistente retomável e progresso no console (`9f8350e9`)
+- Login com cookie seguro e sessões por aparelho (0129) (`7a40d812`)
+- Backup externo cifrado em S3 compatível e teste de restauração (`28798d48`)
+
+### Fixed
+
+- PR #464 CodeQL alerts and review findings (`633f1d29`)
+
+### Maintenance
+
+- App do provedor (PWA) com notificações push (0130) (`edd19b05`)
+- Adapta testes de push e e2e do PWA/onboarding ao login por cookie (`d1fdcec9`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/f16b687b911e...1da71839064e)
+
 ## [1.25.0] - 2026-11-03
 
 ### New
