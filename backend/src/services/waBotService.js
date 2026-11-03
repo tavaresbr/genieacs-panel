@@ -12,6 +12,7 @@ import MaintenanceService from './maintenanceService.js';
 import WaTagService from './waTagService.js';
 import BillingStatusService from './billingStatusService.js';
 import PlatformOwnerBotService from './platformOwnerBotService.js';
+import AddonService from './addonService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -268,6 +269,8 @@ const PAUSA_ATENDENTE_MS = 4 * 60 * 60 * 1000;
  * bot passa para um atendente, com a mesma pausa do "atendente".
  */
 const PASSO_VALIDADE_MS = 30 * 60 * 1000;
+/** O "sim" que libera o desbloqueio vale pouco: quem responde depois não é a mesma conversa. */
+const PASSO_LIBERACAO_VALIDADE_MS = 5 * 60 * 1000;
 const TENTATIVAS_DOCUMENTO = 3;
 const JANELA_TENTATIVAS_MS = 60 * 60 * 1000;
 /** Quantos contratos cabem na lista de escolha: um dígito por opção. */
@@ -555,7 +558,8 @@ async function responderLiberacao(link, conversation) {
 function passoAtivo(conversation) {
   if (!conversation?.bot_step || !conversation.bot_step_at) return null;
   const desde = new Date(conversation.bot_step_at).getTime();
-  return Date.now() - desde < PASSO_VALIDADE_MS ? conversation.bot_step : null;
+  const validade = conversation.bot_step === PASSO_LIBERACAO ? PASSO_LIBERACAO_VALIDADE_MS : PASSO_VALIDADE_MS;
+  return Date.now() - desde < validade ? conversation.bot_step : null;
 }
 
 class WaBotService {
@@ -583,6 +587,7 @@ class WaBotService {
   static TENTATIVAS_DOCUMENTO = TENTATIVAS_DOCUMENTO;
 
   static PASSO_VALIDADE_MS = PASSO_VALIDADE_MS;
+  static PASSO_LIBERACAO_VALIDADE_MS = PASSO_LIBERACAO_VALIDADE_MS;
 
   static PASSO_LIBERACAO = PASSO_LIBERACAO;
 
@@ -638,6 +643,11 @@ class WaBotService {
     // Desligado na tela do WhatsApp: o provedor atende tudo à mão.
     const { botEnabled } = await WhatsAppConfigService.getConfig();
     if (botEnabled === false) return { replied: false, reason: 'disabled' };
+
+    // O add-on de WhatsApp (0127), quando o catálogo o exige: a porta das
+    // telas não alcança o bot, que responde do webhook. Sem add-on `gated`,
+    // nem consulta — o bot de todo mundo segue como era.
+    if (!(await AddonService.allows('whatsapp'))) return { replied: false, reason: 'addon_required' };
 
     // An opt-out is already recorded by the inbound handler and confirmed
     // elsewhere. Routing "SAIR" through the intent table would answer a request

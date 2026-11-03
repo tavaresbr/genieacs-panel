@@ -49,11 +49,12 @@ export function tokenDaQuery(query) {
 }
 
 /**
- * A credencial que o v2 manda quando não há `?t=`: header `apikey`, ou o campo
- * `apikey` do corpo do evento.
+ * A credencial que o v2 manda quando não há `?t=`: só o header `apikey`. O
+ * campo `apikey` do corpo do evento não vale mais: ele viaja dentro do que o
+ * remetente escreve e seria uma segunda porta para a chave da instância.
  */
-export function credencialDoPedido(headers, body) {
-  return String(headers?.apikey || headers?.['x-api-key'] || body?.apikey || '');
+export function credencialDoPedido(headers) {
+  return String(headers?.apikey || headers?.['x-api-key'] || '');
 }
 
 /**

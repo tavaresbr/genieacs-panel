@@ -22,6 +22,7 @@ import { exemptUntilFromDateInput, todayIso, toIsoDay } from '@/lib/subscription
 import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { CardBadge } from '@/components/card-badge'
 import { TenantReferrals } from '@/components/platform/tenant-referrals'
+import { TenantAddons } from '@/components/platform/tenant-addons'
 import { ConsolePlanChange } from '@/components/platform/console-plan-change'
 
 interface Props {
@@ -759,6 +760,9 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
 
       {/* A indicação e os créditos do provedor (0106), com o ajuste manual. */}
       <TenantReferrals tenantId={tenantId} />
+
+      {/* Os add-ons pagos do provedor (0127): dar de graça e revogar, com motivo. */}
+      <TenantAddons tenantId={tenantId} />
 
       {/* Extrato */}
       {events.length > 0 && (

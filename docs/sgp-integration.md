@@ -266,8 +266,17 @@ panel accepts several shapes, all of which still require the secret:
 - the digest in hex or base64;
 - the signed payload being either the body alone or `<timestamp>.<body>`.
 
-Turn on *Require a signed timestamp* only once SGP is confirmed to send one:
-with it on, a delivery without a fresh timestamp is refused.
+*Require a signed timestamp* is **on by default for a new integration** (one
+with no SGP configuration saved yet): a delivery without a fresh timestamp is
+refused, which closes the replay of a captured delivery. Integrations saved
+before this default keep the setting they had (off unless someone turned it
+on), so nothing that already receives events stops. If this SGP install does
+not send a timestamp header, deliveries answer `401` and the panel's log shows
+`Rejected an SGP webhook delivery: missing_timestamp` — turn the option off on
+the same screen. To turn it on for
+an older integration, confirm SGP sends the timestamp and switch it on (or
+`PUT /api/sgp/config` with `{"webhookRequireTimestamp": true}`); see
+`docs/seguranca-auditoria.md` §4.2.
 
 Verify a delivery by hand with:
 

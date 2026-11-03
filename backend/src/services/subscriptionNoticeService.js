@@ -260,7 +260,8 @@ class SubscriptionNoticeService {
   /** A fatura de pró-rata vencida mais antiga, emitida no gateway — ou nada. */
   static async overdueProration() {
     const linha = await tdb('billing_charges')
-      .where({ kind: 'proration' })
+      // A pró-rata da ativação de um add-on (0127) também.
+      .whereIn('kind', ['proration', 'addon'])
       .whereIn('status', OPEN_CHARGE_STATUSES)
       .whereNotNull('gateway_charge_id')
       .orderBy('due_date', 'asc')
@@ -434,7 +435,7 @@ class SubscriptionNoticeService {
       // Sem prazo vencido na assinatura, a cobrança vencida também é dívida.
       devendo = {
         since: new Date(`${isoDateOf(vencida.due_date) ?? hoje}T12:00:00Z`),
-        reason: vencida.kind === 'proration' || vencida.kind === 'overage' ? 'proration_overdue' : 'renewal_expired'
+        reason: vencida.kind === 'proration' || vencida.kind === 'overage' || vencida.kind === 'addon' ? 'proration_overdue' : 'renewal_expired'
       };
     }
     if (!devendo && !suspensoAuto) return { sent: false, reason: 'not_overdue' };

@@ -59,7 +59,10 @@ export default function Invite() {
     event.preventDefault()
     setError('')
     if (form.username.trim().length < 3) return setError(t('setup.error.usernameTooShort'))
-    if (form.password.length < 8) return setError(t('setup.error.passwordTooShort'))
+    // Sem mínimo aqui: quem já tem conta digita a senha que JÁ tem, e ela pode
+    // ser de antes da regra de 10 caracteres. A regra da senha nova é do
+    // servidor, que só a aplica a quem está criando conta por este convite.
+    if (!form.password) return setError(t('setup.error.passwordTooShort'))
     // O e-mail é exigido de quem está criando conta aqui. Como esta tela não
     // sabe (nem deve saber) se a pessoa já existe no deploy, ela pede sempre e
     // deixa o backend ignorá-lo quando a conta já existe — perguntar seria

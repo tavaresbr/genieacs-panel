@@ -1,21 +1,105 @@
 {
-  "version": "1.22.1",
-  "build": 1463,
-  "sourceCommit": "a2475fdd7354",
-  "releasedAt": "2026-11-02",
-  "basedOnTag": "v1.22.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/9648e04194d4...a2475fdd7354",
+  "version": "1.24.0",
+  "build": 1500,
+  "sourceCommit": "70a272adb8bb",
+  "releasedAt": "2026-11-03",
+  "basedOnTag": "v1.23.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5777ee1b2692...70a272adb8bb",
   "changes": [
     {
-      "shortHash": "0dc8cdf9",
+      "shortHash": "7690e680",
       "date": "2026-11-02",
-      "title": "Auditoria das ações sensíveis do WhatsApp: liberar, vincular, chamado, telefone, régua, campanha, opt-out, modelos e configuração",
+      "title": "Segurança: recusa CORS_ORIGINS=* em produção, CSP opt-in de upgrade e JWT com algoritmo fixo",
       "category": "Maintenance"
     },
     {
-      "shortHash": "f205caf1",
+      "shortHash": "0214f9c3",
       "date": "2026-11-02",
-      "title": "Let a server follow new releases on its own",
+      "title": "Segurança: política de senha nova (10+, sem comuns, diferente do login) e limitador da troca de senha",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b6b78a58",
+      "date": "2026-11-02",
+      "title": "Segurança: webhook do SGP exige carimbo de tempo por padrão nas integrações novas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0ef1a613",
+      "date": "2026-11-02",
+      "title": "Segurança: redação de credenciais no logger e no console embrulhado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "01cd5b3b",
+      "date": "2026-11-02",
+      "title": "Varredura de segredos (gitleaks) e CodeQL, não bloqueantes",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8b7008be",
+      "date": "2026-11-02",
+      "title": "Relatório da auditoria de segurança (rodada D)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6596180b",
+      "date": "2026-11-02",
+      "title": "Página de status da plataforma (0126)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ef75d6e8",
+      "date": "2026-11-02",
+      "title": "Programa de afiliados com comissão recorrente e lote mensal por Pix (0124)",
+      "category": "New"
+    },
+    {
+      "shortHash": "4ecb2ee0",
+      "date": "2026-11-02",
+      "title": "Add-ons pagos (0125) — catálogo, direito, cobrança e telas",
+      "category": "New"
+    },
+    {
+      "shortHash": "09b47eb7",
+      "date": "2026-11-02",
+      "title": "Correções da revisão — porta, cobrança e Pix",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "3f62be28",
+      "date": "2026-11-02",
+      "title": "Afiliados, add-ons e página de status no navegador",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f5a69e87",
+      "date": "2026-11-02",
+      "title": "Gitleaks ignora a senha de teste do password-policy.test.js",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7bee45b0",
+      "date": "2026-11-02",
+      "title": "Segurança: corrige os 13 alertas do CodeQL no PR de afiliados",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2b9654ee",
+      "date": "2026-11-02",
+      "title": "Segurança: webhook só por header ou ?t=, nome do cliente tratado como dado na IA, 'sim' da liberação vale 5 min",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "086ed44e",
+      "date": "2026-11-02",
+      "title": "Segurança: sessão do afiliado por versão e logs sem quebra de linha (CodeQL)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bf647c4c",
+      "date": "2026-11-02",
+      "title": "Logs com JSON.stringify e ação de auditoria sem 'password' no nome",
       "category": "Maintenance"
     }
   ]

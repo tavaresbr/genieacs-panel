@@ -328,10 +328,19 @@ describe('whatsapp webhook authentication', () => {
     assert.equal(trocado.status, 401);
   });
 
-  it('accepts the instance key in the body when there is no ?t=', async () => {
+  it('refuses the instance key in the body when there is no ?t=', async () => {
     const { status } = await call(hook(), {
       method: 'POST',
       body: { instance: INSTANCE, event: 'messages.upsert', apikey: INSTANCE_TOKEN }
+    });
+    assert.equal(status, 401);
+  });
+
+  it('still accepts the instance key in the apikey header when there is no ?t=', async () => {
+    const { status } = await call(hook(), {
+      method: 'POST',
+      headers: { apikey: INSTANCE_TOKEN },
+      body: { instance: INSTANCE, event: 'messages.upsert' }
     });
     assert.equal(status, 200);
   });

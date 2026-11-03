@@ -7,6 +7,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
 
 export default function Setup() {
   const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' })
@@ -32,7 +33,7 @@ export default function Setup() {
       setError(t('setup.error.emailInvalid'))
       return
     }
-    if (formData.password.length < 8) {
+    if (formData.password.length < PASSWORD_MIN_LENGTH) {
       setError(t('setup.error.passwordTooShort'))
       return
     }

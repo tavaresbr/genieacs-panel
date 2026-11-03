@@ -847,7 +847,11 @@ const DEFAULT_CONFIG = Object.freeze({
   ticketOccurrenceType: DEFAULT_TICKET_OCCURRENCE_TYPE,
   endpoints: DEFAULT_ENDPOINTS,
   webhookEnabled: false,
-  webhookRequireTimestamp: false,
+  // Ligado nas integrações NOVAS (sem configuração gravada): a entrega precisa
+  // de um carimbo de tempo assinado e recente, o que fecha a repetição de uma
+  // entrega capturada. As já gravadas antes desta versão sem o campo são lidas
+  // como `false` em `readStoredConfig` — nada muda para quem já recebe eventos.
+  webhookRequireTimestamp: true,
   webhookToleranceSeconds: 300,
   reconcileEnabled: false,
   reconcileIntervalMinutes: 15,
@@ -1124,6 +1128,10 @@ class SgpService {
       return {
         ...DEFAULT_CONFIG,
         ...parsed,
+        // Configuração gravada sem o campo é de antes de existir a exigência
+        // por padrão: continua sem exigir, para não derrubar um webhook que
+        // funciona. Quem quiser liga na tela (ver docs/sgp-integration.md).
+        webhookRequireTimestamp: parsed.webhookRequireTimestamp === true,
         endpoints: withEndpointDefaults(parsed.endpoints)
       };
     } catch {
@@ -2134,7 +2142,7 @@ class SgpService {
       vendedor_id: input.vendedorId,
       tecnico_id: input.technicianId,
       splitter_id: input.splitterId,
-      splitter_porta: input.splitterId ? input.splitterPort : '',
+      splitter_port: input.splitterId ? input.splitterPort : '',
       login: input.login,
       senha: input.password,
       os_instalacao: input.installOs ? 1 : '',

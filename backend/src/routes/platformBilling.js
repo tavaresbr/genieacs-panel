@@ -5,6 +5,7 @@ import PlatformCouponsController from '../controllers/platformCouponsController.
 import PlatformReferralsController from '../controllers/platformReferralsController.js';
 import CancellationController from '../controllers/cancellationController.js';
 import PlatformDelinquencyController from '../controllers/platformDelinquencyController.js';
+import PlatformAddonsController from '../controllers/platformAddonsController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -68,5 +69,15 @@ router.post('/tenants/:id/credits', ...guard, PlatformReferralsController.adjust
 // vão no corpo, e cada um é tratado no escopo dele (ver o controlador).
 router.get('/delinquency', ...guard, PlatformDelinquencyController.list);
 router.post('/delinquency/actions', ...guard, PlatformDelinquencyController.run);
+
+// Os add-ons pagos (0127): o catálogo, e os add-ons de UM provedor — dar de
+// graça e revogar, com motivo, nas duas trilhas.
+router.get('/addons', ...guard, PlatformAddonsController.list);
+router.post('/addons', ...guard, PlatformAddonsController.create);
+router.patch('/addons/:id', ...guard, PlatformAddonsController.update);
+router.delete('/addons/:id', ...guard, PlatformAddonsController.remove);
+router.get('/tenants/:id/addons', ...guard, PlatformAddonsController.forTenant);
+router.post('/tenants/:id/addons', ...guard, PlatformAddonsController.grant);
+router.post('/tenants/:id/addons/:code/revoke', ...guard, PlatformAddonsController.revoke);
 
 export default router;

@@ -80,7 +80,10 @@ function startSgpStub() {
       }
       if (req.url.startsWith('/api/ura/consultacliente')) {
         if (doc === CPF_EXISTENTE) {
-          return send({ status: 1, contratos: [{ contrato: 'K-EXISTE', contratoStatus: 'Ativo', razaoSocial: 'Já Existe da Silva', cpfCnpj: CPF_EXISTENTE }] });
+          return send({ status: 1, contratos: [{
+            contrato: 'K-EXISTE', contratoStatus: 'Ativo', razaoSocial: 'Já Existe da Silva', cpfCnpj: CPF_EXISTENTE,
+            endereco: { logradouro: 'Rua das Acácias', numero: '12', bairro: 'Aldeota', cidade: 'Fortaleza', uf: 'CE', cep: '60150-000' }
+          }] });
         }
         return send({ status: 0, msg: 'Cliente não encontrado' });
       }
@@ -734,7 +737,7 @@ describe('listas do SGP, login livre e sugestões', () => {
       assert.equal(body.vendedor_id, 3, 'sem escolha vai o vendedor padrão');
       assert.equal(body.tecnico_id, 5);
       assert.equal(body.splitter_id, 21);
-      assert.equal(body.splitter_porta, 4);
+      assert.equal(body.splitter_port, 4);
     });
 
     it('recusa vendedor, técnico, CTO ou porta fora das listas', async () => {
@@ -745,5 +748,64 @@ describe('listas do SGP, login livre e sugestões', () => {
       }
       assert.deepEqual(criados, []);
     });
+  });
+});
+
+describe('novo contrato para quem já está no SGP', () => {
+  const novoContrato = (body) => call(`${panelUrl}/api/contacts/sgp/precadastro`, { method: 'POST', ...auth(), body });
+  const CONTRATO = (extra = {}) => ({
+    ...PESSOA,
+    document: CPF_EXISTENTE,
+    name: 'Já Existe da Silva',
+    planId: 9,
+    dueDayId: 15,
+    login: 'ja.existe.dois',
+    password: 'senha-123',
+    newContract: true,
+    ...extra
+  });
+
+  it('a consulta traz o que o SGP tem do cliente, sem consultar a TeiaH', async () => {
+    const res = await lookup(CPF_EXISTENTE);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.teiahConsulted, false);
+    assert.equal(res.body.data.prefill, null);
+    const { existing } = res.body.data;
+    assert.equal(existing.source, 'sgp');
+    assert.equal(existing.name, 'Já Existe da Silva');
+    assert.equal(existing.address.street, 'Rua das Acácias');
+    assert.equal(existing.address.city, 'Fortaleza');
+  });
+
+  it('manda o pré-cadastro com o CPF do cliente e abre a ficha dele', async () => {
+    criados.length = 0;
+    modoCriacao = 'ok';
+    const res = await novoContrato(CONTRATO());
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const [{ path, body }] = criados;
+    assert.equal(path, '/api/precadastro/F');
+    assert.equal(body.cpfcnpj.replace(/\D/g, ''), CPF_EXISTENTE);
+    assert.equal(body.plano_id, 9);
+    assert.equal(body.login, 'ja.existe.dois');
+    assert.equal(res.body.data.filed, 'sgp');
+    assert.equal(res.body.data.newContract, true);
+    assert.equal(res.body.data.key, 'K-EXISTE');
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contact.created' }).orderBy('id', 'desc').first());
+    assert.equal(JSON.parse(trilha.detail).newContract, true);
+  });
+
+  it('não manda novo contrato para quem não está no SGP', async () => {
+    criados.length = 0;
+    const res = await novoContrato(CONTRATO({ document: '390.533.447-05' }));
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'not_in_sgp');
+    assert.deepEqual(criados, []);
+  });
+
+  it('sem pedir novo contrato, quem já está no SGP continua recusado', async () => {
+    criados.length = 0;
+    const res = await novoContrato(CONTRATO({ newContract: undefined }));
+    assert.equal(res.status, 409);
+    assert.deepEqual(criados, []);
   });
 });

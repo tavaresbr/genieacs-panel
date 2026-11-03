@@ -30,6 +30,8 @@ import CancellationService from './cancellationService.js';
 import PlatformAlertService from './platformAlertService.js';
 import NpsService from './npsService.js';
 import PlanPriceChangeService from './planPriceChangeService.js';
+import StatusService from './statusService.js';
+import AffiliatePayoutService from './affiliatePayoutService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -227,6 +229,18 @@ class SchedulerService {
       // provedor, como os alertas — o reajuste é do catálogo. Nunca lança.
       .then(() => PlanPriceChangeService.schedulerPass().catch((error) => {
         console.warn(`Could not run the plan price changes: ${error.message}`);
+      }))
+      // A página de status (0128): as verificações de minuto em minuto, a
+      // manutenção vencida encerrada e o aviso aos provedores. Fora do laço
+      // por provedor — é do serviço, não de um deles. Nunca lança.
+      .then(() => StatusService.schedulerPass().catch((error) => {
+        console.warn(`Could not run the status checks: ${error.message}`);
+      }))
+      // Os lotes mensais dos afiliados (0126): nos dias 1 a 3 monta (nunca
+      // aprova nem envia), e acompanha os Pix enviados. Acima dos provedores,
+      // no máximo uma passada por hora. Nunca lança.
+      .then(() => AffiliatePayoutService.schedulerPass().catch((error) => {
+        console.warn(`Could not run the affiliate payouts: ${error.message}`);
       }))
       .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))

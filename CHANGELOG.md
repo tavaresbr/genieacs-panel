@@ -7,6 +7,52 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.24.0] - 2026-11-03
+
+### New
+
+- Programa de afiliados com comissão recorrente e lote mensal por Pix (0124) (`ef75d6e8`)
+- Add-ons pagos (0125) — catálogo, direito, cobrança e telas (`4ecb2ee0`)
+
+### Fixed
+
+- Correções da revisão — porta, cobrança e Pix (`09b47eb7`)
+
+### Maintenance
+
+- Segurança: recusa CORS_ORIGINS=* em produção, CSP opt-in de upgrade e JWT com algoritmo fixo (`7690e680`)
+- Segurança: política de senha nova (10+, sem comuns, diferente do login) e limitador da troca de senha (`0214f9c3`)
+- Segurança: webhook do SGP exige carimbo de tempo por padrão nas integrações novas (`b6b78a58`)
+- Segurança: redação de credenciais no logger e no console embrulhado (`0ef1a613`)
+- Varredura de segredos (gitleaks) e CodeQL, não bloqueantes (`01cd5b3b`)
+- Relatório da auditoria de segurança (rodada D) (`8b7008be`)
+- Página de status da plataforma (0126) (`6596180b`)
+- Afiliados, add-ons e página de status no navegador (`3f62be28`)
+- Gitleaks ignora a senha de teste do password-policy.test.js (`f5a69e87`)
+- Segurança: corrige os 13 alertas do CodeQL no PR de afiliados (`7bee45b0`)
+- Segurança: webhook só por header ou ?t=, nome do cliente tratado como dado na IA, 'sim' da liberação vale 5 min (`2b9654ee`)
+- Segurança: sessão do afiliado por versão e logs sem quebra de linha (CodeQL) (`086ed44e`)
+- Logs com JSON.stringify e ação de auditoria sem 'password' no nome (`bf647c4c`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/5777ee1b2692...70a272adb8bb)
+
+## [1.23.0] - 2026-11-02
+
+### New
+
+- Avisos da IA: chave recusada, crédito de volta e resumo diário (`5105e8f9`)
+- Avisos do SGP: fora do ar, credencial recusada e desbloqueio com erro (`e58de674`)
+- Avisos de operação: GenieACS sem resposta, fila travada e régua que falha (`adf4730e`)
+- Bot e ficha usam as faturas do Asaas (fase 3) (`fe13d55e`)
+- Avisos da plataforma: backup atrasado e certificado perto de vencer (`5fbd82f5`)
+
+### Maintenance
+
+- Segurança: vínculo só por CPF fica não verificado; CPF e PIX não vão para a IA (`a13da37c`)
+- Novo cliente: novo contrato para quem já está no SGP; CTO vai como splitter_port (`2a98d77f`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/fcc06f9adc59...df10ca35fe98)
+
 ## [1.22.1] - 2026-11-02
 
 ### Maintenance

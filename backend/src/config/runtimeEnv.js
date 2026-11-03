@@ -48,3 +48,35 @@ export function assertNotPlaceholderSecret(name, value) {
     throw new Error(`${name} still holds the example value; generate a random one for production`);
   }
 }
+
+/**
+ * Recusa, em produção, `CORS_ORIGINS` com `*`.
+ *
+ * O `*` desliga a checagem de origem inteira (`isAllowedOrigin` em `app.js`):
+ * qualquer site aberto no navegador de um operador passa a poder chamar a API
+ * do painel com as credenciais que o próprio navegador anexa. Em
+ * desenvolvimento isso é conveniência e continua valendo; em produção é uma
+ * porta que ninguém abre de propósito, então o processo nem sobe e diz o que
+ * pôr no lugar. A origem igual ao `Host` continua aceita sem estar na lista,
+ * então quem só usa o painel pelo próprio endereço não precisa listar nada.
+ */
+export function assertCorsOriginsSafe(origins, production = isProduction()) {
+  if (!production) return;
+  if ((origins || []).some((o) => String(o).trim() === '*')) {
+    throw new Error(
+      "CORS_ORIGINS='*' is not allowed in production: list the panel's browser origins "
+      + '(e.g. CORS_ORIGINS=https://<panel host>); same-host requests are already accepted'
+    );
+  }
+}
+
+/**
+ * `CSP_UPGRADE_INSECURE_REQUESTS=true` liga o `upgrade-insecure-requests` da
+ * CSP. Desligado por padrão porque o servidor embutido fala HTTP: num deploy
+ * acessado por `http://IP:porta` a diretiva faria o navegador pedir os assets
+ * em HTTPS numa porta sem TLS, e o painel abriria em branco. Quem está atrás
+ * de um proxy com TLS (o caso do SaaS e do `install.sh` com domínio) liga.
+ */
+export function wantsUpgradeInsecureRequests(env = process.env) {
+  return String(env.CSP_UPGRADE_INSECURE_REQUESTS || '').trim().toLowerCase() === 'true';
+}

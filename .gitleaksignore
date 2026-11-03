@@ -1,0 +1,2 @@
+# Falsos positivos conferidos: senhas de teste em fixtures, não segredos.
+0214f9c336edc821ec7ba9e5753f1dca25aa2a47:backend/test/password-policy.test.js:generic-api-key:99

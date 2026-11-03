@@ -32,7 +32,14 @@ export const SEO_PAGES = Object.freeze({
     description: `Como o ${PRODUCT_NAME} trata dados pessoais, para que servem e quais são os direitos do titular (LGPD).`,
     heading: 'Política de privacidade'
   },
-  '/login': { noindex: true }
+  '/login': { noindex: true },
+  // A página de status (0128): se o serviço está no ar, a disponibilidade de
+  // 90 dias e os incidentes. É o que se procura quando algo parece fora do ar.
+  '/status': {
+    title: `Status · ${PRODUCT_NAME}`,
+    description: `Situação dos serviços do ${PRODUCT_NAME} agora, disponibilidade dos últimos 90 dias, incidentes e manutenções programadas.`,
+    heading: 'Status dos serviços'
+  }
 });
 
 export const FEATURES = Object.freeze([

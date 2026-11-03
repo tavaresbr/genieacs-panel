@@ -193,7 +193,37 @@ class PlatformAudit {
     // provedor já confirmado pelo documento: a segunda via, a situação da
     // assinatura ou o link do recibo. O detalhe diz O QUE saiu (e para qual
     // telefone, mascarado) — nunca o Pix nem a linha digitável.
-    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed'
+    BOT_BILLING_DISCLOSED: 'bot.billing_disclosed',
+    // A página de status (0128): o incidente ou a manutenção aberta, mudada
+    // (título, componentes, impacto, janela, aviso aos provedores), a mensagem
+    // nova na linha do tempo e o encerramento — este também quando é o
+    // sistema que encerra a manutenção que passou do fim.
+    STATUS_INCIDENT_CREATED: 'status.incident_created',
+    STATUS_INCIDENT_UPDATED: 'status.incident_updated',
+    STATUS_INCIDENT_POSTED: 'status.incident_update_posted',
+    STATUS_INCIDENT_RESOLVED: 'status.incident_resolved',
+    // O programa de afiliados (0126). Nenhuma fala de um provedor — `tenant_id`
+    // sai nulo —, e o detalhe nomeia o afiliado e o lote, nunca a chave Pix.
+    // O dinheiro que sai tem uma linha por passo: quem aprovou, quem mandou,
+    // quem marcou como pago à mão.
+    AFFILIATE_CREATED: 'affiliate.created',
+    AFFILIATE_UPDATED: 'affiliate.updated',
+    AFFILIATE_STATUS_CHANGED: 'affiliate.status_changed',
+    AFFILIATE_ACCESS_LINK: 'affiliate.password_link',
+    AFFILIATE_PAYOUTS_BUILT: 'affiliate.payouts_built',
+    AFFILIATE_PAYOUT_APPROVED: 'affiliate.payout_approved',
+    AFFILIATE_PAYOUT_SENT: 'affiliate.payout_sent',
+    AFFILIATE_PAYOUT_SEND_FAILED: 'affiliate.payout_send_failed',
+    AFFILIATE_PAYOUT_REFRESHED: 'affiliate.payout_refreshed',
+    AFFILIATE_PAYOUT_PAID: 'affiliate.payout_paid',
+    AFFILIATE_PAYOUT_CANCELED: 'affiliate.payout_canceled',
+    // Os add-ons pagos (0127): o catálogo mexido pelo console, e o add-on de
+    // um provedor ativado, cancelado, dado de graça ou revogado — pelo próprio
+    // provedor (`selfService: true`) ou pelo console, com o motivo.
+    ADDON_CREATED: 'addon.created',
+    ADDON_UPDATED: 'addon.updated',
+    ADDON_DELETED: 'addon.deleted',
+    TENANT_ADDON_CHANGED: 'tenant.addon_changed'
   });
 
   /**

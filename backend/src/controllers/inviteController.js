@@ -11,6 +11,7 @@ import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import { newPasswordProblem, suppliedPasswordProblem } from '../utils/passwordPolicy.js';
 import MfaService, { mfaEnabled } from '../services/mfaService.js';
 import AccountLockout from '../models/AccountLockout.js';
 import {
@@ -198,8 +199,12 @@ class InviteController {
       if (username.length < 3 || username.length > 64) {
         return res.status(400).json(createErrorResponse(req.t('auth.usernameLength')));
       }
-      if (password.length < 8 || password.length > 128) {
-        return res.status(400).json(createErrorResponse(req.t('auth.passwordLength')));
+      // Aqui só o teto: a senha pode ser a de uma conta que JÁ existe, e essa
+      // é aceita como estiver. A regra da senha nova vale mais abaixo, só
+      // para quem está criando conta por este convite.
+      const senhaForaDoTeto = suppliedPasswordProblem(password);
+      if (senhaForaDoTeto) {
+        return res.status(400).json(createErrorResponse(req.t(senhaForaDoTeto.key)));
       }
 
       const role = normalizeRole(invite.role);
@@ -266,6 +271,12 @@ class InviteController {
       // convite de um provedor mexer no login que a pessoa usa em outro.
       if (!existente && (!email || !isValidEmail(email))) {
         return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+      }
+      if (!existente) {
+        const senhaRuim = newPasswordProblem(password, { username, email });
+        if (senhaRuim) {
+          return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
+        }
       }
       if (!existente && await User.loginConflict({ username, email })) {
         return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));

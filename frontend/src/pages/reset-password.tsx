@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
 
 /**
  * "Esqueci minha senha": a escolha da senha nova.
@@ -38,7 +39,7 @@ export default function ResetPassword() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
-    if (form.password.length < 8) return setError(t('setup.error.passwordTooShort'))
+    if (form.password.length < PASSWORD_MIN_LENGTH) return setError(t('setup.error.passwordTooShort'))
     if (form.password !== form.confirm) return setError(t('reset.mismatch'))
 
     setSubmitting(true)

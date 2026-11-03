@@ -9,6 +9,8 @@ import { effectiveWebhookToken } from '../services/billing/asaasSettingsService.
 import BillingInvoiceService from '../services/billing/billingInvoiceService.js';
 import CardAutopayService from '../services/billing/cardAutopayService.js';
 import Tenant from '../models/Tenant.js';
+import AffiliatePayoutService from '../services/affiliatePayoutService.js';
+import { logSafe } from '../utils/logger.js';
 
 /**
  * A entrega do gateway de pagamento: o provedor pagou, e o painel volta a
@@ -348,6 +350,28 @@ class BillingWebhookController {
     if (/^INVOICE_/.test(String(req.body?.event ?? ''))) {
       const code = await BillingInvoiceService.applyWebhook(req.body);
       return res.json({ success: true, code });
+    }
+
+    // As transferências Pix do programa de afiliados (0126): eventos
+    // `TRANSFER_*`, com a transferência no corpo. Só mudam o lote cujo
+    // `transfer_id` é o da entrega; a desconhecida é ignorada — 200 sempre.
+    // Inclusive na falha: um 500 faria a Asaas reenviar e, depois de algumas
+    // recusas, PAUSAR a fila inteira do webhook — e com ela os pagamentos dos
+    // provedores. A consulta de hora em hora (`schedulerPass`) acerta o lote.
+    if (/^TRANSFER_/.test(String(req.body?.event ?? ''))) {
+      try {
+        const code = await AffiliatePayoutService.applyTransferWebhook(req.body);
+        return res.json({ success: true, code });
+      } catch (error) {
+        // O evento e a mensagem vêm da entrega: sem quebra de linha (que
+        // forjaria uma linha nova no log) e cortados, ali mesmo na chamada.
+        // JSON.stringify também escapa o que sobrar de controle e aspas.
+        const evento = JSON.stringify(logSafe(req.body?.event, 64));
+        const motivo = JSON.stringify(logSafe(error?.message, 300));
+        console.error(`Billing webhook: could not apply ${evento} to an affiliate payout `
+          + `(the hourly refresh reconciles it): ${motivo}`);
+        return res.json({ success: true, code: 'transfer_deferred' });
+      }
     }
 
     const leitura = AsaasBillingProvider.interpretar(req.body);

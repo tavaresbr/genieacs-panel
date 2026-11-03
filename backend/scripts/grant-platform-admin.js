@@ -3,6 +3,7 @@ import { getDb, closePool } from '../src/config/database.js';
 import PlatformAdmin from '../src/models/PlatformAdmin.js';
 import User from '../src/models/User.js';
 import { isValidEmail } from '../src/utils/helpers.js';
+import { newPasswordProblem, POLICY_PROBLEM_TEXT_EN } from '../src/utils/passwordPolicy.js';
 
 /**
  * Hands the control plane to somebody on an install that already has users.
@@ -120,8 +121,17 @@ async function main() {
         return;
       }
       const password = await senhaDeFora();
-      if (!password || password.length < 8 || password.length > 128) {
-        console.error('Password must come from PLATFORM_ADMIN_PASSWORD or stdin, 8 to 128 characters');
+      if (!password) {
+        console.error('Password must come from PLATFORM_ADMIN_PASSWORD or stdin, 10 to 128 characters');
+        process.exitCode = 1;
+        return;
+      }
+      // A mesma regra da senha nova do painel (`utils/passwordPolicy.js`).
+      const senhaRuim = newPasswordProblem(password, { username, email });
+      if (senhaRuim) {
+        console.error(senhaRuim.code === 'password_length'
+          ? 'Password must come from PLATFORM_ADMIN_PASSWORD or stdin, 10 to 128 characters'
+          : POLICY_PROBLEM_TEXT_EN[senhaRuim.code]);
         process.exitCode = 1;
         return;
       }

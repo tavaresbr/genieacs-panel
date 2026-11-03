@@ -43,6 +43,7 @@ import { blockingOver } from '@/lib/overage'
 import { ReferralCard } from '@/components/referral-card'
 import { CancelSubscription } from '@/components/cancel-subscription'
 import { BillingGuideModal } from '@/components/billing-guide-modal'
+import { AddonsCard } from '@/components/addons-card'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -764,6 +765,13 @@ export default function PlanPage() {
             propósito: o bloco tem a própria carga, então um provedor sem
             assinatura — que é um dos que mais precisa pagar — continua vendo o
             que deve. */}
+        {/* Os add-ons pagos (0127), logo depois do plano: o que se soma a ele
+            na fatura. A ativação cobra a pró-rata — a lista de cobranças abaixo
+            recarrega junto. */}
+        <div className="mt-6">
+          <AddonsCard canWrite={podeEscrever} onChanged={() => setChargesKey((k) => k + 1)} />
+        </div>
+
         <div className="mt-6">
           <TenantCharges refreshKey={chargesKey} />
         </div>

@@ -85,6 +85,7 @@ export const SEM_DADO_DE_ASSINANTE = Object.freeze({
   credit_allocations: 'quanto de cada crédito abateu cada cobrança do provedor',
   cancellation_requests: 'pedidos de cancelamento do provedor conosco — motivo e oferta aceita, nenhum assinante',
   platform_nps: 'a nota de satisfação que o provedor deu à plataforma (NPS) e o comentário dele, nenhum assinante',
+  tenant_addons: 'os add-ons que o provedor contratou conosco, nenhum assinante',
   outage_events: 'rompimentos por caixa do mapa — só a caixa e contagens, nenhum assinante',
   outage_incidents: 'quedas em massa por nó do mapa — quem foi atingido sai em outage_incident_devices',
   maintenance_windows: 'manutenções programadas por nó do mapa — quem foi avisado sai em maintenance_window_devices'

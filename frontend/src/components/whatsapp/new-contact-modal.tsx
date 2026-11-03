@@ -34,6 +34,27 @@ const EMPTY_FORM = {
 
 type Form = typeof EMPTY_FORM
 
+/** The form filled from what a source holds (the TeiaH, the Receita, the SGP's record). */
+function formFrom(prefill: ContactDocumentLookup['prefill'] | ContactDocumentLookup['existing'] | undefined): Form {
+  if (!prefill) return { ...EMPTY_FORM }
+  return {
+    ...EMPTY_FORM,
+    name: prefill.name ?? '',
+    tradeName: prefill.tradeName ?? '',
+    birthDate: prefill.birthDate ?? '',
+    email: prefill.email ?? '',
+    whatsappPhone: prefill.phone ?? '',
+    zip: (prefill.address.zip ?? '').replace(/\D/g, '').slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2'),
+    street: prefill.address.street ?? '',
+    number: prefill.address.number ?? '',
+    complement: prefill.address.complement ?? '',
+    district: prefill.address.district ?? '',
+    city: prefill.address.city ?? '',
+    state: prefill.address.state ?? '',
+    reference: prefill.address.reference ?? ''
+  }
+}
+
 const ADDRESS_FIELDS: [AddressField, TranslationKey, string][] = [
   ['street', 'contacts.profile.addressPart.street', 'sm:col-span-4'],
   ['number', 'contacts.profile.addressPart.number', 'sm:col-span-2'],
@@ -88,6 +109,9 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   // With a contract (the SGP's pre-registration): the lists come from
   // Settings → SGP, and the option shows only once a plan is configured there.
   const [withContract, setWithContract] = useState(false)
+  // A new contract for a client the SGP already has: the form filled from the
+  // SGP's record, always with a contract, sent with `newContract`.
+  const [newContract, setNewContract] = useState(false)
   const [preRegOptions, setPreRegOptions] = useState<PreRegistrationOptions | null>(null)
   const [contract, setContract] = useState({
     planId: '', dueDayId: '', login: '', password: '', installOs: true,
@@ -127,8 +151,8 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
 
   // A login out of the name ("maria.silva") and a password to change, so the
   // operator rarely has to invent either.
-  const suggestLogin = () => {
-    const parts = form.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const suggestLogin = (name = form.name) => {
+    const parts = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
       .replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean)
     return parts.length ? [parts[0], parts.at(-1)].filter((part, index, all) => all.indexOf(part) === index).join('.') : ''
   }
@@ -159,6 +183,27 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
 
   const open = (key: string) => navigate(`/contacts/${encodeURIComponent(key)}`)
 
+  const canNewContract = can('sgp.act') && Boolean(lookup?.sgpChecked) &&
+    Boolean(preRegOptions?.plans.length) && Boolean(preRegOptions?.dueDays.length)
+  const startNewContract = () => {
+    const existing = lookup?.existing ?? null
+    const filled = formFrom(existing)
+    setForm({
+      ...filled,
+      latitude: existing?.address.latitude ?? undefined,
+      longitude: existing?.address.longitude ?? undefined
+    })
+    setInSgp(true)
+    setWithContract(true)
+    setNewContract(true)
+    setContract((current) => ({
+      ...current,
+      login: current.login || suggestLogin(filled.name),
+      password: current.password || suggestPassword()
+    }))
+    setShowForm(true)
+  }
+
   const runLookup = async (fresh = false) => {
     // A new consultation is a paid call; ask first when the panel already holds one.
     if (fresh && !window.confirm(t('contacts.new.teiahRefreshConfirm', { date: lookup?.teiahConsultedAt ? formatDateTime(lookup.teiahConsultedAt) : '' }))) return
@@ -166,6 +211,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
     setLookupError(null)
     setLookup(null)
     setShowForm(false)
+    setNewContract(false)
     try {
       const res = await contactsAPI.lookupDocument(document, fresh)
       if (!res.success || !res.data) {
@@ -175,24 +221,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
       const found = res.data
       setLookup(found)
       if (found.inSgp.length > 0 || found.inPanel) return
-      const prefill = found.prefill
-      setForm({
-        ...EMPTY_FORM,
-        ...(prefill ? {
-          name: prefill.name ?? '',
-          tradeName: prefill.tradeName ?? '',
-          birthDate: prefill.birthDate ?? '',
-          email: prefill.email ?? '',
-          whatsappPhone: prefill.phone ?? '',
-          zip: (prefill.address.zip ?? '').replace(/\D/g, '').slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2'),
-          street: prefill.address.street ?? '',
-          number: prefill.address.number ?? '',
-          complement: prefill.address.complement ?? '',
-          district: prefill.address.district ?? '',
-          city: prefill.address.city ?? '',
-          state: prefill.address.state ?? ''
-        } : {})
-      })
+      setForm(formFrom(found.prefill))
       setShowForm(true)
     } finally {
       setLooking(false)
@@ -265,7 +294,8 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
         ...(contract.sellerId ? { sellerId: Number(contract.sellerId) } : {}),
         ...(contract.technicianId ? { technicianId: Number(contract.technicianId) } : {}),
         ...(contract.splitterId ? { splitterId: Number(contract.splitterId) } : {}),
-        ...(contract.splitterId && contract.splitterPort ? { splitterPort: Number(contract.splitterPort) } : {})
+        ...(contract.splitterId && contract.splitterPort ? { splitterPort: Number(contract.splitterPort) } : {}),
+        ...(newContract ? { newContract: true } : {})
       })
       : toSgp
       ? await contactsAPI.createInSgp({
@@ -307,7 +337,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
       }
     }
     setSaving(false)
-    toast.success(t(toPreRegister ? 'contacts.new.preRegistered' : toSgp ? 'contacts.new.createdInSgp' : 'contacts.profile.created'))
+    toast.success(t(newContract ? 'contacts.new.newContractSent' : toPreRegister ? 'contacts.new.preRegistered' : toSgp ? 'contacts.new.createdInSgp' : 'contacts.profile.created'))
     open(res.data.key)
   }
 
@@ -372,6 +402,23 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                 </li>
               ))}
             </ul>
+            {can('sgp.act') && lookup.sgpChecked && !newContract && (
+              <div className="mt-3 border-t border-border pt-3">
+                <button
+                  type="button"
+                  className="modern-button"
+                  disabled={!canNewContract}
+                  data-testid="new-contact-new-contract"
+                  onClick={startNewContract}
+                >
+                  <Icon name="document" size={16} />
+                  {t('contacts.new.newContract')}
+                </button>
+                {preRegOptions && !canNewContract && (
+                  <p className="mt-2 text-xs text-muted-foreground">{t('contacts.new.newContractNeedsConfig')}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -404,7 +451,9 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
               <p className="mt-4 flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
                 <Icon name="info" size={16} />
                 <span>
-                  {!lookup.sgpChecked
+                  {newContract
+                    ? t('contacts.new.newContractFor', { name: form.name || '—' })
+                    : !lookup.sgpChecked
                     ? t('contacts.new.sgpNotChecked')
                     : lookup.prefill?.source === 'teiah'
                       ? t('contacts.new.teiahPrefilled')
@@ -452,7 +501,13 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                 <label className="field-label" htmlFor="new-contact-name">
                   {t(isCompany ? 'contacts.new.legalName' : 'contacts.profile.name')}
                 </label>
-                <input id="new-contact-name" className="modern-input" value={form.name} onChange={(event) => set('name', event.target.value)} />
+                <input
+                  id="new-contact-name"
+                  className="modern-input"
+                  value={form.name}
+                  readOnly={newContract}
+                  onChange={(event) => set('name', event.target.value)}
+                />
               </div>
               {isCompany && (
                 <>
@@ -519,7 +574,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
               ))}
             </div>
 
-            {canCreateInSgp && (
+            {canCreateInSgp && !newContract && (
               <label className="mt-5 flex items-start gap-3">
                 <input type="checkbox" className="mt-1" checked={inSgp} onChange={(event) => setInSgp(event.target.checked)} />
                 <span className="text-sm">
@@ -542,7 +597,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
             )}
             {canPreRegister && preRegOptions && (
               <div className="mt-4 rounded-md border border-border p-3" data-testid="new-contact-contract">
-                <div className="flex flex-wrap gap-4 text-sm" role="radiogroup">
+                <div className={`flex flex-wrap gap-4 text-sm${newContract ? ' hidden' : ''}`} role="radiogroup">
                   <label className="flex items-center gap-2">
                     <input type="radio" name="new-contact-mode" checked={!withContract} onChange={() => setWithContract(false)} />
                     {t('contacts.new.clientOnly')}
@@ -736,7 +791,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
               disabled={saving || !form.name.trim() || (toSgp && missingForSgp) || missingContract}
               onClick={() => void save()}
             >
-              {toPreRegister ? t('contacts.new.preRegister') : toSgp ? t('contacts.new.createInSgp') : t('common.save')}
+              {newContract ? t('contacts.new.newContract') : toPreRegister ? t('contacts.new.preRegister') : toSgp ? t('contacts.new.createInSgp') : t('common.save')}
             </button>
           )}
         </div>

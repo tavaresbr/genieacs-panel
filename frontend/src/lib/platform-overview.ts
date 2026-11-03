@@ -7,7 +7,9 @@
 /** As abas do console, na ordem da faixa. `home` (Início) é a padrão. */
 export const PLATFORM_TABS = [
   'home', 'tenants', 'plans', 'subscriptions', 'delinquency', 'revenue', 'coupons', 'leads',
-  'admins', 'audit', 'settings', 'deployment', 'catalogue', 'help'
+  'admins', 'audit', 'settings', 'deployment', 'catalogue', 'help', 'affiliates',
+  // A página de status (0128): as verificações e os incidentes.
+  'status'
 ] as const
 
 export type PlatformTab = (typeof PLATFORM_TABS)[number]
