@@ -7981,3 +7981,36 @@ export const onboardingConsoleAPI = {
   summaries: () =>
     apiClient.get<{ summaries: OnboardingSummary[] }>('/platform/tenants/onboarding'),
 }
+
+// ── As notificações push do app do provedor (0130) ─────────────────────
+
+/** Os eventos que a pessoa liga ou desliga no aparelho. */
+export type PushEvent = 'invoice' | 'ont_offline' | 'mass_outage' | 'wa_disconnected' | 'new_message'
+
+export interface PushPreferences {
+  events: Record<PushEvent, boolean>
+  /** Os eventos que o papel desta pessoa permite receber. */
+  available: PushEvent[]
+  /** Quantos aparelhos a pessoa tem inscritos neste provedor. */
+  devices: number
+}
+
+/** O que o navegador entrega em `PushSubscription.toJSON()`. */
+export interface PushSubscriptionPayload {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+}
+
+export const pushAPI = {
+  vapidPublicKey: () => apiClient.get<{ publicKey: string }>('/push/vapid-public-key'),
+  /** 400 `push_endpoint_invalid`/`push_keys_invalid`; 403 `push_own_session_only` na personificação. */
+  subscribe: (subscription: PushSubscriptionPayload) =>
+    apiClient.post<{ devices: number }>('/push/subscribe', { subscription }),
+  unsubscribe: (endpoint: string) =>
+    apiClient.post<{ removed: number; devices: number }>('/push/unsubscribe', { endpoint }),
+  /** 409 `push_no_device` quando nenhum aparelho desta pessoa está inscrito. */
+  test: () => apiClient.post<{ sent: number }>('/push/test', {}),
+  preferences: () => apiClient.get<PushPreferences>('/push/preferences'),
+  savePreferences: (events: Partial<Record<PushEvent, boolean>>) =>
+    apiClient.put<Pick<PushPreferences, 'events' | 'available'>>('/push/preferences', { events }),
+}

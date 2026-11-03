@@ -109,6 +109,8 @@ export const INNER_SCREENS: readonly InnerScreen[] = [
   { path: '/devices/detail', labelKey: 'siteMap.inner.device', reachedKey: 'siteMap.inner.deviceReached', permission: 'devices.list' },
   { path: '/contacts/:key', labelKey: 'siteMap.inner.contact', reachedKey: 'siteMap.inner.contactReached', permission: 'whatsapp.read' },
   { path: '/onboarding', labelKey: 'siteMap.inner.onboarding', reachedKey: 'siteMap.inner.onboardingReached', permission: 'settings.write' },
+  // Minha conta (0130): todo papel chega — `devices.list` é o que o `viewer` tem.
+  { path: '/account', labelKey: 'account.title', reachedKey: 'account.reached', permission: 'devices.list' },
 ]
 
 /**

@@ -19,6 +19,8 @@ import WaMarketingOptOutService from './waMarketingOptOutService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DATA_DIR } from '../config/paths.js';
+import PushService from './pushService.js';
+import WhatsAppConfigService from './whatsappConfigService.js';
 
 /**
  * Os quatro tratadores do webhook de entrada.
@@ -484,9 +486,35 @@ async function gravarMensagem(account, item) {
   // (ou entra na fila). Só na entrada, e nunca por uma nota da pesquisa.
   if (!fromMe && !soPesquisa) {
     await WaAssignmentService.afterInbound({ conversation, botResult: resultadoDoBot });
+    // 11. O push do app (0130), depois da distribuição — é ela que diz se a
+    // conversa tem atendente. Solto de propósito: o webhook não espera o
+    // serviço de push de ninguém, e `avisarPorPush` nunca lança.
+    void avisarPorPush(conversation.id);
   }
 
   return { handled: true, conversationId: conversation.id, direction: linha.direction };
+}
+
+/**
+ * A mensagem nova vira push para quem atende — a mesma regra do sino do
+ * painel (`waNotificationService`): a conversa com atendente avisa só ele, a
+ * sem atendente avisa quando espera gente (bot desligado, pausado ou fila), e
+ * a que o bot está levando não avisa ninguém.
+ */
+async function avisarPorPush(conversationId) {
+  try {
+    const atual = await WaConversation.getById(conversationId);
+    if (!atual) return;
+    let needsHuman = Boolean(atual.waiting_since);
+    if (!atual.assigned_user_id && !needsHuman) {
+      const pausado = atual.bot_paused_until && new Date(atual.bot_paused_until).getTime() > Date.now();
+      const { botEnabled } = await WhatsAppConfigService.getConfig();
+      needsHuman = botEnabled === false || Boolean(pausado);
+    }
+    await PushService.notifyInboundMessage({ conversation: atual, needsHuman });
+  } catch (error) {
+    console.warn(`push inbound: ${String(error?.message || error).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 200)}`);
+  }
 }
 
 /**
