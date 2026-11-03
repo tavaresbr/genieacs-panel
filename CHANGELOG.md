@@ -7,6 +7,20 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.25.0] - 2026-11-03
+
+### New
+
+- Cadastro de cliente também no Asaas (fase 4) (`2cdfd0af`)
+- Webhook de pagamento da conta do provedor (fase 5a) (`c896ce96`)
+- Régua e campanhas cobram também o Asaas (fase 5b) (`0735a1c6`)
+
+### Maintenance
+
+- Vincular à mão não é mais desfeito na hora pela regra de número antigo (`64b3950f`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/8cc534ff8ba2...d188d364de6c)
+
 ## [1.24.0] - 2026-11-03
 
 ### New
