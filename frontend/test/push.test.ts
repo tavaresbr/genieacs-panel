@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import vm from 'node:vm'
+import { describe, expect, it, vi } from 'vitest'
 
 import { isIos, pushSupport, sameKey, subscriptionPayload, urlBase64ToUint8Array, PUSH_EVENT_ORDER } from '@/lib/push'
 import { isStandalone, serviceWorkerUrl } from '@/lib/pwa'
@@ -89,6 +90,48 @@ describe('o service worker', () => {
   it('tem a página offline no casco', () => {
     expect(sw).toMatch(/OFFLINE_URL = '\/offline\.html'/)
     expect(readFileSync(path.join(AQUI, '..', 'public', 'offline.html'), 'utf8')).toMatch(/<html/)
+  })
+
+  // O SW de verdade, rodado num `self` de mentira: só os ouvintes interessam.
+  function carregarSw() {
+    const ouvintes = new Map<string, (event: unknown) => void>()
+    const skipWaiting = vi.fn()
+    const contexto: Record<string, unknown> = {
+      URL,
+      self: {
+        location: { href: 'https://painel.test/sw.js?v=abc', origin: 'https://painel.test' },
+        addEventListener: (tipo: string, fn: (event: unknown) => void) => ouvintes.set(tipo, fn),
+        skipWaiting,
+      },
+    }
+    vm.runInNewContext(sw, contexto)
+    return { ouvintes, skipWaiting, caminhoSeguro: contexto.caminhoSeguro as (v: unknown) => string }
+  }
+
+  it('só aceita SKIP_WAITING de uma janela do mesmo endereço', () => {
+    const { ouvintes, skipWaiting } = carregarSw()
+    const mensagem = ouvintes.get('message')!
+    mensagem({ origin: 'https://outro.test', data: { type: 'SKIP_WAITING' } })
+    mensagem({ origin: '', source: { url: 'https://outro.test/' }, data: { type: 'SKIP_WAITING' } })
+    mensagem({ origin: '', data: { type: 'SKIP_WAITING' } })
+    expect(skipWaiting).not.toHaveBeenCalled()
+    mensagem({ origin: 'https://painel.test', data: { type: 'OUTRA' } })
+    expect(skipWaiting).not.toHaveBeenCalled()
+    mensagem({ origin: 'https://painel.test', data: { type: 'SKIP_WAITING' } })
+    expect(skipWaiting).toHaveBeenCalledTimes(1)
+    mensagem({ origin: '', source: { url: 'https://painel.test/clientes' }, data: { type: 'SKIP_WAITING' } })
+    expect(skipWaiting).toHaveBeenCalledTimes(2)
+  })
+
+  it('o clique na notificação só abre caminho deste endereço', () => {
+    const { caminhoSeguro } = carregarSw()
+    expect(caminhoSeguro('/clientes/12?aba=onu')).toBe('/clientes/12?aba=onu')
+    for (const ruim of [
+      undefined, null, 42, '', 'clientes', 'https://evil.test/', '//evil.test/x', '/\\evil.test/x',
+      '/a\\b', '/\t/evil.test', '/a\nb', 'javascript:alert(1)', `/${'a'.repeat(3000)}`,
+    ]) {
+      expect(caminhoSeguro(ruim)).toBe('/')
+    }
   })
 
   it('o painel aponta para o manifest', () => {

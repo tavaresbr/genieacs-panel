@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import AppState from '../../models/AppState.js';
 import Tenant from '../../models/Tenant.js';
 import { runInTenant } from '../../config/tenantContext.js';
@@ -359,4 +360,36 @@ export async function writeStatus(patch) {
   return true;
 }
 
-export default { effectiveConfig, readPublic, save, readStatus, writeStatus, maskTail };
+/**
+ * A identidade desta instalação no bucket: 12 hex sorteados uma vez e
+ * guardados na caixa da plataforma (`INSTALL_ID_KEY`). Vai no nome de cada
+ * objeto (`objectKeyFor`) e no metadado `skygp-install-id`, e é o que a
+ * retenção usa para só apagar o que ESTA instalação enviou — duas instalações
+ * apontadas para o mesmo bucket e prefixo (homologação e produção, um painel
+ * migrado) não podam uma a outra.
+ *
+ * Gravada com `insert` e relida: duas instâncias sorteando juntas, o índice
+ * único de `app_state` deixa entrar só uma, e as duas leem a mesma.
+ */
+export const INSTALL_ID_KEY = 'external_backup_install_id';
+export const INSTALL_ID_PATTERN = /^[0-9a-f]{12}$/;
+
+export async function installId() {
+  const platformId = await caixaDaPlataforma();
+  if (!platformId) return null;
+  const lerId = async () => {
+    const bruto = await runInTenant(platformId, () => AppState.get(INSTALL_ID_KEY));
+    return INSTALL_ID_PATTERN.test(String(bruto ?? '')) ? String(bruto) : null;
+  };
+  const atual = await lerId();
+  if (atual) return atual;
+  const sorteado = crypto.randomBytes(6).toString('hex');
+  try {
+    await runInTenant(platformId, () => AppState.insertIfMissing(INSTALL_ID_KEY, sorteado));
+  } catch {
+    // Outra instância gravou primeiro: vale a dela, relida abaixo.
+  }
+  return (await lerId()) ?? null;
+}
+
+export default { effectiveConfig, readPublic, save, readStatus, writeStatus, maskTail, installId };

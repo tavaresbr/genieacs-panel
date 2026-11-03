@@ -330,11 +330,20 @@ cmd_upload() {
 # enqueue of the `backup_failed` alert through the panel's database. The
 # database may be exactly what failed, so the marker is written first and the
 # enqueue is allowed to fail. Both use the same deduplication key: one alert.
+#
+# The reason comes from systemd (or whoever calls this), so it is cleaned
+# before anything is built from it: control characters (newline, tab, ESC,
+# DEL...) are dropped everywhere — a raw one inside a JSON string makes the
+# marker unparseable, and in the log it could fake extra lines — and quotes
+# and backslashes are dropped from the JSON value, which printf does not
+# escape.
 cmd_notify_failure() {
   local motivo="${1:-skygenpanel-backup.service failed}"
+  motivo="$(printf '%s' "$motivo" | LC_ALL=C tr -d '\000-\037\177')"
+  [ -n "$motivo" ] || motivo="skygenpanel-backup.service failed"
   if mkdir -p -- "$DEST_ROOT" 2>/dev/null; then
     printf '{"at":"%s","reason":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-      "$(printf '%s' "$motivo" | tr -d '"\\' | head -c 300)" > "$DEST_ROOT/.last-failure" \
+      "$(printf '%s' "$motivo" | LC_ALL=C tr -d '\000-\037\177"\\' | head -c 300)" > "$DEST_ROOT/.last-failure" \
       || warn "Could not write the failure marker in $DEST_ROOT"
   fi
   ( cd "$INSTALL_DIR/backend" && node scripts/backup-external.js notify-failure --reason "$motivo" ) >/dev/null 2>&1 \

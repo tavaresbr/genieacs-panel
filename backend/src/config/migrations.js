@@ -3623,7 +3623,11 @@ const ADDON_TABLES = [
  *   rotated_at     quando foi trocado pelo sucessor; reapresentado depois da
  *                  folga, é reuso e a família inteira cai;
  *   revoked_at     quando a família foi encerrada (sair, encerrar, reuso);
- *   user_agent, ip o contexto curto que a lista de sessões mostra.
+ *   user_agent, ip o contexto curto que a lista de sessões mostra;
+ *   family_expires_at  o teto da família, que a rotação não estende. Nulo no
+ *                  login comum (sete dias renovados a cada uso); numa família
+ *                  convertida do refresh antigo, o vencimento do JWT dele —
+ *                  a conversão não ganha sete dias novos.
  */
 const refreshTokensTable = (db) => (t) => {
   t.increments('id').primary();
@@ -3641,6 +3645,7 @@ const refreshTokensTable = (db) => (t) => {
   t.string('ip', 64).nullable();
   t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
   t.timestamp('last_used_at').nullable();
+  t.timestamp('family_expires_at').nullable();
   t.index(['family_id'], 'refresh_tokens_family_idx');
   t.index(['user_id', 'revoked_at'], 'refresh_tokens_user_idx');
   t.index(['expires_at'], 'refresh_tokens_expiry_idx');

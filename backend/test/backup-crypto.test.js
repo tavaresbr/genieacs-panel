@@ -125,7 +125,7 @@ describe('a cifra do backup', () => {
   it('recusa chave pública que não é X25519, e o ponto de ordem baixa', async () => {
     assert.throws(() => parsePublicKey('skygp-backup-pub-1:abc'), BackupCryptoError);
     assert.throws(() => parsePublicKey('não é chave'), BackupCryptoError);
-    const rsa = crypto.generateKeyPairSync('rsa', { modulusLength: 1024 }).publicKey.export({ type: 'spki', format: 'pem' });
+    const rsa = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ type: 'spki', format: 'pem' });
     assert.throws(() => parsePublicKey(rsa), BackupCryptoError);
     assert.throws(() => parsePublicKey(`skygp-backup-pub-1:${Buffer.alloc(32).toString('base64url')}`), /low-order/);
     await falha(encryptBuffer(Buffer.from('x'), `skygp-backup-pub-1:${Buffer.alloc(32).toString('base64url')}`), 'invalid_public_key');

@@ -4,13 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { log } from '../../utils/logger.js';
-import { acquireLease, releaseLease } from '../schedulerLease.js';
+import { acquireLease, releaseLease, renewLease } from '../schedulerLease.js';
 import PlatformAlertService, { saoPauloClock } from '../platformAlertService.js';
 import { HEADER_BYTES, createEncryptStream, inspectEncrypted, parseHeader, parsePublicKey } from './backupCrypto.js';
 import { S3Client, S3Error, hashingStream } from './s3Client.js';
 import { packDirectory } from './tarArchive.js';
 import { BackupError, createLocalBackup, stampOf } from './localBackup.js';
-import { effectiveConfig, readStatus, writeStatus } from './externalBackupSettings.js';
+import { INSTALL_ID_PATTERN, effectiveConfig, installId, readStatus, writeStatus } from './externalBackupSettings.js';
 
 /**
  * O backup externo: tirar, empacotar, cifrar, enviar, podar — e conferir.
@@ -44,9 +44,11 @@ import { effectiveConfig, readStatus, writeStatus } from './externalBackupSettin
  */
 
 export const OBJECT_SUFFIX = '.tar.skygpbk';
-const NOME = /(?:^|\/)skygp-backup-(\d{4}-\d{2}-\d{2}T\d{6}Z)\.tar\.skygpbk$/;
+const NOME = /(?:^|\/)skygp-backup-(\d{4}-\d{2}-\d{2}T\d{6}Z)(?:-([0-9a-f]{12}))?\.tar\.skygpbk$/;
 const LEASE = 'external-backup';
-const LEASE_TTL_MS = 6 * 3600_000;
+export const LEASE_TTL_MS = 6 * 3600_000;
+/** De quanto em quanto tempo a vez é renovada enquanto um envio ou download dura. */
+export const LEASE_HEARTBEAT_MS = 15 * 60_000;
 const VERIFY_EVERY_MS = 7 * 24 * 3600_000;
 const PASS_INTERVAL_MS = 60_000;
 
@@ -67,17 +69,35 @@ export function redact(texto, config) {
   return saida.slice(0, 500);
 }
 
-export function objectKeyFor(prefix, stamp) {
-  return `${prefix || ''}skygp-backup-${stamp}${OBJECT_SUFFIX}`;
+/**
+ * O nome do objeto: o carimbo e a identidade da instalação que o enviou
+ * (`externalBackupSettings.installId`) — é por ela que a retenção sabe o que
+ * é seu.
+ */
+export function objectKeyFor(prefix, stamp, install) {
+  const sufixo = install && INSTALL_ID_PATTERN.test(install) ? `-${install}` : '';
+  return `${prefix || ''}skygp-backup-${stamp}${sufixo}${OBJECT_SUFFIX}`;
 }
 
-/** O carimbo de uma chave nossa, ou nulo para qualquer outro objeto. */
-export function stampOfKey(key, prefix = '') {
+/** O carimbo e a instalação de uma chave no formato nosso, ou nulo para qualquer outro objeto. */
+export function parseObjectKey(key, prefix = '') {
   if (prefix && !key.startsWith(prefix)) return null;
   const resto = key.slice(prefix.length);
   if (resto.includes('/')) return null;
   const m = resto.match(NOME);
-  return m ? m[1] : null;
+  return m ? { stamp: m[1], installId: m[2] ?? null } : null;
+}
+
+/**
+ * O carimbo de uma chave nossa, ou nulo para qualquer outro objeto. Com
+ * `install`, só as chaves enviadas por ESSA instalação contam — uma sem
+ * identidade, ou com a de outra, é de outra pessoa.
+ */
+export function stampOfKey(key, prefix = '', install = undefined) {
+  const lido = parseObjectKey(key, prefix);
+  if (!lido) return null;
+  if (install !== undefined && lido.installId !== install) return null;
+  return lido.stamp;
 }
 
 function diaDoCarimbo(stamp) {
@@ -94,12 +114,15 @@ function semanaDe(dia) {
 /**
  * O que a retenção mantém: o mais novo de cada um dos `keepDaily` dias mais
  * recentes, e o mais novo de cada uma das `keepWeekly` semanas anteriores a
- * eles. O mais novo de todos, sempre. Só olha para os NOSSOS objetos — um
- * arquivo de outra pessoa no mesmo prefixo nunca é apagado.
+ * eles. O mais novo de todos, sempre. Só olha para os NOSSOS objetos — os
+ * com a identidade DESTA instalação (`installId`) no nome. Um arquivo de outra
+ * pessoa no mesmo prefixo, de outra instalação no mesmo bucket, ou sem
+ * identidade nenhuma, nunca é apagado; sem `installId`, nada é.
  */
-export function planRetention(objetos, { prefix = '', keepDaily, keepWeekly }) {
+export function planRetention(objetos, { prefix = '', keepDaily, keepWeekly, installId: install = null }) {
+  if (!install || !INSTALL_ID_PATTERN.test(install)) return { keep: [], remove: [] };
   const nossos = objetos
-    .map((o) => ({ ...o, stamp: stampOfKey(o.key, prefix) }))
+    .map((o) => ({ ...o, stamp: stampOfKey(o.key, prefix, install) }))
     .filter((o) => o.stamp)
     .sort((a, b) => (a.stamp < b.stamp ? 1 : a.stamp > b.stamp ? -1 : 0));
   const manter = new Set();
@@ -134,6 +157,38 @@ class ExternalBackupService {
   static lastPassAt = 0;
   /** Trocável nos testes: o `fetch` e os tetos do multipart. */
   static clientOptions = {};
+  /** Trocável nos testes: o intervalo da renovação da vez. */
+  static leaseHeartbeatMs = LEASE_HEARTBEAT_MS;
+
+  /**
+   * Segura a vez enquanto `fn` roda: a cada `leaseHeartbeatMs` ela é estendida
+   * por mais `LEASE_TTL_MS` — um envio de muitos GB num link lento passa das
+   * seis horas, e uma vez vencida no meio deixaria outra instância começar o
+   * mesmo backup em paralelo. Renovar é atualização condicional sobre quem a
+   * tem: se outra instância a tomou (o relógio parou por horas), a renovação
+   * falha e fica no log, sem roubar a vez de volta.
+   */
+  static async withLeaseHeartbeat(fn) {
+    let renovando = null;
+    const timer = setInterval(() => {
+      if (renovando) return;
+      renovando = renewLease(LEASE, { ttlMs: LEASE_TTL_MS })
+        .then((ok) => {
+          if (!ok) log.warn('external backup lease could not be renewed');
+        })
+        .catch((error) => log.warn('external backup lease renewal failed', { err: { message: error?.message } }))
+        .finally(() => {
+          renovando = null;
+        });
+    }, Math.max(10, Number(this.leaseHeartbeatMs) || LEASE_HEARTBEAT_MS));
+    timer.unref?.();
+    try {
+      return await fn();
+    } finally {
+      clearInterval(timer);
+      if (renovando) await renovando;
+    }
+  }
 
   static client(config) {
     return new S3Client({ ...config.connection, ...this.clientOptions });
@@ -180,7 +235,15 @@ class ExternalBackupService {
     }
     const minha = await acquireLease(LEASE, { ttlMs: LEASE_TTL_MS, now }).catch(() => false);
     if (!minha) return { status: 'skipped', reason: 'other_instance' };
+    try {
+      return await this.withLeaseHeartbeat(() => this.performLeased({ trigger, sourceDir, now, inicio, config, source }));
+    } finally {
+      await releaseLease(LEASE).catch(() => {});
+    }
+  }
 
+  /** O corpo de `perform`, já com a vez (e a renovação dela) nas mãos. */
+  static async performLeased({ trigger, sourceDir, now, inicio, config, source }) {
     const { day } = saoPauloClock(now);
     let trabalho = null;
     try {
@@ -228,12 +291,15 @@ class ExternalBackupService {
       );
       const { sha256, bytes } = conta.result();
 
-      const key = objectKeyFor(config.connection.prefix, stamp);
+      const instalacao = await installId();
+      if (!instalacao) throw new BackupError('This install has no identity to tag its backups with', 'no_install_id');
+      const key = objectKeyFor(config.connection.prefix, stamp, instalacao);
       const cliente = this.client(config);
       const envio = await cliente.putObject(key, {
         filePath: cifrado,
         metadata: {
           'skygp-sha256': sha256,
+          'skygp-install-id': instalacao,
           'skygp-key-id': config.keyId,
           'skygp-format': '1',
           'skygp-schema': String(manifest.schemaMigration ?? 'unknown').slice(0, 100)
@@ -244,7 +310,7 @@ class ExternalBackupService {
       let retentionError = null;
       try {
         const plano = planRetention(await cliente.listObjects(config.connection.prefix), {
-          prefix: config.connection.prefix, keepDaily: config.keepDaily, keepWeekly: config.keepWeekly
+          prefix: config.connection.prefix, keepDaily: config.keepDaily, keepWeekly: config.keepWeekly, installId: instalacao
         });
         for (const velho of plano.remove) {
           if (velho === key) continue;
@@ -297,16 +363,26 @@ class ExternalBackupService {
       return resultado;
     } finally {
       if (trabalho) fs.rmSync(trabalho, { recursive: true, force: true });
-      await releaseLease(LEASE).catch(() => {});
     }
   }
 
-  /** Os nossos objetos no bucket, do mais novo para o mais velho. */
-  static async listBackups(config = null) {
+  /**
+   * Os objetos DESTA instalação no bucket, do mais novo para o mais velho.
+   * `allInstalls` lista os de qualquer instalação no formato nosso — é o que a
+   * CLI do restore usa numa máquina nova, cuja identidade ainda não enviou nada.
+   * Só leitura: a retenção nunca usa esta lista.
+   */
+  static async listBackups(config = null, { allInstalls = false } = {}) {
     const cfg = config ?? await effectiveConfig();
+    const instalacao = allInstalls ? undefined : await installId();
+    if (!allInstalls && !instalacao) return [];
     const objetos = await this.client(cfg).listObjects(cfg.connection.prefix);
     return objetos
-      .map((o) => ({ ...o, stamp: stampOfKey(o.key, cfg.connection.prefix) }))
+      .map((o) => {
+        const lido = parseObjectKey(o.key, cfg.connection.prefix);
+        const meu = lido && (allInstalls || lido.installId === instalacao);
+        return { ...o, stamp: meu ? lido.stamp : null, installId: lido?.installId ?? null };
+      })
       .filter((o) => o.stamp)
       .sort((a, b) => (a.stamp < b.stamp ? 1 : -1));
   }
@@ -320,6 +396,15 @@ class ExternalBackupService {
     if (!config.configured) return { status: 'skipped', reason: 'not_configured' };
     const minha = await acquireLease(LEASE, { ttlMs: LEASE_TTL_MS, now }).catch(() => false);
     if (!minha) return { status: 'skipped', reason: 'other_instance' };
+    try {
+      return await this.withLeaseHeartbeat(() => this.verifyLeased({ trigger, now, key, config }));
+    } finally {
+      await releaseLease(LEASE).catch(() => {});
+    }
+  }
+
+  /** O corpo de `verifyLatest`, já com a vez (e a renovação dela) nas mãos. */
+  static async verifyLeased({ trigger, now, key, config }) {
     const inicio = Date.now();
     let trabalho = null;
     let alvo = key;
@@ -391,7 +476,6 @@ class ExternalBackupService {
       return resultado;
     } finally {
       if (trabalho) fs.rmSync(trabalho, { recursive: true, force: true });
-      await releaseLease(LEASE).catch(() => {});
     }
   }
 
@@ -479,7 +563,10 @@ class ExternalBackupService {
    * estado (a tela mostra) e enfileira o `backup_failed`. Nunca lança.
    */
   static async recordHostFailure({ reason = 'skygenpanel-backup.service failed', now = new Date() } = {}) {
-    const hostFailure = { at: now.toISOString(), reason: String(reason).slice(0, 300) };
+    // Sem caracteres de controle: o motivo vem do host e vai para a tela, o alerta e o log.
+    // eslint-disable-next-line no-control-regex -- é o que sai
+    const limpo = String(reason ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim() || 'skygenpanel-backup.service failed';
+    const hostFailure = { at: now.toISOString(), reason: limpo.slice(0, 300) };
     await writeStatus({ hostFailure }).catch(() => {});
     return this.alertFailure({ stage: 'backup', source: 'host', error: hostFailure.reason, now });
   }

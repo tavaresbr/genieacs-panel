@@ -56,6 +56,10 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('message', (event) => {
+  // Só uma janela deste mesmo endereço manda no SW. A mensagem de um SW chega
+  // com `origin` vazio em alguns navegadores: aí vale a origem de quem mandou.
+  const origem = event.origin || (event.source && event.source.url ? new URL(event.source.url).origin : '')
+  if (origem !== self.location.origin) return
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
@@ -100,6 +104,20 @@ self.addEventListener('fetch', (event) => {
 
 // ── Push ─────────────────────────────────────────────────────────────
 
+/**
+ * O destino do clique numa notificação: só um caminho deste mesmo endereço —
+ * começa com `/`, e não com `//` nem `/\\` (que o navegador lê como outro
+ * host); barra invertida e caractere de controle em qualquer ponto também
+ * ficam de fora. Qualquer outra coisa vira `/`.
+ */
+function caminhoSeguro(valor) {
+  if (typeof valor !== 'string' || valor.length > 2048) return '/'
+  if (!valor.startsWith('/') || valor.startsWith('//')) return '/'
+  // eslint-disable-next-line no-control-regex -- controle é justamente o que sai
+  if (/[\\\u0000-\u001f\u007f]/.test(valor)) return '/'
+  return valor
+}
+
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -114,7 +132,7 @@ self.addEventListener('push', (event) => {
       const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       if (janelas.some((c) => c.visibilityState === 'visible' && c.focused)) return
     }
-    const url = typeof data.url === 'string' && data.url.startsWith('/') && !data.url.startsWith('//') ? data.url : '/'
+    const url = caminhoSeguro(data.url)
     await self.registration.showNotification(String(data.title || 'TR69 Controle'), {
       body: typeof data.body === 'string' ? data.body : '',
       tag: typeof data.tag === 'string' ? data.tag : undefined,
@@ -127,8 +145,8 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const destino = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin)
-  if (destino.origin !== self.location.origin) return
+  let destino = new URL(caminhoSeguro(event.notification.data && event.notification.data.url), self.location.origin)
+  if (destino.origin !== self.location.origin) destino = new URL('/', self.location.origin)
   event.waitUntil((async () => {
     const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const janela of janelas) {

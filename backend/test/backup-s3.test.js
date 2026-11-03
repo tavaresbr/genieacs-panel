@@ -8,7 +8,7 @@ import path from 'node:path';
 const {
   EMPTY_SHA256, S3Client, S3Error, encodePath, signV4, signingKey
 } = await import('../src/services/backup/s3Client.js');
-const { planRetention, stampOfKey, objectKeyFor } = await import('../src/services/backup/externalBackupService.js');
+const { planRetention, stampOfKey, objectKeyFor, parseObjectKey } = await import('../src/services/backup/externalBackupService.js');
 const { startFakeS3 } = await import('./helpers/fakeS3.js');
 
 /**
@@ -171,7 +171,9 @@ describe('contra um S3 de mentira', () => {
 });
 
 describe('a retenção', () => {
-  const chave = (dia, hora = '031700') => objectKeyFor('bk/', `${dia}T${hora}Z`);
+  const ESTA = 'a1b2c3d4e5f6';
+  const OUTRA = '0f0e0d0c0b0a';
+  const chave = (dia, hora = '031700', install = ESTA) => objectKeyFor('bk/', `${dia}T${hora}Z`, install);
 
   it('mantém o mais novo de cada um dos N dias e de cada uma das M semanas antes deles', () => {
     const objetos = [];
@@ -182,7 +184,7 @@ describe('a retenção', () => {
     }
     objetos.push({ key: chave('2026-11-03', '120000') });
     objetos.push({ key: 'bk/de-outra-pessoa.tar' }, { key: 'bk/sub/skygp-backup-2020-01-01T000000Z.tar.skygpbk' });
-    const plano = planRetention(objetos, { prefix: 'bk/', keepDaily: 7, keepWeekly: 3 });
+    const plano = planRetention(objetos, { prefix: 'bk/', keepDaily: 7, keepWeekly: 3, installId: ESTA });
     assert.equal(plano.keep.length, 10);
     assert.ok(plano.keep.includes(chave('2026-11-03', '120000')));
     assert.ok(!plano.keep.includes(chave('2026-11-03')), 'o segundo do mesmo dia sai');
@@ -196,5 +198,28 @@ describe('a retenção', () => {
     assert.equal(plano.keep.length + plano.remove.length, 41);
     assert.equal(stampOfKey(chave('2026-11-03'), 'bk/'), '2026-11-03T031700Z');
     assert.equal(stampOfKey('outro/skygp-backup-2026-11-03T031700Z.tar.skygpbk', 'bk/'), null);
+  });
+
+  it('só poda o que ESTA instalação enviou: outra no mesmo prefixo, ou um objeto sem identidade, nunca sai', () => {
+    const objetos = [];
+    for (let i = 0; i < 30; i += 1) {
+      const d = new Date(Date.UTC(2026, 10, 3) - i * 86_400_000).toISOString().slice(0, 10);
+      objetos.push({ key: chave(d) }, { key: chave(d, '040000', OUTRA) }, { key: objectKeyFor('bk/', `${d}T050000Z`) });
+    }
+    const plano = planRetention(objetos, { prefix: 'bk/', keepDaily: 3, keepWeekly: 1, installId: ESTA });
+    assert.equal(plano.keep.length, 4);
+    assert.ok(plano.remove.length > 0);
+    for (const k of [...plano.keep, ...plano.remove]) assert.ok(k.endsWith(`-${ESTA}.tar.skygpbk`), k);
+    // E a outra instalação poda só os dela.
+    const dela = planRetention(objetos, { prefix: 'bk/', keepDaily: 3, keepWeekly: 1, installId: OUTRA });
+    for (const k of dela.remove) assert.ok(k.includes(`-${OUTRA}.`), k);
+    // Sem identidade (ou uma inválida), nada sai.
+    assert.deepEqual(planRetention(objetos, { prefix: 'bk/', keepDaily: 1, keepWeekly: 0 }).remove, []);
+    assert.deepEqual(planRetention(objetos, { prefix: 'bk/', keepDaily: 1, keepWeekly: 0, installId: 'nao-hex' }).remove, []);
+    // A chave guarda a identidade; quem pede a de outra não a reconhece.
+    assert.equal(stampOfKey(chave('2026-11-03'), 'bk/', ESTA), '2026-11-03T031700Z');
+    assert.equal(stampOfKey(chave('2026-11-03'), 'bk/', OUTRA), null);
+    assert.equal(stampOfKey(objectKeyFor('bk/', '2026-11-03T031700Z'), 'bk/', ESTA), null);
+    assert.deepEqual(parseObjectKey(chave('2026-11-03'), 'bk/'), { stamp: '2026-11-03T031700Z', installId: ESTA });
   });
 });

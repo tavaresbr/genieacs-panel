@@ -84,3 +84,26 @@ export async function releaseLease(name, { holder = LEASE_HOLDER } = {}) {
   const apagou = await db('app_state').where({ tenant_id: tenantId, key, value: atual.value }).del();
   return Number(apagou) === 1;
 }
+
+/**
+ * Estende a vez `name` por mais `ttlMs` a partir de agora, só se ESTA
+ * instância ainda a tem — o "batimento" de um passo que pode durar mais que a
+ * própria vez (o envio de um backup grande). Atualização condicional sobre o
+ * valor lido: se outra instância a tomou no meio, não a rouba de volta e
+ * devolve `false`. Sem a caixa da plataforma, não há disputa: `true`.
+ */
+export async function renewLease(name, { ttlMs, now = new Date(), holder = LEASE_HOLDER } = {}) {
+  const db = getDb();
+  const tenantId = await caixaDaPlataforma(db);
+  if (!tenantId) return true;
+  const key = `${PREFIXO}${String(name).slice(0, 100)}`;
+  // tenant-scope-exempt: a linha é da caixa da plataforma, escrita por id.
+  const atual = await db('app_state').where({ tenant_id: tenantId, key }).first();
+  const lido = lerValor(atual?.value);
+  if (!lido || lido.holder !== holder) return false;
+  const novo = JSON.stringify({ holder, until: now.getTime() + Math.max(1000, Number(ttlMs) || 0) });
+  // tenant-scope-exempt: a linha é da caixa da plataforma, escrita por id.
+  const trocou = await db('app_state').where({ tenant_id: tenantId, key, value: atual.value })
+    .update({ value: novo, updated_at: now });
+  return Number(trocou) === 1;
+}

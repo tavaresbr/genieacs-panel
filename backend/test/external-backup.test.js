@@ -24,7 +24,8 @@ const {
 } = await import('./helpers/harness.js');
 const { startFakeS3 } = await import('./helpers/fakeS3.js');
 const { default: ExternalBackupService, objectKeyFor } = await import('../src/services/backup/externalBackupService.js');
-const { readStatus, effectiveConfig, CONFIG_KEY, STATUS_KEY } = await import('../src/services/backup/externalBackupSettings.js');
+const { readStatus, effectiveConfig, installId, CONFIG_KEY, INSTALL_ID_KEY, STATUS_KEY } = await import('../src/services/backup/externalBackupSettings.js');
+const { LEASE_HOLDER } = await import('../src/services/schedulerLease.js');
 const { generateKeyPair } = await import('../src/services/backup/backupCrypto.js');
 const { decryptAndExtract, restoreCheck } = await import('../src/services/backup/backupRestore.js');
 const { saveProfile, invalidatePlatformProfile } = await import('../src/services/platformProfileService.js');
@@ -221,10 +222,18 @@ describe('a configuração pelo console', () => {
 
 describe('o backup, o envio e a poda', () => {
   it('"Fazer backup agora": tira, cifra, envia com o sha256 nos metadados, e registra', async () => {
-    // Cinco backups velhos e um objeto de outra pessoa no mesmo prefixo.
-    for (const dia of ['2025-12-20', '2025-12-21', '2026-01-01', '2026-01-02', '2026-01-03']) {
-      fake.objects.set(objectKeyFor('painel/', `${dia}T031700Z`), { body: Buffer.from('velho'), metadata: {} });
+    // Cinco backups velhos desta instalação, os mesmos dias de OUTRA
+    // instalação no mesmo prefixo, um sem identidade e um objeto de outra pessoa.
+    const minha = await installId();
+    assert.match(minha, /^[0-9a-f]{12}$/);
+    assert.equal(await installId(), minha, 'a identidade mudou entre duas leituras');
+    const outra = minha === '0123456789ab' ? 'ba9876543210' : '0123456789ab';
+    const dias = ['2025-12-20', '2025-12-21', '2026-01-01', '2026-01-02', '2026-01-03'];
+    for (const dia of dias) {
+      fake.objects.set(objectKeyFor('painel/', `${dia}T031700Z`, minha), { body: Buffer.from('velho'), metadata: {} });
+      fake.objects.set(objectKeyFor('painel/', `${dia}T031700Z`, outra), { body: Buffer.from('alheio'), metadata: {} });
     }
+    fake.objects.set(objectKeyFor('painel/', '2025-12-20T031700Z'), { body: Buffer.from('sem-id'), metadata: {} });
     fake.objects.set('painel/nao-e-nosso.txt', { body: Buffer.from('x'), metadata: {} });
 
     const r = await platform('/integrations/backup/run', { method: 'POST' });
@@ -241,6 +250,8 @@ describe('o backup, o envio e a poda', () => {
     assert.ok(objeto, 'o arquivo não chegou ao bucket');
     assert.equal(objeto.metadata['skygp-sha256'], crypto.createHash('sha256').update(objeto.body).digest('hex'));
     assert.equal(objeto.metadata['skygp-key-id'], par.keyId);
+    assert.equal(objeto.metadata['skygp-install-id'], minha);
+    assert.ok(lastRun.key.endsWith(`-${minha}.tar.skygpbk`), lastRun.key);
     assert.equal(lastRun.bytes, objeto.body.length);
     assert.equal(objeto.body.subarray(0, 7).toString(), 'SKYGPBK');
 
@@ -248,9 +259,17 @@ describe('o backup, o envio e a poda', () => {
     // semana dele; a semana de dezembro sai inteira. O de outra pessoa fica.
     assert.ok(fake.objects.has('painel/nao-e-nosso.txt'));
     assert.equal(lastRun.deleted, 2);
-    assert.equal(fake.objects.has(objectKeyFor('painel/', '2026-01-01T031700Z')), true);
-    assert.equal(fake.objects.has(objectKeyFor('painel/', '2025-12-21T031700Z')), false);
-    assert.equal(fake.objects.has(objectKeyFor('painel/', '2025-12-20T031700Z')), false);
+    assert.equal(fake.objects.has(objectKeyFor('painel/', '2026-01-01T031700Z', minha)), true);
+    assert.equal(fake.objects.has(objectKeyFor('painel/', '2025-12-21T031700Z', minha)), false);
+    assert.equal(fake.objects.has(objectKeyFor('painel/', '2025-12-20T031700Z', minha)), false);
+    // Os da outra instalação e o sem identidade ficam todos.
+    for (const dia of dias) assert.ok(fake.objects.has(objectKeyFor('painel/', `${dia}T031700Z`, outra)), dia);
+    assert.ok(fake.objects.has(objectKeyFor('painel/', '2025-12-20T031700Z')));
+    // E a verificação olha para o desta instalação, não para o de outra.
+    const listados = await ExternalBackupService.listBackups();
+    assert.ok(listados.every((o) => o.installId === minha));
+    assert.equal(listados[0].key, lastRun.key);
+    assert.ok((await ExternalBackupService.listBackups(null, { allInstalls: true })).some((o) => o.installId === outra));
 
     const tela = await platform('/integrations/backup');
     assert.equal(tela.body.data.status.lastRun.status, 'ok');
@@ -372,6 +391,65 @@ describe('o agendador', () => {
   });
 });
 
+describe('a vez durante um envio longo', () => {
+  it('é renovada enquanto o envio dura, e devolvida no fim', async () => {
+    const chaveDaVez = 'lease:external-backup';
+    const lerVez = async () => {
+      const linha = await getDb()('app_state').where({ key: chaveDaVez }).first();
+      return linha ? JSON.parse(linha.value) : null;
+    };
+    const vistas = [];
+    const intervaloOriginal = ExternalBackupService.leaseHeartbeatMs;
+    const opcoesOriginais = ExternalBackupService.clientOptions;
+    ExternalBackupService.leaseHeartbeatMs = 40;
+    // O PUT do arquivo demora: o tempo de várias renovações.
+    ExternalBackupService.clientOptions = {
+      ...opcoesOriginais,
+      fetchImpl: async (url, init) => {
+        if (init?.method === 'PUT') {
+          for (let i = 0; i < 6; i += 1) {
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((resolve) => { setTimeout(resolve, 60); });
+            // eslint-disable-next-line no-await-in-loop
+            vistas.push(await lerVez());
+          }
+        }
+        return fetch(url, init);
+      }
+    };
+    // A vez tomada "há cinco horas e meia": sem renovar, venceria no meio.
+    const inicio = new Date(Date.now() - 5.5 * 3600_000);
+    try {
+      const r = await ExternalBackupService.perform({ trigger: 'manual', now: inicio });
+      assert.equal(r.status, 'ok', JSON.stringify(r));
+    } finally {
+      ExternalBackupService.leaseHeartbeatMs = intervaloOriginal;
+      ExternalBackupService.clientOptions = opcoesOriginais;
+    }
+    const tomada = inicio.getTime() + 6 * 3600_000;
+    const renovadas = vistas.filter((v) => v && v.holder === LEASE_HOLDER && Number(v.until) > tomada);
+    assert.ok(renovadas.length >= 1, `a vez não foi renovada: ${JSON.stringify(vistas)}`);
+    assert.ok(Number(renovadas.at(-1).until) > Date.now() + 5 * 3600_000);
+    assert.equal(await lerVez(), null, 'a vez não foi devolvida no fim');
+  });
+
+  it('não rouba a vez de volta se outra instância a tomou', async () => {
+    const { acquireLease, renewLease } = await import('../src/services/schedulerLease.js');
+    assert.equal(await acquireLease('teste-renovar', { ttlMs: 1000, holder: 'a' }), true);
+    assert.equal(await renewLease('teste-renovar', { ttlMs: 60_000, holder: 'a' }), true);
+    assert.equal(await renewLease('teste-renovar', { ttlMs: 60_000, holder: 'b' }), false);
+    const linha = await getDb()('app_state').where({ key: 'lease:teste-renovar' }).first();
+    assert.equal(JSON.parse(linha.value).holder, 'a');
+  });
+
+  it('a identidade da instalação é gravada uma vez só', async () => {
+    const id = await installId();
+    const linhas = await getDb()('app_state').where({ key: INSTALL_ID_KEY });
+    assert.equal(linhas.length, 1);
+    assert.equal(linhas[0].value, id);
+  });
+});
+
 describe('o host', () => {
   it('envia um backup tirado pelo script, e a falha do systemd vira um alerta só (aviso direto + marcador)', async () => {
     const stamp = '2026-11-02T031700Z';
@@ -381,7 +459,7 @@ describe('o host', () => {
     fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ client: 'better-sqlite3', schemaMigration: '0001' }));
     const r = await ExternalBackupService.perform({ trigger: 'host', sourceDir: dir });
     assert.equal(r.status, 'ok', JSON.stringify(r));
-    assert.equal(r.key, objectKeyFor('painel/', stamp));
+    assert.equal(r.key, objectKeyFor('painel/', stamp, await installId()));
     assert.equal(r.source, 'host');
 
     await getDb()('platform_alerts').del();

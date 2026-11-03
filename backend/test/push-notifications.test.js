@@ -188,7 +188,21 @@ describe('a inscrição do aparelho', () => {
     assert.equal(Number(linha.tenant_id), alfa);
     assert.equal(Number(linha.user_id), pessoas.dona.id);
     assert.equal(linha.endpoint_hash, endpointHash(endpointDe('dona')));
-    assert.ok(!JSON.stringify(linha).includes('fcm.googleapis.com'), 'o endpoint não pode ficar em claro');
+    // Nenhuma coluna guarda o endpoint, nem um endereço do mesmo serviço de push.
+    const endpoint = endpointDe('dona');
+    const hostDoPush = new URL(endpoint).host;
+    for (const [coluna, valor] of Object.entries(linha)) {
+      if (typeof valor !== 'string') continue;
+      assert.notEqual(valor, endpoint, `o endpoint ficou em claro em ${coluna}`);
+      let host = null;
+      try {
+        host = new URL(valor).host;
+      } catch {
+        host = null;
+      }
+      assert.notEqual(host, hostDoPush, `o endpoint ficou em claro em ${coluna}`);
+      assert.equal(valor.indexOf(endpoint), -1, `o endpoint ficou em claro em ${coluna}`);
+    }
 
     // Outra pessoa tentando tirar o aparelho da dona: nada sai.
     const alheio = await api('tecnico', '/unsubscribe', { method: 'POST', body: { endpoint: endpointDe('dona') } });

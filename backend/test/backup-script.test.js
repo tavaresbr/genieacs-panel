@@ -1,6 +1,6 @@
 import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -225,6 +225,29 @@ describe('a poda', () => {
     assert.match(marcador.at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
     // E o marcador não vira "uma cópia" para a poda nem para o verify.
     assert.deepEqual(copias(), []);
+  });
+
+  it('notify-failure tira os caracteres de controle do motivo antes de montar o JSON', () => {
+    fs.rmSync(destino, { recursive: true, force: true });
+    const r = spawnSync('/bin/bash', [SCRIPT, 'notify-failure', 'linha 1\nlinha 2\t\u001b[31mvermelho\u007f\r"fim"\\'], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, SKYGP_DIR: install, SKYGP_BACKUP_DIR: destino }
+    });
+    assert.equal(r.status, 0, r.stderr);
+    const bruto = fs.readFileSync(path.join(destino, '.last-failure'), 'utf8');
+    assert.equal(bruto.trimEnd().split('\n').length, 1, 'o marcador tem mais de uma linha');
+    // eslint-disable-next-line no-control-regex -- é o que não pode estar lá
+    assert.doesNotMatch(bruto.trimEnd(), /[\u0000-\u001f\u007f]/);
+    assert.equal(JSON.parse(bruto).reason, 'linha 1linha 2[31mvermelhofim');
+    // O aviso no log também sai numa linha só.
+    assert.ok(r.stderr.split('\n').some((l) => l.includes('backup failure recorded: linha 1linha 2')), r.stderr);
+
+    // Só controle: vale o motivo padrão.
+    fs.rmSync(destino, { recursive: true, force: true });
+    execFileSync('/bin/bash', [SCRIPT, 'notify-failure', '\n\t'], {
+      encoding: 'utf8', env: { PATH: process.env.PATH, SKYGP_DIR: install, SKYGP_BACKUP_DIR: destino }, stdio: ['ignore', 'pipe', 'pipe']
+    });
+    assert.equal(JSON.parse(fs.readFileSync(path.join(destino, '.last-failure'), 'utf8')).reason, 'skygenpanel-backup.service failed');
   });
 
   it('o service chama o envio externo depois do run e tem OnFailure=', () => {

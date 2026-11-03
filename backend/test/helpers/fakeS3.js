@@ -59,10 +59,11 @@ export async function startFakeS3({ bucket, accessKeyId, secretAccessKey, region
         estado.rejections.push({ code: 'InvalidAccessKeyId', auth });
         return erroXml(res, 403, 'InvalidAccessKeyId');
       }
-      const headers = {};
-      for (const nome of m[4].split(';')) headers[nome] = req.headers[nome];
+      // Um Map, e não um objeto: os nomes vêm da requisição (`SignedHeaders`).
+      const assinados = new Map();
+      for (const nome of m[4].split(';')) assinados.set(nome, req.headers[nome]);
       const { signature } = signV4({
-        method: req.method, path: cru, query, headers, payloadHash: req.headers['x-amz-content-sha256'],
+        method: req.method, path: cru, query, headers: Object.fromEntries(assinados), payloadHash: req.headers['x-amz-content-sha256'],
         region, accessKeyId, secretAccessKey
       });
       if (signature !== m[5]) {

@@ -138,6 +138,17 @@ Uma integração **nova** já nasce exigindo o carimbo. Se o SGP daquele provedo
 - **Não exige "maiúscula, número e símbolo".** Regras de composição empurram para `Senha@123`. O mínimo de 10 caracteres com a lista das comuns segue a NIST SP 800-63B.
 - **Não consulta serviços externos de senhas vazadas** (k-anonymity do HIBP). Seria uma dependência de rede no caminho do cadastro. Pode entrar como opção desligada por padrão.
 
+### 4.4 Push: um aparelho inscrito de novo, noutro provedor, passa para o provedor atual
+
+O endpoint de push é **um aparelho** (um navegador), e não uma conta. Em `PushService.subscribe`, uma inscrição com um endpoint que já existe apaga a linha antiga, **em qualquer provedor e de qualquer pessoa** (`runUnscoped`, pelo `endpoint_hash`), e grava a nova no provedor e na pessoa da sessão atual. Na prática:
+
+- quem usa o mesmo navegador em dois provedores (ou entrega o celular a outra pessoa) passa a receber só os avisos da sessão que se inscreveu por último. O provedor anterior perde o aparelho sem aviso, e a pessoa anterior para de receber;
+- é de propósito: um celular passado de mão em mão não pode continuar recebendo avisos do dono anterior, e duas linhas com o mesmo endpoint mandariam avisos de dois provedores para o mesmo aparelho;
+- não é um vazamento entre provedores: só quem tem a inscrição do navegador (endpoint e chaves, que só a página daquela origem lê) consegue movê-la, e a linha antiga é apagada, não lida;
+- para voltar a receber os avisos do provedor anterior, basta reativar as notificações numa sessão dele. A linha volta para lá.
+
+Prova em `backend/test/push-notifications.test.js`.
+
 ## 5. Proposta (PR separado): tokens em cookie httpOnly com rotação do refresh
 
 **Decisão do usuário: só o desenho entra agora, a implementação vai num PR separado.**
@@ -150,6 +161,9 @@ Uma integração **nova** já nasce exigindo o carimbo. Se o SGP daquele provedo
 - O token de acesso leva o `sid` (a família), e a hidratação confere que a família está viva. "Sair" e "Encerrar" valem na próxima requisição, e não só quando os 15 minutos acabam.
 - "Sair" encerra só este aparelho. "Sair de todos" (`POST /api/auth/sessions/revoke-all`) sobe o `token_version` e revoga todas as famílias. A tela "Sessões ativas" fica em Configurações › Acesso da conta.
 - O refresh responde 401 a toda recusa e tem um limite próprio (`refreshLimiter`), mais folgado que o do login.
+- **A folga de 10 s (`REFRESH_GRACE_MS`) é idempotente.** Reenviar o token já girado dentro dela — duas abas juntas, ou a resposta que se perdeu e o navegador tentou de novo com o cookie antigo — devolve o sucessor atual da família: nada é revogado, nenhum galho novo é aberto e nenhuma linha de reuso vai para a trilha. Depois da folga é reuso: a família cai e o `SESSION_REFRESH_REUSE` é gravado.
+- **O refresh antigo (JWT no corpo, de antes da 0129)** é convertido uma vez numa família com **teto** (`family_expires_at`): o `exp` do próprio JWT. A conversão não ganha sete dias novos e nenhuma rotação seguinte passa do teto. A linha do JWT fica até o teto vencer, mesmo revogada, e é ela que faz o mesmo JWT ser recusado em vez de convertido de novo. "Sair" de uma sessão convertida (ou com um token de acesso sem `sid`) sobe o `token_version`, como o "Sair" de antes: é a única coisa que derruba o JWT sem estado. O custo, uma vez na transição, é sair de todos os aparelhos.
+- `JWT_EXPIRES_IN=15m` no `install.sh`, no `deploy/saas.env.example` e no `backend/.env.example`. Um `.env` antigo com `1h` deve ser corrigido à mão.
 - Prova em `backend/test/session-cookies.test.js` e `frontend/e2e/session.spec.ts`.
 
 ### Problema

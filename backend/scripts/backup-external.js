@@ -10,7 +10,7 @@ import path from 'node:path';
  *   node scripts/backup-external.js upload [diretório] [--if-configured]
  *   node scripts/backup-external.js notify-failure [--reason "texto"]
  *   node scripts/backup-external.js verify
- *   node scripts/backup-external.js list
+ *   node scripts/backup-external.js list [--all]
  *   node scripts/backup-external.js status
  *   node scripts/backup-external.js restore --from-s3 <chave|latest> --private-key <arquivo> [--keep] [--target-url URL]
  *   node scripts/backup-external.js restore --file <arquivo.skygpbk> --private-key <arquivo> [--keep] [--target-url URL]
@@ -84,7 +84,9 @@ async function restaurar(opcoes) {
       if (!config.connectionReady) throw new Error('The S3 connection is not configured in the console');
       let key = opcoes['from-s3'];
       if (key === 'latest') {
-        const [ultimo] = await Service.listBackups(config);
+        // O desta instalação; numa máquina nova (identidade sem envios), o
+        // mais novo de qualquer instalação no prefixo.
+        const [ultimo] = (await Service.listBackups(config)).concat(await Service.listBackups(config, { allInstalls: true }));
         if (!ultimo) throw new Error('There is no backup in the bucket');
         key = ultimo.key;
       }
@@ -147,7 +149,7 @@ async function main() {
     if (r.status === 'failed') process.exitCode = 1;
     return undefined;
   }
-  if (verbo === 'list') return saida(await Service.listBackups());
+  if (verbo === 'list') return saida(await Service.listBackups(null, { allInstalls: opcoes.all === true }));
   if (verbo === 'status') return saida(await readStatus());
   process.stderr.write('usage: backup-external.js upload|notify-failure|verify|list|status|restore (see the header of this file)\n');
   process.exitCode = 1;

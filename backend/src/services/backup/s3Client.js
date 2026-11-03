@@ -248,21 +248,28 @@ export class S3Client {
       const r = await this.request('PUT', key, { body, headers: { 'content-type': contentType, ...meta } });
       return { etag: r.headers.get('etag'), multipart: false };
     }
-    const tamanho = (await fs.promises.stat(filePath)).size;
-    if (tamanho <= this.multipartThreshold) {
-      const conteudo = await fs.promises.readFile(filePath);
-      const r = await this.request('PUT', key, { body: conteudo, headers: { 'content-type': contentType, ...meta } });
-      return { etag: r.headers.get('etag'), multipart: false };
+    // Um descritor só: o tamanho (`fstat`) e o conteúdo vêm do MESMO arquivo
+    // aberto, e não de um caminho que pode ter sido trocado entre um e outro.
+    const fh = await fs.promises.open(filePath, 'r');
+    try {
+      const tamanho = (await fh.stat()).size;
+      if (tamanho <= this.multipartThreshold) {
+        const conteudo = await fh.readFile();
+        const r = await this.request('PUT', key, { body: conteudo, headers: { 'content-type': contentType, ...meta } });
+        return { etag: r.headers.get('etag'), multipart: false };
+      }
+      return await this.multipartUpload(key, fh, tamanho, { 'content-type': contentType, ...meta });
+    } finally {
+      await fh.close();
     }
-    return this.multipartUpload(key, filePath, tamanho, { 'content-type': contentType, ...meta });
   }
 
-  async multipartUpload(key, filePath, tamanho, headers) {
+  /** As partes saem de `fh`, já aberto por `putObject` (e fechado por ele). */
+  async multipartUpload(key, fh, tamanho, headers) {
     const inicio = await this.request('POST', key, { query: [['uploads', '']], headers });
     const uploadId = xmlValue(await inicio.text(), 'UploadId');
     if (!uploadId) throw new S3Error('S3 did not return an UploadId', { code: 's3_error' });
     const partes = [];
-    const fh = await fs.promises.open(filePath, 'r');
     try {
       for (let numero = 1, posicao = 0; posicao < tamanho; numero += 1, posicao += this.partSize) {
         const n = Math.min(this.partSize, tamanho - posicao);
@@ -292,8 +299,6 @@ export class S3Client {
       // Uma subida pela metade é cobrada como armazenamento até alguém abortar.
       await this.request('DELETE', key, { query: [['uploadId', uploadId]], expect: [200, 204, 404] }).catch(() => {});
       throw error;
-    } finally {
-      await fh.close();
     }
   }
 

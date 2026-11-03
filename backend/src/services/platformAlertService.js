@@ -830,8 +830,18 @@ class PlatformAlertService {
       const fs = await import('node:fs/promises');
       const path = await import('node:path');
       const marcador = path.join(dir, '.last-failure');
-      const st = await fs.stat(marcador).catch(() => null);
-      if (!st) return { checked: true, enqueued: 0 };
+      // Um descritor só para o marcador: a data (`fstat`) e o motivo vêm do
+      // MESMO arquivo, e não de um caminho trocado entre a consulta e a leitura.
+      const fh = await fs.open(marcador, 'r').catch(() => null);
+      if (!fh) return { checked: true, enqueued: 0 };
+      let st;
+      let conteudo = null;
+      try {
+        st = await fh.stat();
+        conteudo = await fh.readFile('utf8').catch(() => null);
+      } finally {
+        await fh.close().catch(() => {});
+      }
       let ultimo = 0;
       for (const e of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])) {
         if (!e.isDirectory()) continue;
@@ -842,7 +852,7 @@ class PlatformAlertService {
       if (ultimo > st.mtimeMs) return { checked: true, enqueued: 0 };
       let motivo = 'skygenpanel-backup.service failed';
       try {
-        const lido = JSON.parse(await fs.readFile(marcador, 'utf8'));
+        const lido = JSON.parse(conteudo ?? '');
         if (typeof lido?.reason === 'string' && lido.reason.trim()) motivo = lido.reason.trim();
       } catch {
         // Um marcador ilegível ainda é uma falha: vale o motivo padrão.

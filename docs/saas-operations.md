@@ -506,8 +506,16 @@ chave privada, nenhum backup é restaurável** — nem por nós.
    duas instâncias não mandam dois arquivos) ou o **host** (o
    `skygenpanel-backup.service` roda `skygenpanel-backup upload --if-configured` depois do
    `run`). Nunca os dois. Retenção: o mais novo de cada um dos N dias mais recentes, e um
-   por semana das M semanas anteriores; só objetos `skygp-backup-*.tar.skygpbk` do prefixo
-   são apagados, nunca o que outra pessoa pôs lá.
+   por semana das M semanas anteriores. Cada instalação tem uma identidade sorteada uma
+   vez (`external_backup_install_id`, na caixa da plataforma) que vai no nome do objeto
+   (`skygp-backup-<carimbo>-<id>.tar.skygpbk`) e no metadado `x-amz-meta-skygp-install-id`;
+   a poda só apaga objetos com a identidade **desta** instalação — nunca o que outra pessoa
+   pôs no prefixo, nem os de outra instalação apontada para o mesmo bucket e prefixo
+   (homologação e produção, por exemplo). Um painel restaurado de outro herda a identidade
+   dele junto com o banco: não aponte os dois para o mesmo prefixo.
+   A vez `external-backup` vale 6 h e é renovada a cada 15 min enquanto o envio (ou o
+   download da verificação) dura: um arquivo grande num link lento não abre a porta para
+   outra instância começar o mesmo backup.
 
 **Guarda da chave privada.** Num gerenciador de senhas da equipe **e** numa cópia offline
 (pendrive no cofre, papel com o PEM). Duas pessoas com acesso. Ao trocar o par, guarde a

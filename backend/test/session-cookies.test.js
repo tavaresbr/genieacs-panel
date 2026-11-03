@@ -140,6 +140,52 @@ describe('a renovação', () => {
     assert.equal((await renovar(ca)).status, 200);
   });
 
+  it('a resposta perdida: reenviar o token girado dentro da folga devolve o mesmo sucessor, sem revogar nem auditar', async () => {
+    const reusos = async () => Number((await getDb()('audit_log').where({ action: AuditLog.ACTIONS.SESSION_REFRESH_REUSE }).count({ n: '*' }))[0].n);
+    const antes = await reusos();
+    const { cookie } = await entrar();
+    const r1 = await renovar(cookie);
+    assert.equal(r1.status, 200);
+    const sucessor = cookieFrom(r1.response);
+    const familia = (await RefreshToken.findByRaw(sucessor)).family_id;
+
+    // A resposta de r1 não chegou: o navegador tenta de novo com o cookie antigo.
+    for (let i = 0; i < 3; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await renovar(cookie);
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      assert.equal(cookieFrom(r.response), sucessor, 'a repetição recebeu outro sucessor');
+      assert.ok(r.body.data.token);
+    }
+    const linhas = await getDb()('refresh_tokens').where({ family_id: familia });
+    assert.equal(linhas.length, 2, 'a repetição abriu um galho na família');
+    assert.ok(linhas.every((l) => !l.revoked_at), 'a repetição revogou a família');
+    assert.equal(await reusos(), antes, 'a repetição virou linha de reuso na trilha');
+    assert.equal((await renovar(sucessor)).status, 200, 'o sucessor deixou de valer');
+  });
+
+  it('a folga é exata: dentro de REFRESH_GRACE_MS é a mesma renovação; depois, reuso', async () => {
+    const user = await getDb()('users').where({ username: DONO.username }).first();
+    for (const [atraso, esperado] of [[REFRESH_GRACE_MS - 1000, true], [REFRESH_GRACE_MS + 2000, false]]) {
+      const { cookie } = await entrar();
+      const girou = await renovar(cookie);
+      const sucessor = cookieFrom(girou.response);
+      const linha = await RefreshToken.findByRaw(cookie);
+      const girouEm = new Date(linha.rotated_at).getTime();
+      // eslint-disable-next-line no-await-in-loop
+      const r = await RefreshToken.rotate({ raw: cookie, user, now: new Date(girouEm + atraso) });
+      assert.equal(r.ok, esperado, `${atraso}ms: ${JSON.stringify(r.reason)}`);
+      if (esperado) {
+        assert.equal(r.raw, sucessor);
+        assert.equal(r.grace, true);
+        assert.equal((await RefreshToken.findByRaw(sucessor)).revoked_at, null);
+      } else {
+        assert.equal(r.reason, 'reuse');
+        assert.ok((await RefreshToken.findByRaw(sucessor)).revoked_at, 'o reuso não revogou a família');
+      }
+    }
+  });
+
   it('sem cookie é 401', async () => {
     const r = await renovar(null);
     assert.equal(r.status, 401);
@@ -325,11 +371,26 @@ describe('o cookie do console e o do painel', () => {
 });
 
 describe('a transição do refresh antigo (uma versão)', () => {
-  const jwtAntigo = (user, extra = {}) => jwt.sign(
-    { userId: user.id, tenantId: extra.tenantId, tokenType: 'refresh', tokenVersion: Number(user.token_version || 0) },
-    process.env.JWT_SECRET,
-    { issuer: 'skygenpanel', audience: 'skygenpanel-admin', expiresIn: '7d' }
-  );
+  // Cada JWT com o próprio `iat`: dois iguais no mesmo segundo seriam o mesmo token.
+  let distinto = 0;
+  const jwtAntigo = (user, extra = {}) => {
+    distinto += 1;
+    const iat = Math.floor(Date.now() / 1000) - 3600 - distinto;
+    return jwt.sign(
+      { userId: user.id, tenantId: extra.tenantId, tokenType: 'refresh', tokenVersion: Number(user.token_version || 0), iat, exp: extra.exp ?? iat + 7 * 24 * 3600 },
+      process.env.JWT_SECRET,
+      { issuer: 'skygenpanel', audience: 'skygenpanel-admin' }
+    );
+  };
+  const migrar = (antigo) => call(`${panelUrl}/api/auth/refresh`, {
+    method: 'POST', headers: cookieHeaders(null), body: { refreshToken: antigo }
+  });
+  const dono = async () => {
+    const user = await getDb()('users').where({ username: DONO.username }).first();
+    const membro = await getDb()('tenant_users').where({ user_id: user.id }).first();
+    return { user, tenantId: membro.tenant_id };
+  };
+  const instante = (v) => new Date(v).getTime();
 
   it('converte o JWT do corpo numa família nova com cookie, uma vez', async () => {
     const user = await getDb()('users').where({ username: DONO.username }).first();
@@ -373,5 +434,108 @@ describe('a transição do refresh antigo (uma versão)', () => {
       method: 'POST', headers: cookieHeaders(null), body: { refreshToken: token }
     });
     assert.equal(acesso.status, 401);
+  });
+
+  it('a família convertida herda o vencimento do JWT, e a rotação não o estende', async () => {
+    const { user, tenantId } = await dono();
+    const exp = Math.floor(Date.now() / 1000) + 2 * 3600;
+    const antigo = jwtAntigo(user, { tenantId, exp });
+    const migrou = await migrar(antigo);
+    assert.equal(migrou.status, 200, JSON.stringify(migrou.body));
+    const cookie = cookieFrom(migrou.response);
+    const raiz = await RefreshToken.findByRaw(antigo);
+    const primeiro = await RefreshToken.findByRaw(cookie);
+    assert.equal(instante(primeiro.family_expires_at), exp * 1000);
+    assert.equal(instante(primeiro.expires_at), exp * 1000, 'a conversão ganhou sete dias novos');
+    assert.equal(instante(raiz.expires_at), exp * 1000);
+
+    // Girar não passa do teto.
+    const girou = await renovar(cookie);
+    assert.equal(girou.status, 200);
+    const segundo = await RefreshToken.findByRaw(cookieFrom(girou.response));
+    assert.equal(instante(segundo.expires_at), exp * 1000);
+    assert.equal(instante(segundo.family_expires_at), exp * 1000);
+
+    // Passado o teto, a família vence — mesmo tendo girado há pouco.
+    const venceu = await RefreshToken.rotate({ raw: cookieFrom(girou.response), user, now: new Date((exp + 1) * 1000) });
+    assert.equal(venceu.ok, false);
+    assert.equal(venceu.reason, 'expired');
+
+    // O login comum segue sem teto: sete dias renovados a cada uso.
+    const comum = await entrar();
+    const linha = await RefreshToken.findByRaw(comum.cookie);
+    assert.equal(linha.family_expires_at, null);
+    assert.ok(instante(linha.expires_at) > Date.now() + 6 * 24 * 3600_000);
+  });
+
+  it('o JWT antigo converte uma vez só: encerrada a família, a limpeza não o deixa converter de novo', async () => {
+    const { user, tenantId } = await dono();
+    const antigo = jwtAntigo(user, { tenantId });
+    const migrou = await migrar(antigo);
+    assert.equal(migrou.status, 200);
+    const familia = (await RefreshToken.findByRaw(antigo)).family_id;
+    // "Encerrar" a sessão na tela (sem subir a versão).
+    await RefreshToken.revokeFamily(familia);
+    // A limpeza de dois dias depois apaga revogados — mas não a linha do JWT,
+    // que ainda tem a assinatura válida.
+    await RefreshToken.prune(new Date(Date.now() + 2 * 24 * 3600_000));
+    assert.ok(await RefreshToken.findByRaw(antigo), 'a limpeza apagou a linha do JWT antigo');
+    const denovo = await migrar(antigo);
+    assert.equal(denovo.status, 401);
+    assert.equal((await getDb()('refresh_tokens').where({ user_id: user.id }).whereNull('revoked_at').where({ family_id: familia })).length, 0);
+    // Depois do teto (e da folga da limpeza), sai.
+    await RefreshToken.prune(new Date(Date.now() + 9 * 24 * 3600_000));
+    assert.equal(await RefreshToken.findByRaw(antigo), null);
+  });
+
+  it('"Sair" de uma sessão convertida sobe o token_version: o JWT antigo morre, e as outras sessões também', async () => {
+    const { user, tenantId } = await dono();
+    const antigo = jwtAntigo(user, { tenantId });
+    const copia = jwtAntigo(user, { tenantId });
+    const migrou = await migrar(antigo);
+    assert.equal(migrou.status, 200);
+    const outro = await entrar();
+    const r = await call(`${panelUrl}/api/auth/logout`, {
+      method: 'POST', headers: { ...authHeaders(migrou.body.data.token), ...cookieHeaders(cookieFrom(migrou.response)) }
+    });
+    assert.equal(r.status, 200);
+    assert.equal(cookieFrom(r.response), '');
+    const depois = await getDb()('users').where({ id: user.id }).first();
+    assert.equal(Number(depois.token_version), Number(user.token_version) + 1, 'a saída da sessão convertida não subiu a versão');
+    // Um outro JWT antigo da mesma versão (outra aba, uma cópia) não converte mais.
+    assert.equal((await migrar(copia)).status, 401);
+    assert.equal((await renovar(outro.cookie)).status, 401);
+  });
+
+  it('"Sair" só pelo cookie de uma sessão convertida também sobe a versão', async () => {
+    const { user, tenantId } = await dono();
+    const migrou = await migrar(jwtAntigo(user, { tenantId }));
+    assert.equal(migrou.status, 200);
+    const r = await call(`${panelUrl}/api/auth/logout`, { method: 'POST', headers: cookieHeaders(cookieFrom(migrou.response)) });
+    assert.equal(r.status, 200);
+    const depois = await getDb()('users').where({ id: user.id }).first();
+    assert.equal(Number(depois.token_version), Number(user.token_version) + 1);
+  });
+
+  it('"Sair" com um token de acesso de antes da 0129 (sem sid) sobe a versão — e um de versão já morta não', async () => {
+    const outro = await entrar();
+    const { user, tenantId } = await dono();
+    const claims = jwt.decode(outro.token);
+    const semSid = jwt.sign(
+      { userId: claims.userId, username: claims.username, tenantId: claims.tenantId, role: claims.role, tokenVersion: claims.tokenVersion },
+      process.env.JWT_SECRET, { issuer: 'skygenpanel', audience: 'skygenpanel-admin', expiresIn: '15m' }
+    );
+    const r = await call(`${panelUrl}/api/auth/logout`, { method: 'POST', headers: { ...authHeaders(semSid), 'X-Requested-With': 'skygenpanel' } });
+    assert.equal(r.status, 200);
+    const depois = await getDb()('users').where({ id: user.id }).first();
+    assert.equal(Number(depois.token_version), Number(user.token_version) + 1);
+    assert.equal((await migrar(jwtAntigo(user, { tenantId }))).status, 401);
+    assert.equal((await renovar(outro.cookie)).status, 401);
+
+    // O mesmo token, agora de uma versão morta, não derruba as sessões de hoje.
+    const hoje = await entrar();
+    const r2 = await call(`${panelUrl}/api/auth/logout`, { method: 'POST', headers: { ...authHeaders(semSid), 'X-Requested-With': 'skygenpanel' } });
+    assert.equal(r2.status, 200);
+    assert.equal((await renovar(hoje.cookie)).status, 200);
   });
 });

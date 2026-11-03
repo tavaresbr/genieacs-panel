@@ -1111,7 +1111,13 @@ class AuthController {
    *    resolve a saída que chega atrasada: a tela já esqueceu o token e outra
    *    pessoa entrou na mesma aba, e o cookie agora é da sessão NOVA — revogar
    *    pelo cookie derrubaria quem acabou de entrar;
-   * 2. do cookie, quando não há token (ou ele é de antes desta versão).
+   * 2. do cookie, quando não há token.
+   *
+   * A sessão que vem do refresh ANTIGO sobe o `token_version`, como o "Sair"
+   * de antes: o token de acesso de antes desta versão (sem `sid`), e a família
+   * convertida dele (`RefreshToken.isLegacyFamily`). O JWT sem estado de onde
+   * ela veio pode ter ficado em outra aba, ou numa cópia, e só a versão o
+   * derruba — o custo é sair de todos os aparelhos, uma vez, na transição.
    *
    * O cookie só é apagado quando é da família encerrada (ou não serve mais).
    * Sempre 200: sair de uma sessão que já não existe é ter saído.
@@ -1141,9 +1147,21 @@ class AuthController {
       const row = raw ? await RefreshToken.findByRaw(raw) : null;
       const sid = typeof decoded?.sid === 'string' ? decoded.sid : null;
       if (sid) {
+        if (await RefreshToken.isLegacyFamily(sid, decoded.userId)) {
+          await AuthController.endLegacySession(decoded.userId, decoded.tokenVersion);
+        }
         await RefreshToken.revokeOwnFamily(decoded.userId, sid);
         if (!row || row.family_id === sid || row.revoked_at) clearRefreshCookie(req, res, kind);
+      } else if (decoded) {
+        // Um token de acesso de antes da 0129 (sem `sid`): não há família a
+        // encerrar, e o refresh que o acompanha é o JWT sem estado.
+        await AuthController.endLegacySession(decoded.userId, decoded.tokenVersion);
+        if (row) await RefreshToken.revokeFamily(row.family_id);
+        clearRefreshCookie(req, res, kind);
       } else {
+        if (row && !row.revoked_at && await RefreshToken.isLegacyFamily(row.family_id, row.user_id)) {
+          await AuthController.endLegacySession(row.user_id, row.token_version);
+        }
         if (row) await RefreshToken.revokeFamily(row.family_id);
         clearRefreshCookie(req, res, kind);
       }
@@ -1152,6 +1170,20 @@ class AuthController {
       console.error('Logout error:', error);
       return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
     }
+  }
+
+  /**
+   * O "Sair" de uma sessão do refresh antigo: sobe o `token_version` (o JWT
+   * sem estado morre) e encerra as famílias da pessoa — mas só se quem pede
+   * está na versão ATUAL dela. Um token de uma versão já morta não serve para
+   * derrubar as sessões de hoje.
+   */
+  static async endLegacySession(userId, tokenVersion) {
+    const user = await User.findById(userId);
+    if (!user || Number(user.token_version || 0) !== Number(tokenVersion || 0)) return false;
+    await User.revokeSessions(user.id);
+    await RefreshToken.revokeAllForUser(user.id);
+    return true;
   }
 
   /** O 401 de toda renovação recusada: o cookie sai junto, e a tela vai ao login. */
@@ -1329,10 +1361,13 @@ class AuthController {
       if (!membership) return AuthController.refreshRefused(req, res, 'panel');
       tenantId = Number(membership.tenant_id);
     }
+    // A família herda o vencimento do JWT: a conversão não dá sete dias novos.
+    const expiresAt = Number.isFinite(Number(decoded.exp)) ? new Date(Number(decoded.exp) * 1000) : null;
     const adotado = await RefreshToken.adoptLegacy({
       legacyToken: legacy, user, audience: isConsole ? CONSOLE_AUDIENCE : PANEL_AUDIENCE,
-      tenantId, context: RefreshToken.context(req)
+      tenantId, context: RefreshToken.context(req), expiresAt
     });
+    if (adotado.expired) return AuthController.refreshRefused(req, res, kind);
     // Já migrado antes: a linha do JWT existe e está rotacionada. Dentro da
     // folga, a rotação devolve o mesmo sucessor; depois dela, é reuso.
     if (adotado.existing) return AuthController.rotateCookie(req, res, legacy, kind);

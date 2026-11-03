@@ -18,9 +18,18 @@ import { DEVELOPMENT_FALLBACK } from '../config/runtimeEnv.js';
  * sorteá-lo obrigaria a guardar o valor em claro ou a abrir um galho na família.
  * Quem não tem a chave não calcula o sucessor de um token roubado.
  *
- * Um token já rotacionado, apresentado DEPOIS da folga, é reuso: alguém tem uma
- * cópia. A família inteira é revogada — a cópia e o aparelho legítimo caem
- * juntos, e a pessoa entra de novo; quem tem só a cópia, não.
+ * Um token já rotacionado, apresentado DENTRO da folga (`REFRESH_GRACE_MS`), é
+ * a mesma renovação repetida — duas abas juntas, ou a resposta que se perdeu
+ * no caminho e o navegador tentou de novo com o cookie antigo: recebe o
+ * sucessor atual da família, sem revogar nada e sem linha de reuso na trilha.
+ * DEPOIS da folga é reuso: alguém tem uma cópia. A família inteira é revogada
+ * — a cópia e o aparelho legítimo caem juntos, e a pessoa entra de novo; quem
+ * tem só a cópia, não.
+ *
+ * A família convertida do refresh antigo (`adoptLegacy`) tem teto
+ * (`family_expires_at`): o vencimento do JWT de onde veio. A rotação não o
+ * estende, e a linha do JWT fica até ele vencer — é ela que faz o mesmo JWT
+ * ser aceito uma vez só.
  *
  * tenant-scope-exempt: tabela compartilhada, declarada em `SHARED_TABLES`. Toda
  * leitura nomeia o hash, a família ou a pessoa.
@@ -97,7 +106,18 @@ class RefreshToken {
     };
   }
 
-  static async insert(db, { familyId, userId, tenantId, audience, raw, tokenVersion, userAgent, ip, now, rotated = false }) {
+  /**
+   * O vencimento de uma linha nova: sete dias a partir de agora, ou o teto da
+   * família, o que vier antes.
+   */
+  static expiryFor(now, familyExpiresAt = null) {
+    const renovado = wholeSecond(new Date(now.getTime() + REFRESH_TTL_MS));
+    const teto = toDate(familyExpiresAt);
+    return teto && teto.getTime() < renovado.getTime() ? wholeSecond(teto) : renovado;
+  }
+
+  static async insert(db, { familyId, userId, tenantId, audience, raw, tokenVersion, userAgent, ip, now, rotated = false, familyExpiresAt = null }) {
+    const teto = toDate(familyExpiresAt);
     await db('refresh_tokens').insert({
       family_id: familyId,
       user_id: userId,
@@ -105,7 +125,8 @@ class RefreshToken {
       audience,
       token_hash: RefreshToken.hash(raw),
       token_version: Number(tokenVersion || 0),
-      expires_at: wholeSecond(new Date(now.getTime() + REFRESH_TTL_MS)),
+      expires_at: RefreshToken.expiryFor(now, teto),
+      family_expires_at: teto ? wholeSecond(teto) : null,
       rotated_at: rotated ? wholeSecond(now) : null,
       user_agent: userAgent ?? null,
       ip: ip ?? null,
@@ -141,21 +162,29 @@ class RefreshToken {
    * sucessor (duas abas migrando juntas); depois dela é reuso, como qualquer
    * outro token rotacionado — o JWT antigo deixa de ser uma credencial de sete
    * dias no `localStorage` no instante em que é migrado.
+   *
+   * A família nova HERDA o vencimento do JWT (`expiresAt`, o `exp` dele) como
+   * teto: converter não dá sete dias novos a um refresh que vencia amanhã, e
+   * nenhuma rotação seguinte passa dele. Sem `exp` (não deveria haver), o teto
+   * é de sete dias a partir de agora — o mesmo de sempre, uma vez.
    */
-  static async adoptLegacy({ legacyToken, user, audience, tenantId = null, context = {}, now = new Date() }) {
+  static async adoptLegacy({ legacyToken, user, audience, tenantId = null, context = {}, now = new Date(), expiresAt = null }) {
     const existing = await RefreshToken.findByRaw(legacyToken);
     if (existing) return { existing };
+    const herdado = toDate(expiresAt);
+    const familyExpiresAt = RefreshToken.expiryFor(now, herdado);
+    if (familyExpiresAt.getTime() <= now.getTime()) return { expired: true };
     const familyId = crypto.randomUUID();
     const raw = RefreshToken.successorOf(legacyToken);
     try {
       await getDb().transaction(async (trx) => {
         await RefreshToken.insert(trx, {
           familyId, userId: user.id, tenantId, audience, raw: legacyToken,
-          tokenVersion: user.token_version, userAgent: context.userAgent, ip: context.ip, now, rotated: true
+          tokenVersion: user.token_version, userAgent: context.userAgent, ip: context.ip, now, rotated: true, familyExpiresAt
         });
         await RefreshToken.insert(trx, {
           familyId, userId: user.id, tenantId, audience, raw,
-          tokenVersion: user.token_version, userAgent: context.userAgent, ip: context.ip, now
+          tokenVersion: user.token_version, userAgent: context.userAgent, ip: context.ip, now, familyExpiresAt
         });
       });
     } catch (error) {
@@ -220,7 +249,8 @@ class RefreshToken {
             tokenVersion: alvo.token_version,
             userAgent: context.userAgent ?? alvo.user_agent,
             ip: context.ip ?? alvo.ip,
-            now
+            now,
+            familyExpiresAt: alvo.family_expires_at ?? null
           });
           return true;
         });
@@ -276,6 +306,20 @@ class RefreshToken {
       .where({ family_id: familyId, user_id: Number(userId) })
       .whereNull('revoked_at')
       .update({ revoked_at: wholeSecond(now) });
+  }
+
+  /**
+   * Se a família desta pessoa veio do refresh antigo (`adoptLegacy`). O JWT
+   * sem estado de onde ela nasceu só morre com o `token_version` — é o que o
+   * "Sair" dela precisa saber.
+   */
+  static async isLegacyFamily(familyId, userId) {
+    if (!familyId || typeof familyId !== 'string' || familyId.length > 36) return false;
+    const row = await getDb()('refresh_tokens')
+      .where({ family_id: familyId, user_id: Number(userId) })
+      .whereNotNull('family_expires_at')
+      .first('id');
+    return Boolean(row);
   }
 
   static async revokeAllForUser(userId, now = new Date()) {
@@ -335,12 +379,19 @@ class RefreshToken {
     return heads.map((h) => ({ ...h, family_created_at: criada.get(h.family_id) ?? h.created_at }));
   }
 
-  /** Apaga o que já não serve: vencido ou revogado há mais de um dia. */
+  /**
+   * Apaga o que já não serve: vencido ou revogado há mais de um dia. A linha
+   * de uma família com teto (a do refresh antigo) fica até o teto passar,
+   * mesmo revogada: enquanto o JWT de onde ela veio ainda tem a assinatura
+   * válida, é ela que o faz ser recusado em vez de convertido de novo.
+   */
   static async prune(now = new Date()) {
     const cutoff = new Date(now.getTime() - TICKET_GRACE_DAYS * 24 * 60 * 60 * 1000);
     return getDb()('refresh_tokens')
       .where('expires_at', '<', cutoff)
-      .orWhere('revoked_at', '<', cutoff)
+      .orWhere((q) => q
+        .where('revoked_at', '<', cutoff)
+        .andWhere((teto) => teto.whereNull('family_expires_at').orWhere('family_expires_at', '<', cutoff)))
       .del();
   }
 }
