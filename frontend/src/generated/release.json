@@ -1,51 +1,105 @@
 {
-  "version": "1.23.0",
-  "build": 1475,
-  "sourceCommit": "df10ca35fe98",
-  "releasedAt": "2026-11-02",
-  "basedOnTag": "v1.22.1",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/fcc06f9adc59...df10ca35fe98",
+  "version": "1.24.0",
+  "build": 1500,
+  "sourceCommit": "70a272adb8bb",
+  "releasedAt": "2026-11-03",
+  "basedOnTag": "v1.23.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5777ee1b2692...70a272adb8bb",
   "changes": [
     {
-      "shortHash": "a13da37c",
+      "shortHash": "7690e680",
       "date": "2026-11-02",
-      "title": "Segurança: vínculo só por CPF fica não verificado; CPF e PIX não vão para a IA",
+      "title": "Segurança: recusa CORS_ORIGINS=* em produção, CSP opt-in de upgrade e JWT com algoritmo fixo",
       "category": "Maintenance"
     },
     {
-      "shortHash": "5105e8f9",
+      "shortHash": "0214f9c3",
       "date": "2026-11-02",
-      "title": "Avisos da IA: chave recusada, crédito de volta e resumo diário",
+      "title": "Segurança: política de senha nova (10+, sem comuns, diferente do login) e limitador da troca de senha",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b6b78a58",
+      "date": "2026-11-02",
+      "title": "Segurança: webhook do SGP exige carimbo de tempo por padrão nas integrações novas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0ef1a613",
+      "date": "2026-11-02",
+      "title": "Segurança: redação de credenciais no logger e no console embrulhado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "01cd5b3b",
+      "date": "2026-11-02",
+      "title": "Varredura de segredos (gitleaks) e CodeQL, não bloqueantes",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8b7008be",
+      "date": "2026-11-02",
+      "title": "Relatório da auditoria de segurança (rodada D)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6596180b",
+      "date": "2026-11-02",
+      "title": "Página de status da plataforma (0126)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ef75d6e8",
+      "date": "2026-11-02",
+      "title": "Programa de afiliados com comissão recorrente e lote mensal por Pix (0124)",
       "category": "New"
     },
     {
-      "shortHash": "e58de674",
+      "shortHash": "4ecb2ee0",
       "date": "2026-11-02",
-      "title": "Avisos do SGP: fora do ar, credencial recusada e desbloqueio com erro",
+      "title": "Add-ons pagos (0125) — catálogo, direito, cobrança e telas",
       "category": "New"
     },
     {
-      "shortHash": "adf4730e",
+      "shortHash": "09b47eb7",
       "date": "2026-11-02",
-      "title": "Avisos de operação: GenieACS sem resposta, fila travada e régua que falha",
-      "category": "New"
+      "title": "Correções da revisão — porta, cobrança e Pix",
+      "category": "Fixed"
     },
     {
-      "shortHash": "fe13d55e",
+      "shortHash": "3f62be28",
       "date": "2026-11-02",
-      "title": "Bot e ficha usam as faturas do Asaas (fase 3)",
-      "category": "New"
+      "title": "Afiliados, add-ons e página de status no navegador",
+      "category": "Maintenance"
     },
     {
-      "shortHash": "5fbd82f5",
+      "shortHash": "f5a69e87",
       "date": "2026-11-02",
-      "title": "Avisos da plataforma: backup atrasado e certificado perto de vencer",
-      "category": "New"
+      "title": "Gitleaks ignora a senha de teste do password-policy.test.js",
+      "category": "Maintenance"
     },
     {
-      "shortHash": "2a98d77f",
+      "shortHash": "7bee45b0",
       "date": "2026-11-02",
-      "title": "Novo cliente: novo contrato para quem já está no SGP; CTO vai como splitter_port",
+      "title": "Segurança: corrige os 13 alertas do CodeQL no PR de afiliados",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2b9654ee",
+      "date": "2026-11-02",
+      "title": "Segurança: webhook só por header ou ?t=, nome do cliente tratado como dado na IA, 'sim' da liberação vale 5 min",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "086ed44e",
+      "date": "2026-11-02",
+      "title": "Segurança: sessão do afiliado por versão e logs sem quebra de linha (CodeQL)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bf647c4c",
+      "date": "2026-11-02",
+      "title": "Logs com JSON.stringify e ação de auditoria sem 'password' no nome",
       "category": "Maintenance"
     }
   ]
