@@ -251,9 +251,9 @@ class WaConversationService {
    *
    * Só solta quando há prova de que aquele número JÁ FOI o do contrato: o
    * número anterior que a sincronização acabou de trocar (`oldPhones`) ou a
-   * régua ter cobrado nele. Uma conversa de outro número ligada a mão pelo
-   * atendente ("Trocar assinante") ou pelo CPF que o cliente digitou nunca foi
-   * número do contrato, e fica como está.
+   * régua ter cobrado nele. Uma conversa ligada a mão pelo atendente
+   * (`bound_via = 'operator'`) fica como está, e a ligada só pelo CPF que o
+   * cliente digitou também, se o número nunca foi cobrado.
    *
    * @returns {Promise<number[]>} as conversas soltas
    */
@@ -265,6 +265,9 @@ class WaConversationService {
     const rows = await tdb('wa_conversations')
       .where({ contract: key })
       .whereNotNull('wa_phone_e164')
+      // A que o atendente vinculou à mão fica: foi ele que a pôs ali, mesmo que o
+      // número já tenha sido cobrado pela régua como o de outro cadastro.
+      .where((q) => q.whereNull('bound_via').orWhereNot('bound_via', 'operator'))
       .select('id', 'wa_phone_e164');
     if (rows.length === 0) return [];
     const { all: atuais } = await this.contractPhones(key);
@@ -372,8 +375,8 @@ class WaConversationService {
     const link = links[0] ?? null;
     const account = link?.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
     const updated = await WaConversation.update(conversation.id, link
-      ? { contract: link.contract, device_id: link.device_id ?? null, sgp_contact_id: null, customer_account_id: account?.id ?? null, bound_via: null, unlinked_at: null }
-      : { ...this.contactBinding(contact), customer_account_id: null, bound_via: null, unlinked_at: null });
+      ? { contract: link.contract, device_id: link.device_id ?? null, sgp_contact_id: null, customer_account_id: account?.id ?? null, bound_via: 'operator', unlinked_at: null }
+      : { ...this.contactBinding(contact), customer_account_id: null, bound_via: 'operator', unlinked_at: null });
 
     const phone = normalizarTelefoneBr(conversation.wa_phone_e164);
     if (savePhone && phone) {
