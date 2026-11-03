@@ -45,7 +45,11 @@ class AsaasProviderCustomerService {
       name: profile.fields.name.value,
       cpfCnpj: normalizeTaxId(profile.fields.document.value),
       // Referência para achar o cliente do painel a partir do Asaas.
-      externalReference: `painel:${key}`.slice(0, 100)
+      externalReference: `painel:${key}`.slice(0, 100),
+      // Sem e-mail nem SMS do Asaas ao cliente: a cobrança do assinante é do
+      // provedor (WhatsApp, SGP), e duplicá-la pelo Asaas é o que se evita. Vale
+      // só para o cliente CRIADO aqui; o que já existia no Asaas não é alterado.
+      notificationDisabled: true
     };
     const email = profile.fields.emails?.value?.[0];
     if (email) payload.email = email;
