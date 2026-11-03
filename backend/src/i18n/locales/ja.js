@@ -1448,5 +1448,7 @@ export default {
   'addons.notActive': 'このアドオンは有効ではありません',
   'addons.notChangeable': '現在のサブスクリプションではアドオンを変更できません',
   'addons.paidPlanRequired': 'アドオンには有料プランが必要です',
-  'addons.required': 'この機能にはアドオンが必要です。プランページで有効にしてください。'
+  'addons.required': 'この機能にはアドオンが必要です。プランページで有効にしてください。',
+  'platformAlert.backup_failed.subject': '外部バックアップに失敗しました',
+  'platformAlert.backup_failed.body': '外部バックアップに失敗しました（段階: {stage}、実行元: {source}）: {error}。コンソールの「連携 → 外部バックアップ」を確認してください。'
 };

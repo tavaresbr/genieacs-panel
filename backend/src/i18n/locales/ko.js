@@ -1451,5 +1451,7 @@ export default {
   'addons.notActive': '이 애드온은 활성 상태가 아닙니다',
   'addons.notChangeable': '현재 구독에서는 애드온을 변경할 수 없습니다',
   'addons.paidPlanRequired': '애드온은 유료 요금제가 필요합니다',
-  'addons.required': '이 기능에는 애드온이 필요합니다. 요금제 페이지에서 활성화하세요.'
+  'addons.required': '이 기능에는 애드온이 필요합니다. 요금제 페이지에서 활성화하세요.',
+  'platformAlert.backup_failed.subject': '외부 백업 실패',
+  'platformAlert.backup_failed.body': '외부 백업이 실패했습니다(단계: {stage}, 실행 주체: {source}): {error}. 콘솔의 통합 → 외부 백업을 확인하세요.'
 };

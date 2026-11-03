@@ -463,10 +463,122 @@ certa de descobrir isso: antes do restore, e não durante.
 destino já for cifrado: o backup passa a carregar a chave mestra e a senha do banco ao lado
 do dado, o que troca "perdi o dado" por "vazou o painel inteiro".
 
-Duas decisões continuam sendo de quem opera, e o painel não as toma: **para onde a cópia
-sai da máquina** (nada disto é backup enquanto vive no mesmo disco) e **instalar
-`postgresql-client` ou `mariadb-client`** quando o install não usa SQLite — o script morre
-dizendo qual pacote falta, em vez de escrever um arquivo vazio e sair zero.
+Uma decisão continua sendo de quem opera: **instalar `postgresql-client` ou
+`mariadb-client`** quando o install não usa SQLite — o script morre dizendo qual pacote
+falta, em vez de escrever um arquivo vazio e sair zero. A outra — **para onde a cópia sai
+da máquina**, porque nada disto é backup enquanto vive no mesmo disco — é o backup externo
+logo abaixo.
+
+### Backup externo cifrado (S3 compatível)
+
+Console → **Integrações → Backup externo**. Uma cópia por dia vai para um bucket
+compatível com S3 — AWS, Backblaze B2, Wasabi, Cloudflare R2 ou MinIO —, **cifrada com uma
+chave que não fica no servidor**.
+
+**O modelo de chave.** O servidor guarda só a chave **pública** X25519; ele cifra e nunca
+decifra. Cada arquivo é cifrado com uma chave efêmera própria (ECDH X25519 → HKDF-SHA256 →
+AES-256-GCM em pedaços de 64 KiB, cada um com tag; contador e marca de "último pedaço" no
+nonce, então um arquivo truncado, reordenado ou adulterado não decifra). Quem invade o
+servidor e o bucket leva arquivos que não abre. A contrapartida é dura e é o ponto: **sem a
+chave privada, nenhum backup é restaurável** — nem por nós.
+
+**Configurar, uma vez:**
+
+1. Crie o bucket e uma credencial que só alcance ele (na AWS: uma política com
+   `s3:ListBucket` no bucket e `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`,
+   `s3:AbortMultipartUpload` em `bucket/prefixo/*`). Ligue o versionamento ou o *object
+   lock* do provedor se quiser proteção também contra quem roubar a credencial.
+2. Preencha endpoint (vazio para a AWS), região, bucket, prefixo e as duas chaves; MinIO e
+   a maioria dos self-hosted querem **endereço no estilo de caminho**. Endpoint, bucket,
+   prefixo e credenciais são guardados cifrados pela caixa de segredos (contexto
+   `skygenpanel-external-backup-v1`, incluído no `skygenpanel rotate-key`). A secret nunca
+   volta para a tela; a access key volta com os quatro últimos caracteres.
+3. **Testar conexão** faz `HeadBucket`, grava um objeto pequeno e o apaga.
+4. **Gerar par de chaves**: o par nasce **no navegador** (WebCrypto X25519). A chave privada
+   aparece uma vez, para baixar (`skygp-backup-private-key-<id>.pem`); a pública só é
+   gravada depois de você marcar que guardou a privada. Navegador sem X25519 cai no
+   servidor, que gera o par, grava a pública e devolve a privada **uma vez**, sem guardá-la
+   (a trilha registra `origin: server`). Quem preferir que a privada nunca toque um
+   navegador gera numa máquina de confiança e cola só a pública:
+   `node backend/scripts/backup-crypto.js keygen --out chave.pem`.
+5. Escolha **quem tira o backup**: o **painel** (Docker/SaaS — o próprio processo faz o
+   dump, à hora escolhida em Brasília, sob a vez `external-backup` do agendador, então
+   duas instâncias não mandam dois arquivos) ou o **host** (o
+   `skygenpanel-backup.service` roda `skygenpanel-backup upload --if-configured` depois do
+   `run`). Nunca os dois. Retenção: o mais novo de cada um dos N dias mais recentes, e um
+   por semana das M semanas anteriores; só objetos `skygp-backup-*.tar.skygpbk` do prefixo
+   são apagados, nunca o que outra pessoa pôs lá.
+
+**Guarda da chave privada.** Num gerenciador de senhas da equipe **e** numa cópia offline
+(pendrive no cofre, papel com o PEM). Duas pessoas com acesso. Ao trocar o par, guarde a
+privada antiga até o último backup cifrado com ela sair da retenção — cada arquivo leva o
+id da chave no cabeçalho (`node backend/scripts/backup-crypto.js inspect <arquivo>`), e o
+restore recusa a chave errada dizendo qual era a certa.
+
+**O que vai no arquivo.** Um `.tar` com o diretório do backup — o dump do banco, o
+`wa-media.tar.gz`, o `db-config.json` e o `manifest.json` (migração do topo, sha256 de cada
+arquivo e as impressões digitais de `SECRET_BOX_KEY`/`JWT_SECRET`) — cifrado. O `.env` não
+vai: guarde `SECRET_BOX_KEY` e `JWT_SECRET` no mesmo cofre da chave privada, ou os segredos
+dentro do banco restaurado voltam nulos.
+
+**Docker/SaaS.** A imagem traz `postgresql16-client` (pg_dump 16, a versão do `postgres:16`
+do compose — um pg_dump mais velho que o servidor se recusa a exportar). O dump e o arquivo
+cifrado são montados em `SKYGP_BACKUP_TMP` (no compose, `/var/lib/skygenpanel/backup-tmp`,
+no volume) e apagados depois do envio. O cliente do MySQL não vem na imagem.
+
+**Avisos.** O evento **"Backup externo falhou"** (`backup_failed`, desligado por padrão, em
+Configurações → Alertas) avisa a falha do envio do painel, a do host e a da verificação
+semanal. No host, o `OnFailure=skygenpanel-backup-failure.service` grava
+`$SKYGP_BACKUP_DIR/.last-failure` e enfileira o alerta pelo banco; se o banco for o que
+caiu, o painel acha o marcador na passada seguinte (mesma chave de deduplicação: um alerta
+só). A Saúde do deploy mostra "Backup externo" configurado ou não.
+
+**A verificação semanal, e o limite dela.** O servidor não tem a chave privada, então o que
+ele prova sozinho é que **o arquivo no bucket é o que ele mandou**: baixa o mais novo,
+compara o sha256 com o gravado no envio (metadado `x-amz-meta-skygp-sha256` e o estado),
+lê o cabeçalho e confere que o tamanho fecha com o desenho dos pedaços. Isso pega arquivo
+corrompido, truncado ou trocado. Provar que **decifra e restaura** exige a privada — é o
+teste abaixo, que deve virar rotina (mensal) de quem a guarda.
+
+### Restaurar
+
+O teste (nunca toca a produção), numa máquina com o checkout do painel e a chave privada:
+
+```bash
+# o mais novo do bucket configurado no console
+skygenpanel-backup restore --from-s3 latest --private-key ./skygp-backup-private-key-<id>.pem
+# ou um arquivo baixado por qualquer cliente S3
+cd /opt/skygenpanel/backend
+node scripts/backup-external.js restore --file skygp-backup-2026-11-03T031700Z.tar.skygpbk \
+  --private-key ./chave.pem --keep
+```
+
+Ele decifra numa pasta temporária (todas as tags GCM têm de fechar), confere cada arquivo
+contra o `sha256` do manifesto e abre o banco num destino **temporário** — o arquivo SQLite
+na própria pasta; no Postgres e no MySQL, um banco `skygp_restore_<hex>` criado na mesma
+instância (o usuário precisa de `CREATEDB`, ou passe `--target-url` de um servidor de
+teste) e apagado no fim —, e confere que `schema_migrations` termina na migração que o
+manifesto registrou e que há tabelas. Sai com um JSON e código 0; qualquer divergência é
+código 1. `--keep` deixa a pasta extraída (e o banco temporário) para o passo seguinte.
+
+A restauração de verdade, a partir da pasta que o `--keep` deixou (painel parado):
+
+```bash
+systemctl stop skygenpanel            # ou: docker compose stop panel
+# SQLite
+install -m 0640 -o skygenpanel <pasta>/panel.sqlite /var/lib/skygenpanel/panel.sqlite
+# Postgres
+pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" <pasta>/database.dump
+# MySQL
+mysql --defaults-extra-file=cred.cnf skygp < <pasta>/database.sql
+# anexos
+tar -xzf <pasta>/wa-media.tar.gz -C /var/lib/skygenpanel
+skygenpanel backup verify             # as impressões das chaves batem?
+systemctl start skygenpanel
+```
+
+Sem o checkout do painel, só com o Node 22: `node backup-crypto.js decrypt --private-key
+chave.pem arquivo.tar.skygpbk | tar -x` (o arquivo é um `tar` padrão depois de decifrado).
 
 Restauração de verdade: parar o painel, restaurar, subir. As migrations no boot
 reconhecem o schema restaurado pelo `schema_migrations` e não refazem nada. Se o dump

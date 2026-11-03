@@ -1447,5 +1447,7 @@ export default {
   'addons.notActive': 'Este add-on não está ativo',
   'addons.notChangeable': 'A assinatura não permite mudar add-ons agora',
   'addons.paidPlanRequired': 'Add-ons exigem um plano pago',
-  'addons.required': 'Este recurso exige um add-on. Ative-o na página Plano.'
+  'addons.required': 'Este recurso exige um add-on. Ative-o na página Plano.',
+  'platformAlert.backup_failed.subject': 'Backup externo falhou',
+  'platformAlert.backup_failed.body': 'O backup externo falhou (etapa: {stage}, executado por: {source}): {error}. Confira Integrações → Backup externo no console.'
 };

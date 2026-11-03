@@ -39,6 +39,15 @@ ENV APP_ENV=production \
     PORTAL_PORT=5891 \
     DATA_DIR=/var/lib/skygenpanel
 
+# O cliente do Postgres, para o backup externo (Integrações → Backup externo)
+# tirar o `pg_dump` de dentro do contêiner: na edição SaaS não há systemd nem
+# timer no host, e o dump é feito pelo próprio painel. Só o cliente (pg_dump e
+# pg_restore, alguns MB), da mesma versão principal do `postgres:16` do
+# compose — um pg_dump mais velho que o servidor se recusa a exportar. O
+# cliente do MySQL fica de fora (dezenas de MB para um dialeto que a SaaS não
+# usa); um self-hosted em MySQL faz o backup pelo host.
+RUN apk add --no-cache postgresql16-client
+
 WORKDIR /app/backend
 COPY --from=backend-deps /app/backend/node_modules ./node_modules
 COPY backend/ ./

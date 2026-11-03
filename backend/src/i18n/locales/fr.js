@@ -1444,5 +1444,7 @@ export default {
   'addons.notActive': 'Ce module complémentaire n\'est pas actif',
   'addons.notChangeable': 'L\'abonnement ne permet pas de modifier les modules complémentaires pour le moment',
   'addons.paidPlanRequired': 'Les modules complémentaires exigent un forfait payant',
-  'addons.required': 'Cette fonctionnalité exige un module complémentaire. Activez-le sur la page Forfait.'
+  'addons.required': 'Cette fonctionnalité exige un module complémentaire. Activez-le sur la page Forfait.',
+  'platformAlert.backup_failed.subject': 'Échec de la sauvegarde externe',
+  'platformAlert.backup_failed.body': 'La sauvegarde externe a échoué (étape : {stage}, exécutée par : {source}) : {error}. Vérifiez Intégrations → Sauvegarde externe dans la console.'
 };

@@ -1448,5 +1448,7 @@ export default {
   'addons.notActive': '此附加元件未啟用',
   'addons.notChangeable': '目前的訂閱不允許變更附加元件',
   'addons.paidPlanRequired': '附加元件需要付費方案',
-  'addons.required': '此功能需要附加元件。請在方案頁面啟用。'
+  'addons.required': '此功能需要附加元件。請在方案頁面啟用。',
+  'platformAlert.backup_failed.subject': '外部備份失敗',
+  'platformAlert.backup_failed.body': '外部備份失敗（步驟：{stage}，執行方：{source}）：{error}。請檢查主控台中的「整合 → 外部備份」。'
 };

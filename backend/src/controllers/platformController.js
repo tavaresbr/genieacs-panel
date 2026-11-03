@@ -25,6 +25,16 @@ import Vendor from '../models/Vendor.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { slugProblem } from '../utils/slug.js';
 import { tenantMediaRoot } from '../services/waMediaService.js';
+import { effectiveConfig as externalBackupConfig } from '../services/backup/externalBackupSettings.js';
+
+/** O backup externo está pronto para rodar? Nunca lança: falha de leitura é "não". */
+async function externalBackupConfigured() {
+  try {
+    return (await externalBackupConfig()).configured;
+  } catch {
+    return false;
+  }
+}
 
 const NAME_MAX_LENGTH = 128;
 
@@ -267,7 +277,11 @@ class PlatformController {
       metricsToken: String(process.env.METRICS_TOKEN || '').length >= 32,
       billingWebhookToken: gateway.webhookTokenConfigured,
       billingGateway: gateway.apiKeyConfigured,
-      rls: rlsEnabled(client)
+      rls: rlsEnabled(client),
+      // O backup externo cifrado (Integrações → Backup externo): conexão S3 e
+      // chave pública gravadas. Sem ele, o único backup é o do disco do
+      // próprio servidor — que some junto com ele.
+      externalBackup: await externalBackupConfigured()
     };
   }
 

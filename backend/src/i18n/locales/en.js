@@ -1448,5 +1448,7 @@ export default {
   'addons.notActive': 'This add-on is not active',
   'addons.notChangeable': 'The subscription does not allow changing add-ons right now',
   'addons.paidPlanRequired': 'Add-ons require a paid plan',
-  'addons.required': 'This feature requires an add-on. Activate it on the Plan page.'
+  'addons.required': 'This feature requires an add-on. Activate it on the Plan page.',
+  'platformAlert.backup_failed.subject': 'External backup failed',
+  'platformAlert.backup_failed.body': 'The external backup failed (step: {stage}, run by: {source}): {error}. Check Integrations → External backup in the console.'
 };

@@ -1446,5 +1446,7 @@ export default {
   'addons.notActive': 'Questo add-on non è attivo',
   'addons.notChangeable': 'L\'abbonamento non consente di modificare gli add-on in questo momento',
   'addons.paidPlanRequired': 'Gli add-on richiedono un piano a pagamento',
-  'addons.required': 'Questa funzione richiede un add-on. Attivalo nella pagina Piano.'
+  'addons.required': 'Questa funzione richiede un add-on. Attivalo nella pagina Piano.',
+  'platformAlert.backup_failed.subject': 'Backup esterno non riuscito',
+  'platformAlert.backup_failed.body': 'Il backup esterno non è riuscito (fase: {stage}, eseguito da: {source}): {error}. Controlla Integrazioni → Backup esterno nella console.'
 };

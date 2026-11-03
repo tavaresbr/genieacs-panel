@@ -1448,5 +1448,7 @@ export default {
   'addons.notActive': '此附加组件未启用',
   'addons.notChangeable': '当前订阅不允许更改附加组件',
   'addons.paidPlanRequired': '附加组件需要付费套餐',
-  'addons.required': '此功能需要附加组件。请在套餐页面启用。'
+  'addons.required': '此功能需要附加组件。请在套餐页面启用。',
+  'platformAlert.backup_failed.subject': '外部备份失败',
+  'platformAlert.backup_failed.body': '外部备份失败（步骤：{stage}，执行方：{source}）：{error}。请检查控制台中的“集成 → 外部备份”。'
 };

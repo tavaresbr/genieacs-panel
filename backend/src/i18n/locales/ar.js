@@ -1440,5 +1440,7 @@ export default {
   'addons.notActive': 'هذه الإضافة غير مفعّلة',
   'addons.notChangeable': 'الاشتراك لا يسمح بتغيير الإضافات الآن',
   'addons.paidPlanRequired': 'الإضافات تتطلب خطة مدفوعة',
-  'addons.required': 'هذه الميزة تتطلب إضافة. فعّلها في صفحة الخطة.'
+  'addons.required': 'هذه الميزة تتطلب إضافة. فعّلها في صفحة الخطة.',
+  'platformAlert.backup_failed.subject': 'فشل النسخ الاحتياطي الخارجي',
+  'platformAlert.backup_failed.body': 'فشل النسخ الاحتياطي الخارجي (المرحلة: {stage}، المنفِّذ: {source}): {error}. راجع التكاملات ← النسخ الاحتياطي الخارجي في وحدة التحكم.'
 };

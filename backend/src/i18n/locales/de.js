@@ -1449,5 +1449,7 @@ export default {
   'addons.notActive': 'Dieses Add-on ist nicht aktiv',
   'addons.notChangeable': 'Das Abonnement erlaubt derzeit keine Änderung der Add-ons',
   'addons.paidPlanRequired': 'Add-ons erfordern einen kostenpflichtigen Tarif',
-  'addons.required': 'Diese Funktion erfordert ein Add-on. Aktivieren Sie es auf der Seite Tarif.'
+  'addons.required': 'Diese Funktion erfordert ein Add-on. Aktivieren Sie es auf der Seite Tarif.',
+  'platformAlert.backup_failed.subject': 'Externes Backup fehlgeschlagen',
+  'platformAlert.backup_failed.body': 'Das externe Backup ist fehlgeschlagen (Schritt: {stage}, ausgeführt von: {source}): {error}. Prüfen Sie Integrationen → Externes Backup in der Konsole.'
 };

@@ -100,7 +100,7 @@ describe('os fatos do deploy', () => {
 
   it('e o que está configurado, como sim ou não', async () => {
     const { configured, database } = (await ler()).body.data;
-    for (const chave of ['mail', 'metricsToken', 'billingWebhookToken', 'billingGateway', 'rls']) {
+    for (const chave of ['mail', 'metricsToken', 'billingWebhookToken', 'billingGateway', 'rls', 'externalBackup']) {
       assert.equal(typeof configured[chave], 'boolean', `${chave} tinha que ser booleano`);
     }
     // As quatro primeiras entraram com valor no ambiente deste arquivo, então

@@ -1448,5 +1448,7 @@ export default {
   'addons.notActive': 'यह ऐड-ऑन सक्रिय नहीं है',
   'addons.notChangeable': 'सदस्यता अभी ऐड-ऑन बदलने की अनुमति नहीं देती',
   'addons.paidPlanRequired': 'ऐड-ऑन के लिए सशुल्क प्लान आवश्यक है',
-  'addons.required': 'इस सुविधा के लिए ऐड-ऑन आवश्यक है। इसे प्लान पेज पर सक्रिय करें।'
+  'addons.required': 'इस सुविधा के लिए ऐड-ऑन आवश्यक है। इसे प्लान पेज पर सक्रिय करें।',
+  'platformAlert.backup_failed.subject': 'बाहरी बैकअप विफल',
+  'platformAlert.backup_failed.body': 'बाहरी बैकअप विफल हुआ (चरण: {stage}, चलाने वाला: {source}): {error}. कंसोल में इंटीग्रेशन → बाहरी बैकअप देखें।'
 };

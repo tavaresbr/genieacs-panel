@@ -1430,6 +1430,8 @@ export interface DeploymentInfo {
     billingWebhookToken: boolean
     billingGateway: boolean
     rls: boolean
+    /** O backup externo cifrado tem conexão S3 e chave pública gravadas. */
+    externalBackup: boolean
   }
 }
 
@@ -1733,7 +1735,8 @@ export const PLATFORM_ALERT_EVENTS = [
   'auto_suspended',
   'big_overdue',
   'backup_stale',
-  'cert_expiring'
+  'cert_expiring',
+  'backup_failed'
 ] as const
 export type PlatformAlertEvent = typeof PLATFORM_ALERT_EVENTS[number]
 export type PlatformAlertChannel = 'whatsapp' | 'email'
@@ -7939,4 +7942,97 @@ export const addonsAPI = {
     apiClient.post<ConsoleTenantAddons>(
       `/platform/tenants/${tenantId}/addons/${encodeURIComponent(code)}/revoke`, { reason }
     ),
+}
+
+// ── Backup externo (Integrações → Backup externo) ─────────────────────────
+
+/** O último envio (ou a tentativa). Nada aqui é segredo. */
+export interface ExternalBackupRun {
+  status: 'ok' | 'failed' | 'running' | 'skipped'
+  trigger?: 'manual' | 'schedule' | 'host'
+  source?: 'panel' | 'host'
+  startedAt?: string
+  finishedAt?: string
+  durationMs?: number
+  key?: string
+  bytes?: number
+  sha256?: string
+  keyId?: string
+  deleted?: number
+  retentionError?: string | null
+  schemaMigration?: string | null
+  error?: string | null
+  code?: string | null
+}
+
+/** A última verificação do arquivo no bucket (sem a chave privada). */
+export interface ExternalBackupVerification {
+  status: 'ok' | 'warning' | 'failed'
+  at: string
+  key?: string | null
+  bytes?: number
+  keyMatches?: boolean
+  error?: string | null
+  code?: string | null
+}
+
+export interface ExternalBackupSettings {
+  configured: boolean
+  platformBox: boolean
+  enabled: boolean
+  runner: 'panel' | 'host'
+  /** Hora do backup diário, no horário de Brasília. */
+  hour: number
+  keepDaily: number
+  keepWeekly: number
+  includeMedia: boolean
+  endpoint: string
+  region: string
+  bucket: string
+  prefix: string
+  forcePathStyle: boolean
+  /** Os quatro últimos caracteres da access key; a secret nunca volta. */
+  accessKeyIdHint: string | null
+  secretAccessKeyConfigured: boolean
+  connectionReadable: boolean
+  publicKey: string | null
+  keyId: string | null
+  keyCreatedAt: string | null
+  keyOrigin: 'browser' | 'server' | 'imported' | null
+  updatedAt: string | null
+  running: boolean
+  status: {
+    lastRun: ExternalBackupRun | null
+    lastSuccess: ExternalBackupRun | null
+    lastVerification: ExternalBackupVerification | null
+    hostFailure: { at: string; reason: string } | null
+  }
+}
+
+/** Ausente não mexe; `secretAccessKey: ''` apaga. */
+export type ExternalBackupUpdate = Partial<Pick<ExternalBackupSettings,
+  'enabled' | 'runner' | 'hour' | 'keepDaily' | 'keepWeekly' | 'includeMedia' | 'endpoint' | 'region'
+  | 'bucket' | 'prefix' | 'forcePathStyle'>> & { accessKeyId?: string; secretAccessKey?: string }
+
+export interface ExternalBackupTestResult {
+  ok: boolean
+  steps: { headBucket: boolean; put: boolean; delete: boolean }
+  error?: string
+  code?: string
+}
+
+export const externalBackupAPI = {
+  get: () => apiClient.get<ExternalBackupSettings>('/platform/integrations/backup'),
+  save: (payload: ExternalBackupUpdate) => apiClient.put<ExternalBackupSettings>('/platform/integrations/backup', payload),
+  /** Só a PÚBLICA sobe. 400 `invalid_public_key`. */
+  setPublicKey: (publicKey: string, origin: 'browser' | 'imported') =>
+    apiClient.post<ExternalBackupSettings>('/platform/integrations/backup/public-key', { publicKey, origin }),
+  /** O caminho sem WebCrypto: a privada vem nesta resposta, uma vez. */
+  serverKeyPair: () => apiClient.post<{
+    privateKeyPem: string; publicKey: string; keyId: string; settings: ExternalBackupSettings
+  }>('/platform/integrations/backup/keypair', {}),
+  test: () => apiClient.post<ExternalBackupTestResult>('/platform/integrations/backup/test', {}),
+  /** 202; 409 `busy`; 400 `not_configured`. */
+  runNow: () => apiClient.post<{ started: boolean }>('/platform/integrations/backup/run', {}),
+  verifyNow: () => apiClient.post<{ started: boolean }>('/platform/integrations/backup/verify', {}),
 }

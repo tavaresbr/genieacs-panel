@@ -1445,5 +1445,7 @@ export default {
   'addons.notActive': 'Este add-on no está activo',
   'addons.notChangeable': 'La suscripción no permite cambiar add-ons ahora',
   'addons.paidPlanRequired': 'Los add-ons requieren un plan de pago',
-  'addons.required': 'Este recurso requiere un add-on. Actívelo en la página Plan.'
+  'addons.required': 'Este recurso requiere un add-on. Actívelo en la página Plan.',
+  'platformAlert.backup_failed.subject': 'Falló la copia de seguridad externa',
+  'platformAlert.backup_failed.body': 'La copia de seguridad externa falló (etapa: {stage}, ejecutada por: {source}): {error}. Revise Integraciones → Copia externa en la consola.'
 };
