@@ -1,5 +1,7 @@
 import WaMetaTemplateService from './waMetaTemplateService.js';
 import SgpService, { SgpError } from './sgpService.js';
+import AsaasBillingSource, { isAsaasContract } from './asaasBillingSource.js';
+import InvoiceSourceService, { mergeOpenInvoices } from './invoiceSourceService.js';
 import BillingStatusService from './billingStatusService.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
@@ -294,7 +296,19 @@ class WaBillingService {
   static async pacedInvoices(contract, pace = true) {
     if (pace) await sleep(SGP_PACE_MS);
     try {
-      const { invoices } = await SgpService.listInvoices({ contract, onlyOpen: true });
+      let invoices;
+      if (isAsaasContract(contract)) {
+        // O cliente só-Asaas não tem contrato no SGP: as faturas vêm do banco.
+        invoices = await AsaasBillingSource.invoicesOf(contract);
+      } else {
+        ({ invoices } = await SgpService.listInvoices({ contract, onlyOpen: true }));
+        // Com a opção ligada, as faturas do Asaas do mesmo CPF somam às do SGP
+        // (a mesma dívida nas duas fontes aparece uma vez só).
+        const asaas = await InvoiceSourceService.asaasInvoicesForContract(contract, { gate: 'billing' });
+        if (asaas.length > 0) invoices = mergeOpenInvoices(invoices, asaas);
+      }
+      // O Pix e a linha digitável do Asaas, só na fatura que vai ser escolhida.
+      invoices = await AsaasBillingSource.completeOldest(invoices);
       // A foto da situação (em dia, vence hoje, atrasado) sai de graça daqui:
       // a régua, a conferência na saída e a atualização da lista passam por este caminho.
       await BillingStatusService.record(contract, invoices);
@@ -406,7 +420,10 @@ class WaBillingService {
       links = await SgpLink.getAll();
       contacts = await SgpContact.listWithContract();
     }
-    return this.subscribersFrom(links, contacts);
+    const fromSgp = this.subscribersFrom(links, contacts);
+    // Quem só existe no Asaas (opção ligada na aba Asaas): contrato sintético.
+    const onlyAsaas = await AsaasBillingSource.subscribers({ contracts });
+    return onlyAsaas.length ? [...fromSgp, ...onlyAsaas] : fromSgp;
   }
 
   /**

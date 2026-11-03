@@ -93,6 +93,7 @@ const QUEM_TEM = {
   'catalogue.write': ['owner', 'admin'],
   'sgp.config': ['owner', 'admin'],
   'asaas.config': ['owner', 'admin'],
+  'asaas.act': ['owner', 'admin'],
   'teiah.act': ['owner', 'admin'],
   'teiah.config': ['owner', 'admin'],
   'provisioning.write': ['owner', 'admin'],
@@ -536,6 +537,17 @@ const CASOS = [
     aceito: [200]
   },
   {
+    // Criar o cliente na conta Asaas do provedor é escrita num sistema de
+    // cobrança: do `asaas.act`, que o plantão não tem. O contato é procurado
+    // antes de qualquer coisa, e uma chave que não existe dá 404.
+    cap: 'asaas.act',
+    label: 'POST /api/contacts/:key/asaas',
+    method: 'POST',
+    path: () => '/api/contacts/CONTRATO-QUE-NAO-EXISTE/asaas',
+    aceito: [404],
+    codigoAceito: 'not_found'
+  },
+  {
     cap: 'teiah.read',
     label: 'GET /api/teiah/export',
     method: 'GET',
@@ -909,7 +921,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
     }
   });
 
-  it('cobre as 38 capacidades', () => {
+  it('cobre as 39 capacidades', () => {
     // Uma capacidade fora da amostra é uma rota sem prova de alcance nenhuma.
     const deFora = PERMISSIONS.filter((cap) => !QUEM_TEM[cap]);
     assert.deepEqual(deFora, [], `capacidades sem caso: ${deFora.join(', ')}`);
@@ -919,15 +931,15 @@ describe('a matriz e a expectativa deste arquivo', () => {
 
   it('tem par de recusa para toda capacidade que algum papel não tem', () => {
     /**
-     * A afirmação central do arquivo, conferida sobre a própria amostra: 36 das
-     * 39 capacidades têm alguém do lado de fora, e cada uma delas precisa de
+     * A afirmação central do arquivo, conferida sobre a própria amostra: 37 das
+     * 40 capacidades têm alguém do lado de fora, e cada uma delas precisa de
      * pelo menos uma rota onde essa recusa é exercitada. As 3 restantes são as
      * do `viewer`, que TODO papel tem — para elas não existe par de recusa a
      * escrever, e dizer o número aqui é o que impede que uma capacidade caia
      * silenciosamente para dentro do `viewer` sem ninguém notar.
      */
     const comRecusa = PERMISSIONS.filter((cap) => QUEM_TEM[cap].length < ROLES.length);
-    assert.equal(comRecusa.length, 36);
+    assert.equal(comRecusa.length, 37);
     for (const cap of comRecusa) {
       assert.ok(CASOS.some((caso) => caso.cap === cap), `${cap} sem rota para recusar`);
     }
@@ -939,8 +951,8 @@ describe('a matriz e a expectativa deste arquivo', () => {
     // deixaria a promessa valendo sobre menos coisa, calada.
     // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas,
     // e depois as três da TeiaH Valid, e a importação da agenda do WhatsApp, e a
-    // conta Asaas do provedor.
-    assert.equal(CASOS.length, 71);
+    // conta Asaas do provedor, e a criação do cliente nela.
+    assert.equal(CASOS.length, 72);
   });
 });
 
@@ -1007,9 +1019,9 @@ describe('o alcance do viewer, sobre a amostra', () => {
 
   it('não alcança nada que mexa em aparelho, em gente ou em configuração', () => {
     // A amostra inteira menos as três acima, numa afirmação só: o que o
-    // `viewer` NÃO alcança é 36 das 39 capacidades.
+    // `viewer` NÃO alcança é 37 das 40 capacidades.
     const fechadas = PERMISSIONS.filter((cap) => !QUEM_TEM[cap].includes('viewer'));
-    assert.equal(fechadas.length, 36, fechadas.join(', '));
+    assert.equal(fechadas.length, 37, fechadas.join(', '));
   });
 });
 

@@ -37,6 +37,9 @@ class AsaasProviderController {
         importCustomers: body.importCustomers,
         importCharges: body.importCharges,
         botLookup: body.botLookup,
+        allowWriteCustomers: body.allowWriteCustomers,
+        webhookEnabled: body.webhookEnabled,
+        billingEnabled: body.billingEnabled,
         syncEnabled: body.syncEnabled,
         syncIntervalHours: body.syncIntervalHours
       });
@@ -59,6 +62,16 @@ class AsaasProviderController {
       return res.json(createResponse(message, result));
     } catch (error) {
       return handleError(req, res, error, 'asaas.connectionTestFailed');
+    }
+  }
+
+  /** Gera um token novo para o webhook e o mostra uma vez só. */
+  static async rotateWebhookToken(req, res) {
+    try {
+      const { token, config } = await AsaasProviderService.rotateWebhookToken();
+      return res.json(createResponse(req.t('asaas.webhookTokenRotated'), { ...config, webhookToken: token }));
+    } catch (error) {
+      return handleError(req, res, error, 'asaas.configSaveFailed');
     }
   }
 

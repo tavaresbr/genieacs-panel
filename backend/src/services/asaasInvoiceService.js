@@ -56,6 +56,16 @@ class AsaasInvoiceService {
     return AsaasProviderService.isReady(config) && config.botLookup === true;
   }
 
+  /**
+   * A régua e as campanhas podem cobrar faturas do Asaas? Ligada, com chave, e o
+   * provedor escolheu isso — separado do bot: cobrar manda mensagem por conta
+   * própria, a quem não perguntou nada.
+   */
+  static async billingEnabled() {
+    const config = await AsaasProviderService.getConfig();
+    return AsaasProviderService.isReady(config) && config.billingEnabled === true;
+  }
+
   /** As faturas em aberto importadas de um CPF/CNPJ (só dígitos). Lê o banco, não o gateway. */
   static async openByDocument(document) {
     const charges = await AsaasCharge.listOpenByDocument(document);

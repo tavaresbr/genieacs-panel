@@ -465,8 +465,11 @@ class ContactProfileService {
     const config = await AsaasProviderService.getConfig();
     const enabled = AsaasProviderService.isReady(config) && config.importCharges;
     const document = normalizeTaxId(profile.fields?.document?.value);
-    if (!enabled || !document) return { enabled, invoices: [] };
-    return { enabled, invoices: await AsaasInvoiceService.openByDocument(document) };
+    // Carregado sob demanda: o serviço de criação importa este.
+    const { default: AsaasProviderCustomerService } = await import('./asaasProviderCustomerService.js');
+    const link = await AsaasProviderCustomerService.statusFor(document);
+    const invoices = enabled && document ? await AsaasInvoiceService.openByDocument(document) : [];
+    return { enabled, invoices, ...link };
   }
 }
 

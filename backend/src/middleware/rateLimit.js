@@ -503,6 +503,22 @@ export const billingWebhookLimiter = limiter({
 });
 
 /**
+ * A entrega do webhook da conta Asaas dos PROVEDORES.
+ *
+ * Teto muito acima do da plataforma (30/min): aqui a origem é o gateway, que
+ * junta num mesmo IP os pagamentos de todos os provedores, e uma virada de dia
+ * com PIX em lote não pode virar 429 — um não-2xx faz o gateway pausar a fila
+ * de entrega do provedor. Continua sendo um teto que um atacante sem o token
+ * não atravessa de graça: a conferência do token é a primeira coisa que roda.
+ */
+export const asaasWebhookLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 600,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests')
+});
+
+/**
  * Provisioning actions write to a subscriber's CPE and each one waits on a
  * connection request, so they are limited per operator on top of the shared
  * API limit rather than by source address.

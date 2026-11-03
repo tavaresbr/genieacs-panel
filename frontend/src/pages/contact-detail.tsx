@@ -25,6 +25,7 @@ import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl } from '@/
 import { isoDay } from '@/lib/date-format'
 import { formatBrPhone } from '@/lib/phone'
 import { ServiceStatusCard } from '@/components/contacts/service-status-card'
+import { AsaasCard } from '@/components/contacts/asaas-card'
 import { TeiahCard } from '@/components/contacts/teiah-card'
 import { LinkDeviceModal } from '@/components/contacts/link-device-modal'
 import { parseAmountToCents } from '@/lib/utils'
@@ -492,6 +493,7 @@ export default function ContactDetailPage() {
           )}
         </Card>
 
+        <AsaasCard contactKey={profile.key} />
         {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} contracts={profile.contracts} whatsappPhone={profile.whatsappPhone} settleMethods={profile.settle?.methods ?? null} />}
 
         {linking && (

@@ -1,3 +1,4 @@
+import { isAsaasContract } from './asaasBillingSource.js';
 import WaBroadcast, { MAX_ATTEMPTS } from '../models/WaBroadcast.js';
 import { retryDelayMs } from './waOutboxWorker.js';
 import { isPermanentFailure } from './waSendFailure.js';
@@ -508,7 +509,8 @@ class WaBroadcastService {
       // Only filled when the thread does not know yet: a conversation already
       // tied to a contract by the inbound path must not be re-pointed by a
       // campaign that happens to carry a different one.
-      if (recipient.contract && !conversation.contract) {
+      // O contrato sintético do cliente só-Asaas não é do SGP: não prende a conversa.
+      if (recipient.contract && !isAsaasContract(recipient.contract) && !conversation.contract) {
         await WaConversation.update(conversation.id, { contract: recipient.contract });
       }
       const message = await WaSendService.enqueue({

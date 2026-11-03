@@ -1,4 +1,6 @@
 import AuditLog from '../models/AuditLog.js';
+import AsaasProviderCustomerService from '../services/asaasProviderCustomerService.js';
+import { AsaasProviderError } from '../services/asaasProviderService.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
 import ContactSheetService, { IMPORT_MAX_BYTES } from '../services/contactSheetService.js';
 import ContactSyncService from '../services/contactSyncService.js';
@@ -18,7 +20,7 @@ import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 function handleError(req, res, error, fallbackKey) {
-  if (error instanceof ContactProfileError || error instanceof SgpError || error instanceof WaError || error instanceof FocusChatError || error instanceof TeiahError) {
+  if (error instanceof ContactProfileError || error instanceof SgpError || error instanceof WaError || error instanceof FocusChatError || error instanceof TeiahError || error instanceof AsaasProviderError) {
     return res.status(error.status).json({
       ...createErrorResponse(translateError(req.t, error), error.code),
       code: error.code
@@ -60,6 +62,26 @@ class ContactController {
       return res.json(createResponse(req.t('contacts.loaded'), await ContactProfileService.asaasInvoices(req.params.key)));
     } catch (error) {
       return handleError(req, res, error, 'contacts.loadFailed');
+    }
+  }
+
+  /** `POST /api/contacts/:key/asaas` — o cliente do contato criado (ou ligado) na conta Asaas do provedor. */
+  static async createInAsaas(req, res) {
+    try {
+      const result = await AsaasProviderCustomerService.createFromContact(req.params.key);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_UPDATED,
+        subjectType: 'contact',
+        subjectId: req.params.key,
+        // Onde foi feito e o id do Asaas — nunca os valores digitados.
+        detail: { asaas: true, asaasCustomerId: result.customer.asaasId, created: result.created }
+      });
+      return res.status(result.created ? 201 : 200).json(createResponse(
+        req.t(result.created ? 'contacts.createdInAsaas' : 'contacts.linkedToAsaas'),
+        result
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.saveFailed');
     }
   }
 

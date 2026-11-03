@@ -36,8 +36,10 @@ class InvoiceSourceService {
   static async documentOfContract(contract) {
     const contact = await SgpContact.getByContract(contract);
     if (contact?.document) return normalizeTaxId(contact.document) || null;
-    const link = await SgpLink.getByContract(contract);
-    return link?.document ? (normalizeTaxId(link.document) || null) : null;
+    // `getByContract` devolve a LISTA de vínculos do contrato (uma linha por ONT).
+    const links = await SgpLink.getByContract(contract);
+    const link = (links || []).find((entry) => entry?.document);
+    return link ? (normalizeTaxId(link.document) || null) : null;
   }
 
   /**
@@ -47,9 +49,10 @@ class InvoiceSourceService {
    * leva o bot a um atendente, e o Asaas fora do ar não pode fazer o mesmo com
    * quem tem a fatura no SGP.
    */
-  static async asaasInvoicesForContract(contract) {
+  static async asaasInvoicesForContract(contract, { gate = 'bot' } = {}) {
     try {
-      if (!(await AsaasInvoiceService.botEnabled())) return [];
+      const allowed = gate === 'billing' ? await AsaasInvoiceService.billingEnabled() : await AsaasInvoiceService.botEnabled();
+      if (!allowed) return [];
       const document = await this.documentOfContract(contract);
       return document ? await AsaasInvoiceService.openByDocument(document) : [];
     } catch (error) {

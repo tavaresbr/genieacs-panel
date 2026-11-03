@@ -104,6 +104,8 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<Form>(EMPTY_FORM)
   const [inSgp, setInSgp] = useState(true)
+  // Escrever na conta Asaas é sempre uma escolha explícita: começa desmarcado.
+  const [inAsaasToo, setInAsaasToo] = useState(false)
   // With a contract (the SGP's pre-registration): the lists come from
   // Settings → SGP, and the option shows only once a plan is configured there.
   const [withContract, setWithContract] = useState(false)
@@ -123,6 +125,8 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   const isCompany = lookup?.personType === 'PJ'
   const canCreateInSgp = can('sgp.act') && Boolean(lookup?.sgpChecked)
   const toSgp = canCreateInSgp && inSgp
+  const canCreateInAsaas = can('asaas.act') && Boolean(lookup?.asaasWritable) && (lookup?.inAsaas.length ?? 0) === 0
+  const toAsaas = canCreateInAsaas && inAsaasToo
   const set = (field: keyof Form, value: string) => setForm((current) => ({ ...current, [field]: value }))
 
   const canPreRegister = toSgp && Boolean(preRegOptions?.plans.length) && Boolean(preRegOptions?.dueDays.length)
@@ -317,11 +321,22 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
           ? { address: Object.fromEntries(Object.entries(address).filter(([, value]) => value)) }
           : {})
       })
-    setSaving(false)
     if (!res.success || !res.data) {
+      setSaving(false)
       toast.error(res.message || t('contacts.profile.saveFailed'))
       return
     }
+    // O Asaas vem DEPOIS, sobre o contato que já está salvo: se ele recusar, o
+    // cadastro não se perde e a ficha oferece "Criar no Asaas" para tentar de novo.
+    if (toAsaas) {
+      const asaas = await contactsAPI.createInAsaas(res.data.key)
+      if (!asaas.success) {
+        toast.warning(t('contacts.new.asaasFailed', { reason: asaas.message || '' }))
+      } else if (asaas.message) {
+        toast.success(asaas.message)
+      }
+    }
+    setSaving(false)
     toast.success(t(newContract ? 'contacts.new.newContractSent' : toPreRegister ? 'contacts.new.preRegistered' : toSgp ? 'contacts.new.createdInSgp' : 'contacts.profile.created'))
     open(res.data.key)
   }
@@ -405,6 +420,13 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
           </div>
+        )}
+
+        {lookup && lookup.inAsaas.length > 0 && (
+          <p className="mt-3 flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm" data-testid="new-contact-in-asaas">
+            <Icon name="check" size={16} />
+            <span><span className="font-semibold">{t('contacts.new.inAsaas')}</span> · {lookup.inAsaas[0].name || '—'}</span>
+          </p>
         )}
 
         {lookup && lookup.inSgp.length === 0 && lookup.inPanel && (
@@ -558,6 +580,15 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                 <span className="text-sm">
                   <span className="block font-semibold">{t('contacts.new.createInSgp')}</span>
                   <span className="text-muted-foreground">{t('contacts.new.createInSgpHint')}</span>
+                </span>
+              </label>
+            )}
+            {canCreateInAsaas && (
+              <label className="mt-5 flex items-start gap-3">
+                <input type="checkbox" className="mt-1" checked={inAsaasToo} onChange={(event) => setInAsaasToo(event.target.checked)} />
+                <span className="text-sm">
+                  <span className="block font-semibold">{t('contacts.new.alsoAsaas')}</span>
+                  <span className="text-muted-foreground">{t('contacts.new.alsoAsaasHint')}</span>
                 </span>
               </label>
             )}
