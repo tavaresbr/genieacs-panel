@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.27.0] - 2026-11-03
+
+### New
+
+- Cliente criado pelo painel nasce sem notificações do Asaas (`4eeae3f1`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/6c71a61a98cb...dbffd49b4384)
+
 ## [1.26.0] - 2026-11-03
 
 ### New
