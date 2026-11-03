@@ -5948,6 +5948,25 @@ const it: Dictionary = {
   'account.description': "Ciò che vale solo per te: gli avvisi di questo dispositivo e l’app installata.",
   'account.reached': "Dal tuo nome, in fondo al menu",
   'account.open': "Apri il mio account",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Sessioni attive',
+  'settings.sessions.description': 'I dispositivi su cui questo account ha effettuato l’accesso. «Esci», nel menu, chiude solo questo dispositivo; qui puoi chiuderne uno qualsiasi, o tutti insieme.',
+  'settings.sessions.revokeAll': 'Esci da tutti',
+  'settings.sessions.revoke': 'Chiudi',
+  'settings.sessions.current': 'Questo dispositivo',
+  'settings.sessions.console': 'Console',
+  'settings.sessions.unknownDevice': 'Browser sconosciuto',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'usata {when}',
+  'settings.sessions.since': 'dal {when}',
+  'settings.sessions.empty': 'Nessuna sessione aperta.',
+  'settings.sessions.loadFailed': 'Impossibile caricare le sessioni.',
+  'settings.sessions.revoked': 'Sessione chiusa.',
+  'settings.sessions.revokedAll': 'Tutte le sessioni sono state chiuse.',
+  'settings.sessions.revokeFailed': 'Impossibile chiudere la sessione.',
+  'settings.sessions.confirmCurrent': 'Questa è la sessione di questo dispositivo. Chiuderla ti riporta all’accesso. Continuare?',
+  'settings.sessions.confirmAll': 'Chiudere TUTTE le sessioni di questo account, inclusa quella di questo dispositivo? Dovrai accedere di nuovo su ciascuno.',
+  'audit.action.sessionRefreshReuse': 'Sessione chiusa per riutilizzo del token di rinnovo',
 }
 
 export default it

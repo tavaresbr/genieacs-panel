@@ -100,8 +100,8 @@ describe('um refresh que volta depois da troca de sessão', () => {
     apiClient.clearTokens()
   })
 
-  it('é descartado: não grava os tokens da sessão anterior por cima da nova', async () => {
-    apiClient.beginSession('token-a', 'refresh-a')
+  it('é descartado: não grava o token da sessão anterior por cima da nova', async () => {
+    apiClient.beginSession('token-a')
 
     let responderRefresh: (value: unknown) => void = () => {}
     const fetchFalso = vi.fn((url: string) => {
@@ -118,20 +118,19 @@ describe('um refresh que volta depois da troca de sessão', () => {
 
     // Sair e entrar como outro provedor enquanto o refresh está no ar.
     apiClient.clearTokens()
-    apiClient.beginSession('token-b', 'refresh-b')
+    apiClient.beginSession('token-b')
 
-    responderRefresh(json(200, { success: true, data: { token: 'token-a2', refreshToken: 'refresh-a2' } }))
+    responderRefresh(json(200, { success: true, data: { token: 'token-a2' } }))
     const res = await pedido
 
     expect(res.success).toBe(false)
-    expect(navegador.getItem('token')).toBe('token-b')
-    expect(navegador.getItem('refreshToken')).toBe('refresh-b')
+    expect(apiClient.getToken()).toBe('token-b')
     // O pedido antigo não foi refeito com token nenhum.
     expect(fetchFalso).toHaveBeenCalledTimes(2)
   })
 
   it('também não derruba a sessão nova quando falha', async () => {
-    apiClient.beginSession('token-a', 'refresh-a')
+    apiClient.beginSession('token-a')
 
     let responderRefresh: (value: unknown) => void = () => {}
     vi.stubGlobal('fetch', vi.fn((url: string) => {
@@ -144,20 +143,22 @@ describe('um refresh que volta depois da troca de sessão', () => {
     const pedido = apiClient.get('/devices')
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
 
-    apiClient.beginSession('token-b', 'refresh-b')
+    apiClient.beginSession('token-b')
     responderRefresh(json(401, { success: false }))
     await pedido
 
-    expect(navegador.getItem('token')).toBe('token-b')
+    expect(apiClient.getToken()).toBe('token-b')
   })
 
-  it('da mesma sessão continua renovando', async () => {
-    apiClient.beginSession('token-a', 'refresh-a')
+  it('da mesma sessão continua renovando, pelo cookie e com o cabeçalho da guarda', async () => {
+    apiClient.beginSession('token-a')
 
     let chamadas = 0
-    vi.stubGlobal('fetch', vi.fn((url: string) => {
+    let pedidoDeRefresh: RequestInit | undefined
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
       if (url.endsWith('/api/auth/refresh')) {
-        return Promise.resolve(json(200, { success: true, data: { token: 'token-a2', refreshToken: 'refresh-a2' } }))
+        pedidoDeRefresh = init
+        return Promise.resolve(json(200, { success: true, data: { token: 'token-a2' } }))
       }
       chamadas += 1
       return Promise.resolve(chamadas === 1
@@ -168,7 +169,81 @@ describe('um refresh que volta depois da troca de sessão', () => {
     const res = await apiClient.get('/devices')
 
     expect(res.success).toBe(true)
-    expect(navegador.getItem('token')).toBe('token-a2')
-    expect(navegador.getItem('refreshToken')).toBe('refresh-a2')
+    expect(apiClient.getToken()).toBe('token-a2')
+    // O refresh vai no cookie (mesma origem), nunca no corpo; e nada em storage.
+    expect(pedidoDeRefresh?.body).toBeUndefined()
+    expect((pedidoDeRefresh?.headers as Record<string, string>)['X-Requested-With']).toBe('skygenpanel')
+    expect(navegador.getItem('token')).toBeNull()
+    expect(navegador.getItem('refreshToken')).toBeNull()
+  })
+
+  it('não acontece numa personificação: o cookie do navegador é de quem personifica', async () => {
+    apiClient.setTabTokens('token-da-aba')
+    const fetchFalso = vi.fn(() => Promise.resolve(json(403, { success: false, code: 'invalid_token' })))
+    vi.stubGlobal('fetch', fetchFalso)
+
+    await apiClient.get('/devices')
+
+    expect(fetchFalso).toHaveBeenCalledTimes(1)
+    expect(fetchFalso.mock.calls.some((c) => String((c as unknown[])[0]).includes('/auth/refresh'))).toBe(false)
+  })
+})
+
+describe('a carga da página', () => {
+  function json(status: number, body: unknown) {
+    return { ok: status >= 200 && status < 300, status, headers: { get: () => 'application/json' }, json: async () => body }
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('window', { dispatchEvent: () => true })
+    apiClient.clearTokens()
+  })
+
+  afterEach(() => {
+    apiClient.clearTokens()
+  })
+
+  it('migra o refresh antigo do localStorage uma vez, pelo corpo, e o apaga', async () => {
+    navegador.setItem('token', 'acesso-velho')
+    navegador.setItem('refreshToken', 'refresh-velho')
+    const corpos: unknown[] = []
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      corpos.push(init?.body ? JSON.parse(String(init.body)) : null)
+      return Promise.resolve(url.endsWith('/api/auth/refresh')
+        ? json(200, { success: true, data: { token: 'acesso-novo' } })
+        : json(404, {}))
+    }))
+
+    expect(await apiClient.restoreSession()).toBe(true)
+    expect(apiClient.getToken()).toBe('acesso-novo')
+    expect(corpos).toEqual([{ refreshToken: 'refresh-velho' }])
+    expect(navegador.getItem('token')).toBeNull()
+    expect(navegador.getItem('refreshToken')).toBeNull()
+  })
+
+  it('sem nada antigo, renova pelo cookie; sem cookie, fica sem sessão e sem barulho', async () => {
+    const chamadas: string[] = []
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      chamadas.push(url)
+      return Promise.resolve(json(401, { success: false, code: 'refresh_required' }))
+    }))
+
+    expect(await apiClient.restoreSession()).toBe(false)
+    // O painel e depois o console: não se sabe qual dos dois cookies existe.
+    expect(chamadas.map((u) => u.replace(/^.*\/api/, ''))).toEqual(['/auth/refresh', '/auth/console/refresh'])
+    expect(apiClient.getToken()).toBeNull()
+  })
+
+  it('tenta o console primeiro quando foi a última sessão deste navegador', async () => {
+    navegador.setItem('skg_session_kind', 'console')
+    const chamadas: string[] = []
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      chamadas.push(url)
+      return Promise.resolve(json(200, { success: true, data: { token: 'do-console', platform: true } }))
+    }))
+
+    expect(await apiClient.restoreSession()).toBe(true)
+    expect(chamadas.map((u) => u.replace(/^.*\/api/, ''))).toEqual(['/auth/console/refresh'])
+    expect(apiClient.getSessionKind()).toBe('console')
   })
 })

@@ -1485,5 +1485,10 @@ export default {
   'push.invoice.suspendedTitle': "面板已停用",
   'push.invoice.suspendedBody': "面板因未付款已被停用。付款后即可恢复。",
   'push.newMessage.title': "WhatsApp 新消息",
-  'push.newMessage.body': "有客户发送了消息。"
+  'push.newMessage.body': "有客户发送了消息。",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': '请求被拒绝：缺少面板安全标头',
+  'auth.sessionNotFound': '未找到会话',
+  'auth.sessionRevoked': '会话已结束',
+  'auth.sessionsRevokedAll': '所有会话均已结束'
 };

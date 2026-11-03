@@ -5950,6 +5950,25 @@ const hi: Dictionary = {
   'account.description': "जो केवल आप पर लागू है: इस डिवाइस की सूचनाएँ और इंस्टॉल किया गया ऐप।",
   'account.reached': "मेनू के नीचे आपके नाम से",
   'account.open': "मेरा खाता खोलें",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'सक्रिय सत्र',
+  'settings.sessions.description': 'वे डिवाइस जिन पर यह खाता साइन इन है। मेनू में "साइन आउट" केवल इस डिवाइस को समाप्त करता है; यहाँ आप किसी को भी, या सभी को एक साथ समाप्त कर सकते हैं।',
+  'settings.sessions.revokeAll': 'सभी से साइन आउट',
+  'settings.sessions.revoke': 'समाप्त करें',
+  'settings.sessions.current': 'यह डिवाइस',
+  'settings.sessions.console': 'कंसोल',
+  'settings.sessions.unknownDevice': 'अज्ञात ब्राउज़र',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': '{when} उपयोग किया गया',
+  'settings.sessions.since': '{when} से',
+  'settings.sessions.empty': 'कोई खुला सत्र नहीं।',
+  'settings.sessions.loadFailed': 'सत्र लोड नहीं हो सके।',
+  'settings.sessions.revoked': 'सत्र समाप्त किया गया।',
+  'settings.sessions.revokedAll': 'सभी सत्र समाप्त कर दिए गए।',
+  'settings.sessions.revokeFailed': 'सत्र समाप्त नहीं किया जा सका।',
+  'settings.sessions.confirmCurrent': 'यह इस डिवाइस का सत्र है। इसे समाप्त करने पर आप साइन-इन पेज पर लौट जाएँगे। जारी रखें?',
+  'settings.sessions.confirmAll': 'इस खाते के सभी सत्र, इस डिवाइस सहित, समाप्त करें? आपको हर डिवाइस पर फिर से साइन इन करना होगा।',
+  'audit.action.sessionRefreshReuse': 'रीफ़्रेश टोकन के दोबारा उपयोग के कारण सत्र समाप्त किया गया',
 }
 
 export default hi

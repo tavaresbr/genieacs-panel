@@ -1485,5 +1485,10 @@ export default {
   'push.invoice.suspendedTitle': "パネルが停止されました",
   'push.invoice.suspendedBody': "未払いのためパネルが停止されました。お支払いで解除されます。",
   'push.newMessage.title': "WhatsAppの新着メッセージ",
-  'push.newMessage.body': "顧客からメッセージが届きました。"
+  'push.newMessage.body': "顧客からメッセージが届きました。",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'リクエストを拒否しました: パネルのセキュリティヘッダーがありません',
+  'auth.sessionNotFound': 'セッションが見つかりません',
+  'auth.sessionRevoked': 'セッションを終了しました',
+  'auth.sessionsRevokedAll': 'すべてのセッションを終了しました'
 };

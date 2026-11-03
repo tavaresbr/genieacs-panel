@@ -153,6 +153,7 @@ diz isso; escolher um número para elas é decisão de negócio que ainda não f
 | Bilhetes de redefinição e verificação | `auth_tickets` | **1 dia** | — | ninguém: fixo no código | expires_at | — |
 | Bilhetes de entrada do console | `impersonation_tickets` | **1 dia** | — | ninguém: fixo no código | expires_at | — |
 | Bloqueio por tentativa de senha | `account_lockouts` | **1 dia** | — | ninguém: fixo no código | updated_at | bloqueios ainda em vigor |
+| Sessões por aparelho (refresh) | `refresh_tokens` | **1 dia** | — | ninguém: fixo no código | expires_at | sessões ainda dentro dos sete dias |
 
 Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **vale** é o menor dos dois, e "para sempre" vira o próprio teto (`SubscriptionService.effectiveRetention`). É a única janela que o provedor não escolheu: a tela mostra o número dele, não o que vale.
 

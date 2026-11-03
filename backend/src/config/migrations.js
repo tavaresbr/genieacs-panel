@@ -3607,6 +3607,50 @@ const ADDON_TABLES = [
 ];
 
 /**
+ * As sessões por aparelho (0129) — ver `models/RefreshToken.js`.
+ *
+ * Cada linha é UM refresh token já emitido; as rotações de um mesmo login
+ * formam a família (`family_id`), e a família é o que a tela "Sessões ativas"
+ * chama de sessão. O valor do token nunca entra aqui: só o sha256 dele.
+ *
+ *   audience       skygenpanel-admin (painel) | skygenpanel-console (console);
+ *   tenant_id      o provedor da sessão de painel; nulo no console. Inteiro
+ *                  simples e não FK: a tabela é da PESSOA, como `users`, e a
+ *                  linha some com ela (FK em `user_id`) ou com o prazo;
+ *   token_version  a versão da pessoa quando a linha nasceu — subir a versão
+ *                  ("sair de todos", troca de senha) mata a família na
+ *                  próxima renovação, mesmo que alguém esqueça de revogá-la;
+ *   rotated_at     quando foi trocado pelo sucessor; reapresentado depois da
+ *                  folga, é reuso e a família inteira cai;
+ *   revoked_at     quando a família foi encerrada (sair, encerrar, reuso);
+ *   user_agent, ip o contexto curto que a lista de sessões mostra.
+ */
+const refreshTokensTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('family_id', 36).notNullable();
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.integer('tenant_id').unsigned().nullable();
+  t.string('audience', 32).notNullable();
+  t.string('token_hash', 64).notNullable().unique();
+  t.integer('token_version').notNullable().defaultTo(0);
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('rotated_at').nullable();
+  t.timestamp('revoked_at').nullable();
+  t.string('user_agent', 255).nullable();
+  t.string('ip', 64).nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('last_used_at').nullable();
+  t.index(['family_id'], 'refresh_tokens_family_idx');
+  t.index(['user_id', 'revoked_at'], 'refresh_tokens_user_idx');
+  t.index(['expires_at'], 'refresh_tokens_expiry_idx');
+};
+
+const REFRESH_TOKEN_TABLES = [
+  ['refresh_tokens', refreshTokensTable]
+];
+
+/**
  * As notificações push do app do provedor (0130) — ver `services/pushService.js`.
  *
  *   push_subscriptions  um aparelho (navegador) de uma pessoa da equipe, num
@@ -3717,6 +3761,7 @@ export const SCHEMA_TABLES = [
   ...AFFILIATE_TABLES,
   ...ADDON_TABLES,
   ...STATUS_PAGE_TABLES,
+  ...REFRESH_TOKEN_TABLES,
   ...PUSH_TABLES
 ].map(([name]) => name);
 
@@ -7457,6 +7502,20 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       for (const [name, builder] of STATUS_PAGE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
+    /** As sessões por aparelho, com rotação do refresh — ver `REFRESH_TOKEN_TABLES`. */
+    id: '0129_refresh_tokens',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('users'))) return true;
+      return db.schema.hasTable('refresh_tokens');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      for (const [name, builder] of REFRESH_TOKEN_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
     }

@@ -1488,5 +1488,10 @@ export default {
   'push.invoice.suspendedTitle': "패널 정지됨",
   'push.invoice.suspendedBody': "미납으로 패널이 정지되었습니다. 결제하면 해제됩니다.",
   'push.newMessage.title': "새 WhatsApp 메시지",
-  'push.newMessage.body': "고객이 메시지를 보냈습니다."
+  'push.newMessage.body': "고객이 메시지를 보냈습니다.",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': '요청이 거부되었습니다: 패널 보안 헤더가 없습니다',
+  'auth.sessionNotFound': '세션을 찾을 수 없습니다',
+  'auth.sessionRevoked': '세션이 종료되었습니다',
+  'auth.sessionsRevokedAll': '모든 세션이 종료되었습니다'
 };

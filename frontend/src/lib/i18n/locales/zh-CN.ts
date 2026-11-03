@@ -5942,6 +5942,25 @@ const zhCN: Dictionary = {
   'account.description': "仅适用于您的设置：此设备的提醒和已安装的应用。",
   'account.reached': "点击菜单底部的您的名字",
   'account.open': "打开我的账户",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': '活动会话',
+  'settings.sessions.description': '此帐户已登录的设备。菜单中的“退出登录”只结束此设备；在这里可以结束其中任何一个，或一次结束全部。',
+  'settings.sessions.revokeAll': '从所有设备退出',
+  'settings.sessions.revoke': '结束',
+  'settings.sessions.current': '此设备',
+  'settings.sessions.console': '控制台',
+  'settings.sessions.unknownDevice': '未知浏览器',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': '{when}使用',
+  'settings.sessions.since': '自{when}起',
+  'settings.sessions.empty': '没有打开的会话。',
+  'settings.sessions.loadFailed': '无法加载会话。',
+  'settings.sessions.revoked': '会话已结束。',
+  'settings.sessions.revokedAll': '所有会话均已结束。',
+  'settings.sessions.revokeFailed': '无法结束会话。',
+  'settings.sessions.confirmCurrent': '这是此设备的会话。结束后将返回登录页面。是否继续？',
+  'settings.sessions.confirmAll': '结束此帐户的所有会话（包括此设备）？您需要在每台设备上重新登录。',
+  'audit.action.sessionRefreshReuse': '因刷新令牌被重复使用而结束会话',
 }
 
 export default zhCN

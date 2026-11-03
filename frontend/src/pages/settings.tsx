@@ -63,6 +63,7 @@ import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/vi
 const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INSTALLER_VIRTUAL_PARAMETERS)])
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 import { MfaCard } from '@/components/mfa-card'
+import { ActiveSessionsCard } from '@/components/active-sessions-card'
 import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-panel'
@@ -3073,6 +3074,8 @@ export default function Settings() {
               {!currentUser?.platform && can('settings.read') && (
                 <MfaPolicyCard selfMfaEnabled={meuMfa} />
               )}
+              {/* Os aparelhos desta conta (0129): "Encerrar" um e "Sair de todos". */}
+              <ActiveSessionsCard />
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                 <h3 className="font-semibold text-foreground">{t('settings.security.changeUsername')}</h3>
                 <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.security.changeUsernameHint')}</p>

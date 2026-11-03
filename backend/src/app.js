@@ -18,6 +18,7 @@ import {
   apiLimiter,
   attachmentUploadLimiter,
   authLimiter,
+  refreshLimiter,
   firmwareUploadLimiter,
   portalIpLimiter,
   portalLoginLimiter
@@ -331,7 +332,8 @@ app.use('/api', requestLogger());
 app.use('/api', httpMetrics());
 app.use('/api', resolveTenant);
 app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/refresh', authLimiter);
+app.use('/api/auth/refresh', refreshLimiter);
+app.use('/api/auth/console/refresh', refreshLimiter);
 app.use('/api/auth/setup', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 

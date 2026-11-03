@@ -253,7 +253,12 @@ class AuditLog {
     OPERATOR_UPDATED: 'operator.updated',
     OPERATOR_PASSWORD_LINK_ISSUED: 'operator.password_link_issued',
     OPERATOR_PASSWORD_SET: 'operator.password_set',
-    OPERATOR_SESSIONS_REVOKED: 'operator.sessions_revoked'
+    OPERATOR_SESSIONS_REVOKED: 'operator.sessions_revoked',
+    // Um refresh já trocado voltou depois da folga de duas abas (0129): alguém
+    // tem uma cópia do cookie de um aparelho da equipe. A sessão daquele
+    // aparelho foi encerrada inteira; o detalhe diz o começo da família e o
+    // navegador de quem reapresentou, nunca o token.
+    SESSION_REFRESH_REUSE: 'session.refresh_reuse'
   });
 
   /**

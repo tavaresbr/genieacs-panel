@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ADMIN_STATE, DELTA_OWNER, consoleTabs, loginViaForm, shot } from './support/demo'
+import { DELTA_OWNER, consoleTabs, loginViaForm, shot, ADMIN, sessionFor } from './support/demo'
 
 /**
  * Os add-ons pagos (0127), de ponta a ponta: o console cria um no catálogo, e
@@ -14,7 +14,7 @@ const CODIGO = 'e2e-relatorios'
 const NOME = 'Relatórios avançados (e2e)'
 
 test.describe('o catálogo no console', () => {
-  test.use({ storageState: ADMIN_STATE })
+  test.use({ storageState: sessionFor(ADMIN) })
 
   test('Planos → Add-ons: cria um add-on de recurso e mostra o aviso antes de exigi-lo', async ({ page }) => {
     await page.goto('/platform')

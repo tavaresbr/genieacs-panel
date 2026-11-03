@@ -1485,5 +1485,10 @@ export default {
   'push.invoice.suspendedTitle': "पैनल निलंबित",
   'push.invoice.suspendedBody': "भुगतान न होने के कारण पैनल निलंबित कर दिया गया। चालू करने के लिए भुगतान करें।",
   'push.newMessage.title': "नया WhatsApp संदेश",
-  'push.newMessage.body': "एक ग्राहक ने संदेश भेजा।"
+  'push.newMessage.body': "एक ग्राहक ने संदेश भेजा।",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'अनुरोध अस्वीकृत: पैनल का सुरक्षा हेडर मौजूद नहीं है',
+  'auth.sessionNotFound': 'सत्र नहीं मिला',
+  'auth.sessionRevoked': 'सत्र समाप्त किया गया',
+  'auth.sessionsRevokedAll': 'सभी सत्र समाप्त कर दिए गए'
 };

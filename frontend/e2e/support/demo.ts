@@ -78,6 +78,46 @@ export async function loginViaForm(page: Page, conta: { email: string, password:
   await expect(page).not.toHaveURL(/\/login/)
 }
 
+/**
+ * Uma sessão NOVA para o cenário, como `storageState` (0129).
+ *
+ * O refresh agora gira a cada uso, e um token já girado apresentado de novo
+ * depois de 10 s é reuso: a família inteira cai. Um `storageState` salvo uma
+ * vez e carregado por todos os cenários é exatamente isso — o mesmo cookie
+ * reapresentado —, então cada cenário entra com um login próprio, pela API,
+ * e recebe o cookie `HttpOnly` dele. O token de acesso não vai em storage
+ * nenhum: a tela o busca no `/api/auth/refresh` ao carregar.
+ */
+export async function freshSessionState(conta: { email: string, password: string }) {
+  const baseURL = process.env.E2E_BASE_URL
+  if (!baseURL) throw new Error('E2E_BASE_URL is not set: the global setup starts the backend')
+  const res = await fetch(`${baseURL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: conta.email, password: conta.password })
+  })
+  if (!res.ok) throw new Error(`login of ${conta.email} answered ${res.status}: ${await res.text()}`)
+  const host = new URL(baseURL).hostname
+  const cookies = res.headers.getSetCookie()
+    .map((linha) => linha.split(';')[0])
+    .map((par) => [par.slice(0, par.indexOf('=')), decodeURIComponent(par.slice(par.indexOf('=') + 1))] as const)
+    .filter(([nome, valor]) => nome === 'skg_rt' && valor)
+    .map(([name, value]) => ({
+      name, value, domain: host, path: '/api/auth',
+      expires: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      httpOnly: true, secure: false, sameSite: 'Strict' as const
+    }))
+  if (!cookies.length) throw new Error(`login of ${conta.email} did not set the refresh cookie`)
+  return { cookies, origins: [] }
+}
+
+/** O `storageState` de um `test.use`: uma sessão nova por cenário. */
+export function sessionFor(conta: { email: string, password: string }) {
+  return async ({}, use: (state: Awaited<ReturnType<typeof freshSessionState>>) => Promise<void>) => {
+    await use(await freshSessionState(conta))
+  }
+}
+
 /** Do painel ao console, pelo item da barra lateral. */
 export async function openConsole(page: Page) {
   await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: /^Provedores/ }).click()

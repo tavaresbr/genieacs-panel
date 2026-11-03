@@ -1486,5 +1486,10 @@ export default {
   'push.invoice.suspendedTitle': "Panel gesperrt",
   'push.invoice.suspendedBody': "Das Panel wurde wegen Nichtzahlung gesperrt. Bezahlen Sie, um es freizuschalten.",
   'push.newMessage.title': "Neue WhatsApp-Nachricht",
-  'push.newMessage.body': "Ein Kunde hat eine Nachricht gesendet."
+  'push.newMessage.body': "Ein Kunde hat eine Nachricht gesendet.",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Anfrage abgelehnt: Der Sicherheits-Header des Panels fehlt',
+  'auth.sessionNotFound': 'Sitzung nicht gefunden',
+  'auth.sessionRevoked': 'Sitzung beendet',
+  'auth.sessionsRevokedAll': 'Alle Sitzungen wurden beendet'
 };

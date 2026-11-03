@@ -5951,6 +5951,25 @@ const ar: Dictionary = {
   'account.description': "ما يخصك وحدك: تنبيهات هذا الجهاز والتطبيق المثبّت.",
   'account.reached': "من اسمك أسفل القائمة",
   'account.open': "فتح حسابي",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'الجلسات النشطة',
+  'settings.sessions.description': 'الأجهزة التي سجّل فيها هذا الحساب الدخول. «تسجيل الخروج» في القائمة يُنهي هذا الجهاز فقط؛ وهنا يمكنك إنهاء أي منها، أو جميعها مرة واحدة.',
+  'settings.sessions.revokeAll': 'الخروج من الجميع',
+  'settings.sessions.revoke': 'إنهاء',
+  'settings.sessions.current': 'هذا الجهاز',
+  'settings.sessions.console': 'وحدة التحكم',
+  'settings.sessions.unknownDevice': 'متصفح غير معروف',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'استُخدمت {when}',
+  'settings.sessions.since': 'منذ {when}',
+  'settings.sessions.empty': 'لا توجد جلسات مفتوحة.',
+  'settings.sessions.loadFailed': 'تعذّر تحميل الجلسات.',
+  'settings.sessions.revoked': 'تم إنهاء الجلسة.',
+  'settings.sessions.revokedAll': 'تم إنهاء جميع الجلسات.',
+  'settings.sessions.revokeFailed': 'تعذّر إنهاء الجلسة.',
+  'settings.sessions.confirmCurrent': 'هذه جلسة هذا الجهاز. إنهاؤها يعيدك إلى صفحة تسجيل الدخول. هل تريد المتابعة؟',
+  'settings.sessions.confirmAll': 'إنهاء جميع جلسات هذا الحساب، بما فيها جلسة هذا الجهاز؟ ستحتاج إلى تسجيل الدخول مجددًا على كل جهاز.',
+  'audit.action.sessionRefreshReuse': 'أُنهيت الجلسة بسبب إعادة استخدام رمز التجديد',
 }
 
 export default ar

@@ -9,6 +9,7 @@ import {
   stopTestServers
 } from './helpers/harness.js';
 
+const { cookieFrom, cookieHeaders } = await import('./helpers/sessionCookies.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
 const { default: PlatformAdmin } = await import('../src/models/PlatformAdmin.js');
 
@@ -62,7 +63,7 @@ before(async () => {
 
   const entrou = await entrar(SO_BETA, beta);
   assert.equal(entrou.status, 200, JSON.stringify(entrou.body));
-  sessao = entrou.body.data;
+  sessao = { ...entrou.body.data, cookie: cookieFrom(entrou.response) };
 });
 
 after(async () => {
@@ -74,9 +75,10 @@ describe('um provedor suspenso', () => {
   it('derruba a sessão que já estava aberta', async () => {
     assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(sessao.token) })).status, 200);
     const renovou = await call(`${panelUrl}/api/auth/refresh`, {
-      method: 'POST', body: { refreshToken: sessao.refreshToken }
+      method: 'POST', headers: cookieHeaders(sessao.cookie)
     });
     assert.equal(renovou.status, 200, 'o refresh tem que funcionar antes da suspensão para o teste abaixo valer');
+    sessao.cookie = cookieFrom(renovou.response);
     await suspender('suspended');
     const depois = await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(sessao.token) });
     assert.notEqual(depois.status, 200, 'a sessão seguiu de pé no provedor suspenso');
@@ -84,7 +86,7 @@ describe('um provedor suspenso', () => {
 
   it('não renova a sessão', async () => {
     const { status } = await call(`${panelUrl}/api/auth/refresh`, {
-      method: 'POST', body: { refreshToken: sessao.refreshToken }
+      method: 'POST', headers: cookieHeaders(sessao.cookie)
     });
     assert.notEqual(status, 200);
   });

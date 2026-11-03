@@ -50,7 +50,7 @@ function callAs(host, url, { method = 'GET', headers = {}, body } = {}) {
         const text = Buffer.concat(chunks).toString('utf8');
         let parsed = null;
         try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
-        resolve({ status: response.statusCode, body: parsed });
+        resolve({ status: response.statusCode, body: parsed, headers: response.headers });
       });
     });
     request.on('error', reject);
@@ -58,6 +58,16 @@ function callAs(host, url, { method = 'GET', headers = {}, body } = {}) {
     request.end();
   });
 }
+
+/** O valor do cookie `name` que a resposta pôs (0129); `undefined` se não pôs. */
+function cookieDe(resposta, name) {
+  for (const linha of [].concat(resposta.headers?.['set-cookie'] ?? [])) {
+    const [par] = linha.split(';');
+    if (par.startsWith(`${name}=`)) return decodeURIComponent(par.slice(name.length + 1));
+  }
+  return undefined;
+}
+const comCookie = (name, value) => ({ 'X-Requested-With': 'skygenpanel', Cookie: `${name}=${value}` });
 
 let panelUrl;
 let casa;
@@ -126,8 +136,15 @@ describe('entrar no console pelo endereço da plataforma', () => {
     assert.equal(body.data.user.platform, true);
     assert.equal(body.data.user.isPlatformAdmin, true);
     assert.ok(body.data.token);
-    // Com refresh, ao contrário da personificação: o console é expediente.
-    assert.ok(body.data.refreshToken);
+    // Com refresh, ao contrário da personificação: o console é expediente. O
+    // refresh vai no cookie do CONSOLE, com o `Path` dele (0129).
+    assert.equal(body.data.refreshToken, undefined);
+    const resposta = await entrarNoConsole('so-plataforma', 'senha-da-plataforma-1');
+    const linha = [].concat(resposta.headers['set-cookie']).find((l) => l.startsWith('skg_crt='));
+    assert.ok(linha, 'o login do console não pôs o cookie do console');
+    assert.match(linha, /Path=\/api\/auth\/console/);
+    assert.match(linha, /HttpOnly/);
+    assert.match(linha, /SameSite=Strict/);
   });
 
   it('recusa quem não tem a chave com o corpo de senha errada', async () => {
@@ -182,7 +199,7 @@ describe('o que a sessão do console alcança', () => {
   before(async () => {
     const entrada = await entrarNoConsole('so-plataforma', 'senha-da-plataforma-1');
     consoleToken = entrada.body.data.token;
-    consoleRefresh = entrada.body.data.refreshToken;
+    consoleRefresh = cookieDe(entrada, 'skg_crt');
   });
 
   it('alcança o console no ápice', async () => {
@@ -242,24 +259,32 @@ describe('o que a sessão do console alcança', () => {
     const denovo = await entrarNoConsole('so-plataforma', 'senha-da-plataforma-2');
     assert.equal(denovo.status, 200);
     consoleToken = denovo.body.data.token;
-    consoleRefresh = denovo.body.data.refreshToken;
+    consoleRefresh = cookieDe(denovo, 'skg_crt');
   });
 
   it('renova no ápice, e não no host de um provedor', async () => {
-    // No host de um provedor a rota existe — ela é do painel também —, então a
-    // recusa vem de dentro: um refresh de console só renova onde a sessão de
-    // console vale.
-    const fora = await naCasa('/api/auth/refresh', {
-      method: 'POST', body: { refreshToken: consoleRefresh }
+    // No host de um provedor a rota do console nem existe (`platformHostOnly`).
+    const fora = await naCasa('/api/auth/console/refresh', {
+      method: 'POST', headers: comCookie('skg_crt', consoleRefresh)
     });
-    assert.equal(fora.status, 403, JSON.stringify(fora.body));
+    assert.equal(fora.status, 404, JSON.stringify(fora.body));
 
-    const dentro = await noApex('/api/auth/refresh', {
-      method: 'POST', body: { refreshToken: consoleRefresh }
+    // O refresh do PAINEL não lê o cookie do console, nem com o nome trocado:
+    // a linha diz a audiência, e ela não é a do painel.
+    const cruzado = await noApex('/api/auth/refresh', {
+      method: 'POST', headers: comCookie('skg_rt', consoleRefresh)
+    });
+    assert.notEqual(cruzado.status, 200, JSON.stringify(cruzado.body));
+
+    const dentro = await noApex('/api/auth/console/refresh', {
+      method: 'POST', headers: comCookie('skg_crt', consoleRefresh)
     });
     assert.equal(dentro.status, 200, JSON.stringify(dentro.body));
     assert.ok(dentro.body.data.token);
-    assert.ok(dentro.body.data.refreshToken);
+    assert.equal(dentro.body.data.refreshToken, undefined);
+    const girado = cookieDe(dentro, 'skg_crt');
+    assert.ok(girado && girado !== consoleRefresh, 'o cookie do console não girou');
+    consoleRefresh = girado;
   });
 
   it('deixa de existir quando a chave é revogada', async () => {

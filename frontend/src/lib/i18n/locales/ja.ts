@@ -5942,6 +5942,25 @@ const ja: Dictionary = {
   'account.description': "あなただけに適用される設定：この端末の通知とインストール済みアプリ。",
   'account.reached': "メニュー下部のお名前から",
   'account.open': "マイアカウントを開く",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'アクティブなセッション',
+  'settings.sessions.description': 'このアカウントでサインインしているデバイスです。メニューの「サインアウト」はこのデバイスだけを終了します。ここではどれでも、またはすべてを一度に終了できます。',
+  'settings.sessions.revokeAll': 'すべてからサインアウト',
+  'settings.sessions.revoke': '終了',
+  'settings.sessions.current': 'このデバイス',
+  'settings.sessions.console': 'コンソール',
+  'settings.sessions.unknownDevice': '不明なブラウザー',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': '{when}に使用',
+  'settings.sessions.since': '{when}から',
+  'settings.sessions.empty': '開いているセッションはありません。',
+  'settings.sessions.loadFailed': 'セッションを読み込めませんでした。',
+  'settings.sessions.revoked': 'セッションを終了しました。',
+  'settings.sessions.revokedAll': 'すべてのセッションを終了しました。',
+  'settings.sessions.revokeFailed': 'セッションを終了できませんでした。',
+  'settings.sessions.confirmCurrent': 'これはこのデバイスのセッションです。終了するとサインイン画面に戻ります。続けますか？',
+  'settings.sessions.confirmAll': 'このデバイスを含め、このアカウントのすべてのセッションを終了しますか？各デバイスで再度サインインが必要になります。',
+  'audit.action.sessionRefreshReuse': '更新トークンの再利用によりセッションを終了しました',
 }
 
 export default ja

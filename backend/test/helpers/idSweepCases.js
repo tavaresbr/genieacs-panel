@@ -903,6 +903,22 @@ export const casos = [
     path: (id) => `/api/tenant/charges/${id}/payment-info`,
     tabela: 'billing_charges'
   },
+  // "Encerrar" uma sessão da lista (0129). O id é uma família de
+  // `refresh_tokens` — da PESSOA, não de provedor —, e a família do alfa é de
+  // alguém do alfa: o operador do beta recebe o mesmo 404 de uma que não
+  // existe, e a linha fica intacta. No controle, a família é do próprio
+  // operador do beta (semeada no `before`), e encerrá-la dá 200. Com o
+  // `X-Requested-With` que a tela manda: sem ele a guarda de CSRF responderia
+  // 403 antes de olhar o id.
+  {
+    chave: 'session',
+    label: 'POST /api/auth/sessions/:id/revoke',
+    method: 'POST',
+    path: (id) => `/api/auth/sessions/${id}/revoke`,
+    headers: { 'X-Requested-With': 'skygenpanel' },
+    tabela: 'refresh_tokens',
+    coluna: 'family_id'
+  },
   // A conta do WhatsApp por último: apagá-la leva as conversas junto, e os
   // casos acima precisam delas de pé.
   {

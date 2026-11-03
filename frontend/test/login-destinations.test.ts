@@ -29,7 +29,7 @@ describe('destinosDaResposta', () => {
 
   it('não transforma um login bem-sucedido em pergunta', () => {
     expect(destinosDaResposta({
-      success: true, data: { token: 'x', refreshToken: 'y', user: {} }
+      success: true, data: { token: 'x', user: {} }
     })).toBeNull()
   })
 

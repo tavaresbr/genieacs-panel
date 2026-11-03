@@ -43,9 +43,9 @@ export default function Impersonate() {
         // Sem refresh token: a sessão dura meia hora e não se renova sozinha.
         // `tabOnly`: a sessão fica só nesta aba. O console abriu o painel
         // numa aba nova e continua atrás — numa instalação de host único as
-        // duas dividem o `localStorage`, e sem isto esta aba trocaria a sessão
-        // do console pela do provedor.
-        adoptSession(res.data.token, undefined, res.data.user, { tabOnly: true })
+        // duas dividem o cookie do refresh, e sem isto esta aba trocaria a
+        // sessão do console pela do provedor.
+        adoptSession(res.data.token, res.data.user, { tabOnly: true })
         navigate('/dashboard', { replace: true })
         return
       }

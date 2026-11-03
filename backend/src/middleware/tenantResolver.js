@@ -225,7 +225,14 @@ const CONSOLE_HOST_PATHS = [
   '/api/auth/refresh',
   // Sem esta, quem opera a plataforma e não trabalha em provedor nenhum não
   // troca a própria senha em lugar nenhum.
-  '/api/auth/change-password'
+  '/api/auth/change-password',
+  // O refresh e a saída do console pelo cookie dele (0129), e a lista de
+  // sessões da própria conta. Nenhuma toca `tdb`: `refresh_tokens` e
+  // `tenants` são compartilhadas.
+  '/api/auth/console/refresh',
+  '/api/auth/console/logout',
+  '/api/auth/sessions',
+  '/api/auth/sessions/revoke-all'
 ];
 
 const PLATFORM_HOST_PATHS = new Set([
@@ -260,7 +267,10 @@ const PLATFORM_HOST_PATHS = new Set([
 // não é provedor. Só no SaaS, onde o ápice é a vitrine. E o portal do
 // afiliado (`/api/affiliate/*`, 0126): quem divulga o produto não é provedor,
 // e a sessão dele (cookie próprio) não abre escopo de provedor nenhum.
-const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/', '/api/affiliate/'] : [];
+// E "Encerrar" uma sessão da lista (`/api/auth/sessions/:id/revoke`, 0129),
+// que o console também mostra em Minha conta; a família é da pessoa, não de
+// provedor.
+const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/', '/api/affiliate/', '/api/auth/sessions/'] : [];
 
 /**
  * Outros nomes do ápice: o domínio de marketing (`tr69.com.br`) servindo a

@@ -1,6 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import { cookieFrom, cookieHeaders } from './helpers/sessionCookies.js';
 
 let panelUrl;
 const admin = { username: 'operator', password: 'initial-password-1', email: 'operator@exemplo.test' };
@@ -30,15 +31,17 @@ describe('operator setup', () => {
   });
 
   it('creates the first administrator and returns a session', async () => {
-    const { status, body } = await call(`${panelUrl}/api/auth/setup`, {
+    const { response, status, body } = await call(`${panelUrl}/api/auth/setup`, {
       method: 'POST',
       body: admin
     });
     assert.equal(status, 201);
     assert.equal(body.data.user.role, 'owner');
     assert.ok(body.data.token);
-    assert.ok(body.data.refreshToken);
-    session = body.data;
+    // O refresh não vem mais no corpo: vai no cookie `HttpOnly` (0129).
+    assert.equal(body.data.refreshToken, undefined);
+    session = { ...body.data, cookie: cookieFrom(response) };
+    assert.ok(session.cookie, 'o setup não pôs o cookie do refresh');
   });
 
   it('refuses a second setup once an administrator exists', async () => {
@@ -77,13 +80,13 @@ describe('operator login', () => {
   });
 
   it('never returns the stored password hash', async () => {
-    const { status, body } = await call(`${panelUrl}/api/auth/login`, {
+    const { response, status, body } = await call(`${panelUrl}/api/auth/login`, {
       method: 'POST',
       body: admin
     });
     assert.equal(status, 200);
     assert.equal(body.data.user.password, undefined);
-    session = body.data;
+    session = { ...body.data, cookie: cookieFrom(response) };
   });
 });
 
@@ -103,7 +106,7 @@ describe('protected routes', () => {
 
   it('rejects a refresh token used as an access token', async () => {
     const { status, body } = await call(`${panelUrl}/api/auth/user`, {
-      headers: authHeaders(session.refreshToken)
+      headers: authHeaders(session.cookie)
     });
     assert.equal(status, 403);
     assert.equal(body.code, 'invalid_token');
@@ -129,27 +132,30 @@ describe('token refresh', () => {
   it('rejects an access token presented as a refresh token', async () => {
     const { status } = await call(`${panelUrl}/api/auth/refresh`, {
       method: 'POST',
+      headers: cookieHeaders(),
       body: { refreshToken: session.token }
     });
-    assert.equal(status, 403);
+    assert.equal(status, 401);
   });
 
-  it('exchanges a refresh token for a new pair', async () => {
-    const { status, body } = await call(`${panelUrl}/api/auth/refresh`, {
+  it('exchanges the refresh cookie for a new access token and a rotated cookie', async () => {
+    const { response, status, body } = await call(`${panelUrl}/api/auth/refresh`, {
       method: 'POST',
-      body: { refreshToken: session.refreshToken }
+      headers: cookieHeaders(session.cookie)
     });
     assert.equal(status, 200);
     assert.ok(body.data.token);
-    assert.ok(body.data.refreshToken);
-    session = body.data;
+    assert.equal(body.data.refreshToken, undefined);
+    const cookie = cookieFrom(response);
+    assert.ok(cookie && cookie !== session.cookie, 'o cookie não girou');
+    session = { ...session, token: body.data.token, cookie };
   });
 });
 
 describe('session revocation', () => {
   it('invalidates existing tokens after a password change', async () => {
     const previousToken = session.token;
-    const previousRefreshToken = session.refreshToken;
+    const previousCookie = session.cookie;
 
     const changed = await call(`${panelUrl}/api/auth/change-password`, {
       method: 'POST',
@@ -166,9 +172,9 @@ describe('session revocation', () => {
 
     const refreshed = await call(`${panelUrl}/api/auth/refresh`, {
       method: 'POST',
-      body: { refreshToken: previousRefreshToken }
+      headers: cookieHeaders(previousCookie)
     });
-    assert.equal(refreshed.status, 403);
+    assert.equal(refreshed.status, 401);
   });
 
   it('invalidates the token used to log out', async () => {
@@ -177,7 +183,7 @@ describe('session revocation', () => {
 
     const loggedOut = await call(`${panelUrl}/api/auth/logout`, {
       method: 'POST',
-      headers: authHeaders(login.body.data.token)
+      headers: { ...authHeaders(login.body.data.token), ...cookieHeaders(cookieFrom(login.response)) }
     });
     assert.equal(loggedOut.status, 200);
 

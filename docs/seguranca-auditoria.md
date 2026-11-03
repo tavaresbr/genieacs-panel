@@ -142,6 +142,16 @@ Uma integração **nova** já nasce exigindo o carimbo. Se o SGP daquele provedo
 
 **Decisão do usuário: só o desenho entra agora, a implementação vai num PR separado.**
 
+**Implementado na migração `0129_refresh_tokens`**, com estas diferenças em relação ao desenho abaixo:
+
+- O prefixo do cookie em HTTPS é `__Secure-` (`__Secure-skg_rt`), e não `__Host-`. O navegador só aceita `__Host-` com `Path=/`, e o `Path=/api/auth` é a metade da proteção que importa. Sem `Domain`, o cookie continua preso ao host.
+- O console tem o próprio cookie (`skg_crt` / `__Secure-skg_crt`) com `Path=/api/auth/console` e rotas próprias: `POST /api/auth/console/refresh` e `/console/logout`.
+- O sucessor de cada refresh é o HMAC do anterior com uma chave do servidor. É isso que deixa a folga de 10 s devolver o MESMO sucessor à aba atrasada sem guardar valor em claro.
+- O token de acesso leva o `sid` (a família), e a hidratação confere que a família está viva. "Sair" e "Encerrar" valem na próxima requisição, e não só quando os 15 minutos acabam.
+- "Sair" encerra só este aparelho. "Sair de todos" (`POST /api/auth/sessions/revoke-all`) sobe o `token_version` e revoga todas as famílias. A tela "Sessões ativas" fica em Configurações › Acesso da conta.
+- O refresh responde 401 a toda recusa e tem um limite próprio (`refreshLimiter`), mais folgado que o do login.
+- Prova em `backend/test/session-cookies.test.js` e `frontend/e2e/session.spec.ts`.
+
 ### Problema
 
 - O `localStorage` (`frontend/src/lib/api.ts:262`) é legível por qualquer script da origem. Um XSS, mesmo bloqueado em parte pela CSP de `script-src 'self'`, leva o token de acesso e o refresh de 7 dias.

@@ -5942,6 +5942,25 @@ const es: Dictionary = {
   'account.description': "Lo que vale solo para ti: los avisos de este dispositivo y la app instalada.",
   'account.reached': "Desde tu nombre, al pie del menú",
   'account.open': "Abrir mi cuenta",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Sesiones activas',
+  'settings.sessions.description': 'Los dispositivos donde esta cuenta tiene sesión iniciada. "Salir", en el menú, cierra solo este dispositivo; aquí puedes cerrar cualquiera de ellos, o todos a la vez.',
+  'settings.sessions.revokeAll': 'Salir de todos',
+  'settings.sessions.revoke': 'Cerrar',
+  'settings.sessions.current': 'Este dispositivo',
+  'settings.sessions.console': 'Consola',
+  'settings.sessions.unknownDevice': 'Navegador desconocido',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'usada {when}',
+  'settings.sessions.since': 'desde {when}',
+  'settings.sessions.empty': 'No hay sesiones abiertas.',
+  'settings.sessions.loadFailed': 'No se pudieron cargar las sesiones.',
+  'settings.sessions.revoked': 'Sesión cerrada.',
+  'settings.sessions.revokedAll': 'Se cerraron todas las sesiones.',
+  'settings.sessions.revokeFailed': 'No se pudo cerrar la sesión.',
+  'settings.sessions.confirmCurrent': 'Esta es la sesión de este dispositivo. Cerrarla te lleva de vuelta al inicio de sesión. ¿Continuar?',
+  'settings.sessions.confirmAll': '¿Cerrar TODAS las sesiones de esta cuenta, incluida la de este dispositivo? Tendrás que iniciar sesión de nuevo en cada uno.',
+  'audit.action.sessionRefreshReuse': 'Sesión cerrada por reutilización del token de renovación',
 }
 
 export default es

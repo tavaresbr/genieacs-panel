@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ADMIN_STATE, DEMO_AFFILIATE, consoleTabs, shot } from './support/demo'
+import { DEMO_AFFILIATE, consoleTabs, shot, ADMIN, sessionFor } from './support/demo'
 
 /**
  * O programa de afiliados (0126) no navegador: o console cadastra um
@@ -13,7 +13,7 @@ test.describe.configure({ mode: 'serial' })
 const NOVO = { name: 'Diego Divulga (e2e)', email: 'diego@afiliados-e2e.test', pix: 'diego@pix-e2e.test' }
 
 test.describe('o console', () => {
-  test.use({ storageState: ADMIN_STATE, permissions: ['clipboard-read', 'clipboard-write'] })
+  test.use({ storageState: sessionFor(ADMIN), permissions: ['clipboard-read', 'clipboard-write'] })
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/platform')
@@ -52,7 +52,7 @@ test.describe('o console', () => {
     // O afiliado define a senha pelo link, num navegador sem sessão nenhuma.
     // Sem a sessão do console: o `browser` do Playwright Test aplica o
     // `storageState` do projeto a todo contexto novo, e um refresh feito aqui
-    // giraria o token guardado em `ADMIN_STATE` para os outros cenários.
+    // giraria o cookie deste cenário (cada um entra com o seu, `sessionFor`).
     const portal = await context.browser()!.newContext({ baseURL: process.env.E2E_BASE_URL, storageState: { cookies: [], origins: [] }, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' })
     const aba = await portal.newPage()
     await aba.goto(link)

@@ -1484,5 +1484,10 @@ export default {
   'push.invoice.suspendedTitle': "Painel suspenso",
   'push.invoice.suspendedBody': "O painel foi suspenso por falta de pagamento. Pague para liberar.",
   'push.newMessage.title': "Nova mensagem no WhatsApp",
-  'push.newMessage.body': "Um cliente enviou uma mensagem."
+  'push.newMessage.body': "Um cliente enviou uma mensagem.",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Requisição recusada: falta o cabeçalho de segurança do painel',
+  'auth.sessionNotFound': 'Sessão não encontrada',
+  'auth.sessionRevoked': 'Sessão encerrada',
+  'auth.sessionsRevokedAll': 'Todas as sessões foram encerradas'
 };

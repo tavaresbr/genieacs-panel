@@ -1486,5 +1486,10 @@ export default {
   'push.invoice.suspendedTitle': "Панель заблокирована",
   'push.invoice.suspendedBody': "Панель заблокирована за неуплату. Оплатите, чтобы разблокировать.",
   'push.newMessage.title': "Новое сообщение WhatsApp",
-  'push.newMessage.body': "Клиент отправил сообщение."
+  'push.newMessage.body': "Клиент отправил сообщение.",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Запрос отклонён: отсутствует заголовок безопасности панели',
+  'auth.sessionNotFound': 'Сеанс не найден',
+  'auth.sessionRevoked': 'Сеанс завершён',
+  'auth.sessionsRevokedAll': 'Все сеансы завершены'
 };

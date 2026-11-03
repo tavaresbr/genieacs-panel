@@ -85,7 +85,7 @@ export default function Invite() {
         return
       }
       if (res.success && res.data) {
-        adoptSession(res.data.token, res.data.refreshToken, res.data.user)
+        adoptSession(res.data.token, res.data.user)
         navigate('/dashboard', { replace: true })
         return
       }

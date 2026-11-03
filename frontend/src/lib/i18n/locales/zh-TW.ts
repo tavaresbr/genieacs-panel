@@ -5943,6 +5943,25 @@ const zhTW: Dictionary = {
   'account.description': "僅適用於您的設定：此裝置的提醒和已安裝的應用程式。",
   'account.reached': "點一下選單底部的您的名字",
   'account.open': "開啟我的帳戶",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': '使用中的工作階段',
+  'settings.sessions.description': '此帳戶已登入的裝置。選單中的「登出」只會結束此裝置；在這裡可以結束其中任何一個，或一次結束全部。',
+  'settings.sessions.revokeAll': '從所有裝置登出',
+  'settings.sessions.revoke': '結束',
+  'settings.sessions.current': '此裝置',
+  'settings.sessions.console': '主控台',
+  'settings.sessions.unknownDevice': '未知的瀏覽器',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': '{when}使用',
+  'settings.sessions.since': '自{when}起',
+  'settings.sessions.empty': '沒有開啟的工作階段。',
+  'settings.sessions.loadFailed': '無法載入工作階段。',
+  'settings.sessions.revoked': '工作階段已結束。',
+  'settings.sessions.revokedAll': '所有工作階段均已結束。',
+  'settings.sessions.revokeFailed': '無法結束工作階段。',
+  'settings.sessions.confirmCurrent': '這是此裝置的工作階段。結束後會回到登入頁面。要繼續嗎？',
+  'settings.sessions.confirmAll': '要結束此帳戶的所有工作階段（包括此裝置）嗎？您需要在每台裝置上重新登入。',
+  'audit.action.sessionRefreshReuse': '因重新整理權杖被重複使用而結束工作階段',
 }
 
 export default zhTW

@@ -1485,5 +1485,10 @@ export default {
   'push.invoice.suspendedTitle': "Panel suspended",
   'push.invoice.suspendedBody': "The panel was suspended for non-payment. Pay to restore access.",
   'push.newMessage.title': "New WhatsApp message",
-  'push.newMessage.body': "A customer sent a message."
+  'push.newMessage.body': "A customer sent a message.",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Request refused: the panel security header is missing',
+  'auth.sessionNotFound': 'Session not found',
+  'auth.sessionRevoked': 'Session ended',
+  'auth.sessionsRevokedAll': 'All sessions have been ended'
 };

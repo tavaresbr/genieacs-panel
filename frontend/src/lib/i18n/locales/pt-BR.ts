@@ -5942,6 +5942,25 @@ const ptBR: Dictionary = {
   'account.description': "O que vale só para você: os avisos deste aparelho e o app instalado.",
   'account.reached': "Pelo seu nome, no rodapé do menu",
   'account.open': "Abrir minha conta",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Sessões ativas',
+  'settings.sessions.description': 'Os aparelhos em que esta conta está conectada. "Sair", no menu, encerra só este aparelho; aqui você encerra qualquer um deles, ou todos de uma vez.',
+  'settings.sessions.revokeAll': 'Sair de todos',
+  'settings.sessions.revoke': 'Encerrar',
+  'settings.sessions.current': 'Este aparelho',
+  'settings.sessions.console': 'Console',
+  'settings.sessions.unknownDevice': 'Navegador desconhecido',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'usada {when}',
+  'settings.sessions.since': 'desde {when}',
+  'settings.sessions.empty': 'Nenhuma sessão aberta.',
+  'settings.sessions.loadFailed': 'Não foi possível carregar as sessões.',
+  'settings.sessions.revoked': 'Sessão encerrada.',
+  'settings.sessions.revokedAll': 'Todas as sessões foram encerradas.',
+  'settings.sessions.revokeFailed': 'Não foi possível encerrar a sessão.',
+  'settings.sessions.confirmCurrent': 'Esta é a sessão deste aparelho. Encerrar leva você de volta ao login. Continuar?',
+  'settings.sessions.confirmAll': 'Encerrar TODAS as sessões desta conta, inclusive a deste aparelho? Você vai precisar entrar de novo em cada um.',
+  'audit.action.sessionRefreshReuse': 'Sessão encerrada por reuso do token de renovação',
 }
 
 export default ptBR

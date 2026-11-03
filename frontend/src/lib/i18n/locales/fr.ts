@@ -5942,6 +5942,25 @@ const fr: Dictionary = {
   'account.description': "Ce qui ne concerne que vous : les alertes de cet appareil et l’app installée.",
   'account.reached': "Par votre nom, en bas du menu",
   'account.open': "Ouvrir mon compte",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Sessions actives',
+  'settings.sessions.description': 'Les appareils sur lesquels ce compte est connecté. « Se déconnecter », dans le menu, ne ferme que cet appareil ; ici, vous pouvez fermer n’importe lequel, ou tous à la fois.',
+  'settings.sessions.revokeAll': 'Se déconnecter partout',
+  'settings.sessions.revoke': 'Fermer',
+  'settings.sessions.current': 'Cet appareil',
+  'settings.sessions.console': 'Console',
+  'settings.sessions.unknownDevice': 'Navigateur inconnu',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'utilisée {when}',
+  'settings.sessions.since': 'depuis {when}',
+  'settings.sessions.empty': 'Aucune session ouverte.',
+  'settings.sessions.loadFailed': 'Impossible de charger les sessions.',
+  'settings.sessions.revoked': 'Session fermée.',
+  'settings.sessions.revokedAll': 'Toutes les sessions ont été fermées.',
+  'settings.sessions.revokeFailed': 'Impossible de fermer la session.',
+  'settings.sessions.confirmCurrent': 'C’est la session de cet appareil. La fermer vous ramène à la connexion. Continuer ?',
+  'settings.sessions.confirmAll': 'Fermer TOUTES les sessions de ce compte, y compris celle de cet appareil ? Vous devrez vous reconnecter sur chacun.',
+  'audit.action.sessionRefreshReuse': 'Session fermée suite à la réutilisation du jeton de renouvellement',
 }
 
 export default fr

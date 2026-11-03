@@ -1481,5 +1481,10 @@ export default {
   'push.invoice.suspendedTitle': "Panneau suspendu",
   'push.invoice.suspendedBody': "Le panneau a été suspendu pour défaut de paiement. Payez pour le débloquer.",
   'push.newMessage.title': "Nouveau message WhatsApp",
-  'push.newMessage.body': "Un client a envoyé un message."
+  'push.newMessage.body': "Un client a envoyé un message.",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'Requête refusée : l’en-tête de sécurité du panneau est absent',
+  'auth.sessionNotFound': 'Session introuvable',
+  'auth.sessionRevoked': 'Session fermée',
+  'auth.sessionsRevokedAll': 'Toutes les sessions ont été fermées'
 };

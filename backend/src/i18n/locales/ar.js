@@ -1477,5 +1477,10 @@ export default {
   'push.invoice.suspendedTitle': "تم إيقاف اللوحة",
   'push.invoice.suspendedBody': "تم إيقاف اللوحة لعدم الدفع. ادفع لإعادة التفعيل.",
   'push.newMessage.title': "رسالة واتساب جديدة",
-  'push.newMessage.body': "أرسل أحد العملاء رسالة."
+  'push.newMessage.body': "أرسل أحد العملاء رسالة.",
+  // As sessões por aparelho (0129).
+  'auth.csrfHeaderRequired': 'تم رفض الطلب: ترويسة أمان اللوحة مفقودة',
+  'auth.sessionNotFound': 'الجلسة غير موجودة',
+  'auth.sessionRevoked': 'تم إنهاء الجلسة',
+  'auth.sessionsRevokedAll': 'تم إنهاء جميع الجلسات'
 };

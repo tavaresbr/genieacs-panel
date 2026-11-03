@@ -5950,6 +5950,25 @@ const ru: Dictionary = {
   'account.description': "То, что касается только вас: оповещения этого устройства и установленное приложение.",
   'account.reached': "Через ваше имя внизу меню",
   'account.open': "Открыть мою учётную запись",
+  // As sessões por aparelho (0129).
+  'settings.sessions.title': 'Активные сеансы',
+  'settings.sessions.description': 'Устройства, на которых выполнен вход в эту учётную запись. «Выйти» в меню завершает только это устройство; здесь можно завершить любое из них или все сразу.',
+  'settings.sessions.revokeAll': 'Выйти везде',
+  'settings.sessions.revoke': 'Завершить',
+  'settings.sessions.current': 'Это устройство',
+  'settings.sessions.console': 'Консоль',
+  'settings.sessions.unknownDevice': 'Неизвестный браузер',
+  'settings.sessions.ip': 'IP {ip}',
+  'settings.sessions.lastUsed': 'использован {when}',
+  'settings.sessions.since': 'с {when}',
+  'settings.sessions.empty': 'Открытых сеансов нет.',
+  'settings.sessions.loadFailed': 'Не удалось загрузить сеансы.',
+  'settings.sessions.revoked': 'Сеанс завершён.',
+  'settings.sessions.revokedAll': 'Все сеансы завершены.',
+  'settings.sessions.revokeFailed': 'Не удалось завершить сеанс.',
+  'settings.sessions.confirmCurrent': 'Это сеанс на этом устройстве. После завершения вы вернётесь на страницу входа. Продолжить?',
+  'settings.sessions.confirmAll': 'Завершить ВСЕ сеансы этой учётной записи, включая это устройство? Придётся снова войти на каждом из них.',
+  'audit.action.sessionRefreshReuse': 'Сеанс завершён из-за повторного использования токена обновления',
 }
 
 export default ru
