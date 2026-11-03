@@ -111,6 +111,7 @@ describe('criar o cliente do painel no Asaas', () => {
     assert.equal(post.payload.province, 'Centro');
     assert.equal(post.payload.email, 'maria@exemplo.test');
     assert.equal(post.payload.externalReference, `painel:${contatoKey}`);
+    assert.equal(post.payload.notificationDisabled, true, 'o cliente nasce sem as notificações do Asaas');
 
     const guardado = await dentro(() => AsaasCustomer.listByDocument(DOC));
     assert.equal(guardado.length, 1);
