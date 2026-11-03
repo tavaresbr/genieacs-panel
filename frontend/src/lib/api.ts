@@ -4244,6 +4244,22 @@ export const contactsAPI = {
       `/contacts/lookup/cep?cep=${encodeURIComponent(cep.replace(/\D/g, ''))}`
     ),
 
+  /** Relê no Asaas o cadastro e as cobranças deste cliente: "Consultar boletos" e "Atualizar". */
+  refreshAsaas: (key: string) =>
+    apiClient.post<{ customer: { asaasId: string; name: string | null }; charges: AsaasChargeView[]; refreshedAt: string }>(
+      `/contacts/${encodeURIComponent(key)}/asaas/refresh`, {}
+    ),
+
+  /** O Pix e a linha digitável de uma cobrança em aberto, lidos do Asaas na hora. */
+  asaasChargeCodes: (key: string, chargeId: string) =>
+    apiClient.get<{ digitableLine: string | null; pix: string | null; link: string | null }>(
+      `/contacts/${encodeURIComponent(key)}/asaas/charges/${encodeURIComponent(chargeId)}/codes`
+    ),
+
+  /** Uma cobrança nova no Asaas para este cliente (a escrita com dinheiro). */
+  createAsaasCharge: (key: string, data: { value: number; dueDate: string; billingType: 'UNDEFINED' | 'BOLETO' | 'PIX'; description?: string }) =>
+    apiClient.post<{ charge: AsaasChargeView }>(`/contacts/${encodeURIComponent(key)}/asaas/charges`, data),
+
   /** O cliente do contato criado (ou ligado, se já existia) na conta Asaas do provedor. */
   createInAsaas: (key: string) =>
     apiClient.post<{ created: boolean; customer: { asaasId: string; name: string | null } }>(
@@ -4323,6 +4339,8 @@ export const contactsAPI = {
       customer: { asaasId: string; name: string | null } | null
       /** "Criar no Asaas" pode aparecer: escrita permitida, documento válido e cliente ainda não existe lá. */
       canCreate: boolean
+      /** "Gerar nova cobrança" pode aparecer: o cliente está no Asaas e o provedor liberou a escrita de cobranças. */
+      canCharge: boolean
     }>(`/contacts/${encodeURIComponent(key)}/asaas-invoices`),
 
   /** The suggested WhatsApp text for one open invoice; nothing is sent. */
@@ -4376,7 +4394,8 @@ export interface ContactServiceStatus {
 }
 
 export interface ContactInvoiceMessage {
-  contract: string
+  /** Nulo para a fatura do Asaas, que não tem contrato no SGP. */
+  contract: string | null
   invoiceId: string
   phone: string | null
   text: string
@@ -4495,6 +4514,18 @@ export const focusChatAPI = {
 
 export type AsaasEnvironment = 'production' | 'sandbox'
 
+/** Uma cobrança do Asaas como a ficha a mostra. */
+export interface AsaasChargeView {
+  id: string
+  amount: number | null
+  dueDate: string | null
+  paymentDate: string | null
+  status: string | null
+  billingType: string | null
+  link: string | null
+  open: boolean
+}
+
 /** A conta Asaas do provedor. A chave da API nunca vem: só se ela existe. */
 export interface AsaasProviderConfig {
   enabled: boolean
@@ -4504,6 +4535,7 @@ export interface AsaasProviderConfig {
   importCharges: boolean
   botLookup: boolean
   allowWriteCustomers: boolean
+  allowWriteCharges: boolean
   billingEnabled: boolean
   webhookEnabled: boolean
   webhookTokenConfigured: boolean
@@ -4552,6 +4584,7 @@ export const asaasProviderAPI = {
     importCharges?: boolean
     botLookup?: boolean
     allowWriteCustomers?: boolean
+    allowWriteCharges?: boolean
     billingEnabled?: boolean
     webhookEnabled?: boolean
     syncEnabled?: boolean

@@ -722,6 +722,60 @@ export function cobrancaDe(item) {
 }
 
 /**
+ * Um cliente da conta pelo id — `GET /customers/{id}`. Só leitura: é como o
+ * painel relê o cadastro de UM cliente sem esperar a importação inteira.
+ */
+export async function getCustomer(customerId, credencial = null) {
+  const resposta = await chamar(`/customers/${idNoCaminho(customerId)}`, { method: 'GET', credencial });
+  if (!resposta?.id) throw new AsaasError('gateway answered without a customer', { code: 'bad_response' });
+  return clienteDe(resposta);
+}
+
+/**
+ * As cobranças de UM cliente, as mais recentes primeiro —
+ * `GET /payments?customer=&limit=`. Todos os status: é a "ficha de boletos" do
+ * cliente, e a paga ou cancelada também interessa a quem atende.
+ *
+ * @returns {Promise<Array<object>>}
+ */
+export async function listCustomerCharges(customerId, { limit = 30 } = {}, credencial = null) {
+  const consulta = new URLSearchParams({
+    customer: String(customerId),
+    limit: String(Math.min(MAX_PAGE_SIZE, Math.max(1, Number(limit) || 30)))
+  });
+  const resposta = await chamar(`/payments?${consulta}`, { method: 'GET', credencial });
+  return (Array.isArray(resposta?.data) ? resposta.data : [])
+    .filter((item) => item && item.id)
+    .map(cobrancaDe)
+    .filter((cobranca) => !cobranca.deleted);
+}
+
+/**
+ * Cria uma cobrança avulsa para um cliente da conta do PROVEDOR —
+ * `POST /payments`. Sem multa, juros nem desconto: esses termos são da conta
+ * (do que o provedor configurou no Asaas), e escolher por ele seria cobrar do
+ * assinante o que o dono da conta não decidiu.
+ *
+ * O valor entra em centavos e sai em reais, pelo ponto único de conversão.
+ */
+export async function createCustomerCharge(
+  { customerId, billingType = 'UNDEFINED', valueCents, dueDate, description, externalReference },
+  credencial = null
+) {
+  const payload = {
+    customer: String(customerId),
+    billingType,
+    value: paraReais(valueCents),
+    dueDate,
+    ...(description ? { description } : {}),
+    ...(externalReference ? { externalReference } : {})
+  };
+  const resposta = await chamar('/payments', { payload, credencial });
+  if (!resposta?.id) throw new AsaasError('gateway created a charge without an id', { code: 'bad_response' });
+  return cobrancaDe(resposta);
+}
+
+/**
  * Uma página de cobranças da conta — `GET /payments?status=&offset=&limit=`.
  * Um status por chamada: é como o gateway filtra. O valor sai em centavos,
  * pelo mesmo ponto único de conversão das cobranças.
@@ -940,7 +994,7 @@ export async function getTransfer(transferId) {
 
 export default {
   createCharge, chargeTermsFor, cancelCharge, getCharge, getPixQrCode, getIdentificationField, getPaymentCard, findChargesByReference, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
-  createCustomer, findCustomersByDocument, listCustomersPage, listChargesPage, testConnection, apiKey, baseUrl, AsaasError,
+  createCustomer, findCustomersByDocument, getCustomer, listCustomerCharges, createCustomerCharge, listCustomersPage, listChargesPage, testConnection, apiKey, baseUrl, AsaasError,
   createInvoice, authorizeInvoice, getInvoice, cancelInvoice, listInvoicesForPayment,
   createTransfer, getTransfer
 };
