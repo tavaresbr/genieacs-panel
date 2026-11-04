@@ -349,7 +349,8 @@ class WhatsAppMessageController {
         state: req.query?.state,
         noPhone: req.query?.noPhone === 'true',
         imported: req.query?.imported === 'true',
-        device: String(req.query?.device ?? '')
+        device: String(req.query?.device ?? ''),
+        asaas: req.query?.asaas === 'true'
       });
       return res.json(createResponse(
         req.t('whatsapp.contactsLoaded', { count: data.contacts.length }),

@@ -11,6 +11,9 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaBillingService from './waBillingService.js';
 import WaConversationService from './waConversationService.js';
+import AsaasCustomer from '../models/AsaasCustomer.js';
+import AsaasProviderService from './asaasProviderService.js';
+import { normalizeTaxId } from '../utils/taxId.js';
 import { tdb } from '../config/database.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
@@ -72,15 +75,15 @@ function maskDocument(document) {
 const DEVICE_FILTERS = ['with', 'without'];
 
 class WaContactService {
-  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false, device = '' } = {}) {
+  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
     const everyone = await this.gather({ search });
-    const subscribers = this.narrow(everyone, { state, noPhone, imported, device });
+    const subscribers = this.narrow(everyone, { state, noPhone, imported, device, asaas });
     const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
     return {
       total: subscribers.length,
-      counts: this.counts(everyone, { state, noPhone, imported, device }),
+      counts: this.counts(everyone, { state, noPhone, imported, device, asaas }),
       contacts: await this.decorate(page)
     };
   }
@@ -97,9 +100,12 @@ class WaContactService {
    * WhatsApp's phone book or a spreadsheet), which no SGP row backs.
    *
    * `device` is `with` or `without` a managed ONT linked to the contract.
+   *
+   * `asaas` keeps only the clients whose CPF/CNPJ is also a client of the
+   * provider's Asaas account (what the last import brought).
    */
-  static async collect({ search = '', state = '', noPhone = false, imported = false, device = '' } = {}) {
-    return this.narrow(await this.gather({ search }), { state, noPhone, imported, device });
+  static async collect({ search = '', state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
+    return this.narrow(await this.gather({ search }), { state, noPhone, imported, device, asaas });
   }
 
   /**
@@ -126,21 +132,42 @@ class WaContactService {
       .filter((row) => !row.contract || !known.has(String(row.contract)))
       .map((row) => this.subscriberFromContact(row));
 
-    return [...withDevice, ...withoutDevice]
+    const everyone = [...withDevice, ...withoutDevice]
       .sort((a, b) => (
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
     ));
+    return this.markAsaas(everyone);
+  }
+
+  /**
+   * Marca quem também é cliente da conta Asaas do provedor, pelo CPF/CNPJ.
+   *
+   * Uma leitura só (os documentos dos clientes do Asaas que a importação trouxe),
+   * e não uma por assinante: a lista passa por milhares. Sem a integração
+   * ligada nada é marcado e `asaasConnected` fica falso — o filtro some da tela.
+   */
+  static async markAsaas(everyone) {
+    const config = await AsaasProviderService.getConfig();
+    if (!AsaasProviderService.isReady(config)) {
+      return everyone.map((subscriber) => ({ ...subscriber, inAsaas: false, asaasConnected: false }));
+    }
+    const documents = await AsaasCustomer.activeDocuments();
+    return everyone.map((subscriber) => {
+      const document = normalizeTaxId(subscriber.document);
+      return { ...subscriber, inAsaas: Boolean(document) && documents.has(document), asaasConnected: true };
+    });
   }
 
   /** The state, phone and origin filters, applied to what `gather` returned. */
-  static narrow(everyone, { state = '', noPhone = false, imported = false, device = '' } = {}) {
+  static narrow(everyone, { state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
     const wanted = CONTACT_STATES.includes(state) ? state : null;
     const linked = DEVICE_FILTERS.includes(device) ? device : null;
     return everyone
       .filter((subscriber) => !wanted || subscriber.state === wanted)
       .filter((subscriber) => !noPhone || !subscriber.phone)
       .filter((subscriber) => !imported || subscriber.importSource)
+      .filter((subscriber) => !asaas || subscriber.inAsaas)
       .filter((subscriber) => !linked || (linked === 'with') === Boolean(subscriber.deviceId));
   }
 
@@ -150,21 +177,25 @@ class WaContactService {
    * toggles, each toggle counts under the current tab — so the number on the
    * active filter is always the list's own total.
    */
-  static counts(everyone, { state = '', noPhone = false, imported = false, device = '' } = {}) {
+  static counts(everyone, { state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
     const size = (filters) => this.narrow(everyone, filters).length;
     const tab = CONTACT_STATES.includes(state) ? state : '';
     return {
       states: {
-        all: size({ noPhone, imported, device }),
-        active: size({ state: 'active', noPhone, imported, device }),
-        blocked: size({ state: 'blocked', noPhone, imported, device }),
-        cancelled: size({ state: 'cancelled', noPhone, imported, device }),
-        none: size({ state: 'none', noPhone, imported, device })
+        all: size({ noPhone, imported, device, asaas }),
+        active: size({ state: 'active', noPhone, imported, device, asaas }),
+        blocked: size({ state: 'blocked', noPhone, imported, device, asaas }),
+        cancelled: size({ state: 'cancelled', noPhone, imported, device, asaas }),
+        none: size({ state: 'none', noPhone, imported, device, asaas })
       },
-      noPhone: size({ state: tab, noPhone: true, imported, device }),
-      imported: size({ state: tab, noPhone, imported: true, device }),
-      withDevice: size({ state: tab, noPhone, imported, device: 'with' }),
-      withoutDevice: size({ state: tab, noPhone, imported, device: 'without' })
+      noPhone: size({ state: tab, noPhone: true, imported, device, asaas }),
+      imported: size({ state: tab, noPhone, imported: true, device, asaas }),
+      withDevice: size({ state: tab, noPhone, imported, device: 'with', asaas }),
+      withoutDevice: size({ state: tab, noPhone, imported, device: 'without', asaas }),
+      // `null` quando a integração com o Asaas não está ligada: a tela esconde o filtro.
+      asaas: everyone.some((subscriber) => subscriber.asaasConnected)
+        ? size({ state: tab, noPhone, imported, device, asaas: true })
+        : null
     };
   }
 
@@ -402,6 +433,7 @@ class WaContactService {
         state: subscriber.state || 'unknown',
         lastSeenAt: subscriber.lastSeenAt || null,
         importSource: subscriber.importSource || null,
+        inAsaas: subscriber.inAsaas === true,
         clientName: subscriber.clientName,
         document: maskDocument(subscriber.document),
         deviceId: subscriber.deviceId,

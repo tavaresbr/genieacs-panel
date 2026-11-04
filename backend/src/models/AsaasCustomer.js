@@ -53,6 +53,12 @@ class AsaasCustomer {
     return tdb('asaas_customers').where({ document: digits, deleted: false }).orderBy('id');
   }
 
+  /** Os CPF/CNPJ (só dígitos) dos clientes do Asaas não removidos: uma leitura para marcar a lista inteira. */
+  static async activeDocuments() {
+    const rows = await tdb('asaas_customers').where({ deleted: false }).whereNotNull('document').distinct('document');
+    return new Set(rows.map((row) => String(row.document)));
+  }
+
   static async count() {
     const [row] = await tdb('asaas_customers').where({ deleted: false }).count({ n: '*' });
     return Number(row?.n ?? 0);

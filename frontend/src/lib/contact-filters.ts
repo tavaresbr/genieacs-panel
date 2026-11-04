@@ -7,6 +7,8 @@ export interface ContactFilters {
   noPhone: boolean
   imported: boolean
   device: ContactDeviceFilter
+  /** Só quem também é cliente do Asaas. */
+  asaas: boolean
 }
 
 /** Where the Contacts menu entry keeps them; cleared with the rest of the session. */
@@ -27,7 +29,8 @@ export function loadContactFilters(key: string, fallback: ContactFilters): Conta
       state: STATES.find((s) => s === saved.state) ?? fallback.state,
       noPhone: typeof saved.noPhone === 'boolean' ? saved.noPhone : fallback.noPhone,
       imported: typeof saved.imported === 'boolean' ? saved.imported : fallback.imported,
-      device: DEVICES.find((d) => d === saved.device) ?? fallback.device
+      device: DEVICES.find((d) => d === saved.device) ?? fallback.device,
+      asaas: typeof saved.asaas === 'boolean' ? saved.asaas : fallback.asaas
     }
   } catch {
     return fallback

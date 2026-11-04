@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CONTACTS_FILTERS_KEY, loadContactFilters, saveContactFilters, type ContactFilters } from '@/lib/contact-filters'
 import { clearSessionScopedStorage } from '@/lib/session-owner'
 
-const fallback: ContactFilters = { search: '', state: 'active', noPhone: false, imported: false, device: '' }
+const fallback: ContactFilters = { search: '', state: 'active', noPhone: false, imported: false, device: '', asaas: false }
 
 function stubStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial))
@@ -19,7 +19,7 @@ describe('contact filters', () => {
 
   it('round-trips what was saved', () => {
     stubStorage()
-    const chosen: ContactFilters = { search: 'ana', state: 'none', noPhone: true, imported: false, device: 'without' }
+    const chosen: ContactFilters = { search: 'ana', state: 'none', noPhone: true, imported: false, device: 'without', asaas: true }
     saveContactFilters(CONTACTS_FILTERS_KEY, chosen)
     expect(loadContactFilters(CONTACTS_FILTERS_KEY, fallback)).toEqual(chosen)
   })
