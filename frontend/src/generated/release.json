@@ -1,15 +1,27 @@
 {
-  "version": "1.28.1",
-  "build": 1530,
-  "sourceCommit": "dcf8106ae062",
+  "version": "1.28.2",
+  "build": 1536,
+  "sourceCommit": "14dcaaed8c16",
   "releasedAt": "2026-11-04",
-  "basedOnTag": "v1.28.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/324a4d42655d...dcf8106ae062",
+  "basedOnTag": "v1.28.1",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/e30c0a1d84d2...14dcaaed8c16",
   "changes": [
     {
-      "shortHash": "52b9565e",
+      "shortHash": "c18cc3bb",
       "date": "2026-11-04",
-      "title": "Filtro Cliente Asaas",
+      "title": "Faixa de quem espera: 'Ver' lista só as conversas que esperam, com chip Esperando",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9ce2c3a7",
+      "date": "2026-11-04",
+      "title": "Tornar um telefone o principal (vira o WhatsApp)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4d5bf090",
+      "date": "2026-11-04",
+      "title": "Telefones não quebram palavras na ficha",
       "category": "Maintenance"
     }
   ]

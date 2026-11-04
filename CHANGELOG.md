@@ -7,6 +7,16 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.2] - 2026-11-04
+
+### Maintenance
+
+- Faixa de quem espera: 'Ver' lista só as conversas que esperam, com chip Esperando (`c18cc3bb`)
+- Tornar um telefone o principal (vira o WhatsApp) (`9ce2c3a7`)
+- Telefones não quebram palavras na ficha (`4d5bf090`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/e30c0a1d84d2...14dcaaed8c16)
+
 ## [1.28.1] - 2026-11-04
 
 ### Maintenance
