@@ -1,15 +1,15 @@
 {
-  "version": "1.27.0",
-  "build": 1524,
-  "sourceCommit": "dbffd49b4384",
-  "releasedAt": "2026-11-03",
-  "basedOnTag": "v1.26.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/6c71a61a98cb...dbffd49b4384",
+  "version": "1.28.0",
+  "build": 1527,
+  "sourceCommit": "b450597a771c",
+  "releasedAt": "2026-11-04",
+  "basedOnTag": "v1.27.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/186d7a265415...b450597a771c",
   "changes": [
     {
-      "shortHash": "4eeae3f1",
+      "shortHash": "323f7572",
       "date": "2026-11-03",
-      "title": "Cliente criado pelo painel nasce sem notificações do Asaas",
+      "title": "Botões do Asaas na ficha do cliente",
       "category": "New"
     }
   ]
