@@ -3102,6 +3102,7 @@ const hi: Dictionary = {
   'whatsapp.waiting.oldest': 'सबसे पुरानी: {minutes} मिनट',
   'whatsapp.waiting.yours': '{count} आपके या बिना एजेंट',
   'whatsapp.waiting.show': 'देखें',
+  'whatsapp.waiting.filterChip': "प्रतीक्षा में",
   'whatsapp.notify.button': 'सूचनाएँ',
   'whatsapp.notify.on': 'अलर्ट चालू',
   'whatsapp.notify.off': 'अलर्ट',

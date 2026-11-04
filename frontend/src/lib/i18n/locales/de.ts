@@ -3004,6 +3004,7 @@ const de: Dictionary = {
   'whatsapp.waiting.oldest': 'am längsten: {minutes} Min.',
   'whatsapp.waiting.yours': '{count} Ihre oder nicht zugewiesen',
   'whatsapp.waiting.show': 'Anzeigen',
+  'whatsapp.waiting.filterChip': "Wartend",
   'whatsapp.notify.button': 'Benachrichtigungen',
   'whatsapp.notify.on': 'Hinweise an',
   'whatsapp.notify.off': 'Hinweise',

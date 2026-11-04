@@ -2917,6 +2917,7 @@ const ja: Dictionary = {
   'whatsapp.waiting.oldest': '最長：{minutes}分',
   'whatsapp.waiting.yours': 'あなたの担当または担当者なし：{count}件',
   'whatsapp.waiting.show': '表示',
+  'whatsapp.waiting.filterChip': "返信待ち",
   'whatsapp.notify.button': '通知',
   'whatsapp.notify.on': '通知オン',
   'whatsapp.notify.off': '通知',

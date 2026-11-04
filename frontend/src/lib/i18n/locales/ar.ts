@@ -3102,6 +3102,7 @@ const ar: Dictionary = {
   'whatsapp.waiting.oldest': 'الأقدم: {minutes} دقيقة',
   'whatsapp.waiting.yours': '{count} لك أو بلا موظف',
   'whatsapp.waiting.show': 'عرض',
+  'whatsapp.waiting.filterChip': "بانتظار الرد",
   'whatsapp.notify.button': 'الإشعارات',
   'whatsapp.notify.on': 'التنبيهات مفعّلة',
   'whatsapp.notify.off': 'التنبيهات',

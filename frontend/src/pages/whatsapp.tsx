@@ -237,6 +237,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   const [status, setStatus] = useState<ConversationStatus>('open')
   const [assignee, setAssignee] = useState<AssigneeFilter>('all')
   const [tagFilter, setTagFilter] = useState<number | null>(null)
+  // "Ver" na faixa de quem espera: só as conversas que passaram do limite, as mais antigas primeiro.
+  const [onlyWaiting, setOnlyWaiting] = useState(false)
   // A mensagem que a próxima resposta cita, e a que está sendo encaminhada.
   const [replyTo, setReplyTo] = useState<WhatsAppMessage | null>(null)
   const replyToRef = useRef<WhatsAppMessage | null>(null)
@@ -248,6 +250,14 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   const waitingMap = useMemo(
     () => new Map((waitingReport?.items ?? []).map((item) => [item.conversationId, item.minutes])),
     [waitingReport]
+  )
+  const shownConversations = useMemo(
+    () => (onlyWaiting
+      ? conversations
+        .filter((row) => waitingMap.has(row.id))
+        .sort((a, b) => (waitingMap.get(b.id) ?? 0) - (waitingMap.get(a.id) ?? 0))
+      : conversations),
+    [conversations, onlyWaiting, waitingMap]
   )
 
   const [loadingList, setLoadingList] = useState(true)
@@ -1057,24 +1067,40 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
               </div>
               <WaitingBanner
                 report={waitingReport}
-                onShow={(filtro) => {
+                onShow={() => {
                   setStatus('open')
-                  setAssignee(filtro)
+                  setAssignee('all')
+                  setTagFilter(null)
+                  setOnlyWaiting(true)
                 }}
               />
+              {onlyWaiting && (
+                <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+                  <button
+                    type="button"
+                    className="inline-flex min-h-7 items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 text-xs font-medium text-primary"
+                    title={t('whatsapp.inbox.clearFilter')}
+                    aria-label={`${t('whatsapp.inbox.clearFilter')}: ${t('whatsapp.waiting.filterChip')}`}
+                    onClick={() => setOnlyWaiting(false)}
+                  >
+                    <span className="truncate">{t('whatsapp.waiting.filterChip')}</span>
+                    <Icon name="x" size={12} className="shrink-0" />
+                  </button>
+                </div>
+              )}
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {loadingList
                   ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
                   : (
                     <ConversationList
-                      conversations={conversations}
+                      conversations={shownConversations}
                       accounts={accounts}
                       selectedId={selectedId}
                       onSelect={select}
                       // An empty list under a search term is a different fact
                       // from an empty inbox, and only one of the two is worth
                       // clearing the box for.
-                      filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null}
+                      filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null || onlyWaiting}
                       waiting={waitingMap}
                       canOpenSgp={canSeeSgp}
                     />

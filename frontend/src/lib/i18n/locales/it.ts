@@ -3127,6 +3127,7 @@ const it: Dictionary = {
   'whatsapp.waiting.oldest': 'la più vecchia: {minutes} min',
   'whatsapp.waiting.yours': '{count} tue o senza operatore',
   'whatsapp.waiting.show': 'Mostra',
+  'whatsapp.waiting.filterChip': "In attesa",
   'whatsapp.notify.button': 'Notifiche',
   'whatsapp.notify.on': 'Avvisi attivi',
   'whatsapp.notify.off': 'Avvisi',
