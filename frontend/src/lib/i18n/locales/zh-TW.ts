@@ -3119,6 +3119,7 @@ const zhTW: Dictionary = {
   'whatsapp.waiting.oldest': '最久：{minutes} 分鐘',
   'whatsapp.waiting.yours': '{count} 個屬於你或未指派',
   'whatsapp.waiting.show': '查看',
+  'whatsapp.waiting.filterChip': "等待中",
   'whatsapp.notify.button': '通知',
   'whatsapp.notify.on': '提醒已開啟',
   'whatsapp.notify.off': '提醒',

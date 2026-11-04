@@ -3127,6 +3127,7 @@ const ru: Dictionary = {
   'whatsapp.waiting.oldest': 'дольше всех: {minutes} мин.',
   'whatsapp.waiting.yours': 'ваших или без оператора: {count}',
   'whatsapp.waiting.show': 'Показать',
+  'whatsapp.waiting.filterChip': "Ожидают",
   'whatsapp.notify.button': 'Уведомления',
   'whatsapp.notify.on': 'Оповещения вкл.',
   'whatsapp.notify.off': 'Оповещения',

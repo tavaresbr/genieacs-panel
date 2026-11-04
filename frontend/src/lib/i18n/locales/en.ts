@@ -3121,6 +3121,7 @@ const en = {
   'whatsapp.waiting.oldest': 'oldest: {minutes} min',
   'whatsapp.waiting.yours': '{count} yours or unassigned',
   'whatsapp.waiting.show': 'Show',
+  'whatsapp.waiting.filterChip': "Waiting",
   'whatsapp.notify.button': 'Notifications',
   'whatsapp.notify.on': 'Alerts on',
   'whatsapp.notify.off': 'Alerts',

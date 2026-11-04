@@ -3119,6 +3119,7 @@ const ptBR: Dictionary = {
   'whatsapp.waiting.oldest': 'a mais antiga: {minutes} min',
   'whatsapp.waiting.yours': '{count} com você ou sem atendente',
   'whatsapp.waiting.show': 'Ver',
+  'whatsapp.waiting.filterChip': "Esperando",
   'whatsapp.notify.button': 'Notificações',
   'whatsapp.notify.on': 'Avisos ligados',
   'whatsapp.notify.off': 'Avisos',

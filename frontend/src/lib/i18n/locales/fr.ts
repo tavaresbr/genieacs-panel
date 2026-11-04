@@ -2828,6 +2828,7 @@ const fr: Dictionary = {
   'whatsapp.waiting.oldest': 'la plus ancienne : {minutes} min',
   'whatsapp.waiting.yours': '{count} à vous ou sans conseiller',
   'whatsapp.waiting.show': 'Voir',
+  'whatsapp.waiting.filterChip': "En attente",
   'whatsapp.notify.button': 'Notifications',
   'whatsapp.notify.on': 'Alertes activées',
   'whatsapp.notify.off': 'Alertes',

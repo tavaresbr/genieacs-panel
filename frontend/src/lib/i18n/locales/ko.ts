@@ -3124,6 +3124,7 @@ const ko: Dictionary = {
   'whatsapp.waiting.oldest': '가장 오래된 대기: {minutes}분',
   'whatsapp.waiting.yours': '내 담당 또는 미배정 {count}건',
   'whatsapp.waiting.show': '보기',
+  'whatsapp.waiting.filterChip': "대기 중",
   'whatsapp.notify.button': '알림',
   'whatsapp.notify.on': '알림 켜짐',
   'whatsapp.notify.off': '알림',

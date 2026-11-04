@@ -3119,6 +3119,7 @@ const es: Dictionary = {
   'whatsapp.waiting.oldest': 'la más antigua: {minutes} min',
   'whatsapp.waiting.yours': '{count} suyos o sin agente',
   'whatsapp.waiting.show': 'Ver',
+  'whatsapp.waiting.filterChip': "Esperando",
   'whatsapp.notify.button': 'Notificaciones',
   'whatsapp.notify.on': 'Avisos activados',
   'whatsapp.notify.off': 'Avisos',

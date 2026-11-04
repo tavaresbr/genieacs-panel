@@ -11,8 +11,8 @@ const POLL_MS = 60_000
 /**
  * Quem espera gente há mais que o limite da regra "Cliente esperando" —
  * lido a cada minuto com a aba à vista. A página usa o mapa para o selo das
- * linhas e esta faixa para o resumo, com o atalho para as conversas de quem
- * está olhando (as suas e as sem atendente).
+ * linhas e esta faixa para o resumo, com o atalho que lista só as conversas
+ * que esperam (de qualquer atendente), as mais antigas primeiro.
  */
 export function useWaiting() {
   const [report, setReport] = useState<WaitingReport | null>(null)
@@ -40,9 +40,8 @@ export function useWaiting() {
 
 export function WaitingBanner({ report, onShow }: {
   report: WaitingReport | null
-  /** Mostra as conversas: as minhas, ou as sem atendente se nenhuma é minha,
-   *  ou todas as abertas quando ninguém espera com você. */
-  onShow: (filter: 'me' | 'unassigned' | 'all') => void
+  /** Mostra só as conversas que esperam, de qualquer atendente. */
+  onShow: () => void
 }) {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -55,7 +54,7 @@ export function WaitingBanner({ report, onShow }: {
     <button
       type="button"
       className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 border-b border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 px-3 py-2 text-start text-xs text-foreground transition-colors hover:bg-[hsl(var(--status-warning))]/20"
-      onClick={() => onShow(minhas > 0 ? 'me' : semDono > 0 ? 'unassigned' : 'all')}
+      onClick={onShow}
     >
       <Icon name="warning" size={14} className="shrink-0 text-[hsl(var(--status-warning))]" />
       <span className="font-semibold">
