@@ -403,14 +403,14 @@ export default function ContactDetailPage() {
                 {fields.phones.value.length > 0 && (
                   <ul className="space-y-1">
                     {fields.phones.value.map((phone) => (
-                      <li key={phone} className="flex items-center gap-2">
-                        {phoneText(phone)}
+                      <li key={phone} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="whitespace-nowrap">{phoneText(phone)}</span>
                         {phoneKey(phone) === phoneKey(profile.whatsappPhone)
-                          ? <span className="modern-badge-info">{t('contacts.profile.mainPhone')}</span>
+                          ? <span className="modern-badge-info whitespace-nowrap">{t('contacts.profile.mainPhone')}</span>
                           : canEdit && (
                             <button
                               type="button"
-                              className="text-xs text-primary hover:underline max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
+                              className="text-xs text-primary hover:underline whitespace-nowrap max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
                               title={t('contacts.profile.makeMainPhone')}
                               aria-label={`${t('contacts.profile.makeMainPhone')} ${phoneText(phone)}`}
                               onClick={() => makeMainPhone(phone)}
@@ -421,7 +421,7 @@ export default function ContactDetailPage() {
                         {can('whatsapp.send') && (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
+                            className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-primary hover:underline disabled:opacity-50 max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
                             disabled={opening}
                             title={t('contacts.profile.chatThisNumber')}
                             aria-label={`${t('contacts.profile.chatThisNumber')} ${phoneText(phone)}`}
