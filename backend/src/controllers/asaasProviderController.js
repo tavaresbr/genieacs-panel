@@ -38,6 +38,7 @@ class AsaasProviderController {
         importCharges: body.importCharges,
         botLookup: body.botLookup,
         allowWriteCustomers: body.allowWriteCustomers,
+        allowWriteCharges: body.allowWriteCharges,
         webhookEnabled: body.webhookEnabled,
         billingEnabled: body.billingEnabled,
         syncEnabled: body.syncEnabled,

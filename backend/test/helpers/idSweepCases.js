@@ -783,6 +783,34 @@ export const casos = [
     tabela: 'sgp_links',
     coluna: 'contract'
   },
+  // Os botões do Asaas na ficha: o contato é procurado ANTES de olhar a
+  // integração, então a chave do vizinho dá 404; no controle a rota passa da
+  // ficha e para na integração que não está ligada (409).
+  {
+    chave: 'sgpContract',
+    label: 'POST /api/contacts/:key/asaas/refresh',
+    method: 'POST',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/asaas/refresh`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  {
+    chave: 'sgpContract',
+    label: 'GET /api/contacts/:key/asaas/charges/:chargeId/codes',
+    method: 'GET',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/asaas/charges/pay_varredura/codes`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  {
+    chave: 'sgpContract',
+    label: 'POST /api/contacts/:key/asaas/charges',
+    method: 'POST',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/asaas/charges`,
+    body: { value: 10, dueDate: '2099-01-01', billingType: 'BOLETO' },
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
   // "Receber": a ficha é procurada antes de tudo, então a chave do vizinho dá
   // 404; no controle a rota passa da ficha e para na baixa não configurada.
   {

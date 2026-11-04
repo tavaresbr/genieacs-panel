@@ -65,6 +65,41 @@ class ContactController {
     }
   }
 
+  /** `POST /api/contacts/:key/asaas/refresh` — relê no Asaas o cadastro e as cobranças deste cliente. */
+  static async refreshAsaas(req, res) {
+    try {
+      return res.json(createResponse(req.t('contacts.asaasRefreshed'), await AsaasProviderCustomerService.refresh(req.params.key)));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.loadFailed');
+    }
+  }
+
+  /** `GET /api/contacts/:key/asaas/charges/:chargeId/codes` — Pix e linha digitável, lidos do Asaas na hora. */
+  static async asaasChargeCodes(req, res) {
+    try {
+      return res.json(createResponse(req.t('contacts.loaded'), await AsaasProviderCustomerService.codes(req.params.key, req.params.chargeId)));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.loadFailed');
+    }
+  }
+
+  /** `POST /api/contacts/:key/asaas/charges` — uma cobrança nova no Asaas para este cliente. */
+  static async createAsaasCharge(req, res) {
+    try {
+      const result = await AsaasProviderCustomerService.createCharge(req.params.key, req.body ?? {});
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_UPDATED,
+        subjectType: 'contact',
+        subjectId: req.params.key,
+        // Qual cobrança e como — nunca o que foi digitado.
+        detail: { asaas: true, asaasChargeId: result.charge.id, billingType: result.charge.billingType }
+      });
+      return res.status(201).json(createResponse(req.t('contacts.chargeCreatedInAsaas'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.saveFailed');
+    }
+  }
+
   /** `POST /api/contacts/:key/asaas` — o cliente do contato criado (ou ligado) na conta Asaas do provedor. */
   static async createInAsaas(req, res) {
     try {

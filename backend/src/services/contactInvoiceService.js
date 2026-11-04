@@ -1,5 +1,8 @@
 import ContactProfileService, { ContactProfileError } from './contactProfileService.js';
 import SgpService from './sgpService.js';
+import AsaasCharge from '../models/AsaasCharge.js';
+import AsaasInvoiceService from './asaasInvoiceService.js';
+import { normalizeTaxId } from '../utils/taxId.js';
 import WaContactService from './waContactService.js';
 import WaSendService from './waSendService.js';
 import { translateError } from '../i18n/index.js';
@@ -37,6 +40,11 @@ class ContactInvoiceService {
     if (!wanted) throw notFound();
     const profile = await ContactProfileService.get(key);
     if (!profile) throw new ContactProfileError('contacts.error.notFound', { code: 'not_found', status: 404 });
+    // Uma fatura da conta Asaas deste cliente (casada pelo CPF/CNPJ): sem contrato
+    // no SGP, e com o Pix e a linha digitável lidos do Asaas AGORA — se ela já
+    // foi paga lá, não se manda boleto de quem pagou.
+    const asaas = await this.findAsaas(profile, wanted);
+    if (asaas) return asaas;
     for (const contract of profile.contracts) {
       // eslint-disable-next-line no-await-in-loop -- few contracts per client, and the SGP answers one at a time
       const { invoices } = await SgpService.listInvoices({ contract: contract.contract, onlyOpen: true });
@@ -44,6 +52,17 @@ class ContactInvoiceService {
       if (invoice) return { profile, contract: contract.contract, invoice };
     }
     throw notFound();
+  }
+
+  /** A fatura do Asaas de ESTE cliente com este id, pronta para mandar, ou `null` se o id não é do Asaas. */
+  static async findAsaas(profile, wanted) {
+    const document = normalizeTaxId(profile.fields?.document?.value);
+    if (!document || !wanted.startsWith('pay_')) return null;
+    const row = await AsaasCharge.getByAsaasId(wanted);
+    if (!row || row.deleted || row.document !== document) return null;
+    const invoice = await AsaasInvoiceService.completeForBot(AsaasInvoiceService.toInvoice(row));
+    if (!invoice) throw notFound();
+    return { profile, contract: null, invoice };
   }
 
   /** The suggested text, one line per field the SGP sent and none for what it did not. */
@@ -54,11 +73,17 @@ class ContactInvoiceService {
     const firstName = first ? first.charAt(0).toLocaleUpperCase('pt-BR') + first.slice(1).toLocaleLowerCase('pt-BR') : '';
     const lines = [
       firstName ? t('contacts.invoiceMessage.greeting', { name: firstName }) : t('contacts.invoiceMessage.greetingNoName'),
-      t('contacts.invoiceMessage.intro', {
-        amount: brl(invoice.amount) ?? '—',
-        date: brDate(invoice.dueDate) ?? '—',
-        contract
-      })
+      // Fatura do Asaas não tem contrato: a frase não cita um.
+      contract
+        ? t('contacts.invoiceMessage.intro', {
+          amount: brl(invoice.amount) ?? '—',
+          date: brDate(invoice.dueDate) ?? '—',
+          contract
+        })
+        : t('contacts.invoiceMessage.introNoContract', {
+          amount: brl(invoice.amount) ?? '—',
+          date: brDate(invoice.dueDate) ?? '—'
+        })
     ];
     if (invoice.digitableLine) lines.push('', t('contacts.invoiceMessage.line'), invoice.digitableLine);
     if (invoice.pix) lines.push('', t('contacts.invoiceMessage.pix'), invoice.pix);

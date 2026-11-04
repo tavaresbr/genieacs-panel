@@ -149,6 +149,31 @@ router.post(
   asaasAdminLimiter,
   ContactController.createInAsaas
 );
+// Ler do Asaas o que é DESTE cliente: "Consultar boletos" e "Atualizar". O
+// plantão pode (é leitura do Asaas, escrita só na cópia do painel); a cobrança
+// nova é a única escrita, e essa pede `asaas.act`.
+router.post(
+  '/:key/asaas/refresh',
+  authenticateToken,
+  requirePermission('contacts.read'),
+  asaasAdminLimiter,
+  ContactController.refreshAsaas
+);
+router.get(
+  '/:key/asaas/charges/:chargeId/codes',
+  authenticateToken,
+  requirePermission('contacts.read'),
+  asaasAdminLimiter,
+  ContactController.asaasChargeCodes
+);
+router.post(
+  '/:key/asaas/charges',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('asaas.act'),
+  asaasAdminLimiter,
+  ContactController.createAsaasCharge
+);
 // Lê o banco (a última importação do Asaas), não o gateway: sem limitador de SGP.
 router.get(
   '/:key/asaas-invoices',
