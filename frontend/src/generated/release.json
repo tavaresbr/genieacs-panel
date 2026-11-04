@@ -1,16 +1,16 @@
 {
-  "version": "1.28.0",
-  "build": 1527,
-  "sourceCommit": "b450597a771c",
+  "version": "1.28.1",
+  "build": 1530,
+  "sourceCommit": "dcf8106ae062",
   "releasedAt": "2026-11-04",
-  "basedOnTag": "v1.27.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/186d7a265415...b450597a771c",
+  "basedOnTag": "v1.28.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/324a4d42655d...dcf8106ae062",
   "changes": [
     {
-      "shortHash": "323f7572",
-      "date": "2026-11-03",
-      "title": "Botões do Asaas na ficha do cliente",
-      "category": "New"
+      "shortHash": "52b9565e",
+      "date": "2026-11-04",
+      "title": "Filtro Cliente Asaas",
+      "category": "Maintenance"
     }
   ]
 }

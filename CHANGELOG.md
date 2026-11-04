@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.1] - 2026-11-04
+
+### Maintenance
+
+- Filtro Cliente Asaas (`52b9565e`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/324a4d42655d...dcf8106ae062)
+
 ## [1.28.0] - 2026-11-04
 
 ### New
