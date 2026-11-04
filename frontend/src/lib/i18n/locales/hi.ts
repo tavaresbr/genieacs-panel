@@ -144,6 +144,8 @@ const hi: Dictionary = {
   'contacts.profile.copyLine': 'भुगतान लाइन',
   'contacts.profile.chat': 'चैट',
   'contacts.profile.chatThisNumber': 'इस नंबर से WhatsApp बातचीत खोलें',
+  'contacts.profile.makeMainPhone': 'मुख्य बनाएँ (WhatsApp नंबर बन जाएगा)',
+  'contacts.profile.mainPhone': 'मुख्य',
   'contacts.profile.addPhone': 'फ़ोन जोड़ें',
   'contacts.profile.extraAddresses': 'अन्य पते',
   'contacts.profile.extraAddressN': 'पता {n}',

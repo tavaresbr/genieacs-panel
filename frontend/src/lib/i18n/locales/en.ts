@@ -146,6 +146,8 @@ const en = {
   'contacts.profile.copyLine': 'Payment line',
   'contacts.profile.chat': 'Chat',
   'contacts.profile.chatThisNumber': 'Open a WhatsApp conversation with this number',
+  'contacts.profile.makeMainPhone': 'Make main (becomes the WhatsApp number)',
+  'contacts.profile.mainPhone': 'Main',
   'contacts.profile.addPhone': 'Add phone',
   'contacts.profile.extraAddresses': 'Other addresses',
   'contacts.profile.extraAddressN': 'Address {n}',

@@ -144,6 +144,8 @@ const ru: Dictionary = {
   'contacts.profile.copyLine': 'Строка оплаты',
   'contacts.profile.chat': 'Написать',
   'contacts.profile.chatThisNumber': 'Открыть диалог WhatsApp с этим номером',
+  'contacts.profile.makeMainPhone': 'Сделать основным (станет номером WhatsApp)',
+  'contacts.profile.mainPhone': 'Основной',
   'contacts.profile.addPhone': 'Добавить телефон',
   'contacts.profile.extraAddresses': 'Другие адреса',
   'contacts.profile.extraAddressN': 'Адрес {n}',

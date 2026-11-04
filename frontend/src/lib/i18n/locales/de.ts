@@ -144,6 +144,8 @@ const de: Dictionary = {
   'contacts.profile.copyLine': 'Zahlungszeile',
   'contacts.profile.chat': 'Chatten',
   'contacts.profile.chatThisNumber': 'WhatsApp-Unterhaltung mit dieser Nummer öffnen',
+  'contacts.profile.makeMainPhone': 'Als Hauptnummer festlegen (wird zur WhatsApp-Nummer)',
+  'contacts.profile.mainPhone': 'Hauptnummer',
   'contacts.profile.addPhone': 'Telefon hinzufügen',
   'contacts.profile.extraAddresses': 'Weitere Adressen',
   'contacts.profile.extraAddressN': 'Adresse {n}',

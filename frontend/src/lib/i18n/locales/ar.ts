@@ -144,6 +144,8 @@ const ar: Dictionary = {
   'contacts.profile.copyLine': 'سطر الدفع',
   'contacts.profile.chat': 'محادثة',
   'contacts.profile.chatThisNumber': 'فتح محادثة واتساب مع هذا الرقم',
+  'contacts.profile.makeMainPhone': 'تعيين كرقم رئيسي (يصبح رقم واتساب)',
+  'contacts.profile.mainPhone': 'رئيسي',
   'contacts.profile.addPhone': 'إضافة هاتف',
   'contacts.profile.extraAddresses': 'عناوين أخرى',
   'contacts.profile.extraAddressN': 'العنوان {n}',

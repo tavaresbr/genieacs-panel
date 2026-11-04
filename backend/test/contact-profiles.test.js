@@ -209,6 +209,15 @@ describe('editar no painel', () => {
     assert.equal(res.body.data.whatsappPhoneSource, 'manual');
   });
 
+  it('tornar um telefone da lista o principal troca o WhatsApp sem mexer na lista', async () => {
+    const antes = await editar('373', { phones: ['(93) 99141-8576', '(93) 99201-1990'] });
+    const lista = antes.body.data.fields.phones.value;
+    const res = await editar('373', { whatsappPhone: '93991418576' });
+    assert.equal(res.body.data.whatsappPhone, '5593991418576');
+    assert.equal(res.body.data.whatsappPhoneSource, 'manual');
+    assert.deepEqual(res.body.data.fields.phones.value, lista);
+  });
+
   it('guarda outros endereços, limpa os vazios e restaura', async () => {
     const res = await editar('373', {
       extraAddresses: [
