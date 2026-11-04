@@ -144,6 +144,8 @@ const ja: Dictionary = {
   'contacts.profile.copyLine': '支払い番号',
   'contacts.profile.chat': 'チャット',
   'contacts.profile.chatThisNumber': 'この番号でWhatsAppの会話を開く',
+  'contacts.profile.makeMainPhone': 'メインにする（WhatsApp番号になります）',
+  'contacts.profile.mainPhone': 'メイン',
   'contacts.profile.addPhone': '電話番号を追加',
   'contacts.profile.extraAddresses': 'その他の住所',
   'contacts.profile.extraAddressN': '住所 {n}',

@@ -144,6 +144,8 @@ const zhCN: Dictionary = {
   'contacts.profile.copyLine': '付款码',
   'contacts.profile.chat': '聊天',
   'contacts.profile.chatThisNumber': '与此号码打开 WhatsApp 会话',
+  'contacts.profile.makeMainPhone': '设为主号码（成为 WhatsApp 号码）',
+  'contacts.profile.mainPhone': '主号码',
   'contacts.profile.addPhone': '添加电话',
   'contacts.profile.extraAddresses': '其他地址',
   'contacts.profile.extraAddressN': '地址 {n}',

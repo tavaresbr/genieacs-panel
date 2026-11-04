@@ -144,6 +144,8 @@ const ko: Dictionary = {
   'contacts.profile.copyLine': '납부 번호',
   'contacts.profile.chat': '대화',
   'contacts.profile.chatThisNumber': '이 번호로 WhatsApp 대화 열기',
+  'contacts.profile.makeMainPhone': '기본으로 설정 (WhatsApp 번호가 됩니다)',
+  'contacts.profile.mainPhone': '기본',
   'contacts.profile.addPhone': '전화번호 추가',
   'contacts.profile.extraAddresses': '기타 주소',
   'contacts.profile.extraAddressN': '주소 {n}',

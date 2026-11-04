@@ -274,6 +274,9 @@ export default function ContactDetailPage() {
 
   const { fields } = profile
   const restore = (field: ContactProfileField) => () => void save({ [field]: null })
+  // The WhatsApp number is the contact's main phone: pick one from the list to make it so.
+  const phoneKey = (phone: string | null | undefined) => (phone ?? '').replace(/\D/g, '').slice(-10)
+  const makeMainPhone = (phone: string) => void save({ whatsappPhone: phone.replace(/\D/g, '') })
   // One of the other addresses becomes the main one, and the old main takes its place in the list.
   const makeMain = async (index: number) => {
     const next = promoteAddress(addressFormFrom(fields.address.value), fields.extraAddresses.value.map(addressFormFrom), index)
@@ -388,6 +391,11 @@ export default function ContactDetailPage() {
                   <span className="flex flex-wrap items-center gap-2">
                     {phoneText(profile.whatsappPhone)}
                     {profile.whatsappPhoneSource === 'manual' && <span className="modern-badge-info">{t('contacts.profile.edited')}</span>}
+                    {profile.whatsappPhoneSource === 'manual' && canEdit && (
+                      <button type="button" className="text-xs text-muted-foreground hover:text-foreground hover:underline" onClick={() => void save({ whatsappPhone: null })}>
+                        {t('contacts.profile.restore')}
+                      </button>
+                    )}
                   </span>
                 )}
               </Row>
@@ -397,6 +405,19 @@ export default function ContactDetailPage() {
                     {fields.phones.value.map((phone) => (
                       <li key={phone} className="flex items-center gap-2">
                         {phoneText(phone)}
+                        {phoneKey(phone) === phoneKey(profile.whatsappPhone)
+                          ? <span className="modern-badge-info">{t('contacts.profile.mainPhone')}</span>
+                          : canEdit && (
+                            <button
+                              type="button"
+                              className="text-xs text-primary hover:underline max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
+                              title={t('contacts.profile.makeMainPhone')}
+                              aria-label={`${t('contacts.profile.makeMainPhone')} ${phoneText(phone)}`}
+                              onClick={() => makeMainPhone(phone)}
+                            >
+                              {t('contacts.profile.makeMainAddress')}
+                            </button>
+                          )}
                         {can('whatsapp.send') && (
                           <button
                             type="button"
