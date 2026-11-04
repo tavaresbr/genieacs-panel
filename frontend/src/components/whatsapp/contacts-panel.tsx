@@ -60,7 +60,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   const [total, setTotal] = useState(0)
   // Where the filters were left, when this panel keeps them between visits.
   const [saved] = useState(() => {
-    const base = { search: '', state: defaultState, noPhone: false, imported: false, device: '' as ContactDeviceFilter }
+    const base = { search: '', state: defaultState, noPhone: false, imported: false, device: '' as ContactDeviceFilter, asaas: false }
     return persistKey ? loadContactFilters(persistKey, base) : base
   })
   const [search, setSearch] = useState(saved.search)
@@ -81,9 +81,11 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   const [imported, setImported] = useState(saved.imported)
   // Só quem tem (ou não tem) equipamento gerenciado vinculado ao contrato.
   const [device, setDevice] = useState<ContactDeviceFilter>(saved.device)
+  // Só quem também é cliente da conta Asaas do provedor.
+  const [asaas, setAsaas] = useState(saved.asaas)
   useEffect(() => {
-    if (persistKey) saveContactFilters(persistKey, { search, state: stateFilter, noPhone, imported, device })
-  }, [persistKey, search, stateFilter, noPhone, imported, device])
+    if (persistKey) saveContactFilters(persistKey, { search, state: stateFilter, noPhone, imported, device, asaas })
+  }, [persistKey, search, stateFilter, noPhone, imported, device, asaas])
   // Quantos contatos cada filtro mostraria; vazio até a primeira leitura.
   const [counts, setCounts] = useState<WhatsAppContactCounts | null>(null)
 
@@ -129,7 +131,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     }
   }, [search, t, toast])
 
-  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean, onlyImported: boolean, deviceFilter: ContactDeviceFilter) => {
+  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean, onlyImported: boolean, deviceFilter: ContactDeviceFilter, onlyAsaas: boolean) => {
     const seq = ++requestSeq.current
     setLoading(true)
     const res = await whatsappAPI.listContacts({
@@ -138,7 +140,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
       state: (state || undefined) as WhatsAppContactState | undefined,
       noPhone: onlyNoPhone,
       imported: onlyImported,
-      device: deviceFilter
+      device: deviceFilter,
+      asaas: onlyAsaas
     })
     if (!alive.current || seq !== requestSeq.current) return
     if (res.success && res.data) {
@@ -152,7 +155,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     setLoading(false)
   }, [t])
 
-  useEffect(() => { void load(debounced, stateFilter, noPhone, imported, device) }, [debounced, stateFilter, noPhone, imported, device, load])
+  useEffect(() => { void load(debounced, stateFilter, noPhone, imported, device, asaas) }, [debounced, stateFilter, noPhone, imported, device, asaas, load])
 
   const loadMore = useCallback(async () => {
     const seq = requestSeq.current
@@ -164,7 +167,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
       state: (stateFilter || undefined) as WhatsAppContactState | undefined,
       noPhone,
       imported,
-      device
+      device,
+      asaas
     })
     if (!alive.current) return
     setLoadingMore(false)
@@ -179,7 +183,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
       ...page.filter((row) => !current.some((held) => held.key === row.key))
     ])
     setTotal(res.data.total)
-  }, [contacts.length, debounced, stateFilter, noPhone, imported, device, t, toast])
+  }, [contacts.length, debounced, stateFilter, noPhone, imported, device, asaas, t, toast])
 
   const open = useCallback(async (contact: WhatsAppContact) => {
     setOpeningContract(contact.key)
@@ -218,7 +222,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   const exportSheet = async () => {
     setExporting(true)
     try {
-      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone, imported, device })
+      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone, imported, device, asaas })
       if (!res.success || !res.blob) {
         toast.error(res.message || t('contacts.sheet.exportFailed'))
         return
@@ -259,6 +263,11 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     <span className="flex flex-wrap items-center gap-1.5">
       {contact.document && (
         <span className="text-xs text-muted-foreground">{contact.document}</span>
+      )}
+      {contact.inAsaas && (
+        <span className="modern-badge-success" title={t('whatsapp.contacts.asaasHint')}>
+          {t('whatsapp.contacts.asaasBadge')}
+        </span>
       )}
       {contact.importSource && (
         <span className="modern-badge-info" title={t('whatsapp.contacts.importedHint')}>
@@ -388,7 +397,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
           <button
             type="button"
             className="modern-button-secondary"
-            onClick={() => void load(debounced, stateFilter, noPhone, imported, device)}
+            onClick={() => void load(debounced, stateFilter, noPhone, imported, device, asaas)}
             disabled={loading}
           >
             <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
@@ -402,7 +411,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
           onClose={() => setTeiahPhones(false)}
           onApplied={() => {
             setTeiahPhones(false)
-            void load(debounced, stateFilter, noPhone, imported, device)
+            void load(debounced, stateFilter, noPhone, imported, device, asaas)
           }}
         />
       )}
@@ -411,7 +420,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
           onClose={() => setImporting(false)}
           onApplied={() => {
             setImporting(false)
-            void load(debounced, stateFilter, noPhone, imported, device)
+            void load(debounced, stateFilter, noPhone, imported, device, asaas)
           }}
         />
       )}
@@ -489,6 +498,21 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
             {countBadge(counts?.imported)}
             {imported && <Icon name="x" size={14} />}
           </button>
+          {counts?.asaas !== null && counts?.asaas !== undefined && (
+            <button
+              type="button"
+              className={asaas ? 'modern-button' : 'modern-button-secondary'}
+              aria-pressed={asaas}
+              data-testid="wa-contacts-asaas"
+              title={t('whatsapp.contacts.asaasHint')}
+              onClick={() => setAsaas((current) => !current)}
+            >
+              <Icon name="invoice" size={16} />
+              {t('whatsapp.contacts.filterAsaas')}
+              {countBadge(counts.asaas)}
+              {asaas && <Icon name="x" size={14} />}
+            </button>
+          )}
           {(['with', 'without'] as const).map((which) => (
             <button
               key={which}

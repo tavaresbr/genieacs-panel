@@ -4297,13 +4297,14 @@ export const contactsAPI = {
     ),
 
   /** The contacts as a CSV, with the list's search and state filter. */
-  exportSheet: (filters: { search?: string; state?: string; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter } = {}) => {
+  exportSheet: (filters: { search?: string; state?: string; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter; asaas?: boolean } = {}) => {
     const query = new URLSearchParams()
     if (filters.search) query.set('search', filters.search)
     if (filters.state) query.set('state', filters.state)
     if (filters.noPhone) query.set('noPhone', 'true')
     if (filters.imported) query.set('imported', 'true')
     if (filters.device) query.set('device', filters.device)
+    if (filters.asaas) query.set('asaas', 'true')
     const suffix = query.toString()
     return apiClient.getBlob(`/contacts/export${suffix ? `?${suffix}` : ''}`)
   },
@@ -6074,6 +6075,8 @@ export interface WhatsAppContact {
   phoneSource: 'manual' | 'sgp' | null
   /** Where an imported client came from; null for what the SGP brought or the team typed. */
   importSource?: 'whatsapp' | 'sheet' | 'google' | 'focuschat' | null
+  /** Também é cliente da conta Asaas do provedor (pelo CPF/CNPJ). */
+  inAsaas?: boolean
   /** Blocked for everything. */
   optedOut: boolean
   /** Blocked only for these kinds; `null` when not blocked or blocked for everything. */
@@ -6095,6 +6098,8 @@ export interface WhatsAppContactCounts {
   /** With and without a managed ONT linked, under the current tab. */
   withDevice?: number
   withoutDevice?: number
+  /** Quantos são também clientes do Asaas; `null` quando a integração não está ligada (o filtro some). */
+  asaas?: number | null
 }
 
 /** Only who has, or has not, a managed ONT linked to the contract. */
@@ -6774,13 +6779,15 @@ export const whatsappAPI = {
     ),
 
   // ── SGP contacts ─────────────────────────────────────────────────────
-  listContacts: (params: { search?: string; limit?: number; offset?: number; state?: WhatsAppContactState; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter } = {}) => {
+  listContacts: (params: { search?: string; limit?: number; offset?: number; state?: WhatsAppContactState; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter; asaas?: boolean } = {}) => {
     const query = new URLSearchParams()
     if (params.search) query.set('search', params.search)
     if (params.state) query.set('state', params.state)
     // Só quem não tem número para mensagem; combina com a situação.
     if (params.noPhone) query.set('noPhone', 'true')
     if (params.imported) query.set('imported', 'true')
+    // Só quem também é cliente da conta Asaas do provedor (casado pelo CPF/CNPJ).
+    if (params.asaas) query.set('asaas', 'true')
     if (params.device) query.set('device', params.device)
     if (params.limit) query.set('limit', String(params.limit))
     if (params.offset) query.set('offset', String(params.offset))

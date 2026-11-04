@@ -43,7 +43,8 @@ describe('os números dos filtros de Contatos', () => {
       noPhone: 4,
       imported: 2,
       withDevice: 0,
-      withoutDevice: 7
+      withoutDevice: 7,
+      asaas: null
     });
     assert.equal(body.data.total, 7);
   });
