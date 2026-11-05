@@ -174,6 +174,14 @@ router.post(
   asaasAdminLimiter,
   ContactController.createAsaasCharge
 );
+router.post(
+  '/:key/asaas/charges/:chargeId/settle',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('asaas.act'),
+  asaasAdminLimiter,
+  ContactController.settleAsaasCharge
+);
 // Lê o banco (a última importação do Asaas), não o gateway: sem limitador de SGP.
 router.get(
   '/:key/asaas-invoices',

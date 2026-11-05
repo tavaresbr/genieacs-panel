@@ -5,7 +5,7 @@ import { personTypeOf } from './contactOnboardingService.js';
 import AsaasCharge, { OPEN_STATUSES } from '../models/AsaasCharge.js';
 import AsaasInvoiceService from './asaasInvoiceService.js';
 import {
-  createCustomer, findCustomersByDocument, getCustomer, listCustomerCharges, createCustomerCharge, AsaasError
+  createCustomer, findCustomersByDocument, getCustomer, listCustomerCharges, createCustomerCharge, getCharge, receiveInCash, AsaasError
 } from './billing/asaasClient.js';
 import crypto from 'node:crypto';
 import { normalizeTaxId } from '../utils/taxId.js';
@@ -32,6 +32,14 @@ import { normalizeTaxId } from '../utils/taxId.js';
 /** O mínimo do boleto no Asaas é R$ 5,00; o teto é só um freio contra dedo a mais. */
 const MIN_CHARGE_CENTS = 500;
 const MAX_CHARGE_CENTS = 10_000_000;
+/** Já pagas no Asaas: baixar de novo é desnecessário. */
+const SETTLED_STATUSES = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
+
+/** Dia do calendário que existe (2026-02-30 não). */
+function sameDay(text) {
+  const date = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
 
 /** Hoje no Brasil, onde o Asaas conta o vencimento. */
 function todayBr() {
@@ -232,6 +240,61 @@ class AsaasProviderCustomerService {
       }, this.credentialFor(config));
       await AsaasCharge.upsertFromAsaas(created, { document, seenAt: new Date() });
       return { charge: this.chargeView(created) };
+    } catch (error) {
+      if (error instanceof AsaasError) throw AsaasProviderService.translateGatewayError(error);
+      throw error;
+    }
+  }
+
+  /**
+   * Dá baixa manual numa cobrança em aberto DESTE cliente: o cliente pagou em
+   * dinheiro, ou fez um Pix fora do Asaas, e o título precisa sair da lista.
+   * No Asaas isso é "recebida em dinheiro" (`receiveInCash`), pelo valor cheio.
+   *
+   * Dinheiro de verdade, então as mesmas travas da cobrança nova: opção própria
+   * (desligada), `asaas.act` na rota, cobrança conferida contra o CPF/CNPJ do
+   * contato e data que não seja futura. Antes de baixar relê-se a cobrança no
+   * Asaas: se o webhook se perdeu e ela já está paga lá, só a cópia do painel é
+   * atualizada — baixar de novo seria recusado, ou pior, contado em dobro.
+   */
+  static async settleCharge(key, chargeId, input = {}) {
+    const { document, config } = await this.requireLinked(key);
+    if (!config.allowWriteCharges) {
+      throw new AsaasProviderError('asaas.error.chargeWriteDisabled', { code: 'write_disabled', status: 409 });
+    }
+    const row = await AsaasCharge.getByAsaasId(chargeId);
+    if (!row || row.deleted || row.document !== document) {
+      throw new ContactProfileError('contacts.error.invoiceNotFound', { code: 'invoice_not_found', status: 404 });
+    }
+    const today = todayBr();
+    const paymentDate = String(input.paymentDate ?? today).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate) || !sameDay(paymentDate) || paymentDate > today) {
+      throw new AsaasProviderError('asaas.error.settleDateInvalid', { code: 'invalid_payment_date' });
+    }
+
+    const credential = this.credentialFor(config);
+    try {
+      const live = await getCharge(row.asaas_id, credential);
+      let status = live.status;
+      let paidOn = live.paidOn;
+      if (OPEN_STATUSES.includes(live.status)) {
+        const cents = live.valueCents ?? row.value_cents;
+        const result = await receiveInCash(row.asaas_id, { paymentDate, value: cents }, credential);
+        status = result.status || 'RECEIVED_IN_CASH';
+        paidOn = paymentDate;
+      } else if (!SETTLED_STATUSES.includes(live.status)) {
+        // Cancelada, estornada…: não é título a quitar.
+        throw new AsaasProviderError('asaas.error.chargeClosed', { code: 'charge_closed', status: 409 });
+      }
+      await AsaasCharge.applyStatus(row.asaas_id, { status, paymentDate: paidOn, dueDate: live.dueDate });
+      try {
+        const { default: WaDunningService } = await import('./waDunningService.js');
+        await WaDunningService.settleByInvoiceKey(row.asaas_id, { paid: true });
+      } catch (error) {
+        console.warn(`Asaas settle: could not settle the dunning queue: ${error.message}`);
+      }
+      const updated = await AsaasCharge.getByAsaasId(row.asaas_id);
+      return { charge: this.chargeView(updated) };
     } catch (error) {
       if (error instanceof AsaasError) throw AsaasProviderService.translateGatewayError(error);
       throw error;

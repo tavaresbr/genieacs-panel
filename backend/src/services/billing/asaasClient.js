@@ -458,10 +458,11 @@ function paraReais(amountCents) {
  * registrar dinheiro sobre um recibo que não existe. Quem chama decide o que
  * fazer com a recusa — e o console, que é quem chama, para tudo.
  */
-export async function receiveInCash(chargeId, { paymentDate, value }) {
+export async function receiveInCash(chargeId, { paymentDate, value }, credencial = null) {
   const caminho = `/payments/${idNoCaminho(chargeId)}/receiveInCash`;
   const resposta = await chamar(caminho, {
-    payload: { paymentDate, value: paraReais(value), notifyCustomer: false }
+    payload: { paymentDate, value: paraReais(value), notifyCustomer: false },
+    credencial
   });
   return { status: resposta?.status ? String(resposta.status) : null };
 }
