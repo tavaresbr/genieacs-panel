@@ -59,6 +59,14 @@ function subir() {
         remotas = [nova, ...remotas];
         return responder(200, nova);
       }
+      const rc = url.pathname.match(/^\/payments\/([^/]+)\/receiveInCash$/);
+      if (req.method === 'POST' && rc) {
+        const c = remotas.find((r) => r.id === rc[1]);
+        if (!c) return responder(404, {});
+        c.status = 'RECEIVED_IN_CASH';
+        c.paymentDate = payload.paymentDate;
+        return responder(200, c);
+      }
       const um = url.pathname.match(/^\/payments\/([^/]+)$/);
       if (req.method === 'GET' && um) {
         const c = remotas.find((r) => r.id === um[1]);
@@ -261,5 +269,71 @@ describe('gerar uma cobrança nova (a escrita com dinheiro)', () => {
       gateway.removeAllListeners('request');
       gateway.on('request', original);
     }
+  });
+});
+
+describe('dar baixa manual (dinheiro em mãos ou Pix fora do Asaas)', () => {
+  const baixa = (id, body = {}) => api(`/asaas/charges/${id}/settle`, { method: 'POST', body });
+  const recebimentos = () => pedidos.filter((p) => p.path.endsWith('/receiveInCash'));
+
+  beforeEach(async () => {
+    // A cópia do painel já com as cobranças, sem gastar o limite de idas ao gateway.
+    for (const c of remotas) {
+      await dentro(() => AsaasCharge.upsertFromAsaas({ ...c, valueCents: Math.round(c.value * 100) }, { document: DOC, seenAt: new Date() }));
+    }
+    pedidos = [];
+  });
+
+  it('baixa o título em aberto: receiveInCash pelo valor cheio, sem avisar o cliente, e a cópia vira paga', async () => {
+    const res = await baixa('pay_aberta');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.charge.open, false);
+    assert.equal(res.body.data.charge.status, 'RECEIVED_IN_CASH');
+    const [pedido] = recebimentos();
+    assert.equal(pedido.payload.value, 99.9);
+    assert.equal(pedido.payload.notifyCustomer, false);
+    assert.equal(pedido.payload.paymentDate, dia(0));
+    assert.equal(pedido.key, CHAVE);
+    assert.equal((await dentro(() => AsaasCharge.getByAsaasId('pay_aberta'))).status, 'RECEIVED_IN_CASH');
+  });
+
+  it('com a opção desligada nada é baixado', async () => {
+    await dentro(() => AsaasProviderService.saveConfig({ allowWriteCharges: false }));
+    const res = await baixa('pay_aberta');
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'write_disabled');
+    assert.equal(pedidos.length, 0);
+  });
+
+  it('data futura ou inválida é recusada antes de ir ao Asaas', async () => {
+    for (const paymentDate of [dia(1), '2026-02-30', 'ontem']) {
+      const res = await baixa('pay_aberta', { paymentDate });
+      assert.equal(res.status, 400, JSON.stringify([paymentDate, res.body]));
+      assert.equal(res.body.code, 'invalid_payment_date');
+    }
+    assert.equal(pedidos.length, 0);
+  });
+
+  it('cobrança que não é deste cliente: 404, e nada é baixado', async () => {
+    await getDb()('asaas_charges').where({ asaas_id: 'pay_aberta' }).update({ document: '11144477735' });
+    const res = await baixa('pay_aberta');
+    assert.equal(res.status, 404);
+    assert.equal(recebimentos().length, 0);
+  });
+
+  it('já paga no Asaas (webhook perdido): só atualiza a cópia, sem receiveInCash', async () => {
+    remotas.find((r) => r.id === 'pay_aberta').status = 'RECEIVED';
+    const res = await baixa('pay_aberta');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.charge.open, false);
+    assert.equal(recebimentos().length, 0);
+  });
+
+  it('cobrança cancelada no Asaas não é título a quitar: 409', async () => {
+    remotas.find((r) => r.id === 'pay_aberta').status = 'DELETED';
+    const res = await baixa('pay_aberta');
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'charge_closed');
+    assert.equal(recebimentos().length, 0);
   });
 });

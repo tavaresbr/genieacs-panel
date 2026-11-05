@@ -4260,6 +4260,12 @@ export const contactsAPI = {
   createAsaasCharge: (key: string, data: { value: number; dueDate: string; billingType: 'UNDEFINED' | 'BOLETO' | 'PIX'; description?: string }) =>
     apiClient.post<{ charge: AsaasChargeView }>(`/contacts/${encodeURIComponent(key)}/asaas/charges`, data),
 
+  /** Baixa manual de uma cobrança em aberto: dinheiro em mãos ou Pix fora do Asaas. */
+  settleAsaasCharge: (key: string, chargeId: string, data: { paymentDate?: string } = {}) =>
+    apiClient.post<{ charge: AsaasChargeView }>(
+      `/contacts/${encodeURIComponent(key)}/asaas/charges/${encodeURIComponent(chargeId)}/settle`, data
+    ),
+
   /** O cliente do contato criado (ou ligado, se já existia) na conta Asaas do provedor. */
   createInAsaas: (key: string) =>
     apiClient.post<{ created: boolean; customer: { asaasId: string; name: string | null } }>(

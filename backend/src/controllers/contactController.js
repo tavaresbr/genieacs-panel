@@ -100,6 +100,22 @@ class ContactController {
     }
   }
 
+  /** `POST /api/contacts/:key/asaas/charges/:chargeId/settle` — baixa manual (dinheiro em mãos ou Pix fora do Asaas). */
+  static async settleAsaasCharge(req, res) {
+    try {
+      const result = await AsaasProviderCustomerService.settleCharge(req.params.key, req.params.chargeId, req.body ?? {});
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_UPDATED,
+        subjectType: 'contact',
+        subjectId: req.params.key,
+        detail: { asaas: true, asaasChargeId: result.charge.id, settled: true }
+      });
+      return res.json(createResponse(req.t('contacts.chargeSettledInAsaas'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.saveFailed');
+    }
+  }
+
   /** `POST /api/contacts/:key/asaas` — o cliente do contato criado (ou ligado) na conta Asaas do provedor. */
   static async createInAsaas(req, res) {
     try {

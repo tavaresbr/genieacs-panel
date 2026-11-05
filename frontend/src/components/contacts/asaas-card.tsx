@@ -50,6 +50,7 @@ export function AsaasCard({ contactKey, whatsappPhone = null, onChanged }: {
   const [copying, setCopying] = useState<string | null>(null)
   const [sending, setSending] = useState<string | null>(null)
   const [newCharge, setNewCharge] = useState(false)
+  const [settling, setSettling] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const res = await contactsAPI.asaasInvoices(contactKey)
@@ -92,6 +93,29 @@ export function AsaasCard({ contactKey, whatsappPhone = null, onChanged }: {
       onChanged?.()
     } finally {
       setCreating(false)
+    }
+  }
+
+  /** Baixa manual: o cliente pagou em dinheiro ou por um Pix fora do Asaas. */
+  const settle = async (charge: AsaasChargeView) => {
+    const message = t('contacts.profile.asaasSettleConfirm', {
+      amount: formatBrl(charge.amount, intlLocale),
+      date: formatSgpDate(charge.dueDate, intlLocale)
+    })
+    if (!window.confirm(message)) return
+    setSettling(charge.id)
+    try {
+      const res = await contactsAPI.settleAsaasCharge(contactKey, charge.id)
+      if (!res.success) {
+        toast.error(res.message || t('contacts.profile.asaasSettleFailed'))
+        return
+      }
+      toast.success(res.message || t('contacts.profile.asaasSettled'))
+      await refresh()
+      await load()
+      onChanged?.()
+    } finally {
+      setSettling(null)
     }
   }
 
@@ -184,6 +208,17 @@ export function AsaasCard({ contactKey, whatsappPhone = null, onChanged }: {
                                 onClick={() => setSending(charge.id)}
                               >
                                 <Icon name="chat" size={14} /> {t('contacts.profile.sendInvoice')}
+                              </button>
+                            )}
+                            {canCharge && (
+                              <button
+                                type="button"
+                                className="modern-button-secondary"
+                                disabled={settling !== null}
+                                data-testid={`asaas-settle-${charge.id}`}
+                                onClick={() => void settle(charge)}
+                              >
+                                <Icon name="check" size={14} /> {t('contacts.profile.asaasSettle')}
                               </button>
                             )}
                           </>
