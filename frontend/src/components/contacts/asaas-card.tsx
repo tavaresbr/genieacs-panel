@@ -210,7 +210,9 @@ export function AsaasCard({ contactKey, whatsappPhone = null, onChanged }: {
                                 <Icon name="chat" size={14} /> {t('contacts.profile.sendInvoice')}
                               </button>
                             )}
-                            {canCharge && (
+                            {/* Sempre à vista para quem pode agir: com a opção desligada o servidor
+                                responde dizendo onde ligar, em vez de o botão simplesmente sumir. */}
+                            {can('asaas.act') && (
                               <button
                                 type="button"
                                 className="modern-button-secondary"
