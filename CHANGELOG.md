@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.3] - 2026-11-05
+
+### Maintenance
+
+- Dar baixa manual no título (dinheiro em mãos ou Pix fora do Asaas) (`7165adf7`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/3b8122833e29...d1c934a61328)
+
 ## [1.28.2] - 2026-11-04
 
 ### Maintenance
