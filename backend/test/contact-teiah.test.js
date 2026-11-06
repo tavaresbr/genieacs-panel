@@ -380,10 +380,10 @@ describe('relatório da TeiaH na ficha', () => {
   it('quem não tem teiah.act não abre o relatório', async () => {
     const created = await call(`${panelUrl}/api/users`, {
       method: 'POST', ...auth(),
-      body: { username: 'tecnico-relatorio', password: 'Senha-forte-123', email: 'tecnico-relatorio@exemplo.test', role: 'tech' }
+      body: { username: 'tecnico-relatorio', password: 'senha-do-tecnico-relatorio-1', email: 'tecnico-relatorio@exemplo.test', role: 'tech' }
     });
     assert.ok([200, 201].includes(created.status), JSON.stringify(created.body));
-    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { username: 'tecnico-relatorio', password: 'Senha-forte-123' } });
+    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { username: 'tecnico-relatorio', password: 'senha-do-tecnico-relatorio-1' } });
     const res = await call(`${panelUrl}/api/contacts/R-100/teiah/report`, { headers: authHeaders(login.body.data.token) });
     assert.equal(res.status, 403);
     assert.equal(res.body.code, 'missing_permission');
