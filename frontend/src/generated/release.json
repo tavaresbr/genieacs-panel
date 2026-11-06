@@ -1,15 +1,15 @@
 {
-  "version": "1.28.4",
-  "build": 1542,
-  "sourceCommit": "599cdf869b83",
-  "releasedAt": "2026-11-05",
-  "basedOnTag": "v1.28.3",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/b6c2572319f8...599cdf869b83",
+  "version": "1.28.5",
+  "build": 1545,
+  "sourceCommit": "59e868eaaaef",
+  "releasedAt": "2026-11-06",
+  "basedOnTag": "v1.28.4",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/fa9a79d6d40e...59e868eaaaef",
   "changes": [
     {
-      "shortHash": "0317dc1b",
+      "shortHash": "a6578fac",
       "date": "2026-11-05",
-      "title": "Botão Dar baixa sempre visível para quem pode agir",
+      "title": "Botão \"Dar baixa\" passa a se chamar \"Receber\"",
       "category": "Maintenance"
     }
   ]

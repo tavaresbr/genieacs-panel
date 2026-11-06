@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.5] - 2026-11-06
+
+### Maintenance
+
+- Botão "Dar baixa" passa a se chamar "Receber" (`a6578fac`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/fa9a79d6d40e...59e868eaaaef)
+
 ## [1.28.4] - 2026-11-05
 
 ### Maintenance
