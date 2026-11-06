@@ -1269,6 +1269,8 @@ export default {
   'teiah.error.unreachable': 'Не удалось связаться с TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid не ответила вовремя',
   'teiah.error.invalidResponse': 'TeiaH Valid прислала неверный ответ',
+  'teiah.error.reportNone': "Этот клиент ещё не проверялся в TeiaH Valid",
+  'teiah.error.reportEmpty': "У TeiaH Valid нет отчёта для печати по этому запросу",
   'teiah.error.credentialsRejected': 'TeiaH Valid отклонила ключ API',
   'teiah.error.rateLimited': 'TeiaH Valid ограничивает запросы; повторите позже',
   'teiah.error.status': 'TeiaH Valid ответила кодом состояния {status}',

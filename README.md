@@ -484,6 +484,21 @@ listed with the reason. A contract already sent with the same content is not
 sent again. The export can run on a schedule or from the **Send now** button, and
 **Preview** shows the payloads without sending anything.
 
+### TeiaH report on the client record
+
+The TeiaH card on a client record has a **TeiaH report** button. It opens a
+popup with the same report the TeiaH site shows and prints (indicators, score,
+person, protests, cheque restrictions, lawsuits, presumed income and pending
+issues), in **Full** or **Summary** mode, with print, download and open-in-tab.
+
+The panel looks up the client's CPF/CNPJ in the provider's TeiaH history
+(`GET /api/consultations`) and asks for that consultation's PDF
+(`GET /api/consultations/{id}/pdf`). TeiaH builds the PDF from data it already
+holds, so **opening the report is not a new paid consultation**. The PDF passes
+through the panel (the API key never reaches the browser) and is not stored.
+A client never consulted gets the **Consult on TeiaH** button instead. It needs
+the `teiah.act` permission, and each opening is recorded in the audit trail.
+
 ## Automatic activation
 
 Open **Settings → Automatic activation** to let a newly installed ONT configure

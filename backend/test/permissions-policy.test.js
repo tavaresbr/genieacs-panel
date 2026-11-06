@@ -21,6 +21,8 @@ describe('Permissions-Policy', () => {
     assert.match(policy, /camera=\(\)/);
     // O player de áudio toca o blob baixado com o token: precisa de `blob:`.
     assert.match(res.headers.get('content-security-policy'), /media-src 'self' blob:/);
+    // O pop-up do relatório da TeiaH mostra o PDF baixado num `<iframe>` de blob.
+    assert.match(res.headers.get('content-security-policy'), /frame-src 'self' blob:/);
   });
 
   it('o portal do assinante continua sem microfone', async () => {

@@ -1268,6 +1268,8 @@ export default {
   'teiah.error.unreachable': 'TeiaH Valid तक नहीं पहुँचा जा सका',
   'teiah.error.timeout': 'TeiaH Valid ने समय सीमा में उत्तर नहीं दिया',
   'teiah.error.invalidResponse': 'TeiaH Valid ने अमान्य उत्तर भेजा',
+  'teiah.error.reportNone': "इस ग्राहक की TeiaH Valid में अभी तक जाँच नहीं हुई है",
+  'teiah.error.reportEmpty': "TeiaH Valid के पास इस जाँच की छापने योग्य रिपोर्ट नहीं है",
   'teiah.error.credentialsRejected': 'TeiaH Valid ने API कुंजी अस्वीकार की',
   'teiah.error.rateLimited': 'TeiaH Valid अनुरोध सीमित कर रहा है; बाद में प्रयास करें',
   'teiah.error.status': 'TeiaH Valid ने स्थिति {status} के साथ उत्तर दिया',

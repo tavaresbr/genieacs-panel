@@ -133,6 +133,9 @@ const helmetOptions = {
       // Áudio do WhatsApp: o arquivo chega com o token no cabeçalho e vira um
       // blob em memória, que é o que o `<audio>` toca (e a prévia da gravação).
       mediaSrc: ["'self'", 'blob:'],
+      // O relatório da TeiaH na ficha: o PDF chega com o token no cabeçalho e
+      // vira um blob em memória, que é o que o `<iframe>` do pop-up mostra.
+      frameSrc: ["'self'", 'blob:'],
       connectSrc: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],

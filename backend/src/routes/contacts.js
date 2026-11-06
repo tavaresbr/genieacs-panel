@@ -122,6 +122,15 @@ router.post(
   sgpAdminLimiter,
   ContactController.teiahConsult
 );
+// The TeiaH's report PDF of the client, from its history: no new paid call.
+router.get(
+  '/:key/teiah/report',
+  authenticateToken,
+  requirePermission('contacts.read'),
+  requirePermission('teiah.act'),
+  sgpAdminLimiter,
+  ContactController.teiahReport
+);
 router.post(
   '/:key/teiah/apply',
   authenticateToken,

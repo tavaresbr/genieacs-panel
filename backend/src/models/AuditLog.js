@@ -143,6 +143,7 @@ class AuditLog {
     // o que veio.
     CONTACT_TEIAH_LOOKUP: 'contact.teiah_lookup',
     CONTACT_TEIAH_APPLIED: 'contact.teiah_applied',
+    CONTACT_TEIAH_REPORT: 'contact.teiah_report',
     // Um título em aberto foi mandado ao cliente pelo WhatsApp, pela ficha. O
     // `detail` diz qual título e qual conversa, nunca o texto (tem o PIX).
     CONTACT_INVOICE_SENT: 'contact.invoice_sent',

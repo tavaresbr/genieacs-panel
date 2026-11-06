@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatBrPhone } from '@/lib/phone'
 import { isSafeExternalUrl } from '@/lib/sgp'
+import { TeiahReportModal } from '@/components/contacts/teiah-report-modal'
 
 function addressLine(address: { street?: string; number?: string; district?: string; city?: string; state?: string; zip?: string }) {
   const street = [address.street, address.number].filter(Boolean).join(', ')
@@ -38,6 +39,7 @@ export function TeiahCard({ profile, onProfile, onReload }: {
   const { t, formatDateTime } = useTranslation()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const teiah = profile.teiah ?? null
 
   const knownPhones = new Set(profile.fields.phones.value)
@@ -124,6 +126,9 @@ export function TeiahCard({ profile, onProfile, onReload }: {
             <Icon name="external" size={16} /> {t('contacts.profile.teiahOpen')}
           </a>
         )}
+        <button type="button" className="modern-button" onClick={() => setReportOpen(true)} data-testid="teiah-report-open">
+          <Icon name="document" size={16} /> {t('contacts.teiahReport.open')}
+        </button>
         <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void consult()}>
           <Icon name="refresh" size={16} className={busy ? 'animate-spin' : ''} />
           {' '}{t(teiah ? 'contacts.profile.teiahRefresh' : 'contacts.profile.teiahConsult')}
@@ -216,6 +221,14 @@ export function TeiahCard({ profile, onProfile, onReload }: {
       )}
 
       {teiah && <p className="mt-3 text-xs text-muted-foreground">{t('contacts.profile.teiahConsultedAt', { date: formatDateTime(teiah.consultedAt) })}</p>}
+      {reportOpen && (
+        <TeiahReportModal
+          contactKey={profile.key}
+          onClose={() => setReportOpen(false)}
+          onConsult={consult}
+          consulting={busy}
+        />
+      )}
     </section>
   )
 }

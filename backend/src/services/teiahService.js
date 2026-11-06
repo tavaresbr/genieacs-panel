@@ -32,6 +32,10 @@ export const DEFAULT_WEB_URL = 'https://valid.teiah.ai';
 export const IMPORT_ONE_PATH = '/api/import/address';
 export const IMPORT_MANY_PATH = '/api/import/addresses';
 export const CONSULT_DOCUMENT_PATH = '/api/whatsapp/consulta-cpf';
+/** The provider's consultation history, and each consultation's report as a PDF. */
+export const CONSULTATIONS_PATH = '/api/consultations';
+/** The report PDF has the person's whole record: a few MB, not the 1 MB of a JSON answer. */
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
 /**
  * Each consultation is a paid call: an answer is reused for this long before
  * the panel asks again. "Not found" is kept for less, since the TeiaH may come
@@ -449,9 +453,12 @@ class TeiahService {
    * the base URL cannot point into the panel's own network, and the refusal
    * names nothing it learned.
    *
-   * @returns {Promise<{ status: number, data: any }>}
+   * `method: 'GET'` sends no body and takes `query`; `raw` answers the bytes
+   * (a PDF) instead of the JSON.
+   *
+   * @returns {Promise<{ status: number, data: any }|{ status: number, buffer: Buffer, contentType: string }>}
    */
-  static async request(path, body, configOverride = null) {
+  static async request(path, body, configOverride = null, { method = 'POST', query = null, raw = false, maxBytes = MAX_RESPONSE_BYTES } = {}) {
     const config = this.requireReady(configOverride || await this.getConfig());
     let url;
     try {
@@ -459,6 +466,10 @@ class TeiahService {
     } catch {
       throw new TeiahError('teiah.error.urlInvalid', { code: 'invalid_base_url', status: 400 });
     }
+    for (const [name, value] of Object.entries(query || {})) {
+      if (value !== undefined && value !== null && value !== '') url.searchParams.set(name, String(value));
+    }
+    const isGet = method === 'GET';
     const hostname = url.hostname.replace(/^\[|\]$/g, '');
 
     const controller = new AbortController();
@@ -478,15 +489,15 @@ class TeiahService {
         url,
         hostname,
         addresses,
-        method: 'POST',
+        method: isGet ? 'GET' : 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+          ...(isGet ? {} : { 'Content-Type': 'application/json' }),
+          Accept: raw ? 'application/pdf' : 'application/json',
           'x-api-key': config.apiKey
         },
-        body: JSON.stringify(body),
+        ...(isGet ? {} : { body: JSON.stringify(body) }),
         signal: controller.signal,
-        maxBytes: MAX_RESPONSE_BYTES
+        maxBytes
       });
     } catch (error) {
       if (error instanceof TeiahError) throw error;
@@ -501,6 +512,10 @@ class TeiahService {
       clearTimeout(timeoutId);
     }
 
+    if (raw) {
+      const buffer = Buffer.from(await response.arrayBuffer().catch(() => new ArrayBuffer(0)));
+      return { status: response.status, buffer, contentType: response.headers.get('content-type') || '' };
+    }
     const text = await response.text().catch(() => '');
     let data = null;
     try {
@@ -608,6 +623,72 @@ class TeiahService {
       console.warn(`TeiaH answer without an address; sections: ${Object.keys(mix).join(', ') || '-'}`);
     }
     return result;
+  }
+
+  /**
+   * The most recent consultation of this CPF/CNPJ in the provider's TeiaH
+   * history that has a report to print — made by the panel or on the TeiaH
+   * site with the same key. `search` matches loosely (any consulted field), so
+   * an item counts only when the document's digits are in it.
+   *
+   * @returns {Promise<{ id: string, createdAt: string|null }|null>}
+   */
+  static async findPrintableConsultation(document) {
+    const digits = String(document ?? '').replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14) return null;
+    const { status, data } = await this.request(CONSULTATIONS_PATH, null, null, {
+      method: 'GET',
+      query: { search: digits, type: digits.length === 14 ? 'CNPJ' : 'CPF', limit: 20, order: 'createdAt:desc' }
+    });
+    if (status < 200 || status >= 300) throw this.failure(status, data);
+    const list = Array.isArray(data)
+      ? data
+      : asList(pick(data || {}, ['data', 'items', 'consultas', 'consultations', 'results', 'resultado']));
+    const candidates = list
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => ({
+        item,
+        id: text(pick(item, ['id', '_id', 'uuid', 'consultaId']), 64),
+        createdAt: text(pick(item, ['createdAt', 'created_at', 'dataConsulta', 'data']), 40)
+      }))
+      .filter(({ item, id }) => id && /^[\w-]{1,64}$/.test(id)
+        && item.imprimivel !== false
+        && JSON.stringify(item).replace(/\D/g, '').includes(digits));
+    // Newest first, whatever order the API kept.
+    candidates.sort((a, b) => (Date.parse(b.createdAt ?? '') || 0) - (Date.parse(a.createdAt ?? '') || 0));
+    const found = candidates[0];
+    return found ? { id: found.id, createdAt: found.createdAt } : null;
+  }
+
+  /**
+   * The report of one consultation as the TeiaH UI prints it — `completo` or
+   * `resumo` — generated from what the TeiaH already holds: no new paid call.
+   * The path is built here from the id; the URLs in the history answer are not
+   * followed, so the key goes nowhere but the configured address.
+   *
+   * @returns {Promise<Buffer>}
+   */
+  static async consultationPdf(id, mode = 'completo') {
+    const cleanId = String(id ?? '');
+    if (!/^[\w-]{1,64}$/.test(cleanId)) {
+      throw new TeiahError('teiah.error.reportNone', { code: 'teiah_report_none', status: 404 });
+    }
+    const { status, buffer, contentType } = await this.request(
+      `${CONSULTATIONS_PATH}/${encodeURIComponent(cleanId)}/pdf`, null, null,
+      { method: 'GET', query: { mode: mode === 'resumo' ? 'resumo' : 'completo' }, raw: true, maxBytes: MAX_PDF_BYTES }
+    );
+    if (status === 204) {
+      throw new TeiahError('teiah.error.reportEmpty', { code: 'teiah_report_empty', status: 404 });
+    }
+    if (status < 200 || status >= 300) throw this.failure(status, null);
+    if (buffer.length === 0) {
+      throw new TeiahError('teiah.error.reportEmpty', { code: 'teiah_report_empty', status: 404 });
+    }
+    // A PDF starts with "%PDF"; anything else (an HTML error page) is not shown.
+    if (buffer.subarray(0, 5).toString('latin1').indexOf('%PDF') !== 0 && !/pdf/i.test(contentType)) {
+      throw new TeiahError('teiah.error.invalidResponse', { code: 'invalid_response', status: 502 });
+    }
+    return buffer;
   }
 
   /**
