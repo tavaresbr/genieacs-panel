@@ -1,2 +1,8 @@
 # Falsos positivos conferidos: senhas de teste em fixtures, não segredos.
 0214f9c336edc821ec7ba9e5753f1dca25aa2a47:backend/test/password-policy.test.js:generic-api-key:99
+# Usuário técnico de teste do relatório TeiaH (contact-teiah.test.js), trocado
+# por uma constante no commit seguinte; os commits do PR continuam no histórico.
+d262f606f1b0cd8e47ca3586d309bbb24593cb3c:backend/test/contact-teiah.test.js:generic-api-key:383
+d262f606f1b0cd8e47ca3586d309bbb24593cb3c:backend/test/contact-teiah.test.js:generic-api-key:386
+16f054675bf2a05630d3af2cad27ed53c893a373:backend/test/contact-teiah.test.js:generic-api-key:383
+16f054675bf2a05630d3af2cad27ed53c893a373:backend/test/contact-teiah.test.js:generic-api-key:386
