@@ -568,3 +568,11 @@
 .map-tiles-dark {
   filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
 }
+
+/* A barra de atalhos do celular (`components/mobile-tab-bar.tsx`) liga `data-tabbar`
+   na raiz enquanto aparece; a casca e a caixa do WhatsApp descontam esta altura. */
+:root { --tabbar-h: 0px; }
+html[data-tabbar='on'] { --tabbar-h: calc(4rem + env(safe-area-inset-bottom)); }
+@media (min-width: 64rem) {
+  html[data-tabbar='on'] { --tabbar-h: 0px; }
+}

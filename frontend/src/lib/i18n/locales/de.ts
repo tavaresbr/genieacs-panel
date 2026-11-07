@@ -46,6 +46,9 @@ const de: Dictionary = {
   // Seitenleiste
   'sidebar.operationsAria': 'TR69 Controle-Betrieb',
   'sidebar.openNavigation': 'Navigation öffnen',
+  'sidebar.tab.more': "Mehr",
+  'sidebar.tab.aria': "Kurzwahl",
+  'sidebar.tab.networkMap': "Topologie",
   'sidebar.closeNavigation': 'Navigation schließen',
   'sidebar.mainNavigation': 'Hauptnavigation',
   'sidebar.primaryNavigation': 'Primär',

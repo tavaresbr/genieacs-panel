@@ -46,6 +46,9 @@ const hi: Dictionary = {
   // साइडबार
   'sidebar.operationsAria': 'TR69 Controle संचालन',
   'sidebar.openNavigation': 'नेविगेशन खोलें',
+  'sidebar.tab.more': "और",
+  'sidebar.tab.aria': "शॉर्टकट",
+  'sidebar.tab.networkMap': "टोपोलॉजी",
   'sidebar.closeNavigation': 'नेविगेशन बंद करें',
   'sidebar.mainNavigation': 'मुख्य नेविगेशन',
   'sidebar.primaryNavigation': 'प्रमुख',

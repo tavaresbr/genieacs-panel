@@ -46,6 +46,9 @@ const ptBR: Dictionary = {
   // Menu lateral
   'sidebar.operationsAria': 'Operações do TR69 Controle',
   'sidebar.openNavigation': 'Abrir navegação',
+  'sidebar.tab.more': "Mais",
+  'sidebar.tab.aria': "Atalhos",
+  'sidebar.tab.networkMap': "Topologia",
   'sidebar.closeNavigation': 'Fechar navegação',
   'sidebar.mainNavigation': 'Navegação principal',
   'sidebar.primaryNavigation': 'Principal',

@@ -48,6 +48,9 @@ const en = {
   // Sidebar
   'sidebar.operationsAria': 'TR69 Controle operations',
   'sidebar.openNavigation': 'Open navigation',
+  'sidebar.tab.more': "More",
+  'sidebar.tab.aria': "Shortcuts",
+  'sidebar.tab.networkMap': "Topology",
   'sidebar.closeNavigation': 'Close navigation',
   'sidebar.mainNavigation': 'Main navigation',
   'sidebar.primaryNavigation': 'Primary',

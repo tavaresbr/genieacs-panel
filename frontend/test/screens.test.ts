@@ -225,3 +225,11 @@ describe('as seções da Configuração', () => {
     expect(tabs).toContain('sgp')
   })
 })
+
+describe('barra de atalhos do celular', () => {
+  it('só aponta para telas que existem no menu', async () => {
+    const { TAB_BAR_HREFS } = await import('@/lib/mobile-bar')
+    const hrefs = MENU_SCREENS.map((screen) => screen.href)
+    for (const href of TAB_BAR_HREFS) expect(hrefs).toContain(href)
+  })
+})

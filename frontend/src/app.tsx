@@ -167,7 +167,7 @@ function ProtectedShell() {
     <div className="flex min-h-screen">
       <Sidebar />
       {/* pt-16 no celular: a barra fixa do menu (sidebar.tsx) cobre o topo. */}
-      <main className="min-w-0 flex-1 pt-16 lg:pt-0">
+      <main className="min-w-0 flex-1 pt-16 pb-(--tabbar-h) lg:pt-0 lg:pb-0">
         {/* A faixa ou o muro da assinatura. Fica na casca e não numa tela
             porque a primeira requisição recusada pode vir de qualquer uma. */}
         {/* Antes de tudo: quem está personificando tem que saber disso em toda

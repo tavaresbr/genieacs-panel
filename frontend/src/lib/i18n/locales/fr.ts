@@ -46,6 +46,9 @@ const fr: Dictionary = {
   // Barre latérale
   'sidebar.operationsAria': 'Opérations TR69 Controle',
   'sidebar.openNavigation': 'Ouvrir la navigation',
+  'sidebar.tab.more': "Plus",
+  'sidebar.tab.aria': "Raccourcis",
+  'sidebar.tab.networkMap': "Topologie",
   'sidebar.closeNavigation': 'Fermer la navigation',
   'sidebar.mainNavigation': 'Navigation principale',
   'sidebar.primaryNavigation': 'Principal',
