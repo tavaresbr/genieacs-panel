@@ -7,6 +7,16 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.6] - 2026-11-07
+
+### Maintenance
+
+- Ficha do cliente: relatório da TeiaH (PDF) num pop-up, sem consulta nova (`d262f606`)
+- Teste do relatório TeiaH: senha de fixture no padrão dos outros testes (gitleaks) (`16f05467`)
+- Senha do usuário de teste do relatório TeiaH vira constante; falsos positivos dos commits anteriores no .gitleaksignore (`5554cbdc`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/7a295367d059...e91880d025fa)
+
 ## [1.28.5] - 2026-11-06
 
 ### Maintenance

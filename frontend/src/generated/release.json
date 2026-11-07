@@ -1,15 +1,27 @@
 {
-  "version": "1.28.5",
-  "build": 1545,
-  "sourceCommit": "59e868eaaaef",
-  "releasedAt": "2026-11-06",
-  "basedOnTag": "v1.28.4",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/fa9a79d6d40e...59e868eaaaef",
+  "version": "1.28.6",
+  "build": 1550,
+  "sourceCommit": "e91880d025fa",
+  "releasedAt": "2026-11-07",
+  "basedOnTag": "v1.28.5",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/7a295367d059...e91880d025fa",
   "changes": [
     {
-      "shortHash": "a6578fac",
-      "date": "2026-11-05",
-      "title": "Botão \"Dar baixa\" passa a se chamar \"Receber\"",
+      "shortHash": "d262f606",
+      "date": "2026-11-06",
+      "title": "Ficha do cliente: relatório da TeiaH (PDF) num pop-up, sem consulta nova",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "16f05467",
+      "date": "2026-11-06",
+      "title": "Teste do relatório TeiaH: senha de fixture no padrão dos outros testes (gitleaks)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5554cbdc",
+      "date": "2026-11-06",
+      "title": "Senha do usuário de teste do relatório TeiaH vira constante; falsos positivos dos commits anteriores no .gitleaksignore",
       "category": "Maintenance"
     }
   ]
