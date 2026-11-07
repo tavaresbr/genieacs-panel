@@ -48,7 +48,6 @@ const ko: Dictionary = {
   'sidebar.openNavigation': '탐색 메뉴 열기',
   'sidebar.tab.more': "더보기",
   'sidebar.tab.aria': "바로가기",
-  'sidebar.tab.networkMap': "토폴로지",
   'sidebar.closeNavigation': '탐색 메뉴 닫기',
   'sidebar.mainNavigation': '기본 탐색 메뉴',
   'sidebar.primaryNavigation': '주요',

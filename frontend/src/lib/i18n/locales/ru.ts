@@ -48,7 +48,6 @@ const ru: Dictionary = {
   'sidebar.openNavigation': 'Открыть навигацию',
   'sidebar.tab.more': "Ещё",
   'sidebar.tab.aria': "Быстрый доступ",
-  'sidebar.tab.networkMap': "Топология",
   'sidebar.closeNavigation': 'Закрыть навигацию',
   'sidebar.mainNavigation': 'Основная навигация',
   'sidebar.primaryNavigation': 'Главное',

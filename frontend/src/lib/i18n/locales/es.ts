@@ -48,7 +48,6 @@ const es: Dictionary = {
   'sidebar.openNavigation': 'Abrir navegación',
   'sidebar.tab.more': "Más",
   'sidebar.tab.aria': "Atajos",
-  'sidebar.tab.networkMap': "Topología",
   'sidebar.closeNavigation': 'Cerrar navegación',
   'sidebar.mainNavigation': 'Navegación principal',
   'sidebar.primaryNavigation': 'Principal',

@@ -72,7 +72,7 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
     >
       {items.map((screen) => {
         const active = isActive(screen.href)
-        const label = screen.href === '/network-map' ? t('sidebar.tab.networkMap') : t(screen.labelKey)
+        const label = t(screen.labelKey)
         return (
           <Link key={screen.href} to={screen.href} className={itemClass(active)} aria-current={active ? 'page' : undefined}>
             {active && <span className="absolute -top-1 h-0.5 w-6 rounded-full bg-[hsl(var(--status-warning))]" aria-hidden="true" />}

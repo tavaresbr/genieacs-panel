@@ -48,7 +48,6 @@ const zhTW: Dictionary = {
   'sidebar.openNavigation': '開啟導覽',
   'sidebar.tab.more': "更多",
   'sidebar.tab.aria': "快捷入口",
-  'sidebar.tab.networkMap': "拓撲",
   'sidebar.closeNavigation': '關閉導覽',
   'sidebar.mainNavigation': '主導覽',
   'sidebar.primaryNavigation': '主要',

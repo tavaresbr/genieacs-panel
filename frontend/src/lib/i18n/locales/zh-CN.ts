@@ -48,7 +48,6 @@ const zhCN: Dictionary = {
   'sidebar.openNavigation': '打开导航',
   'sidebar.tab.more': "更多",
   'sidebar.tab.aria': "快捷入口",
-  'sidebar.tab.networkMap': "拓扑",
   'sidebar.closeNavigation': '关闭导航',
   'sidebar.mainNavigation': '主导航',
   'sidebar.primaryNavigation': '主要',
