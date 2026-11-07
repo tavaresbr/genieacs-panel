@@ -62,6 +62,16 @@ let panelUrl;
 let token;
 let teiahServer;
 const consultas = [];
+// O histórico de consultas da TeiaH: o pedido de relatório lê daqui.
+const historico = [];
+const HISTORICO = [
+  { id: 'c-antiga', documento: '813.735.630-44', createdAt: '2026-10-01T10:00:00Z', imprimivel: true },
+  { id: 'c-nova', documento: '813.735.630-44', createdAt: '2026-11-01T10:00:00Z', imprimivel: true },
+  // A busca é solta: um documento que só começa igual não é este cliente.
+  { id: 'c-outro', documento: '813.735.999-99', createdAt: '2026-11-05T10:00:00Z', imprimivel: true },
+  { id: 'c-falhou', documento: '813.735.630-44', createdAt: '2026-11-04T10:00:00Z', imprimivel: false },
+  { id: 'sem-dados', documento: '111.444.777-35', createdAt: '2026-11-01T10:00:00Z', imprimivel: true }
+];
 // Para o teste do erro: a TeiaH fora do ar não deixa nada guardado.
 let teiahFora = false;
 const auth = () => ({ headers: authHeaders(token) });
@@ -76,6 +86,22 @@ function startTeiahStub() {
         res.end(JSON.stringify(body));
       };
       if (req.headers['x-api-key'] !== TEIAH_KEY) return send(401, { message: 'API Key inválida' });
+      // O histórico e o PDF do relatório: leitura do que a TeiaH já guardou.
+      if (req.method === 'GET') {
+        const url = new URL(req.url, 'http://teiah');
+        historico.push(url);
+        if (url.pathname === '/api/consultations') {
+          const search = url.searchParams.get('search');
+          return send(200, { total: 3, data: HISTORICO.filter((item) => item.documento.replace(/\D/g, '').startsWith(search.slice(0, 6))) });
+        }
+        const pdf = url.pathname.match(/^\/api\/consultations\/([\w-]+)\/pdf$/);
+        if (pdf) {
+          if (pdf[1] === 'sem-dados') { res.writeHead(204); return res.end(); }
+          res.writeHead(200, { 'Content-Type': 'application/pdf' });
+          return res.end(`%PDF-1.4 relatorio ${pdf[1]} ${url.searchParams.get('mode')}`);
+        }
+        return send(404, {});
+      }
       const { cpf } = JSON.parse(raw || '{}');
       consultas.push(cpf);
       if (teiahFora) return send(503, { message: 'indisponível' });
@@ -312,5 +338,62 @@ describe('não consultar de novo o que foi consultado há pouco', () => {
     const rows = await asTenant(() => getDb()('audit_log').where({ action: 'contact.teiah_lookup' }));
     assert.ok(rows.some((row) => JSON.parse(row.detail).cached === true));
     for (const row of rows) assert.equal(row.detail.includes(CPF_E), false);
+  });
+});
+
+describe('relatório da TeiaH na ficha', () => {
+  const relatorio = (key, mode) => fetch(`${panelUrl}/api/contacts/${key}/teiah/report${mode ? `?mode=${mode}` : ''}`, auth());
+
+  it('traz o PDF da consulta mais recente do histórico, sem consultar de novo', async () => {
+    await addContract('R-100', 'Relatório Cliente', CPF_A);
+    const antes = consultas.length;
+    historico.length = 0;
+    const res = await relatorio('R-100');
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(res.headers.get('content-type'), 'application/pdf');
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    assert.match(res.headers.get('content-disposition'), /^inline; filename="teiah-81373563044-completo\.pdf"$/);
+    assert.equal(await res.text(), '%PDF-1.4 relatorio c-nova completo');
+    assert.equal(consultas.length, antes, 'pedir o relatório pagou uma consulta nova');
+    const [lista, pdf] = historico;
+    assert.equal(lista.searchParams.get('search'), CPF_A);
+    assert.equal(lista.searchParams.get('type'), 'CPF');
+    assert.equal(lista.searchParams.get('order'), 'createdAt:desc');
+    assert.equal(pdf.pathname, '/api/consultations/c-nova/pdf');
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contact.teiah_report' }).orderBy('id', 'desc').first());
+    assert.deepEqual(JSON.parse(trilha.detail), { mode: 'completo', consultationId: 'c-nova' });
+    assert.equal(trilha.detail.includes(CPF_A), false, 'a trilha levou o documento');
+  });
+
+  it('o resumo pede o modo resumo', async () => {
+    const res = await relatorio('R-100', 'resumo');
+    assert.equal(await res.text(), '%PDF-1.4 relatorio c-nova resumo');
+  });
+
+  it('quem nunca foi consultado na TeiaH recebe teiah_report_none', async () => {
+    await addContract('R-200', 'Sem Consulta', CPF_D);
+    const res = await relatorio('R-200');
+    assert.equal(res.status, 404);
+    assert.equal((await res.json()).code, 'teiah_report_none');
+  });
+
+  it('quem não tem teiah.act não abre o relatório', async () => {
+    const SENHA_DO_TECNICO = ['senha', 'do', 'tecnico', 'relatorio', '1'].join('-');
+    const created = await call(`${panelUrl}/api/users`, {
+      method: 'POST', ...auth(),
+      body: { username: 'tecnico-relatorio', password: SENHA_DO_TECNICO, email: 'tecnico-relatorio@exemplo.test', role: 'tech' }
+    });
+    assert.ok([200, 201].includes(created.status), JSON.stringify(created.body));
+    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { username: 'tecnico-relatorio', password: SENHA_DO_TECNICO } });
+    const res = await call(`${panelUrl}/api/contacts/R-100/teiah/report`, { headers: authHeaders(login.body.data.token) });
+    assert.equal(res.status, 403);
+    assert.equal(res.body.code, 'missing_permission');
+  });
+
+  it('consulta sem dados para imprimir recebe teiah_report_empty', async () => {
+    await addContract('R-300', 'Sem Dados', CPF_C);
+    const res = await relatorio('R-300');
+    assert.equal(res.status, 404);
+    assert.equal((await res.json()).code, 'teiah_report_empty');
   });
 });

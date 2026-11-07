@@ -1268,6 +1268,8 @@ export default {
   'teiah.error.unreachable': 'Could not reach TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid did not respond within the time limit',
   'teiah.error.invalidResponse': 'TeiaH Valid sent an invalid response',
+  'teiah.error.reportNone': "This client has not been consulted on TeiaH Valid yet",
+  'teiah.error.reportEmpty': "TeiaH Valid has no printable report for this consultation",
   'teiah.error.credentialsRejected': 'TeiaH Valid rejected the API key',
   'teiah.error.rateLimited': 'TeiaH Valid is rate limiting requests; try again later',
   'teiah.error.status': 'TeiaH Valid responded with status {status}',

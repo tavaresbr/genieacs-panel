@@ -4220,6 +4220,10 @@ export const contactsAPI = {
   teiahConsult: (key: string, fresh = false) =>
     apiClient.post<{ teiah: ContactTeiah; cached: boolean }>(`/contacts/${encodeURIComponent(key)}/teiah`, fresh ? { fresh: true } : {}),
 
+  /** The TeiaH's report PDF of this client (from its history: no new paid call). */
+  teiahReport: (key: string, mode: 'completo' | 'resumo' = 'completo') =>
+    apiClient.getBlob(`/contacts/${encodeURIComponent(key)}/teiah/report?mode=${mode}`),
+
   /** Merges the phones and e-mails the TeiaH found into the record. */
   teiahApply: (key: string) =>
     apiClient.post<ContactTeiahApplied & { profile: ContactProfile }>(`/contacts/${encodeURIComponent(key)}/teiah/apply`, {}),

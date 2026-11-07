@@ -850,6 +850,16 @@ export const casos = [
     coluna: 'contract'
   },
   {
+    // O relatório (PDF) da TeiaH: a chave do vizinho não acha ficha, então
+    // nenhum documento vai ao histórico da TeiaH.
+    chave: 'sgpContract',
+    label: 'GET /api/contacts/:key/teiah/report',
+    method: 'GET',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/teiah/report`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  {
     chave: 'sgpContract',
     label: 'POST /api/contacts/:key/teiah/apply',
     method: 'POST',

@@ -1268,6 +1268,8 @@ export default {
   'teiah.error.unreachable': 'TeiaH Valid に接続できませんでした',
   'teiah.error.timeout': 'TeiaH Valid が制限時間内に応答しませんでした',
   'teiah.error.invalidResponse': 'TeiaH Valid が無効な応答を返しました',
+  'teiah.error.reportNone': "この顧客はまだ TeiaH Valid で照会されていません",
+  'teiah.error.reportEmpty': "TeiaH Valid にはこの照会の印刷可能なレポートがありません",
   'teiah.error.credentialsRejected': 'TeiaH Valid が API キーを拒否しました',
   'teiah.error.rateLimited': 'TeiaH Valid がリクエストを制限しています。後で再試行してください',
   'teiah.error.status': 'TeiaH Valid がステータス {status} を返しました',

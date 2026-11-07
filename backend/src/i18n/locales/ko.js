@@ -1271,6 +1271,8 @@ export default {
   'teiah.error.unreachable': 'TeiaH Valid에 연결할 수 없습니다',
   'teiah.error.timeout': 'TeiaH Valid가 제한 시간 내에 응답하지 않았습니다',
   'teiah.error.invalidResponse': 'TeiaH Valid가 잘못된 응답을 보냈습니다',
+  'teiah.error.reportNone': "이 고객은 아직 TeiaH Valid에서 조회되지 않았습니다",
+  'teiah.error.reportEmpty': "TeiaH Valid에 이 조회의 인쇄 가능한 보고서가 없습니다",
   'teiah.error.credentialsRejected': 'TeiaH Valid가 API 키를 거부했습니다',
   'teiah.error.rateLimited': 'TeiaH Valid가 요청을 제한하고 있습니다. 나중에 다시 시도하십시오',
   'teiah.error.status': 'TeiaH Valid가 상태 코드 {status}(으)로 응답했습니다',

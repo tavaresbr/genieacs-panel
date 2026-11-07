@@ -1268,6 +1268,8 @@ export default {
   'teiah.error.unreachable': '無法連線 TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid 未在時限內回應',
   'teiah.error.invalidResponse': 'TeiaH Valid 回傳了無效回應',
+  'teiah.error.reportNone': "此客戶尚未在 TeiaH Valid 查詢過",
+  'teiah.error.reportEmpty': "TeiaH Valid 沒有此次查詢的可列印報告",
   'teiah.error.credentialsRejected': 'TeiaH Valid 拒絕了 API 金鑰',
   'teiah.error.rateLimited': 'TeiaH Valid 正在限制請求，請稍後重試',
   'teiah.error.status': 'TeiaH Valid 回傳狀態碼 {status}',

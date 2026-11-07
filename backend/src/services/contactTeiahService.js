@@ -86,6 +86,31 @@ class ContactTeiahService {
   }
 
   /**
+   * The TeiaH's own report of this client (the one its site shows and prints),
+   * as a PDF: the latest consultation of the record's CPF/CNPJ in the
+   * provider's TeiaH history, made from data the TeiaH already holds — no new
+   * paid call, and nothing of it kept in the panel.
+   *
+   * @returns {Promise<{ pdf: Buffer, consultationId: string, document: string }>}
+   */
+  static async report(key, mode = 'completo') {
+    const row = await ContactProfileService.rowFor(key);
+    if (!row) throw new ContactProfileError('contacts.error.notFound', { code: 'not_found', status: 404 });
+    const client = await ContactProfileService.clientFor(row);
+    const document = digitsOf(shownValue('document', client, row));
+    if (!personTypeOf(document)) {
+      throw new ContactProfileError('contacts.error.invalidDocument', { code: 'invalid_document' });
+    }
+    TeiahService.requireReady(await TeiahService.getConfig());
+    const found = await TeiahService.findPrintableConsultation(document);
+    if (!found) {
+      throw new TeiahError('teiah.error.reportNone', { code: 'teiah_report_none', status: 404 });
+    }
+    const pdf = await TeiahService.consultationPdf(found.id, mode);
+    return { pdf, consultationId: found.id, document };
+  }
+
+  /**
    * Merges the snapshot's phones and e-mails into the record, the way an
    * operator's edit does (restorable, nothing removed), and gives the contracts
    * that have no WhatsApp number the first mobile.

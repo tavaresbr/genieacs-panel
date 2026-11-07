@@ -278,6 +278,32 @@ class ContactController {
     }
   }
 
+  /**
+   * `GET /api/contacts/:key/teiah/report?mode=completo|resumo` — the TeiaH's
+   * report PDF of this client, passed through: shown inline, never cached.
+   */
+  static async teiahReport(req, res) {
+    try {
+      const mode = req.query.mode === 'resumo' ? 'resumo' : 'completo';
+      const { pdf, consultationId, document } = await ContactTeiahService.report(req.params.key, mode);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_TEIAH_REPORT,
+        subjectType: 'contact',
+        subjectId: req.params.key,
+        detail: { mode, consultationId }
+      });
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="teiah-${document}-${mode}.pdf"`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return res.send(pdf);
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.lookupFailed');
+    }
+  }
+
   /** `POST /api/contacts/:key/teiah/apply` — merges what the TeiaH found into the record. */
   static async teiahApply(req, res) {
     try {

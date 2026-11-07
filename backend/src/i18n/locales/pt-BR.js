@@ -1267,6 +1267,8 @@ export default {
   'teiah.error.unreachable': 'Não foi possível alcançar a TeiaH Valid',
   'teiah.error.timeout': 'A TeiaH Valid não respondeu dentro do tempo limite',
   'teiah.error.invalidResponse': 'A TeiaH Valid enviou uma resposta inválida',
+  'teiah.error.reportNone': "Este cliente ainda não foi consultado na TeiaH Valid",
+  'teiah.error.reportEmpty': "A TeiaH Valid não tem relatório para imprimir dessa consulta",
   'teiah.error.credentialsRejected': 'A TeiaH Valid recusou a chave de API',
   'teiah.error.rateLimited': 'A TeiaH Valid limitou as requisições; tente mais tarde',
   'teiah.error.status': 'A TeiaH Valid respondeu com status {status}',
