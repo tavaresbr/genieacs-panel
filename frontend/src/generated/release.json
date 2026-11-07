@@ -1,21 +1,15 @@
 {
-  "version": "1.28.7",
-  "build": 1555,
-  "sourceCommit": "df7c942cbb59",
+  "version": "1.28.8",
+  "build": 1558,
+  "sourceCommit": "3e599d4d641d",
   "releasedAt": "2026-11-07",
-  "basedOnTag": "v1.28.6",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/6c7b6b3c6521...df7c942cbb59",
+  "basedOnTag": "v1.28.7",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/9091707ba1b1...3e599d4d641d",
   "changes": [
     {
-      "shortHash": "caa7b2ac",
+      "shortHash": "4d72d3b1",
       "date": "2026-11-07",
-      "title": "Barra fixa de atalhos embaixo (Operação, WhatsApp, Topologia, Configuração e Mais)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "e4ef5e1b",
-      "date": "2026-11-07",
-      "title": "Novo cliente: consulta do endereço da instalação na TeiaH, com relatório",
+      "title": "Barra do celular: Contatos no lugar de Topologia",
       "category": "Maintenance"
     }
   ]

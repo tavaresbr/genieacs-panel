@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.8] - 2026-11-07
+
+### Maintenance
+
+- Barra do celular: Contatos no lugar de Topologia (`4d72d3b1`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/9091707ba1b1...3e599d4d641d)
+
 ## [1.28.7] - 2026-11-07
 
 ### Maintenance
