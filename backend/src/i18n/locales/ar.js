@@ -1179,6 +1179,7 @@ export default {
   'contacts.error.invalidDocument': 'رقم CPF أو CNPJ غير صالح',
   'contacts.error.teiahNotConsulted': 'استعلم من TeiaH قبل التطبيق',
   'contacts.error.invalidCep': 'رمز بريدي غير صالح',
+  'contacts.error.addressIncomplete': "للاستعلام عن العنوان في TeiaH، املأ الرمز البريدي والشارع والرقم",
   'contacts.error.alreadyInSgp': 'رقم CPF/CNPJ هذا مسجل بالفعل في SGP ({name})',
   'contacts.error.notInSgp': "رقم CPF/CNPJ هذا غير موجود في SGP: سجّل العميل أولًا",
   'contacts.error.loginTaken': "اسم الدخول مستخدم بالفعل. اقتراح: {suggestion}",

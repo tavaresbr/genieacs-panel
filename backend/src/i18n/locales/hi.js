@@ -1187,6 +1187,7 @@ export default {
   'contacts.error.invalidDocument': 'अमान्य CPF या CNPJ',
   'contacts.error.teiahNotConsulted': 'लागू करने से पहले TeiaH में खोजें',
   'contacts.error.invalidCep': 'अमान्य पिन कोड',
+  'contacts.error.addressIncomplete': "TeiaH में पता जाँचने के लिए CEP, सड़क और नंबर भरें",
   'contacts.error.alreadyInSgp': 'यह CPF/CNPJ पहले से SGP में पंजीकृत है ({name})',
   'contacts.error.notInSgp': "यह CPF/CNPJ SGP में नहीं है: पहले ग्राहक को दर्ज करें",
   'contacts.error.loginTaken': "यह लॉगिन पहले से उपयोग में है। सुझाव: {suggestion}",

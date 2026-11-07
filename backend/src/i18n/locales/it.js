@@ -1185,6 +1185,7 @@ export default {
   'contacts.error.invalidDocument': 'CPF o CNPJ non valido',
   'contacts.error.teiahNotConsulted': 'Consulta TeiaH prima di applicare',
   'contacts.error.invalidCep': 'CAP non valido',
+  'contacts.error.addressIncomplete': "Per verificare l'indirizzo su TeiaH, compila CEP, via e numero",
   'contacts.error.alreadyInSgp': 'Questo CPF/CNPJ è già registrato nell’SGP ({name})',
   'contacts.error.notInSgp': "Questo CPF/CNPJ non è nello SGP: registra prima il cliente",
   'contacts.error.loginTaken': "Il login è già in uso. Suggerimento: {suggestion}",

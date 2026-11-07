@@ -72,6 +72,13 @@ const HISTORICO = [
   { id: 'c-falhou', documento: '813.735.630-44', createdAt: '2026-11-04T10:00:00Z', imprimivel: false },
   { id: 'sem-dados', documento: '111.444.777-35', createdAt: '2026-11-01T10:00:00Z', imprimivel: true }
 ];
+// A consulta por endereço: o que a TeiaH recebeu, e o histórico dessas consultas.
+const enderecosConsultados = [];
+const HISTORICO_ENDERECO = [
+  { id: 'e-certo', tipo: 'ENDERECO', cep: '68180430', numero: '398', createdAt: '2026-11-02T10:00:00Z', imprimivel: true },
+  // Mesmo CEP, outro número: não é a casa consultada.
+  { id: 'e-vizinho', tipo: 'ENDERECO', cep: '68180430', numero: '400', createdAt: '2026-11-05T10:00:00Z', imprimivel: true }
+];
 // Para o teste do erro: a TeiaH fora do ar não deixa nada guardado.
 let teiahFora = false;
 const auth = () => ({ headers: authHeaders(token) });
@@ -92,6 +99,9 @@ function startTeiahStub() {
         historico.push(url);
         if (url.pathname === '/api/consultations') {
           const search = url.searchParams.get('search');
+          if (url.searchParams.get('type') === 'ENDERECO') {
+            return send(200, { data: HISTORICO_ENDERECO.filter((item) => item.cep === search) });
+          }
           return send(200, { total: 3, data: HISTORICO.filter((item) => item.documento.replace(/\D/g, '').startsWith(search.slice(0, 6))) });
         }
         const pdf = url.pathname.match(/^\/api\/consultations\/([\w-]+)\/pdf$/);
@@ -101,6 +111,14 @@ function startTeiahStub() {
           return res.end(`%PDF-1.4 relatorio ${pdf[1]} ${url.searchParams.get('mode')}`);
         }
         return send(404, {});
+      }
+      if (req.url === '/api/whatsapp/consulta') {
+        const body = JSON.parse(raw || '{}');
+        enderecosConsultados.push(body);
+        if (body.cep === '68180-430') {
+          return send(201, { resultado: { score: { data: { score: 420, risco: 'ALTO' } }, dividas: { data: [{ valor: '150,00' }, { valor: '50' }] } } });
+        }
+        return send(201, { mensagem: 'Nenhum registro para este endereço' });
       }
       const { cpf } = JSON.parse(raw || '{}');
       consultas.push(cpf);
@@ -395,5 +413,79 @@ describe('relatório da TeiaH na ficha', () => {
     const res = await relatorio('R-300');
     assert.equal(res.status, 404);
     assert.equal((await res.json()).code, 'teiah_report_empty');
+  });
+});
+
+describe('consulta de endereço no Novo cliente', () => {
+  const ENDERECO = { zip: '68180-430', street: 'Rua Riomar Tapajós', number: '398', district: 'Bela Vista', complement: '' };
+  const consultar = (body) => call(`${panelUrl}/api/contacts/lookup/address`, { method: 'POST', ...auth(), body });
+
+  it('manda CEP, rua e número e traz o score, o risco e as dívidas', async () => {
+    enderecosConsultados.length = 0;
+    const res = await consultar({ address: ENDERECO });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(enderecosConsultados, [{ cep: '68180-430', logradouro: 'Rua Riomar Tapajós', numero: '398', bairro: 'Bela Vista' }]);
+    const { result, cached } = res.body.data;
+    assert.equal(cached, false);
+    assert.equal(result.found, true);
+    assert.equal(result.score, 420);
+    assert.equal(result.risk, 'ALTO');
+    assert.equal(result.debtCount, 2);
+    assert.equal(result.debtAmount, 200);
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contact.teiah_address' }).orderBy('id', 'desc').first());
+    assert.deepEqual(JSON.parse(trilha.detail), { found: true, cached: false });
+    assert.equal(trilha.detail.includes('68180'), false, 'a trilha levou o CEP');
+  });
+
+  it('o mesmo endereço não é pago de novo; fresh consulta outra vez', async () => {
+    enderecosConsultados.length = 0;
+    const repetida = await consultar({ address: { ...ENDERECO, number: ' 398 ' } });
+    assert.equal(repetida.body.data.cached, true);
+    assert.deepEqual(enderecosConsultados, []);
+    const nova = await consultar({ address: ENDERECO, fresh: true });
+    assert.equal(nova.body.data.cached, false);
+    assert.equal(enderecosConsultados.length, 1);
+  });
+
+  it('um endereço sem registro volta como não encontrado', async () => {
+    const res = await consultar({ address: { ...ENDERECO, zip: '68180-000' } });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.result.found, false);
+    assert.equal(res.body.data.result.message, 'Nenhum registro para este endereço');
+  });
+
+  it('endereço incompleto não chega à TeiaH', async () => {
+    enderecosConsultados.length = 0;
+    for (const address of [{ ...ENDERECO, zip: '6818' }, { ...ENDERECO, number: '' }, { ...ENDERECO, street: 'RUA' }]) {
+      const res = await consultar({ address });
+      assert.equal(res.status, 400, JSON.stringify(res.body));
+      assert.equal(res.body.code, 'address_incomplete');
+    }
+    assert.deepEqual(enderecosConsultados, []);
+  });
+
+  it('o relatório vem do histórico, da consulta deste CEP e número', async () => {
+    historico.length = 0;
+    const res = await fetch(`${panelUrl}/api/contacts/lookup/address/report?cep=68180-430&number=398&mode=resumo`, auth());
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(await res.text(), '%PDF-1.4 relatorio e-certo resumo');
+    assert.match(res.headers.get('content-disposition'), /teiah-endereco-68180430-resumo\.pdf/);
+    assert.equal(historico[0].searchParams.get('type'), 'ENDERECO');
+    assert.equal(historico[0].searchParams.get('search'), '68180430');
+    const semConsulta = await fetch(`${panelUrl}/api/contacts/lookup/address/report?cep=68180430&number=12`, auth());
+    assert.equal(semConsulta.status, 404);
+    assert.equal((await semConsulta.json()).code, 'teiah_report_none');
+  });
+
+  it('quem não tem teiah.act não consulta o endereço', async () => {
+    const SENHA_DO_TECNICO = ['senha', 'do', 'tecnico', 'endereco', '1'].join('-');
+    const created = await call(`${panelUrl}/api/users`, {
+      method: 'POST', ...auth(),
+      body: { username: 'tecnico-endereco', password: SENHA_DO_TECNICO, email: 'tecnico-endereco@exemplo.test', role: 'tech' }
+    });
+    assert.ok([200, 201].includes(created.status), JSON.stringify(created.body));
+    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { username: 'tecnico-endereco', password: SENHA_DO_TECNICO } });
+    const res = await call(`${panelUrl}/api/contacts/lookup/address`, { method: 'POST', headers: authHeaders(login.body.data.token), body: { address: ENDERECO } });
+    assert.equal(res.status, 403);
   });
 });

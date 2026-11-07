@@ -499,6 +499,19 @@ through the panel (the API key never reaches the browser) and is not stored.
 A client never consulted gets the **Consult on TeiaH** button instead. It needs
 the `teiah.act` permission, and each opening is recorded in the audit trail.
 
+### TeiaH address check in New client
+
+In **New client**, once the installation address has a CEP, street and number,
+**Check address on TeiaH** calls `POST /api/whatsapp/consulta` and shows, before
+anyone is registered, the score and risk TeiaH gives that address and the debts
+found there, with **View report** (the same PDF popup, from the TeiaH history
+with `type=ENDERECO`). The check is paid: the button asks first, and the panel
+reuses a check of the same CEP and number for 30 days (7 when nothing was
+found). The answer's format is not documented, so fields are read under several
+names, and an answer with nothing recognized logs only its keys. It needs
+`teiah.act`; the audit trail records whether something was found, never the
+address.
+
 ## Automatic activation
 
 Open **Settings → Automatic activation** to let a newly installed ONT configure

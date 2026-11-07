@@ -384,6 +384,46 @@ class ContactController {
   }
 
   /** `GET /api/contacts/lookup/cep?cep=` — the address of a CEP, to fill the form. */
+  /** `POST /api/contacts/lookup/address` — the TeiaH check of the installation address. */
+  static async lookupAddressTeiah(req, res) {
+    try {
+      const result = await ContactOnboardingService.lookupAddressTeiah(req.body);
+      // Neither the address nor the CEP: whether something was found, and if it was paid.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_TEIAH_ADDRESS,
+        subjectType: 'contact',
+        subjectId: null,
+        detail: { found: result.result.found === true, cached: result.cached }
+      });
+      return res.json(createResponse(req.t('contacts.lookupDone'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.lookupFailed');
+    }
+  }
+
+  /** `GET /api/contacts/lookup/address/report?cep=&number=&mode=` — that check's report PDF. */
+  static async addressTeiahReport(req, res) {
+    try {
+      const mode = req.query.mode === 'resumo' ? 'resumo' : 'completo';
+      const { pdf, consultationId, cep } = await ContactOnboardingService.addressTeiahReport(req.query, mode);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_TEIAH_REPORT,
+        subjectType: 'contact',
+        subjectId: null,
+        detail: { mode, consultationId, origin: 'address' }
+      });
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="teiah-endereco-${cep}-${mode}.pdf"`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      return res.send(pdf);
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.lookupFailed');
+    }
+  }
+
   static async lookupCep(req, res) {
     try {
       const result = await ContactOnboardingService.lookupCep(req.query?.cep);

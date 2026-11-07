@@ -1190,6 +1190,7 @@ export default {
   'contacts.error.invalidDocument': 'CPF 또는 CNPJ가 올바르지 않습니다',
   'contacts.error.teiahNotConsulted': '적용하기 전에 TeiaH에서 조회하세요',
   'contacts.error.invalidCep': '우편번호가 올바르지 않습니다',
+  'contacts.error.addressIncomplete': "TeiaH에서 주소를 조회하려면 CEP, 거리, 번지를 입력하세요",
   'contacts.error.alreadyInSgp': '이 CPF/CNPJ는 이미 SGP에 등록되어 있습니다({name})',
   'contacts.error.notInSgp': "이 CPF/CNPJ는 SGP에 없습니다. 먼저 고객을 등록하세요",
   'contacts.error.loginTaken': "이 로그인은 이미 사용 중입니다. 제안: {suggestion}",
