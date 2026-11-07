@@ -4102,6 +4102,16 @@ export type ContactProfilePatch = Partial<{
 }>
 
 /** What the panel knows about a CPF/CNPJ before the "Novo cliente" form. */
+/** What the TeiaH says about an installation address. Unknown fields come null. */
+export interface TeiahAddressCheck {
+  found: boolean
+  score?: number | null
+  risk?: string | null
+  debtCount?: number | null
+  debtAmount?: number | null
+  message?: string | null
+}
+
 export interface ContactDocumentLookup {
   document: string
   personType: 'PF' | 'PJ'
@@ -4136,6 +4146,8 @@ export interface ContactDocumentLookup {
   prefillError: boolean
   /** Whether the TeiaH was asked (the document is nobody's yet and the integration is on). */
   teiahConsulted: boolean
+  /** The TeiaH integration is configured: the address check can be offered. */
+  teiahReady?: boolean
   /** The answer was one the panel already held (younger than 30 days): no new paid call. */
   teiahCached?: boolean
   teiahConsultedAt?: string | null
@@ -4221,6 +4233,16 @@ export const contactsAPI = {
     apiClient.post<{ teiah: ContactTeiah; cached: boolean }>(`/contacts/${encodeURIComponent(key)}/teiah`, fresh ? { fresh: true } : {}),
 
   /** The TeiaH's report PDF of this client (from its history: no new paid call). */
+  /** The TeiaH check of an installation address (a paid call, kept 30 days). */
+  teiahAddress: (address: { zip: string; street: string; number: string; district?: string; complement?: string }, fresh = false) =>
+    apiClient.post<{ result: TeiahAddressCheck; consultedAt: string; cached: boolean }>(
+      '/contacts/lookup/address', { address, ...(fresh ? { fresh: true } : {}) }
+    ),
+
+  /** That address check's report PDF, from the TeiaH history. */
+  teiahAddressReport: (cep: string, number: string, mode: 'completo' | 'resumo' = 'completo') =>
+    apiClient.getBlob(`/contacts/lookup/address/report?cep=${encodeURIComponent(cep.replace(/\D/g, ''))}&number=${encodeURIComponent(number)}&mode=${mode}`),
+
   teiahReport: (key: string, mode: 'completo' | 'resumo' = 'completo') =>
     apiClient.getBlob(`/contacts/${encodeURIComponent(key)}/teiah/report?mode=${mode}`),
 

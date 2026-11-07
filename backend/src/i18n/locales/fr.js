@@ -1183,6 +1183,7 @@ export default {
   'contacts.error.invalidDocument': 'CPF ou CNPJ invalide',
   'contacts.error.teiahNotConsulted': 'Consultez TeiaH avant d\'appliquer',
   'contacts.error.invalidCep': 'Code postal invalide',
+  'contacts.error.addressIncomplete': "Pour vérifier l'adresse sur TeiaH, renseignez le CEP, la rue et le numéro",
   'contacts.error.alreadyInSgp': 'Ce CPF/CNPJ est déjà enregistré dans le SGP ({name})',
   'contacts.error.notInSgp': "Ce CPF/CNPJ n'est pas dans le SGP : enregistrez d'abord le client",
   'contacts.error.loginTaken': "Cet identifiant est déjà utilisé. Suggestion : {suggestion}",

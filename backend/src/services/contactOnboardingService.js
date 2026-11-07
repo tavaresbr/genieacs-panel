@@ -4,7 +4,7 @@ import SgpContact from '../models/SgpContact.js';
 import WaContactService from './waContactService.js';
 import ContactProfileService, { ContactProfileError } from './contactProfileService.js';
 import { lookupCnpj } from './cnpjLookupService.js';
-import TeiahService from './teiahService.js';
+import TeiahService, { TeiahError } from './teiahService.js';
 import AsaasCustomer from '../models/AsaasCustomer.js';
 import AsaasProviderService from './asaasProviderService.js';
 import { lookupCep } from './addressLookupService.js';
@@ -192,7 +192,9 @@ class ContactOnboardingService {
 
     // Nobody here knows this document: the TeiaH, when the provider has it,
     // fills the form — a CPF has no other source.
-    if (!known && TeiahService.isReady(await TeiahService.getConfig())) {
+    // Whether the TeiaH is configured: also what shows the address check in the form.
+    const teiahReady = TeiahService.isReady(await TeiahService.getConfig());
+    if (!known && teiahReady) {
       teiahConsulted = true;
       try {
         // A consultation younger than 30 days is not paid for twice.
@@ -307,6 +309,7 @@ class ContactOnboardingService {
       existing,
       prefillError,
       teiahConsulted,
+      teiahReady,
       teiahCached,
       teiahConsultedAt,
       teiahScore,
@@ -366,6 +369,49 @@ class ContactOnboardingService {
       }
     }
     return result;
+  }
+
+  /** The address the TeiaH address check needs: CEP, street and number. */
+  static addressForTeiah(body) {
+    const address = body?.address ?? body ?? {};
+    const cep = String(address.zip ?? address.cep ?? '').replace(/\D/g, '');
+    const street = clean(address.street);
+    const number = clean(address.number, 20);
+    if (cep.length !== 8 || !street || !number || BARE_STREET.test(street)) {
+      throw new ContactProfileError('contacts.error.addressIncomplete', { code: 'address_incomplete' });
+    }
+    return {
+      cep,
+      street,
+      number,
+      district: clean(address.district),
+      complement: clean(address.complement)
+    };
+  }
+
+  /**
+   * "Consultar endereço na TeiaH" in Novo cliente: whether the installation
+   * address has a debt history, before anyone is registered. A paid call,
+   * behind the panel's 30-day memory of the same CEP and number.
+   */
+  static async lookupAddressTeiah(body) {
+    const address = this.addressForTeiah(body);
+    TeiahService.requireReady(await TeiahService.getConfig());
+    return TeiahService.consultAddressCached(address, { fresh: body?.fresh === true });
+  }
+
+  /** The TeiaH's report PDF of that address check, from its history: no new paid call. */
+  static async addressTeiahReport(query, mode) {
+    const cep = String(query?.cep ?? '').replace(/\D/g, '');
+    const number = clean(query?.number ?? query?.numero, 20);
+    if (cep.length !== 8 || !number) {
+      throw new ContactProfileError('contacts.error.addressIncomplete', { code: 'address_incomplete' });
+    }
+    TeiahService.requireReady(await TeiahService.getConfig());
+    const found = await TeiahService.findPrintableAddressConsultation(cep, number);
+    if (!found) throw new TeiahError('teiah.error.reportNone', { code: 'teiah_report_none', status: 404 });
+    const pdf = await TeiahService.consultationPdf(found.id, mode);
+    return { pdf, consultationId: found.id, cep };
   }
 
   static async lookupCep(cep) {

@@ -1187,6 +1187,7 @@ export default {
   'contacts.error.invalidDocument': 'CPF または CNPJ が無効です',
   'contacts.error.teiahNotConsulted': '適用する前に TeiaH で照会してください',
   'contacts.error.invalidCep': '郵便番号が無効です',
+  'contacts.error.addressIncomplete': "TeiaH で住所を照会するには、CEP・通り・番地を入力してください",
   'contacts.error.alreadyInSgp': 'この CPF/CNPJ はすでに SGP に登録されています（{name}）',
   'contacts.error.notInSgp': "この CPF/CNPJ は SGP にありません。先に顧客を登録してください",
   'contacts.error.loginTaken': "このログインは既に使用されています。候補: {suggestion}",

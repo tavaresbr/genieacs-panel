@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { contactsAPI } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 
 type Mode = 'completo' | 'resumo'
+
+type ReportResponse = { success: boolean; blob?: Blob; filename?: string; code?: string; message?: string }
 
 type State =
   | { kind: 'loading' }
@@ -17,24 +18,31 @@ type State =
  * panel (the key never reaches the browser) and is never kept: it lives in an
  * object URL freed when the popup closes.
  */
-export function TeiahReportModal({ contactKey, onClose, onConsult, consulting }: {
-  contactKey: string
+export function TeiahReportModal({ load, reportKey, onClose, onConsult, consulting = false, noneText }: {
+  /** Fetches the PDF of one mode: the client record's, or an address check's. */
+  load: (mode: Mode) => Promise<ReportResponse>
+  /** Changes when `load` points elsewhere (another client, another address). */
+  reportKey: string
   onClose: () => void
   /** "Consultar na TeiaH" for a client never consulted: a paid call, the card's own. */
-  onConsult: () => Promise<void>
-  consulting: boolean
+  onConsult?: () => Promise<void>
+  consulting?: boolean
+  /** What to say when the TeiaH history has no report for this one. */
+  noneText?: string
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('completo')
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const frame = useRef<HTMLIFrameElement>(null)
+  const loader = useRef(load)
+  useEffect(() => { loader.current = load }, [load])
 
   useEffect(() => {
     let url: string | null = null
     let cancelled = false
     setState({ kind: 'loading' })
-    void contactsAPI.teiahReport(contactKey, mode).then((res) => {
+    void loader.current(mode).then((res) => {
       if (cancelled) return
       if (!res.success || !res.blob) {
         if (res.code === 'teiah_report_none') setState({ kind: 'none' })
@@ -48,7 +56,7 @@ export function TeiahReportModal({ contactKey, onClose, onConsult, consulting }:
       cancelled = true
       if (url) URL.revokeObjectURL(url)
     }
-  }, [contactKey, mode, attempt, t])
+  }, [reportKey, mode, attempt, t])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
@@ -57,6 +65,7 @@ export function TeiahReportModal({ contactKey, onClose, onConsult, consulting }:
   }, [onClose])
 
   const consultThenLoad = async () => {
+    if (!onConsult) return
     await onConsult()
     setAttempt((value) => value + 1)
   }
@@ -114,11 +123,15 @@ export function TeiahReportModal({ contactKey, onClose, onConsult, consulting }:
           )}
           {state.kind === 'none' && (
             <div className="p-6 text-sm">
-              <p>{t('contacts.teiahReport.none')}</p>
-              <button type="button" className="modern-button mt-3" disabled={consulting} onClick={() => void consultThenLoad()}>
-                <Icon name="refresh" size={16} className={consulting ? 'animate-spin' : ''} /> {t('contacts.profile.teiahConsult')}
-              </button>
-              <p className="mt-2 text-xs text-muted-foreground">{t('contacts.teiahReport.consultHint')}</p>
+              <p>{noneText ?? t('contacts.teiahReport.none')}</p>
+              {onConsult && (
+                <>
+                  <button type="button" className="modern-button mt-3" disabled={consulting} onClick={() => void consultThenLoad()}>
+                    <Icon name="refresh" size={16} className={consulting ? 'animate-spin' : ''} /> {t('contacts.profile.teiahConsult')}
+                  </button>
+                  <p className="mt-2 text-xs text-muted-foreground">{t('contacts.teiahReport.consultHint')}</p>
+                </>
+              )}
             </div>
           )}
           {state.kind === 'error' && (

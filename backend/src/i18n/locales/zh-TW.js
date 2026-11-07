@@ -1187,6 +1187,7 @@ export default {
   'contacts.error.invalidDocument': 'CPF 或 CNPJ 無效',
   'contacts.error.teiahNotConsulted': '請先在 TeiaH 查詢再套用',
   'contacts.error.invalidCep': '郵遞區號無效',
+  'contacts.error.addressIncomplete': "要在 TeiaH 查詢地址，請填寫 CEP、街道和門牌號",
   'contacts.error.alreadyInSgp': '此 CPF/CNPJ 已在 SGP 中登錄（{name}）',
   'contacts.error.notInSgp': "此 CPF/CNPJ 不在 SGP 中：請先登錄客戶",
   'contacts.error.loginTaken': "此登入名稱已被使用。建議：{suggestion}",

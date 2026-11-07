@@ -1188,6 +1188,7 @@ export default {
   'contacts.error.invalidDocument': 'Неверный CPF или CNPJ',
   'contacts.error.teiahNotConsulted': 'Сначала запросите данные в TeiaH',
   'contacts.error.invalidCep': 'Неверный индекс',
+  'contacts.error.addressIncomplete': "Чтобы проверить адрес в TeiaH, заполните CEP, улицу и номер дома",
   'contacts.error.alreadyInSgp': 'Этот CPF/CNPJ уже зарегистрирован в SGP ({name})',
   'contacts.error.notInSgp': "Этого CPF/CNPJ нет в SGP: сначала зарегистрируйте клиента",
   'contacts.error.loginTaken': "Этот логин уже используется. Предложение: {suggestion}",

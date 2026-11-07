@@ -24,6 +24,24 @@ router.get(
   ContactController.lookupDocument
 );
 router.get('/lookup/cep', authenticateToken, requirePermission('contacts.edit'), sgpAdminLimiter, ContactController.lookupCep);
+// The TeiaH address check of the installation address (a paid call) and its
+// report PDF from the TeiaH history (no new call): the integration's `act`.
+router.post(
+  '/lookup/address',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('teiah.act'),
+  sgpAdminLimiter,
+  ContactController.lookupAddressTeiah
+);
+router.get(
+  '/lookup/address/report',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('teiah.act'),
+  sgpAdminLimiter,
+  ContactController.addressTeiahReport
+);
 // The TeiaH for clients already in the panel — a paid call that sends a CPF/CNPJ
 // out, so the integration's own `act` capability on top of editing. The static
 // paths come before `/:key`.

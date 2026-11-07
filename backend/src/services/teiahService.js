@@ -34,6 +34,8 @@ export const IMPORT_MANY_PATH = '/api/import/addresses';
 export const CONSULT_DOCUMENT_PATH = '/api/whatsapp/consulta-cpf';
 /** The provider's consultation history, and each consultation's report as a PDF. */
 export const CONSULTATIONS_PATH = '/api/consultations';
+/** The address check: CEP + street + number, as the TeiaH site's "Endereço" tab. */
+export const CONSULT_ADDRESS_PATH = '/api/whatsapp/consulta';
 /** The report PDF has the person's whole record: a few MB, not the 1 MB of a JSON answer. */
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
 /**
@@ -297,6 +299,64 @@ export function normalizeConsult(payload) {
     score
   };
   return result;
+}
+
+/** A number however the API wrote it: 653, "653", "1.234,56". */
+function amount(value) {
+  if (value === null || value === undefined || value === '' || typeof value === 'object') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const raw = String(value).trim().replace(/[^\d,.-]/g, '');
+  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** The first value under these names, searched in each scope in turn. */
+function pickIn(scopes, names) {
+  for (const scope of scopes) {
+    const value = pick(scope, names);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+/**
+ * What "Novo cliente" shows out of an address check (`POST /api/whatsapp/consulta`):
+ * the score and risk the TeiaH gives the address, and the size of the debt
+ * found there. The answer's shape is not documented, so each field is looked
+ * up under several names, at the root and under `resultado`/`data`/`score`.
+ * Nothing that names a person or another provider is kept.
+ */
+export function normalizeAddressConsult(payload) {
+  if (!payload || typeof payload !== 'object') return { found: false };
+  const root = pick(payload, ['resultado', 'result', 'data']);
+  const base = root && typeof root === 'object' && !Array.isArray(root) ? root : payload;
+  const scoreSection = section(base, ['score', 'teiahScore', 'scoreEndereco']);
+  const scopes = [scoreSection && typeof scoreSection === 'object' ? scoreSection : null, base, payload].filter(Boolean);
+
+  const scoreRaw = typeof scoreSection === 'object' ? pickIn(scopes, ['score', 'pontuacao', 'nota', 'valor']) : scoreSection;
+  const score = amount(scoreRaw ?? pickIn(scopes, ['score', 'pontuacao', 'nota']));
+  const risk = text(pickIn(scopes, ['risco', 'faixaRisco', 'classificacao', 'nivelRisco', 'risk']), 60);
+  const debts = section(base, ['dividas', 'debitos', 'inadimplencias', 'ocorrencias', 'registros', 'pendencias']);
+  const debtList = Array.isArray(debts) ? debts : null;
+  const count = amount(pickIn(scopes, ['quantidade', 'quantidadeDividas', 'totalOcorrencias', 'qtdOcorrencias', 'ocorrencias', 'total']))
+    ?? (debtList ? debtList.length : null);
+  const totalAmount = amount(pickIn(scopes, ['valorTotal', 'valorDivida', 'totalDivida', 'valorDevido', 'divida', 'valor']))
+    ?? (debtList && debtList.length
+      ? debtList.reduce((sum, entry) => sum + (amount(pick(entry, ['valor', 'valorDivida', 'debito'])) ?? 0), 0) || null
+      : null);
+  const message = text(pickIn(scopes, ['mensagem', 'message', 'descricao', 'status']), 200);
+  const explicit = pickIn(scopes, ['encontrado', 'found', 'possuiRegistro', 'temRegistro']);
+
+  const known = score !== null || risk !== null || count !== null || totalAmount !== null;
+  return {
+    found: explicit !== null ? truthy(explicit) || known : known,
+    score,
+    risk,
+    debtCount: count,
+    debtAmount: totalAmount,
+    message
+  };
 }
 
 class TeiahService {
@@ -626,19 +686,61 @@ class TeiahService {
   }
 
   /**
-   * The most recent consultation of this CPF/CNPJ in the provider's TeiaH
-   * history that has a report to print — made by the panel or on the TeiaH
-   * site with the same key. `search` matches loosely (any consulted field), so
-   * an item counts only when the document's digits are in it.
+   * The address check, with the panel's memory in front like the CPF one: the
+   * same CEP and number checked within `CONSULT_CACHE_DAYS` (a miss,
+   * `CONSULT_MISS_CACHE_DAYS`) is not paid for twice. Kept under
+   * `end:<cep>:<número>` in `teiah_consultations` — no person behind it.
    *
-   * @returns {Promise<{ id: string, createdAt: string|null }|null>}
+   * @returns {Promise<{ result: object, consultedAt: string, cached: boolean }>}
    */
-  static async findPrintableConsultation(document) {
-    const digits = String(document ?? '').replace(/\D/g, '');
-    if (digits.length !== 11 && digits.length !== 14) return null;
+  static async consultAddressCached(address, { fresh = false } = {}) {
+    const cep = String(address?.cep ?? '').replace(/\D/g, '');
+    const number = String(address?.number ?? '').trim().toLowerCase().replace(/\s+/g, '').slice(0, 10);
+    const key = `end:${cep}:${number}`;
+    if (!fresh) {
+      const stored = await TeiahConsultation.get(key);
+      if (stored) {
+        const days = stored.data.found === false ? CONSULT_MISS_CACHE_DAYS : CONSULT_CACHE_DAYS;
+        if (Date.now() - stored.consultedAt.getTime() < days * 86_400_000) {
+          return { result: stored.data, consultedAt: stored.consultedAt.toISOString(), cached: true };
+        }
+      }
+    }
+    const result = await this.consultAddress(address);
+    const saved = await TeiahConsultation.save(key, result);
+    return { result, consultedAt: saved.consultedAt.toISOString(), cached: false };
+  }
+
+  static async consultAddress(address) {
+    const cep = String(address?.cep ?? '').replace(/\D/g, '');
+    const body = {
+      cep: cep.replace(/^(\d{5})(\d{3})$/, '$1-$2'),
+      logradouro: text(address?.street, 200),
+      numero: text(address?.number, 20),
+      ...(text(address?.district, 120) ? { bairro: text(address.district, 120) } : {}),
+      ...(text(address?.complement, 120) ? { complemento: text(address.complement, 120) } : {})
+    };
+    const { status, data } = await this.request(CONSULT_ADDRESS_PATH, body);
+    if (status === 404) return { found: false };
+    if (status < 200 || status >= 300) throw this.failure(status, data);
+    const result = normalizeAddressConsult(data);
+    if (!result.found && data && typeof data === 'object') {
+      // Only the names of the fields: enough to map the answer, nothing of it.
+      const inner = pick(data, ['resultado', 'result', 'data']);
+      const keys = [...Object.keys(data), ...(inner && typeof inner === 'object' ? Object.keys(inner).map((k) => `resultado.${k}`) : [])];
+      console.warn(`TeiaH address answer with nothing recognized; keys: ${keys.join(', ') || '-'}`);
+    }
+    return result;
+  }
+
+  /**
+   * The most recent printable consultation in the provider's TeiaH history
+   * matching `search`/`type` and accepted by `matches` (the search is loose).
+   */
+  static async findInHistory({ search, type, matches }) {
     const { status, data } = await this.request(CONSULTATIONS_PATH, null, null, {
       method: 'GET',
-      query: { search: digits, type: digits.length === 14 ? 'CNPJ' : 'CPF', limit: 20, order: 'createdAt:desc' }
+      query: { search, type, limit: 20, order: 'createdAt:desc' }
     });
     if (status < 200 || status >= 300) throw this.failure(status, data);
     const list = Array.isArray(data)
@@ -651,13 +753,49 @@ class TeiahService {
         id: text(pick(item, ['id', '_id', 'uuid', 'consultaId']), 64),
         createdAt: text(pick(item, ['createdAt', 'created_at', 'dataConsulta', 'data']), 40)
       }))
-      .filter(({ item, id }) => id && /^[\w-]{1,64}$/.test(id)
-        && item.imprimivel !== false
-        && JSON.stringify(item).replace(/\D/g, '').includes(digits));
-    // Newest first, whatever order the API kept.
+      .filter(({ item, id }) => id && /^[\w-]{1,64}$/.test(id) && item.imprimivel !== false && matches(item));
     candidates.sort((a, b) => (Date.parse(b.createdAt ?? '') || 0) - (Date.parse(a.createdAt ?? '') || 0));
     const found = candidates[0];
     return found ? { id: found.id, createdAt: found.createdAt } : null;
+  }
+
+  /** The latest address check of this CEP and number in the TeiaH history. */
+  static async findPrintableAddressConsultation(cep, number) {
+    const digits = String(cep ?? '').replace(/\D/g, '');
+    const wanted = String(number ?? '').trim().toLowerCase();
+    if (digits.length !== 8 || !wanted) return null;
+    return this.findInHistory({
+      search: digits,
+      type: 'ENDERECO',
+      matches: (item) => {
+        const flat = JSON.stringify(item);
+        if (!flat.replace(/\D/g, '').includes(digits)) return false;
+        const numberField = text(pickIn([item, pick(item, ['endereco', 'address', 'dadosConsultados', 'dados']) || {}], ['numero', 'number']), 20);
+        // The number's own field when the item has one; otherwise the number
+        // as a whole word somewhere in it.
+        if (numberField) return numberField.toLowerCase() === wanted;
+        const bare = wanted.replace(/[^\w]/g, '');
+        return Boolean(bare) && new RegExp(`(^|[^\\w])${bare}([^\\w]|$)`).test(flat.toLowerCase());
+      }
+    });
+  }
+
+  /**
+   * The most recent consultation of this CPF/CNPJ in the provider's TeiaH
+   * history that has a report to print — made by the panel or on the TeiaH
+   * site with the same key. `search` matches loosely (any consulted field), so
+   * an item counts only when the document's digits are in it.
+   *
+   * @returns {Promise<{ id: string, createdAt: string|null }|null>}
+   */
+  static async findPrintableConsultation(document) {
+    const digits = String(document ?? '').replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14) return null;
+    return this.findInHistory({
+      search: digits,
+      type: digits.length === 14 ? 'CNPJ' : 'CPF',
+      matches: (item) => JSON.stringify(item).replace(/\D/g, '').includes(digits)
+    });
   }
 
   /**

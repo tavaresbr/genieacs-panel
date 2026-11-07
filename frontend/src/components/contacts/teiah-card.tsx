@@ -6,6 +6,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { formatBrPhone } from '@/lib/phone'
 import { isSafeExternalUrl } from '@/lib/sgp'
 import { TeiahReportModal } from '@/components/contacts/teiah-report-modal'
+import { riskBadge } from '@/lib/teiah'
 
 function addressLine(address: { street?: string; number?: string; district?: string; city?: string; state?: string; zip?: string }) {
   const street = [address.street, address.number].filter(Boolean).join(', ')
@@ -17,13 +18,6 @@ function addressLine(address: { street?: string; number?: string; district?: str
 const addressKey = (address: ContactAddress) => [address.street, address.number, address.zip]
   .map((part) => String(part ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''))
   .join('|')
-
-function riskBadge(risk: string | null) {
-  const value = (risk ?? '').toUpperCase()
-  if (value.startsWith('BAIX')) return 'modern-badge-success'
-  if (value.startsWith('ALT')) return 'modern-badge-error'
-  return 'modern-badge-warning'
-}
 
 /**
  * "TeiaH Valid" on the record: what the TeiaH knows about this CPF/CNPJ — score
@@ -223,7 +217,8 @@ export function TeiahCard({ profile, onProfile, onReload }: {
       {teiah && <p className="mt-3 text-xs text-muted-foreground">{t('contacts.profile.teiahConsultedAt', { date: formatDateTime(teiah.consultedAt) })}</p>}
       {reportOpen && (
         <TeiahReportModal
-          contactKey={profile.key}
+          reportKey={profile.key}
+          load={(mode) => contactsAPI.teiahReport(profile.key, mode)}
           onClose={() => setReportOpen(false)}
           onConsult={consult}
           consulting={busy}
