@@ -7,6 +7,15 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.7] - 2026-11-07
+
+### Maintenance
+
+- Barra fixa de atalhos embaixo (Operação, WhatsApp, Topologia, Configuração e Mais) (`caa7b2ac`)
+- Novo cliente: consulta do endereço da instalação na TeiaH, com relatório (`e4ef5e1b`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/6c7b6b3c6521...df7c942cbb59)
+
 ## [1.28.6] - 2026-11-07
 
 ### Maintenance

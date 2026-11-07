@@ -1,27 +1,21 @@
 {
-  "version": "1.28.6",
-  "build": 1550,
-  "sourceCommit": "e91880d025fa",
+  "version": "1.28.7",
+  "build": 1555,
+  "sourceCommit": "df7c942cbb59",
   "releasedAt": "2026-11-07",
-  "basedOnTag": "v1.28.5",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/7a295367d059...e91880d025fa",
+  "basedOnTag": "v1.28.6",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/6c7b6b3c6521...df7c942cbb59",
   "changes": [
     {
-      "shortHash": "d262f606",
-      "date": "2026-11-06",
-      "title": "Ficha do cliente: relatório da TeiaH (PDF) num pop-up, sem consulta nova",
+      "shortHash": "caa7b2ac",
+      "date": "2026-11-07",
+      "title": "Barra fixa de atalhos embaixo (Operação, WhatsApp, Topologia, Configuração e Mais)",
       "category": "Maintenance"
     },
     {
-      "shortHash": "16f05467",
-      "date": "2026-11-06",
-      "title": "Teste do relatório TeiaH: senha de fixture no padrão dos outros testes (gitleaks)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "5554cbdc",
-      "date": "2026-11-06",
-      "title": "Senha do usuário de teste do relatório TeiaH vira constante; falsos positivos dos commits anteriores no .gitleaksignore",
+      "shortHash": "e4ef5e1b",
+      "date": "2026-11-07",
+      "title": "Novo cliente: consulta do endereço da instalação na TeiaH, com relatório",
       "category": "Maintenance"
     }
   ]
