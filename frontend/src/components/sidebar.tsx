@@ -9,6 +9,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
+import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal'
 
 /** "1.17.0 (3acef98)": a versão e o commit do build, quando há. */
@@ -95,6 +96,8 @@ export default function Sidebar() {
           <Icon name="menu" size={23} />
         </button>
       </header>
+
+      <MobileTabBar onMore={() => setIsMobileOpen(true)} />
 
       {isMobileOpen && (
         <div className="fixed inset-0 z-2000 lg:hidden" role="dialog" aria-modal="true" aria-label={t('sidebar.mainNavigation')}>

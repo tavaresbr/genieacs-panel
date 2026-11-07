@@ -42,6 +42,7 @@ import { AvailabilityToggle } from '@/components/whatsapp/assignment'
 import { NotifyToggle } from '@/components/whatsapp/message-notifier'
 import { focusedConversation } from '@/lib/wa-notify'
 import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
+import { setMobileBarHidden, setMobileBarUnread, subscribeMobileBar } from '@/lib/mobile-bar'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { cardHeightAboveKeyboard, cardOutOfView, visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
@@ -863,6 +864,17 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
   // No celular, lista OU conversa; no computador, as duas (`lib/wa-inbox-pane.ts`).
   const panes = inboxPanes(conversation !== null)
+  // A barra de atalhos do celular: some com a conversa aberta (o chat usa a
+  // tela toda) e mostra as não lidas no atalho do WhatsApp.
+  const chatOpen = conversation !== null
+  useEffect(() => {
+    setMobileBarHidden('whatsapp-chat', chatOpen)
+    return () => setMobileBarHidden('whatsapp-chat', false)
+  }, [chatOpen])
+  useEffect(() => {
+    setMobileBarUnread(unreadTotal)
+    return () => setMobileBarUnread(0)
+  }, [unreadTotal])
   // Teclado do iPhone: o Safari não encolhe a página, só a `visualViewport`
   // (`lib/wa-keyboard.ts`). Com o teclado aberto o cartão passa a caber na
   // parte visível, com a caixa de escrever logo acima dele. Só no celular.
@@ -912,8 +924,10 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       if (window.scrollY !== 0 || (next !== null && vv.offsetTop > 0)) window.scrollTo(0, 0)
       const card = cardRef.current
       const rect = card?.getBoundingClientRect() ?? null
+      // A barra de atalhos, quando aparece, fica entre o cartão e o fim da tela.
+      const barHeight = document.querySelector<HTMLElement>('[data-mobile-tab-bar]')?.offsetHeight ?? 0
       const height = rect
-        ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: rect.top })
+        ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: rect.top }, { margin: 8 + barHeight })
         : null
       if (height !== lastCard) {
         lastCard = height
@@ -940,7 +954,10 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     // Um aviso que aparece ou some acima do cartão empurra o topo dele.
     const observer = new ResizeObserver(update)
     observer.observe(body)
+    // A barra de atalhos aparecer ou sumir muda onde o cartão termina.
+    const unsubscribeBar = subscribeMobileBar(() => window.requestAnimationFrame(update))
     return () => {
+      unsubscribeBar()
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
       observer.disconnect()
@@ -979,7 +996,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
           // iPhone (ver `WhatsAppPage`), e a conta desconta o mesmo.
           <section
             ref={cardRef}
-            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-88 grid-cols-1 overflow-hidden lg:h-auto lg:min-h-128 lg:flex-1 ${
+            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom)-var(--tabbar-h))] min-h-88 grid-cols-1 overflow-hidden lg:h-auto lg:min-h-128 lg:flex-1 ${
               // Uma classe de colunas por vez: duas `lg:grid-cols-*` juntas
               // dependem da ordem do CSS gerado, e o painel caía numa segunda linha.
               // Com o Módulo SGP aberto, o painel é sempre uma coluna (nunca por

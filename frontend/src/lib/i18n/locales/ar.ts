@@ -46,6 +46,9 @@ const ar: Dictionary = {
   // الشريط الجانبي
   'sidebar.operationsAria': 'عمليات TR69 Controle',
   'sidebar.openNavigation': 'فتح قائمة التنقل',
+  'sidebar.tab.more': "المزيد",
+  'sidebar.tab.aria': "اختصارات",
+  'sidebar.tab.networkMap': "الطوبولوجيا",
   'sidebar.closeNavigation': 'إغلاق قائمة التنقل',
   'sidebar.mainNavigation': 'التنقل الرئيسي',
   'sidebar.primaryNavigation': 'الرئيسية',
