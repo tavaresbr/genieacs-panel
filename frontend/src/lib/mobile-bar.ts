@@ -47,4 +47,4 @@ export function useMobileBar(): State {
 }
 
 /** Quais atalhos a barra mostra, na ordem dela. Cada um é uma tela do menu (`lib/screens.ts`). */
-export const TAB_BAR_HREFS = ['/dashboard', '/whatsapp', '/network-map', '/settings'] as const
+export const TAB_BAR_HREFS = ['/dashboard', '/whatsapp', '/contacts', '/settings'] as const

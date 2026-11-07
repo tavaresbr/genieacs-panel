@@ -48,7 +48,6 @@ const ar: Dictionary = {
   'sidebar.openNavigation': 'فتح قائمة التنقل',
   'sidebar.tab.more': "المزيد",
   'sidebar.tab.aria': "اختصارات",
-  'sidebar.tab.networkMap': "الطوبولوجيا",
   'sidebar.closeNavigation': 'إغلاق قائمة التنقل',
   'sidebar.mainNavigation': 'التنقل الرئيسي',
   'sidebar.primaryNavigation': 'الرئيسية',

@@ -48,7 +48,6 @@ const ja: Dictionary = {
   'sidebar.openNavigation': 'ナビゲーションを開く',
   'sidebar.tab.more': "その他",
   'sidebar.tab.aria': "ショートカット",
-  'sidebar.tab.networkMap': "トポロジー",
   'sidebar.closeNavigation': 'ナビゲーションを閉じる',
   'sidebar.mainNavigation': 'メインナビゲーション',
   'sidebar.primaryNavigation': '主要',

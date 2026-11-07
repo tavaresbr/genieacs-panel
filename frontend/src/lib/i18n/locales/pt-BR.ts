@@ -48,7 +48,6 @@ const ptBR: Dictionary = {
   'sidebar.openNavigation': 'Abrir navegação',
   'sidebar.tab.more': "Mais",
   'sidebar.tab.aria': "Atalhos",
-  'sidebar.tab.networkMap': "Topologia",
   'sidebar.closeNavigation': 'Fechar navegação',
   'sidebar.mainNavigation': 'Navegação principal',
   'sidebar.primaryNavigation': 'Principal',

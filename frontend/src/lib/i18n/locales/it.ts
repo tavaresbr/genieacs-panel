@@ -48,7 +48,6 @@ const it: Dictionary = {
   'sidebar.openNavigation': 'Apri la navigazione',
   'sidebar.tab.more': "Altro",
   'sidebar.tab.aria': "Scorciatoie",
-  'sidebar.tab.networkMap': "Topologia",
   'sidebar.closeNavigation': 'Chiudi la navigazione',
   'sidebar.mainNavigation': 'Navigazione principale',
   'sidebar.primaryNavigation': 'Principale',
