@@ -258,6 +258,7 @@ describe('cadastrar no SGP', () => {
     const detalhe = JSON.parse(trilha.detail);
     assert.equal(detalhe.sgp, true);
     assert.equal(detalhe.sgpClientId, '58');
+    assert.equal(detalhe.riskAcknowledged, undefined, 'sem aviso de risco, a trilha não fala de risco');
     assert.equal(trilha.detail.includes('Joaquim'), false, 'a trilha guardou dado pessoal');
   });
 
@@ -270,9 +271,13 @@ describe('cadastrar no SGP', () => {
       responsibleName: 'Ricardo Almeida Rocha',
       responsibleDocument: '224.271.340-07',
       birthDate: '1980-03-18',
-      address: { street: 'Avenida Washington Soares', number: 'S/N', district: 'Edson Queiroz', city: 'Fortaleza', state: 'CE', zip: '60811100' }
+      address: { street: 'Avenida Washington Soares', number: 'S/N', district: 'Edson Queiroz', city: 'Fortaleza', state: 'CE', zip: '60811100' },
+      // O operador viu o aviso de risco da TeiaH e cadastrou mesmo assim.
+      riskAcknowledged: true
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contact.created' }).orderBy('id', 'desc').first());
+    assert.equal(JSON.parse(trilha.detail).riskAcknowledged, true);
     const [{ path, body }] = criados;
     assert.equal(path, '/api/crm/cliente/J');
     assert.equal(body.cpfcnpj, '67.897.733/0001-41');
@@ -780,7 +785,7 @@ describe('novo contrato para quem já está no SGP', () => {
   it('manda o pré-cadastro com o CPF do cliente e abre a ficha dele', async () => {
     criados.length = 0;
     modoCriacao = 'ok';
-    const res = await novoContrato(CONTRATO());
+    const res = await novoContrato(CONTRATO({ riskAcknowledged: true }));
     assert.equal(res.status, 201, JSON.stringify(res.body));
     const [{ path, body }] = criados;
     assert.equal(path, '/api/precadastro/F');
@@ -792,6 +797,7 @@ describe('novo contrato para quem já está no SGP', () => {
     assert.equal(res.body.data.key, 'K-EXISTE');
     const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contact.created' }).orderBy('id', 'desc').first());
     assert.equal(JSON.parse(trilha.detail).newContract, true);
+    assert.equal(JSON.parse(trilha.detail).riskAcknowledged, true);
   });
 
   it('não manda novo contrato para quem não está no SGP', async () => {

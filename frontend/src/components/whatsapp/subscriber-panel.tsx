@@ -6,6 +6,7 @@ import { Link } from 'react-router'
 import { whatsappAPI, type SgpInvoice, type WaSubscriberPanel, type WaSubscriberPartError, type WhatsAppMessage, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { ContactLink } from '@/components/whatsapp/contact-link'
+import { TeiahLeadAddress } from '@/components/whatsapp/teiah-lead-address'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
@@ -486,6 +487,12 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
             </button>
           )}
         </Card>
+
+        {can('teiah.act') && panel.teiahReady && (!panel.ready || panel.contracts.items.length === 0) && (
+          <Card icon="pin" title={t('whatsapp.sgp.teiahAddress.title')}>
+            <TeiahLeadAddress onDraft={onDraft} />
+          </Card>
+        )}
 
         {!panel.ready ? (
           <Card icon="info" title={t('whatsapp.sgp.title')}>

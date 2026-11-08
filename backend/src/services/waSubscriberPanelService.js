@@ -1,4 +1,5 @@
 import SgpService, { SgpError, deriveContractState } from './sgpService.js';
+import TeiahService from './teiahService.js';
 import DeviceService from './deviceService.js';
 import WaConversationService from './waConversationService.js';
 import WaTemplateService from './waTemplateService.js';
@@ -305,8 +306,11 @@ class WaSubscriberPanelService {
       boundVia: conversation.bound_via || null
     };
 
+    // Whether the TeiaH address check can be offered for a lead in this thread.
+    const teiahReady = TeiahService.isReady(await TeiahService.getConfig().catch(() => null));
+
     if (!SgpService.isReady(config)) {
-      return { ready: false, attendance, ticketEnabled: false };
+      return { ready: false, attendance, ticketEnabled: false, teiahReady };
     }
 
     const found = await this.findContracts(conversation, { document });
@@ -350,7 +354,8 @@ class WaSubscriberPanelService {
       // A régua parada para este contrato (comprovante recebido): a faixa
       // com "Retomar" no topo das faturas.
       dunningPause,
-      ticketEnabled: config.ticketEnabled === true
+      ticketEnabled: config.ticketEnabled === true,
+      teiahReady
     };
   }
 

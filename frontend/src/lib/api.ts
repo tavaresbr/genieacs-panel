@@ -4173,6 +4173,8 @@ export interface ContactCreateInSgp {
   birthDate?: string
   notes?: string
   address: ContactAddress & { latitude?: number; longitude?: number }
+  /** The operator saw the TeiaH risk warning and registered anyway (kept in the audit trail). */
+  riskAcknowledged?: boolean
 }
 
 /** What a spreadsheet import did — or, in a preview, would do. */
@@ -6007,6 +6009,8 @@ export type WaSubscriberPanel =
       ready: false
       attendance: WaSubscriberAttendance
       ticketEnabled: false
+      /** The TeiaH is configured: the address check can be offered for a lead. */
+      teiahReady?: boolean
     }
   | {
       ready: true
@@ -6016,6 +6020,8 @@ export type WaSubscriberPanel =
         /** How the number was recognised; `conversation` when an operator bound it. */
         matchedOn: 'manual' | 'sgp' | 'conversation' | null
       }
+      /** The TeiaH is configured: the address check can be offered for a lead. */
+      teiahReady?: boolean
       contracts: {
         items: WaSubscriberContract[]
         /** SGP registrations with no contract, to bind the thread to the client itself. */

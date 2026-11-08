@@ -7,6 +7,7 @@ import { formatBrPhone } from '@/lib/phone'
 import { isSafeExternalUrl } from '@/lib/sgp'
 import { TeiahReportModal } from '@/components/contacts/teiah-report-modal'
 import { riskBadge } from '@/lib/teiah'
+import { TeiahAddressCheck } from '@/components/contacts/teiah-address-check'
 
 function addressLine(address: { street?: string; number?: string; district?: string; city?: string; state?: string; zip?: string }) {
   const street = [address.street, address.number].filter(Boolean).join(', ')
@@ -65,6 +66,10 @@ export function TeiahCard({ profile, onProfile, onReload }: {
   }
 
   // One of the TeiaH's addresses kept on the record, among its other addresses.
+  // The addresses on the record — the main one and the extra ones — each can be
+  // checked on the TeiaH (a paid call, asked one by one).
+  const recordAddresses = [profile.fields.address.value, ...profile.fields.extraAddresses.value]
+    .filter((address): address is ContactAddress => Boolean(address && (address.street || address.zip)))
   const knownAddresses = new Set([profile.fields.address.value, ...profile.fields.extraAddresses.value]
     .filter((address): address is ContactAddress => Boolean(address)).map(addressKey))
   const addAddress = async (address: ContactAddress) => {
@@ -215,6 +220,29 @@ export function TeiahCard({ profile, onProfile, onReload }: {
       )}
 
       {teiah && <p className="mt-3 text-xs text-muted-foreground">{t('contacts.profile.teiahConsultedAt', { date: formatDateTime(teiah.consultedAt) })}</p>}
+
+      {recordAddresses.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3" data-testid="teiah-record-addresses">
+          <p className="mb-2 text-sm font-semibold">{t('contacts.profile.teiahAddressesCheck')}</p>
+          <div className="space-y-2">
+            {recordAddresses.map((address, index) => (
+              <TeiahAddressCheck
+                key={`${index}-${address.zip ?? ''}-${address.number ?? ''}`}
+                compact
+                testId={`teiah-record-address-${index}`}
+                title={addressLine(address) || t('contacts.profile.teiahAddressIncomplete')}
+                address={{
+                  zip: address.zip ?? '',
+                  street: address.street ?? '',
+                  number: address.number ?? '',
+                  district: address.district ?? '',
+                  complement: address.complement ?? ''
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       {reportOpen && (
         <TeiahReportModal
           reportKey={profile.key}

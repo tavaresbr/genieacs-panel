@@ -512,6 +512,22 @@ names, and an answer with nothing recognized logs only its keys. It needs
 `teiah.act`; the audit trail records whether something was found, never the
 address.
 
+The same check is offered in two more places, with the same confirmation and
+30-day reuse:
+
+- **Client record:** the TeiaH card lists the record's addresses (the main one
+  and the extra ones), each with its own **Check address on TeiaH**.
+- **WhatsApp conversation:** for a number with no contract (a lead), the SGP
+  panel beside the thread has a small address form (the CEP fills the street
+  and district). **Use in reply** puts a one-line summary in the reply box;
+  nothing is sent by itself.
+
+**Risk warning in New client.** When TeiaH gives the CPF/CNPJ or the
+installation address a high risk, or finds debts at the address, a red notice
+lists the reasons above the save button. Sending to the SGP then asks for
+confirmation, and the audit trail's `contact.created` entry records
+`riskAcknowledged: true` (never the score or the address).
+
 ## Automatic activation
 
 Open **Settings → Automatic activation** to let a newly installed ONT configure

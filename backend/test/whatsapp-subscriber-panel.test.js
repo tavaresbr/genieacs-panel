@@ -8,6 +8,7 @@ const { default: WhatsAppConfigService } = await import('../src/services/whatsap
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
 const { default: SgpLink } = await import('../src/models/SgpLink.js');
+const { default: TeiahService } = await import('../src/services/teiahService.js');
 
 const APP = 'painel';
 const SGP_TOKEN = 'token-secreto-modulo';
@@ -286,6 +287,18 @@ describe('acting from the thread', () => {
     const { status } = await agir(fios.estranho, 'unlock', { contract: ATIVO });
     assert.equal(status, 409);
     assert.equal(liberacoes().length, 0);
+  });
+
+  it('says whether the TeiaH address check can be offered for the lead', async () => {
+    const sem = await painel(fios.estranho);
+    assert.equal(sem.body.data.teiahReady, false);
+    await asTenant(() => TeiahService.saveConfig({ enabled: true, baseUrl: 'http://127.0.0.1:9', apiKey: 'chave-do-painel' }));
+    try {
+      const com = await painel(fios.estranho);
+      assert.equal(com.body.data.teiahReady, true);
+    } finally {
+      await asTenant(() => TeiahService.saveConfig({ enabled: false }));
+    }
   });
 
   it('finds the contracts when the operator types a contract number instead of a document', async () => {
