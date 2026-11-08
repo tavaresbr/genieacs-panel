@@ -431,7 +431,7 @@ describe('a sessão de personificação', () => {
     const h = { ...bearer(token), 'X-Requested-With': 'skygenpanel' };
     const antes = await getDb()('tenant_users').where({ tenant_id: beta }).count({ n: '*' }).first();
     const tentativas = [
-      ['POST', '/api/users', { username: 'plantado', password: 'Senha-forte-123', role: 'admin' }],
+      ['POST', '/api/users', { username: 'plantado', password: 'nao-importa', role: 'admin' }],
       ['PATCH', '/api/users/1', { role: 'admin' }],
       ['POST', '/API/Invites', { email: 'x@exemplo.test', role: 'admin' }]
     ];
