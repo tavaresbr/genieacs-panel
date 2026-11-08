@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 // depende dela — um prazo é um prazo nas duas — mas `resolveTarget` consulta
 // `IS_SAAS` para decidir portas e faixas privadas, e um arquivo que muda de
 // comportamento conforme a máquina é um arquivo que um dia falha sozinho.
+// Estes serviços cifram segredos ao carregar; sem JWT_SECRET o processo não sobe.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
 process.env.EDITION = 'selfhosted';
 
 const { PinnedTransport } = await import('../src/utils/net/pinnedFetch.js');

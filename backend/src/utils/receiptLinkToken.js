@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
-import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
+import { DEVELOPMENT_FALLBACK, developmentFallbackAllowed } from '../config/runtimeEnv.js';
 
 /**
  * A credencial do link público do recibo (`GET /api/public/receipt/:token`).
@@ -32,7 +32,7 @@ let cachedKey = null;
 let cachedFrom = null;
 
 function signingKey() {
-  if (!process.env.JWT_SECRET && isProduction()) {
+  if (!process.env.JWT_SECRET && !developmentFallbackAllowed()) {
     throw new Error('JWT_SECRET must be set to sign receipt links');
   }
   const base = process.env.JWT_SECRET || DEVELOPMENT_FALLBACK;

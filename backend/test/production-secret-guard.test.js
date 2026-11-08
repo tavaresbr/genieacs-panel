@@ -52,7 +52,7 @@ describe('a production process refuses the built-in fallback secret', () => {
       specifier: './src/middleware/portalAuth.js',
       call: '',
       clear: ['JWT_SECRET', 'PORTAL_JWT_SECRET'],
-      expect: /must be set in production/
+      expect: /must be set/
     },
     {
       what: 'the WhatsApp media link key',
@@ -82,9 +82,19 @@ describe('a production process refuses the built-in fallback secret', () => {
       });
     }
 
-    it(`still boots ${what} outside production`, async () => {
-      const output = await bootWith({}, REPORT(specifier, call));
+    it(`still boots ${what} when development is declared`, async () => {
+      const output = await bootWith({ APP_ENV: 'development' }, REPORT(specifier, call));
       assert.equal(output.split('\n').pop(), 'BOOTED');
+    });
+
+    // Antes, sem nenhuma variável de ambiente o processo subia com o segredo
+    // constante do repositório. Agora o desenvolvimento tem de ser declarado.
+    it(`refuses ${what} when no environment is declared`, async () => {
+      const env = {};
+      for (const name of clear) delete env[name];
+      const output = await bootWith(env, REPORT(specifier, call));
+      assert.match(output, /^REFUSED: /, `${what} booted on the fallback with no environment`);
+      assert.match(output, expect);
     });
 
     it(`boots ${what} in production once a secret is configured`, async () => {

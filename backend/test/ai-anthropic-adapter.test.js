@@ -2,6 +2,8 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
+// Estes serviços cifram segredos ao carregar; sem JWT_SECRET o processo não sobe.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
 const { toAnthropicMessages, AI_ADAPTERS } = await import('../src/services/waAiAdapters.js');
 const { default: WaAiClient } = await import('../src/services/waAiClient.js');
 
