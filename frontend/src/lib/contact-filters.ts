@@ -9,6 +9,8 @@ export interface ContactFilters {
   device: ContactDeviceFilter
   /** Só quem também é cliente do Asaas. */
   asaas: boolean
+  /** Só quem a TeiaH deu risco alto. */
+  teiahHigh?: boolean
 }
 
 /** Where the Contacts menu entry keeps them; cleared with the rest of the session. */
@@ -30,7 +32,8 @@ export function loadContactFilters(key: string, fallback: ContactFilters): Conta
       noPhone: typeof saved.noPhone === 'boolean' ? saved.noPhone : fallback.noPhone,
       imported: typeof saved.imported === 'boolean' ? saved.imported : fallback.imported,
       device: DEVICES.find((d) => d === saved.device) ?? fallback.device,
-      asaas: typeof saved.asaas === 'boolean' ? saved.asaas : fallback.asaas
+      asaas: typeof saved.asaas === 'boolean' ? saved.asaas : fallback.asaas,
+      teiahHigh: typeof saved.teiahHigh === 'boolean' ? saved.teiahHigh : fallback.teiahHigh
     }
   } catch {
     return fallback

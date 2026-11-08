@@ -301,6 +301,56 @@ export function normalizeConsult(payload) {
   return result;
 }
 
+/** One page of the history and the most read for a report: 25 × 200 = 5 000 consultations. */
+const HISTORY_PAGE = 200;
+const HISTORY_MAX_PAGES = 25;
+
+/**
+ * One consultation of the provider's TeiaH history, as the spend report needs
+ * it: kind, who asked, when, what it cost and how it ended — never the
+ * document or the address consulted. Field names are not documented, so each
+ * is read under several.
+ */
+export function historyItem(item) {
+  const user = pick(item, ['usuario', 'user', 'usuarioConsulta']);
+  const userName = text(typeof user === 'object' ? pick(user || {}, ['nome', 'name', 'username', 'email']) : user, 80)
+    ?? text(pick(item, ['userName', 'usuarioNome', 'nomeUsuario', 'consultadoPor', 'nome']), 80);
+  const rawCost = amount(pick(item, ['valor', 'custo', 'preco', 'cost', 'price', 'value', 'amount', 'debito', 'valorConsulta']));
+  const type = text(pick(item, ['tipo', 'type', 'tipoConsulta']), 30);
+  return {
+    type: type ? type.toUpperCase() : null,
+    origin: text(pick(item, ['origem', 'canal', 'source', 'origin']), 30),
+    status: text(pick(item, ['status', 'situacao', 'resultado']), 40),
+    userName,
+    createdAt: text(pick(item, ['createdAt', 'created_at', 'dataConsulta', 'data']), 40),
+    cost: rawCost === null ? null : Math.abs(rawCost)
+  };
+}
+
+/** The history as totals: by month, by kind and by user, with the cost of each. */
+export function summarizeHistory(items) {
+  const group = (keyOf) => {
+    const groups = new Map();
+    for (const item of items) {
+      const key = keyOf(item) || '—';
+      const entry = groups.get(key) || { key, count: 0, cost: 0 };
+      entry.count += 1;
+      entry.cost += item.cost ?? 0;
+      groups.set(key, entry);
+    }
+    return [...groups.values()].map((entry) => ({ ...entry, cost: Math.round(entry.cost * 100) / 100 }));
+  };
+  const totalCost = Math.round(items.reduce((sum, item) => sum + (item.cost ?? 0), 0) * 100) / 100;
+  return {
+    total: items.length,
+    totalCost,
+    costKnown: items.some((item) => item.cost !== null),
+    byMonth: group((item) => (item.createdAt || '').slice(0, 7)).sort((a, b) => b.key.localeCompare(a.key)),
+    byType: group((item) => item.type).sort((a, b) => b.count - a.count),
+    byUser: group((item) => item.userName).sort((a, b) => b.count - a.count)
+  };
+}
+
 /** A number however the API wrote it: 653, "653", "1.234,56". */
 function amount(value) {
   if (value === null || value === undefined || value === '' || typeof value === 'object') return null;
@@ -731,6 +781,48 @@ class TeiahService {
       console.warn(`TeiaH address answer with nothing recognized; keys: ${keys.join(', ') || '-'}`);
     }
     return result;
+  }
+
+  /**
+   * What the provider's consultations cost, from the TeiaH history of its key
+   * (the panel's and the site's alike): totals by month, kind and user over a
+   * period, and the latest ones. Read page by page up to `HISTORY_MAX_PAGES`;
+   * `truncated` says when there was more.
+   */
+  static async consultationSummary({ from, to } = {}) {
+    // Only a single AAAA-MM-DD string: a repeated query parameter arrives as an array.
+    const asDate = (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
+    const end = asDate(to) ?? new Date().toISOString().slice(0, 10);
+    const start = asDate(from) ?? `${end.slice(0, 7)}-01`;
+    if (start > end) {
+      throw new TeiahError('teiah.error.periodInvalid', { code: 'invalid_period', status: 400 });
+    }
+    this.requireReady(await this.getConfig());
+    const items = [];
+    let truncated = false;
+    for (let page = 0; page < HISTORY_MAX_PAGES; page += 1) {
+      // eslint-disable-next-line no-await-in-loop -- one page after the other, each depends on the last
+      const { status, data } = await this.request(CONSULTATIONS_PATH, null, null, {
+        method: 'GET',
+        query: { startDate: start, endDate: end, limit: HISTORY_PAGE, offset: page * HISTORY_PAGE, order: 'createdAt:desc' },
+        maxBytes: 8 * 1024 * 1024
+      });
+      if (status < 200 || status >= 300) throw this.failure(status, data);
+      const list = Array.isArray(data)
+        ? data
+        : asList(pick(data || {}, ['data', 'items', 'consultas', 'consultations', 'results', 'resultado']));
+      items.push(...list.filter((item) => item && typeof item === 'object').map(historyItem));
+      if (list.length < HISTORY_PAGE) break;
+      if (page === HISTORY_MAX_PAGES - 1) truncated = true;
+    }
+    return {
+      from: start,
+      to: end,
+      truncated,
+      ...summarizeHistory(items),
+      // Newest first whatever order the API kept.
+      recent: [...items].sort((a, b) => (Date.parse(b.createdAt ?? '') || 0) - (Date.parse(a.createdAt ?? '') || 0)).slice(0, 20)
+    };
   }
 
   /**

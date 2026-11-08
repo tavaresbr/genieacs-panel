@@ -1249,6 +1249,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': 'Configuration TeiaH Valid chargée',
   'teiah.configLoadFailed': 'Échec du chargement de la configuration TeiaH Valid',
+  'teiah.summaryFailed': "Échec du chargement de l'historique des consultations TeiaH Valid",
   'teiah.configSaved': 'Configuration TeiaH Valid enregistrée',
   'teiah.configSaveFailed': 'Échec de l’enregistrement de la configuration TeiaH Valid',
   'teiah.connectionOk': 'Connexion à TeiaH Valid établie et clé acceptée',
@@ -1267,6 +1268,7 @@ export default {
   'teiah.error.unreachable': 'Impossible de joindre TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid n’a pas répondu dans le délai imparti',
   'teiah.error.invalidResponse': 'TeiaH Valid a envoyé une réponse invalide',
+  'teiah.error.periodInvalid': "La période est invalide : la date de début est après la date de fin",
   'teiah.error.reportNone': "Ce client n'a pas encore été consulté sur TeiaH Valid",
   'teiah.error.reportEmpty': "TeiaH Valid n'a pas de rapport imprimable pour cette consultation",
   'teiah.error.credentialsRejected': 'TeiaH Valid a refusé la clé d’API',

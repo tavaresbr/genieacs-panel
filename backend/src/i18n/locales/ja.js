@@ -1253,6 +1253,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid の設定を読み込みました',
   'teiah.configLoadFailed': 'TeiaH Valid の設定を読み込めませんでした',
+  'teiah.summaryFailed': "TeiaH Valid の照会履歴を読み込めませんでした",
   'teiah.configSaved': 'TeiaH Valid の設定を保存しました',
   'teiah.configSaveFailed': 'TeiaH Valid の設定を保存できませんでした',
   'teiah.connectionOk': 'TeiaH Valid に接続し、キーが受け入れられました',
@@ -1271,6 +1272,7 @@ export default {
   'teiah.error.unreachable': 'TeiaH Valid に接続できませんでした',
   'teiah.error.timeout': 'TeiaH Valid が制限時間内に応答しませんでした',
   'teiah.error.invalidResponse': 'TeiaH Valid が無効な応答を返しました',
+  'teiah.error.periodInvalid': "期間が無効です: 開始日が終了日より後です",
   'teiah.error.reportNone': "この顧客はまだ TeiaH Valid で照会されていません",
   'teiah.error.reportEmpty': "TeiaH Valid にはこの照会の印刷可能なレポートがありません",
   'teiah.error.credentialsRejected': 'TeiaH Valid が API キーを拒否しました',

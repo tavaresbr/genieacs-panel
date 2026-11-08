@@ -6,7 +6,8 @@ import { Link } from 'react-router'
 import { whatsappAPI, type SgpInvoice, type WaSubscriberPanel, type WaSubscriberPartError, type WhatsAppMessage, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { ContactLink } from '@/components/whatsapp/contact-link'
-import { TeiahLeadAddress } from '@/components/whatsapp/teiah-lead-address'
+import { TeiahLeadAddress, type LeadAddress } from '@/components/whatsapp/teiah-lead-address'
+import { NewContactModal } from '@/components/whatsapp/new-contact-modal'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
@@ -96,6 +97,9 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const [contract, setContract] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [searchedDocument, setSearchedDocument] = useState<string | null>(null)
+  // "Cadastrar como novo cliente" from the lead's address card: the Novo
+  // cliente form, opened with the phone of this thread and that address.
+  const [registering, setRegistering] = useState<LeadAddress | null>(null)
   const [busy, setBusy] = useState<'unlock' | 'resume' | 'ticket' | 'bind' | 'unbind' | 'registration' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
   const [templates, setTemplates] = useState<WhatsAppTemplate[] | null>(null)
   const [templateId, setTemplateId] = useState('')
@@ -490,7 +494,10 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
 
         {can('teiah.act') && panel.teiahReady && (!panel.ready || panel.contracts.items.length === 0) && (
           <Card icon="pin" title={t('whatsapp.sgp.teiahAddress.title')}>
-            <TeiahLeadAddress onDraft={onDraft} />
+            <TeiahLeadAddress
+              onDraft={onDraft}
+              onRegister={can('contacts.edit') ? (address) => setRegistering(address) : undefined}
+            />
           </Card>
         )}
 
@@ -960,6 +967,16 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
           </>
         )}
       </div>
+      {registering && (
+        <NewContactModal
+          onClose={() => setRegistering(null)}
+          initial={{
+            name: attendance.pushName || '',
+            whatsappPhone: formatBrPhone(attendance.phone) || '',
+            ...registering
+          }}
+        />
+      )}
     </aside>
   )
 }

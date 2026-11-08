@@ -3,6 +3,7 @@ import { contactsAPI } from '@/lib/api'
 import { TeiahAddressCheck, type TeiahAddressOutcome } from '@/components/contacts/teiah-address-check'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
+import { Icon } from '@/components/ui/icon'
 
 /**
  * The address a lead gives in the chat, checked on the TeiaH before the lead
@@ -10,9 +11,15 @@ import { formatMoney } from '@/lib/money'
  * the number. "Usar na resposta" puts a one-line summary in the reply box —
  * nothing is sent by itself.
  */
-export function TeiahLeadAddress({ onDraft }: { onDraft?: (text: string) => void }) {
+export interface LeadAddress { zip: string; street: string; number: string; district: string; complement: string; city: string; state: string }
+
+export function TeiahLeadAddress({ onDraft, onRegister }: {
+  onDraft?: (text: string) => void
+  /** "Cadastrar como novo cliente" with this address; absent without the permission. */
+  onRegister?: (address: LeadAddress) => void
+}) {
   const { t } = useTranslation()
-  const [form, setForm] = useState({ zip: '', street: '', number: '', district: '', complement: '', city: '' })
+  const [form, setForm] = useState<LeadAddress>({ zip: '', street: '', number: '', district: '', complement: '', city: '', state: '' })
   const [cepLooking, setCepLooking] = useState(false)
   const set = (field: keyof typeof form, value: string) => setForm((current) => ({ ...current, [field]: value }))
 
@@ -28,7 +35,8 @@ export function TeiahLeadAddress({ onDraft }: { onDraft?: (text: string) => void
         ...current,
         street: current.street || data.addressLine || '',
         district: current.district || data.district || '',
-        city: current.city || [data.city, data.state].filter(Boolean).join('/')
+        city: current.city || data.city || '',
+        state: current.state || data.state || ''
       }))
     } finally {
       setCepLooking(false)
@@ -36,7 +44,8 @@ export function TeiahLeadAddress({ onDraft }: { onDraft?: (text: string) => void
   }
 
   const summary = ({ result }: TeiahAddressOutcome) => {
-    const place = [`${form.street.trim()}, ${form.number.trim()}`, form.district.trim(), form.city.trim()].filter(Boolean).join(' - ')
+    const city = [form.city.trim(), form.state.trim()].filter(Boolean).join('/')
+    const place = [`${form.street.trim()}, ${form.number.trim()}`, form.district.trim(), city].filter(Boolean).join(' - ')
     if (!result.found) return t('whatsapp.sgp.teiahAddress.draftNone', { address: place })
     return t('whatsapp.sgp.teiahAddress.draft', {
       address: place,
@@ -100,6 +109,11 @@ export function TeiahLeadAddress({ onDraft }: { onDraft?: (text: string) => void
           </button>
         ) : undefined}
       />
+      {onRegister && (
+        <button type="button" className="modern-button-secondary w-full" onClick={() => onRegister(form)} data-testid="wa-teiah-register">
+          <Icon name="contacts" size={16} /> {t('whatsapp.sgp.teiahAddress.register')}
+        </button>
+      )}
     </div>
   )
 }

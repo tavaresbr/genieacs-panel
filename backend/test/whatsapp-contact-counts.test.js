@@ -44,7 +44,9 @@ describe('os números dos filtros de Contatos', () => {
       imported: 2,
       withDevice: 0,
       withoutDevice: 7,
-      asaas: null
+      asaas: null,
+      // Ninguém consultado na TeiaH: o filtro de risco some.
+      teiahHigh: null
     });
     assert.equal(body.data.total, 7);
   });

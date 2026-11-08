@@ -8,3 +8,6 @@ d262f606f1b0cd8e47ca3586d309bbb24593cb3c:backend/test/contact-teiah.test.js:gene
 16f054675bf2a05630d3af2cad27ed53c893a373:backend/test/contact-teiah.test.js:generic-api-key:386
 # Senha de teste que a revisão recusa antes de validar (commit 25330637); já trocada.
 25330637a0f83c88aa93c3ee733702cda1aaafc2:backend/test/impersonation.test.js:generic-api-key:434
+# Senha do usuário de teste do selo de risco (teiah-contact-filter.test.js),
+# trocada por uma constante no commit seguinte.
+23f85d42696fbb9e50f6400c2e6715741bd84dcc:backend/test/teiah-contact-filter.test.js:generic-api-key:27

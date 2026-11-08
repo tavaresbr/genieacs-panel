@@ -8,6 +8,8 @@ const router = express.Router();
 router.get('/config', authenticateToken, requirePermission('teiah.config'), TeiahController.getConfig);
 router.put('/config', authenticateToken, requirePermission('teiah.config'), TeiahController.updateConfig);
 router.post('/test', authenticateToken, requirePermission('teiah.config'), teiahAdminLimiter, TeiahController.testConnection);
+// What the consultations cost, read from the TeiaH history (several pages): the test's budget.
+router.get('/consultations/summary', authenticateToken, requirePermission('teiah.config'), teiahAdminLimiter, TeiahController.consultationSummary);
 
 router.get('/export', authenticateToken, requirePermission('teiah.read'), TeiahController.getExportStatus);
 router.get('/export/items', authenticateToken, requirePermission('teiah.read'), TeiahController.listExportItems);

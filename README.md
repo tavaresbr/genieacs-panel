@@ -522,6 +522,23 @@ The same check is offered in two more places, with the same confirmation and
   and district). **Use in reply** puts a one-line summary in the reply box;
   nothing is sent by itself.
 
+**Risk badge in Contacts.** Clients whose CPF/CNPJ was checked on TeiaH show
+the risk of the last check next to the name (green, amber or red), and the
+**High risk (TeiaH)** filter lists only the red ones. It is read from the
+checks the panel already keeps — the list never calls TeiaH.
+
+**Checks and spend.** Settings → TeiaH Valid has a **Checks and spend**
+section (for `teiah.config`): for a period, it reads the TeiaH history of the
+provider's key (`GET /api/consultations`, the panel's checks and the site's)
+and shows the number of checks and their cost by month, by type and by user,
+plus the latest ones — never the document or address checked. Up to 5,000
+checks per period; nothing is stored.
+
+**New client from WhatsApp.** In the lead's address card, **Register as new
+client** opens New client with the conversation's phone and name and the
+checked address already filled in (what the SGP or TeiaH brings for the
+document still comes first).
+
 **Risk warning in New client.** When TeiaH gives the CPF/CNPJ or the
 installation address a high risk, or finds debts at the address, a red notice
 lists the reasons above the save button. Sending to the SGP then asks for

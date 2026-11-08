@@ -1245,6 +1245,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': 'تم تحميل إعدادات TeiaH Valid',
   'teiah.configLoadFailed': 'تعذر تحميل إعدادات TeiaH Valid',
+  'teiah.summaryFailed': "فشل تحميل سجل استعلامات TeiaH Valid",
   'teiah.configSaved': 'تم حفظ إعدادات TeiaH Valid',
   'teiah.configSaveFailed': 'تعذر حفظ إعدادات TeiaH Valid',
   'teiah.connectionOk': 'تم الاتصال بـ TeiaH Valid وقُبل المفتاح',
@@ -1263,6 +1264,7 @@ export default {
   'teiah.error.unreachable': 'تعذر الوصول إلى TeiaH Valid',
   'teiah.error.timeout': 'لم تستجب TeiaH Valid ضمن المهلة',
   'teiah.error.invalidResponse': 'أرسلت TeiaH Valid استجابة غير صالحة',
+  'teiah.error.periodInvalid': "الفترة غير صالحة: تاريخ البداية بعد تاريخ النهاية",
   'teiah.error.reportNone': "لم يتم الاستعلام عن هذا العميل في TeiaH Valid بعد",
   'teiah.error.reportEmpty': "لا يوجد لدى TeiaH Valid تقرير قابل للطباعة لهذا الاستعلام",
   'teiah.error.credentialsRejected': 'رفضت TeiaH Valid مفتاح API',
