@@ -1,15 +1,21 @@
 {
-  "version": "1.28.9",
-  "build": 1561,
-  "sourceCommit": "bc21719f5ea8",
+  "version": "1.28.10",
+  "build": 1565,
+  "sourceCommit": "7ee82863f0a6",
   "releasedAt": "2026-11-08",
-  "basedOnTag": "v1.28.8",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/d13eef7a76e6...bc21719f5ea8",
+  "basedOnTag": "v1.28.9",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/d877eb8ab71e...7ee82863f0a6",
   "changes": [
     {
-      "shortHash": "92ac1282",
+      "shortHash": "25330637",
       "date": "2026-11-08",
-      "title": "Endereço na ficha e no WhatsApp, e aviso de risco no Novo cliente",
+      "title": "Segurança: sessão de atendimento não cria nem altera operadores e convites",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "cc4a133a",
+      "date": "2026-11-08",
+      "title": "Teste da personificação sem senha com cara de segredo; ignora o achado do commit anterior",
       "category": "Maintenance"
     }
   ]

@@ -7,6 +7,15 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.10] - 2026-11-08
+
+### Maintenance
+
+- Segurança: sessão de atendimento não cria nem altera operadores e convites (`25330637`)
+- Teste da personificação sem senha com cara de segredo; ignora o achado do commit anterior (`cc4a133a`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/d877eb8ab71e...7ee82863f0a6)
+
 ## [1.28.9] - 2026-11-08
 
 ### Maintenance
