@@ -1,21 +1,27 @@
 {
-  "version": "1.28.10",
-  "build": 1565,
-  "sourceCommit": "7ee82863f0a6",
+  "version": "1.28.11",
+  "build": 1570,
+  "sourceCommit": "0bf9cd64f5b7",
   "releasedAt": "2026-11-08",
-  "basedOnTag": "v1.28.9",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/d877eb8ab71e...7ee82863f0a6",
+  "basedOnTag": "v1.28.10",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/f150cfe5f8a2...0bf9cd64f5b7",
   "changes": [
     {
-      "shortHash": "25330637",
+      "shortHash": "2873c9e9",
       "date": "2026-11-08",
-      "title": "Segurança: sessão de atendimento não cria nem altera operadores e convites",
+      "title": "Segurança: JWT_SECRET obrigatório; o segredo de desenvolvimento só com APP_ENV=development ou test",
       "category": "Maintenance"
     },
     {
-      "shortHash": "cc4a133a",
+      "shortHash": "397690e7",
       "date": "2026-11-08",
-      "title": "Teste da personificação sem senha com cara de segredo; ignora o achado do commit anterior",
+      "title": "JWT_SECRET obrigatório também nos links de mídia, recibo e sonda; testes ajustados",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "3abfbcdb",
+      "date": "2026-11-08",
+      "title": "Testes que carregam serviços sem o harness definem JWT_SECRET",
       "category": "Maintenance"
     }
   ]

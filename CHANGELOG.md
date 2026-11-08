@@ -7,6 +7,16 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.11] - 2026-11-08
+
+### Maintenance
+
+- Segurança: JWT_SECRET obrigatório; o segredo de desenvolvimento só com APP_ENV=development ou test (`2873c9e9`)
+- JWT_SECRET obrigatório também nos links de mídia, recibo e sonda; testes ajustados (`397690e7`)
+- Testes que carregam serviços sem o harness definem JWT_SECRET (`3abfbcdb`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/f150cfe5f8a2...0bf9cd64f5b7)
+
 ## [1.28.10] - 2026-11-08
 
 ### Maintenance
