@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.9] - 2026-11-08
+
+### Maintenance
+
+- Endereço na ficha e no WhatsApp, e aviso de risco no Novo cliente (`92ac1282`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/d13eef7a76e6...bc21719f5ea8)
+
 ## [1.28.8] - 2026-11-07
 
 ### Maintenance
