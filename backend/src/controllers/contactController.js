@@ -445,8 +445,9 @@ class ContactController {
         action: AuditLog.ACTIONS.CONTACT_CREATED,
         subjectType: 'contact',
         subjectId: profile.key,
-        // Where it was created and the SGP's id — never the values typed.
-        detail: { sgp: true, sgpClientId: clientId }
+        // Where it was created and the SGP's id — never the values typed. And
+        // whether the operator saw the TeiaH risk warning and went on.
+        detail: { sgp: true, sgpClientId: clientId, ...(req.body?.riskAcknowledged === true ? { riskAcknowledged: true } : {}) }
       });
       return res.status(201).json(createResponse(req.t('contacts.createdInSgp'), profile));
     } catch (error) {
@@ -483,6 +484,7 @@ class ContactController {
           sgp: true,
           preRegistration: true,
           ...(newContract ? { newContract: true } : {}),
+          ...(req.body?.riskAcknowledged === true ? { riskAcknowledged: true } : {}),
           filed,
           sgpClientId: sent.clientId,
           preRegistrationId: sent.preRegistrationId

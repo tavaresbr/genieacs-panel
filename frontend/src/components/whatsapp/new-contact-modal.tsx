@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { contactsAPI, type ContactDocumentLookup, type PreRegistrationOptions, type TeiahAddressCheck } from '@/lib/api'
-import { TeiahReportModal } from '@/components/contacts/teiah-report-modal'
-import { riskBadge } from '@/lib/teiah'
+import { contactsAPI, type ContactDocumentLookup, type PreRegistrationOptions } from '@/lib/api'
+import { TeiahAddressCheck, type TeiahAddressOutcome } from '@/components/contacts/teiah-address-check'
+import { teiahRiskWarnings } from '@/lib/teiah'
 import { formatMoney } from '@/lib/money'
 import { formatDistance, sortSplitters } from '@/lib/pre-registration'
 import { Icon } from '@/components/ui/icon'
@@ -124,11 +124,9 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   const [loginCheck, setLoginCheck] = useState<{ login: string; taken: boolean; suggestion: string | null } | null>(null)
   const [saving, setSaving] = useState(false)
   const [cepLooking, setCepLooking] = useState(false)
-  // The TeiaH address check of the installation address. It belongs to the
-  // address it was made for: change the CEP, street or number and it is gone.
-  const [addressCheck, setAddressCheck] = useState<{ key: string; result: TeiahAddressCheck; consultedAt: string; cached: boolean } | null>(null)
-  const [checkingAddress, setCheckingAddress] = useState(false)
-  const [addressReportOpen, setAddressReportOpen] = useState(false)
+  // The TeiaH address check of the installation address, as the box reports it
+  // (null when there is none for the address typed now): the risk warning reads it.
+  const [addressOutcome, setAddressOutcome] = useState<TeiahAddressOutcome | null>(null)
 
   const isCompany = lookup?.personType === 'PJ'
   const canCreateInSgp = can('sgp.act') && Boolean(lookup?.sgpChecked)
@@ -191,36 +189,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
 
   const open = (key: string) => navigate(`/contacts/${encodeURIComponent(key)}`)
 
-  const zipDigits = form.zip.replace(/\D/g, '')
-  const addressKey = `${zipDigits}|${form.number.trim().toLowerCase()}|${form.street.trim().toLowerCase()}`
   const canCheckAddress = can('teiah.act') && Boolean(lookup?.teiahReady)
-  const addressComplete = zipDigits.length === 8 && Boolean(form.street.trim()) && Boolean(form.number.trim())
-  const currentCheck = addressCheck?.key === addressKey ? addressCheck : null
-  const checkAddress = async (fresh = false) => {
-    // A paid call: asked first, unless the panel already has this address (then
-    // the server answers from its 30-day memory and nothing is paid).
-    if (!window.confirm(t(fresh ? 'contacts.new.teiahAddress.refreshConfirm' : 'contacts.new.teiahAddress.confirm'))) return
-    setCheckingAddress(true)
-    try {
-      const res = await contactsAPI.teiahAddress({
-        zip: zipDigits,
-        street: form.street.trim(),
-        number: form.number.trim(),
-        district: form.district.trim(),
-        complement: form.complement.trim()
-      }, fresh)
-      if (!res.success || !res.data) {
-        toast.error(res.message || t('contacts.new.teiahAddress.failed'))
-        return
-      }
-      setAddressCheck({ key: addressKey, ...res.data })
-      if (res.data.cached) toast.info(t('contacts.new.teiahAddress.fromCache', { date: formatDateTime(res.data.consultedAt) }))
-    } catch {
-      toast.error(t('contacts.new.teiahAddress.failed'))
-    } finally {
-      setCheckingAddress(false)
-    }
-  }
 
   const canNewContract = can('sgp.act') && Boolean(lookup?.sgpChecked) &&
     Boolean(preRegOptions?.plans.length) && Boolean(preRegOptions?.dueDays.length)
@@ -297,7 +266,22 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   const missingForSgp = !form.name.trim() || !form.street.trim() || !form.district.trim() || !form.city.trim()
     || !/^[A-Za-z]{2}$/.test(form.state.trim()) || form.zip.replace(/\D/g, '').length !== 8
 
+  // A high TeiaH risk (the CPF or the installation address), or debts at the
+  // address: said above the button, and asked again before the SGP gets it.
+  const riskReasons = teiahRiskWarnings({ cpf: lookup?.teiahScore ?? null, address: addressOutcome?.result ?? null })
+  const riskText = riskReasons.map((reason) => {
+    if (reason.kind === 'cpf') return t('contacts.new.riskReason.cpf', { risk: reason.risk, score: reason.score ?? '—' })
+    if (reason.kind === 'address') return t('contacts.new.riskReason.address', { risk: reason.risk, score: reason.score ?? '—' })
+    return t('contacts.new.riskReason.debts', {
+      count: reason.count ?? '—',
+      amount: reason.amount ? formatMoney(Math.round(reason.amount * 100), 'BRL') : '—'
+    })
+  })
+
   const save = async () => {
+    const sendsToSgp = toPreRegister || toSgp
+    const riskAcknowledged = sendsToSgp && riskText.length > 0
+    if (riskAcknowledged && !window.confirm(t('contacts.new.riskConfirm', { reasons: riskText.join('\n') }))) return
     setSaving(true)
     const address = {
       street: form.street.trim(),
@@ -334,7 +318,8 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
         ...(contract.technicianId ? { technicianId: Number(contract.technicianId) } : {}),
         ...(contract.splitterId ? { splitterId: Number(contract.splitterId) } : {}),
         ...(contract.splitterId && contract.splitterPort ? { splitterPort: Number(contract.splitterPort) } : {}),
-        ...(newContract ? { newContract: true } : {})
+        ...(newContract ? { newContract: true } : {}),
+        ...(riskAcknowledged ? { riskAcknowledged: true } : {})
       })
       : toSgp
       ? await contactsAPI.createInSgp({
@@ -348,7 +333,8 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
         email: form.email.trim(),
         whatsappPhone: form.whatsappPhone.trim(),
         birthDate: form.birthDate,
-        address: { ...address, latitude: form.latitude, longitude: form.longitude }
+        address: { ...address, latitude: form.latitude, longitude: form.longitude },
+        ...(riskAcknowledged ? { riskAcknowledged: true } : {})
       })
       : await contactsAPI.create({
         name: form.name.trim(),
@@ -614,78 +600,10 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
             </div>
 
             {canCheckAddress && (
-              <div className="mt-4 rounded-md border border-border p-3" data-testid="new-contact-teiah-address">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold">{t('contacts.new.teiahAddress.title')}</span>
-                  {!currentCheck && (
-                    <button
-                      type="button"
-                      className="modern-button-secondary"
-                      disabled={!addressComplete || checkingAddress}
-                      onClick={() => void checkAddress()}
-                      data-testid="new-contact-teiah-address-check"
-                    >
-                      <Icon name="search" size={16} className={checkingAddress ? 'animate-pulse' : ''} />
-                      {' '}{t('contacts.new.teiahAddress.check')}
-                    </button>
-                  )}
-                </div>
-                {!currentCheck && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t(addressComplete ? 'contacts.new.teiahAddress.hint' : 'contacts.new.teiahAddress.needsAddress')}
-                  </p>
-                )}
-                {currentCheck && (
-                  <div className="mt-2 space-y-2 text-sm">
-                    {currentCheck.result.found ? (
-                      <dl className="grid gap-1 sm:grid-cols-2">
-                        {currentCheck.result.score !== null && currentCheck.result.score !== undefined && (
-                          <div className="flex flex-wrap items-center gap-x-2">
-                            <dt className="text-muted-foreground">{t('contacts.new.teiahAddress.score')}:</dt>
-                            <dd className="flex items-center gap-2 font-medium">
-                              {currentCheck.result.score}
-                              {currentCheck.result.risk && <span className={riskBadge(currentCheck.result.risk)}>{currentCheck.result.risk}</span>}
-                            </dd>
-                          </div>
-                        )}
-                        {(currentCheck.result.score === null || currentCheck.result.score === undefined) && currentCheck.result.risk && (
-                          <div className="flex flex-wrap items-center gap-x-2">
-                            <dt className="text-muted-foreground">{t('contacts.new.teiahAddress.risk')}:</dt>
-                            <dd><span className={riskBadge(currentCheck.result.risk)}>{currentCheck.result.risk}</span></dd>
-                          </div>
-                        )}
-                        {(currentCheck.result.debtCount || currentCheck.result.debtAmount) ? (
-                          <div className="flex flex-wrap gap-x-2">
-                            <dt className="text-muted-foreground">{t('contacts.new.teiahAddress.debts')}:</dt>
-                            <dd className="font-medium">
-                              {currentCheck.result.debtCount ?? '—'}
-                              {currentCheck.result.debtAmount ? ` · ${formatMoney(Math.round(currentCheck.result.debtAmount * 100), 'BRL')}` : ''}
-                            </dd>
-                          </div>
-                        ) : null}
-                      </dl>
-                    ) : (
-                      <p className="text-muted-foreground">{currentCheck.result.message || t('contacts.new.teiahAddress.none')}</p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span>{t('contacts.new.teiahAddress.consultedAt', { date: formatDateTime(currentCheck.consultedAt) })}</span>
-                      <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setAddressReportOpen(true)}>
-                        {t('contacts.new.teiahAddress.report')}
-                      </button>
-                      <button type="button" className="font-semibold text-primary hover:underline" disabled={checkingAddress} onClick={() => void checkAddress(true)}>
-                        {t('contacts.new.teiahAddress.refresh')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            {addressReportOpen && (
-              <TeiahReportModal
-                reportKey={addressKey}
-                load={(mode) => contactsAPI.teiahAddressReport(zipDigits, form.number.trim(), mode)}
-                onClose={() => setAddressReportOpen(false)}
-                noneText={t('contacts.new.teiahAddress.reportNone')}
+              <TeiahAddressCheck
+                testId="new-contact-teiah-address"
+                address={{ zip: form.zip, street: form.street, number: form.number, district: form.district, complement: form.complement }}
+                onResult={setAddressOutcome}
               />
             )}
 
@@ -895,6 +813,15 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
           </>
+        )}
+
+        {showForm && riskText.length > 0 && (
+          <div className="mt-5 rounded-md border border-[hsl(var(--status-danger))] bg-[hsl(var(--status-danger)/0.08)] p-3 text-sm" role="alert" data-testid="new-contact-risk">
+            <p className="font-semibold text-[hsl(var(--status-danger))]">{t('contacts.new.riskWarning')}</p>
+            <ul className="mt-1 list-disc ps-5">
+              {riskText.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </div>
         )}
 
         <div className="mt-6 flex flex-wrap justify-end gap-2">
