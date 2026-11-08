@@ -31,6 +31,7 @@ export default {
   'auth.setupStatusRetrieved': '已取得設定狀態',
   'auth.setupStatusFailed': '無法取得設定狀態',
   'auth.setupAlreadyCompleted': '設定已完成',
+  'auth.setupTokenInvalid': "安裝碼不相符。",
   'auth.usernameLength': '使用者名稱需為 3 至 64 個字元',
   'auth.passwordLength': '密碼需為 10 至 128 個字元',
   'auth.adminCreated': '擁有者帳號已建立',

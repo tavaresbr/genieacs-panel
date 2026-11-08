@@ -31,6 +31,7 @@ export default {
   'auth.setupStatusRetrieved': '已获取配置状态',
   'auth.setupStatusFailed': '无法获取配置状态',
   'auth.setupAlreadyCompleted': '配置已完成',
+  'auth.setupTokenInvalid': "安装码不匹配。",
   'auth.usernameLength': '用户名需为 3 至 64 个字符',
   'auth.passwordLength': '密码需为 10 至 128 个字符',
   'auth.adminCreated': '所有者账号已创建',

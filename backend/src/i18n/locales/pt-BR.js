@@ -28,6 +28,7 @@ export default {
   'auth.setupStatusRetrieved': 'Status da configuração inicial obtido',
   'auth.setupStatusFailed': 'Não foi possível obter o status da configuração inicial',
   'auth.setupAlreadyCompleted': 'A configuração inicial já foi concluída',
+  'auth.setupTokenInvalid': "O código de instalação não confere.",
   'auth.usernameLength': 'O usuário deve ter entre 3 e 64 caracteres',
   'auth.passwordLength': 'A senha deve ter entre 10 e 128 caracteres',
   'auth.adminCreated': 'Conta de proprietário criada com sucesso',

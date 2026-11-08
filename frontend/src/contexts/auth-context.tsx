@@ -38,7 +38,7 @@ interface AuthContextType {
   login: (
     identifier: string, password: string, destino?: LoginDestination, totpCode?: string
   ) => Promise<boolean | LoginDestinations | MfaStep | 'locked'>
-  completeSetup: (username: string, password: string, email: string) => Promise<boolean>
+  completeSetup: (username: string, password: string, email: string, setupToken?: string) => Promise<boolean>
   /**
    * Para quem chega com a sessão já pronta: o convite aceito e a personificação
    * resgatada. O refresh, quando há, já está no cookie (0129).
@@ -196,9 +196,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  const completeSetup = async (username: string, password: string, email: string): Promise<boolean> => {
+  const completeSetup = async (username: string, password: string, email: string, setupToken?: string): Promise<boolean> => {
     try {
-      const res = await authAPI.setupAdmin(username, password, email)
+      const res = await authAPI.setupAdmin(username, password, email, setupToken)
       if (res.success && res.data) {
         const { token, user } = res.data as {
           token: string

@@ -11,6 +11,7 @@ import RefreshToken, { describeUserAgent } from '../models/RefreshToken.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from '../middleware/sessionCookie.js';
 import { openConsoleSession, openPanelSession } from '../services/panelSessionService.js';
 import { createResponse, createErrorResponse, isValidEmail, usernameLengthProblem } from '../utils/helpers.js';
+import { segredosIguais } from '../utils/wa/waWebhookAuth.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { getDb } from '../config/database.js';
@@ -941,7 +942,11 @@ class AuthController {
     try {
       const count = await User.count();
       return res.json(
-        createResponse(req.t('auth.setupStatusRetrieved'), { needsSetup: count === 0 })
+        createResponse(req.t('auth.setupStatusRetrieved'), {
+          needsSetup: count === 0,
+          // Só diz SE a tela deve pedir o código, nunca o código.
+          tokenRequired: count === 0 && Boolean(process.env.SETUP_TOKEN)
+        })
       );
     } catch (error) {
       console.error('Setup status error:', error);
@@ -953,6 +958,17 @@ class AuthController {
 
   static async setupAdmin(req, res) {
     try {
+      // Proteção de primeiro uso: com `SETUP_TOKEN` no ambiente, quem cria a
+      // primeira conta precisa saber o código. Sem ela, numa instalação exposta
+      // antes do cadastro, o primeiro visitante vira dono do painel.
+      if (process.env.SETUP_TOKEN) {
+        const enviado = req.body?.setupToken ?? req.headers['x-setup-token'];
+        if (!segredosIguais(process.env.SETUP_TOKEN, enviado)) {
+          return res.status(403).json(
+            createErrorResponse(req.t('auth.setupTokenInvalid'), null, 'setup_token_invalid')
+          );
+        }
+      }
       const { username, password } = req.body;
 
       if (!username || !password) {
