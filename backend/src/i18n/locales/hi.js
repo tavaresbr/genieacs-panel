@@ -1093,6 +1093,7 @@ export default {
   'tenant.renameFailed': 'प्रदाता का नाम नहीं बदला जा सका',
   'tenant.nameInvalid': 'प्रदाता का नाम 1 से 128 अक्षरों के बीच होना चाहिए',
   'auth.impersonationReadOnly': 'सहायता सत्र में खाते की क्रियाएँ (साइन आउट, पासवर्ड, दूसरा कारक) उपलब्ध नहीं हैं।',
+  'auth.impersonationTeamLocked': "सहायता सत्र में ऑपरेटर या आमंत्रण बनाए या बदले नहीं जा सकते।",
   'auth.impersonationTicketRequired': 'इम्पर्सनेशन टिकट आवश्यक है',
   'auth.impersonationTicketInvalid': 'यह इम्पर्सनेशन लिंक अब मान्य नहीं है। कंसोल से नया बनाएँ।',
   'auth.impersonationStarted': 'सहायता सत्र शुरू हुआ',

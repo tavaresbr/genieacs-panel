@@ -689,13 +689,30 @@ function impersonationRefusal(req, session) {
   // mexeria na conta da plataforma a partir do painel de um cliente.
   // `routedPath` e não o caminho cru: o roteador ignora caixa, e com a
   // comparação literal `POST /API/Auth/logout` atravessava este muro.
-  if (!routedPath(req).startsWith('/api/auth/')) return null;
-  return {
-    success: false,
-    message: req.t('auth.impersonationReadOnly'),
-    code: 'impersonation_read_only'
-  };
+  const path = routedPath(req);
+  if (path.startsWith('/api/auth/')) {
+    return {
+      success: false,
+      message: req.t('auth.impersonationReadOnly'),
+      code: 'impersonation_read_only'
+    };
+  }
+  // A equipe do provedor também fica de fora: o atendimento tem papel de
+  // administrador e dura 30 minutos, e criar um operador, trocar a senha de
+  // outro ou mandar um convite deixaria um acesso que sobrevive ao fim dele.
+  // O provedor mexe na própria equipe; a plataforma só olha.
+  if (TEAM_PATHS.some((base) => path === base || path.startsWith(`${base}/`))) {
+    return {
+      success: false,
+      message: req.t('auth.impersonationTeamLocked'),
+      code: 'impersonation_team_locked'
+    };
+  }
+  return null;
 }
+
+/** Operadores e convites do provedor: leitura só, numa sessão de atendimento. */
+const TEAM_PATHS = ['/api/users', '/api/invites'];
 
 /**
  * Aqui morava `authenticateTokenOptional` — a forma "sessão se houver", para a

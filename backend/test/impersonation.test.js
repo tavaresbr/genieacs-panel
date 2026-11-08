@@ -426,6 +426,25 @@ describe('a sessão de personificação', () => {
     assert.equal(linha.actor_username, 'admin-beta', 'a trilha não diz quem fez');
   });
 
+  it('não cria nem altera operadores e convites do provedor, mas lê a lista', async () => {
+    const token = await personificar();
+    const h = { ...bearer(token), 'X-Requested-With': 'skygenpanel' };
+    const antes = await getDb()('tenant_users').where({ tenant_id: beta }).count({ n: '*' }).first();
+    const tentativas = [
+      ['POST', '/api/users', { username: 'plantado', password: 'Senha-forte-123', role: 'admin' }],
+      ['PATCH', '/api/users/1', { role: 'admin' }],
+      ['POST', '/API/Invites', { email: 'x@exemplo.test', role: 'admin' }]
+    ];
+    for (const [method, caminho, corpo] of tentativas) {
+      const res = await noBeta(caminho, { method, headers: h, body: corpo });
+      assert.equal(res.status, 403, `${method} ${caminho}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.code, 'impersonation_team_locked', caminho);
+    }
+    const depois = await getDb()('tenant_users').where({ tenant_id: beta }).count({ n: '*' }).first();
+    assert.equal(Number(depois.n), Number(antes.n));
+    assert.equal((await noBeta('/api/users', { headers: bearer(token) })).status, 200);
+  });
+
   it('não desloga — que derrubaria as sessões de quem personifica, não as do cliente', async () => {
     const token = await personificar();
     const antes = await getDb()('users').where({ id: plataformaUserId }).first();

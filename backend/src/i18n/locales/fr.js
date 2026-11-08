@@ -1089,6 +1089,7 @@ export default {
   'public.leadNotifySubject': 'Demande de démonstration : {name}',
   'public.leadNotifyBody': 'Nom : {name}\nEntreprise : {company}\nE-mail : {email}\nWhatsApp : {phone}\nVille : {city}\nÉquipements : {devices}\nOffre : {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'Dans une session d\'assistance, les actions du compte (déconnexion, mot de passe, double authentification) ne sont pas disponibles.',
+  'auth.impersonationTeamLocked': "Dans une session d'assistance, on ne peut ni créer ni modifier des opérateurs ou des invitations.",
   'auth.impersonationTicketRequired': 'Le ticket d\'usurpation est obligatoire',
   'auth.impersonationTicketInvalid': 'Ce lien d\'usurpation n\'est plus valide. Générez-en un autre depuis la console.',
   'auth.impersonationStarted': 'Session d\'assistance démarrée',

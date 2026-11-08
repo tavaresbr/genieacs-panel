@@ -1094,6 +1094,7 @@ export default {
   'public.leadNotifySubject': 'Запрос демонстрации: {name}',
   'public.leadNotifyBody': 'Имя: {name}\nКомпания: {company}\nE-mail: {email}\nWhatsApp: {phone}\nГород: {city}\nУстройства: {devices}\nТариф: {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'В сеансе поддержки действия с учётной записью (выход, пароль, второй фактор) недоступны.',
+  'auth.impersonationTeamLocked': "В сессии поддержки нельзя создавать или менять операторов и приглашения.",
   'auth.impersonationTicketRequired': 'Требуется билет олицетворения',
   'auth.impersonationTicketInvalid': 'Эта ссылка олицетворения больше не действует. Создайте новую в консоли.',
   'auth.impersonationStarted': 'Сеанс поддержки начат',

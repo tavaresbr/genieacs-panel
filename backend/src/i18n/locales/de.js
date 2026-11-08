@@ -1094,6 +1094,7 @@ export default {
   'public.leadNotifySubject': 'Demo-Anfrage: {name}',
   'public.leadNotifyBody': 'Name: {name}\nFirma: {company}\nE-Mail: {email}\nWhatsApp: {phone}\nStadt: {city}\nGeräte: {devices}\nTarif: {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'In einer Support-Sitzung sind Kontoaktionen (Abmelden, Passwort, zweiter Faktor) nicht verfügbar.',
+  'auth.impersonationTeamLocked': "In einer Support-Sitzung können Bediener und Einladungen weder angelegt noch geändert werden.",
   'auth.impersonationTicketRequired': 'Das Identitätswechsel-Ticket ist erforderlich',
   'auth.impersonationTicketInvalid': 'Dieser Identitätswechsel-Link gilt nicht mehr. Erzeugen Sie in der Konsole einen neuen.',
   'auth.impersonationStarted': 'Support-Sitzung gestartet',

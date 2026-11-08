@@ -1085,6 +1085,7 @@ export default {
   'tenant.renameFailed': 'تعذّرت إعادة تسمية المزوّد',
   'tenant.nameInvalid': 'يجب أن يكون اسم المزوّد بين 1 و128 حرفًا',
   'auth.impersonationReadOnly': 'في جلسة الدعم لا تتوفر إجراءات الحساب (تسجيل الخروج، كلمة المرور، العامل الثاني).',
+  'auth.impersonationTeamLocked': "لا يمكن إنشاء المشغّلين أو الدعوات أو تعديلها أثناء جلسة الدعم.",
   'auth.impersonationTicketRequired': 'تذكرة انتحال الهوية مطلوبة',
   'auth.impersonationTicketInvalid': 'لم يعد رابط انتحال الهوية هذا صالحًا. أنشئ رابطًا جديدًا من وحدة التحكم.',
   'auth.impersonationStarted': 'بدأت جلسة الدعم',

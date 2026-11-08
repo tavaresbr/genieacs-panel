@@ -1096,6 +1096,7 @@ export default {
   'public.leadNotifySubject': '데모 요청: {name}',
   'public.leadNotifyBody': '이름: {name}\n회사: {company}\n이메일: {email}\nWhatsApp: {phone}\n도시: {city}\n장비 수: {devices}\n요금제: {plan}\n\n{message}',
   'auth.impersonationReadOnly': '지원 세션에서는 계정 작업(로그아웃, 비밀번호, 2단계 인증)을 사용할 수 없습니다.',
+  'auth.impersonationTeamLocked': "지원 세션에서는 운영자나 초대를 만들거나 변경할 수 없습니다.",
   'auth.impersonationTicketRequired': '가장 티켓이 필요합니다',
   'auth.impersonationTicketInvalid': '이 가장 링크는 더 이상 유효하지 않습니다. 콘솔에서 새로 발급하세요.',
   'auth.impersonationStarted': '지원 세션이 시작되었습니다',
