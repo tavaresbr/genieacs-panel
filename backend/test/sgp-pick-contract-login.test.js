@@ -1,6 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+// Estes serviços cifram segredos ao carregar; sem JWT_SECRET o processo não sobe.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
 const { default: SgpService } = await import('../src/services/sgpService.js');
 
 /**

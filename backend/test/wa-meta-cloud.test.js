@@ -18,6 +18,8 @@ import {
 import { decidirEnvioCloud, META_WINDOW_MARGIN_MS, META_WINDOW_MS } from '../src/utils/wa/waJanelaMeta.js';
 import { lerFalhaDeEnvio, lerRecibo } from '../src/utils/wa/waRecibo.js';
 
+// Estes serviços cifram segredos ao carregar; sem JWT_SECRET o processo não sobe.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
 const { isPermanentFailure } = await import('../src/services/waSendFailure.js');
 const { WaError } = await import('../src/services/whatsappConfigService.js');
 const { validateMetaTemplateInput } = await import('../src/services/waMetaTemplateService.js');

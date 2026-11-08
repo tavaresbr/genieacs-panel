@@ -15,6 +15,8 @@ import {
   sendTemplateRequest
 } from '../src/utils/wa/evolutionApi.js';
 
+// Estes serviços cifram segredos ao carregar; sem JWT_SECRET o processo não sobe.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
 const { normalizeMetaTemplate } = await import('../src/services/waSendService.js');
 const { metaFilename } = await import('../src/services/waMetaTemplateService.js');
 

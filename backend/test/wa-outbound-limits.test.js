@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { safeFetch } from '../src/utils/wa/ssrfGuard.js';
-import { PinnedTransport } from '../src/utils/net/pinnedFetch.js';
-import { EvolutionClient } from '../src/services/evolutionClient.js';
+// Estes serviços cifram segredos ao carregar; sem JWT_SECRET o processo não sobe.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
+
+const { safeFetch } = await import('../src/utils/wa/ssrfGuard.js');
+const { PinnedTransport } = await import('../src/utils/net/pinnedFetch.js');
+const { EvolutionClient } = await import('../src/services/evolutionClient.js');
 
 /**
  * Os dois limites que faltavam em toda requisição que o painel faz para fora.
