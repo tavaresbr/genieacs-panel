@@ -2,7 +2,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { isRequestSecure } from '../config/proxy.js';
-import { DEVELOPMENT_FALLBACK, assertNotPlaceholderSecret, isProduction } from '../config/runtimeEnv.js';
+import { DEVELOPMENT_FALLBACK, assertNotPlaceholderSecret, developmentFallbackAllowed } from '../config/runtimeEnv.js';
 import AffiliateService from '../services/affiliateService.js';
 
 /**
@@ -28,8 +28,8 @@ const AFFILIATE_SESSION_TTL_SECONDS = 60 * 60;
 const AUDIENCE = 'skygenpanel-affiliate-portal';
 
 const baseSecret = process.env.AFFILIATE_JWT_SECRET || process.env.JWT_SECRET;
-if (!baseSecret && isProduction()) {
-  throw new Error('AFFILIATE_JWT_SECRET or JWT_SECRET must be set in production');
+if (!baseSecret && !developmentFallbackAllowed()) {
+  throw new Error('AFFILIATE_JWT_SECRET or JWT_SECRET must be set (only APP_ENV=development or test may use the built-in development secret)');
 }
 assertNotPlaceholderSecret('AFFILIATE_JWT_SECRET', process.env.AFFILIATE_JWT_SECRET);
 const affiliateSecret = process.env.AFFILIATE_JWT_SECRET || crypto

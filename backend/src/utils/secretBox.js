@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
-import { DEVELOPMENT_FALLBACK, isProduction, assertNotPlaceholderSecret } from '../config/runtimeEnv.js';
+import { DEVELOPMENT_FALLBACK, developmentFallbackAllowed, assertNotPlaceholderSecret } from '../config/runtimeEnv.js';
 
 /**
  * Authenticated encryption for secrets that an operator must be able to read
@@ -40,7 +40,7 @@ function readBaseSecrets() {
   const jwtSecret = process.env.JWT_SECRET;
   const dedicatedKey = process.env.SECRET_BOX_KEY;
 
-  if (!jwtSecret && !dedicatedKey && isProduction()) {
+  if (!jwtSecret && !dedicatedKey && !developmentFallbackAllowed()) {
     throw new Error(
       'SECRET_BOX_KEY (or JWT_SECRET) must be set to protect stored customer secrets'
     );

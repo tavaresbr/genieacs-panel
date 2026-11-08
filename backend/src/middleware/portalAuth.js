@@ -3,15 +3,15 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import CustomerAccount from '../models/CustomerAccount.js';
 import { isRequestSecure } from '../config/proxy.js';
-import { DEVELOPMENT_FALLBACK, assertNotPlaceholderSecret, isProduction } from '../config/runtimeEnv.js';
+import { DEVELOPMENT_FALLBACK, assertNotPlaceholderSecret, developmentFallbackAllowed } from '../config/runtimeEnv.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
 
 export const PORTAL_COOKIE_NAME = 'skygp_portal_session';
 const PORTAL_SESSION_TTL_SECONDS = 30 * 60;
 
 const baseSecret = process.env.PORTAL_JWT_SECRET || process.env.JWT_SECRET;
-if (!baseSecret && isProduction()) {
-  throw new Error('PORTAL_JWT_SECRET or JWT_SECRET must be set in production');
+if (!baseSecret && !developmentFallbackAllowed()) {
+  throw new Error('PORTAL_JWT_SECRET or JWT_SECRET must be set (only APP_ENV=development or test may use the built-in development secret)');
 }
 assertNotPlaceholderSecret('PORTAL_JWT_SECRET', process.env.PORTAL_JWT_SECRET);
 const portalSecret = process.env.PORTAL_JWT_SECRET || crypto
