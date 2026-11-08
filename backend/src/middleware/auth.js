@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { DEVELOPMENT_FALLBACK, isProduction, assertNotPlaceholderSecret } from '../config/runtimeEnv.js';
+import { DEVELOPMENT_FALLBACK, developmentFallbackAllowed, isProduction, assertNotPlaceholderSecret } from '../config/runtimeEnv.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import Tenant, { mfaRequired } from '../models/Tenant.js';
@@ -68,8 +68,8 @@ const JWT_SECRET = (() => {
     assertNotPlaceholderSecret('JWT_SECRET', secret);
     return secret;
   }
-  if (isProduction()) {
-    throw new Error('JWT_SECRET must be set in production');
+  if (!developmentFallbackAllowed()) {
+    throw new Error('JWT_SECRET must be set (only APP_ENV=development or test may use the built-in development secret)');
   }
   console.warn('JWT_SECRET not set; using insecure development fallback');
   return DEVELOPMENT_FALLBACK;

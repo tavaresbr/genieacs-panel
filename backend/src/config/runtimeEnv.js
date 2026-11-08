@@ -28,6 +28,22 @@ export function isProduction() {
 }
 
 /**
+ * Pode este processo cair no segredo de desenvolvimento (`DEVELOPMENT_FALLBACK`)?
+ *
+ * Só quando alguém disse, em voz alta, que é desenvolvimento ou teste:
+ * `APP_ENV=development|test` ou `NODE_ENV=test`. Antes a regra era o inverso —
+ * "recusa em produção" —, e um processo sem nenhuma das duas variáveis subia
+ * assinando sessões de administrador com uma constante que está num repositório
+ * público. Uma guarda que só vale se o operador declarou produção falha aberta
+ * justamente para quem esqueceu de declarar.
+ */
+export function developmentFallbackAllowed() {
+  return process.env.APP_ENV === 'development'
+    || process.env.APP_ENV === 'test'
+    || process.env.NODE_ENV === 'test';
+}
+
+/**
  * Refuses, in production, a secret copied from `.env.example` or equal to the
  * development fallback.
  *

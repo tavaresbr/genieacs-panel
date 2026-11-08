@@ -1,6 +1,9 @@
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+// O app não sobe sem segredo de sessão fora de desenvolvimento declarado; este
+// teste mexe em `APP_ENV` só depois, caso a caso.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
 const { errorHandler } = await import('../src/app.js');
 
 /**

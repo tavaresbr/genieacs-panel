@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { credencialDoPedido } from '../src/utils/wa/waWebhookAuth.js';
 import { nomeSeguro } from '../src/utils/wa/sensivel.js';
 
+// O serviço do robô cifra segredos ao carregar; sem JWT_SECRET o processo não sobe.
+process.env.JWT_SECRET ||= 'test-jwt-secret-that-is-long-enough-for-this-file';
+
 describe('webhook: a credencial só vem do header', () => {
   it('lê apikey e x-api-key do header', () => {
     assert.equal(credencialDoPedido({ apikey: 'a' }), 'a');
