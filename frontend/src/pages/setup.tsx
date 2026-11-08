@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { authAPI } from '@/lib/api'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
@@ -14,6 +15,17 @@ export default function Setup() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { completeSetup } = useAuth()
+  // O servidor pode exigir um código de instalação (`SETUP_TOKEN`) para criar a
+  // primeira conta; a tela só pede quando ele diz que precisa.
+  const [tokenRequired, setTokenRequired] = useState(false)
+  const [setupToken, setSetupToken] = useState('')
+  useEffect(() => {
+    let alive = true
+    authAPI.getSetupStatus()
+      .then((res) => { if (alive && res.success && (res.data as { tokenRequired?: boolean } | null)?.tokenRequired) setTokenRequired(true) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
   const { t } = useTranslation()
   const { name } = useTenant()
 
@@ -44,8 +56,8 @@ export default function Setup() {
 
     setLoading(true)
     try {
-      if (!await completeSetup(formData.username.trim(), formData.password, formData.email.trim())) {
-        setError(t('setup.error.createFailed'))
+      if (!await completeSetup(formData.username.trim(), formData.password, formData.email.trim(), tokenRequired ? setupToken.trim() : undefined)) {
+        setError(t(tokenRequired ? 'setup.error.token' : 'setup.error.createFailed'))
       }
     } catch {
       setError(t('setup.error.unreachable'))
@@ -107,6 +119,16 @@ export default function Setup() {
                 <div id="setup-error" className="alert-error flex gap-2.5" role="alert">
                   <Icon name="warning" size={19} className="mt-0.5 shrink-0" />
                   <span>{error}</span>
+                </div>
+              )}
+
+              {tokenRequired && (
+                <div>
+                  <label htmlFor="setupToken" className="field-label">{t('setup.token')}</label>
+                  <input id="setupToken" name="setupToken" type="password" autoComplete="off" required value={setupToken}
+                    onChange={(event) => setSetupToken(event.target.value)} className="modern-input"
+                    aria-describedby="setup-token-hint" />
+                  <p id="setup-token-hint" className="field-hint">{t('setup.tokenHint')}</p>
                 </div>
               )}
 

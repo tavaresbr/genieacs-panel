@@ -28,6 +28,7 @@ export default {
   'auth.setupStatusRetrieved': 'Stato della configurazione iniziale ottenuto',
   'auth.setupStatusFailed': 'Non è stato possibile ottenere lo stato della configurazione iniziale',
   'auth.setupAlreadyCompleted': 'La configurazione iniziale è già stata completata',
+  'auth.setupTokenInvalid': "Il codice di installazione non corrisponde.",
   'auth.usernameLength': 'Il nome utente deve avere da 3 a 64 caratteri',
   'auth.passwordLength': 'La password deve avere da 10 a 128 caratteri',
   'auth.adminCreated': 'Account proprietario creato correttamente',

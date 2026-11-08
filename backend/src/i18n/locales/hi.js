@@ -29,6 +29,7 @@ export default {
   'auth.setupStatusRetrieved': 'सेटअप स्थिति प्राप्त हुई',
   'auth.setupStatusFailed': 'सेटअप स्थिति प्राप्त नहीं हो सकी',
   'auth.setupAlreadyCompleted': 'सेटअप पहले ही पूरा हो चुका है',
+  'auth.setupTokenInvalid': "सेटअप कोड मेल नहीं खाता।",
   'auth.usernameLength': 'उपयोगकर्ता नाम 3 से 64 अक्षरों के बीच होना चाहिए',
   'auth.passwordLength': 'पासवर्ड 10 से 128 अक्षरों के बीच होना चाहिए',
   'auth.adminCreated': 'स्वामी खाता बन गया',

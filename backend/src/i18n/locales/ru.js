@@ -31,6 +31,7 @@ export default {
   'auth.setupStatusRetrieved': 'Состояние первоначальной настройки получено',
   'auth.setupStatusFailed': 'Не удалось получить состояние первоначальной настройки',
   'auth.setupAlreadyCompleted': 'Первоначальная настройка уже завершена',
+  'auth.setupTokenInvalid': "Код установки не совпадает.",
   'auth.usernameLength': 'Имя пользователя должно содержать от 3 до 64 символов',
   'auth.passwordLength': 'Пароль должен содержать от 10 до 128 символов',
   'auth.adminCreated': 'Учётная запись владельца создана',

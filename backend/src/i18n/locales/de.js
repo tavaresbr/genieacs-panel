@@ -31,6 +31,7 @@ export default {
   'auth.setupStatusRetrieved': 'Einrichtungsstatus abgerufen',
   'auth.setupStatusFailed': 'Der Einrichtungsstatus konnte nicht abgerufen werden',
   'auth.setupAlreadyCompleted': 'Die Einrichtung ist bereits abgeschlossen',
+  'auth.setupTokenInvalid': "Der Einrichtungscode stimmt nicht überein.",
   'auth.usernameLength': 'Der Benutzername muss zwischen 3 und 64 Zeichen lang sein',
   'auth.passwordLength': 'Das Passwort muss zwischen 10 und 128 Zeichen lang sein',
   'auth.adminCreated': 'Inhaberkonto erfolgreich erstellt',

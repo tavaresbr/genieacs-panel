@@ -29,6 +29,7 @@ export default {
   'auth.setupStatusRetrieved': 'تم جلب حالة الإعداد الأولي',
   'auth.setupStatusFailed': 'تعذّر جلب حالة الإعداد الأولي',
   'auth.setupAlreadyCompleted': 'الإعداد الأولي مكتمل بالفعل',
+  'auth.setupTokenInvalid': "رمز التثبيت غير مطابق.",
   'auth.usernameLength': 'يجب أن يتراوح اسم المستخدم بين ٣ و٦٤ حرفًا',
   'auth.passwordLength': 'يجب أن تتراوح كلمة المرور بين ١٠ و١٢٨ حرفًا',
   'auth.adminCreated': 'تم إنشاء حساب المالك',

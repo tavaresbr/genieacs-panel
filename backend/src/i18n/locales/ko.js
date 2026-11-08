@@ -31,6 +31,7 @@ export default {
   'auth.setupStatusRetrieved': '초기 설정 상태를 조회했습니다',
   'auth.setupStatusFailed': '초기 설정 상태를 조회하지 못했습니다',
   'auth.setupAlreadyCompleted': '초기 설정이 이미 완료되었습니다',
+  'auth.setupTokenInvalid': "설치 코드가 일치하지 않습니다.",
   'auth.usernameLength': '사용자 이름은 3자에서 64자 사이여야 합니다',
   'auth.passwordLength': '비밀번호는 10자에서 128자 사이여야 합니다',
   'auth.adminCreated': '소유자 계정을 생성했습니다',

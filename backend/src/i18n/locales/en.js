@@ -31,6 +31,7 @@ export default {
   'auth.setupStatusRetrieved': 'Setup status retrieved',
   'auth.setupStatusFailed': 'Failed to get the setup status',
   'auth.setupAlreadyCompleted': 'Setup already completed',
+  'auth.setupTokenInvalid': "The setup code does not match.",
   'auth.usernameLength': 'The username must be between 3 and 64 characters',
   'auth.passwordLength': 'The password must be between 10 and 128 characters',
   'auth.adminCreated': 'Owner account created successfully',

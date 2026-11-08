@@ -31,6 +31,7 @@ export default {
   'auth.setupStatusRetrieved': 'セットアップの状態を取得しました',
   'auth.setupStatusFailed': 'セットアップの状態を取得できませんでした',
   'auth.setupAlreadyCompleted': 'セットアップは完了しています',
+  'auth.setupTokenInvalid': "セットアップコードが一致しません。",
   'auth.usernameLength': 'ユーザー名は 3〜64 文字で入力してください',
   'auth.passwordLength': 'パスワードは 10〜128 文字で入力してください',
   'auth.adminCreated': 'オーナーアカウントを作成しました',

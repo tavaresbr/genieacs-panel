@@ -934,8 +934,8 @@ export const authAPI = {
   getSetupStatus: () =>
     apiClient.get('/auth/setup-status'),
 
-  setupAdmin: (username: string, password: string, email: string) =>
-    apiClient.post('/auth/setup', { username, password, email }),
+  setupAdmin: (username: string, password: string, email: string, setupToken?: string) =>
+    apiClient.post('/auth/setup', { username, password, email, ...(setupToken ? { setupToken } : {}) }),
 
   /**
    * O identificador continua chegando como `username` porque é o nome do campo
