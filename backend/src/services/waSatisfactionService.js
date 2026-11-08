@@ -46,39 +46,51 @@ export function lerNota(texto) {
  */
 class WaSatisfactionService {
   /**
+   * Esta conversa receberia a pesquisa se fosse encerrada agora? Só decide, não
+   * envia nada: é o que a tela consulta para perguntar ao atendente.
+   *
+   * @returns {Promise<{ask: boolean, reason?: string, agentId?: number|null}>}
+   */
+  static async wouldAsk(conversation, { now = new Date() } = {}) {
+    const { satisfaction } = await WaBotConfigService.getConfig();
+    if (!satisfaction?.enabled) return { ask: false, reason: 'disabled' };
+
+    const ultima = await tdb('wa_satisfaction')
+      .where({ conversation_id: conversation.id })
+      .orderBy('id', 'desc')
+      .first();
+    // Uma pergunta ainda esperando resposta não ganha irmã.
+    if (ultima && ['pending', 'comment'].includes(ultima.status)
+      && now.getTime() - timestampMs(ultima.asked_at) < JANELA_MS) {
+      return { ask: false, reason: 'pending' };
+    }
+
+    // Só se houve gente: uma conversa que o bot resolveu sozinho, ou um
+    // aviso de cobrança arquivado, não teve atendimento para avaliar. E só
+    // o que veio depois da última pesquisa — senão encerrar duas vezes o
+    // mesmo atendimento pergunta duas vezes.
+    const humano = await tdb('wa_messages')
+      .where({ conversation_id: conversation.id, direction: 'out', source: 'operator', is_note: false })
+      .modify((q) => { if (ultima) q.where('created_at', '>', ultima.asked_at); })
+      .orderBy('id', 'desc')
+      .first('sent_by');
+    if (!humano) return { ask: false, reason: 'no_agent' };
+
+    if (conversation.wa_phone_e164) {
+      const fora = await WaOptOut.activePhones([conversation.wa_phone_e164], 'survey');
+      if (fora.size) return { ask: false, reason: 'opted_out' };
+    }
+    return { ask: true, agentId: humano.sent_by || null };
+  }
+
+  /**
    * Chamado depois de uma conversa ser encerrada por um atendente.
    * @returns {Promise<{asked: boolean, reason?: string}>}
    */
   static async onClosed(conversation, { userId = null, now = new Date() } = {}) {
     try {
-      const { satisfaction } = await WaBotConfigService.getConfig();
-      if (!satisfaction?.enabled) return { asked: false, reason: 'disabled' };
-
-      const ultima = await tdb('wa_satisfaction')
-        .where({ conversation_id: conversation.id })
-        .orderBy('id', 'desc')
-        .first();
-      // Uma pergunta ainda esperando resposta não ganha irmã.
-      if (ultima && ['pending', 'comment'].includes(ultima.status)
-        && now.getTime() - timestampMs(ultima.asked_at) < JANELA_MS) {
-        return { asked: false, reason: 'pending' };
-      }
-
-      // Só se houve gente: uma conversa que o bot resolveu sozinho, ou um
-      // aviso de cobrança arquivado, não teve atendimento para avaliar. E só
-      // o que veio depois da última pesquisa — senão encerrar duas vezes o
-      // mesmo atendimento pergunta duas vezes.
-      const humano = await tdb('wa_messages')
-        .where({ conversation_id: conversation.id, direction: 'out', source: 'operator', is_note: false })
-        .modify((q) => { if (ultima) q.where('created_at', '>', ultima.asked_at); })
-        .orderBy('id', 'desc')
-        .first('sent_by');
-      if (!humano) return { asked: false, reason: 'no_agent' };
-
-      if (conversation.wa_phone_e164) {
-        const fora = await WaOptOut.activePhones([conversation.wa_phone_e164], 'survey');
-        if (fora.size) return { asked: false, reason: 'opted_out' };
-      }
+      const decisao = await this.wouldAsk(conversation, { now });
+      if (!decisao.ask) return { asked: false, reason: decisao.reason };
 
       await WaSendService.enqueue({
         conversationId: conversation.id,
@@ -87,7 +99,7 @@ class WaSatisfactionService {
       });
       await tinsertReturningId('wa_satisfaction', {
         conversation_id: conversation.id,
-        agent_user_id: humano.sent_by || userId || null,
+        agent_user_id: decisao.agentId || userId || null,
         status: 'pending',
         asked_at: now
       });

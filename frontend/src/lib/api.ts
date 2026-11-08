@@ -5933,6 +5933,8 @@ export interface WhatsAppConversation {
   /** The SGP client with no contract this thread is bound to, if any. */
   sgpContactId: number | null
   clientName: string | null
+  /** Closing now would send the satisfaction survey (detail only). */
+  surveyOnClose?: boolean
   /** The contact asked not to be contacted. Replying is still allowed. */
   optedOut: boolean
   /** Pediu para não receber promoção: desde quando e por onde. Só a promoção para. */
@@ -6791,8 +6793,12 @@ export const whatsappAPI = {
   // Closing is a filing decision, not a deletion: the thread and its history
   // stay, and an inbound message reopens it — a customer who writes again is
   // not answered by an archive.
-  setConversationStatus: (conversationId: number, status: 'open' | 'closed') =>
-    apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/status`, { status }),
+  setConversationStatus: (conversationId: number, status: 'open' | 'closed', options: { survey?: boolean } = {}) =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/status`, {
+      status,
+      // Só `false` dispensa a pesquisa de satisfação ao encerrar.
+      ...(options.survey === false ? { survey: false } : {})
+    }),
 
   /** Assumir (o próprio id), transferir para um colega, ou `null` para soltar. */
   assignConversation: (conversationId: number, userId: number | null) =>

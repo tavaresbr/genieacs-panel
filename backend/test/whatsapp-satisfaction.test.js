@@ -172,6 +172,28 @@ describe('a pesquisa de satisfação', () => {
     assert.equal((await getDb()('wa_satisfaction').where({ conversation_id: id })).length, 1);
   });
 
+  it('encerrar sem pesquisa (survey:false) não manda nada ao cliente', async () => {
+    const id = await atendida('5593981120020');
+    const antes = (await saidasDoBot(id)).length;
+    const res = await call(`${panelUrl}/api/whatsapp/conversations/${id}/status`, {
+      method: 'POST', headers: authHeaders(token), body: { status: 'closed', survey: false }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.ok((await linhaDe(id)).closed_at, 'a conversa foi encerrada');
+    assert.equal(await pesquisaDe(id), undefined, 'não deixa pesquisa pendente');
+    assert.equal((await saidasDoBot(id)).length, antes, 'nenhuma mensagem do bot saiu');
+  });
+
+  it('a conversa diz se encerrar mandaria a pesquisa (surveyOnClose)', async () => {
+    const comGente = await atendida('5593981120021');
+    const semGente = await atendida('5593981120022', { comAtendente: false });
+    const ler = async (id) => (await call(`${panelUrl}/api/whatsapp/conversations/${id}`, { headers: authHeaders(token) })).body.data;
+    assert.equal((await ler(comGente)).surveyOnClose, true);
+    assert.equal((await ler(semGente)).surveyOnClose, false);
+    await asTenant(() => WaBotConfigService.saveConfig({ satisfaction: { enabled: false } }));
+    assert.equal((await ler(comGente)).surveyOnClose, false);
+  });
+
   it('o relatório soma as notas, por atendente, com os comentários das baixas', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/satisfaction-report?days=30`, { headers: authHeaders(token) });
     assert.equal(status, 200);
