@@ -790,9 +790,10 @@ class TeiahService {
    * `truncated` says when there was more.
    */
   static async consultationSummary({ from, to } = {}) {
-    const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ''));
-    const end = isDate(to) ? to : new Date().toISOString().slice(0, 10);
-    const start = isDate(from) ? from : `${end.slice(0, 7)}-01`;
+    // Only a single AAAA-MM-DD string: a repeated query parameter arrives as an array.
+    const asDate = (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
+    const end = asDate(to) ?? new Date().toISOString().slice(0, 10);
+    const start = asDate(from) ?? `${end.slice(0, 7)}-01`;
     if (start > end) {
       throw new TeiahError('teiah.error.periodInvalid', { code: 'invalid_period', status: 400 });
     }

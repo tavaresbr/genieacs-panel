@@ -547,6 +547,15 @@ describe('gasto com consultas (histórico da TeiaH)', () => {
     assert.equal(invertido.status, 400);
     assert.equal(invertido.body.code, 'invalid_period');
   });
+
+  it('um parâmetro repetido não passa como data', async () => {
+    teiah.historyQueries.length = 0;
+    const res = await resumo('?from=2026-10-01&from=2026-10-02&to=2026-11-30');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    // A lista foi ignorada: vale o padrão, o começo do mês do fim.
+    assert.equal(res.body.data.from, '2026-11-01');
+    assert.equal(teiah.historyQueries[0].searchParams.get('startDate'), '2026-11-01');
+  });
 });
 
 describe('deploy compartilhado', () => {
