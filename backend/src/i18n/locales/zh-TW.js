@@ -1252,6 +1252,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': '已載入 TeiaH Valid 設定',
   'teiah.configLoadFailed': '無法載入 TeiaH Valid 設定',
+  'teiah.summaryFailed': "載入 TeiaH Valid 查詢歷史失敗",
   'teiah.configSaved': '已儲存 TeiaH Valid 設定',
   'teiah.configSaveFailed': '無法儲存 TeiaH Valid 設定',
   'teiah.connectionOk': '已連線 TeiaH Valid，金鑰已被接受',
@@ -1270,6 +1271,7 @@ export default {
   'teiah.error.unreachable': '無法連線 TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid 未在時限內回應',
   'teiah.error.invalidResponse': 'TeiaH Valid 回傳了無效回應',
+  'teiah.error.periodInvalid': "期間無效：開始日期晚於結束日期",
   'teiah.error.reportNone': "此客戶尚未在 TeiaH Valid 查詢過",
   'teiah.error.reportEmpty': "TeiaH Valid 沒有此次查詢的可列印報告",
   'teiah.error.credentialsRejected': 'TeiaH Valid 拒絕了 API 金鑰',

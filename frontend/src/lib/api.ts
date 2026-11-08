@@ -4331,7 +4331,7 @@ export const contactsAPI = {
     ),
 
   /** The contacts as a CSV, with the list's search and state filter. */
-  exportSheet: (filters: { search?: string; state?: string; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter; asaas?: boolean } = {}) => {
+  exportSheet: (filters: { search?: string; state?: string; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter; asaas?: boolean; teiahHigh?: boolean } = {}) => {
     const query = new URLSearchParams()
     if (filters.search) query.set('search', filters.search)
     if (filters.state) query.set('state', filters.state)
@@ -4339,6 +4339,7 @@ export const contactsAPI = {
     if (filters.imported) query.set('imported', 'true')
     if (filters.device) query.set('device', filters.device)
     if (filters.asaas) query.set('asaas', 'true')
+    if (filters.teiahHigh) query.set('teiahHigh', 'true')
     const suffix = query.toString()
     return apiClient.getBlob(`/contacts/export${suffix ? `?${suffix}` : ''}`)
   },
@@ -4641,9 +4642,31 @@ export const asaasProviderAPI = {
     apiClient.post<{ accountName: string | null; environment: AsaasEnvironment }>('/asaas/test', payload)
 }
 
+/** One group of the TeiaH spend report: a month, a kind of consultation or a user. */
+export interface TeiahSpendGroup { key: string; count: number; cost: number }
+
+/** The TeiaH consultations of a period, from its history: totals and the latest ones (no document). */
+export interface TeiahConsultationSummary {
+  from: string
+  to: string
+  truncated: boolean
+  total: number
+  totalCost: number
+  /** The history carried a cost for at least one consultation. */
+  costKnown: boolean
+  byMonth: TeiahSpendGroup[]
+  byType: TeiahSpendGroup[]
+  byUser: TeiahSpendGroup[]
+  recent: { type: string | null; origin: string | null; status: string | null; userName: string | null; createdAt: string | null; cost: number | null }[]
+}
+
 export const teiahAPI = {
   getConfig: () =>
     apiClient.get<TeiahConfig>('/teiah/config'),
+
+  /** What the consultations cost, from the TeiaH history of the key (panel and site). */
+  consultationSummary: (from: string, to: string) =>
+    apiClient.get<TeiahConsultationSummary>(`/teiah/consultations/summary?${new URLSearchParams({ from, to })}`),
 
   updateConfig: (config: Partial<Omit<TeiahConfig, 'apiKeyConfigured' | 'ready' | 'updatedAt'>> & { apiKey?: string }) =>
     apiClient.put<TeiahConfig>('/teiah/config', config),
@@ -6115,6 +6138,9 @@ export interface WhatsAppContact {
   importSource?: 'whatsapp' | 'sheet' | 'google' | 'focuschat' | null
   /** Também é cliente da conta Asaas do provedor (pelo CPF/CNPJ). */
   inAsaas?: boolean
+  /** O risco da última consulta da TeiaH a este CPF/CNPJ, para o selo; null se nunca consultado. */
+  teiahRisk?: string | null
+  teiahScore?: number | null
   /** Blocked for everything. */
   optedOut: boolean
   /** Blocked only for these kinds; `null` when not blocked or blocked for everything. */
@@ -6138,6 +6164,8 @@ export interface WhatsAppContactCounts {
   withoutDevice?: number
   /** Quantos são também clientes do Asaas; `null` quando a integração não está ligada (o filtro some). */
   asaas?: number | null
+  /** Quantos a TeiaH deu risco alto; `null` quando ninguém da lista foi consultado (o filtro some). */
+  teiahHigh?: number | null
 }
 
 /** Only who has, or has not, a managed ONT linked to the contract. */
@@ -6817,7 +6845,7 @@ export const whatsappAPI = {
     ),
 
   // ── SGP contacts ─────────────────────────────────────────────────────
-  listContacts: (params: { search?: string; limit?: number; offset?: number; state?: WhatsAppContactState; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter; asaas?: boolean } = {}) => {
+  listContacts: (params: { search?: string; limit?: number; offset?: number; state?: WhatsAppContactState; noPhone?: boolean; imported?: boolean; device?: ContactDeviceFilter; asaas?: boolean; teiahHigh?: boolean } = {}) => {
     const query = new URLSearchParams()
     if (params.search) query.set('search', params.search)
     if (params.state) query.set('state', params.state)
@@ -6826,6 +6854,8 @@ export const whatsappAPI = {
     if (params.imported) query.set('imported', 'true')
     // Só quem também é cliente da conta Asaas do provedor (casado pelo CPF/CNPJ).
     if (params.asaas) query.set('asaas', 'true')
+    // Só quem a última consulta da TeiaH deu risco alto.
+    if (params.teiahHigh) query.set('teiahHigh', 'true')
     if (params.device) query.set('device', params.device)
     if (params.limit) query.set('limit', String(params.limit))
     if (params.offset) query.set('offset', String(params.offset))

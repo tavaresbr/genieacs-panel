@@ -514,7 +514,8 @@ ContactController.exportSheet = async function exportSheet(req, res) {
       noPhone: req.query.noPhone === 'true',
       imported: req.query.imported === 'true',
       device: String(req.query.device ?? ''),
-      asaas: req.query.asaas === 'true'
+      asaas: req.query.asaas === 'true',
+      teiahHigh: req.query.teiahHigh === 'true'
     };
     const { csv, count } = await ContactSheetService.exportCsv(filters);
     await AuditLog.fromRequest(req, {

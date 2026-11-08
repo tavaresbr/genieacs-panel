@@ -1250,6 +1250,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': 'Configurazione di TeiaH Valid caricata',
   'teiah.configLoadFailed': 'Impossibile caricare la configurazione di TeiaH Valid',
+  'teiah.summaryFailed': "Impossibile caricare lo storico delle consultazioni TeiaH Valid",
   'teiah.configSaved': 'Configurazione di TeiaH Valid salvata',
   'teiah.configSaveFailed': 'Impossibile salvare la configurazione di TeiaH Valid',
   'teiah.connectionOk': 'Connessione a TeiaH Valid stabilita e chiave accettata',
@@ -1268,6 +1269,7 @@ export default {
   'teiah.error.unreachable': 'Impossibile raggiungere TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid non ha risposto entro il tempo limite',
   'teiah.error.invalidResponse': 'TeiaH Valid ha inviato una risposta non valida',
+  'teiah.error.periodInvalid': "Il periodo non è valido: la data iniziale è dopo quella finale",
   'teiah.error.reportNone': "Questo cliente non è ancora stato consultato su TeiaH Valid",
   'teiah.error.reportEmpty': "TeiaH Valid non ha un report stampabile per questa consultazione",
   'teiah.error.credentialsRejected': 'TeiaH Valid ha rifiutato la chiave API',

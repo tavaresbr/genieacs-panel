@@ -1255,6 +1255,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid 설정을 불러왔습니다',
   'teiah.configLoadFailed': 'TeiaH Valid 설정을 불러오지 못했습니다',
+  'teiah.summaryFailed': "TeiaH Valid 조회 기록을 불러오지 못했습니다",
   'teiah.configSaved': 'TeiaH Valid 설정을 저장했습니다',
   'teiah.configSaveFailed': 'TeiaH Valid 설정을 저장하지 못했습니다',
   'teiah.connectionOk': 'TeiaH Valid에 연결되었고 키가 승인되었습니다',
@@ -1273,6 +1274,7 @@ export default {
   'teiah.error.unreachable': 'TeiaH Valid에 연결할 수 없습니다',
   'teiah.error.timeout': 'TeiaH Valid가 제한 시간 내에 응답하지 않았습니다',
   'teiah.error.invalidResponse': 'TeiaH Valid가 잘못된 응답을 보냈습니다',
+  'teiah.error.periodInvalid': "기간이 잘못되었습니다: 시작일이 종료일보다 늦습니다",
   'teiah.error.reportNone': "이 고객은 아직 TeiaH Valid에서 조회되지 않았습니다",
   'teiah.error.reportEmpty': "TeiaH Valid에 이 조회의 인쇄 가능한 보고서가 없습니다",
   'teiah.error.credentialsRejected': 'TeiaH Valid가 API 키를 거부했습니다',

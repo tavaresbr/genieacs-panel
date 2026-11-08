@@ -1252,6 +1252,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': '已加载 TeiaH Valid 配置',
   'teiah.configLoadFailed': '无法加载 TeiaH Valid 配置',
+  'teiah.summaryFailed': "加载 TeiaH Valid 查询历史失败",
   'teiah.configSaved': '已保存 TeiaH Valid 配置',
   'teiah.configSaveFailed': '无法保存 TeiaH Valid 配置',
   'teiah.connectionOk': '已连接 TeiaH Valid，密钥已被接受',
@@ -1270,6 +1271,7 @@ export default {
   'teiah.error.unreachable': '无法连接 TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid 未在时限内响应',
   'teiah.error.invalidResponse': 'TeiaH Valid 返回了无效响应',
+  'teiah.error.periodInvalid': "时间段无效：开始日期晚于结束日期",
   'teiah.error.reportNone': "该客户尚未在 TeiaH Valid 查询过",
   'teiah.error.reportEmpty': "TeiaH Valid 没有此次查询的可打印报告",
   'teiah.error.credentialsRejected': 'TeiaH Valid 拒绝了 API 密钥',

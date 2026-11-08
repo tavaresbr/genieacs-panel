@@ -96,9 +96,10 @@ let sgpServer;
 let teiahServer;
 let teiahUrl;
 const invoiceCalls = [];
-const teiah = { batches: [], singles: [], keys: [], batchStatus: 201 };
+const teiah = { batches: [], singles: [], keys: [], batchStatus: 201, historyQueries: [] };
 
 const auth = () => ({ headers: authHeaders(token) });
+const HISTORICO = [];
 const linhas = () => asTenant(() => getDb()('teiah_exports').orderBy('contract'));
 const porContrato = async () => Object.fromEntries((await linhas()).map((row) => [row.contract, row]));
 
@@ -144,6 +145,13 @@ function startTeiahStub() {
     };
     teiah.keys.push(req.headers['x-api-key'] ?? null);
     if (req.headers['x-api-key'] !== API_KEY) return send(401, { statusCode: 401, message: 'Unauthorized' });
+    if (req.method === 'GET' && req.url.startsWith('/api/consultations?')) {
+      const url = new URL(req.url, 'http://teiah');
+      teiah.historyQueries.push(url);
+      const offset = Number(url.searchParams.get('offset'));
+      const limit = Number(url.searchParams.get('limit'));
+      return send(200, { total: HISTORICO.length, data: HISTORICO.slice(offset, offset + limit) });
+    }
     if (req.method === 'POST' && req.url === '/api/import/addresses') {
       if (teiah.batchStatus !== 201) return send(teiah.batchStatus, { message: ['each value in body must be a string'] });
       teiah.batches.push(body);
@@ -492,6 +500,52 @@ describe('envio dos inadimplentes', () => {
   it('nada do vizinho: o outro provedor não tem registro nem envio', async () => {
     const doBeta = await runInTenant(beta, () => getDb()('teiah_exports').where({ tenant_id: beta }));
     assert.deepEqual(doBeta, []);
+  });
+});
+
+describe('gasto com consultas (histórico da TeiaH)', () => {
+  const resumo = (query = '') => call(`${panelUrl}/api/teiah/consultations/summary${query}`, auth());
+
+  before(async () => {
+    // 250 consultas: passa de uma página (200) e obriga a ler a segunda.
+    HISTORICO.length = 0;
+    for (let i = 0; i < 250; i += 1) {
+      HISTORICO.push({
+        id: `h-${i}`,
+        tipo: i % 5 === 0 ? 'ENDERECO' : 'CPF',
+        documento: '529.982.247-25',
+        valor: i % 5 === 0 ? '-2,50' : -4.99,
+        usuario: { nome: i % 2 === 0 ? 'Thiago Tavares' : 'Ana Atendente' },
+        status: 'Consultado',
+        createdAt: i < 100 ? '2026-11-05T10:00:00Z' : '2026-10-20T10:00:00Z'
+      });
+    }
+    await asTenant(() => TeiahService.saveConfig({ enabled: true, baseUrl: teiahUrl, apiKey: API_KEY }));
+  });
+
+  it('soma por mês, por tipo e por usuário, lendo todas as páginas', async () => {
+    teiah.historyQueries.length = 0;
+    const res = await resumo('?from=2026-10-01&to=2026-11-30');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const data = res.body.data;
+    assert.equal(data.total, 250);
+    assert.equal(data.truncated, false);
+    assert.equal(teiah.historyQueries.length, 2);
+    assert.equal(teiah.historyQueries[0].searchParams.get('startDate'), '2026-10-01');
+    assert.equal(teiah.historyQueries[1].searchParams.get('offset'), '200');
+    // 200 de CPF a 4,99 e 50 de endereço a 2,50.
+    assert.equal(data.totalCost, Math.round((200 * 4.99 + 50 * 2.5) * 100) / 100);
+    assert.deepEqual(data.byType.map((t) => [t.key, t.count]), [['CPF', 200], ['ENDERECO', 50]]);
+    assert.deepEqual(data.byMonth.map((m) => [m.key, m.count]), [['2026-11', 100], ['2026-10', 150]]);
+    assert.deepEqual(data.byUser.map((u) => u.count).sort(), [125, 125]);
+    assert.equal(data.recent.length, 20);
+    assert.equal(JSON.stringify(data).includes('529'), false, 'o relatório levou o documento consultado');
+  });
+
+  it('recusa período invertido', async () => {
+    const invertido = await resumo('?from=2026-11-30&to=2026-11-01');
+    assert.equal(invertido.status, 400);
+    assert.equal(invertido.body.code, 'invalid_period');
   });
 });
 

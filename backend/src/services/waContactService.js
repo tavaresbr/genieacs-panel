@@ -75,15 +75,15 @@ function maskDocument(document) {
 const DEVICE_FILTERS = ['with', 'without'];
 
 class WaContactService {
-  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
+  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false, imported = false, device = '', asaas = false, teiahHigh = false } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
     const everyone = await this.gather({ search });
-    const subscribers = this.narrow(everyone, { state, noPhone, imported, device, asaas });
+    const subscribers = this.narrow(everyone, { state, noPhone, imported, device, asaas, teiahHigh });
     const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
     return {
       total: subscribers.length,
-      counts: this.counts(everyone, { state, noPhone, imported, device, asaas }),
+      counts: this.counts(everyone, { state, noPhone, imported, device, asaas, teiahHigh }),
       contacts: await this.decorate(page)
     };
   }
@@ -104,8 +104,8 @@ class WaContactService {
    * `asaas` keeps only the clients whose CPF/CNPJ is also a client of the
    * provider's Asaas account (what the last import brought).
    */
-  static async collect({ search = '', state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
-    return this.narrow(await this.gather({ search }), { state, noPhone, imported, device, asaas });
+  static async collect({ search = '', state = '', noPhone = false, imported = false, device = '', asaas = false, teiahHigh = false } = {}) {
+    return this.narrow(await this.gather({ search }), { state, noPhone, imported, device, asaas, teiahHigh });
   }
 
   /**
@@ -137,7 +137,42 @@ class WaContactService {
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
     ));
-    return this.markAsaas(everyone);
+    return this.markTeiah(await this.markAsaas(everyone));
+  }
+
+  /**
+   * O selo da TeiaH: o risco que a última consulta deu ao CPF/CNPJ, pelo
+   * documento, de uma leitura só (as fichas que têm consulta guardada). Quem
+   * nunca foi consultado fica sem selo — nada aqui consulta a TeiaH.
+   */
+  static async markTeiah(everyone) {
+    const rows = await tdb('sgp_clients').whereNotNull('teiah').select('document', 'overrides', 'teiah');
+    const byDocument = new Map();
+    for (const row of rows) {
+      // A client typed in the panel keeps its CPF/CNPJ in the operator's edits.
+      let overrides = row.overrides;
+      if (typeof overrides === 'string') {
+        try { overrides = JSON.parse(overrides); } catch { overrides = null; }
+      }
+      const document = normalizeTaxId(row.document || overrides?.document?.value);
+      if (!document) continue;
+      let teiah = row.teiah;
+      if (typeof teiah === 'string') {
+        try { teiah = JSON.parse(teiah); } catch { teiah = null; }
+      }
+      const risk = typeof teiah?.score?.risk === 'string' ? teiah.score.risk.trim() : '';
+      if (!risk) continue;
+      byDocument.set(document, { risk: risk.slice(0, 40), score: Number.isFinite(teiah.score.score) ? teiah.score.score : null });
+    }
+    return everyone.map((subscriber) => {
+      const found = byDocument.get(normalizeTaxId(subscriber.document)) ?? null;
+      return {
+        ...subscriber,
+        teiahRisk: found?.risk ?? null,
+        teiahScore: found?.score ?? null,
+        teiahHigh: Boolean(found && /^(ALT|HIGH)/i.test(found.risk))
+      };
+    });
   }
 
   /**
@@ -160,7 +195,7 @@ class WaContactService {
   }
 
   /** The state, phone and origin filters, applied to what `gather` returned. */
-  static narrow(everyone, { state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
+  static narrow(everyone, { state = '', noPhone = false, imported = false, device = '', asaas = false, teiahHigh = false } = {}) {
     const wanted = CONTACT_STATES.includes(state) ? state : null;
     const linked = DEVICE_FILTERS.includes(device) ? device : null;
     return everyone
@@ -168,6 +203,7 @@ class WaContactService {
       .filter((subscriber) => !noPhone || !subscriber.phone)
       .filter((subscriber) => !imported || subscriber.importSource)
       .filter((subscriber) => !asaas || subscriber.inAsaas)
+      .filter((subscriber) => !teiahHigh || subscriber.teiahHigh)
       .filter((subscriber) => !linked || (linked === 'with') === Boolean(subscriber.deviceId));
   }
 
@@ -177,24 +213,28 @@ class WaContactService {
    * toggles, each toggle counts under the current tab — so the number on the
    * active filter is always the list's own total.
    */
-  static counts(everyone, { state = '', noPhone = false, imported = false, device = '', asaas = false } = {}) {
+  static counts(everyone, { state = '', noPhone = false, imported = false, device = '', asaas = false, teiahHigh = false } = {}) {
     const size = (filters) => this.narrow(everyone, filters).length;
     const tab = CONTACT_STATES.includes(state) ? state : '';
     return {
       states: {
-        all: size({ noPhone, imported, device, asaas }),
-        active: size({ state: 'active', noPhone, imported, device, asaas }),
-        blocked: size({ state: 'blocked', noPhone, imported, device, asaas }),
-        cancelled: size({ state: 'cancelled', noPhone, imported, device, asaas }),
-        none: size({ state: 'none', noPhone, imported, device, asaas })
+        all: size({ noPhone, imported, device, asaas, teiahHigh }),
+        active: size({ state: 'active', noPhone, imported, device, asaas, teiahHigh }),
+        blocked: size({ state: 'blocked', noPhone, imported, device, asaas, teiahHigh }),
+        cancelled: size({ state: 'cancelled', noPhone, imported, device, asaas, teiahHigh }),
+        none: size({ state: 'none', noPhone, imported, device, asaas, teiahHigh })
       },
-      noPhone: size({ state: tab, noPhone: true, imported, device, asaas }),
-      imported: size({ state: tab, noPhone, imported: true, device, asaas }),
-      withDevice: size({ state: tab, noPhone, imported, device: 'with', asaas }),
-      withoutDevice: size({ state: tab, noPhone, imported, device: 'without', asaas }),
+      noPhone: size({ state: tab, noPhone: true, imported, device, asaas, teiahHigh }),
+      imported: size({ state: tab, noPhone, imported: true, device, asaas, teiahHigh }),
+      withDevice: size({ state: tab, noPhone, imported, device: 'with', asaas, teiahHigh }),
+      withoutDevice: size({ state: tab, noPhone, imported, device: 'without', asaas, teiahHigh }),
       // `null` quando a integração com o Asaas não está ligada: a tela esconde o filtro.
       asaas: everyone.some((subscriber) => subscriber.asaasConnected)
-        ? size({ state: tab, noPhone, imported, device, asaas: true })
+        ? size({ state: tab, noPhone, imported, device, asaas: true, teiahHigh })
+        : null,
+      // `null` quando ninguém da lista foi consultado na TeiaH: a tela esconde o filtro.
+      teiahHigh: everyone.some((subscriber) => subscriber.teiahRisk)
+        ? size({ state: tab, noPhone, imported, device, asaas, teiahHigh: true })
         : null
     };
   }
@@ -434,6 +474,9 @@ class WaContactService {
         lastSeenAt: subscriber.lastSeenAt || null,
         importSource: subscriber.importSource || null,
         inAsaas: subscriber.inAsaas === true,
+        // O risco da última consulta da TeiaH a este CPF/CNPJ, para o selo; null se nunca consultado.
+        teiahRisk: subscriber.teiahRisk ?? null,
+        teiahScore: subscriber.teiahScore ?? null,
         clientName: subscriber.clientName,
         document: maskDocument(subscriber.document),
         deviceId: subscriber.deviceId,

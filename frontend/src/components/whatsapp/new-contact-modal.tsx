@@ -94,7 +94,10 @@ function maskDocument(value: string) {
  * ERP, "Cadastrar também no SGP", which creates the client there first and
  * files it here under the SGP's own id.
  */
-export function NewContactModal({ onClose }: { onClose: () => void }) {
+/** What the caller already knows (the WhatsApp lead: phone, name, the address checked). */
+export type NewContactInitial = Partial<Pick<Form, 'name' | 'whatsappPhone' | 'zip' | 'street' | 'number' | 'complement' | 'district' | 'city' | 'state'>>
+
+export function NewContactModal({ onClose, initial }: { onClose: () => void; initial?: NewContactInitial }) {
   const { t, formatDateTime } = useTranslation()
   const toast = useToast()
   const navigate = useNavigate()
@@ -134,6 +137,15 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
   const canCreateInAsaas = can('asaas.act') && Boolean(lookup?.asaasWritable) && (lookup?.inAsaas.length ?? 0) === 0
   const toAsaas = canCreateInAsaas && inAsaasToo
   const set = (field: keyof Form, value: string) => setForm((current) => ({ ...current, [field]: value }))
+  // What the caller passed fills only what the source (SGP, TeiaH, Receita) left empty.
+  const withInitial = (filled: Form): Form => {
+    if (!initial) return filled
+    const merged = { ...filled }
+    for (const [field, value] of Object.entries(initial) as [keyof NewContactInitial, string | undefined][]) {
+      if (value && !String(merged[field] ?? '').trim()) merged[field] = value
+    }
+    return merged
+  }
 
   const canPreRegister = toSgp && Boolean(preRegOptions?.plans.length) && Boolean(preRegOptions?.dueDays.length)
   const toPreRegister = canPreRegister && withContract
@@ -197,7 +209,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
     const existing = lookup?.existing ?? null
     const filled = formFrom(existing)
     setForm({
-      ...filled,
+      ...withInitial(filled),
       latitude: existing?.address.latitude ?? undefined,
       longitude: existing?.address.longitude ?? undefined
     })
@@ -229,7 +241,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
       const found = res.data
       setLookup(found)
       if (found.inSgp.length > 0 || found.inPanel) return
-      setForm(formFrom(found.prefill))
+      setForm(withInitial(formFrom(found.prefill)))
       setShowForm(true)
     } finally {
       setLooking(false)
@@ -465,7 +477,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
         )}
 
         {!lookup && !showForm && (
-          <button type="button" className="mt-3 text-sm text-muted-foreground underline max-sm:min-h-10" onClick={() => { setForm(EMPTY_FORM); setShowForm(true) }}>
+          <button type="button" className="mt-3 text-sm text-muted-foreground underline max-sm:min-h-10" onClick={() => { setForm(withInitial(EMPTY_FORM)); setShowForm(true) }}>
             {t('contacts.new.withoutDocument')}
           </button>
         )}

@@ -14,6 +14,7 @@ import { loadContactFilters, saveContactFilters } from '@/lib/contact-filters'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
 import { NewContactModal } from '@/components/whatsapp/new-contact-modal'
+import { riskBadge } from '@/lib/teiah'
 import { TeiahPhonesModal } from '@/components/contacts/teiah-phones-modal'
 
 /** Same pause as the inbox search: one request per word, not per letter. */
@@ -60,7 +61,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   const [total, setTotal] = useState(0)
   // Where the filters were left, when this panel keeps them between visits.
   const [saved] = useState(() => {
-    const base = { search: '', state: defaultState, noPhone: false, imported: false, device: '' as ContactDeviceFilter, asaas: false }
+    const base = { search: '', state: defaultState, noPhone: false, imported: false, device: '' as ContactDeviceFilter, asaas: false, teiahHigh: false }
     return persistKey ? loadContactFilters(persistKey, base) : base
   })
   const [search, setSearch] = useState(saved.search)
@@ -83,9 +84,11 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   const [device, setDevice] = useState<ContactDeviceFilter>(saved.device)
   // Só quem também é cliente da conta Asaas do provedor.
   const [asaas, setAsaas] = useState(saved.asaas)
+  // Só quem a última consulta da TeiaH deu risco alto.
+  const [teiahHigh, setTeiahHigh] = useState(saved.teiahHigh === true)
   useEffect(() => {
-    if (persistKey) saveContactFilters(persistKey, { search, state: stateFilter, noPhone, imported, device, asaas })
-  }, [persistKey, search, stateFilter, noPhone, imported, device, asaas])
+    if (persistKey) saveContactFilters(persistKey, { search, state: stateFilter, noPhone, imported, device, asaas, teiahHigh })
+  }, [persistKey, search, stateFilter, noPhone, imported, device, asaas, teiahHigh])
   // Quantos contatos cada filtro mostraria; vazio até a primeira leitura.
   const [counts, setCounts] = useState<WhatsAppContactCounts | null>(null)
 
@@ -131,7 +134,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     }
   }, [search, t, toast])
 
-  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean, onlyImported: boolean, deviceFilter: ContactDeviceFilter, onlyAsaas: boolean) => {
+  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean, onlyImported: boolean, deviceFilter: ContactDeviceFilter, onlyAsaas: boolean, onlyTeiahHigh: boolean) => {
     const seq = ++requestSeq.current
     setLoading(true)
     const res = await whatsappAPI.listContacts({
@@ -141,7 +144,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
       noPhone: onlyNoPhone,
       imported: onlyImported,
       device: deviceFilter,
-      asaas: onlyAsaas
+      asaas: onlyAsaas,
+      teiahHigh: onlyTeiahHigh
     })
     if (!alive.current || seq !== requestSeq.current) return
     if (res.success && res.data) {
@@ -155,7 +159,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     setLoading(false)
   }, [t])
 
-  useEffect(() => { void load(debounced, stateFilter, noPhone, imported, device, asaas) }, [debounced, stateFilter, noPhone, imported, device, asaas, load])
+  useEffect(() => { void load(debounced, stateFilter, noPhone, imported, device, asaas, teiahHigh) }, [debounced, stateFilter, noPhone, imported, device, asaas, teiahHigh, load])
 
   const loadMore = useCallback(async () => {
     const seq = requestSeq.current
@@ -168,7 +172,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
       noPhone,
       imported,
       device,
-      asaas
+      asaas,
+      teiahHigh
     })
     if (!alive.current) return
     setLoadingMore(false)
@@ -183,7 +188,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
       ...page.filter((row) => !current.some((held) => held.key === row.key))
     ])
     setTotal(res.data.total)
-  }, [contacts.length, debounced, stateFilter, noPhone, imported, device, asaas, t, toast])
+  }, [contacts.length, debounced, stateFilter, noPhone, imported, device, asaas, teiahHigh, t, toast])
 
   const open = useCallback(async (contact: WhatsAppContact) => {
     setOpeningContract(contact.key)
@@ -222,7 +227,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   const exportSheet = async () => {
     setExporting(true)
     try {
-      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone, imported, device, asaas })
+      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone, imported, device, asaas, teiahHigh })
       if (!res.success || !res.blob) {
         toast.error(res.message || t('contacts.sheet.exportFailed'))
         return
@@ -263,6 +268,15 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     <span className="flex flex-wrap items-center gap-1.5">
       {contact.document && (
         <span className="text-xs text-muted-foreground">{contact.document}</span>
+      )}
+      {contact.teiahRisk && (
+        <span
+          className={riskBadge(contact.teiahRisk)}
+          title={t('whatsapp.contacts.teiahHint', { score: contact.teiahScore ?? '—' })}
+          data-testid="wa-contact-teiah-risk"
+        >
+          {t('whatsapp.contacts.teiahBadge', { risk: contact.teiahRisk })}
+        </span>
       )}
       {contact.inAsaas && (
         <span className="modern-badge-success" title={t('whatsapp.contacts.asaasHint')}>
@@ -397,7 +411,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
           <button
             type="button"
             className="modern-button-secondary"
-            onClick={() => void load(debounced, stateFilter, noPhone, imported, device, asaas)}
+            onClick={() => void load(debounced, stateFilter, noPhone, imported, device, asaas, teiahHigh)}
             disabled={loading}
           >
             <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
@@ -411,7 +425,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
           onClose={() => setTeiahPhones(false)}
           onApplied={() => {
             setTeiahPhones(false)
-            void load(debounced, stateFilter, noPhone, imported, device, asaas)
+            void load(debounced, stateFilter, noPhone, imported, device, asaas, teiahHigh)
           }}
         />
       )}
@@ -420,7 +434,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
           onClose={() => setImporting(false)}
           onApplied={() => {
             setImporting(false)
-            void load(debounced, stateFilter, noPhone, imported, device, asaas)
+            void load(debounced, stateFilter, noPhone, imported, device, asaas, teiahHigh)
           }}
         />
       )}
@@ -511,6 +525,21 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
               {t('whatsapp.contacts.filterAsaas')}
               {countBadge(counts.asaas)}
               {asaas && <Icon name="x" size={14} />}
+            </button>
+          )}
+          {counts?.teiahHigh !== null && counts?.teiahHigh !== undefined && (
+            <button
+              type="button"
+              className={teiahHigh ? 'modern-button' : 'modern-button-secondary'}
+              aria-pressed={teiahHigh}
+              data-testid="wa-contacts-teiah-high"
+              title={t('whatsapp.contacts.teiahFilterHint')}
+              onClick={() => setTeiahHigh((current) => !current)}
+            >
+              <Icon name="warning" size={16} />
+              {t('whatsapp.contacts.filterTeiahHigh')}
+              {countBadge(counts.teiahHigh)}
+              {teiahHigh && <Icon name="x" size={14} />}
             </button>
           )}
           {(['with', 'without'] as const).map((which) => (

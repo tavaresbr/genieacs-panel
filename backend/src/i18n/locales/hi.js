@@ -1252,6 +1252,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': 'TeiaH Valid कॉन्फ़िगरेशन लोड हुआ',
   'teiah.configLoadFailed': 'TeiaH Valid कॉन्फ़िगरेशन लोड नहीं हो सका',
+  'teiah.summaryFailed': "TeiaH Valid का जाँच इतिहास लोड नहीं हो सका",
   'teiah.configSaved': 'TeiaH Valid कॉन्फ़िगरेशन सहेजा गया',
   'teiah.configSaveFailed': 'TeiaH Valid कॉन्फ़िगरेशन सहेजा नहीं जा सका',
   'teiah.connectionOk': 'TeiaH Valid से कनेक्शन हुआ और कुंजी स्वीकार हुई',
@@ -1270,6 +1271,7 @@ export default {
   'teiah.error.unreachable': 'TeiaH Valid तक नहीं पहुँचा जा सका',
   'teiah.error.timeout': 'TeiaH Valid ने समय सीमा में उत्तर नहीं दिया',
   'teiah.error.invalidResponse': 'TeiaH Valid ने अमान्य उत्तर भेजा',
+  'teiah.error.periodInvalid': "अवधि अमान्य है: शुरुआती तारीख अंतिम तारीख के बाद है",
   'teiah.error.reportNone': "इस ग्राहक की TeiaH Valid में अभी तक जाँच नहीं हुई है",
   'teiah.error.reportEmpty': "TeiaH Valid के पास इस जाँच की छापने योग्य रिपोर्ट नहीं है",
   'teiah.error.credentialsRejected': 'TeiaH Valid ने API कुंजी अस्वीकार की',

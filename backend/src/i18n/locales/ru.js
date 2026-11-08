@@ -1253,6 +1253,7 @@ export default {
   // TeiaH Valid
   'teiah.configLoaded': 'Настройки TeiaH Valid загружены',
   'teiah.configLoadFailed': 'Не удалось загрузить настройки TeiaH Valid',
+  'teiah.summaryFailed': "Не удалось загрузить историю запросов TeiaH Valid",
   'teiah.configSaved': 'Настройки TeiaH Valid сохранены',
   'teiah.configSaveFailed': 'Не удалось сохранить настройки TeiaH Valid',
   'teiah.connectionOk': 'Подключение к TeiaH Valid установлено, ключ принят',
@@ -1271,6 +1272,7 @@ export default {
   'teiah.error.unreachable': 'Не удалось связаться с TeiaH Valid',
   'teiah.error.timeout': 'TeiaH Valid не ответила вовремя',
   'teiah.error.invalidResponse': 'TeiaH Valid прислала неверный ответ',
+  'teiah.error.periodInvalid': "Неверный период: начальная дата позже конечной",
   'teiah.error.reportNone': "Этот клиент ещё не проверялся в TeiaH Valid",
   'teiah.error.reportEmpty': "У TeiaH Valid нет отчёта для печати по этому запросу",
   'teiah.error.credentialsRejected': 'TeiaH Valid отклонила ключ API',

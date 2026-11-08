@@ -57,6 +57,16 @@ class TeiahController {
     }
   }
 
+  /** `GET /api/teiah/consultations/summary?from=&to=` — what the TeiaH consultations cost, from its history. */
+  static async consultationSummary(req, res) {
+    try {
+      const summary = await TeiahService.consultationSummary({ from: req.query.from, to: req.query.to });
+      return res.json(createResponse(req.t('teiah.configLoaded'), summary));
+    } catch (error) {
+      return handleError(req, res, error, 'teiah.summaryFailed');
+    }
+  }
+
   static async getExportStatus(req, res) {
     try {
       const status = await TeiahExportService.getStatus();
