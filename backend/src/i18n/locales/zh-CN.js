@@ -1093,6 +1093,7 @@ export default {
   'public.leadNotifySubject': '演示请求：{name}',
   'public.leadNotifyBody': '姓名：{name}\n公司：{company}\n邮箱：{email}\nWhatsApp：{phone}\n城市：{city}\n设备数：{devices}\n套餐：{plan}\n\n{message}',
   'auth.impersonationReadOnly': '支持会话中无法进行账户操作（退出、密码、双重验证）。',
+  'auth.impersonationTeamLocked': "在支持会话中无法创建或修改操作员和邀请。",
   'auth.impersonationTicketRequired': '需要模拟凭据',
   'auth.impersonationTicketInvalid': '此模拟链接已失效，请在控制台重新生成。',
   'auth.impersonationStarted': '支持会话已开始',

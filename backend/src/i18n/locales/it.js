@@ -1091,6 +1091,7 @@ export default {
   'public.leadNotifySubject': 'Richiesta di demo: {name}',
   'public.leadNotifyBody': 'Nome: {name}\nAzienda: {company}\nE-mail: {email}\nWhatsApp: {phone}\nCittà: {city}\nDispositivi: {devices}\nPiano: {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'In una sessione di assistenza le azioni dell\'account (uscita, password, secondo fattore) non sono disponibili.',
+  'auth.impersonationTeamLocked': "In una sessione di assistenza non si possono creare né modificare operatori o inviti.",
   'auth.impersonationTicketRequired': 'Il ticket di impersonificazione è obbligatorio',
   'auth.impersonationTicketInvalid': 'Questo link di impersonificazione non è più valido. Generane un altro dalla console.',
   'auth.impersonationStarted': 'Sessione di assistenza avviata',

@@ -1092,6 +1092,7 @@ export default {
   'public.leadNotifySubject': 'Pedido de demonstração: {name}',
   'public.leadNotifyBody': 'Nome: {name}\nEmpresa: {company}\nE-mail: {email}\nWhatsApp: {phone}\nCidade: {city}\nDispositivos: {devices}\nPlano: {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'Numa sessão de atendimento, as ações da conta (sair, senha, segundo fator) não estão disponíveis.',
+  'auth.impersonationTeamLocked': "Numa sessão de atendimento não é possível criar nem alterar operadores ou convites.",
   'auth.impersonationTicketRequired': 'O bilhete de personificação é obrigatório',
   'auth.impersonationTicketInvalid': 'Este link de personificação não vale mais. Gere outro pelo console.',
   'auth.impersonationStarted': 'Sessão de atendimento iniciada',

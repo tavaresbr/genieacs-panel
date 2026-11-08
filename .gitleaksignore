@@ -6,3 +6,5 @@ d262f606f1b0cd8e47ca3586d309bbb24593cb3c:backend/test/contact-teiah.test.js:gene
 d262f606f1b0cd8e47ca3586d309bbb24593cb3c:backend/test/contact-teiah.test.js:generic-api-key:386
 16f054675bf2a05630d3af2cad27ed53c893a373:backend/test/contact-teiah.test.js:generic-api-key:383
 16f054675bf2a05630d3af2cad27ed53c893a373:backend/test/contact-teiah.test.js:generic-api-key:386
+# Senha de teste que a revisão recusa antes de validar (commit 25330637); já trocada.
+25330637a0f83c88aa93c3ee733702cda1aaafc2:backend/test/impersonation.test.js:generic-api-key:434

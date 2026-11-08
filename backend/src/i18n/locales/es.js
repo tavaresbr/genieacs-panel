@@ -1090,6 +1090,7 @@ export default {
   'public.leadNotifySubject': 'Solicitud de demostración: {name}',
   'public.leadNotifyBody': 'Nombre: {name}\nEmpresa: {company}\nCorreo: {email}\nWhatsApp: {phone}\nCiudad: {city}\nDispositivos: {devices}\nPlan: {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'En una sesión de soporte, las acciones de la cuenta (salir, contraseña, segundo factor) no están disponibles.',
+  'auth.impersonationTeamLocked': "En una sesión de atención no se pueden crear ni cambiar operadores ni invitaciones.",
   'auth.impersonationTicketRequired': 'El tique de suplantación es obligatorio',
   'auth.impersonationTicketInvalid': 'Este enlace de suplantación ya no es válido. Genere otro desde la consola.',
   'auth.impersonationStarted': 'Sesión de soporte iniciada',

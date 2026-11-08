@@ -1093,6 +1093,7 @@ export default {
   'public.leadNotifySubject': '示範請求：{name}',
   'public.leadNotifyBody': '姓名：{name}\n公司：{company}\n電子郵件：{email}\nWhatsApp：{phone}\n城市：{city}\n設備數：{devices}\n方案：{plan}\n\n{message}',
   'auth.impersonationReadOnly': '支援工作階段中無法進行帳戶操作（登出、密碼、雙重驗證）。',
+  'auth.impersonationTeamLocked': "在支援工作階段中無法建立或修改操作員與邀請。",
   'auth.impersonationTicketRequired': '需要模擬憑證',
   'auth.impersonationTicketInvalid': '此模擬連結已失效，請在主控台重新產生。',
   'auth.impersonationStarted': '支援工作階段已開始',

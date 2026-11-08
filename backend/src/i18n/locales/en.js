@@ -1093,6 +1093,7 @@ export default {
   'public.leadNotifySubject': 'Demo request: {name}',
   'public.leadNotifyBody': 'Name: {name}\nCompany: {company}\nEmail: {email}\nWhatsApp: {phone}\nCity: {city}\nDevices: {devices}\nPlan: {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'Account actions (sign out, password, two-factor) are not available in a support session.',
+  'auth.impersonationTeamLocked': "Operators and invitations cannot be created or changed in a support session.",
   'auth.impersonationTicketRequired': 'The impersonation ticket is required',
   'auth.impersonationTicketInvalid': 'This impersonation link is no longer valid. Start a new one from the console.',
   'auth.impersonationStarted': 'Support session started',

@@ -1093,6 +1093,7 @@ export default {
   'public.leadNotifySubject': 'デモのリクエスト: {name}',
   'public.leadNotifyBody': '名前: {name}\n会社: {company}\nメール: {email}\nWhatsApp: {phone}\n都市: {city}\n機器数: {devices}\nプラン: {plan}\n\n{message}',
   'auth.impersonationReadOnly': 'サポートセッションでは、アカウント操作（ログアウト、パスワード、二要素認証）は利用できません。',
+  'auth.impersonationTeamLocked': "サポートセッションでは、オペレーターや招待の作成・変更はできません。",
   'auth.impersonationTicketRequired': 'なりすましチケットが必要です',
   'auth.impersonationTicketInvalid': 'このなりすましリンクは無効になりました。コンソールから新しく発行してください。',
   'auth.impersonationStarted': 'サポートセッションを開始しました',
