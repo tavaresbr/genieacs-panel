@@ -1,33 +1,15 @@
 {
-  "version": "1.28.12",
-  "build": 1577,
-  "sourceCommit": "37c23b7708a1",
+  "version": "1.28.13",
+  "build": 1580,
+  "sourceCommit": "74d8bb2015f8",
   "releasedAt": "2026-11-09",
-  "basedOnTag": "v1.28.11",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5094c1a650f9...37c23b7708a1",
+  "basedOnTag": "v1.28.12",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/e8286a6a92a3...74d8bb2015f8",
   "changes": [
     {
-      "shortHash": "495e9969",
+      "shortHash": "0424302c",
       "date": "2026-11-08",
-      "title": "Segurança: código de instalação (SETUP_TOKEN) opcional no primeiro cadastro",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "23f85d42",
-      "date": "2026-11-08",
-      "title": "Selo de risco nos Contatos, relatório de consultas e Novo cliente pelo WhatsApp",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "26739ea9",
-      "date": "2026-11-08",
-      "title": "Teste do selo de risco: senha de fixture em constante; marcação do commit anterior no .gitleaksignore",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "5bec1e84",
-      "date": "2026-11-08",
-      "title": "Relatório da TeiaH: só aceita data como texto AAAA-MM-DD (parâmetro repetido chega como lista)",
+      "title": "Pergunta se manda a pesquisa de satisfação (e permite encerrar sem mandar)",
       "category": "Maintenance"
     }
   ]
