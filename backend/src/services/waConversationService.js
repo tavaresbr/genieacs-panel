@@ -421,6 +421,8 @@ class WaConversationService {
       // desde a primeira mensagem dele sem resposta. Nota interna e envio
       // automático (régua, campanha) não contam como resposta.
       awaitingSince: extra.awaitingSince ?? null,
+      // O cliente falou e nenhum ATENDENTE respondeu (o robô não conta): a faixa de espera da lista.
+      awaitingHumanSince: extra.awaitingHumanSince ?? null,
       // Em dia, vence hoje ou atrasado, pela última consulta ao SGP; null sem foto.
       billing: extra.billing ?? null,
       sgpUrl: extra.sgpUrl ?? null,
@@ -524,7 +526,9 @@ class WaConversationService {
     const semPromocao = await WaMarketingOptOut.activeByPhone(rows.map((r) => r.wa_phone_e164));
     const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
     const etiquetas = await WaTagService.tagsFor(rows.map((r) => r.id));
-    const aguardando = await this.awaitingSince(rows.filter((r) => !r.closed_at).map((r) => r.id));
+    const abertas = rows.filter((r) => !r.closed_at).map((r) => r.id);
+    const aguardando = await this.awaitingSince(abertas);
+    const aguardandoGente = await this.awaitingSince(abertas, { sources: ['operator'] });
     // A cor da situação financeira: a foto guardada, e as velhas atualizadas
     // em segundo plano — a lista não espera o SGP.
     const situacoes = await BillingStatusService.forContracts(contracts);
@@ -537,6 +541,7 @@ class WaConversationService {
     return rows.map((row) => this.publicConversation(row, {
       tags: etiquetas.get(Number(row.id)) ?? [],
       awaitingSince: aguardando.get(Number(row.id)) ?? null,
+      awaitingHumanSince: aguardandoGente.get(Number(row.id)) ?? null,
       billing: row.contract ? situacoes.get(row.contract) ?? null : null,
       sgpUrl: sgpUrlOf(row.contract),
       assignedTo: row.assigned_user_id ? atendentes.get(Number(row.assigned_user_id)) ?? null : null,
@@ -566,10 +571,12 @@ class WaConversationService {
    * Quais destas conversas têm o cliente esperando resposta, e desde quando:
    * `Map<id, ISO>` com a primeira mensagem dele depois da última resposta.
    *
-   * Resposta é saída de gente (painel ou celular) ou do bot. Três consultas
-   * agrupadas, não uma por conversa — a lista desenha cinquenta de uma vez.
+   * Resposta é saída de gente (painel ou celular) ou do bot — ou, com
+   * `sources: ['operator']`, só de gente: o cliente que o robô respondeu mas
+   * nenhum atendente atendeu continua esperando (a faixa da lista). Três
+   * consultas agrupadas, não uma por conversa — a lista desenha cinquenta de uma vez.
    */
-  static async awaitingSince(conversationIds) {
+  static async awaitingSince(conversationIds, { sources = ['operator', 'bot'] } = {}) {
     const ids = [...new Set(conversationIds.map(Number).filter(Boolean))];
     const mapa = new Map();
     if (!ids.length) return mapa;
@@ -580,7 +587,7 @@ class WaConversationService {
     const ultimaResposta = new Map((await tdb('wa_messages')
       .whereIn('conversation_id', ultimaEntrada.map((r) => r.conversation_id))
       .where({ direction: 'out', is_note: false })
-      .whereIn('source', ['operator', 'bot'])
+      .whereIn('source', sources)
       .groupBy('conversation_id').select('conversation_id').max({ ultima: 'id' }))
       .map((r) => [Number(r.conversation_id), Number(r.ultima)]));
     const esperando = ultimaEntrada
@@ -638,6 +645,7 @@ class WaConversationService {
     const atendentes = await WaAssignmentService.names([conversation.assigned_user_id]);
     const etiquetas = await WaTagService.tagsFor([conversation.id]);
     const aguardando = conversation.closed_at ? new Map() : await this.awaitingSince([conversation.id]);
+    const aguardandoGente = conversation.closed_at ? new Map() : await this.awaitingSince([conversation.id], { sources: ['operator'] });
     // O mesmo atalho para o cadastro no SGP que a lista traz, pelo cliente
     // que a sincronização de contatos guardou no contrato (`client_ref`).
     const doContrato = conversation.contract
@@ -653,6 +661,7 @@ class WaConversationService {
       sgpUrl: sgpConfig?.enabled ? SgpService.clientPageUrl(sgpConfig, doContrato.client_ref) : null,
       tags: etiquetas.get(Number(conversation.id)) ?? [],
       awaitingSince: aguardando.get(Number(conversation.id)) ?? null,
+      awaitingHumanSince: aguardandoGente.get(Number(conversation.id)) ?? null,
       billing: conversation.contract
         ? (await BillingStatusService.forContracts([conversation.contract])).get(conversation.contract) ?? null
         : null,

@@ -3,7 +3,7 @@
  *
  * Antes a marca era a situação do pagamento, que não muda quando se responde, e
  * a equipe não distinguia quem já foi atendido. Agora ela só existe enquanto o
- * cliente espera (`awaitingSince`: falou por último e ninguém respondeu) e
+ * cliente espera um atendente (`awaitingHumanSince`: falou por último e nenhum atendente respondeu; o robô não conta) e
  * esquenta com o tempo: verde até 5 minutos, amarela até 15, vermelha depois.
  */
 export const WAIT_WARN_MIN = 5
