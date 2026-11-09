@@ -1434,6 +1434,7 @@ const hi: Dictionary = {
   'settings.mfa.enabled': 'दो-चरण लॉगिन चालू किया गया',
   'settings.mfa.disabled': 'दो-चरण लॉगिन बंद किया गया',
   'settings.mfa.failed': 'पूरा नहीं किया जा सका।',
+  'settings.mfa.loadFailed': "दो-चरणीय लॉगिन की स्थिति लोड नहीं हो सकी।",
   'settings.mfaPolicy.title': 'टीम से अनिवार्य करें',
   'settings.mfaPolicy.description': 'अनिवार्य होने पर, इस प्रदाता में दो-चरणीय लॉगिन के बिना आने वाले हर व्यक्ति को पैनल इस्तेमाल करने से पहले इसे चालू करना होगा।',
   'settings.mfaPolicy.on': 'अनिवार्य',

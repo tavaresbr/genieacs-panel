@@ -15,6 +15,15 @@ import { formatDate, formatRelativeTime } from '@/lib/utils'
  *
  * "Sair" no menu continua encerrando só este aparelho.
  */
+/**
+ * 127.0.0.1 / ::1 não diz nada sobre o aparelho: é o proxy reverso falando com
+ * o painel. Acontece quando o `TRUST_PROXY` não está ligado (ou o proxy não
+ * repassa o `X-Forwarded-For`); melhor esconder do que mostrar um IP enganoso.
+ */
+function ipDeLoopback(ip: string): boolean {
+  return /^(::ffff:)?127\./.test(ip) || ip === '::1'
+}
+
 export function ActiveSessionsCard() {
   const { t } = useTranslation()
   const toast = useToast()
@@ -23,6 +32,7 @@ export function ActiveSessionsCard() {
   const [ocupado, setOcupado] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
+    setErro(false)
     const res = await authAPI.sessions()
     if (res.success && res.data) {
       setSessoes(res.data.sessions)
@@ -93,7 +103,14 @@ export function ActiveSessionsCard() {
         </button>
       </div>
 
-      {erro && <p className="text-sm text-destructive">{t('settings.sessions.loadFailed')}</p>}
+      {erro && (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-destructive">{t('settings.sessions.loadFailed')}</p>
+          <button type="button" className="modern-button-secondary" onClick={() => { void carregar() }}>
+            {t('common.retry')}
+          </button>
+        </div>
+      )}
       {!erro && sessoes === null && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
       {!erro && sessoes?.length === 0 && <p className="text-sm text-muted-foreground">{t('settings.sessions.empty')}</p>}
 
@@ -116,7 +133,7 @@ export function ActiveSessionsCard() {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {[
                     sessao.tenantName,
-                    sessao.ip ? t('settings.sessions.ip', { ip: sessao.ip }) : null,
+                    sessao.ip && !ipDeLoopback(sessao.ip) ? t('settings.sessions.ip', { ip: sessao.ip }) : null,
                     t('settings.sessions.lastUsed', { when: formatRelativeTime(sessao.lastUsedAt) }),
                     t('settings.sessions.since', { when: formatDate(sessao.createdAt) })
                   ].filter(Boolean).join(' · ')}

@@ -1442,6 +1442,7 @@ const es: Dictionary = {
   'settings.mfa.enabled': 'Inicio de sesión en dos pasos activado',
   'settings.mfa.disabled': 'Inicio de sesión en dos pasos desactivado',
   'settings.mfa.failed': 'No se pudo completar.',
+  'settings.mfa.loadFailed': "No se pudo cargar el estado de la verificación en dos pasos.",
   'settings.mfaPolicy.title': 'Exigir al equipo',
   'settings.mfaPolicy.description': 'Con el requisito activo, quien entre en este proveedor sin inicio de sesión en dos pasos deberá activarlo antes de usar el panel.',
   'settings.mfaPolicy.on': 'Obligatorio',

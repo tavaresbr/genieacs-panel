@@ -1442,6 +1442,7 @@ const fr: Dictionary = {
   'settings.mfa.enabled': 'Connexion en deux étapes activée',
   'settings.mfa.disabled': 'Connexion en deux étapes désactivée',
   'settings.mfa.failed': 'Impossible de terminer l\'opération.',
+  'settings.mfa.loadFailed': "Impossible de charger l'état de la connexion en deux étapes.",
   'settings.mfaPolicy.title': 'Exiger de l’équipe',
   'settings.mfaPolicy.description': 'Une fois exigée, toute personne qui se connecte à ce fournisseur sans connexion en deux étapes doit l’activer avant d’utiliser le panneau.',
   'settings.mfaPolicy.on': 'Exigée',

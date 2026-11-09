@@ -1445,6 +1445,7 @@ const de: Dictionary = {
   'settings.mfa.enabled': 'Zwei-Schritt-Anmeldung aktiviert',
   'settings.mfa.disabled': 'Zwei-Schritt-Anmeldung deaktiviert',
   'settings.mfa.failed': 'Konnte nicht abgeschlossen werden.',
+  'settings.mfa.loadFailed': "Der Status der Zwei-Schritt-Anmeldung konnte nicht geladen werden.",
   'settings.mfaPolicy.title': 'Vom Team verlangen',
   'settings.mfaPolicy.description': 'Wenn verlangt, muss jede Person, die sich ohne Anmeldung in zwei Schritten bei diesem Anbieter anmeldet, sie vor der Nutzung des Panels aktivieren.',
   'settings.mfaPolicy.on': 'Verlangt',

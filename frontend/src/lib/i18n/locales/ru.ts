@@ -1445,6 +1445,7 @@ const ru: Dictionary = {
   'settings.mfa.enabled': 'Двухэтапный вход включён',
   'settings.mfa.disabled': 'Двухэтапный вход выключен',
   'settings.mfa.failed': 'Не удалось завершить.',
+  'settings.mfa.loadFailed': "Не удалось загрузить состояние двухэтапного входа.",
   'settings.mfaPolicy.title': 'Требовать от команды',
   'settings.mfaPolicy.description': 'Если требование включено, каждый, кто входит в этот провайдер без двухэтапного входа, должен включить его, прежде чем пользоваться панелью.',
   'settings.mfaPolicy.on': 'Обязателен',

@@ -1442,6 +1442,7 @@ const zhCN: Dictionary = {
   'settings.mfa.enabled': '已开启两步登录',
   'settings.mfa.disabled': '已关闭两步登录',
   'settings.mfa.failed': '无法完成。',
+  'settings.mfa.loadFailed': "无法加载两步登录状态。",
   'settings.mfaPolicy.title': '要求团队使用',
   'settings.mfaPolicy.description': '开启后，未启用两步登录的人进入此服务商时，须先启用才能使用面板。',
   'settings.mfaPolicy.on': '已要求',

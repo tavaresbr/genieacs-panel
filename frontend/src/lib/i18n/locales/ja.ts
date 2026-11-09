@@ -1442,6 +1442,7 @@ const ja: Dictionary = {
   'settings.mfa.enabled': '2 段階ログインを有効にしました',
   'settings.mfa.disabled': '2 段階ログインを無効にしました',
   'settings.mfa.failed': '完了できませんでした。',
+  'settings.mfa.loadFailed': "2段階ログインの状態を読み込めませんでした。",
   'settings.mfaPolicy.title': 'チームに必須化',
   'settings.mfaPolicy.description': '必須にすると、2段階ログインなしでこのプロバイダーに入った人は、パネルを使う前に有効化を求められます。',
   'settings.mfaPolicy.on': '必須',

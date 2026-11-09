@@ -1442,6 +1442,7 @@ const ko: Dictionary = {
   'settings.mfa.enabled': '2단계 로그인을 켰습니다',
   'settings.mfa.disabled': '2단계 로그인을 껐습니다',
   'settings.mfa.failed': '완료할 수 없습니다.',
+  'settings.mfa.loadFailed': "2단계 로그인 상태를 불러올 수 없습니다.",
   'settings.mfaPolicy.title': '팀에 요구',
   'settings.mfaPolicy.description': '요구를 켜면 2단계 로그인 없이 이 공급자에 들어온 사람은 패널을 쓰기 전에 먼저 켜야 합니다.',
   'settings.mfaPolicy.on': '필수',
