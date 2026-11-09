@@ -108,7 +108,7 @@ describe('lerNota', () => {
 });
 
 describe('a pesquisa de satisfação', () => {
-  it('encerrar pergunta; a nota alta agradece e a conversa continua encerrada', async () => {
+  it('encerrar pergunta; a nota alta é gravada, agradece, e a conversa volta para quem atende', async () => {
     const id = await atendida('5593981120001');
     const { status } = await encerrar(id);
     assert.equal(status, 200);
@@ -123,8 +123,8 @@ describe('a pesquisa de satisfação', () => {
     assert.equal(depois.status, 'answered');
     assert.equal(depois.score, 5);
     const conversa = await linhaDe(id);
-    assert.ok(conversa.closed_at, 'a nota não reabre a conversa');
-    assert.equal(conversa.unread_count, 0);
+    assert.equal(conversa.closed_at, null, 'o cliente falou: a conversa volta para as abertas');
+    assert.equal(conversa.unread_count, 1);
     assert.equal((await saidasDoBot(id)).length, 2, 'pergunta e agradecimento');
   });
 
@@ -133,7 +133,7 @@ describe('a pesquisa de satisfação', () => {
     await encerrar(id);
     await cliente('5593981120002', '2');
     assert.equal((await pesquisaDe(id)).status, 'comment');
-    assert.ok((await linhaDe(id)).closed_at);
+    assert.equal((await linhaDe(id)).closed_at, null, 'a nota também reabre');
 
     await cliente('5593981120002', 'Demorou muito para resolver');
     const pesquisa = await pesquisaDe(id);

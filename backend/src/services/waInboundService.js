@@ -411,10 +411,14 @@ async function gravarMensagem(account, item) {
 
   // 7b. A resposta da pesquisa de satisfação, numa conversa encerrada. Uma
   // nota não reabre o fio nem cai no bot; outro assunto segue o fluxo normal.
-  const pesquisa = !fromMe && conversation.closed_at && !promocao?.consumed
-    ? await WaSatisfactionService.captureReply({ conversation, text: texto })
+  // Também numa conversa já reaberta pela nota baixa: o comentário que ela
+  // pede chega com a conversa aberta, e `captureReply` só o aceita nesse caso.
+  const pesquisa = !fromMe && !promocao?.consumed
+    ? await WaSatisfactionService.captureReply({ conversation, text: texto, closed: Boolean(conversation.closed_at) })
     : null;
-  const soPesquisa = pesquisa?.consumed === true && pesquisa.reopen === false;
+  // A nota é gravada, mas NÃO deixa a conversa arquivada: um "1" do cliente
+  // pode ser a escolha do menu e não a nota, e quem atende precisa ver que ele
+  // falou. Qualquer mensagem do cliente numa conversa encerrada a reabre.
 
   // 8. O topo da lista de conversas.
   const patch = { last_message_at: agora };
@@ -429,10 +433,10 @@ async function gravarMensagem(account, item) {
     // fora da lista padrão do operador e vira invisível — que é exatamente o
     // contrário do que a lista existe para fazer. Só na ENTRADA: um eco de
     // saída é o operador digitando, e não é notícia do cliente.
-    if (conversation.closed_at && !soPesquisa) patch.closed_at = null;
+    if (conversation.closed_at) patch.closed_at = null;
     // Incremento no banco, não `lido + 1` em memória: dois eventos do mesmo
     // contato chegam concorrentes e um leria o contador antes do outro escrever.
-    if (!soPesquisa) patch.unread_count = getDb().raw('unread_count + 1');
+    patch.unread_count = getDb().raw('unread_count + 1');
   }
   await WaConversation.update(conversation.id, patch);
 
@@ -483,8 +487,8 @@ async function gravarMensagem(account, item) {
   }
 
   // 10. A distribuição: a conversa que precisa de gente ganha um atendente
-  // (ou entra na fila). Só na entrada, e nunca por uma nota da pesquisa.
-  if (!fromMe && !soPesquisa) {
+  // (ou entra na fila). Só na entrada.
+  if (!fromMe) {
     await WaAssignmentService.afterInbound({ conversation, botResult: resultadoDoBot });
     // 11. O push do app (0130), depois da distribuição — é ela que diz se a
     // conversa tem atendente. Solto de propósito: o webhook não espera o

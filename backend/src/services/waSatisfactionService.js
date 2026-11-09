@@ -119,7 +119,7 @@ class WaSatisfactionService {
    *
    * @returns {Promise<{consumed: boolean, reopen: boolean}>}
    */
-  static async captureReply({ conversation, text, now = new Date() }) {
+  static async captureReply({ conversation, text, closed = true, now = new Date() }) {
     const nada = { consumed: false, reopen: true };
     try {
       const linha = await tdb('wa_satisfaction')
@@ -128,6 +128,10 @@ class WaSatisfactionService {
         .orderBy('id', 'desc')
         .first();
       if (!linha) return nada;
+      // Conversa aberta: só o COMENTÁRIO pedido pela nota baixa é da pesquisa. Uma
+      // pergunta ainda "pendente" numa conversa aberta (reaberta à mão) não vira
+      // nota por um número solto.
+      if (!closed && linha.status !== 'comment') return nada;
       const desde = timestampMs(linha.status === 'comment' ? linha.answered_at : linha.asked_at);
       if (!Number.isFinite(desde) || now.getTime() - desde > JANELA_MS) return nada;
 
