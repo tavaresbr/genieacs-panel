@@ -443,6 +443,24 @@ describe('a IA atendendo', () => {
   });
 
   describe('vendas: registrar_interesse_comercial', () => {
+    it('quem não é cliente recebe a conversa de vendas no prompt; cliente identificado não', async () => {
+      await limparFio(DESCONHECIDO);
+      roteiro = [{ content: 'Oi! De onde você fala?' }];
+      await receber(DESCONHECIDO, 'oi, quero internet');
+      const sistema = pedidosIa.at(-1).payload.messages[0].content;
+      assert.match(sistema, /CONVERSA COM QUEM AINDA NÃO É CLIENTE/);
+      assert.match(sistema, /no máximo DOIS/);
+      const nomes = pedidosIa.at(-1).payload.tools.map((t) => t.function.name);
+      const campos = Object.keys(pedidosIa.at(-1).payload.tools.find((t) => t.function.name === 'registrar_interesse_comercial').function.parameters.properties);
+      assert.ok(nomes.includes('registrar_interesse_comercial'));
+      assert.ok(campos.includes('cidade') && campos.includes('motivo') && campos.includes('perfil'));
+
+      await limparFio(ASSINANTE);
+      roteiro = [{ content: 'Oi!' }];
+      await receber(ASSINANTE, 'oi');
+      assert.doesNotMatch(pedidosIa.at(-1).payload.messages[0].content, /CONVERSA COM QUEM AINDA NÃO É CLIENTE/);
+    });
+
     const notasDe = async (telefone) => {
       const conversa = await conversaDe(telefone);
       return getDb()('wa_messages').where({ conversation_id: conversa.id, is_note: true }).pluck('body');
@@ -451,7 +469,7 @@ describe('a IA atendendo', () => {
     it('vira nota interna, etiqueta Venda e passagem à equipe; o bot cala depois', async () => {
       await limparFio(DESCONHECIDO);
       roteiro = [
-        { tool: 'registrar_interesse_comercial', args: { nome: 'Maria  Silva', plano: '500 Mega', endereco: 'Centro, Itaituba', observacao: 'prefere ligar à noite' }, content: 'Anotei, Maria.' }
+        { tool: 'registrar_interesse_comercial', args: { nome: 'Maria  Silva', plano: '500 Mega', endereco: 'Centro, Itaituba', observacao: 'prefere ligar à noite', cidade: 'Itaituba', motivo: 'trabalha em casa', perfil: 'qualidade' }, content: 'Anotei, Maria.' }
       ];
       await receber(DESCONHECIDO, 'quero contratar internet');
       const saidas = await respostas(DESCONHECIDO);
@@ -465,6 +483,9 @@ describe('a IA atendendo', () => {
       assert.match(notas[0], /Nome: Maria Silva/);
       assert.match(notas[0], /Plano de interesse: 500 Mega/);
       assert.match(notas[0], /Endereço\/bairro: Centro, Itaituba/);
+      assert.match(notas[0], /Cidade\/bairro: Itaituba/);
+      assert.match(notas[0], /Motivo: trabalha em casa/);
+      assert.match(notas[0], /Perfil: prioriza qualidade/);
       assert.match(notas[0], new RegExp(`WhatsApp: ${DESCONHECIDO}`));
 
       const conversa = await conversaDe(DESCONHECIDO);

@@ -6379,6 +6379,8 @@ export interface BotAiConfig {
   baseUrl: string
   model: string
   instructions: string
+  /** Nome e jeito do atendente nas conversas de venda. */
+  persona: string
   hasApiKey: boolean
   /** O id de workspace enviado à Anthropic quando a chave não pertence a um; vazio na maioria dos casos. */
   workspaceId: string
@@ -6397,6 +6399,7 @@ export interface BotAiInput {
   baseUrl?: string
   model?: string
   instructions?: string
+  persona?: string
   apiKey?: string
   workspaceId?: string
 }
