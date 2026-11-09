@@ -5,6 +5,7 @@ import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js
 import { deploymentIsShared } from './genieacsEgress.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { toCsvWith } from '../utils/csv.js';
 
 /**
  * TeiaH Valid — a shared base of addresses that left a provider owing money.
@@ -55,6 +56,26 @@ const DEFAULT_CONFIG = Object.freeze({
   batchSize: 50,
   rentalDefault: 'omit'
 });
+
+/**
+ * The admin's guards over paid consultations, kept apart from the connection
+ * settings (saved with a password, see `saveGuards`): a monthly spend limit,
+ * the price of each kind of consultation the panel counts against it, and
+ * whether a client whose risk got worse alerts the team.
+ */
+const GUARDS_KEY = 'teiah_guards';
+const DEFAULT_GUARDS = Object.freeze({
+  monthlyLimit: null,
+  priceCpf: 4.99,
+  priceAddress: 2.5,
+  alertWorsening: false,
+  updatedAt: null
+});
+/** What the panel paid this month, one key per month: `teiah_usage_2026-11`. */
+const usageKey = (month) => `teiah_usage_${month}`;
+const currentMonth = () => new Date().toISOString().slice(0, 7);
+/** Past this share of the limit the usage reads as "near". */
+const LIMIT_WARNING_SHARE = 0.8;
 
 /** What `aluguel` says when the SGP does not: leave it out, or always false/true. */
 export const RENTAL_DEFAULTS = Object.freeze(['omit', 'false', 'true']);
@@ -508,6 +529,112 @@ class TeiahService {
     return Boolean(config?.enabled && config.baseUrl && config.apiKey);
   }
 
+  static async getGuards() {
+    let stored = {};
+    try {
+      stored = JSON.parse((await AppState.get(GUARDS_KEY)) || '{}') || {};
+    } catch {
+      stored = {};
+    }
+    const price = (value, fallback) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1000 ? Math.round(parsed * 100) / 100 : fallback;
+    };
+    const limit = Number(stored.monthlyLimit);
+    return {
+      monthlyLimit: Number.isFinite(limit) && limit > 0 ? Math.round(limit * 100) / 100 : null,
+      priceCpf: price(stored.priceCpf, DEFAULT_GUARDS.priceCpf),
+      priceAddress: price(stored.priceAddress, DEFAULT_GUARDS.priceAddress),
+      alertWorsening: stored.alertWorsening === true,
+      updatedAt: stored.updatedAt || null
+    };
+  }
+
+  /** An absent field keeps its value; `monthlyLimit: null` (or 0) removes the limit. */
+  static async saveGuards(patch = {}) {
+    const current = await this.getGuards();
+    const money = (value, fallback, max) => {
+      if (value === undefined) return fallback;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > max) {
+        throw new TeiahError('teiah.error.guardInvalid', { code: 'invalid_guard', status: 400 });
+      }
+      return Math.round(parsed * 100) / 100;
+    };
+    const next = {
+      monthlyLimit: patch.monthlyLimit === undefined
+        ? current.monthlyLimit
+        : (patch.monthlyLimit === null || patch.monthlyLimit === '' || Number(patch.monthlyLimit) === 0
+          ? null
+          : money(patch.monthlyLimit, current.monthlyLimit, 1_000_000)),
+      priceCpf: money(patch.priceCpf, current.priceCpf, 1000),
+      priceAddress: money(patch.priceAddress, current.priceAddress, 1000),
+      alertWorsening: patch.alertWorsening === undefined ? current.alertWorsening : patch.alertWorsening === true,
+      updatedAt: new Date().toISOString()
+    };
+    await AppState.upsert(GUARDS_KEY, JSON.stringify(next));
+    return next;
+  }
+
+  /** What the panel paid this month, counted by the panel, and how it stands against the limit. */
+  static async monthUsage() {
+    const month = currentMonth();
+    let stored = {};
+    try {
+      stored = JSON.parse((await AppState.get(usageKey(month))) || '{}') || {};
+    } catch {
+      stored = {};
+    }
+    const guards = await this.getGuards();
+    const spent = Math.round((Number(stored.spent) || 0) * 100) / 100;
+    return {
+      month,
+      count: Number(stored.count) || 0,
+      spent,
+      limit: guards.monthlyLimit,
+      near: guards.monthlyLimit !== null && spent >= guards.monthlyLimit * LIMIT_WARNING_SHARE,
+      reached: guards.monthlyLimit !== null && spent >= guards.monthlyLimit
+    };
+  }
+
+  /** A paid call the panel just made, added to this month's count. */
+  static async recordUsage(kind) {
+    const guards = await this.getGuards();
+    const cost = kind === 'address' ? guards.priceAddress : guards.priceCpf;
+    const month = currentMonth();
+    let stored = {};
+    try {
+      stored = JSON.parse((await AppState.get(usageKey(month))) || '{}') || {};
+    } catch {
+      stored = {};
+    }
+    const next = {
+      count: (Number(stored.count) || 0) + 1,
+      spent: Math.round(((Number(stored.spent) || 0) + cost) * 100) / 100
+    };
+    await AppState.upsert(usageKey(month), JSON.stringify(next));
+    return next;
+  }
+
+  /**
+   * Refuses a paid call that would pass the monthly limit, unless an admin
+   * confirmed it with their password (`override`, decided by the controller).
+   */
+  static async checkLimit(kind, { override = false } = {}) {
+    if (override) return;
+    const guards = await this.getGuards();
+    if (guards.monthlyLimit === null) return;
+    const usage = await this.monthUsage();
+    const cost = kind === 'address' ? guards.priceAddress : guards.priceCpf;
+    if (usage.spent + cost > guards.monthlyLimit + 1e-9) {
+      throw new TeiahError('teiah.error.limitReached', {
+        code: 'teiah_limit_reached',
+        status: 409,
+        vars: { spent: usage.spent.toFixed(2), limit: guards.monthlyLimit.toFixed(2) }
+      });
+    }
+  }
+
   static requireReady(config) {
     if (!this.isReady(config)) {
       throw new TeiahError('teiah.error.notConfigured', { code: 'not_configured', status: 409 });
@@ -704,7 +831,7 @@ class TeiahService {
    *
    * @returns {Promise<{ result: object, consultedAt: string, cached: boolean }>}
    */
-  static async consultCached(document, { fresh = false } = {}) {
+  static async consultCached(document, { fresh = false, override = false } = {}) {
     const digits = String(document ?? '').replace(/\D/g, '');
     if (!fresh) {
       const stored = await TeiahConsultation.get(digits);
@@ -715,7 +842,9 @@ class TeiahService {
         }
       }
     }
+    await this.checkLimit('cpf', { override });
     const result = await this.consultDocument(digits);
+    await this.recordUsage('cpf');
     const saved = await TeiahConsultation.save(digits, result);
     return { result, consultedAt: saved.consultedAt.toISOString(), cached: false };
   }
@@ -743,7 +872,7 @@ class TeiahService {
    *
    * @returns {Promise<{ result: object, consultedAt: string, cached: boolean }>}
    */
-  static async consultAddressCached(address, { fresh = false } = {}) {
+  static async consultAddressCached(address, { fresh = false, override = false } = {}) {
     const cep = String(address?.cep ?? '').replace(/\D/g, '');
     const number = String(address?.number ?? '').trim().toLowerCase().replace(/\s+/g, '').slice(0, 10);
     const key = `end:${cep}:${number}`;
@@ -756,7 +885,9 @@ class TeiahService {
         }
       }
     }
+    await this.checkLimit('address', { override });
     const result = await this.consultAddress(address);
+    await this.recordUsage('address');
     const saved = await TeiahConsultation.save(key, result);
     return { result, consultedAt: saved.consultedAt.toISOString(), cached: false };
   }
@@ -790,6 +921,19 @@ class TeiahService {
    * `truncated` says when there was more.
    */
   static async consultationSummary({ from, to } = {}) {
+    const { start, end, items, truncated } = await this.historyItems({ from, to });
+    return {
+      from: start,
+      to: end,
+      truncated,
+      ...summarizeHistory(items),
+      // Newest first whatever order the API kept.
+      recent: [...items].sort((a, b) => (Date.parse(b.createdAt ?? '') || 0) - (Date.parse(a.createdAt ?? '') || 0)).slice(0, 20)
+    };
+  }
+
+  /** Every consultation of the period in the TeiaH history (several pages), as `historyItem`s. */
+  static async historyItems({ from, to } = {}) {
     // Only a single AAAA-MM-DD string: a repeated query parameter arrives as an array.
     const asDate = (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
     const end = asDate(to) ?? new Date().toISOString().slice(0, 10);
@@ -815,14 +959,30 @@ class TeiahService {
       if (list.length < HISTORY_PAGE) break;
       if (page === HISTORY_MAX_PAGES - 1) truncated = true;
     }
-    return {
-      from: start,
-      to: end,
-      truncated,
-      ...summarizeHistory(items),
-      // Newest first whatever order the API kept.
-      recent: [...items].sort((a, b) => (Date.parse(b.createdAt ?? '') || 0) - (Date.parse(a.createdAt ?? '') || 0)).slice(0, 20)
-    };
+    return { start, end, items, truncated };
+  }
+
+  /**
+   * The period's consultations as a spreadsheet (date, kind, origin, user,
+   * status, cost): no CPF/CNPJ, no name of whoever was consulted.
+   */
+  static async spendCsv({ from, to } = {}) {
+    const { start, end, items, truncated } = await this.historyItems({ from, to });
+    const rows = [...items]
+      .sort((a, b) => (Date.parse(b.createdAt ?? '') || 0) - (Date.parse(a.createdAt ?? '') || 0))
+      .map((item) => ({
+        ...item,
+        cost: item.cost === null ? '' : item.cost.toFixed(2).replace('.', ',')
+      }));
+    const csv = toCsvWith([
+      { header: 'Data', field: 'createdAt' },
+      { header: 'Tipo', field: 'type' },
+      { header: 'Origem', field: 'origin' },
+      { header: 'Usuário', field: 'userName' },
+      { header: 'Status', field: 'status' },
+      { header: 'Custo (R$)', field: 'cost' }
+    ], rows);
+    return { csv, count: rows.length, from: start, to: end, truncated };
   }
 
   /**

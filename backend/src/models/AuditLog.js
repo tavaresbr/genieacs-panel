@@ -145,6 +145,16 @@ class AuditLog {
     CONTACT_TEIAH_APPLIED: 'contact.teiah_applied',
     CONTACT_TEIAH_REPORT: 'contact.teiah_report',
     CONTACT_TEIAH_ADDRESS: 'contact.teiah_address',
+    // A faixa de risco de um cliente subiu numa nova consulta (BAIXO → ALTO).
+    // Gravada pelo sistema; o `detail` traz o nome, as faixas e o score.
+    CONTACT_TEIAH_RISK_UP: 'contact.teiah_risk_up',
+    // Funções de administrador da TeiaH, todas confirmadas com a senha de
+    // quem agiu: os limites de gasto, a reconsulta dos antigos, a planilha
+    // de gastos e uma consulta paga acima do limite do mês.
+    TEIAH_GUARDS_CHANGED: 'teiah.guards_changed',
+    TEIAH_RECONSULT_RUN: 'teiah.reconsult_run',
+    TEIAH_SPEND_EXPORTED: 'teiah.spend_exported',
+    TEIAH_LIMIT_OVERRIDDEN: 'teiah.limit_overridden',
     // Um título em aberto foi mandado ao cliente pelo WhatsApp, pela ficha. O
     // `detail` diz qual título e qual conversa, nunca o texto (tem o PIX).
     CONTACT_INVOICE_SENT: 'contact.invoice_sent',

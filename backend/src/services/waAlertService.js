@@ -115,7 +115,9 @@ const RULE_KEYS = Object.freeze({
   wa_unlock_failed: { firing: 'whatsapp.alerts.unlockFailed', cleared: null },
   genieacs_down: { firing: 'whatsapp.alerts.genieacsDown', cleared: null },
   wa_outbox_stuck: { firing: 'whatsapp.alerts.outboxStuck', cleared: null },
-  wa_dunning_failed: { firing: 'whatsapp.alerts.dunningFailed', cleared: null }
+  wa_dunning_failed: { firing: 'whatsapp.alerts.dunningFailed', cleared: null },
+  // A faixa de risco TeiaH de um cliente subiu numa nova consulta (`ContactTeiahService.noteWorsening`).
+  teiah_risk_up: { firing: 'whatsapp.alerts.teiahRiskUp', cleared: null }
 });
 
 /**

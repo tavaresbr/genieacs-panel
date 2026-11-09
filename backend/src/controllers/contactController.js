@@ -18,6 +18,7 @@ import { WaError } from '../services/whatsappConfigService.js';
 import SgpService, { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { ownPasswordMatches } from '../middleware/confirmPassword.js';
 
 function handleError(req, res, error, fallbackKey) {
   if (error instanceof ContactProfileError || error instanceof SgpError || error instanceof WaError || error instanceof FocusChatError || error instanceof TeiahError || error instanceof AsaasProviderError) {
@@ -33,6 +34,31 @@ function handleError(req, res, error, fallbackKey) {
 /** Who edited, as the record keeps it: the operator's name, never a token. */
 function actorOf(req) {
   return req.user?.username ?? (req.user?.userId ? `#${req.user.userId}` : null);
+}
+
+/**
+ * A paid consultation past the monthly limit: only an admin, and only with
+ * their own password (`limitPassword`), lets it through. `false` when the
+ * request did not ask to pass the limit.
+ */
+async function limitOverride(req) {
+  const password = req.body?.limitPassword;
+  if (password === undefined || password === null || password === '') return false;
+  if (!roleHas(req.user?.role, 'teiah.config')) {
+    throw new TeiahError('teiah.error.limitAdminOnly', { code: 'forbidden', status: 403 });
+  }
+  if (!(await ownPasswordMatches(req, password))) {
+    throw new TeiahError('auth.confirmPasswordIncorrect', { code: 'password_incorrect', status: 403 });
+  }
+  return true;
+}
+
+async function auditOverride(req, origin) {
+  await AuditLog.fromRequest(req, {
+    action: AuditLog.ACTIONS.TEIAH_LIMIT_OVERRIDDEN,
+    subjectType: 'teiah',
+    detail: { origin }
+  });
 }
 
 class ContactController {
@@ -265,7 +291,9 @@ class ContactController {
   /** `POST /api/contacts/:key/teiah` — asks the TeiaH about this client and files the answer on the record. */
   static async teiahConsult(req, res) {
     try {
-      const result = await ContactTeiahService.consult(req.params.key, { fresh: req.body?.fresh === true });
+      const override = await limitOverride(req);
+      const result = await ContactTeiahService.consult(req.params.key, { fresh: req.body?.fresh === true, override });
+      if (override && !result.cached) await auditOverride(req, 'profile');
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.CONTACT_TEIAH_LOOKUP,
         subjectType: 'contact',
@@ -387,7 +415,9 @@ class ContactController {
   /** `POST /api/contacts/lookup/address` — the TeiaH check of the installation address. */
   static async lookupAddressTeiah(req, res) {
     try {
-      const result = await ContactOnboardingService.lookupAddressTeiah(req.body);
+      const override = await limitOverride(req);
+      const result = await ContactOnboardingService.lookupAddressTeiah(req.body, { override });
+      if (override && !result.cached) await auditOverride(req, 'address');
       // Neither the address nor the CEP: whether something was found, and if it was paid.
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.CONTACT_TEIAH_ADDRESS,

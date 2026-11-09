@@ -8,6 +8,7 @@ import { isSafeExternalUrl } from '@/lib/sgp'
 import { TeiahReportModal } from '@/components/contacts/teiah-report-modal'
 import { riskBadge } from '@/lib/teiah'
 import { TeiahAddressCheck } from '@/components/contacts/teiah-address-check'
+import { useTeiahLimitOverride } from '@/components/contacts/use-teiah-limit'
 
 function addressLine(address: { street?: string; number?: string; district?: string; city?: string; state?: string; zip?: string }) {
   const street = [address.street, address.number].filter(Boolean).join(', ')
@@ -35,6 +36,7 @@ export function TeiahCard({ profile, onProfile, onReload }: {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const limit = useTeiahLimitOverride()
   const teiah = profile.teiah ?? null
 
   const knownPhones = new Set(profile.fields.phones.value)
@@ -51,7 +53,10 @@ export function TeiahCard({ profile, onProfile, onReload }: {
       && !window.confirm(t('contacts.profile.teiahRefreshConfirm', { date: formatDateTime(teiah.consultedAt) }))) return
     setBusy(true)
     try {
-      const res = await contactsAPI.teiahConsult(profile.key, asksAgain)
+      const res = await limit.retry(
+        await contactsAPI.teiahConsult(profile.key, asksAgain),
+        (password) => contactsAPI.teiahConsult(profile.key, asksAgain, password)
+      )
       if (!res.success || !res.data) {
         toast.error(res.message || t('contacts.profile.teiahFailed'))
         return
@@ -243,6 +248,7 @@ export function TeiahCard({ profile, onProfile, onReload }: {
           </div>
         </div>
       )}
+      {limit.element}
       {reportOpen && (
         <TeiahReportModal
           reportKey={profile.key}

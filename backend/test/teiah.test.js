@@ -558,6 +558,36 @@ describe('gasto com consultas (histórico da TeiaH)', () => {
   });
 });
 
+describe('planilha de gastos (administrador, com senha)', () => {
+  const SENHA_ADMIN = ['operator', 'password', '1'].join('-');
+  const exportar = (body) => fetch(`${panelUrl}/api/teiah/consultations/export`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  it('sem a senha não sai; com ela sai o CSV sem o documento consultado', async () => {
+    const sem = await exportar({ from: '2026-10-01', to: '2026-11-30' });
+    assert.equal(sem.status, 400);
+    assert.equal((await sem.json()).code, 'password_required');
+    const errada = await exportar({ from: '2026-10-01', to: '2026-11-30', password: ['nao', 'e', 'esta'].join('-') });
+    assert.equal(errada.status, 403);
+
+    const res = await exportar({ from: '2026-10-01', to: '2026-11-30', password: SENHA_ADMIN });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.match(res.headers.get('content-type'), /text\/csv/);
+    assert.match(res.headers.get('content-disposition'), /teiah-gastos-2026-10-01-a-2026-11-30\.csv/);
+    const csv = await res.text();
+    const linhas = csv.trim().split('\r\n');
+    assert.equal(linhas.length, 251, 'cabeçalho e as 250 consultas');
+    assert.match(linhas[0], /Data;Tipo;Origem;Usuário;Status;Custo/);
+    assert.ok(linhas.some((linha) => linha.includes(';4,99')));
+    assert.equal(csv.includes('529'), false, 'a planilha levou o documento consultado');
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'teiah.spend_exported' }));
+    assert.equal(trilha.length, 1);
+  });
+});
+
 describe('deploy compartilhado', () => {
   it('recusa uma API apontada para a rede interna', async () => {
     await refreshDeploymentSharing();

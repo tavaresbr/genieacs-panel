@@ -9,6 +9,7 @@ import BillingStatusService from './billingStatusService.js';
 import { WaError } from './whatsappConfigService.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
+import SgpClient from '../models/SgpClient.js';
 import WaConversation from '../models/WaConversation.js';
 import WaSendService from './waSendService.js';
 import AuditLog from '../models/AuditLog.js';
@@ -283,6 +284,27 @@ class WaSubscriberPanelService {
    * number that is not in the list selects nothing rather than falling back to
    * a guess. `document` is the manual search for an unknown number.
    */
+  /**
+   * The TeiaH risk the panel holds for this CPF/CNPJ (its last consultation),
+   * for the badge at the top of the thread. Nothing here consults the TeiaH.
+   * Admins only: the controller decides who gets it.
+   *
+   * @returns {Promise<{ risk: string, score: number|null, consultedAt: string|null } | null>}
+   */
+  static async teiahBadge(document) {
+    const digits = String(document ?? '').replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14) return null;
+    const client = await SgpClient.getByDocument(digits);
+    const score = client?.teiah?.score;
+    const risk = typeof score?.risk === 'string' ? score.risk.trim().slice(0, 40) : '';
+    if (!risk) return null;
+    return {
+      risk,
+      score: Number.isFinite(score.score) ? score.score : null,
+      consultedAt: client.teiah.consultedAt ?? null
+    };
+  }
+
   static async build(conversationId, { contract: wanted = null, document = null } = {}) {
     let conversation = await WaConversationService.get(conversationId);
     // Aberta a conversa antiga de um cliente que trocou de número: ela sai do

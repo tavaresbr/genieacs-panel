@@ -5,6 +5,7 @@ import { SgpError } from '../services/sgpService.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
+import { roleHas } from '../config/permissions.js';
 
 function handleError(req, res, error, fallbackKey) {
   if (error instanceof SgpError || error instanceof WaError) {
@@ -35,6 +36,16 @@ function present(req, panel) {
 }
 
 /**
+ * The TeiaH risk badge of the thread's client: admins only (`teiah.config`),
+ * and only what the panel already holds. A failure leaves the badge out.
+ */
+async function withTeiah(req, panel) {
+  if (!panel?.ready || !panel.attendance?.document || !roleHas(req.user?.role, 'teiah.config')) return panel;
+  const teiah = await WaSubscriberPanelService.teiahBadge(panel.attendance.document).catch(() => null);
+  return teiah ? { ...panel, teiah } : panel;
+}
+
+/**
  * The SGP side panel of a WhatsApp thread. Reading needs both the inbox and
  * the ERP; every act on the ERP needs `sgp.act`, exactly as on the device page.
  */
@@ -45,7 +56,7 @@ class WhatsAppSubscriberController {
         contract: req.query?.contract || null,
         document: req.query?.document || null
       });
-      return res.json(createResponse(req.t('sgp.dataLoaded'), present(req, panel)));
+      return res.json(createResponse(req.t('sgp.dataLoaded'), present(req, await withTeiah(req, panel))));
     } catch (error) {
       return handleError(req, res, error, 'sgp.dataLoadFailed');
     }
@@ -63,7 +74,7 @@ class WhatsAppSubscriberController {
         subjectId: req.params?.id,
         detail: { contract: String(req.body?.contract ?? '') || null, byDocument: Boolean(req.body?.document) }
       });
-      return res.json(createResponse(req.t('sgp.contractLinked'), present(req, panel)));
+      return res.json(createResponse(req.t('sgp.contractLinked'), present(req, await withTeiah(req, panel))));
     } catch (error) {
       return handleError(req, res, error, 'sgp.linkFailed');
     }

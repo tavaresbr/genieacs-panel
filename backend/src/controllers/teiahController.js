@@ -1,5 +1,7 @@
 import TeiahService, { TeiahError } from '../services/teiahService.js';
 import TeiahExportService from '../services/teiahExportService.js';
+import ContactTeiahService from '../services/contactTeiahService.js';
+import AuditLog from '../models/AuditLog.js';
 import { SgpError } from '../services/sgpService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
@@ -62,6 +64,99 @@ class TeiahController {
     try {
       const summary = await TeiahService.consultationSummary({ from: req.query.from, to: req.query.to });
       return res.json(createResponse(req.t('teiah.configLoaded'), summary));
+    } catch (error) {
+      return handleError(req, res, error, 'teiah.summaryFailed');
+    }
+  }
+
+  /** `GET /api/teiah/guards` — the admin's spend guards and this month's usage. */
+  static async getGuards(req, res) {
+    try {
+      const [guards, usage] = await Promise.all([TeiahService.getGuards(), TeiahService.monthUsage()]);
+      return res.json(createResponse(req.t('teiah.configLoaded'), { guards, usage }));
+    } catch (error) {
+      return handleError(req, res, error, 'teiah.configLoadFailed');
+    }
+  }
+
+  /** `PUT /api/teiah/guards` — confirmed with the admin's own password (middleware). */
+  static async updateGuards(req, res) {
+    try {
+      const body = req.body ?? {};
+      const guards = await TeiahService.saveGuards({
+        monthlyLimit: body.monthlyLimit,
+        priceCpf: body.priceCpf,
+        priceAddress: body.priceAddress,
+        alertWorsening: body.alertWorsening
+      });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TEIAH_GUARDS_CHANGED,
+        subjectType: 'teiah',
+        detail: {
+          monthlyLimit: guards.monthlyLimit,
+          priceCpf: guards.priceCpf,
+          priceAddress: guards.priceAddress,
+          alertWorsening: guards.alertWorsening
+        }
+      });
+      return res.json(createResponse(req.t('teiah.configSaved'), { guards, usage: await TeiahService.monthUsage() }));
+    } catch (error) {
+      return handleError(req, res, error, 'teiah.configSaveFailed');
+    }
+  }
+
+  /** `GET /api/teiah/worsened` — the clients whose risk went up lately. */
+  static async worsened(req, res) {
+    try {
+      return res.json(createResponse(req.t('teiah.configLoaded'), { items: await ContactTeiahService.worsened() }));
+    } catch (error) {
+      return handleError(req, res, error, 'teiah.configLoadFailed');
+    }
+  }
+
+  /** `GET /api/teiah/reconsult/preview` — how many stale clients, and the estimated cost. */
+  static async reconsultPreview(req, res) {
+    try {
+      return res.json(createResponse(req.t('teiah.configLoaded'), await ContactTeiahService.reconsultPreview()));
+    } catch (error) {
+      return handleError(req, res, error, 'teiah.configLoadFailed');
+    }
+  }
+
+  /** `POST /api/teiah/reconsult/run` — confirmed with the admin's own password (middleware). */
+  static async reconsultRun(req, res) {
+    try {
+      const result = await ContactTeiahService.reconsultStale({ max: req.body?.max });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TEIAH_RECONSULT_RUN,
+        subjectType: 'teiah',
+        detail: {
+          processed: result.processed,
+          failed: result.failed,
+          worsened: result.worsened.length,
+          stoppedByLimit: result.stoppedByLimit
+        }
+      });
+      return res.json(createResponse(req.t('teiah.reconsultDone'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'teiah.reconsultFailed');
+    }
+  }
+
+  /** `POST /api/teiah/consultations/export` — the spend report as CSV, confirmed with the password. */
+  static async exportSpend(req, res) {
+    try {
+      const body = req.body ?? {};
+      const { csv, count, from, to } = await TeiahService.spendCsv({ from: body.from, to: body.to });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TEIAH_SPEND_EXPORTED,
+        subjectType: 'teiah',
+        detail: { count, from, to }
+      });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="teiah-gastos-${from}-a-${to}.csv"`);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(csv);
     } catch (error) {
       return handleError(req, res, error, 'teiah.summaryFailed');
     }

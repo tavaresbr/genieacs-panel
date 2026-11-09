@@ -1,6 +1,7 @@
 'use client'
 
 import { TeiahSpendPanel } from '@/components/settings/teiah-spend-panel'
+import { TeiahAdminPanel } from '@/components/settings/teiah-admin-panel'
 import { useCallback, useEffect, useState } from 'react'
 import {
   teiahAPI,
@@ -523,6 +524,7 @@ export function TeiahPanel() {
           </>
         )}
       </div>
+      {canConfigure && config?.ready && <TeiahAdminPanel />}
       {canConfigure && config?.ready && <TeiahSpendPanel />}
     </div>
   )

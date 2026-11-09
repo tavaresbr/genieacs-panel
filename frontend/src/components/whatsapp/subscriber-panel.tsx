@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { formatBrPhone } from '@/lib/phone'
 import { formatDocument } from '@/lib/document'
+import { riskBadge } from '@/lib/teiah'
 import type { TranslationKey } from '@/lib/i18n'
 
 /**
@@ -450,6 +451,18 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
               {phone && <p className="font-mono text-xs text-muted-foreground" title={phone}>{formatBrPhone(phone)}</p>}
               {panel.ready && panel.attendance.matchedOn && (
                 <p className="mt-1 text-xs text-muted-foreground">{t(MATCHED_ON[panel.attendance.matchedOn])}</p>
+              )}
+              {/* Admins only (the server sends it to them alone): the risk of the
+                  client's last TeiaH consultation, nothing consulted now. */}
+              {panel.ready && panel.teiah && (
+                <p className="mt-1 flex flex-wrap items-center gap-1 text-xs" data-testid="wa-teiah-badge">
+                  <span className="text-muted-foreground">{t('whatsapp.sgp.teiahRisk')}</span>
+                  <span className={riskBadge(panel.teiah.risk)}>{panel.teiah.risk}</span>
+                  {panel.teiah.score !== null && <span className="text-muted-foreground">{t('whatsapp.sgp.teiahScore', { score: panel.teiah.score })}</span>}
+                  {panel.teiah.consultedAt && (
+                    <span className="text-muted-foreground">· {formatDateTime(panel.teiah.consultedAt)}</span>
+                  )}
+                </p>
               )}
             </div>
             {phone && (

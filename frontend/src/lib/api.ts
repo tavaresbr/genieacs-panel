@@ -673,12 +673,18 @@ class ApiClient {
    */
   async getBlob(
     endpoint: string,
-    retryAfterRefresh = true
+    retryAfterRefresh = true,
+    body?: unknown
   ): Promise<{ success: boolean; blob?: Blob; filename?: string; code?: string; message?: string }> {
     const headers: Record<string, string> = { 'Accept-Language': getActiveLocale(), ...CSRF_HEADERS }
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`
+    // With a body it is a POST: a download that needs something the URL must
+    // not carry (a password confirming it).
+    const init: RequestInit = body === undefined
+      ? { headers }
+      : { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
     try {
-      const response = await fetch(`${this.baseURL}/api${endpoint}`, { headers })
+      const response = await fetch(`${this.baseURL}/api${endpoint}`, init)
       if (!response.ok) {
         const contentType = response.headers.get('content-type') || ''
         const data = contentType.includes('application/json') ? await response.json() : {}
@@ -688,7 +694,7 @@ class ApiClient {
         // visível, e a pessoa clica de novo.
         if (response.status === 403 && data.code === 'invalid_token' && retryAfterRefresh) {
           const refreshed = await this.refreshAccessToken()
-          if (refreshed) return this.getBlob(endpoint, false)
+          if (refreshed) return this.getBlob(endpoint, false, body)
         }
 
         // O 402 da assinatura é da casca do app, não desta chamada: quem mostra
@@ -729,6 +735,11 @@ class ApiClient {
     } catch {
       return { success: false, message: translate(getActiveLocale(), 'api.requestFailed') }
     }
+  }
+
+  /** A file the server answers to a POST (`getBlob` with a JSON body). */
+  async postBlob(endpoint: string, body: unknown) {
+    return this.getBlob(endpoint, true, body)
   }
 
   /**
@@ -4150,6 +4161,8 @@ export interface ContactDocumentLookup {
   teiahReady?: boolean
   /** The answer was one the panel already held (younger than 30 days): no new paid call. */
   teiahCached?: boolean
+  /** The month's TeiaH spending limit stopped the consultation. */
+  teiahLimitReached?: boolean
   teiahConsultedAt?: string | null
   teiahScore: {
     score: number | null
@@ -4231,14 +4244,18 @@ export const contactsAPI = {
     apiClient.post<ContactSyncResult>(`/contacts/${encodeURIComponent(key)}/sync`, {}),
 
   /** Asks the TeiaH about this client and keeps the answer on the record. */
-  teiahConsult: (key: string, fresh = false) =>
-    apiClient.post<{ teiah: ContactTeiah; cached: boolean }>(`/contacts/${encodeURIComponent(key)}/teiah`, fresh ? { fresh: true } : {}),
+  teiahConsult: (key: string, fresh = false, limitPassword?: string) =>
+    apiClient.post<{ teiah: ContactTeiah; cached: boolean }>(`/contacts/${encodeURIComponent(key)}/teiah`, {
+      ...(fresh ? { fresh: true } : {}),
+      // An admin passing the month's TeiaH limit, with their own password.
+      ...(limitPassword ? { limitPassword } : {})
+    }),
 
   /** The TeiaH's report PDF of this client (from its history: no new paid call). */
   /** The TeiaH check of an installation address (a paid call, kept 30 days). */
-  teiahAddress: (address: { zip: string; street: string; number: string; district?: string; complement?: string }, fresh = false) =>
+  teiahAddress: (address: { zip: string; street: string; number: string; district?: string; complement?: string }, fresh = false, limitPassword?: string) =>
     apiClient.post<{ result: TeiahAddressCheck; consultedAt: string; cached: boolean }>(
-      '/contacts/lookup/address', { address, ...(fresh ? { fresh: true } : {}) }
+      '/contacts/lookup/address', { address, ...(fresh ? { fresh: true } : {}), ...(limitPassword ? { limitPassword } : {}) }
     ),
 
   /** That address check's report PDF, from the TeiaH history. */
@@ -4684,7 +4701,74 @@ export const teiahAPI = {
     apiClient.get<{ items: TeiahPreviewItem[] }>('/teiah/export/preview'),
 
   runExport: () =>
-    apiClient.post<{ running: boolean }>('/teiah/export/run')
+    apiClient.post<{ running: boolean }>('/teiah/export/run'),
+
+  /** Admin only: the spend guards (monthly limit, prices, worsening alert) and the month's usage. */
+  getGuards: () =>
+    apiClient.get<{ guards: TeiahGuards; usage: TeiahUsage }>('/teiah/guards'),
+
+  /** Admin only, confirmed with the admin's own password. */
+  updateGuards: (guards: Partial<Omit<TeiahGuards, 'updatedAt'>>, password: string) =>
+    apiClient.put<{ guards: TeiahGuards; usage: TeiahUsage }>('/teiah/guards', { ...guards, password }),
+
+  /** Admin only: the clients whose risk went up on a new consultation. */
+  worsened: () =>
+    apiClient.get<{ items: TeiahWorsened[] }>('/teiah/worsened'),
+
+  /** Admin only: the active clients consulted more than 6 months ago, and the estimated cost. */
+  reconsultPreview: () =>
+    apiClient.get<TeiahReconsultPreview>('/teiah/reconsult/preview'),
+
+  /** Admin only, confirmed with the password: consults the stale clients again (a paid run). */
+  reconsultRun: (password: string, max?: number) =>
+    apiClient.post<TeiahReconsultResult>('/teiah/reconsult/run', { password, ...(max ? { max } : {}) }),
+
+  /** Admin only, confirmed with the password: the period's consultations as a CSV sheet. */
+  exportSpend: (from: string, to: string, password: string) =>
+    apiClient.postBlob('/teiah/consultations/export', { from, to, password })
+}
+
+export interface TeiahGuards {
+  monthlyLimit: number | null
+  priceCpf: number
+  priceAddress: number
+  alertWorsening: boolean
+  updatedAt: string | null
+}
+
+export interface TeiahUsage {
+  month: string
+  count: number
+  spent: number
+  limit: number | null
+  near: boolean
+  reached: boolean
+}
+
+export interface TeiahWorsened {
+  key: string
+  name: string | null
+  from: string | null
+  to: string | null
+  score: number | null
+  at: string
+}
+
+export interface TeiahReconsultPreview {
+  count: number
+  batch: number
+  priceCpf: number
+  estimatedCost: number
+  usage: TeiahUsage
+  sample: Array<{ key: string; name: string | null; consultedAt: string }>
+}
+
+export interface TeiahReconsultResult {
+  processed: number
+  failed: number
+  worsened: Array<{ key: string; name: string | null; from: string; to: string }>
+  stoppedByLimit: boolean
+  remaining: number
 }
 
 export interface SgpContractChoice {
@@ -6049,6 +6133,8 @@ export type WaSubscriberPanel =
       }
       /** The TeiaH is configured: the address check can be offered for a lead. */
       teiahReady?: boolean
+      /** Admins only: the risk of the client's last TeiaH consultation, for the badge. */
+      teiah?: { risk: string; score: number | null; consultedAt: string | null }
       contracts: {
         items: WaSubscriberContract[]
         /** SGP registrations with no contract, to bind the thread to the client itself. */
