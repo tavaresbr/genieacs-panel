@@ -1,6 +1,6 @@
 {
   "name": "genieacs-panel-api",
-  "version": "1.28.13",
+  "version": "1.28.14",
   "description": "API for TR69 Controle",
   "main": "src/server.js",
   "type": "module",

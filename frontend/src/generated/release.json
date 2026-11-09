@@ -1,15 +1,15 @@
 {
-  "version": "1.28.13",
-  "build": 1580,
-  "sourceCommit": "74d8bb2015f8",
+  "version": "1.28.14",
+  "build": 1583,
+  "sourceCommit": "2e5c299c2942",
   "releasedAt": "2026-11-09",
-  "basedOnTag": "v1.28.12",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/e8286a6a92a3...74d8bb2015f8",
+  "basedOnTag": "v1.28.13",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/9244399863c1...2e5c299c2942",
   "changes": [
     {
-      "shortHash": "0424302c",
-      "date": "2026-11-08",
-      "title": "Pergunta se manda a pesquisa de satisfação (e permite encerrar sem mandar)",
+      "shortHash": "c3a2a140",
+      "date": "2026-11-09",
+      "title": "Lista de conversas: a faixa lateral passa a ser o tempo de espera (verde, amarela, vermelha) e apaga ao responder",
       "category": "Maintenance"
     }
   ]
