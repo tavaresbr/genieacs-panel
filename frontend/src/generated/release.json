@@ -1,16 +1,22 @@
 {
-  "version": "1.28.15",
-  "build": 1586,
-  "sourceCommit": "cd888001cfc7",
+  "version": "1.28.16",
+  "build": 1591,
+  "sourceCommit": "aca20ac79603",
   "releasedAt": "2026-11-09",
-  "basedOnTag": "v1.28.14",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bbf02bceda59...cd888001cfc7",
+  "basedOnTag": "v1.28.15",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bd7d9095561f...aca20ac79603",
   "changes": [
     {
-      "shortHash": "e4351692",
+      "shortHash": "521b34bc",
       "date": "2026-11-09",
-      "title": "Faixa de espera: só a resposta de um atendente apaga; o robô não conta",
+      "title": "Lista de conversas: tira a barrinha do número; fica só a faixa de tempo de espera",
       "category": "Maintenance"
+    },
+    {
+      "shortHash": "b9883b19",
+      "date": "2026-11-09",
+      "title": "Acesso da conta — estado do 2FA, retry nas sessões, IP loopback e plural",
+      "category": "Fixed"
     }
   ]
 }

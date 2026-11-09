@@ -7,6 +7,18 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.16] - 2026-11-09
+
+### Fixed
+
+- Acesso da conta — estado do 2FA, retry nas sessões, IP loopback e plural (`b9883b19`)
+
+### Maintenance
+
+- Lista de conversas: tira a barrinha do número; fica só a faixa de tempo de espera (`521b34bc`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/bd7d9095561f...aca20ac79603)
+
 ## [1.28.15] - 2026-11-09
 
 ### Maintenance
