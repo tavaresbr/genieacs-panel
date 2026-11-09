@@ -1,27 +1,33 @@
 {
-  "version": "1.28.11",
-  "build": 1570,
-  "sourceCommit": "0bf9cd64f5b7",
-  "releasedAt": "2026-11-08",
-  "basedOnTag": "v1.28.10",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/f150cfe5f8a2...0bf9cd64f5b7",
+  "version": "1.28.12",
+  "build": 1577,
+  "sourceCommit": "37c23b7708a1",
+  "releasedAt": "2026-11-09",
+  "basedOnTag": "v1.28.11",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5094c1a650f9...37c23b7708a1",
   "changes": [
     {
-      "shortHash": "2873c9e9",
+      "shortHash": "495e9969",
       "date": "2026-11-08",
-      "title": "Segurança: JWT_SECRET obrigatório; o segredo de desenvolvimento só com APP_ENV=development ou test",
+      "title": "Segurança: código de instalação (SETUP_TOKEN) opcional no primeiro cadastro",
       "category": "Maintenance"
     },
     {
-      "shortHash": "397690e7",
+      "shortHash": "23f85d42",
       "date": "2026-11-08",
-      "title": "JWT_SECRET obrigatório também nos links de mídia, recibo e sonda; testes ajustados",
+      "title": "Selo de risco nos Contatos, relatório de consultas e Novo cliente pelo WhatsApp",
       "category": "Maintenance"
     },
     {
-      "shortHash": "3abfbcdb",
+      "shortHash": "26739ea9",
       "date": "2026-11-08",
-      "title": "Testes que carregam serviços sem o harness definem JWT_SECRET",
+      "title": "Teste do selo de risco: senha de fixture em constante; marcação do commit anterior no .gitleaksignore",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5bec1e84",
+      "date": "2026-11-08",
+      "title": "Relatório da TeiaH: só aceita data como texto AAAA-MM-DD (parâmetro repetido chega como lista)",
       "category": "Maintenance"
     }
   ]

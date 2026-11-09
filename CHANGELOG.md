@@ -7,6 +7,17 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.12] - 2026-11-09
+
+### Maintenance
+
+- Segurança: código de instalação (SETUP_TOKEN) opcional no primeiro cadastro (`495e9969`)
+- Selo de risco nos Contatos, relatório de consultas e Novo cliente pelo WhatsApp (`23f85d42`)
+- Teste do selo de risco: senha de fixture em constante; marcação do commit anterior no .gitleaksignore (`26739ea9`)
+- Relatório da TeiaH: só aceita data como texto AAAA-MM-DD (parâmetro repetido chega como lista) (`5bec1e84`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/5094c1a650f9...37c23b7708a1)
+
 ## [1.28.11] - 2026-11-08
 
 ### Maintenance
