@@ -1444,6 +1444,7 @@ const en = {
   'settings.mfa.enabled': 'Two-step login turned on',
   'settings.mfa.disabled': 'Two-step login turned off',
   'settings.mfa.failed': 'Could not complete this.',
+  'settings.mfa.loadFailed': "Could not load the two-step login status.",
   'settings.mfaPolicy.title': 'Require from the team',
   'settings.mfaPolicy.description': 'When required, anyone who signs in to this provider without two-step login is taken to turn it on before using the panel.',
   'settings.mfaPolicy.on': 'Required',

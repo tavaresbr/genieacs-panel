@@ -36,16 +36,18 @@ export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
   const [acao, setAcao] = useState<Acao>(null)
   const [codigosNovos, setCodigosNovos] = useState<string[] | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const [erroStatus, setErroStatus] = useState(false)
 
   const carregar = useCallback(async () => {
-    try {
-      const res = await authAPI.mfaStatus()
-      if (res.success && res.data) {
-        setStatus(res.data)
-        onStatusChange?.(res.data)
-      }
-    } catch {
-      /* sem o estado, o cartão mostra só o botão de ativar, que o servidor confere */
+    // O cliente da API não lança: a falha volta como `success: false`. Sem o
+    // estado, não dá para dizer "Desligado" — seria mentira para quem já usa 2FA.
+    const res = await authAPI.mfaStatus()
+    if (res.success && res.data) {
+      setStatus(res.data)
+      setErroStatus(false)
+      onStatusChange?.(res.data)
+    } else {
+      setErroStatus(true)
     }
   }, [onStatusChange])
 
@@ -134,6 +136,8 @@ export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
   }
 
   const ligado = Boolean(status?.enabled)
+  // Estado desconhecido: só se o carregamento falhou e nada foi lido antes.
+  const semEstado = erroStatus && status === null
 
   return (
     <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
@@ -145,10 +149,21 @@ export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">{t('settings.mfa.description')}</p>
         </div>
-        <span className={ligado ? 'modern-badge-success' : 'modern-badge'}>
-          {ligado ? t('settings.mfa.on') : t('settings.mfa.off')}
-        </span>
+        {!semEstado && (
+          <span className={ligado ? 'modern-badge-success' : 'modern-badge'}>
+            {ligado ? t('settings.mfa.on') : t('settings.mfa.off')}
+          </span>
+        )}
       </div>
+
+      {semEstado && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-destructive">{t('settings.mfa.loadFailed')}</p>
+          <button type="button" className="modern-button-secondary" onClick={() => void carregar()}>
+            {t('common.retry')}
+          </button>
+        </div>
+      )}
 
       {codigosNovos && (
         <div className="mt-4 space-y-3 rounded-md border border-[hsl(var(--status-warning))]/50 bg-card p-4" role="region" aria-label={t('settings.mfa.recoveryTitle')}>
@@ -171,7 +186,7 @@ export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
         </div>
       )}
 
-      {!ligado && !pendente && !codigosNovos && (
+      {!semEstado && !ligado && !pendente && !codigosNovos && (
         <div className="mt-4">
           <button type="button" className="modern-button" disabled={ocupado} onClick={() => void iniciar()}>
             {t('settings.mfa.enable')}

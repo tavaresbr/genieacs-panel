@@ -1445,6 +1445,7 @@ const it: Dictionary = {
   'settings.mfa.enabled': 'Accesso in due passaggi attivato',
   'settings.mfa.disabled': 'Accesso in due passaggi disattivato',
   'settings.mfa.failed': 'Impossibile completare l\'operazione.',
+  'settings.mfa.loadFailed': "Impossibile caricare lo stato dell'accesso in due passaggi.",
   'settings.mfaPolicy.title': 'Richiedi al team',
   'settings.mfaPolicy.description': 'Con il requisito attivo, chi accede a questo provider senza accesso in due passaggi deve attivarlo prima di usare il pannello.',
   'settings.mfaPolicy.on': 'Obbligatorio',

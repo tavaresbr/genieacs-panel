@@ -1442,6 +1442,7 @@ const zhTW: Dictionary = {
   'settings.mfa.enabled': '已開啟兩步驟登入',
   'settings.mfa.disabled': '已關閉兩步驟登入',
   'settings.mfa.failed': '無法完成。',
+  'settings.mfa.loadFailed': "無法載入兩步驟登入狀態。",
   'settings.mfaPolicy.title': '要求團隊使用',
   'settings.mfaPolicy.description': '開啟後，未啟用兩步驟登入的人進入此服務商時，須先啟用才能使用面板。',
   'settings.mfaPolicy.on': '已要求',

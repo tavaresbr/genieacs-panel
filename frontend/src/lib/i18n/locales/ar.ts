@@ -1434,6 +1434,7 @@ const ar: Dictionary = {
   'settings.mfa.enabled': 'تم تفعيل تسجيل الدخول بخطوتين',
   'settings.mfa.disabled': 'تم إيقاف تسجيل الدخول بخطوتين',
   'settings.mfa.failed': 'تعذر الإكمال.',
+  'settings.mfa.loadFailed': "تعذّر تحميل حالة تسجيل الدخول بخطوتين.",
   'settings.mfaPolicy.title': 'اشتراطه على الفريق',
   'settings.mfaPolicy.description': 'عند تفعيل الاشتراط، يُطلب من كل من يدخل إلى هذا المزود دون تسجيل الدخول بخطوتين تفعيله قبل استخدام اللوحة.',
   'settings.mfaPolicy.on': 'مطلوب',
