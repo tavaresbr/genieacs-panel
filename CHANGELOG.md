@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.15] - 2026-11-09
+
+### Maintenance
+
+- Faixa de espera: só a resposta de um atendente apaga; o robô não conta (`e4351692`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/bbf02bceda59...cd888001cfc7)
+
 ## [1.28.14] - 2026-11-09
 
 ### Maintenance

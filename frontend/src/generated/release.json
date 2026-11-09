@@ -1,15 +1,15 @@
 {
-  "version": "1.28.14",
-  "build": 1583,
-  "sourceCommit": "2e5c299c2942",
+  "version": "1.28.15",
+  "build": 1586,
+  "sourceCommit": "cd888001cfc7",
   "releasedAt": "2026-11-09",
-  "basedOnTag": "v1.28.13",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/9244399863c1...2e5c299c2942",
+  "basedOnTag": "v1.28.14",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bbf02bceda59...cd888001cfc7",
   "changes": [
     {
-      "shortHash": "c3a2a140",
+      "shortHash": "e4351692",
       "date": "2026-11-09",
-      "title": "Lista de conversas: a faixa lateral passa a ser o tempo de espera (verde, amarela, vermelha) e apaga ao responder",
+      "title": "Faixa de espera: só a resposta de um atendente apaga; o robô não conta",
       "category": "Maintenance"
     }
   ]
