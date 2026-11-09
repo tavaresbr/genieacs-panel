@@ -11,13 +11,6 @@ export interface ConversationBilling {
 }
 
 // Classes escritas por inteiro: o Tailwind só gera o que aparece no código.
-/** A moldura da linha da conversa. */
-export const BILLING_FRAME: Record<BillingStatus, string> = {
-  ok: 'ring-2 ring-inset ring-[hsl(var(--status-success)/0.55)]',
-  due_today: 'ring-2 ring-inset ring-[hsl(var(--status-warning)/0.75)]',
-  overdue: 'ring-2 ring-inset ring-[hsl(var(--status-danger)/0.75)]'
-}
-
 /** O selo (contrato, rótulo): borda, fundo e texto na cor. */
 export const BILLING_BADGE: Record<BillingStatus, string> = {
   ok: 'border-[hsl(var(--status-success)/0.5)] bg-[hsl(var(--status-success)/0.12)] text-[hsl(var(--status-success))]',
