@@ -3,6 +3,7 @@ import { teiahAPI, type TeiahConsultationSummary, type TeiahSpendGroup } from '@
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import { formatMoney } from '@/lib/money'
+import { usePasswordPrompt } from '@/components/ui/password-prompt'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const monthStart = () => `${today().slice(0, 7)}-01`
@@ -19,6 +20,8 @@ export function TeiahSpendPanel() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<TeiahConsultationSummary | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const passwordPrompt = usePasswordPrompt()
 
   const money = (value: number) => formatMoney(Math.round(value * 100), 'BRL')
 
@@ -36,6 +39,31 @@ export function TeiahSpendPanel() {
       setError(t('settings.teiah.spend.failed'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  /** The period's consultations as a CSV sheet: admin only, confirmed with the password. */
+  const exportCsv = async () => {
+    const password = await passwordPrompt.ask(t('settings.teiah.spend.exportConfirm'))
+    if (!password) return
+    setExporting(true)
+    setError(null)
+    try {
+      const res = await teiahAPI.exportSpend(from, to, password)
+      if (!res.success || !res.blob) {
+        setError(res.message || t('settings.teiah.spend.failed'))
+        return
+      }
+      const url = URL.createObjectURL(res.blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = res.filename || `teiah-gastos-${from}-a-${to}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -80,7 +108,11 @@ export function TeiahSpendPanel() {
         <button type="button" className="modern-button-secondary" disabled={loading || !from || !to} onClick={() => void load()} data-testid="teiah-spend-load">
           <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} /> {t('settings.teiah.spend.load')}
         </button>
+        <button type="button" className="modern-button-secondary" disabled={exporting || !from || !to} onClick={() => void exportCsv()} data-testid="teiah-spend-export">
+          <Icon name="document" size={16} /> {t('settings.teiah.spend.export')}
+        </button>
       </div>
+      {passwordPrompt.element}
       {error && <p className="mt-3 text-sm text-destructive" role="alert">{error}</p>}
       {summary && (
         <div className="mt-4 space-y-4">

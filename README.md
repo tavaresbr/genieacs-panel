@@ -545,6 +545,29 @@ lists the reasons above the save button. Sending to the SGP then asks for
 confirmation, and the audit trail's `contact.created` entry records
 `riskAcknowledged: true` (never the score or the address).
 
+**Administrator functions.** Only administrators (`teiah.config`) see these,
+and every one that changes something or spends credits asks for the person's
+own password first (checked again by the server):
+
+- **Monthly spending limit.** Settings → TeiaH Valid → *Administrators only*
+  sets a monthly limit and the price of a CPF/CNPJ and of an address check.
+  The panel adds up each paid check it makes (the 30-day memory costs
+  nothing) and shows a bar, warning from 80%. A check that would pass the
+  limit is refused (`409 teiah_limit_reached`); an administrator can let it
+  through with their password (`limitPassword`), recorded as
+  `teiah.limit_overridden`.
+- **Alert when a client gets worse.** When a new check gives a client a higher
+  risk band than the last one (LOW → HIGH, say), the trail records
+  `contact.teiah_risk_up`, the section lists those clients, and — if turned
+  on — the team gets the alert through the channels set up in Alerts.
+- **Reconsult old clients.** Shows how many active clients were checked more
+  than 6 months ago and the estimated cost, then checks up to 100 of them
+  again. It stops when the monthly limit is reached.
+- **Risk badge in the WhatsApp conversation.** The attendance card shows the
+  risk of the client's last check (no new check is made).
+- **Spend spreadsheet.** *Checks and spend* exports the period's checks as
+  CSV (date, type, origin, user, status, cost — never the document).
+
 ## Automatic activation
 
 Open **Settings → Automatic activation** to let a newly installed ONT configure

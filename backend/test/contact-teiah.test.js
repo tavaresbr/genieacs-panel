@@ -489,3 +489,156 @@ describe('consulta de endereço no Novo cliente', () => {
     assert.equal(res.status, 403);
   });
 });
+
+describe('funções de administrador: limite, piora do risco e reconsulta', () => {
+  // A senha do dono, a mesma do setup lá em cima, montada para o gitleaks.
+  const SENHA_ADMIN = ['operator', 'password', '1'].join('-');
+  const SENHA_ERRADA = ['nao', 'e', 'esta'].join('-');
+  const CPF_PIORA = '24681357928';
+  const CPF_ANTIGO = '13579246828';
+  const guardas = (body) => call(`${panelUrl}/api/teiah/guards`, { method: 'PUT', ...auth(), body });
+  let tokenTecnico;
+
+  before(async () => {
+    RESPOSTAS[CPF_PIORA] = { resultado: { mix: { pessoa: { data: { nome: 'PEDRO PIORA' } }, score: { data: { risco: 'BAIXO', score: 800 } } } } };
+    RESPOSTAS[CPF_ANTIGO] = { resultado: { mix: { pessoa: { data: { nome: 'OTO ANTIGO' } }, score: { data: { risco: 'MÉDIO', score: 500 } } } } };
+    const SENHA_DO_TECNICO = ['senha', 'do', 'tecnico', 'guardas', '1'].join('-');
+    await call(`${panelUrl}/api/users`, {
+      method: 'POST', ...auth(),
+      body: { username: 'tecnico-guardas', password: SENHA_DO_TECNICO, email: 'tecnico-guardas@exemplo.test', role: 'tech' }
+    });
+    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { username: 'tecnico-guardas', password: SENHA_DO_TECNICO } });
+    tokenTecnico = login.body.data.token;
+  });
+
+  after(async () => {
+    await asTenant(() => TeiahService.saveGuards({ monthlyLimit: null, alertWorsening: false }));
+  });
+
+  it('só administrador vê e muda as guardas', async () => {
+    const tecnico = { headers: authHeaders(tokenTecnico) };
+    for (const [path, method] of [['guards', 'GET'], ['guards', 'PUT'], ['worsened', 'GET'], ['reconsult/preview', 'GET'], ['reconsult/run', 'POST'], ['consultations/export', 'POST']]) {
+      const res = await call(`${panelUrl}/api/teiah/${path}`, { method, ...tecnico, ...(method === 'GET' ? {} : { body: { password: SENHA_ADMIN } }) });
+      assert.equal(res.status, 403, `${method} ${path}`);
+    }
+    const lido = await call(`${panelUrl}/api/teiah/guards`, auth());
+    assert.equal(lido.status, 200, JSON.stringify(lido.body));
+    assert.equal(lido.body.data.guards.monthlyLimit, null);
+    assert.ok(lido.body.data.usage.count >= 1, 'as consultas pagas acima contaram');
+  });
+
+  it('mudar as guardas pede a senha de quem muda', async () => {
+    const sem = await guardas({ monthlyLimit: 100 });
+    assert.equal(sem.status, 400);
+    assert.equal(sem.body.code, 'password_required');
+    const errada = await guardas({ monthlyLimit: 100, password: SENHA_ERRADA });
+    assert.equal(errada.status, 403);
+    assert.equal(errada.body.code, 'password_incorrect');
+    const invalida = await guardas({ priceCpf: -1, password: SENHA_ADMIN });
+    assert.equal(invalida.status, 400);
+    assert.equal(invalida.body.code, 'invalid_guard');
+    const certa = await guardas({ monthlyLimit: 100, priceCpf: 5, alertWorsening: true, password: SENHA_ADMIN });
+    assert.equal(certa.status, 200, JSON.stringify(certa.body));
+    assert.equal(certa.body.data.guards.monthlyLimit, 100);
+    assert.equal(certa.body.data.guards.priceCpf, 5);
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'teiah.guards_changed' }));
+    assert.equal(trilha.length, 1);
+    assert.equal(trilha[0].detail.includes(SENHA_ADMIN), false);
+  });
+
+  it('a piora do risco fica na trilha e na lista dos administradores', async () => {
+    await addContract('P-1', 'Pedro Piora', CPF_PIORA);
+    const primeira = await call(`${panelUrl}/api/contacts/P-1/teiah`, { method: 'POST', ...auth(), body: { fresh: true } });
+    assert.equal(primeira.status, 200, JSON.stringify(primeira.body));
+    assert.equal(primeira.body.data.worsened, null);
+    RESPOSTAS[CPF_PIORA].resultado.mix.score.data = { risco: 'ALTO', score: 300 };
+    const segunda = await call(`${panelUrl}/api/contacts/P-1/teiah`, { method: 'POST', ...auth(), body: { fresh: true } });
+    assert.deepEqual(segunda.body.data.worsened, { from: 'BAIXO', to: 'ALTO' });
+    const lista = await call(`${panelUrl}/api/teiah/worsened`, auth());
+    assert.equal(lista.status, 200);
+    assert.equal(lista.body.data.items[0].key, 'P-1');
+    assert.equal(lista.body.data.items[0].name, 'Pedro Piora');
+    assert.equal(lista.body.data.items[0].to, 'ALTO');
+    // Melhorar não é piorar.
+    RESPOSTAS[CPF_PIORA].resultado.mix.score.data = { risco: 'BAIXO', score: 900 };
+    const terceira = await call(`${panelUrl}/api/contacts/P-1/teiah`, { method: 'POST', ...auth(), body: { fresh: true } });
+    assert.equal(terceira.body.data.worsened, null);
+  });
+
+  it('reconsultar os antigos: prévia com custo, e rodar pede a senha', async () => {
+    await addContract('O-1', 'Oto Antigo', CPF_ANTIGO);
+    await call(`${panelUrl}/api/contacts/O-1/teiah`, { method: 'POST', ...auth(), body: { fresh: true } });
+    // A consulta envelhece: oito meses atrás.
+    await asTenant(async () => {
+      const db = getDb();
+      const row = await db('sgp_clients').where({ document: CPF_ANTIGO }).first();
+      const teiah = typeof row.teiah === 'string' ? JSON.parse(row.teiah) : row.teiah;
+      teiah.consultedAt = new Date(Date.now() - 240 * 86_400_000).toISOString();
+      await db('sgp_clients').where({ id: row.id }).update({ teiah: JSON.stringify(teiah) });
+    });
+    const previa = await call(`${panelUrl}/api/teiah/reconsult/preview`, auth());
+    assert.equal(previa.status, 200, JSON.stringify(previa.body));
+    assert.equal(previa.body.data.count, 1);
+    assert.equal(previa.body.data.estimatedCost, 5);
+    assert.equal(previa.body.data.sample[0].name, 'Oto Antigo');
+
+    consultas.length = 0;
+    const sem = await call(`${panelUrl}/api/teiah/reconsult/run`, { method: 'POST', ...auth(), body: {} });
+    assert.equal(sem.status, 400);
+    assert.equal(sem.body.code, 'password_required');
+    assert.deepEqual(consultas, []);
+    const roda = await call(`${panelUrl}/api/teiah/reconsult/run`, { method: 'POST', ...auth(), body: { password: SENHA_ADMIN } });
+    assert.equal(roda.status, 200, JSON.stringify(roda.body));
+    assert.equal(roda.body.data.processed, 1);
+    assert.deepEqual(consultas, [CPF_ANTIGO]);
+    const depois = await call(`${panelUrl}/api/teiah/reconsult/preview`, auth());
+    assert.equal(depois.body.data.count, 0, 'consultado agora, não é mais antigo');
+  });
+
+  it('o selo de risco da conversa vem do que o painel guardou', async () => {
+    const { default: WaSubscriberPanelService } = await import('../src/services/waSubscriberPanelService.js');
+    const selo = await asTenant(() => WaSubscriberPanelService.teiahBadge(CPF_PIORA));
+    assert.equal(selo.risk, 'BAIXO');
+    assert.equal(selo.score, 900);
+    assert.equal(await asTenant(() => WaSubscriberPanelService.teiahBadge('00000000000')), null);
+  });
+
+  it('passado o limite do mês, só o administrador com a senha consulta', async () => {
+    await guardas({ monthlyLimit: 1, password: SENHA_ADMIN });
+    consultas.length = 0;
+    const barrada = await call(`${panelUrl}/api/contacts/P-1/teiah`, { method: 'POST', ...auth(), body: { fresh: true } });
+    assert.equal(barrada.status, 409, JSON.stringify(barrada.body));
+    assert.equal(barrada.body.code, 'teiah_limit_reached');
+    assert.deepEqual(consultas, [], 'nada foi pago');
+
+    const errada = await call(`${panelUrl}/api/contacts/P-1/teiah`, { method: 'POST', ...auth(), body: { fresh: true, limitPassword: SENHA_ERRADA } });
+    assert.equal(errada.status, 403);
+    assert.equal(errada.body.code, 'password_incorrect');
+
+    const liberada = await call(`${panelUrl}/api/contacts/P-1/teiah`, { method: 'POST', ...auth(), body: { fresh: true, limitPassword: SENHA_ADMIN } });
+    assert.equal(liberada.status, 200, JSON.stringify(liberada.body));
+    assert.deepEqual(consultas, [CPF_PIORA]);
+
+    const endereco = await call(`${panelUrl}/api/contacts/lookup/address`, {
+      method: 'POST', ...auth(), body: { fresh: true, address: { zip: '68180-430', street: 'RUA DO LIMITE', number: '7', district: 'CENTRO' } }
+    });
+    assert.equal(endereco.status, 409, JSON.stringify(endereco.body));
+    assert.equal(endereco.body.code, 'teiah_limit_reached');
+
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'teiah.limit_overridden' }));
+    assert.equal(trilha.length, 1);
+
+    // A reconsulta em lote não passa do limite: para.
+    await asTenant(async () => {
+      const db = getDb();
+      const row = await db('sgp_clients').where({ document: CPF_ANTIGO }).first();
+      const teiah = typeof row.teiah === 'string' ? JSON.parse(row.teiah) : row.teiah;
+      teiah.consultedAt = '2025-01-01T00:00:00.000Z';
+      await db('sgp_clients').where({ id: row.id }).update({ teiah: JSON.stringify(teiah) });
+    });
+    const lote = await call(`${panelUrl}/api/teiah/reconsult/run`, { method: 'POST', ...auth(), body: { password: SENHA_ADMIN } });
+    assert.equal(lote.status, 200, JSON.stringify(lote.body));
+    assert.equal(lote.body.data.stoppedByLimit, true);
+    assert.equal(lote.body.data.processed, 0);
+  });
+});

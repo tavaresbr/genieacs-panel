@@ -6,6 +6,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { TeiahReportModal } from '@/components/contacts/teiah-report-modal'
 import { riskBadge } from '@/lib/teiah'
 import { formatMoney } from '@/lib/money'
+import { useTeiahLimitOverride } from '@/components/contacts/use-teiah-limit'
 
 export interface TeiahAddressInput {
   zip: string
@@ -50,6 +51,7 @@ export function TeiahAddressCheck({ address, onResult, compact = false, title, t
   const [check, setCheck] = useState<(TeiahAddressOutcome & { key: string }) | null>(null)
   const [busy, setBusy] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const limit = useTeiahLimitOverride()
 
   const zipDigits = address.zip.replace(/\D/g, '')
   const key = teiahAddressKey(address)
@@ -68,13 +70,17 @@ export function TeiahAddressCheck({ address, onResult, compact = false, title, t
     if (!window.confirm(t(fresh ? 'contacts.new.teiahAddress.refreshConfirm' : 'contacts.new.teiahAddress.confirm'))) return
     setBusy(true)
     try {
-      const res = await contactsAPI.teiahAddress({
+      const body = {
         zip: zipDigits,
         street: address.street.trim(),
         number: address.number.trim(),
         district: address.district?.trim() ?? '',
         complement: address.complement?.trim() ?? ''
-      }, fresh)
+      }
+      const res = await limit.retry(
+        await contactsAPI.teiahAddress(body, fresh),
+        (password) => contactsAPI.teiahAddress(body, fresh, password)
+      )
       if (!res.success || !res.data) {
         toast.error(res.message || t('contacts.new.teiahAddress.failed'))
         return
@@ -158,6 +164,7 @@ export function TeiahAddressCheck({ address, onResult, compact = false, title, t
           </div>
         </div>
       )}
+      {limit.element}
       {reportOpen && (
         <TeiahReportModal
           reportKey={key}

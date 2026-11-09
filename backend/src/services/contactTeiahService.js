@@ -5,6 +5,8 @@ import TeiahService, { TeiahError } from './teiahService.js';
 import ContactProfileService, { ContactProfileError, shownValue, whatsappPhoneOf } from './contactProfileService.js';
 import WaContactService, { contactKey } from './waContactService.js';
 import { personTypeOf } from './contactOnboardingService.js';
+import AuditLog from '../models/AuditLog.js';
+import WaAlertService from './waAlertService.js';
 
 /** One scan reads this many clients: each is a paid call to the TeiaH. */
 export const SCAN_LIMIT = 30;
@@ -16,6 +18,24 @@ export const APPLY_LIMIT = 200;
 const PENDING_LIMIT = 500;
 
 const MOBILE = /^55\d{2}9\d{8}$/;
+
+/** A client consulted longer ago than this is "stale" for the admin's reconsult. */
+export const STALE_MONTHS = 6;
+/** The most clients one reconsult run asks the TeiaH about. */
+export const RECONSULT_LIMIT = 100;
+
+/**
+ * Where a TeiaH risk band sits: 1 low, 2 medium, 3 high; `null` when the band
+ * is missing or not one the panel knows. Same reading as the frontend badge.
+ */
+export function riskRank(risk) {
+  const value = String(risk ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+  if (!value) return null;
+  if (value.startsWith('BAIX') || value.startsWith('LOW')) return 1;
+  if (value.startsWith('ALT') || value.startsWith('HIGH')) return 3;
+  if (value.startsWith('MED') || value.startsWith('MODERAD')) return 2;
+  return null;
+}
 
 function digitsOf(value) {
   return String(value ?? '').replace(/\D/g, '');
@@ -67,7 +87,7 @@ async function pool(items, size, task) {
  */
 class ContactTeiahService {
   /** The TeiaH of one client: the CPF/CNPJ the record shows, and the record it lands on. */
-  static async consult(key, { fresh = false } = {}) {
+  static async consult(key, { fresh = false, override = false } = {}) {
     const row = await ContactProfileService.rowFor(key);
     if (!row) throw new ContactProfileError('contacts.error.notFound', { code: 'not_found', status: 404 });
     const existing = await ContactProfileService.clientFor(row);
@@ -78,11 +98,146 @@ class ContactTeiahService {
     TeiahService.requireReady(await TeiahService.getConfig());
     // The panel's memory first: a consultation younger than 30 days is not paid
     // for twice, whoever made it (this record, "Novo cliente" or the bulk run).
-    const consulted = await TeiahService.consultCached(document, { fresh });
+    const consulted = await TeiahService.consultCached(document, { fresh, override });
     const client = await ContactProfileService.ensureClient(row);
     const teiah = snapshotOf(consulted.result, consulted.consultedAt);
     await SgpClient.setTeiah(client.id, teiah);
-    return { teiah, cached: consulted.cached };
+    const worsened = await this.noteWorsening(key, existing, row, teiah);
+    return { teiah, cached: consulted.cached, worsened };
+  }
+
+  /**
+   * The risk band went up since the last consultation (low → high, say): kept
+   * in the audit trail, which the admins' list reads, and sent to the team's
+   * alert channels when the admin turned that on. Never throws.
+   *
+   * @returns {Promise<{ from: string, to: string } | null>}
+   */
+  static async noteWorsening(key, existing, row, teiah) {
+    try {
+      const from = existing?.teiah?.score?.risk ?? null;
+      const to = teiah?.score?.risk ?? null;
+      const before = riskRank(from);
+      const after = riskRank(to);
+      if (before === null || after === null || after <= before) return null;
+      const name = String(shownValue('name', existing, row) ?? '').slice(0, 80) || String(key);
+      const score = teiah.score?.score ?? null;
+      await AuditLog.record({
+        action: AuditLog.ACTIONS.CONTACT_TEIAH_RISK_UP,
+        actorKind: 'system',
+        subjectType: 'contact',
+        subjectId: key,
+        detail: { name, from, to, score }
+      });
+      const guards = await TeiahService.getGuards();
+      if (guards.alertWorsening) {
+        await WaAlertService.notifyEvent({
+          rule: 'teiah_risk_up',
+          subject: `teiah:${key}`,
+          vars: { name, from, to, score: score ?? '-' }
+        });
+      }
+      return { from, to };
+    } catch (error) {
+      console.warn(`TeiaH worsening not noted: ${String(error?.message).slice(0, 200)}`);
+      return null;
+    }
+  }
+
+  /** The clients whose risk went up lately, newest first, from the audit trail. */
+  static async worsened({ limit = 50 } = {}) {
+    const rows = await AuditLog.list({ action: AuditLog.ACTIONS.CONTACT_TEIAH_RISK_UP, limit });
+    return rows.map((row) => {
+      let detail = {};
+      try {
+        detail = JSON.parse(row.detail || '{}') || {};
+      } catch {
+        detail = {};
+      }
+      return {
+        key: row.subject_id,
+        name: detail.name ?? null,
+        from: detail.from ?? null,
+        to: detail.to ?? null,
+        score: detail.score ?? null,
+        at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+      };
+    });
+  }
+
+  /**
+   * Active clients whose TeiaH snapshot is older than `STALE_MONTHS`: one per
+   * document (a client with several contracts is asked once), oldest first.
+   */
+  static async staleCandidates({ months = STALE_MONTHS } = {}) {
+    const subscribers = await WaContactService.collect({ state: 'active' });
+    const byDocument = new Map();
+    for (const subscriber of subscribers) {
+      const document = digitsOf(subscriber.document);
+      if (!personTypeOf(document) || byDocument.has(document)) continue;
+      byDocument.set(document, { key: contactKey(subscriber), name: subscriber.clientName, document });
+    }
+    const snapshots = await this.snapshotsByDocument([...byDocument.keys()]);
+    const cutoff = Date.now() - months * 30 * 86_400_000;
+    const stale = [];
+    for (const entry of byDocument.values()) {
+      const at = Date.parse(snapshots.get(entry.document)?.consultedAt ?? '');
+      if (Number.isFinite(at) && at < cutoff) stale.push({ ...entry, consultedAt: new Date(at).toISOString() });
+    }
+    return stale.sort((a, b) => a.consultedAt.localeCompare(b.consultedAt));
+  }
+
+  /** What a reconsult would do: how many clients, and what it would cost by the admin's prices. */
+  static async reconsultPreview() {
+    const stale = await this.staleCandidates();
+    const guards = await TeiahService.getGuards();
+    const usage = await TeiahService.monthUsage();
+    const next = Math.min(stale.length, RECONSULT_LIMIT);
+    return {
+      count: stale.length,
+      batch: next,
+      priceCpf: guards.priceCpf,
+      estimatedCost: Math.round(next * guards.priceCpf * 100) / 100,
+      usage,
+      sample: stale.slice(0, 10).map(({ key, name, consultedAt }) => ({ key, name, consultedAt }))
+    };
+  }
+
+  /**
+   * Asks the TeiaH again about the stale clients, at most `max` (≤ 100). The
+   * monthly limit applies (no override here): reaching it stops the run.
+   */
+  static async reconsultStale({ max = RECONSULT_LIMIT } = {}) {
+    const cap = Math.min(Math.max(Math.floor(Number(max)) || RECONSULT_LIMIT, 1), RECONSULT_LIMIT);
+    const stale = await this.staleCandidates();
+    const batch = stale.slice(0, cap);
+    if (batch.length > 0) TeiahService.requireReady(await TeiahService.getConfig());
+    let processed = 0;
+    let failed = 0;
+    let stoppedByLimit = false;
+    const worsened = [];
+    await pool(batch, SCAN_CONCURRENCY, async (entry) => {
+      if (stoppedByLimit) return;
+      try {
+        const done = await this.consult(entry.key, { fresh: true });
+        processed += 1;
+        if (done.worsened) worsened.push({ key: entry.key, name: entry.name, ...done.worsened });
+      } catch (error) {
+        if (error instanceof TeiahError && error.code === 'teiah_limit_reached') {
+          stoppedByLimit = true;
+          return;
+        }
+        if (error instanceof TeiahError && ['unauthorized', 'credentials_rejected', 'not_configured'].includes(error.code)) throw error;
+        failed += 1;
+      }
+    });
+    return {
+      processed,
+      failed,
+      worsened,
+      stoppedByLimit,
+      remaining: stale.length - processed
+    };
   }
 
   /**

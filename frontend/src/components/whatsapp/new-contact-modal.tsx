@@ -500,6 +500,12 @@ export function NewContactModal({ onClose, initial }: { onClose: () => void; ini
                 </span>
               </p>
             )}
+            {lookup?.teiahLimitReached && (
+              <p className="mt-3 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning))] p-3 text-sm" role="alert" data-testid="new-contact-teiah-limit">
+                <Icon name="warning" size={16} />
+                <span>{t('teiahLimit.lookupStopped')}</span>
+              </p>
+            )}
             {lookup?.teiahCached && lookup.teiahConsultedAt && (
               <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" data-testid="new-contact-teiah-cached">
                 <span>{t('contacts.new.teiahCachedNote', { date: formatDateTime(lookup.teiahConsultedAt) })}</span>

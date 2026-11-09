@@ -177,6 +177,8 @@ class ContactOnboardingService {
     let teiahScore = null;
     let teiahConsulted = false;
     let teiahCached = false;
+    // The month's TeiaH limit stopped the consultation: the form says so.
+    let teiahLimitReached = false;
     let teiahConsultedAt = null;
     let deceased = false;
     const known = inSgp.length > 0 || Boolean(inPanel);
@@ -218,6 +220,7 @@ class ContactOnboardingService {
       } catch (error) {
         console.warn(`TeiaH document lookup failed: ${error.code || error.message}`);
         prefillError = true;
+        if (error?.code === 'teiah_limit_reached') teiahLimitReached = true;
       }
     }
 
@@ -311,6 +314,7 @@ class ContactOnboardingService {
       teiahConsulted,
       teiahReady,
       teiahCached,
+      teiahLimitReached,
       teiahConsultedAt,
       teiahScore,
       deceased
@@ -394,10 +398,10 @@ class ContactOnboardingService {
    * address has a debt history, before anyone is registered. A paid call,
    * behind the panel's 30-day memory of the same CEP and number.
    */
-  static async lookupAddressTeiah(body) {
+  static async lookupAddressTeiah(body, { override = false } = {}) {
     const address = this.addressForTeiah(body);
     TeiahService.requireReady(await TeiahService.getConfig());
-    return TeiahService.consultAddressCached(address, { fresh: body?.fresh === true });
+    return TeiahService.consultAddressCached(address, { fresh: body?.fresh === true, override });
   }
 
   /** The TeiaH's report PDF of that address check, from its history: no new paid call. */
