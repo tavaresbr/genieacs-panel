@@ -136,11 +136,10 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
         // tempo de espera (`faixaEspera`), não o pagamento.
         const situacao = conversation.billing ?? null
         const rotulo = situacao ? billingLabel(situacao.status, situacao.daysOverdue) : null
-        // A faixa do número fica ao lado da faixa de espera (que ocupa os 6 px da
-        // borda), por isso começa depois dela quando há espera.
-        const faixa = numero
-          ? `${numero.className} ${faixaEspera ? 'shadow-[inset_9px_0_0_0_hsl(var(--wa-account))]' : 'shadow-[inset_4px_0_0_0_hsl(var(--wa-account))]'}`
-          : active ? 'shadow-[inset_3px_0_0_0_hsl(var(--primary))]' : ''
+        // Sem faixa do número: a lateral é só a faixa de espera. O número que
+        // recebeu continua no selo colorido; `numero.className` fica porque é ele
+        // que define `--wa-account`, usada pelo selo e pela conversa aberta.
+        const faixa = numero ? numero.className : ''
         return (
           <li key={conversation.id}>
             <button
