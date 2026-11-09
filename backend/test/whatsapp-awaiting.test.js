@@ -75,3 +75,28 @@ describe('aguardando resposta', () => {
     assert.equal((await daConversa()).awaitingSince, null);
   });
 });
+
+describe('aguardando um ATENDENTE (a faixa da lista)', () => {
+  it('a resposta do robô não apaga; a de um atendente apaga; o cliente falando de novo acende', async () => {
+    const c = await asTenant(() => WaConversation.ensure({
+      accountId, externalThreadId: '5593981190077@s.whatsapp.net', waPhone: '5593981190077', waLid: null, pushName: 'Bia'
+    }));
+    await getDb()('wa_conversations').where({ id: c.id }).update({ engaged_at: new Date(), last_message_at: new Date() });
+    const daConversa = async () => (await lista()).find((x) => x.id === c.id);
+
+    await msg(c.id, 'in', { minutosAtras: 20 });
+    await msg(c.id, 'out', { source: 'bot', minutosAtras: 19 });
+    const comRobo = await daConversa();
+    assert.equal(comRobo.awaitingSince, null, 'para o painel o robô respondeu');
+    assert.ok(comRobo.awaitingHumanSince, 'mas nenhum atendente respondeu: a faixa fica');
+
+    await msg(c.id, 'out', { source: 'operator', minutosAtras: 10 });
+    assert.equal((await daConversa()).awaitingHumanSince, null, 'o atendente respondeu: a faixa apaga');
+
+    await msg(c.id, 'in', { minutosAtras: 3 });
+    const acendeu = await daConversa();
+    assert.ok(acendeu.awaitingHumanSince, 'o cliente falou de novo: acende');
+    const minutos = (Date.now() - new Date(acendeu.awaitingHumanSince).getTime()) / 60_000;
+    assert.ok(minutos < 5, 'conta desde a nova mensagem, não desde a antiga');
+  });
+});

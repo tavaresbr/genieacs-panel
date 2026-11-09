@@ -5952,6 +5952,8 @@ export interface WhatsAppConversation {
   waitingSince?: string | null
   /** O cliente falou por último e ninguém respondeu: desde a primeira mensagem sem resposta. */
   awaitingSince?: string | null
+  /** O cliente falou e nenhum ATENDENTE respondeu (o robô não conta): a faixa de espera da lista. */
+  awaitingHumanSince?: string | null
   /** Em dia, vence hoje ou atrasado, pela última consulta ao SGP; null sem foto. */
   billing?: ConversationBilling | null
   /** O cadastro do cliente no SGP, quando o id dele já foi sincronizado e o SGP está ligado. */

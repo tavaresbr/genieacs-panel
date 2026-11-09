@@ -128,7 +128,9 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
         // O cliente falou por último e ninguém respondeu: a linha pisca até
         // alguém (ou o bot) responder. `motion-safe`: quem pediu menos
         // movimento ao sistema vê a marca parada.
-        const aguardando = conversation.awaitingSince ? minutesSince(conversation.awaitingSince, now) : null
+        // O tempo de espera é de ATENDENTE: o robô responder (menu, fatura) não
+        // apaga a faixa; só um atendente responder apaga, e o cliente falar de novo acende.
+        const aguardando = conversation.awaitingHumanSince ? minutesSince(conversation.awaitingHumanSince, now) : null
         const faixaEspera = waitBand(aguardando)
         // A situação financeira continua escrita no selo; a COR da lateral é o
         // tempo de espera (`faixaEspera`), não o pagamento.
