@@ -302,7 +302,11 @@ class WhatsAppMessageController {
       ));
     }
     try {
-      const conversation = await WaConversationService.setStatus(req.params?.id, status, { userId: req.user?.userId ?? null });
+      const conversation = await WaConversationService.setStatus(req.params?.id, status, {
+        userId: req.user?.userId ?? null,
+        // Só `false` dispensa a pesquisa; omitido continua como sempre.
+        survey: req.body?.survey !== false
+      });
       return res.json(createResponse(
         req.t(status === 'closed' ? 'whatsapp.conversationClosed' : 'whatsapp.conversationReopened'),
         conversation

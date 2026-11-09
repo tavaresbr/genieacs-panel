@@ -42,6 +42,7 @@ import { AvailabilityToggle } from '@/components/whatsapp/assignment'
 import { NotifyToggle } from '@/components/whatsapp/message-notifier'
 import { focusedConversation } from '@/lib/wa-notify'
 import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
+import { CloseSurveyDialog } from '@/components/whatsapp/close-survey-dialog'
 import { setMobileBarHidden, setMobileBarUnread, subscribeMobileBar } from '@/lib/mobile-bar'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { cardHeightAboveKeyboard, cardOutOfView, visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
@@ -662,12 +663,12 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
    * the list is asked again rather than patched, since only the server knows
    * whether the row still belongs under the filter on screen.
    */
-  const file = useCallback(async (next: 'open' | 'closed') => {
+  const file = useCallback(async (next: 'open' | 'closed', survey?: boolean) => {
     const id = selectedIdRef.current
     if (id === null) return
     setFiling(true)
     try {
-      const res = await whatsappAPI.setConversationStatus(id, next)
+      const res = await whatsappAPI.setConversationStatus(id, next, { survey })
       if (!alive.current) return
       if (!res.success || !res.data) {
         toast.error(whatsappErrorMessage(t, res.code))
@@ -681,6 +682,25 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       if (alive.current) setFiling(false)
     }
   }, [t, toast])
+
+  // Encerrar: se a pesquisa de satisfação sairia, pergunta antes (a cada vez);
+  // se não sairia, encerra direto como sempre.
+  const [askSurvey, setAskSurvey] = useState(false)
+  const requestFile = useCallback(async (next: 'open' | 'closed') => {
+    if (next !== 'closed') { void file(next); return }
+    const id = selectedIdRef.current
+    if (id === null) return
+    try {
+      const res = await whatsappAPI.getConversation(id)
+      if (alive.current && selectedIdRef.current === id && res.success && res.data?.surveyOnClose) {
+        setAskSurvey(true)
+        return
+      }
+    } catch {
+      // sem a resposta, encerra como sempre: a pesquisa é acessória
+    }
+    void file('closed')
+  }, [file])
 
   // ── Sending ────────────────────────────────────────────────────────────────
   const submit = useCallback(async (
@@ -1142,7 +1162,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
                     onReact={(message, emoji) => void reactTo(message, emoji)}
                     onDelete={(message) => void deleteMessage(message)}
                     filing={filing}
-                    onFile={(next) => void file(next)}
+                    onFile={(next) => void requestFile(next)}
                     sgpPanelOpen={canSeeSgp ? showSgpPanel : undefined}
                     onToggleSgpPanel={canSeeSgp ? toggleSgpPanel : undefined}
                     onLinked={linked}
@@ -1221,6 +1241,13 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
           </section>
         )}
       </div>
+      {askSurvey && (
+        <CloseSurveyDialog
+          busy={filing}
+          onCancel={() => setAskSurvey(false)}
+          onChoose={(survey) => { setAskSurvey(false); void file('closed', survey) }}
+        />
+      )}
       {forwarding && (
         <ForwardDialog
           message={forwarding}

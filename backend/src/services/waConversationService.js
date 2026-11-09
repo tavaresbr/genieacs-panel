@@ -400,6 +400,8 @@ class WaConversationService {
       contract: row.contract || null,
       sgpContactId: row.sgp_contact_id ? Number(row.sgp_contact_id) : null,
       clientName: extra.clientName ?? null,
+      // Encerrar agora mandaria a pesquisa de satisfação? (só a conversa aberta, e só no detalhe)
+      surveyOnClose: extra.surveyOnClose ?? false,
       optedOut: extra.optedOut ?? false,
       // Só quando o bloqueio é parcial: os tipos que ele cobre.
       optOutCategories: extra.optOutCategories ?? null,
@@ -642,7 +644,12 @@ class WaConversationService {
       ? (contact?.contract === conversation.contract ? contact : await SgpContact.getByContract(conversation.contract))
       : null;
     const sgpConfig = doContrato?.client_ref ? await SgpService.getConfig() : null;
+    // A tela pergunta se manda a pesquisa só quando ela de fato sairia.
+    const surveyOnClose = conversation.closed_at
+      ? false
+      : await WaSatisfactionService.wouldAsk(conversation).then((d) => d.ask).catch(() => false);
     return this.publicConversation(conversation, {
+      surveyOnClose,
       sgpUrl: sgpConfig?.enabled ? SgpService.clientPageUrl(sgpConfig, doContrato.client_ref) : null,
       tags: etiquetas.get(Number(conversation.id)) ?? [],
       awaitingSince: aguardando.get(Number(conversation.id)) ?? null,
@@ -676,7 +683,7 @@ class WaConversationService {
    * counterpart lives in `waInboundService` — a customer who writes again
    * reopens their own thread, because an archive cannot answer anybody.
    */
-  static async setStatus(id, status, { userId = null } = {}) {
+  static async setStatus(id, status, { userId = null, survey = true } = {}) {
     const conversation = await this.get(id);
     const closing = status === 'closed';
     const wasOpen = !conversation.closed_at;
@@ -690,7 +697,9 @@ class WaConversationService {
     });
     // Encerrar de verdade (não o segundo clique) é o momento da pesquisa de
     // satisfação. Ela decide sozinha se pergunta e nunca lança.
-    if (closing && wasOpen) await WaSatisfactionService.onClosed(updated, { userId });
+    // `survey: false` é o atendente escolhendo não mandar: o cliente respondia
+    // "obrigado" à pesquisa e a conversa reabria, sem nunca acabar.
+    if (closing && wasOpen && survey !== false) await WaSatisfactionService.onClosed(updated, { userId });
     return this.decorate(updated);
   }
 
