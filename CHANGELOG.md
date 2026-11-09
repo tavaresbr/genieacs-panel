@@ -7,6 +7,15 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.28.17] - 2026-11-09
+
+### Maintenance
+
+- Cliente que fala numa conversa encerrada a reabre, inclusive com a nota da pesquisa (`4531725c`)
+- Admin-only spend limit, worsening alert, reconsult, WhatsApp risk badge and CSV export (`515b2b48`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/beb4e2571bcf...bb102cbcea96)
+
 ## [1.28.16] - 2026-11-09
 
 ### Fixed

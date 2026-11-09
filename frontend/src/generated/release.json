@@ -1,22 +1,22 @@
 {
-  "version": "1.28.16",
-  "build": 1591,
-  "sourceCommit": "aca20ac79603",
+  "version": "1.28.17",
+  "build": 1596,
+  "sourceCommit": "bb102cbcea96",
   "releasedAt": "2026-11-09",
-  "basedOnTag": "v1.28.15",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bd7d9095561f...aca20ac79603",
+  "basedOnTag": "v1.28.16",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/beb4e2571bcf...bb102cbcea96",
   "changes": [
     {
-      "shortHash": "521b34bc",
+      "shortHash": "4531725c",
       "date": "2026-11-09",
-      "title": "Lista de conversas: tira a barrinha do número; fica só a faixa de tempo de espera",
+      "title": "Cliente que fala numa conversa encerrada a reabre, inclusive com a nota da pesquisa",
       "category": "Maintenance"
     },
     {
-      "shortHash": "b9883b19",
+      "shortHash": "515b2b48",
       "date": "2026-11-09",
-      "title": "Acesso da conta — estado do 2FA, retry nas sessões, IP loopback e plural",
-      "category": "Fixed"
+      "title": "Admin-only spend limit, worsening alert, reconsult, WhatsApp risk badge and CSV export",
+      "category": "Maintenance"
     }
   ]
 }

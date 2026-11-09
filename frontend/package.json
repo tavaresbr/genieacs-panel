@@ -1,6 +1,6 @@
 {
   "name": "genieacs-panel-frontend",
-  "version": "1.28.16",
+  "version": "1.28.17",
   "private": true,
   "scripts": {
     "dev": "vite",
