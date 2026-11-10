@@ -7,6 +7,18 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.31.0] - 2026-11-10
+
+### New
+
+- Base de conhecimento e cobertura para a IA de vendas (`d847f95d`)
+
+### Fixed
+
+- PrepararFio volta a ser exportada (`ef1a4a03`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/5dc690e57c49...5e434d8f5950)
+
 ## [1.30.0] - 2026-11-10
 
 ### New

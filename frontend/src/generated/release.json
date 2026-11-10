@@ -1,34 +1,22 @@
 {
-  "version": "1.30.0",
-  "build": 1606,
-  "sourceCommit": "e8cd57f049ba",
+  "version": "1.31.0",
+  "build": 1610,
+  "sourceCommit": "5e434d8f5950",
   "releasedAt": "2026-11-10",
-  "basedOnTag": "v1.29.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/e93e45efc406...e8cd57f049ba",
+  "basedOnTag": "v1.30.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5dc690e57c49...5e434d8f5950",
   "changes": [
     {
-      "shortHash": "2dfc192b",
+      "shortHash": "d847f95d",
       "date": "2026-11-10",
-      "title": "Catálogo de planos que a IA de vendas pode oferecer",
+      "title": "Base de conhecimento e cobertura para a IA de vendas",
       "category": "New"
     },
     {
-      "shortHash": "74cb266c",
+      "shortHash": "ef1a4a03",
       "date": "2026-11-10",
-      "title": "Registra wa_sales_plans no manifesto de dados pessoais",
+      "title": "PrepararFio volta a ser exportada",
       "category": "Fixed"
-    },
-    {
-      "shortHash": "09b2f313",
-      "date": "2026-11-10",
-      "title": "Admin chooses how the phone search works (off, already consulted, paid)",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "e12f718e",
-      "date": "2026-11-10",
-      "title": "The phone scan now answers 409 when paid search is off",
-      "category": "Maintenance"
     }
   ]
 }
