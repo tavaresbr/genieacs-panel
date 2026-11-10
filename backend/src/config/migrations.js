@@ -3737,6 +3737,32 @@ const waSalesPlansTable = (db) => (t) => {
 
 const WA_SALES_PLAN_TABLES = [['wa_sales_plans', waSalesPlansTable]];
 
+/**
+ * A base de conhecimento da IA de vendas (0132): o que a empresa tem de bom
+ * (`vantagem`), como responder a uma dúvida ou objeção (`objecao`, `faq`) e as
+ * palavras (`triggers`, separadas por vírgula) que fazem o item entrar na
+ * conversa. `origin` diz de onde veio: `exemplo` (semente, nunca vale antes de
+ * o operador editar), `manual` ou `sugerida` (aprendizado, só depois de aprovada).
+ * `uses` conta quantas vezes o item foi usado, para o relatório.
+ */
+const waAiKnowledgeTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('kind', 16).notNullable().defaultTo('vantagem');
+  t.string('title', 120).notNullable();
+  t.string('triggers', 300).nullable();
+  t.string('answer', 600).notNullable();
+  t.boolean('active').notNullable().defaultTo(false);
+  t.string('origin', 16).notNullable().defaultTo('manual');
+  t.integer('uses').unsigned().notNullable().defaultTo(0);
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'active'], 'wa_ai_knowledge_active_idx');
+};
+
+const WA_AI_KNOWLEDGE_TABLES = [['wa_ai_knowledge', waAiKnowledgeTable]];
+
 const PUSH_TABLES = [
   ['push_subscriptions', pushSubscriptionsTable],
   ['push_preferences', pushPreferencesTable]
@@ -3794,7 +3820,8 @@ export const SCHEMA_TABLES = [
   ...STATUS_PAGE_TABLES,
   ...REFRESH_TOKEN_TABLES,
   ...PUSH_TABLES,
-  ...WA_SALES_PLAN_TABLES
+  ...WA_SALES_PLAN_TABLES,
+  ...WA_AI_KNOWLEDGE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -7579,6 +7606,20 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       for (const [name, builder] of WA_SALES_PLAN_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
+    /** A base de conhecimento da IA de vendas — ver `WA_AI_KNOWLEDGE_TABLES`. */
+    id: '0132_wa_ai_knowledge',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_ai_knowledge');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of WA_AI_KNOWLEDGE_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
     }

@@ -6,6 +6,7 @@ import { createSecretBox } from '../utils/secretBox.js';
 import { AI_DEFAULT_BASE_URL, AI_DEFAULT_MODEL, normalizeAiBaseUrl } from './waAiClient.js';
 import { AI_PROVIDERS, AI_PROVIDER_ANTHROPIC, AI_PROVIDER_OPENAI, aiProviderOrDefault, isAiProvider } from './waAiAdapters.js';
 import { limparPersona } from '../utils/wa/vendasPrompt.js';
+import { limparLugares } from '../utils/wa/conhecimento.js';
 
 /** A chave da IA, cifrada num contexto só dela. */
 const aiKeyBox = createSecretBox('skygenpanel-wa-ai-key-v1');
@@ -90,7 +91,9 @@ function padroes() {
       workspaceId: '',
       instructions: '',
       // Nome e jeito do atendente nas conversas de venda (ex.: "Ana, simpática e informal").
-      persona: ''
+      persona: '',
+      // Cidades e bairros que a empresa atende; fora da lista a IA chama um atendente.
+      coverage: []
     }
   };
 }
@@ -144,6 +147,8 @@ function lerIa(raw, atual) {
   const instructions = raw.instructions === undefined ? atual.instructions : String(raw.instructions ?? '').trim();
   if (instructions.length > AI_INSTRUCTIONS_MAX) throw invalido('whatsapp.error.invalidBotConfig', 'bot_message_too_long');
   const persona = raw.persona === undefined ? limparPersona(atual.persona) : limparPersona(raw.persona);
+  const coverage = raw.coverage === undefined ? (limparLugares(atual.coverage) ?? []) : limparLugares(raw.coverage);
+  if (coverage === null) throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai_coverage');
   const proximo = {
     enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true,
     suggest: raw.suggest === undefined ? atual.suggest : raw.suggest === true,
@@ -154,7 +159,8 @@ function lerIa(raw, atual) {
     apiKey,
     workspaceId,
     instructions,
-    persona
+    persona,
+    coverage
   };
   // Ligar sem chave seria uma IA que falha a cada mensagem.
   if ((proximo.enabled || proximo.suggest) && !proximo.apiKey) {
