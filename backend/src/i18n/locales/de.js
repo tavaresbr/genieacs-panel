@@ -1281,6 +1281,7 @@ export default {
   'teiah.reconsultDone': "Erneute Abfrage abgeschlossen",
   'teiah.error.limitAdminOnly': "Nur ein Administrator kann das monatliche TeiaH-Limit überschreiten",
   'teiah.error.guardInvalid': "Ungültiger Wert: verwenden Sie eine positive Zahl",
+  'teiah.error.phoneScanOff': "The phone search with paid TeiaH checks is turned off. An administrator can change this in Settings → TeiaH Valid.",
   'teiah.error.limitReached': "Das monatliche TeiaH-Ausgabenlimit ist erreicht (R$ {spent} von R$ {limit}). Nur ein Administrator kann diese Abfrage mit seinem Passwort freigeben.",
   'teiah.error.reportNone': "Dieser Kunde wurde in TeiaH Valid noch nicht abgefragt",
   'teiah.error.reportEmpty': "TeiaH Valid hat für diese Abfrage keinen druckbaren Bericht",

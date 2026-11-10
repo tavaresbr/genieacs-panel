@@ -1277,6 +1277,7 @@ export default {
   'teiah.reconsultDone': "Reconsulta concluida",
   'teiah.error.limitAdminOnly': "Solo un administrador puede superar el límite mensual de TeiaH",
   'teiah.error.guardInvalid': "Valor inválido: use un número positivo",
+  'teiah.error.phoneScanOff': "La búsqueda de teléfonos con consulta paga en TeiaH está desactivada. Un administrador puede cambiarlo en Configuración → TeiaH Valid.",
   'teiah.error.limitReached': "Se alcanzó el límite mensual de gastos con TeiaH (R$ {spent} de R$ {limit}). Solo un administrador, con su contraseña, puede liberar esta consulta.",
   'teiah.error.reportNone': "Este cliente aún no fue consultado en TeiaH Valid",
   'teiah.error.reportEmpty': "TeiaH Valid no tiene informe imprimible de esta consulta",

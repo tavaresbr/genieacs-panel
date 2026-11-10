@@ -1280,6 +1280,7 @@ export default {
   'teiah.reconsultDone': "再照会が完了しました",
   'teiah.error.limitAdminOnly': "TeiaH の月間上限を超えられるのは管理者のみです",
   'teiah.error.guardInvalid': "無効な値です: 正の数を入力してください",
+  'teiah.error.phoneScanOff': "The phone search with paid TeiaH checks is turned off. An administrator can change this in Settings → TeiaH Valid.",
   'teiah.error.limitReached': "TeiaH の月間利用上限に達しました (R$ {spent} / R$ {limit})。この照会を許可できるのは、パスワードを入力した管理者のみです。",
   'teiah.error.reportNone': "この顧客はまだ TeiaH Valid で照会されていません",
   'teiah.error.reportEmpty': "TeiaH Valid にはこの照会の印刷可能なレポートがありません",

@@ -87,7 +87,8 @@ class TeiahController {
         monthlyLimit: body.monthlyLimit,
         priceCpf: body.priceCpf,
         priceAddress: body.priceAddress,
-        alertWorsening: body.alertWorsening
+        alertWorsening: body.alertWorsening,
+        phoneScan: body.phoneScan
       });
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.TEIAH_GUARDS_CHANGED,
@@ -96,7 +97,8 @@ class TeiahController {
           monthlyLimit: guards.monthlyLimit,
           priceCpf: guards.priceCpf,
           priceAddress: guards.priceAddress,
-          alertWorsening: guards.alertWorsening
+          alertWorsening: guards.alertWorsening,
+          phoneScan: guards.phoneScan
         }
       });
       return res.json(createResponse(req.t('teiah.configSaved'), { guards, usage: await TeiahService.monthUsage() }));

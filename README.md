@@ -565,6 +565,10 @@ own password first (checked again by the server):
   again. It stops when the monthly limit is reached.
 - **Risk badge in the WhatsApp conversation.** The attendance card shows the
   risk of the client's last check (no new check is made).
+- **Phone search on TeiaH.** The administrator chooses how *Search phones on
+  TeiaH* (active clients with no phone) works: *only clients already checked
+  in the last 6 months* (the default: it lists the phones TeiaH already gave,
+  no new paid check), *check the missing ones* (paid, as before) or *off*.
 - **Spend spreadsheet.** *Checks and spend* exports the period's checks as
   CSV (date, type, origin, user, status, cost — never the document).
 

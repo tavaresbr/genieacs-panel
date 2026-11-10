@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import {
   teiahAPI,
   type TeiahGuards,
+  type TeiahPhoneScanMode,
   type TeiahReconsultPreview,
   type TeiahReconsultResult,
   type TeiahUsage,
@@ -16,7 +17,7 @@ import { formatMoney } from '@/lib/money'
 import { riskBadge } from '@/lib/teiah'
 import { parseAmountToCents } from '@/lib/utils'
 
-type Form = { monthlyLimit: string; priceCpf: string; priceAddress: string; alertWorsening: boolean }
+type Form = { monthlyLimit: string; priceCpf: string; priceAddress: string; alertWorsening: boolean; phoneScan: TeiahPhoneScanMode }
 
 const asText = (value: number | null) => (value === null ? '' : String(value).replace('.', ','))
 /** What was typed, in reais; NaN when it is not an amount. */
@@ -44,7 +45,7 @@ export function TeiahAdminPanel() {
   const passwordPrompt = usePasswordPrompt()
   const [usage, setUsage] = useState<TeiahUsage | null>(null)
   const [guards, setGuards] = useState<TeiahGuards | null>(null)
-  const [form, setForm] = useState<Form>({ monthlyLimit: '', priceCpf: '', priceAddress: '', alertWorsening: false })
+  const [form, setForm] = useState<Form>({ monthlyLimit: '', priceCpf: '', priceAddress: '', alertWorsening: false, phoneScan: 'consulted' })
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState<TeiahReconsultPreview | null>(null)
   const [previewing, setPreviewing] = useState(false)
@@ -62,7 +63,8 @@ export function TeiahAdminPanel() {
       monthlyLimit: asText(next.guards.monthlyLimit),
       priceCpf: asText(next.guards.priceCpf),
       priceAddress: asText(next.guards.priceAddress),
-      alertWorsening: next.guards.alertWorsening
+      alertWorsening: next.guards.alertWorsening,
+      phoneScan: next.guards.phoneScan ?? 'consulted'
     })
   }, [])
 
@@ -88,7 +90,7 @@ export function TeiahAdminPanel() {
     setSaving(true)
     setError(null)
     try {
-      const res = await teiahAPI.updateGuards({ monthlyLimit: limit, priceCpf, priceAddress, alertWorsening: form.alertWorsening }, password)
+      const res = await teiahAPI.updateGuards({ monthlyLimit: limit, priceCpf, priceAddress, alertWorsening: form.alertWorsening, phoneScan: form.phoneScan }, password)
       if (!res.success || !res.data) {
         setError(res.message || t('settings.teiah.admin.saveFailed'))
         return
@@ -216,6 +218,21 @@ export function TeiahAdminPanel() {
               <span className="text-muted-foreground">{t('settings.teiah.admin.alertHint')}</span>
             </span>
           </label>
+          <div className="sm:col-span-3">
+            <label className="field-label" htmlFor="teiah-phone-scan">{t('settings.teiah.admin.phoneScan')}</label>
+            <select
+              id="teiah-phone-scan"
+              className="modern-input w-full"
+              value={form.phoneScan}
+              onChange={(event) => setForm((current) => ({ ...current, phoneScan: event.target.value as TeiahPhoneScanMode }))}
+              data-testid="teiah-phone-scan"
+            >
+              <option value="consulted">{t('settings.teiah.admin.phoneScanConsulted')}</option>
+              <option value="paid">{t('settings.teiah.admin.phoneScanPaid')}</option>
+              <option value="off">{t('settings.teiah.admin.phoneScanOff')}</option>
+            </select>
+            <p className="field-hint mt-1">{t('settings.teiah.admin.phoneScanHint')}</p>
+          </div>
           <div className="sm:col-span-3">
             <button type="button" className="modern-button" disabled={saving} onClick={() => void save()} data-testid="teiah-guards-save">
               <Icon name="lock" size={16} /> {t('settings.teiah.admin.save')}

@@ -69,6 +69,7 @@ const DEFAULT_GUARDS = Object.freeze({
   priceCpf: 4.99,
   priceAddress: 2.5,
   alertWorsening: false,
+  phoneScan: 'consulted',
   updatedAt: null
 });
 /** What the panel paid this month, one key per month: `teiah_usage_2026-11`. */
@@ -76,6 +77,20 @@ const usageKey = (month) => `teiah_usage_${month}`;
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 /** Past this share of the limit the usage reads as "near". */
 const LIMIT_WARNING_SHARE = 0.8;
+
+/**
+ * "Buscar telefones na TeiaH" (clients with no phone): `off` turns it off,
+ * `consulted` only reads what the panel already holds from the last 6 months
+ * (no new paid call), `paid` also asks the TeiaH about the others.
+ */
+export const PHONE_SCAN_MODES = Object.freeze(['off', 'consulted', 'paid']);
+
+function phoneScanMode(value) {
+  if (!PHONE_SCAN_MODES.includes(value)) {
+    throw new TeiahError('teiah.error.guardInvalid', { code: 'invalid_guard', status: 400 });
+  }
+  return value;
+}
 
 /** What `aluguel` says when the SGP does not: leave it out, or always false/true. */
 export const RENTAL_DEFAULTS = Object.freeze(['omit', 'false', 'true']);
@@ -546,6 +561,7 @@ class TeiahService {
       priceCpf: price(stored.priceCpf, DEFAULT_GUARDS.priceCpf),
       priceAddress: price(stored.priceAddress, DEFAULT_GUARDS.priceAddress),
       alertWorsening: stored.alertWorsening === true,
+      phoneScan: PHONE_SCAN_MODES.includes(stored.phoneScan) ? stored.phoneScan : DEFAULT_GUARDS.phoneScan,
       updatedAt: stored.updatedAt || null
     };
   }
@@ -570,6 +586,7 @@ class TeiahService {
       priceCpf: money(patch.priceCpf, current.priceCpf, 1000),
       priceAddress: money(patch.priceAddress, current.priceAddress, 1000),
       alertWorsening: patch.alertWorsening === undefined ? current.alertWorsening : patch.alertWorsening === true,
+      phoneScan: patch.phoneScan === undefined ? current.phoneScan : phoneScanMode(patch.phoneScan),
       updatedAt: new Date().toISOString()
     };
     await AppState.upsert(GUARDS_KEY, JSON.stringify(next));

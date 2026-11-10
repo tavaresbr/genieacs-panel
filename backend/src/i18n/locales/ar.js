@@ -1272,6 +1272,7 @@ export default {
   'teiah.reconsultDone': "اكتمل الاستعلام من جديد",
   'teiah.error.limitAdminOnly': "المسؤول فقط يمكنه تجاوز الحد الشهري لـ TeiaH",
   'teiah.error.guardInvalid': "قيمة غير صالحة: استخدم رقمًا موجبًا",
+  'teiah.error.phoneScanOff': "The phone search with paid TeiaH checks is turned off. An administrator can change this in Settings → TeiaH Valid.",
   'teiah.error.limitReached': "تم بلوغ حد الإنفاق الشهري لـ TeiaH (R$ {spent} من R$ {limit}). لا يمكن السماح بهذا الاستعلام إلا لمسؤول بكلمة المرور الخاصة به.",
   'teiah.error.reportNone': "لم يتم الاستعلام عن هذا العميل في TeiaH Valid بعد",
   'teiah.error.reportEmpty': "لا يوجد لدى TeiaH Valid تقرير قابل للطباعة لهذا الاستعلام",

@@ -342,6 +342,10 @@ class ContactTeiahService {
    * `applyMany`, after the operator saw `pending`.
    */
   static async scan() {
+    // Only an admin's choice lets this pay for new consultations.
+    if ((await TeiahService.getGuards()).phoneScan !== 'paid') {
+      throw new TeiahError('teiah.error.phoneScanOff', { code: 'teiah_scan_disabled', status: 409 });
+    }
     const candidates = await this.withoutPhone();
     const snapshots = await this.snapshotsByDocument(candidates.map((entry) => entry.document));
     const todo = candidates.filter((entry) => !recent(snapshots.get(entry.document)));
@@ -372,13 +376,17 @@ class ContactTeiahService {
   }
 
   /** The clients with no phone for whom the TeiaH has one, to show before applying. */
-  static async pending() {
+  static async pending({ mode = 'paid' } = {}) {
+    if (mode === 'off') return [];
     const candidates = await this.withoutPhone();
     const snapshots = await this.snapshotsByDocument(candidates.map((entry) => entry.document));
+    // `consulted`: only what the TeiaH said in the last 6 months.
+    const cutoff = Date.now() - STALE_MONTHS * 30 * 86_400_000;
     const rows = [];
     for (const entry of candidates) {
       const teiah = snapshots.get(entry.document);
       if (!teiah?.phones?.length) continue;
+      if (mode === 'consulted' && !(Date.parse(teiah.consultedAt ?? '') >= cutoff)) continue;
       rows.push({ key: entry.key, name: entry.name, phones: teiah.phones, emails: teiah.emails ?? [], consultedAt: teiah.consultedAt ?? null });
       if (rows.length >= PENDING_LIMIT) break;
     }

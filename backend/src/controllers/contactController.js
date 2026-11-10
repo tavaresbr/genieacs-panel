@@ -13,7 +13,7 @@ import { FocusChatError } from '../services/focusChatService.js';
 import ContactInvoiceService from '../services/contactInvoiceService.js';
 import ContactOnboardingService from '../services/contactOnboardingService.js';
 import ContactTeiahService from '../services/contactTeiahService.js';
-import { TeiahError } from '../services/teiahService.js';
+import TeiahService, { TeiahError } from '../services/teiahService.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import SgpService, { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
@@ -367,7 +367,8 @@ class ContactController {
   /** `GET /api/contacts/teiah/phones` — the clients with no phone that the TeiaH has a phone for. */
   static async teiahPending(req, res) {
     try {
-      return res.json(createResponse(req.t('contacts.loaded'), { rows: await ContactTeiahService.pending() }));
+      const mode = (await TeiahService.getGuards()).phoneScan;
+      return res.json(createResponse(req.t('contacts.loaded'), { mode, rows: await ContactTeiahService.pending({ mode }) }));
     } catch (error) {
       return handleError(req, res, error, 'contacts.loadFailed');
     }

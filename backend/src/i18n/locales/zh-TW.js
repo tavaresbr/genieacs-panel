@@ -1280,6 +1280,7 @@ export default {
   'teiah.reconsultDone': "重新查詢已完成",
   'teiah.error.limitAdminOnly': "只有管理員才能超出 TeiaH 每月上限",
   'teiah.error.guardInvalid': "無效的值：請使用正數",
+  'teiah.error.phoneScanOff': "The phone search with paid TeiaH checks is turned off. An administrator can change this in Settings → TeiaH Valid.",
   'teiah.error.limitReached': "已達到 TeiaH 每月支出上限（R$ {spent} / R$ {limit}）。只有管理員輸入密碼後才能允許此查詢。",
   'teiah.error.reportNone': "此客戶尚未在 TeiaH Valid 查詢過",
   'teiah.error.reportEmpty': "TeiaH Valid 沒有此次查詢的可列印報告",

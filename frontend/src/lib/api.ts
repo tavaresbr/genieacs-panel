@@ -4074,6 +4074,8 @@ export interface ContactTeiah {
 }
 
 /** A client with no phone that the TeiaH has a phone for, to show before applying. */
+export type TeiahPhoneScanMode = 'off' | 'consulted' | 'paid'
+
 export interface ContactTeiahPending {
   key: string
   name: string | null
@@ -4270,7 +4272,7 @@ export const contactsAPI = {
     apiClient.post<ContactTeiahApplied & { profile: ContactProfile }>(`/contacts/${encodeURIComponent(key)}/teiah/apply`, {}),
 
   /** The clients with no phone that the TeiaH has a phone for. */
-  teiahPending: () => apiClient.get<{ rows: ContactTeiahPending[] }>('/contacts/teiah/phones'),
+  teiahPending: () => apiClient.get<{ rows: ContactTeiahPending[]; mode?: TeiahPhoneScanMode }>('/contacts/teiah/phones'),
 
   /** Asks the TeiaH about the next clients with no phone (a block at a time). */
   teiahScan: () => apiClient.post<ContactTeiahScan>('/contacts/teiah/phones/scan', {}),
@@ -4733,6 +4735,8 @@ export interface TeiahGuards {
   priceCpf: number
   priceAddress: number
   alertWorsening: boolean
+  /** "Buscar telefones na TeiaH": off, only what was consulted in the last 6 months, or paid checks too. */
+  phoneScan: TeiahPhoneScanMode
   updatedAt: string | null
 }
 

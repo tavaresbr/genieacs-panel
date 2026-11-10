@@ -1280,6 +1280,7 @@ export default {
   'teiah.reconsultDone': "दोबारा जाँच पूरी हुई",
   'teiah.error.limitAdminOnly': "केवल व्यवस्थापक ही TeiaH की मासिक सीमा पार कर सकता है",
   'teiah.error.guardInvalid': "अमान्य मान: धनात्मक संख्या का उपयोग करें",
+  'teiah.error.phoneScanOff': "The phone search with paid TeiaH checks is turned off. An administrator can change this in Settings → TeiaH Valid.",
   'teiah.error.limitReached': "TeiaH की मासिक खर्च सीमा पूरी हो गई है (R$ {spent} / R$ {limit})। केवल व्यवस्थापक अपने पासवर्ड से यह जाँच अनुमत कर सकता है।",
   'teiah.error.reportNone': "इस ग्राहक की TeiaH Valid में अभी तक जाँच नहीं हुई है",
   'teiah.error.reportEmpty': "TeiaH Valid के पास इस जाँच की छापने योग्य रिपोर्ट नहीं है",
