@@ -1283,6 +1283,7 @@ export default {
   'teiah.reconsultDone': "재조회가 완료되었습니다",
   'teiah.error.limitAdminOnly': "관리자만 TeiaH 월 한도를 초과할 수 있습니다",
   'teiah.error.guardInvalid': "잘못된 값입니다: 양수를 입력하세요",
+  'teiah.error.phoneScanOff': "The phone search with paid TeiaH checks is turned off. An administrator can change this in Settings → TeiaH Valid.",
   'teiah.error.limitReached': "TeiaH 월 지출 한도에 도달했습니다 (R$ {spent} / R$ {limit}). 비밀번호를 입력한 관리자만 이 조회를 허용할 수 있습니다.",
   'teiah.error.reportNone': "이 고객은 아직 TeiaH Valid에서 조회되지 않았습니다",
   'teiah.error.reportEmpty': "TeiaH Valid에 이 조회의 인쇄 가능한 보고서가 없습니다",

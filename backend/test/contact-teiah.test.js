@@ -235,11 +235,25 @@ describe('consultar e aplicar na ficha', () => {
 });
 
 describe('a busca em lote dos clientes sem telefone', () => {
+  const modo = (phoneScan) => asTenant(() => TeiahService.saveGuards({ phoneScan }));
+  after(() => modo('consulted'));
+
+  it('por padrão não paga consulta nova: a busca paga fica desligada', async () => {
+    consultas.length = 0;
+    const scan = await call(`${panelUrl}/api/contacts/teiah/phones/scan`, { method: 'POST', ...auth() });
+    assert.equal(scan.status, 409, JSON.stringify(scan.body));
+    assert.equal(scan.body.code, 'teiah_scan_disabled');
+    assert.deepEqual(consultas, []);
+    const lista = await call(`${panelUrl}/api/contacts/teiah/phones`, auth());
+    assert.equal(lista.body.data.mode, 'consulted');
+  });
+
   it('consulta só quem está ativo, sem telefone e com documento; prévia e aplicar', async () => {
     await addContract('L-1', 'Bia Sem Fone', CPF_B);
     await addContract('L-2', 'Carlos Sem Fone', CPF_C);
     await addContract('L-3', 'Diogo Cancelado', CPF_D, { state: 'cancelled' });
     await addContract('L-4', 'Com Número', CPF_D, { phone_e164: '5593955550000' });
+    await modo('paid');
     consultas.length = 0;
 
     const scan = await call(`${panelUrl}/api/contacts/teiah/phones/scan`, { method: 'POST', ...auth() });
@@ -258,6 +272,28 @@ describe('a busca em lote dos clientes sem telefone', () => {
     // A Bia não tem telefone na TeiaH: não aparece. O Carlos tem.
     assert.deepEqual(prévia.body.data.rows.map((row) => row.key), ['L-2']);
     assert.deepEqual(prévia.body.data.rows[0].phones, ['5593988887777']);
+
+    // Só os já consultados nos últimos 6 meses: o Carlos, consultado agora,
+    // continua; com a consulta envelhecida, sai. Desligada, nada aparece.
+    await modo('consulted');
+    assert.deepEqual((await call(`${panelUrl}/api/contacts/teiah/phones`, auth())).body.data.rows.map((row) => row.key), ['L-2']);
+    const envelhecer = (consultedAt) => asTenant(async () => {
+      const db = getDb();
+      const row = await db('sgp_clients').where({ document: CPF_C }).first();
+      const teiah = typeof row.teiah === 'string' ? JSON.parse(row.teiah) : row.teiah;
+      const antes = teiah.consultedAt;
+      teiah.consultedAt = consultedAt;
+      await db('sgp_clients').where({ id: row.id }).update({ teiah: JSON.stringify(teiah) });
+      return antes;
+    });
+    const original = await envelhecer(new Date(Date.now() - 240 * 86_400_000).toISOString());
+    assert.deepEqual((await call(`${panelUrl}/api/contacts/teiah/phones`, auth())).body.data.rows, []);
+    await envelhecer(original);
+    await modo('off');
+    const desligada = await call(`${panelUrl}/api/contacts/teiah/phones`, auth());
+    assert.equal(desligada.body.data.mode, 'off');
+    assert.deepEqual(desligada.body.data.rows, []);
+    await modo('consulted');
 
     const aplicado = await call(`${panelUrl}/api/contacts/teiah/phones/apply`, { method: 'POST', ...auth(), body: { keys: ['L-2', 'L-inexistente'] } });
     assert.equal(aplicado.status, 200, JSON.stringify(aplicado.body));
@@ -536,6 +572,7 @@ describe('funções de administrador: limite, piora do risco e reconsulta', () =
     assert.equal(errada.body.code, 'password_incorrect');
     const invalida = await guardas({ priceCpf: -1, password: SENHA_ADMIN });
     assert.equal(invalida.status, 400);
+    assert.equal((await guardas({ phoneScan: 'sempre', password: SENHA_ADMIN })).status, 400);
     assert.equal(invalida.body.code, 'invalid_guard');
     const certa = await guardas({ monthlyLimit: 100, priceCpf: 5, alertWorsening: true, password: SENHA_ADMIN });
     assert.equal(certa.status, 200, JSON.stringify(certa.body));

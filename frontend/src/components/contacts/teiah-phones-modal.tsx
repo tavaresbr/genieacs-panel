@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { contactsAPI, type ContactTeiahPending } from '@/lib/api'
+import { contactsAPI, type ContactTeiahPending, type TeiahPhoneScanMode } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -16,6 +16,8 @@ export function TeiahPhonesModal({ onClose, onApplied }: { onClose: () => void; 
   const { t, formatNumber } = useTranslation()
   const toast = useToast()
   const [rows, setRows] = useState<ContactTeiahPending[] | null>(null)
+  // The admin's choice: off, only what was consulted in the last 6 months, or paid checks too.
+  const [mode, setMode] = useState<TeiahPhoneScanMode>('paid')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [scanning, setScanning] = useState(false)
   const [progress, setProgress] = useState<{ done: number; remaining: number | null } | null>(null)
@@ -36,6 +38,7 @@ export function TeiahPhonesModal({ onClose, onApplied }: { onClose: () => void; 
       return
     }
     setRows(res.data.rows)
+    setMode(res.data.mode ?? 'paid')
     setSelected(new Set(res.data.rows.map((row) => row.key)))
   }, [t, toast])
 
@@ -102,7 +105,14 @@ export function TeiahPhonesModal({ onClose, onApplied }: { onClose: () => void; 
         <h2 id="teiah-phones-title" className="section-heading">{t('contacts.teiahPhones.title')}</h2>
         <p className="field-hint mt-1">{t('contacts.teiahPhones.intro')}</p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        {mode !== 'paid' && (
+          <p className="mt-3 flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm" role="note" data-testid="teiah-phones-mode">
+            <Icon name="info" size={16} />
+            <span>{t(mode === 'off' ? 'contacts.teiahPhones.modeOff' : 'contacts.teiahPhones.modeConsulted')}</span>
+          </p>
+        )}
+
+        {mode === 'paid' && <div className="mt-4 flex flex-wrap items-center gap-2">
           {scanning ? (
             <button type="button" className="modern-button-secondary" onClick={() => { stop.current = true }}>
               <Icon name="stop" size={16} /> {t('contacts.teiahPhones.stop')}
@@ -118,7 +128,7 @@ export function TeiahPhonesModal({ onClose, onApplied }: { onClose: () => void; 
               {t('contacts.teiahPhones.progress', { done: formatNumber(progress.done), remaining: formatNumber(progress.remaining ?? 0) })}
             </span>
           )}
-        </div>
+        </div>}
 
         <div className="mt-4">
           {rows === null && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
