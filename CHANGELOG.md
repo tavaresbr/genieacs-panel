@@ -7,6 +7,23 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.30.0] - 2026-11-10
+
+### New
+
+- Catálogo de planos que a IA de vendas pode oferecer (`2dfc192b`)
+
+### Fixed
+
+- Registra wa_sales_plans no manifesto de dados pessoais (`74cb266c`)
+
+### Maintenance
+
+- Admin chooses how the phone search works (off, already consulted, paid) (`09b2f313`)
+- The phone scan now answers 409 when paid search is off (`e12f718e`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/e93e45efc406...e8cd57f049ba)
+
 ## [1.29.0] - 2026-11-10
 
 ### New
