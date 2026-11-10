@@ -6385,6 +6385,8 @@ export interface BotAiConfig {
   instructions: string
   /** Nome e jeito do atendente nas conversas de venda. */
   persona: string
+  /** Cidades e bairros atendidos; fora da lista a IA chama um atendente. */
+  coverage: string[]
   hasApiKey: boolean
   /** O id de workspace enviado à Anthropic quando a chave não pertence a um; vazio na maioria dos casos. */
   workspaceId: string
@@ -6404,6 +6406,7 @@ export interface BotAiInput {
   model?: string
   instructions?: string
   persona?: string
+  coverage?: string[]
   apiKey?: string
   workspaceId?: string
 }
@@ -6494,6 +6497,23 @@ export interface SalesPlan {
 
 export type SalesPlanInput = Partial<Omit<SalesPlan, 'id' | 'sgpPlanId'>>
 
+/** Um item da base de conhecimento da IA de vendas. */
+export type AiKnowledgeKind = 'vantagem' | 'objecao' | 'faq'
+
+export interface AiKnowledgeItem {
+  id: number
+  kind: AiKnowledgeKind
+  title: string
+  triggers: string
+  answer: string
+  active: boolean
+  /** `exemplo` não vale até ser editado. */
+  origin: 'exemplo' | 'manual' | 'sugerida'
+  uses: number
+}
+
+export type AiKnowledgeInput = Partial<Pick<AiKnowledgeItem, 'kind' | 'title' | 'triggers' | 'answer' | 'active'>>
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
@@ -6527,6 +6547,11 @@ export const whatsappAPI = {
   /** A IA melhora um texto do bot; nada é gravado, o texto volta para a caixa. */
   improveBotMessage: (payload: { key: BotMessageKey; text: string }) =>
     apiClient.post<{ text: string }>('/whatsapp/bot-config/ai-improve-message', payload),
+
+  listAiKnowledge: () => apiClient.get<AiKnowledgeItem[]>('/whatsapp/ai-knowledge'),
+  createAiKnowledge: (input: AiKnowledgeInput) => apiClient.post<AiKnowledgeItem>('/whatsapp/ai-knowledge', input),
+  updateAiKnowledge: (id: number, input: AiKnowledgeInput) => apiClient.put<AiKnowledgeItem>(`/whatsapp/ai-knowledge/${id}`, input),
+  deleteAiKnowledge: (id: number) => apiClient.delete<null>(`/whatsapp/ai-knowledge/${id}`),
 
   listSalesPlans: () => apiClient.get<SalesPlan[]>('/whatsapp/sales-plans'),
   createSalesPlan: (input: SalesPlanInput) => apiClient.post<SalesPlan>('/whatsapp/sales-plans', input),

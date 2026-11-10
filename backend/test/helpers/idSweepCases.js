@@ -145,6 +145,23 @@ export const casos = [
     tabela: 'wa_templates'
   },
   {
+    // Um item da base de conhecimento da IA de vendas. O id do vizinho dá 404
+    // antes de qualquer validação do corpo.
+    chave: 'aiKnowledge',
+    label: 'PUT /api/whatsapp/ai-knowledge/:id',
+    method: 'PUT',
+    path: (id) => `/api/whatsapp/ai-knowledge/${id}`,
+    body: { title: 'Outro título' },
+    tabela: 'wa_ai_knowledge'
+  },
+  {
+    chave: 'aiKnowledge',
+    label: 'DELETE /api/whatsapp/ai-knowledge/:id',
+    method: 'DELETE',
+    path: (id) => `/api/whatsapp/ai-knowledge/${id}`,
+    tabela: 'wa_ai_knowledge'
+  },
+  {
     // O plano do catálogo da IA de vendas: o preço que a IA cita é decisão de
     // cada provedor. O id do vizinho dá 404 antes de qualquer validação do corpo.
     chave: 'salesPlan',

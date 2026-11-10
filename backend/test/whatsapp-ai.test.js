@@ -443,6 +443,39 @@ describe('a IA atendendo', () => {
   });
 
   describe('vendas: registrar_interesse_comercial', () => {
+    it('a base de conhecimento e a cobertura entram no prompt de quem não é cliente', async () => {
+      const { default: WaAiKnowledgeService } = await import('../src/services/waAiKnowledgeService.js');
+      const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
+      const ids = [];
+      try {
+        for (const dados of [
+          { kind: 'vantagem', title: 'Suporte', answer: 'Atendemos de segunda a domingo.' },
+          { kind: 'objecao', title: 'Acha caro', triggers: 'caro, preço alto', answer: 'O plano inclui Wi-Fi 6 e suporte.' },
+          { kind: 'objecao', title: 'Cai', triggers: 'cai, instável', answer: 'Rede em fibra monitorada.' }
+        ]) ids.push((await asTenant(() => WaAiKnowledgeService.create(dados))).id);
+        await asTenant(() => WaBotConfigService.saveConfig({ ai: { coverage: ['Itaituba', 'Moraes Almeida'] } }));
+
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'Entendo!' }];
+        await receber(DESCONHECIDO, 'achei o preço alto');
+        const sistema = pedidosIa.at(-1).payload.messages[0].content;
+        assert.match(sistema, /Base de conhecimento da empresa/);
+        assert.match(sistema, /Atendemos de segunda a domingo/, 'vantagens sempre');
+        assert.match(sistema, /O plano inclui Wi-Fi 6/, 'objeção com gatilho');
+        assert.doesNotMatch(sistema, /Rede em fibra monitorada/, 'sem o gatilho, fora');
+        assert.match(sistema, /Lugares atendidos pela empresa: Itaituba, Moraes Almeida/);
+        assert.match(sistema, /não confirme nem negue/);
+
+        await limparFio(ASSINANTE);
+        roteiro = [{ content: 'Oi!' }];
+        await receber(ASSINANTE, 'oi');
+        assert.doesNotMatch(pedidosIa.at(-1).payload.messages[0].content, /Base de conhecimento da empresa|Lugares atendidos/, 'cliente identificado não recebe');
+      } finally {
+        for (const id of ids) await asTenant(() => WaAiKnowledgeService.remove(id));
+        await asTenant(() => WaBotConfigService.saveConfig({ ai: { coverage: [] } }));
+      }
+    });
+
     it('com planos no catálogo, a IA ganha consultar_planos e recebe no máximo dois, sem o inativo', async () => {
       const { default: WaSalesPlanService } = await import('../src/services/waSalesPlanService.js');
       const ids = [];

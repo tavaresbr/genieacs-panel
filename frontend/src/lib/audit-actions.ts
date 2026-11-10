@@ -106,6 +106,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'whatsapp.broadcast_status': 'audit.action.whatsappBroadcastStatus',
   'whatsapp.template_changed': 'audit.action.whatsappTemplateChanged',
   'whatsapp.sales_plan_changed': 'audit.action.whatsappSalesPlanChanged',
+  'whatsapp.ai_knowledge_changed': 'audit.action.whatsappAiKnowledgeChanged',
   'whatsapp.meta_settings_saved': 'audit.action.whatsappMetaSettingsSaved',
   'whatsapp.config_saved': 'audit.action.whatsappConfigSaved',
   'whatsapp.account_changed': 'audit.action.whatsappAccountChanged',

@@ -151,6 +151,10 @@ async function semear(tenantId, slug) {
       name: 'segunda-via', body: 'Olá {{nome}}', category: 'cobranca', active: true
     });
 
+    alvo.aiKnowledge = await semearLinha('wa_ai_knowledge', {
+      kind: 'vantagem', title: 'Suporte', answer: 'Atendemos todos os dias.', active: true, origin: 'manual'
+    });
+
     alvo.salesPlan = await semearLinha('wa_sales_plans', {
       name: 'Fibra 300', profile: 'equilibrado', price_cents: 8990, active: true
     });

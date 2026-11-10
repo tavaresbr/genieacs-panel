@@ -102,6 +102,8 @@ export const SCOPED_TABLES = new Set([
   'wa_templates',
   // Os planos que a IA de vendas oferece: preço e perfil são de cada provedor.
   'wa_sales_plans',
+  // O que a IA de vendas sabe da empresa: vantagens, objeções e perguntas frequentes.
+  'wa_ai_knowledge',
   // Os modelos aprovados na conta da Meta de cada número oficial.
   'wa_meta_templates',
   'wa_broadcasts',
