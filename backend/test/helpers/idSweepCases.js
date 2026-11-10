@@ -145,6 +145,23 @@ export const casos = [
     tabela: 'wa_templates'
   },
   {
+    // O plano do catálogo da IA de vendas: o preço que a IA cita é decisão de
+    // cada provedor. O id do vizinho dá 404 antes de qualquer validação do corpo.
+    chave: 'salesPlan',
+    label: 'PUT /api/whatsapp/sales-plans/:id',
+    method: 'PUT',
+    path: (id) => `/api/whatsapp/sales-plans/${id}`,
+    body: { priceCents: 9990 },
+    tabela: 'wa_sales_plans'
+  },
+  {
+    chave: 'salesPlan',
+    label: 'DELETE /api/whatsapp/sales-plans/:id',
+    method: 'DELETE',
+    path: (id) => `/api/whatsapp/sales-plans/${id}`,
+    tabela: 'wa_sales_plans'
+  },
+  {
     // A edição de uma campanha de aviso. O id do vizinho tem que dar 404 antes
     // de qualquer validação do corpo. No controle, o id do próprio beta dá 409
     // (a campanha semeada é de cobrança, e só a de aviso se edita): o 409 só

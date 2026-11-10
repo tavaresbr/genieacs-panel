@@ -3711,6 +3711,32 @@ const pushPreferencesTable = (db) => (t) => {
   t.unique(['tenant_id', 'user_id'], 'push_preferences_user_uq');
 };
 
+/**
+ * O catálogo de planos que a IA de vendas pode oferecer (0131). Um plano é uma
+ * linha do provedor: nome, velocidade, preço em centavos, o que inclui e o
+ * `profile` (econômico, equilibrado ou premium), que decide quais dois a IA
+ * mostra a cada tipo de cliente. `sgp_plan_id` guarda o id do SGP quando o
+ * plano veio da importação dos nomes. Escopada: preço é decisão de cada ISP.
+ */
+const waSalesPlansTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('name', 80).notNullable();
+  t.integer('speed_mbps').unsigned().nullable();
+  t.integer('price_cents').unsigned().nullable();
+  t.string('includes', 300).nullable();
+  t.string('profile', 16).notNullable().defaultTo('equilibrado');
+  t.boolean('active').notNullable().defaultTo(true);
+  t.integer('sort_order').notNullable().defaultTo(0);
+  t.integer('sgp_plan_id').unsigned().nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'name'], 'wa_sales_plans_name_uq');
+};
+
+const WA_SALES_PLAN_TABLES = [['wa_sales_plans', waSalesPlansTable]];
+
 const PUSH_TABLES = [
   ['push_subscriptions', pushSubscriptionsTable],
   ['push_preferences', pushPreferencesTable]
@@ -3767,7 +3793,8 @@ export const SCHEMA_TABLES = [
   ...ADDON_TABLES,
   ...STATUS_PAGE_TABLES,
   ...REFRESH_TOKEN_TABLES,
-  ...PUSH_TABLES
+  ...PUSH_TABLES,
+  ...WA_SALES_PLAN_TABLES
 ].map(([name]) => name);
 
 /**
@@ -7538,6 +7565,20 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       for (const [name, builder] of PUSH_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
+    /** O catálogo de planos da IA de vendas — ver `WA_SALES_PLAN_TABLES`. */
+    id: '0131_wa_sales_plans',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_sales_plans');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of WA_SALES_PLAN_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
     }

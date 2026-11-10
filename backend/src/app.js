@@ -63,6 +63,7 @@ import whatsappRoutes from './routes/whatsapp.js';
 import whatsappMessageRoutes from './routes/whatsappMessages.js';
 import whatsappAlertRoutes from './routes/whatsappAlerts.js';
 import whatsappBillingRoutes from './routes/whatsappBilling.js';
+import whatsappSalesPlanRoutes from './routes/whatsappSalesPlans.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import billingWebhookRoutes from './routes/billingWebhook.js';
 import { BILLING_WEBHOOK_PATH } from './config/billingWebhookPath.js';
@@ -451,6 +452,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);
 app.use('/api/whatsapp', whatsappBillingRoutes);
+app.use('/api/whatsapp', whatsappSalesPlanRoutes);
 app.use('/api/provisioning', provisioningRoutes);
 // As notificações push do app do provedor (0130): só a pessoa logada.
 app.use('/api/push', pushRoutes);

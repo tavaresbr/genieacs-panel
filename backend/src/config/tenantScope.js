@@ -100,6 +100,8 @@ export const SCOPED_TABLES = new Set([
   // run per provider, and stops one provider's ONT outage from suppressing
   // another provider's alert for the same rule.
   'wa_templates',
+  // Os planos que a IA de vendas oferece: preço e perfil são de cada provedor.
+  'wa_sales_plans',
   // Os modelos aprovados na conta da Meta de cada número oficial.
   'wa_meta_templates',
   'wa_broadcasts',

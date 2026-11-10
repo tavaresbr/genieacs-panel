@@ -22,6 +22,8 @@ import {
 } from '../utils/wa/waModeloIa.js';
 import { MENSAGEM_MAX, limparMensagem, mensagemTemContexto, promptDeMensagem } from '../utils/wa/waMensagemIa.js';
 import { blocoVendas, linhaPersona } from '../utils/wa/vendasPrompt.js';
+import { descreverPlano, perfilDoCliente } from '../utils/wa/planosVenda.js';
+import WaSalesPlanService from './waSalesPlanService.js';
 import { getDb, tdb } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { isValidCnpj, isValidCpf, normalizeTaxId } from '../utils/taxId.js';
@@ -103,6 +105,14 @@ const FERRAMENTAS = {
         observacao: { type: 'string', description: 'Algo útil para a equipe comercial, em poucas palavras' }
       },
       required: ['nome'],
+      additionalProperties: false
+    }
+  },
+  consultar_planos: {
+    description: 'Busca no catálogo da empresa os planos (no máximo dois) que mais combinam com o perfil do cliente. Use só depois de entender o que a pessoa precisa, e cite apenas o que voltar daqui.',
+    parameters: {
+      type: 'object',
+      properties: { perfil: { type: 'string', enum: ['economico', 'equilibrado', 'qualidade'], description: 'O que pesa mais para a pessoa, se deu para perceber' } },
       additionalProperties: false
     }
   },
@@ -446,6 +456,10 @@ class WaAiService {
     const { options } = await WaBotConfigService.getConfig();
     const sugestao = modo === 'sugestao';
 
+    // Só oferece a ferramenta se o provedor cadastrou ao menos um plano com preço.
+    const temPlanos = !sugestao && !link?.contract && ai.sales !== false
+      && (await WaSalesPlanService.contarOfereciveis()) > 0;
+
     const nomes = () => {
       const lista = [];
       if (link?.contract) {
@@ -455,6 +469,7 @@ class WaAiService {
       } else if (!sugestao && options.document) {
         lista.push('identificar_cliente');
       }
+      if (temPlanos) lista.push('consultar_planos');
       if (!sugestao && ai.sales !== false) lista.push('registrar_interesse_comercial');
       if (!sugestao) lista.push('transferir_para_atendente');
       return lista;
@@ -539,6 +554,11 @@ class WaAiService {
         }
         case 'liberar_em_confianca':
           return await this.liberar({ conversation, link });
+        case 'consultar_planos': {
+          const planos = await WaSalesPlanService.paraIa(perfilDoCliente(chamada.arguments?.perfil) ? chamada.arguments.perfil : null);
+          if (!planos.length) return { paraModelo: 'Nenhum plano cadastrado para oferecer agora. Não cite preços: diga que um consultor passa os valores.' };
+          return { paraModelo: `Planos para oferecer (cite só estes, no máximo dois, explicando por que combinam):\n${planos.map((p) => `- ${descreverPlano(p)}`).join('\n')}` };
+        }
         case 'registrar_interesse_comercial':
           return await this.registrarInteresse({ conversation, dados: chamada.arguments || {} });
         case 'identificar_cliente':
