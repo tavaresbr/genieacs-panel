@@ -9,6 +9,7 @@ import { TagsManager } from '@/components/whatsapp/tags'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 
 const AI_INSTRUCTIONS_MAX = 4000
+const PERSONA_MAX = 200
 
 /** A ordem em que os textos aparecem na tela: do primeiro contato à despedida. */
 const MESSAGE_KEYS: BotMessageKey[] = [
@@ -205,6 +206,7 @@ export function ChatbotTab() {
           baseUrl: config.ai.baseUrl,
           model: config.ai.model,
           instructions: config.ai.instructions,
+          persona: config.ai.persona,
           ...(aiKey.trim() ? { apiKey: aiKey.trim() } : aiKeyRemove ? { apiKey: '' } : {})
         }
       })
@@ -388,6 +390,18 @@ export function ChatbotTab() {
               <p className="field-hint">{t('settings.chatbot.aiWorkspaceIdHint')}</p>
             </div>
           )}
+          <div>
+            <label htmlFor="bot-ai-persona" className="field-label">{t('settings.chatbot.aiPersona')}</label>
+            <input
+              id="bot-ai-persona"
+              className="modern-input w-full text-sm"
+              maxLength={PERSONA_MAX}
+              value={config.ai.persona}
+              placeholder={t('settings.chatbot.aiPersonaPlaceholder')}
+              onChange={(event) => patchAi({ persona: event.target.value })}
+            />
+            <p className="field-hint">{t('settings.chatbot.aiPersonaHint')}</p>
+          </div>
           <div>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <label htmlFor="bot-ai-instructions" className="field-label mb-0">{t('settings.chatbot.aiInstructions')}</label>
