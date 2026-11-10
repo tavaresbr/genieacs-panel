@@ -156,6 +156,11 @@ function textoDoAnexo(mensagem) {
   return `[${mensagem.direction === 'in' ? 'o cliente enviou' : 'a equipe enviou'} ${o}]`;
 }
 
+/** O que o cliente escreveu nas duas últimas mensagens: com isso a base de conhecimento acha o que responder. */
+function ultimasDoCliente(fio) {
+  return fio.filter((m) => m.role === 'user').slice(-2).map((m) => String(m.content ?? '')).join(' ');
+}
+
 /**
  * O fio na forma que o modelo aceita: abre e fecha com `user`, e nunca tem dois
  * turnos seguidos do mesmo papel. A z.ai recusa o resto com 400 · 1214
@@ -167,12 +172,7 @@ function textoDoAnexo(mensagem) {
  *   quando ele termina em `assistant` (o rascunho para o atendente); sem ela, um
  *   fio que não termina em `user` volta vazio.
  */
-export /** O que o cliente escreveu nas duas últimas mensagens: com isso a base de conhecimento acha o que responder. */
-function ultimasDoCliente(fio) {
-  return fio.filter((m) => m.role === 'user').slice(-2).map((m) => String(m.content ?? '')).join(' ');
-}
-
-function prepararFio(turnos, { fecharComUsuario = null } = {}) {
+export function prepararFio(turnos, { fecharComUsuario = null } = {}) {
   const juntos = [];
   for (const turno of turnos) {
     const conteudo = String(turno?.content ?? '').trim();
