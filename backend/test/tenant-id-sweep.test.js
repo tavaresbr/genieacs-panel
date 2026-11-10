@@ -151,6 +151,10 @@ async function semear(tenantId, slug) {
       name: 'segunda-via', body: 'Olá {{nome}}', category: 'cobranca', active: true
     });
 
+    alvo.salesPlan = await semearLinha('wa_sales_plans', {
+      name: 'Fibra 300', profile: 'equilibrado', price_cents: 8990, active: true
+    });
+
     // O mesmo número nos dois: uma pessoa pode ser assinante dos dois
     // provedores e ter pedido silêncio a um só.
     alvo.tag = await semearLinha('wa_tags', { name: `Etiqueta ${slug}`, color: 'blue' });

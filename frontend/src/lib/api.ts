@@ -6476,6 +6476,24 @@ export interface BotReport {
   intents: Record<string, number>
 }
 
+/** Um plano do catálogo que a IA de vendas pode oferecer. */
+export type SalesPlanProfile = 'economico' | 'equilibrado' | 'premium'
+
+export interface SalesPlan {
+  id: number
+  name: string
+  speedMbps: number | null
+  /** Em centavos; sem preço a IA não oferece o plano. */
+  priceCents: number | null
+  includes: string
+  profile: SalesPlanProfile
+  active: boolean
+  sortOrder: number
+  sgpPlanId: number | null
+}
+
+export type SalesPlanInput = Partial<Omit<SalesPlan, 'id' | 'sgpPlanId'>>
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
@@ -6509,6 +6527,13 @@ export const whatsappAPI = {
   /** A IA melhora um texto do bot; nada é gravado, o texto volta para a caixa. */
   improveBotMessage: (payload: { key: BotMessageKey; text: string }) =>
     apiClient.post<{ text: string }>('/whatsapp/bot-config/ai-improve-message', payload),
+
+  listSalesPlans: () => apiClient.get<SalesPlan[]>('/whatsapp/sales-plans'),
+  createSalesPlan: (input: SalesPlanInput) => apiClient.post<SalesPlan>('/whatsapp/sales-plans', input),
+  updateSalesPlan: (id: number, input: SalesPlanInput) => apiClient.put<SalesPlan>(`/whatsapp/sales-plans/${id}`, input),
+  deleteSalesPlan: (id: number) => apiClient.delete<null>(`/whatsapp/sales-plans/${id}`),
+  /** Traz do SGP só os nomes dos planos; preço e velocidade o operador completa. */
+  importSalesPlansFromSgp: () => apiClient.post<{ imported: number; total: number }>('/whatsapp/sales-plans/import-sgp', {}),
 
   /** Se o botão "Sugerir (IA)" aparece para quem atende. */
   getAiStatus: () =>

@@ -443,6 +443,36 @@ describe('a IA atendendo', () => {
   });
 
   describe('vendas: registrar_interesse_comercial', () => {
+    it('com planos no catálogo, a IA ganha consultar_planos e recebe no máximo dois, sem o inativo', async () => {
+      const { default: WaSalesPlanService } = await import('../src/services/waSalesPlanService.js');
+      const ids = [];
+      try {
+        for (const dados of [
+          { name: 'Essencial', priceCents: 6990, speedMbps: 100, profile: 'economico' },
+          { name: 'Família', priceCents: 8990, speedMbps: 300, profile: 'equilibrado', includes: 'Wi-Fi 6' },
+          { name: 'Gamer', priceCents: 12990, speedMbps: 600, profile: 'premium' },
+          { name: 'Aposentado', priceCents: 4990, profile: 'economico', active: false }
+        ]) ids.push((await asTenant(() => WaSalesPlanService.create(dados))).id);
+
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ tool: 'consultar_planos', args: { perfil: 'economico' }, content: 'Tenho o Essencial e o Família.' }];
+        await receber(DESCONHECIDO, 'quero um plano barato');
+        const primeira = pedidosIa.at(-2);
+        assert.ok(primeira.payload.tools.map((t) => t.function.name).includes('consultar_planos'));
+        const volta = pedidosIa.at(-1).payload.messages.filter((m) => m.role === 'tool').at(-1).content;
+        assert.match(volta, /Essencial — 100 Mega — R\$ 69,90/);
+        assert.match(volta, /Família — 300 Mega — R\$ 89,90 por mês — inclui: Wi-Fi 6/);
+        assert.doesNotMatch(volta, /Gamer|Aposentado/);
+
+        await limparFio(ASSINANTE);
+        roteiro = [{ content: 'Oi!' }];
+        await receber(ASSINANTE, 'oi');
+        assert.ok(!pedidosIa.at(-1).payload.tools.map((t) => t.function.name).includes('consultar_planos'), 'cliente identificado não recebe');
+      } finally {
+        for (const id of ids) await asTenant(() => WaSalesPlanService.remove(id));
+      }
+    });
+
     it('quem não é cliente recebe a conversa de vendas no prompt; cliente identificado não', async () => {
       await limparFio(DESCONHECIDO);
       roteiro = [{ content: 'Oi! De onde você fala?' }];

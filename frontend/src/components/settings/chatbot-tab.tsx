@@ -7,6 +7,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { TagsManager } from '@/components/whatsapp/tags'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
+import { SalesPlansPanel } from '@/components/settings/sales-plans-panel'
 
 const AI_INSTRUCTIONS_MAX = 4000
 const PERSONA_MAX = 200
@@ -443,6 +444,8 @@ export function ChatbotTab() {
           </p>
         </div>
       </section>
+
+      <SalesPlansPanel />
 
       <section className="modern-card p-5 sm:p-6">
         <h2 className="section-heading">{t('settings.chatbot.optionsTitle')}</h2>

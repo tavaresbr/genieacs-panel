@@ -92,6 +92,7 @@ class AuditLog {
     WHATSAPP_DUNNING_RUN: 'whatsapp.dunning_run',
     WHATSAPP_BROADCAST_STATUS: 'whatsapp.broadcast_status',
     WHATSAPP_TEMPLATE_CHANGED: 'whatsapp.template_changed',
+    WHATSAPP_SALES_PLAN_CHANGED: 'whatsapp.sales_plan_changed',
     WHATSAPP_META_SETTINGS_SAVED: 'whatsapp.meta_settings_saved',
     WHATSAPP_CONFIG_SAVED: 'whatsapp.config_saved',
     WHATSAPP_ACCOUNT_CHANGED: 'whatsapp.account_changed',
