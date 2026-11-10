@@ -429,12 +429,14 @@ const CASOS = [
     codigoAceito: 'not_found'
   },
   {
-    // Sem a TeiaH ligada e sem cliente a consultar, a passada acaba vazia.
+    // A busca paga vem desligada por padrão (o administrador escolhe o modo):
+    // passada a guarda de permissão, a resposta é a recusa do modo, 409.
     cap: 'teiah.act',
     label: 'POST /api/contacts/teiah/phones/scan',
     method: 'POST',
     path: () => '/api/contacts/teiah/phones/scan',
-    aceito: [200]
+    aceito: [409],
+    codigoAceito: 'teiah_scan_disabled'
   },
   {
     cap: 'teiah.act',
