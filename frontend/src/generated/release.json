@@ -1,22 +1,16 @@
 {
-  "version": "1.28.17",
-  "build": 1596,
-  "sourceCommit": "bb102cbcea96",
-  "releasedAt": "2026-11-09",
-  "basedOnTag": "v1.28.16",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/beb4e2571bcf...bb102cbcea96",
+  "version": "1.29.0",
+  "build": 1599,
+  "sourceCommit": "5276bef77cab",
+  "releasedAt": "2026-11-10",
+  "basedOnTag": "v1.28.17",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5e9fa3b09eae...5276bef77cab",
   "changes": [
     {
-      "shortHash": "4531725c",
+      "shortHash": "4f99038a",
       "date": "2026-11-09",
-      "title": "Cliente que fala numa conversa encerrada a reabre, inclusive com a nota da pesquisa",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "515b2b48",
-      "date": "2026-11-09",
-      "title": "Admin-only spend limit, worsening alert, reconsult, WhatsApp risk badge and CSV export",
-      "category": "Maintenance"
+      "title": "Conversa de vendas mais humana para quem ainda não é cliente",
+      "category": "New"
     }
   ]
 }
