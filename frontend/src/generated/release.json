@@ -1,22 +1,16 @@
 {
-  "version": "1.31.0",
-  "build": 1610,
-  "sourceCommit": "5e434d8f5950",
-  "releasedAt": "2026-11-10",
-  "basedOnTag": "v1.30.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5dc690e57c49...5e434d8f5950",
+  "version": "1.32.0",
+  "build": 1613,
+  "sourceCommit": "2e1feb38952a",
+  "releasedAt": "2026-11-11",
+  "basedOnTag": "v1.31.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/1b22e45c5a60...2e1feb38952a",
   "changes": [
     {
-      "shortHash": "d847f95d",
-      "date": "2026-11-10",
-      "title": "Base de conhecimento e cobertura para a IA de vendas",
+      "shortHash": "1c3a6c73",
+      "date": "2026-11-11",
+      "title": "Resultado da venda ao encerrar e relatório Vendas da IA",
       "category": "New"
-    },
-    {
-      "shortHash": "ef1a4a03",
-      "date": "2026-11-10",
-      "title": "PrepararFio volta a ser exportada",
-      "category": "Fixed"
     }
   ]
 }
