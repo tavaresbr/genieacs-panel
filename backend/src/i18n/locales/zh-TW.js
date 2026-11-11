@@ -736,6 +736,7 @@ export default {
   'whatsapp.aiKnowledge.answerRequired': 'Enter the item answer',
   'whatsapp.aiKnowledge.notFound': 'Item not found',
   'whatsapp.aiKnowledge.exampleUnedited': 'Edit the example text before turning it on',
+  'whatsapp.aiKnowledge.placeholder': 'Replace the bracketed text with the real fact before turning it on',
   'whatsapp.lead.invalid': 'Invalid sale outcome',
   'whatsapp.templates.aiDrafted': 'AI 草稿已就緒',
   'whatsapp.templates.aiDraftFailed': 'AI 無法撰寫文字',

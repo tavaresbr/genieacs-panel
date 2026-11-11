@@ -74,6 +74,22 @@ describe('o parser e a validação das sugestões', () => {
   });
 });
 
+describe('aprovar uma sugestão', () => {
+  it('com espaço a preencher entre colchetes não ativa; editada, sim', async () => {
+    resposta = JSON.stringify([{ kind: 'objecao', title: 'Preço do concorrente', triggers: 'concorrente', answer: 'Compare o que inclui; [preencha a condição real].' }]);
+    const c = await venda();
+    await asTenant(() => WaAiLearningService.sugerir(c.id));
+    const { default: WaAiKnowledgeService } = await import('../src/services/waAiKnowledgeService.js');
+    const alvo = (await pendentes()).find((l) => /\[/.test(l.answer));
+    assert.ok(alvo, 'a sugestão traz um espaço a preencher');
+    await assert.rejects(asTenant(() => WaAiKnowledgeService.update(alvo.id, { active: true })), { code: 'ai_knowledge_placeholder' });
+    const aprovada = await asTenant(() => WaAiKnowledgeService.update(alvo.id, { answer: 'Compare o que o plano inclui, sem fidelidade.', active: true }));
+    assert.equal(aprovada.active, true);
+    assert.equal(aprovada.origin, 'sugerida', 'continua marcada como vinda da IA');
+    await assert.rejects(asTenant(() => WaAiKnowledgeService.create({ kind: 'faq', title: 'Prazo', answer: 'Instalamos em [N] dias.' })), { code: 'ai_knowledge_placeholder' });
+  });
+});
+
 describe('sugerir itens para a base depois da venda', () => {
   it('grava sugestões inativas, marcadas como sugeridas, sem mudar o que a IA diz', async () => {
     resposta = JSON_OK;
