@@ -3,6 +3,7 @@ import AddonService from './addonService.js';
 import WaBotConfigService from './waBotConfigService.js';
 import WaAiClient from './waAiClient.js';
 import { mascararSensivel } from '../utils/wa/sensivel.js';
+import { logSafe } from '../utils/logger.js';
 import { TIPOS_DE_CONHECIMENTO, normalizar } from '../utils/wa/conhecimento.js';
 
 const MENSAGENS = 40;
@@ -127,7 +128,7 @@ class WaAiLearningService {
       }
       return gravadas;
     } catch (error) {
-      console.warn(`[wa] IA: sugestões para a base: ${error?.code || error?.message}`);
+      console.warn(`[wa] IA: sugestões para a base: ${JSON.stringify(logSafe(error?.code || error?.message, 200))}`);
       return 0;
     }
   }
