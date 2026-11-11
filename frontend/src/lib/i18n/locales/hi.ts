@@ -1041,6 +1041,8 @@ const hi: Dictionary = {
   'portal.wifi.noSavedPassword': 'अभी सहेजा नहीं गया',
   'portal.wifi.showSavedPassword': 'सहेजा गया पासवर्ड दिखाएँ',
   'portal.wifi.hideSavedPassword': 'सहेजा गया पासवर्ड छिपाएँ',
+  'portal.wifi.reauthLabel': 'देखने के लिए पोर्टल पासवर्ड की पुष्टि करें',
+  'portal.wifi.reauthConfirm': 'दिखाएँ',
   'portal.wifi.savedPasswordHint': 'केवल इस पोर्टल से भेजा गया अंतिम पासवर्ड ही दिखाया जाता है।',
   'portal.wifi.ssidLabel': 'Wi-Fi नाम',
   'portal.wifi.ssidHint': 'अधिकतम 32 अक्षर।',
@@ -1966,6 +1968,7 @@ const hi: Dictionary = {
   'detail.advanced.pass': 'पासवर्ड',
   'detail.advanced.updateSuperadmin': 'superadmin अपडेट करें',
   'detail.advanced.updateUseradmin': 'useradmin अपडेट करें',
+  'detail.advanced.vpNotConfigured': 'वर्चुअल पैरामीटर कॉन्फ़िगर नहीं है। सेटिंग्स › वर्चुअल पैरामीटर में सेट करें।',
 
   // API क्लाइंट के वैकल्पिक संदेश
   'api.requestFailed': 'अनुरोध विफल रहा',
@@ -4039,6 +4042,10 @@ const hi: Dictionary = {
   'audit.actorKind.platform': 'प्लेटफ़ॉर्म',
   'audit.actorKind.system': 'सिस्टम',
   'audit.action.portalPasswordRevealed': 'पोर्टल का पासवर्ड देखा गया',
+  'audit.action.portalCustomerLocked': 'असफल प्रयासों के बाद ग्राहक पोर्टल लॉक हुआ',
+  'audit.action.portalCustomerWifiUpdated': 'ग्राहक ने पोर्टल में Wi-Fi बदला',
+  'audit.action.portalCustomerWifiRevealed': 'ग्राहक ने सहेजा हुआ Wi-Fi पासवर्ड देखा',
+  'audit.action.portalCustomerTrustUnlock': 'ग्राहक ने पोर्टल में भरोसे पर अनलॉक का अनुरोध किया',
   'audit.action.portalPasswordReset': 'पोर्टल का पासवर्ड रीसेट किया गया',
   'audit.action.genieacsUrlChanged': 'GenieACS का पता बदला गया',
   'audit.action.genieacsAuthChanged': 'GenieACS के क्रेडेंशियल बदले गए',

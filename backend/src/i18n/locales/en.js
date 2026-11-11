@@ -411,6 +411,7 @@ export default {
   'portal.wifiUpdateFailed': 'The WiFi change could not be sent. Try again in a moment.',
   'portal.wifiPasswordReady': 'WiFi password available',
   'portal.wifiPasswordNotSaved': 'The password for this network has never been saved through the portal',
+  'portal.reauthRequired': 'Confirm your portal password to continue.',
   'portal.wifiPasswordRevealFailed': 'The WiFi password could not be revealed. Try again in a moment.',
   'portal.billingUnavailable': 'Invoice lookup is not available on this portal',
   'portal.invoicesReady': 'Invoices available',

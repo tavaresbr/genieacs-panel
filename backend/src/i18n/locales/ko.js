@@ -412,6 +412,7 @@ export default {
   'portal.wifiUpdateFailed': 'Wi-Fi 변경 사항을 전송하지 못했습니다. 잠시 후 다시 시도하십시오.',
   'portal.wifiPasswordReady': 'Wi-Fi 비밀번호를 사용할 수 있습니다',
   'portal.wifiPasswordNotSaved': '이 네트워크의 비밀번호는 포털을 통해 저장된 적이 없습니다',
+  'portal.reauthRequired': '계속하려면 포털 비밀번호를 확인하세요.',
   'portal.wifiPasswordRevealFailed': 'Wi-Fi 비밀번호를 표시하지 못했습니다. 잠시 후 다시 시도하십시오.',
   'portal.billingUnavailable': '이 포털에서는 청구서 조회를 사용할 수 없습니다',
   'portal.invoicesReady': '청구서를 사용할 수 있습니다',

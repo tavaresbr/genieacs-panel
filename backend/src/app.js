@@ -701,6 +701,13 @@ portalApp.get('/api/health', (req, res) => {
 portalApp.use('/api', requestLogger());
 portalApp.use('/api', httpMetrics());
 portalApp.use('/api', resolveTenant);
+// Nada do portal (senha da rede, faturas, dados da conexão) pode ficar em cache
+// de navegador compartilhado ou de proxy.
+portalApp.use('/api/customer', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+  next();
+});
 portalApp.use('/api/customer', customerPortalRoutes);
 portalApp.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: req.t('common.routeNotFound') });

@@ -411,6 +411,7 @@ export default {
   'portal.wifiUpdateFailed': '无法发送 Wi-Fi 修改。请稍候重试。',
   'portal.wifiPasswordReady': 'Wi-Fi 密码可用',
   'portal.wifiPasswordNotSaved': '该网络的密码从未通过门户保存过',
+  'portal.reauthRequired': '请输入门户密码以继续。',
   'portal.wifiPasswordRevealFailed': '无法显示 Wi-Fi 密码。请稍候重试。',
   'portal.billingUnavailable': '该门户不支持账单查询',
   'portal.invoicesReady': '账单可用',

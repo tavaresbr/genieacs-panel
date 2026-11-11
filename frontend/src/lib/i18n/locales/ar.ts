@@ -1041,6 +1041,8 @@ const ar: Dictionary = {
   'portal.wifi.noSavedPassword': 'لم تُحفظ بعد',
   'portal.wifi.showSavedPassword': 'إظهار كلمة المرور المحفوظة',
   'portal.wifi.hideSavedPassword': 'إخفاء كلمة المرور المحفوظة',
+  'portal.wifi.reauthLabel': 'أكّد كلمة مرور البوابة لعرضها',
+  'portal.wifi.reauthConfirm': 'إظهار',
   'portal.wifi.savedPasswordHint': 'تُعرض آخر كلمة مرور أُرسلت عبر هذه البوابة فقط.',
   'portal.wifi.ssidLabel': 'اسم شبكة Wi-Fi',
   'portal.wifi.ssidHint': 'حتى ٣٢ حرفًا.',
@@ -1966,6 +1968,7 @@ const ar: Dictionary = {
   'detail.advanced.pass': 'كلمة المرور',
   'detail.advanced.updateSuperadmin': 'تحديث superadmin',
   'detail.advanced.updateUseradmin': 'تحديث useradmin',
+  'detail.advanced.vpNotConfigured': 'لم يتم إعداد المعامل الافتراضي. حدده في الإعدادات › المعاملات الافتراضية.',
 
   // رسائل احتياطية لعميل الواجهة البرمجية
   'api.requestFailed': 'فشل الطلب',
@@ -4040,6 +4043,10 @@ const ar: Dictionary = {
   'audit.actorKind.platform': 'المنصة',
   'audit.actorKind.system': 'النظام',
   'audit.action.portalPasswordRevealed': 'تم كشف كلمة مرور البوابة',
+  'audit.action.portalCustomerLocked': 'تم قفل بوابة المشترك بعد محاولات فاشلة',
+  'audit.action.portalCustomerWifiUpdated': 'غيّر المشترك شبكة Wi-Fi في البوابة',
+  'audit.action.portalCustomerWifiRevealed': 'كشف المشترك كلمة مرور Wi-Fi المحفوظة',
+  'audit.action.portalCustomerTrustUnlock': 'طلب المشترك فتح الخدمة بالثقة من البوابة',
   'audit.action.portalPasswordReset': 'تمت إعادة تعيين كلمة مرور البوابة',
   'audit.action.genieacsUrlChanged': 'تم تغيير عنوان GenieACS',
   'audit.action.genieacsAuthChanged': 'تم تغيير بيانات اعتماد GenieACS',

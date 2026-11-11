@@ -40,7 +40,7 @@ router.get(
   portalAccountLimiter,
   CustomerPortalController.overview
 );
-router.get(
+router.post(
   '/wifi/:index/password',
   authenticatePortalCustomer,
   portalAccountLimiter,

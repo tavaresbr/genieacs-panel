@@ -1052,6 +1052,8 @@ const en = {
   'portal.wifi.noSavedPassword': 'Not saved yet',
   'portal.wifi.showSavedPassword': 'Show the saved password',
   'portal.wifi.hideSavedPassword': 'Hide the saved password',
+  'portal.wifi.reauthLabel': 'Confirm your portal password to view it',
+  'portal.wifi.reauthConfirm': 'Show',
   'portal.wifi.savedPasswordHint': 'Only the last password sent through this portal is shown.',
   'portal.wifi.ssidLabel': 'WiFi name',
   'portal.wifi.ssidHint': 'Up to 32 characters.',
@@ -1993,6 +1995,7 @@ const en = {
   'detail.advanced.pass': 'Password',
   'detail.advanced.updateSuperadmin': 'Update superadmin',
   'detail.advanced.updateUseradmin': 'Update useradmin',
+  'detail.advanced.vpNotConfigured': 'Virtual parameter not configured. Set it in Settings › Virtual parameters.',
 
   // API client fallbacks
   'api.requestFailed': 'The request failed',
@@ -4033,6 +4036,10 @@ const en = {
   'audit.actorKind.platform': 'platform',
   'audit.actorKind.system': 'system',
   'audit.action.portalPasswordRevealed': 'Portal password revealed',
+  'audit.action.portalCustomerLocked': 'Subscriber portal locked after failed attempts',
+  'audit.action.portalCustomerWifiUpdated': 'Subscriber changed the Wi-Fi in the portal',
+  'audit.action.portalCustomerWifiRevealed': 'Subscriber revealed the saved Wi-Fi password',
+  'audit.action.portalCustomerTrustUnlock': 'Subscriber requested a trust unlock in the portal',
   'audit.action.portalPasswordReset': 'Portal password reset',
   'audit.action.genieacsUrlChanged': 'GenieACS address changed',
   'audit.action.genieacsAuthChanged': 'GenieACS credentials changed',

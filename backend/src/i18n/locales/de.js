@@ -411,6 +411,7 @@ export default {
   'portal.wifiUpdateFailed': 'Die WLAN-Änderung konnte nicht gesendet werden. Versuchen Sie es gleich erneut.',
   'portal.wifiPasswordReady': 'WLAN-Passwort verfügbar',
   'portal.wifiPasswordNotSaved': 'Das Passwort für dieses Netzwerk wurde nie über das Portal gespeichert',
+  'portal.reauthRequired': 'Bestätigen Sie Ihr Portal-Passwort, um fortzufahren.',
   'portal.wifiPasswordRevealFailed': 'Das WLAN-Passwort konnte nicht angezeigt werden. Versuchen Sie es gleich erneut.',
   'portal.billingUnavailable': 'Die Rechnungsabfrage ist in diesem Portal nicht verfügbar',
   'portal.invoicesReady': 'Rechnungen verfügbar',

@@ -136,6 +136,15 @@ WiFi e faturas quando o SGP está ligado.
 
 Não compartilha sessão com o painel, e a origem é verificada (`portalOriginGuard`).
 
+Proteções do login e das ações sensíveis:
+
+- **Trava por conta**: 10 tentativas erradas em 15 minutos travam o ID por 15 minutos
+  (`AccountLockout`, a mesma regra do painel). O operador destrava ao redefinir a senha do portal.
+- **Ver a senha do Wi-Fi salva** pede a senha do portal de novo (`POST /api/customer/wifi/:index/password`).
+- **Trilha**: travas, trocas de Wi-Fi, revelações de senha e pedidos de liberação em confiança
+  entram na tela Auditoria (autor `system`, com o ID do cliente). Nunca senha nem SSID.
+- Respostas do portal saem com `Cache-Control: no-store`.
+
 ---
 
 ## 5. Quem enxerga o quê, por papel

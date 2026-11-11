@@ -410,6 +410,7 @@ export default {
   'portal.wifiUpdateFailed': 'Wi-Fi の変更を送信できませんでした。しばらくしてから再試行してください。',
   'portal.wifiPasswordReady': 'Wi-Fi のパスワードを利用できます',
   'portal.wifiPasswordNotSaved': 'このネットワークのパスワードは、ポータルから保存されたことがありません',
+  'portal.reauthRequired': '続行するにはポータルのパスワードを入力してください。',
   'portal.wifiPasswordRevealFailed': 'Wi-Fi のパスワードを表示できませんでした。しばらくしてから再試行してください。',
   'portal.billingUnavailable': 'このポータルでは請求書の照会を利用できません',
   'portal.invoicesReady': '請求書を利用できます',

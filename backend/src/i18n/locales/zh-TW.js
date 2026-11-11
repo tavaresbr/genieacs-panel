@@ -410,6 +410,7 @@ export default {
   'portal.wifiUpdateFailed': '無法傳送 Wi-Fi 變更。請稍候重試。',
   'portal.wifiPasswordReady': 'Wi-Fi 密碼可用',
   'portal.wifiPasswordNotSaved': '該網路的密碼從未透過入口網站儲存過',
+  'portal.reauthRequired': '請輸入入口網站密碼以繼續。',
   'portal.wifiPasswordRevealFailed': '無法顯示 Wi-Fi 密碼。請稍候重試。',
   'portal.billingUnavailable': '該入口網站不支援帳單查詢',
   'portal.invoicesReady': '帳單可用',

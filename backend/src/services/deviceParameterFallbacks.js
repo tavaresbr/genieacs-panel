@@ -350,8 +350,8 @@ export const WAN_SERVICE_NAMES = /^(?:x_[a-z0-9-]+_)?service_?list$/i;
 /** How many rows a parameter listing hands back at most. */
 const PARAMETER_LIST_LIMIT = 500;
 
-/** Values that are credentials, and so are never shown back. */
-const SECRET_NAMES = /password|passwd|passphrase|secret|presharedkey|keypassphrase|wepkey/i;
+/** Values that are credentials, and so are never shown back. Broad on purpose: `LoginSuperPass` is as much a credential as `Password`. */
+const SECRET_NAMES = /pass|presharedkey|senha|secret|wepkey|key$/i;
 
 /**
  * Every parameter in a GenieACS device document, one row per leaf, filtered

@@ -1052,6 +1052,8 @@ const ru: Dictionary = {
   'portal.wifi.noSavedPassword': 'Ещё не сохранён',
   'portal.wifi.showSavedPassword': 'Показать сохранённый пароль',
   'portal.wifi.hideSavedPassword': 'Скрыть сохранённый пароль',
+  'portal.wifi.reauthLabel': 'Подтвердите пароль портала, чтобы увидеть',
+  'portal.wifi.reauthConfirm': 'Показать',
   'portal.wifi.savedPasswordHint': 'Отображается только последний пароль, отправленный через этот портал.',
   'portal.wifi.ssidLabel': 'Название сети Wi-Fi',
   'portal.wifi.ssidHint': 'До 32 символов.',
@@ -1996,6 +1998,7 @@ const ru: Dictionary = {
   'detail.advanced.pass': 'Пароль',
   'detail.advanced.updateSuperadmin': 'Обновить superadmin',
   'detail.advanced.updateUseradmin': 'Обновить useradmin',
+  'detail.advanced.vpNotConfigured': 'Виртуальный параметр не настроен. Укажите его в Настройки › Виртуальные параметры.',
 
   // Резервные сообщения API-клиента
   'api.requestFailed': 'Запрос не выполнен',
@@ -4039,6 +4042,10 @@ const ru: Dictionary = {
   'audit.actorKind.platform': 'платформа',
   'audit.actorKind.system': 'система',
   'audit.action.portalPasswordRevealed': 'Пароль портала показан',
+  'audit.action.portalCustomerLocked': 'Портал абонента заблокирован после неудачных попыток',
+  'audit.action.portalCustomerWifiUpdated': 'Абонент изменил Wi-Fi в портале',
+  'audit.action.portalCustomerWifiRevealed': 'Абонент показал сохранённый пароль Wi-Fi',
+  'audit.action.portalCustomerTrustUnlock': 'Абонент запросил разблокировку в доверие через портал',
   'audit.action.portalPasswordReset': 'Пароль портала сброшен',
   'audit.action.genieacsUrlChanged': 'Адрес GenieACS изменён',
   'audit.action.genieacsAuthChanged': 'Учётные данные GenieACS изменены',

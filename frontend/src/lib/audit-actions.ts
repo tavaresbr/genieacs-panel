@@ -25,6 +25,10 @@ import type { TranslationKey } from '@/lib/i18n/dictionary'
 export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'portal_password.revealed': 'audit.action.portalPasswordRevealed',
   'portal_password.reset': 'audit.action.portalPasswordReset',
+  'portal_customer.account_locked': 'audit.action.portalCustomerLocked',
+  'portal_customer.wifi_updated': 'audit.action.portalCustomerWifiUpdated',
+  'portal_customer.wifi_revealed': 'audit.action.portalCustomerWifiRevealed',
+  'portal_customer.trust_unlock': 'audit.action.portalCustomerTrustUnlock',
   'genieacs.url_changed': 'audit.action.genieacsUrlChanged',
   'genieacs.auth_changed': 'audit.action.genieacsAuthChanged',
   'genieacs.connection_changed': 'audit.action.genieacsConnectionChanged',

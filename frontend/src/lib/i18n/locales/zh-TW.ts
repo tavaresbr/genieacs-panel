@@ -1050,6 +1050,8 @@ const zhTW: Dictionary = {
   'portal.wifi.noSavedPassword': '尚未儲存',
   'portal.wifi.showSavedPassword': '顯示已儲存的密碼',
   'portal.wifi.hideSavedPassword': '隱藏已儲存的密碼',
+  'portal.wifi.reauthLabel': '請輸入入口網站密碼以檢視',
+  'portal.wifi.reauthConfirm': '顯示',
   'portal.wifi.savedPasswordHint': '僅顯示透過本入口網站送出的最後一組密碼。',
   'portal.wifi.ssidLabel': 'Wi-Fi 名稱',
   'portal.wifi.ssidHint': '最多 32 個字元。',
@@ -1991,6 +1993,7 @@ const zhTW: Dictionary = {
   'detail.advanced.pass': '密碼',
   'detail.advanced.updateSuperadmin': '更新超級管理員',
   'detail.advanced.updateUseradmin': '更新使用者管理員',
+  'detail.advanced.vpNotConfigured': '尚未設定虛擬參數。請在 設定 › 虛擬參數 中設定。',
 
   // API 用戶端的備援提示
   'api.requestFailed': '要求失敗',
@@ -4032,6 +4035,10 @@ const zhTW: Dictionary = {
   'audit.actorKind.platform': '平台',
   'audit.actorKind.system': '系統',
   'audit.action.portalPasswordRevealed': '檢視了入口網站密碼',
+  'audit.action.portalCustomerLocked': '因多次失敗嘗試鎖定用戶入口網站',
+  'audit.action.portalCustomerWifiUpdated': '用戶在入口網站變更了Wi-Fi',
+  'audit.action.portalCustomerWifiRevealed': '用戶檢視了已儲存的Wi-Fi密碼',
+  'audit.action.portalCustomerTrustUnlock': '用戶在入口網站申請了信任解鎖',
   'audit.action.portalPasswordReset': '重設了入口網站密碼',
   'audit.action.genieacsUrlChanged': '變更了 GenieACS 位址',
   'audit.action.genieacsAuthChanged': '變更了 GenieACS 憑證',
