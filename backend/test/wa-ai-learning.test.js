@@ -94,8 +94,10 @@ describe('sugerir itens para a base depois da venda', () => {
   it('grava sugestões inativas, marcadas como sugeridas, sem mudar o que a IA diz', async () => {
     resposta = JSON_OK;
     const c = await venda();
+    const antes = (await pendentes()).length;
     assert.equal(await asTenant(() => WaAiLearningService.sugerir(c.id)), 2);
-    const linhas = await pendentes();
+    const linhas = (await pendentes()).filter((l) => ['Vizinho paga menos', 'Tem fidelidade?'].includes(l.title));
+    assert.equal((await pendentes()).length, antes + 2);
     assert.equal(linhas.length, 2);
     assert.ok(linhas.every((l) => !l.active && l.origin === 'sugerida'));
     const { default: WaAiKnowledgeService } = await import('../src/services/waAiKnowledgeService.js');
