@@ -411,6 +411,7 @@ export default {
   'portal.wifiUpdateFailed': 'La modification du Wi-Fi n’a pas pu être envoyée. Réessayez dans un instant.',
   'portal.wifiPasswordReady': 'Mot de passe Wi-Fi disponible',
   'portal.wifiPasswordNotSaved': 'Le mot de passe de ce réseau n’a jamais été enregistré via le portail',
+  'portal.reauthRequired': 'Confirmez le mot de passe du portail pour continuer.',
   'portal.wifiPasswordRevealFailed': 'Le mot de passe Wi-Fi n’a pas pu être affiché. Réessayez dans un instant.',
   'portal.billingUnavailable': 'La consultation des factures n’est pas disponible sur ce portail',
   'portal.invoicesReady': 'Factures disponibles',

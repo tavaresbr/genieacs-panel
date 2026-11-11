@@ -409,6 +409,7 @@ export default {
   'portal.wifiUpdateFailed': 'Wi-Fi बदलाव भेजा नहीं जा सका। थोड़ी देर में फिर कोशिश करें।',
   'portal.wifiPasswordReady': 'Wi-Fi पासवर्ड उपलब्ध है',
   'portal.wifiPasswordNotSaved': 'इस नेटवर्क का पासवर्ड पोर्टल से कभी सहेजा नहीं गया',
+  'portal.reauthRequired': 'जारी रखने के लिए पोर्टल पासवर्ड की पुष्टि करें।',
   'portal.wifiPasswordRevealFailed': 'Wi-Fi पासवर्ड दिखाया नहीं जा सका। थोड़ी देर में फिर कोशिश करें।',
   'portal.billingUnavailable': 'इस पोर्टल पर चालान देखना उपलब्ध नहीं है',
   'portal.invoicesReady': 'चालान उपलब्ध हैं',

@@ -410,6 +410,7 @@ export default {
   'portal.wifiUpdateFailed': 'تعذّر إرسال تغيير Wi-Fi. أعد المحاولة بعد قليل.',
   'portal.wifiPasswordReady': 'كلمة مرور Wi-Fi متاحة',
   'portal.wifiPasswordNotSaved': 'لم تُحفظ كلمة مرور هذه الشبكة عبر البوابة قط',
+  'portal.reauthRequired': 'أكّد كلمة مرور البوابة للمتابعة.',
   'portal.wifiPasswordRevealFailed': 'تعذّر إظهار كلمة مرور Wi-Fi. أعد المحاولة بعد قليل.',
   'portal.billingUnavailable': 'استعلام الفواتير غير متاح في هذه البوابة',
   'portal.invoicesReady': 'الفواتير متاحة',

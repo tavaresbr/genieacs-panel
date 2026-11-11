@@ -408,6 +408,7 @@ export default {
   'portal.wifiUpdateFailed': 'Não foi possível enviar a alteração do WiFi. Tente novamente em instantes.',
   'portal.wifiPasswordReady': 'Senha do WiFi disponível',
   'portal.wifiPasswordNotSaved': 'A senha desta rede nunca foi salva por este portal',
+  'portal.reauthRequired': 'Confirme a senha do portal para continuar.',
   'portal.wifiPasswordRevealFailed': 'Não foi possível exibir a senha do WiFi. Tente novamente em instantes.',
   'portal.billingUnavailable': 'A consulta de faturas não está disponível neste portal',
   'portal.invoicesReady': 'Faturas disponíveis',

@@ -1050,6 +1050,8 @@ const ja: Dictionary = {
   'portal.wifi.noSavedPassword': 'まだ保存されていません',
   'portal.wifi.showSavedPassword': '保存されたパスワードを表示',
   'portal.wifi.hideSavedPassword': '保存されたパスワードを非表示',
+  'portal.wifi.reauthLabel': '表示するにはポータルのパスワードを入力してください',
+  'portal.wifi.reauthConfirm': '表示',
   'portal.wifi.savedPasswordHint': 'このポータルから送信した最後のパスワードのみが表示されます。',
   'portal.wifi.ssidLabel': 'Wi-Fi 名',
   'portal.wifi.ssidHint': '32 文字までです。',
@@ -1991,6 +1993,7 @@ const ja: Dictionary = {
   'detail.advanced.pass': 'パスワード',
   'detail.advanced.updateSuperadmin': 'スーパー管理者を更新',
   'detail.advanced.updateUseradmin': 'ユーザー管理者を更新',
+  'detail.advanced.vpNotConfigured': '仮想パラメータが未設定です。設定 › 仮想パラメータで指定してください。',
 
   // API クライアントの代替メッセージ
   'api.requestFailed': 'リクエストに失敗しました',
@@ -4031,6 +4034,10 @@ const ja: Dictionary = {
   'audit.actorKind.platform': 'プラットフォーム',
   'audit.actorKind.system': 'システム',
   'audit.action.portalPasswordRevealed': 'ポータルのパスワードを表示',
+  'audit.action.portalCustomerLocked': '失敗した試行により加入者ポータルをロック',
+  'audit.action.portalCustomerWifiUpdated': '加入者がポータルでWi-Fiを変更',
+  'audit.action.portalCustomerWifiRevealed': '加入者が保存済みのWi-Fiパスワードを表示',
+  'audit.action.portalCustomerTrustUnlock': '加入者がポータルで信頼解除を申請',
   'audit.action.portalPasswordReset': 'ポータルのパスワードを再設定',
   'audit.action.genieacsUrlChanged': 'GenieACS のアドレスを変更',
   'audit.action.genieacsAuthChanged': 'GenieACS の認証情報を変更',

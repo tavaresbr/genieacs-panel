@@ -411,6 +411,7 @@ export default {
   'portal.wifiUpdateFailed': 'Не удалось отправить изменения Wi-Fi. Повторите попытку чуть позже.',
   'portal.wifiPasswordReady': 'Пароль Wi-Fi доступен',
   'portal.wifiPasswordNotSaved': 'Пароль этой сети ни разу не сохранялся через портал',
+  'portal.reauthRequired': 'Подтвердите пароль портала, чтобы продолжить.',
   'portal.wifiPasswordRevealFailed': 'Не удалось показать пароль Wi-Fi. Повторите попытку чуть позже.',
   'portal.billingUnavailable': 'На этом портале просмотр счетов недоступен',
   'portal.invoicesReady': 'Счета доступны',

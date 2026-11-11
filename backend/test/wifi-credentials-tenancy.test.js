@@ -272,7 +272,9 @@ describe('a portal session, end to end', () => {
 
   it('reveals the password it stored for itself', async () => {
     const { status, body } = await call(`${portalUrl}/api/customer/wifi/1/password`, {
-      headers: { Cookie: cookie }
+      method: 'POST',
+      headers: { Cookie: cookie },
+      body: { password: account.alfa.portalPassword }
     });
     assert.equal(status, 200, JSON.stringify(body));
     assert.equal(body.data.password, 'senha-alfa-rodada');
@@ -288,7 +290,9 @@ describe('a portal session, end to end', () => {
     assert.equal(rotated.status, 200, JSON.stringify(rotated.body));
 
     const { body } = await call(`${portalUrl}/api/customer/wifi/1/password`, {
-      headers: { Cookie: cookie }
+      method: 'POST',
+      headers: { Cookie: cookie },
+      body: { password: account.alfa.portalPassword }
     });
     assert.equal(body.data.password, 'senha-alfa-nova-9');
 

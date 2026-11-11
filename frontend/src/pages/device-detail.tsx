@@ -2464,9 +2464,13 @@ export default function DeviceDetailPage() {
                     <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.superadmin')}</h4>
                     <p className="text-sm text-gray-500 wrap-anywhere">{t('detail.advanced.user')}: {vp.superAdmin?.value || t('common.na')}</p>
                     <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.superPassword?.value ? '******' : t('common.na')}</p>
+                    {!vp.superPassword?.path && (
+                      <p className="mt-2 text-xs text-muted-foreground">{t('detail.advanced.vpNotConfigured')}</p>
+                    )}
                     <button
                       onClick={() => handleOpenCredentialModal('super')}
-                      className="modern-button mt-3"
+                      disabled={!vp.superPassword?.path}
+                      className="modern-button mt-3 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t('detail.advanced.updateSuperadmin')}
                     </button>
@@ -2475,9 +2479,13 @@ export default function DeviceDetailPage() {
                     <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.useradmin')}</h4>
                     <p className="text-sm text-gray-500 wrap-anywhere">{t('detail.advanced.user')}: {vp.userAdmin?.value || t('common.na')}</p>
                     <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.userPassword?.value ? '******' : t('common.na')}</p>
+                    {!vp.userPassword?.path && (
+                      <p className="mt-2 text-xs text-muted-foreground">{t('detail.advanced.vpNotConfigured')}</p>
+                    )}
                     <button
                       onClick={() => handleOpenCredentialModal('user')}
-                      className="modern-button mt-3"
+                      disabled={!vp.userPassword?.path}
+                      className="modern-button mt-3 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t('detail.advanced.updateUseradmin')}
                     </button>

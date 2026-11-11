@@ -1050,6 +1050,8 @@ const es: Dictionary = {
   'portal.wifi.noSavedPassword': 'Aún no guardada',
   'portal.wifi.showSavedPassword': 'Mostrar la contraseña guardada',
   'portal.wifi.hideSavedPassword': 'Ocultar la contraseña guardada',
+  'portal.wifi.reauthLabel': 'Confirme la contraseña del portal para verla',
+  'portal.wifi.reauthConfirm': 'Mostrar',
   'portal.wifi.savedPasswordHint': 'Solo se muestra la última contraseña enviada por este portal.',
   'portal.wifi.ssidLabel': 'Nombre de la red WiFi',
   'portal.wifi.ssidHint': 'Hasta 32 caracteres.',
@@ -1991,6 +1993,7 @@ const es: Dictionary = {
   'detail.advanced.pass': 'Contraseña',
   'detail.advanced.updateSuperadmin': 'Actualizar superadmin',
   'detail.advanced.updateUseradmin': 'Actualizar useradmin',
+  'detail.advanced.vpNotConfigured': 'Parámetro virtual no configurado. Defínalo en Ajustes › Parámetros virtuales.',
 
   // Mensajes del cliente de API
   'api.requestFailed': 'La solicitud falló',
@@ -4031,6 +4034,10 @@ const es: Dictionary = {
   'audit.actorKind.platform': 'plataforma',
   'audit.actorKind.system': 'sistema',
   'audit.action.portalPasswordRevealed': 'Contraseña del portal revelada',
+  'audit.action.portalCustomerLocked': 'Portal del abonado bloqueado por intentos fallidos',
+  'audit.action.portalCustomerWifiUpdated': 'El abonado cambió el Wi-Fi en el portal',
+  'audit.action.portalCustomerWifiRevealed': 'El abonado reveló la contraseña Wi-Fi guardada',
+  'audit.action.portalCustomerTrustUnlock': 'El abonado solicitó un desbloqueo de confianza en el portal',
   'audit.action.portalPasswordReset': 'Contraseña del portal restablecida',
   'audit.action.genieacsUrlChanged': 'Dirección de GenieACS modificada',
   'audit.action.genieacsAuthChanged': 'Credenciales de GenieACS modificadas',

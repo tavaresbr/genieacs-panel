@@ -1,4 +1,6 @@
 import bcrypt from 'bcryptjs';
+import AccountLockout from '../models/AccountLockout.js';
+import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
 import DeviceService from '../services/deviceService.js';
 import DeviceHistoryService from '../services/deviceHistoryService.js';
@@ -497,6 +499,10 @@ class DeviceController {
         );
       }
       const password = await CustomerPortalPasswordService.reset(account.id);
+      // A saída de quem foi trancado por tentativas erradas: o operador provou o cargo.
+      await AccountLockout.clear(
+        AccountLockout.forIdentifier(`portal:${currentTenantId()}:${account.customer_id}`)
+      ).catch(() => {});
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.PORTAL_PASSWORD_RESET,
         subjectType: 'customer_account',

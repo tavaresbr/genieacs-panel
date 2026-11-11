@@ -1,6 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { asTenant, call, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, call, defaultTenantId, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
@@ -205,5 +205,71 @@ describe('operator password reset', () => {
   it('reveals the stored password to an operator', async () => {
     const row = await getDb()('customer_accounts').where({ id: bob.id }).first();
     assert.equal(CustomerPortalPasswordService.reveal(row), bob.password);
+  });
+});
+
+describe('portal account lockout and re-authentication', () => {
+  const carol = { customerId: 'CSG-QRSTUVW-234569', password: null, id: null };
+
+  before(async () => {
+    await createAccount(carol, 3);
+  });
+
+  it('locks the account after repeated wrong passwords, even for the right one', async () => {
+    // O limitador por endereço fecharia antes da trava numa rajada de um IP só;
+    // a trava existe para quem distribui os palpites, então a rajada vem direto
+    // do contador por conta.
+    const AccountLockout = (await import('../src/models/AccountLockout.js')).default;
+    const subject = AccountLockout.forIdentifier(`portal:${await defaultTenantId()}:${carol.customerId}`);
+    for (let i = 0; i < 10; i += 1) {
+      const tentativa = await AccountLockout.attempt(subject);
+      await AccountLockout.failure(tentativa);
+    }
+    const right = await call(`${portalUrl}/api/customer/login`, {
+      method: 'POST',
+      body: { customerId: carol.customerId, password: carol.password }
+    });
+    assert.equal(right.status, 429);
+    assert.equal(right.body.code, 'account_locked');
+  });
+
+  it('is unlocked when the operator resets the portal password', async () => {
+    const AccountLockout = (await import('../src/models/AccountLockout.js')).default;
+    await AccountLockout.clear(
+      AccountLockout.forIdentifier(`portal:${await defaultTenantId()}:${carol.customerId}`)
+    );
+    const { status } = await call(`${portalUrl}/api/customer/login`, {
+      method: 'POST',
+      body: { customerId: carol.customerId, password: carol.password }
+    });
+    assert.equal(status, 200);
+  });
+
+  it('refuses to reveal a Wi-Fi password without the portal password', async () => {
+    const login = await call(`${portalUrl}/api/customer/login`, {
+      method: 'POST',
+      body: { customerId: alice.customerId, password: alice.password }
+    });
+    const cookie = cookieHeader(sessionCookie(login.response));
+    const wrong = await call(`${portalUrl}/api/customer/wifi/1/password`, {
+      method: 'POST',
+      headers: { Cookie: cookie },
+      body: { password: 'WRONGPASS1' }
+    });
+    assert.equal(wrong.status, 401);
+    assert.equal(wrong.body.code, 'reauth_required');
+    const old = await call(`${portalUrl}/api/customer/wifi/1/password`, { headers: { Cookie: cookie } });
+    assert.ok([404, 405].includes(old.status));
+  });
+
+  it('sends no-store on authenticated portal responses', async () => {
+    const login = await call(`${portalUrl}/api/customer/login`, {
+      method: 'POST',
+      body: { customerId: alice.customerId, password: alice.password }
+    });
+    const { response } = await call(`${portalUrl}/api/customer/session`, {
+      headers: { Cookie: cookieHeader(sessionCookie(login.response)) }
+    });
+    assert.match(response.headers.get('cache-control') || '', /no-store/);
   });
 });

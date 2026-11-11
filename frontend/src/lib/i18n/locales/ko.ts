@@ -1050,6 +1050,8 @@ const ko: Dictionary = {
   'portal.wifi.noSavedPassword': '아직 저장되지 않음',
   'portal.wifi.showSavedPassword': '저장된 비밀번호 표시',
   'portal.wifi.hideSavedPassword': '저장된 비밀번호 숨기기',
+  'portal.wifi.reauthLabel': '보려면 포털 비밀번호를 확인하세요',
+  'portal.wifi.reauthConfirm': '보기',
   'portal.wifi.savedPasswordHint': '이 포털을 통해 전송한 마지막 비밀번호만 표시됩니다.',
   'portal.wifi.ssidLabel': 'Wi-Fi 이름',
   'portal.wifi.ssidHint': '최대 32자입니다.',
@@ -1993,6 +1995,7 @@ const ko: Dictionary = {
   'detail.advanced.pass': '비밀번호',
   'detail.advanced.updateSuperadmin': 'superadmin 업데이트',
   'detail.advanced.updateUseradmin': 'useradmin 업데이트',
+  'detail.advanced.vpNotConfigured': '가상 파라미터가 설정되지 않았습니다. 설정 › 가상 파라미터에서 지정하세요.',
 
   // API 클라이언트 폴백
   'api.requestFailed': '요청이 실패했습니다',
@@ -4038,6 +4041,10 @@ const ko: Dictionary = {
   'audit.actorKind.platform': '플랫폼',
   'audit.actorKind.system': '시스템',
   'audit.action.portalPasswordRevealed': '포털 비밀번호 확인',
+  'audit.action.portalCustomerLocked': '실패한 시도로 가입자 포털 잠김',
+  'audit.action.portalCustomerWifiUpdated': '가입자가 포털에서 Wi-Fi를 변경',
+  'audit.action.portalCustomerWifiRevealed': '가입자가 저장된 Wi-Fi 비밀번호 확인',
+  'audit.action.portalCustomerTrustUnlock': '가입자가 포털에서 신뢰 해제를 요청',
   'audit.action.portalPasswordReset': '포털 비밀번호 재설정',
   'audit.action.genieacsUrlChanged': 'GenieACS 주소 변경',
   'audit.action.genieacsAuthChanged': 'GenieACS 자격 증명 변경',

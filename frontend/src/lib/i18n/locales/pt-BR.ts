@@ -1050,6 +1050,8 @@ const ptBR: Dictionary = {
   'portal.wifi.noSavedPassword': 'Ainda não salva',
   'portal.wifi.showSavedPassword': 'Mostrar a senha salva',
   'portal.wifi.hideSavedPassword': 'Ocultar a senha salva',
+  'portal.wifi.reauthLabel': 'Confirme a senha do portal para ver',
+  'portal.wifi.reauthConfirm': 'Mostrar',
   'portal.wifi.savedPasswordHint': 'Somente a última senha enviada por este portal é exibida.',
   'portal.wifi.ssidLabel': 'Nome da rede WiFi',
   'portal.wifi.ssidHint': 'Até 32 caracteres.',
@@ -1991,6 +1993,7 @@ const ptBR: Dictionary = {
   'detail.advanced.pass': 'Senha',
   'detail.advanced.updateSuperadmin': 'Atualizar superadmin',
   'detail.advanced.updateUseradmin': 'Atualizar useradmin',
+  'detail.advanced.vpNotConfigured': 'Parâmetro virtual não configurado. Defina em Configurações › Parâmetros virtuais.',
 
   // Mensagens do cliente de API
   'api.requestFailed': 'A requisição falhou',
@@ -4031,6 +4034,10 @@ const ptBR: Dictionary = {
   'audit.actorKind.platform': 'plataforma',
   'audit.actorKind.system': 'sistema',
   'audit.action.portalPasswordRevealed': 'Senha do portal revelada',
+  'audit.action.portalCustomerLocked': 'Portal do assinante travado por tentativas erradas',
+  'audit.action.portalCustomerWifiUpdated': 'Assinante trocou o Wi-Fi no portal',
+  'audit.action.portalCustomerWifiRevealed': 'Assinante revelou a senha Wi-Fi salva',
+  'audit.action.portalCustomerTrustUnlock': 'Assinante pediu liberação em confiança no portal',
   'audit.action.portalPasswordReset': 'Senha do portal redefinida',
   'audit.action.genieacsUrlChanged': 'Endereço do GenieACS alterado',
   'audit.action.genieacsAuthChanged': 'Credenciais do GenieACS alteradas',

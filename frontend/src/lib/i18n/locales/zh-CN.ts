@@ -1050,6 +1050,8 @@ const zhCN: Dictionary = {
   'portal.wifi.noSavedPassword': '尚未保存',
   'portal.wifi.showSavedPassword': '显示已保存的密码',
   'portal.wifi.hideSavedPassword': '隐藏已保存的密码',
+  'portal.wifi.reauthLabel': '请输入门户密码以查看',
+  'portal.wifi.reauthConfirm': '显示',
   'portal.wifi.savedPasswordHint': '仅显示通过本门户发送的最后一个密码。',
   'portal.wifi.ssidLabel': 'Wi-Fi 名称',
   'portal.wifi.ssidHint': '最多 32 个字符。',
@@ -1991,6 +1993,7 @@ const zhCN: Dictionary = {
   'detail.advanced.pass': '密码',
   'detail.advanced.updateSuperadmin': '更新超级管理员',
   'detail.advanced.updateUseradmin': '更新用户管理员',
+  'detail.advanced.vpNotConfigured': '未配置虚拟参数。请在 设置 › 虚拟参数 中设置。',
 
   // API 客户端的兜底提示
   'api.requestFailed': '请求失败',
@@ -4031,6 +4034,10 @@ const zhCN: Dictionary = {
   'audit.actorKind.platform': '平台',
   'audit.actorKind.system': '系统',
   'audit.action.portalPasswordRevealed': '查看了门户密码',
+  'audit.action.portalCustomerLocked': '因多次失败尝试锁定用户门户',
+  'audit.action.portalCustomerWifiUpdated': '用户在门户中更改了Wi-Fi',
+  'audit.action.portalCustomerWifiRevealed': '用户查看了已保存的Wi-Fi密码',
+  'audit.action.portalCustomerTrustUnlock': '用户在门户中申请了信任解封',
   'audit.action.portalPasswordReset': '重置了门户密码',
   'audit.action.genieacsUrlChanged': '修改了 GenieACS 地址',
   'audit.action.genieacsAuthChanged': '修改了 GenieACS 凭据',

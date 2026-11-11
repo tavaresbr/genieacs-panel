@@ -16,6 +16,25 @@ import Setting from '../models/Setting.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { readDateFormat } from '../utils/dateFormat.js';
+import AccountLockout from '../models/AccountLockout.js';
+import AuditLog from '../models/AuditLog.js';
+
+/**
+ * Uma linha na trilha do provedor sobre o que o ASSINANTE fez no portal. O
+ * autor é o ID do cliente, com `actor_kind: 'system'` (não é operador). Nunca
+ * grava senha nem SSID: só índice da rede e se a senha mudou. Não lança.
+ */
+function auditPortal(req, action, detail, customer = req.customer) {
+  return AuditLog.record({
+    action,
+    actorKind: 'system',
+    actorUsername: customer?.customer_id ?? null,
+    subjectType: 'customer_account',
+    subjectId: customer?.id ?? null,
+    detail,
+    ip: req.ip ?? null
+  });
+}
 
 // Entries are only worth keeping for their 30 second lifetime, so the map is
 // swept whenever it grows past this many customers instead of retaining one
@@ -50,15 +69,52 @@ class CustomerPortalController {
         return res.status(401).json(createErrorResponse(req.t('portal.invalidCredentials'), null, 'invalid_credentials'));
       }
 
+      // A trava por CONTA, a mesma do painel e do portal do afiliado. O limitador
+      // por endereço não segura quem distribui os palpites; este conta pelo alvo.
+      // O sujeito é o mesmo para ID que existe e que não existe (anti-enumeração)
+      // e leva o provedor, porque o mesmo ID pode existir em dois.
+      const tentativa = await AccountLockout.attempt(
+        AccountLockout.forIdentifier(`portal:${currentTenantId()}:${customerId}`)
+      );
+      if (!tentativa.allowed) {
+        if (tentativa.justLocked) {
+          await AuditLog.record({
+            action: AuditLog.ACTIONS.PORTAL_CUSTOMER_LOCKED,
+            actorKind: 'system',
+            actorUsername: customerId,
+            subjectType: 'customer_account',
+            detail: { via: 'portal_login', lockedUntil: new Date(tentativa.lockedUntil).toISOString() },
+            ip: req.ip ?? null
+          });
+        }
+        // O mesmo custo de uma conferência, para a resposta não revelar a trava.
+        await CustomerPortalPasswordService.rejectUnknownAccount(password);
+        return AccountLockout.lockedResponse(req, res, tentativa);
+      }
+
       const account = await CustomerAccount.getByCustomerId(customerId);
       if (!account) {
         await CustomerPortalPasswordService.rejectUnknownAccount(password);
+        await AccountLockout.failure(tentativa);
         return res.status(401).json(createErrorResponse(req.t('portal.invalidCredentials'), null, 'invalid_credentials'));
       }
       if (!(await CustomerPortalPasswordService.verify(account, password))) {
+        const falha = await AccountLockout.failure(tentativa);
+        if (falha.justLocked) {
+          await AuditLog.record({
+            action: AuditLog.ACTIONS.PORTAL_CUSTOMER_LOCKED,
+            actorKind: 'system',
+            actorUsername: customerId,
+            subjectType: 'customer_account',
+            subjectId: account.id,
+            detail: { via: 'portal_login', lockedUntil: new Date(falha.lockedUntil).toISOString() },
+            ip: req.ip ?? null
+          });
+        }
         return res.status(401).json(createErrorResponse(req.t('portal.invalidCredentials'), null, 'invalid_credentials'));
       }
 
+      await AccountLockout.clear(tentativa.subject);
       res.cookie(PORTAL_COOKIE_NAME, signPortalSession(account), portalCookieOptions(req));
       return res.json(createResponse(req.t('portal.loginSuccess'), {
         customerId: account.customer_id
@@ -161,7 +217,7 @@ class CustomerPortalController {
   static async updateWifi(req, res) {
     try {
       const wifiIndex = Number(req.body?.index);
-      const ssid = String(req.body?.ssid ?? '').trim();
+      const ssid = String(req.body?.ssid ?? '').normalize('NFC').trim();
       const password = req.body?.password === undefined
         ? ''
         : String(req.body.password);
@@ -204,6 +260,10 @@ class CustomerPortalController {
       );
       CustomerPortalController.overviewCache.delete(String(req.customer.id));
       DeviceService.invalidateDashboard();
+      await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_WIFI_UPDATED, {
+        index: wifiIndex,
+        passwordChanged: Boolean(password)
+      });
 
       return res.json(createResponse(
         req.t('portal.wifiUpdateQueued'),
@@ -224,12 +284,32 @@ class CustomerPortalController {
     }
   }
 
+  /**
+   * `POST /api/customer/wifi/:index/password` com `{ password }`: a senha do
+   * portal, de novo. Ver a senha da rede em claro é o ato mais sensível do
+   * portal, e a sessão de 30 minutos sozinha não basta (cookie roubado, PC
+   * compartilhado). A conferência passa pela mesma trava por conta do login.
+   */
   static async revealWifiPassword(req, res) {
     try {
       const wifiIndex = Number(req.params?.index);
       if (!Number.isInteger(wifiIndex) || wifiIndex < 1 || wifiIndex > 8) {
         return res.status(400).json(createErrorResponse(req.t('portal.wifiNetworkInvalid'), null, 'invalid_wifi_index'));
       }
+      const typed = String(req.body?.password ?? '').trim().toUpperCase();
+      const tentativa = await AccountLockout.attempt(
+        AccountLockout.forIdentifier(`portal:${currentTenantId()}:${req.customer.customer_id}`)
+      );
+      if (!tentativa.allowed) {
+        await CustomerPortalPasswordService.rejectUnknownAccount(typed);
+        return AccountLockout.lockedResponse(req, res, tentativa);
+      }
+      if (!/^[A-Z0-9]{6,32}$/.test(typed) || !(await CustomerPortalPasswordService.verify(req.customer, typed))) {
+        await AccountLockout.failure(tentativa);
+        return res.status(401).json(createErrorResponse(req.t('portal.reauthRequired'), null, 'reauth_required'));
+      }
+      await AccountLockout.clear(tentativa.subject);
+
       const password = await CustomerWifiCredentialService.reveal(
         req.customer.id,
         wifiIndex
@@ -239,6 +319,7 @@ class CustomerPortalController {
           req.t('portal.wifiPasswordNotSaved'), null, 'wifi_password_not_saved'
         ));
       }
+      await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_WIFI_REVEALED, { index: wifiIndex });
       return res.json(createResponse(req.t('portal.wifiPasswordReady'), { password }, 'wifi_password_ok'));
     } catch (error) {
       console.error('Customer portal WiFi password reveal error:', error);
@@ -300,6 +381,7 @@ class CustomerPortalController {
 
       const { link } = await SgpService.resolveDeviceContract(req.customer.device_id);
       const result = await SgpService.requestTrustUnlock({ contract: link.contract });
+      await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_TRUST_UNLOCK, {});
       return res.json(createResponse(result.message));
     } catch (error) {
       if (error instanceof SgpError) {

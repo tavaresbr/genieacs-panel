@@ -1052,6 +1052,8 @@ const de: Dictionary = {
   'portal.wifi.noSavedPassword': 'Noch nicht gespeichert',
   'portal.wifi.showSavedPassword': 'Gespeichertes Passwort anzeigen',
   'portal.wifi.hideSavedPassword': 'Gespeichertes Passwort verbergen',
+  'portal.wifi.reauthLabel': 'Portal-Passwort zur Anzeige bestätigen',
+  'portal.wifi.reauthConfirm': 'Anzeigen',
   'portal.wifi.savedPasswordHint': 'Es wird nur das zuletzt über dieses Portal gesendete Passwort angezeigt.',
   'portal.wifi.ssidLabel': 'WLAN-Name',
   'portal.wifi.ssidHint': 'Bis zu 32 Zeichen.',
@@ -1994,6 +1996,7 @@ const de: Dictionary = {
   'detail.advanced.pass': 'Passwort',
   'detail.advanced.updateSuperadmin': 'Superadmin aktualisieren',
   'detail.advanced.updateUseradmin': 'Useradmin aktualisieren',
+  'detail.advanced.vpNotConfigured': 'Virtueller Parameter nicht konfiguriert. In Einstellungen › Virtuelle Parameter festlegen.',
 
   // Rückfallmeldungen des API-Clients
   'api.requestFailed': 'Die Anfrage ist fehlgeschlagen',
@@ -4035,6 +4038,10 @@ const de: Dictionary = {
   'audit.actorKind.platform': 'Plattform',
   'audit.actorKind.system': 'System',
   'audit.action.portalPasswordRevealed': 'Portal-Passwort angezeigt',
+  'audit.action.portalCustomerLocked': 'Teilnehmerportal nach Fehlversuchen gesperrt',
+  'audit.action.portalCustomerWifiUpdated': 'Teilnehmer hat das WLAN im Portal geändert',
+  'audit.action.portalCustomerWifiRevealed': 'Teilnehmer hat das gespeicherte WLAN-Passwort angezeigt',
+  'audit.action.portalCustomerTrustUnlock': 'Teilnehmer hat im Portal eine Vertrauensfreischaltung angefordert',
   'audit.action.portalPasswordReset': 'Portal-Passwort zurückgesetzt',
   'audit.action.genieacsUrlChanged': 'GenieACS-Adresse geändert',
   'audit.action.genieacsAuthChanged': 'GenieACS-Zugangsdaten geändert',
