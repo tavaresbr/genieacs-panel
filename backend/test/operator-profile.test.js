@@ -20,8 +20,8 @@ let techToken;
 let techId;
 let adminId;
 let ownerId;
-const TECH = { username: 'tecnico', password: 'tecnico-pass-123', email: 'tecnico@exemplo.test' };
-const ADMIN = { username: 'gerente', password: 'gerente-pass-123', email: 'gerente@exemplo.test' };
+const TECH = { username: 'tecnico', password: 'senha-teste-1111', email: 'tecnico@exemplo.test' };
+const ADMIN = { username: 'gerente', password: 'senha-teste-2222', email: 'gerente@exemplo.test' };
 
 const profile = (id, token, body) => call(`${panelUrl}/api/users/${id}/profile`, {
   method: 'PATCH', headers: authHeaders(token), body
@@ -32,7 +32,7 @@ before(async () => {
   ({ panelUrl } = await startTestServers());
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'dono', password: 'dono-pass-12345', email: 'dono@exemplo.test' }
+    body: { username: 'dono', password: 'senha-teste-3333', email: 'dono@exemplo.test' }
   });
   ownerToken = setup.body.data.token;
   ownerId = setup.body.data.user.id;
