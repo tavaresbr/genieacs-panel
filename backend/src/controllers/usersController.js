@@ -302,33 +302,39 @@ class UsersController {
       // trocar o e-mail de alguém seria o caminho para tomar a conta dela.
       const trocaLogin = nextUsername !== undefined || nextEmail !== undefined;
       let loginMudou = false;
-      if (trocaLogin) {
+      // Os fatos que decidem a recusa são lidos SEMPRE, e o corpo da requisição
+      // só escolhe se a recusa vale — nunca se a pergunta é feita. É a mesma
+      // decisão de antes, escrita de modo que um valor do usuário não controle
+      // uma consulta de segurança (e o CodeQL não precise adivinhar isso).
+      const [daPlataforma, vinculos, conflitoLogin] = await Promise.all([
+        PlatformAdmin.has(id),
+        TenantUser.listForUser(id),
+        User.loginConflict({
+          username: nextUsername === undefined || nextUsername === user.username ? null : nextUsername,
+          email: nextEmail === undefined || nextEmail === (user.email ?? null) ? null : nextEmail,
+          exceptId: id
+        })
+      ]);
+      const problemaLogin = (() => {
         if (presentRole(membership.role) === 'owner' && presentRole(req.user.role) !== 'owner') {
-          return res.status(403).json(createErrorResponse(req.t('users.ownerOnly')));
+          return { status: 403, key: 'users.ownerOnly' };
         }
-        if (id === req.user.userId) {
-          return res.status(400).json(createErrorResponse(req.t('users.loginSelf'), null, 'login_self'));
-        }
-        if (await PlatformAdmin.has(id)) {
-          return res.status(409).json(createErrorResponse(req.t('users.loginPlatform'), null, 'login_platform'));
-        }
-        if ((await TenantUser.listForUser(id)).length > 1) {
-          return res.status(409).json(createErrorResponse(req.t('users.loginElsewhere'), null, 'login_elsewhere'));
-        }
+        if (id === req.user.userId) return { status: 400, key: 'users.loginSelf', code: 'login_self' };
+        if (daPlataforma) return { status: 409, key: 'users.loginPlatform', code: 'login_platform' };
+        if (vinculos.length > 1) return { status: 409, key: 'users.loginElsewhere', code: 'login_elsewhere' };
         if (nextUsername !== undefined && (nextUsername.length < 3 || nextUsername.length > 64)) {
-          return res.status(400).json(createErrorResponse(req.t('auth.usernameLength')));
+          return { status: 400, key: 'auth.usernameLength' };
         }
         if (nextEmail !== undefined && (!nextEmail || !isValidEmail(nextEmail))) {
-          return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+          return { status: 400, key: 'auth.emailInvalid' };
         }
-        const conflito = await User.loginConflict({
-          username: nextUsername === user.username ? null : nextUsername,
-          email: nextEmail === (user.email ?? null) ? null : nextEmail,
-          exceptId: id
-        });
-        if (conflito) {
-          return res.status(409).json(createErrorResponse(req.t('users.loginUnavailable')));
-        }
+        if (conflitoLogin) return { status: 409, key: 'users.loginUnavailable' };
+        return null;
+      })();
+      if (trocaLogin && problemaLogin) {
+        return res.status(problemaLogin.status).json(
+          createErrorResponse(req.t(problemaLogin.key), null, problemaLogin.code)
+        );
       }
 
       if (nextRole !== undefined) {
