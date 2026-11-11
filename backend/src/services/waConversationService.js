@@ -16,6 +16,9 @@ import BillingStatusService from './billingStatusService.js';
 import SgpService from './sgpService.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
+/** Por que uma venda se perdeu, como o atendente marca ao encerrar. */
+export const MOTIVOS_DE_PERDA = Object.freeze(['price', 'competitor', 'no_coverage', 'no_interest', 'other']);
+
 /** How many messages a thread hands back before the caller has to ask for more. */
 const PAGE = 100;
 
@@ -402,6 +405,9 @@ class WaConversationService {
       clientName: extra.clientName ?? null,
       // Encerrar agora mandaria a pesquisa de satisfação? (só a conversa aberta, e só no detalhe)
       surveyOnClose: extra.surveyOnClose ?? false,
+      // A IA entregou esta conversa como venda (interesse registrado), e o resultado, se já dado.
+      leadAt: row.lead_at || null,
+      leadOutcome: row.lead_outcome || null,
       optedOut: extra.optedOut ?? false,
       // Só quando o bloqueio é parcial: os tipos que ele cobre.
       optOutCategories: extra.optOutCategories ?? null,
@@ -692,8 +698,36 @@ class WaConversationService {
    * counterpart lives in `waInboundService` — a customer who writes again
    * reopens their own thread, because an archive cannot answer anybody.
    */
-  static async setStatus(id, status, { userId = null, survey = true } = {}) {
+  /**
+   * O resultado da venda, dito ao encerrar uma conversa que a IA entregou como
+   * venda: `{ outcome: 'won'|'lost'|'unknown', reason?, planId? }`. `unknown` (ou
+   * nada) não grava. O motivo só vale para `lost`, o plano só para `won`, e o
+   * plano tem de ser do catálogo deste provedor.
+   */
+  static async lerResultadoDaVenda(conversation, lead) {
+    if (!lead || typeof lead !== 'object' || lead.outcome === undefined || lead.outcome === 'unknown') return null;
+    const recusa = (codigo, status = 400) => new WaError('whatsapp.lead.invalid', { code: codigo, status });
+    if (!conversation.lead_at) throw recusa('lead_not_a_sale', 409);
+    if (lead.outcome !== 'won' && lead.outcome !== 'lost') throw recusa('lead_outcome_invalid');
+    if (lead.outcome === 'lost') {
+      if (!MOTIVOS_DE_PERDA.includes(lead.reason)) throw recusa('lead_reason_invalid');
+      if (lead.planId !== undefined && lead.planId !== null) throw recusa('lead_plan_only_when_won');
+      return { lead_outcome: 'lost', lead_lost_reason: lead.reason, lead_plan_id: null };
+    }
+    if (lead.reason !== undefined && lead.reason !== null) throw recusa('lead_reason_only_when_lost');
+    let planId = null;
+    if (lead.planId !== undefined && lead.planId !== null) {
+      planId = Number(lead.planId);
+      const existe = Number.isInteger(planId) && await tdb('wa_sales_plans').where({ id: planId }).first('id');
+      if (!existe) throw recusa('lead_plan_invalid');
+    }
+    return { lead_outcome: 'won', lead_lost_reason: null, lead_plan_id: planId };
+  }
+
+  static async setStatus(id, status, { userId = null, survey = true, lead = null } = {}) {
     const conversation = await this.get(id);
+    // Valida antes de encerrar: um resultado inválido não pode deixar a conversa encerrada sem registro.
+    const resultado = status === 'closed' && !conversation.closed_at ? await this.lerResultadoDaVenda(conversation, lead) : null;
     const closing = status === 'closed';
     const wasOpen = !conversation.closed_at;
     // Reopening an open thread and closing a closed one are both writes that
@@ -702,7 +736,8 @@ class WaConversationService {
     const updated = await WaConversation.update(conversation.id, {
       closed_at: closing ? new Date() : null,
       // Encerrada não espera ninguém: sai da fila da distribuição.
-      ...(closing ? { waiting_since: null } : {})
+      ...(closing ? { waiting_since: null } : {}),
+      ...(resultado ?? {})
     });
     // Encerrar de verdade (não o segundo clique) é o momento da pesquisa de
     // satisfação. Ela decide sozinha se pergunta e nunca lança.

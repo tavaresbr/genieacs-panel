@@ -6,6 +6,7 @@ import MetaNumberHealthService from '../services/metaNumberHealthService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
 import WaMarketingOptOutService from '../services/waMarketingOptOutService.js';
 import WaAiService from '../services/waAiService.js';
+import WaSalesReportService from '../services/waSalesReportService.js';
 import WaBotReportService from '../services/waBotReportService.js';
 import WaSatisfactionService from '../services/waSatisfactionService.js';
 import WaResponseTimeService from '../services/waResponseTimeService.js';
@@ -91,6 +92,18 @@ class WhatsAppController {
       return res.json(createResponse(
         req.t('whatsapp.configLoaded'),
         await WaBotReportService.report({ days: Number(req.query?.days) })
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `GET /api/whatsapp/sales-report?days=` — as vendas que a IA entregou e como terminaram. */
+  static async getSalesReport(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('whatsapp.configLoaded'),
+        await WaSalesReportService.report({ days: Number(req.query?.days) })
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');

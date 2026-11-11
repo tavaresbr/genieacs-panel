@@ -8,7 +8,8 @@ const router = express.Router();
 // oferece e por quanto; ler a lista também é configuração, não plantão.
 const gestao = [authenticateToken, requirePermission('whatsapp.config')];
 
-router.get('/sales-plans', ...gestao, WhatsAppSalesPlanController.list);
+// Listar é de quem atende: a janela de encerrar escolhe o plano vendido. Mudar o catálogo é configuração.
+router.get('/sales-plans', authenticateToken, requirePermission('whatsapp.read'), WhatsAppSalesPlanController.list);
 router.post('/sales-plans', ...gestao, WhatsAppSalesPlanController.create);
 // Declarada antes das rotas com `:id`, para `import-sgp` nunca ser lido como id.
 router.post('/sales-plans/import-sgp', ...gestao, WhatsAppSalesPlanController.importFromSgp);

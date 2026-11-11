@@ -94,6 +94,7 @@ class AuditLog {
     WHATSAPP_TEMPLATE_CHANGED: 'whatsapp.template_changed',
     WHATSAPP_SALES_PLAN_CHANGED: 'whatsapp.sales_plan_changed',
     WHATSAPP_AI_KNOWLEDGE_CHANGED: 'whatsapp.ai_knowledge_changed',
+    WHATSAPP_LEAD_OUTCOME: 'whatsapp.lead_outcome',
     WHATSAPP_META_SETTINGS_SAVED: 'whatsapp.meta_settings_saved',
     WHATSAPP_CONFIG_SAVED: 'whatsapp.config_saved',
     WHATSAPP_ACCOUNT_CHANGED: 'whatsapp.account_changed',
