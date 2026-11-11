@@ -4287,6 +4287,7 @@ const en = {
   'platform.member.revokeConfirm': 'End every session of {username}? They will have to sign in again on every device.',
   'platform.member.sessionsRevoked': 'All sessions ended.',
   'audit.action.operatorUpdated': 'Operator account edited by the platform',
+  'audit.action.operatorProfileUpdated': 'Operator record edited',
   'audit.action.operatorPasswordLinkIssued': 'New password link issued by the platform',
   'audit.action.operatorPasswordSet': 'Operator password set by the platform',
   'audit.action.operatorSessionsRevoked': 'Operator sessions ended by the platform',

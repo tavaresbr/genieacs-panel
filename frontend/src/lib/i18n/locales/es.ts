@@ -4285,6 +4285,7 @@ const es: Dictionary = {
   'platform.member.revokeConfirm': '¿Cerrar todas las sesiones de {username}? Tendrá que iniciar sesión de nuevo en todos los dispositivos.',
   'platform.member.sessionsRevoked': 'Todas las sesiones se cerraron.',
   'audit.action.operatorUpdated': 'Cuenta de operador editada por la plataforma',
+  'audit.action.operatorProfileUpdated': 'Registro de operador editado',
   'audit.action.operatorPasswordLinkIssued': 'Enlace de contraseña nuevo generado por la plataforma',
   'audit.action.operatorPasswordSet': 'Contraseña de operador definida por la plataforma',
   'audit.action.operatorSessionsRevoked': 'Sesiones de operador cerradas por la plataforma',

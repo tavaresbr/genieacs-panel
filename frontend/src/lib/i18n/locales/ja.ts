@@ -4285,6 +4285,7 @@ const ja: Dictionary = {
   'platform.member.revokeConfirm': '{username} のすべてのセッションを終了しますか？ すべての端末で再ログインが必要になります。',
   'platform.member.sessionsRevoked': 'すべてのセッションを終了しました。',
   'audit.action.operatorUpdated': 'プラットフォームがオペレーターアカウントを編集',
+  'audit.action.operatorProfileUpdated': 'オペレーター情報を編集',
   'audit.action.operatorPasswordLinkIssued': 'プラットフォームが新しいパスワードリンクを発行',
   'audit.action.operatorPasswordSet': 'プラットフォームがオペレーターのパスワードを設定',
   'audit.action.operatorSessionsRevoked': 'プラットフォームがオペレーターのセッションを終了',

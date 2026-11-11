@@ -66,6 +66,25 @@ export const casos = [
     tabela: 'users'
   },
   {
+    // O cadastro da equipe (CPF, endereço…). O id do vizinho tem que dar 404
+    // antes de qualquer validação: uma recusa de campo já diria que a pessoa
+    // existe. O controle é o próprio operador do beta lendo/editando o seu.
+    // Antes do DELETE, que encerra o vínculo da pessoa semeada.
+    chave: 'user',
+    label: 'GET /api/users/:id/profile',
+    method: 'GET',
+    path: (id) => `/api/users/${id}/profile`,
+    tabela: 'users'
+  },
+  {
+    chave: 'user',
+    label: 'PATCH /api/users/:id/profile',
+    method: 'PATCH',
+    path: (id) => `/api/users/${id}/profile`,
+    body: { jobTitle: 'Técnico' },
+    tabela: 'users'
+  },
+  {
     chave: 'user',
     label: 'DELETE /api/users/:id',
     method: 'DELETE',

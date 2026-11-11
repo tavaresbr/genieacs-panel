@@ -23,6 +23,7 @@ e a divisória está no schema, não numa opinião:
 | --- | --- | --- | --- |
 | Assinante de um ISP (quem tem a ONT) | **o ISP** | **nós** | as 56 tabelas escopadas por `tenant_id` |
 | Operador do painel (quem faz login) | **nós** | — | `users`, `tenant_users` |
+| Cadastro da equipe de um ISP (CPF, endereço, contato, dados de trabalho) | **o ISP** | **nós** | `operator_profiles` (escopada por `tenant_id`; o CPF fica cifrado e só a tela de edição o lê) |
 | Interessado que pediu contato na vitrine | **nós** | — | `leads` |
 | Cadastro fiscal do ISP | **nós** | — | colunas `billing_*` de `tenants` |
 
@@ -76,7 +77,7 @@ história.
 Declaradas uma a uma em `SEM_DADO_DE_ASSINANTE`, cada qual com o motivo escrito ao lado:
 configuração do provedor (`settings`, `app_state`, `map_settings`,
 `tenant_genieacs_connections`, `provisioning_profiles`, `whatsapp_accounts`), catálogo
-(`vendors`, `wifi_security_config`), equipe (`tenant_invites`, `wa_agents`), modelos,
+(`vendors`, `wifi_security_config`), equipe (`tenant_invites`, `wa_agents`, `operator_profiles`), modelos,
 etiquetas e campanhas (`wa_tags`, `wa_templates`, `wa_meta_templates`, `wa_broadcasts` — o
 destinatário sai na tabela de recipients, que está no grupo acima), a conta do provedor
 conosco (`subscriptions`, `billing_events`, `billing_charges`, `billing_invoices`,

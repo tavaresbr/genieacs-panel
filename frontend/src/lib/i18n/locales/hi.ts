@@ -4293,6 +4293,7 @@ const hi: Dictionary = {
   'platform.member.revokeConfirm': '{username} के सभी सत्र समाप्त करें? उसे हर उपकरण पर फिर से लॉग इन करना होगा।',
   'platform.member.sessionsRevoked': 'सभी सत्र समाप्त हो गए।',
   'audit.action.operatorUpdated': 'प्लेटफ़ॉर्म ने ऑपरेटर खाता संपादित किया',
+  'audit.action.operatorProfileUpdated': 'ऑपरेटर रिकॉर्ड संपादित',
   'audit.action.operatorPasswordLinkIssued': 'प्लेटफ़ॉर्म ने नया पासवर्ड लिंक बनाया',
   'audit.action.operatorPasswordSet': 'प्लेटफ़ॉर्म ने ऑपरेटर पासवर्ड सेट किया',
   'audit.action.operatorSessionsRevoked': 'प्लेटफ़ॉर्म ने ऑपरेटर सत्र समाप्त किए',

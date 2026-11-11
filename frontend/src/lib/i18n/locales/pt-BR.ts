@@ -4285,6 +4285,7 @@ const ptBR: Dictionary = {
   'platform.member.revokeConfirm': 'Encerrar todas as sessões de {username}? A pessoa vai ter que entrar de novo em todos os dispositivos.',
   'platform.member.sessionsRevoked': 'Todas as sessões foram encerradas.',
   'audit.action.operatorUpdated': 'Conta de operador editada pela plataforma',
+  'audit.action.operatorProfileUpdated': 'Cadastro de operador editado',
   'audit.action.operatorPasswordLinkIssued': 'Link de senha novo gerado pela plataforma',
   'audit.action.operatorPasswordSet': 'Senha de operador definida pela plataforma',
   'audit.action.operatorSessionsRevoked': 'Sessões de operador encerradas pela plataforma',

@@ -4291,6 +4291,7 @@ const it: Dictionary = {
   'platform.member.revokeConfirm': 'Chiudere tutte le sessioni di {username}? Dovrà accedere di nuovo su tutti i dispositivi.',
   'platform.member.sessionsRevoked': 'Tutte le sessioni sono state chiuse.',
   'audit.action.operatorUpdated': 'Account operatore modificato dalla piattaforma',
+  'audit.action.operatorProfileUpdated': 'Scheda operatore modificata',
   'audit.action.operatorPasswordLinkIssued': 'Nuovo link della password generato dalla piattaforma',
   'audit.action.operatorPasswordSet': 'Password operatore impostata dalla piattaforma',
   'audit.action.operatorSessionsRevoked': 'Sessioni operatore chiuse dalla piattaforma',
