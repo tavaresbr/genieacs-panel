@@ -25,6 +25,8 @@ router.get('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.
 router.put('/marketing-opt-out', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMarketingOptOutConfig);
 // O relatório do bot é leitura de quem atende, não de quem configura.
 router.get('/bot-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getBotReport);
+// As vendas que a IA entregou à equipe e como terminaram.
+router.get('/sales-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getSalesReport);
 // A pesquisa de satisfação: leitura de quem atende, como o relatório do bot.
 router.get('/response-time-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getResponseTimeReport);
 router.get('/satisfaction-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getSatisfactionReport);

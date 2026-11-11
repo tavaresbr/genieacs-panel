@@ -620,6 +620,8 @@ class WaAiService {
       conversationId: conversation.id, body: linhas.join('\n'), isNote: true, userId: null, source: 'bot'
     });
     await WaTagService.tagSales(conversation.id);
+    // É daqui que a conversa passa a contar como venda no relatório, e a pedir o resultado ao encerrar.
+    await tdb('wa_conversations').where({ id: conversation.id }).whereNull('lead_at').update({ lead_at: new Date() });
     // Avisa a equipe pelos canais dos alertas (WhatsApp, e-mail, Telegram), se ligados. Não lança.
     await WaAlertService.notifyEvent({
       rule: 'wa_lead',

@@ -305,8 +305,17 @@ class WhatsAppMessageController {
       const conversation = await WaConversationService.setStatus(req.params?.id, status, {
         userId: req.user?.userId ?? null,
         // Só `false` dispensa a pesquisa; omitido continua como sempre.
-        survey: req.body?.survey !== false
+        survey: req.body?.survey !== false,
+        lead: req.body?.lead ?? null
       });
+      if (status === 'closed' && req.body?.lead?.outcome && req.body.lead.outcome !== 'unknown' && conversation?.leadOutcome) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.WHATSAPP_LEAD_OUTCOME,
+          subjectType: 'conversation',
+          subjectId: String(conversation.id),
+          detail: { outcome: conversation.leadOutcome, reason: req.body.lead.reason ?? null, planId: req.body.lead.planId ?? null }
+        });
+      }
       return res.json(createResponse(
         req.t(status === 'closed' ? 'whatsapp.conversationClosed' : 'whatsapp.conversationReopened'),
         conversation

@@ -8,7 +8,8 @@ import {
   type WhatsAppMetaTemplate,
   type WhatsAppConversation,
   type WhatsAppMessage,
-  type WhatsAppTag
+  type WhatsAppTag,
+  type SaleResult
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { InboxFilterButton, InboxFilterChips } from '@/components/whatsapp/inbox-filters'
@@ -29,6 +30,7 @@ import { ReferralsPanel } from '@/components/whatsapp/referrals-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
+import { SalesReportPanel } from '@/components/whatsapp/sales-report-panel'
 import { SatisfactionPanel } from '@/components/whatsapp/satisfaction-panel'
 import { MetaUsagePanel } from '@/components/whatsapp/meta-usage-panel'
 import { ResponseTimePanel } from '@/components/whatsapp/response-time-panel'
@@ -663,15 +665,15 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
    * the list is asked again rather than patched, since only the server knows
    * whether the row still belongs under the filter on screen.
    */
-  const file = useCallback(async (next: 'open' | 'closed', survey?: boolean) => {
+  const file = useCallback(async (next: 'open' | 'closed', survey?: boolean, lead?: SaleResult) => {
     const id = selectedIdRef.current
     if (id === null) return
     setFiling(true)
     try {
-      const res = await whatsappAPI.setConversationStatus(id, next, { survey })
+      const res = await whatsappAPI.setConversationStatus(id, next, { survey, lead })
       if (!alive.current) return
       if (!res.success || !res.data) {
-        toast.error(whatsappErrorMessage(t, res.code))
+        toast.error(res.message || whatsappErrorMessage(t, res.code))
         return
       }
       if (selectedIdRef.current === id) setConversation(res.data)
@@ -683,17 +685,19 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     }
   }, [t, toast])
 
-  // Encerrar: se a pesquisa de satisfação sairia, pergunta antes (a cada vez);
-  // se não sairia, encerra direto como sempre.
-  const [askSurvey, setAskSurvey] = useState(false)
+  // Encerrar: pergunta antes, a cada vez, se a pesquisa de satisfação sairia e/ou se a
+  // conversa era uma venda da IA ainda sem resultado; sem nenhuma das duas, encerra direto.
+  const [askClose, setAskClose] = useState<{ survey: boolean; sale: boolean } | null>(null)
   const requestFile = useCallback(async (next: 'open' | 'closed') => {
     if (next !== 'closed') { void file(next); return }
     const id = selectedIdRef.current
     if (id === null) return
     try {
       const res = await whatsappAPI.getConversation(id)
-      if (alive.current && selectedIdRef.current === id && res.success && res.data?.surveyOnClose) {
-        setAskSurvey(true)
+      const survey = Boolean(res.data?.surveyOnClose)
+      const sale = Boolean(res.data?.leadAt && !res.data?.leadOutcome)
+      if (alive.current && selectedIdRef.current === id && res.success && (survey || sale)) {
+        setAskClose({ survey, sale })
         return
       }
     } catch {
@@ -1241,11 +1245,13 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
           </section>
         )}
       </div>
-      {askSurvey && (
+      {askClose && (
         <CloseSurveyDialog
           busy={filing}
-          onCancel={() => setAskSurvey(false)}
-          onChoose={(survey) => { setAskSurvey(false); void file('closed', survey) }}
+          survey={askClose.survey}
+          sale={askClose.sale}
+          onCancel={() => setAskClose(null)}
+          onChoose={(survey, lead) => { setAskClose(null); void file('closed', askClose.survey ? survey : undefined, lead) }}
         />
       )}
       {forwarding && (
@@ -1606,6 +1612,7 @@ export default function WhatsAppPage() {
         {tab === 'botReport' && (
           <div className="grid gap-8">
             <BotReportPanel />
+            <SalesReportPanel />
             <ResponseTimePanel />
             <SatisfactionPanel />
             <TagsReportPanel />

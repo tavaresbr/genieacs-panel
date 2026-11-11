@@ -555,6 +555,7 @@ describe('a IA atendendo', () => {
       const etiquetas = await getDb()('wa_conversation_tags as ct').join('wa_tags as t', 't.id', 'ct.tag_id')
         .where('ct.conversation_id', conversa.id).pluck('t.name');
       assert.ok(etiquetas.includes('Venda'), JSON.stringify(etiquetas));
+      assert.ok(conversa.lead_at, 'a conversa passa a contar como venda');
       assert.ok(new Date(conversa.bot_paused_until) > new Date(), 'o bot ficou em pausa');
       const eventos = await getDb()('wa_bot_events').where({ conversation_id: conversa.id, intent: 'lead' });
       assert.equal(eventos.length, 1);

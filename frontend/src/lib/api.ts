@@ -6023,6 +6023,10 @@ export interface WhatsAppConversation {
   clientName: string | null
   /** Closing now would send the satisfaction survey (detail only). */
   surveyOnClose?: boolean
+  /** A IA entregou esta conversa como venda (interesse registrado). */
+  leadAt?: string | null
+  /** Como a venda terminou, quando o atendente já disse. */
+  leadOutcome?: 'won' | 'lost' | null
   /** The contact asked not to be contacted. Replying is still allowed. */
   optedOut: boolean
   /** Pediu para não receber promoção: desde quando e por onde. Só a promoção para. */
@@ -6479,6 +6483,26 @@ export interface BotReport {
   intents: Record<string, number>
 }
 
+/** Como uma venda que a IA entregou terminou, dito ao encerrar a conversa. */
+export type SaleLostReason = 'price' | 'competitor' | 'no_coverage' | 'no_interest' | 'other'
+export type SaleResult =
+  | { outcome: 'won'; planId?: number }
+  | { outcome: 'lost'; reason: SaleLostReason }
+
+/** `GET /whatsapp/sales-report`: as vendas que a IA entregou e como terminaram. */
+export interface SalesReport {
+  days: 7 | 30 | 90
+  leads: number
+  won: number
+  lost: number
+  open: number
+  /** Percentual (0–100, uma casa); null sem leads. */
+  conversionRate: number | null
+  lostReasons: Record<SaleLostReason, number>
+  topPlans: { planId: number; name: string | null; sales: number }[]
+  topKnowledge: { id: number; title: string; kind: string; uses: number }[]
+}
+
 /** Um plano do catálogo que a IA de vendas pode oferecer. */
 export type SalesPlanProfile = 'economico' | 'equilibrado' | 'premium'
 
@@ -6571,6 +6595,9 @@ export const whatsappAPI = {
   /** Um rascunho da IA para a caixa de resposta; nada é enviado. */
   suggestReply: (conversationId: number) =>
     apiClient.post<{ text: string }>(`/whatsapp/conversations/${conversationId}/suggest-reply`, {}),
+
+  getSalesReport: (days: 7 | 30 | 90) =>
+    apiClient.get<SalesReport>(`/whatsapp/sales-report?days=${days}`),
 
   getBotReport: (days: 7 | 30 | 90) =>
     apiClient.get<BotReport>(`/whatsapp/bot-report?days=${days}`),
@@ -6938,11 +6965,12 @@ export const whatsappAPI = {
   // Closing is a filing decision, not a deletion: the thread and its history
   // stay, and an inbound message reopens it — a customer who writes again is
   // not answered by an archive.
-  setConversationStatus: (conversationId: number, status: 'open' | 'closed', options: { survey?: boolean } = {}) =>
+  setConversationStatus: (conversationId: number, status: 'open' | 'closed', options: { survey?: boolean; lead?: SaleResult } = {}) =>
     apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/status`, {
       status,
       // Só `false` dispensa a pesquisa de satisfação ao encerrar.
-      ...(options.survey === false ? { survey: false } : {})
+      ...(options.survey === false ? { survey: false } : {}),
+      ...(options.lead ? { lead: options.lead } : {})
     }),
 
   /** Assumir (o próprio id), transferir para um colega, ou `null` para soltar. */

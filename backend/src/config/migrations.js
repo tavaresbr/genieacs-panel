@@ -1794,6 +1794,19 @@ const WA_CONVERSATION_BOUND_VIA_COLUMNS = [
   ['bound_via', (t) => t.string('bound_via', 16).nullable()]
 ];
 
+/**
+ * A venda que a IA entregou à equipe (0133): `lead_at` marca a conversa em que
+ * a IA registrou interesse comercial; ao encerrá-la o atendente diz se fechou
+ * (`won`) ou perdeu (`lost`, com o motivo) e, se fechou, qual plano
+ * (`lead_plan_id`, do catálogo `wa_sales_plans`). Alimenta o relatório de vendas.
+ */
+const WA_CONVERSATION_LEAD_COLUMNS = [
+  ['lead_at', (t) => t.timestamp('lead_at').nullable()],
+  ['lead_outcome', (t) => t.string('lead_outcome', 8).nullable()],
+  ['lead_lost_reason', (t) => t.string('lead_lost_reason', 16).nullable()],
+  ['lead_plan_id', (t) => t.integer('lead_plan_id').unsigned().nullable()]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -7622,6 +7635,22 @@ export const migrations = [
       for (const [name, builder] of WA_AI_KNOWLEDGE_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
+    }
+  },
+  {
+    /** O resultado da venda da IA — ver `WA_CONVERSATION_LEAD_COLUMNS`. */
+    id: '0133_wa_conversation_lead',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_LEAD_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_LEAD_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

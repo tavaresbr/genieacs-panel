@@ -735,6 +735,7 @@ export default {
   'whatsapp.aiKnowledge.answerRequired': 'Enter the item answer',
   'whatsapp.aiKnowledge.notFound': 'Item not found',
   'whatsapp.aiKnowledge.exampleUnedited': 'Edit the example text before turning it on',
+  'whatsapp.lead.invalid': 'Invalid sale outcome',
   'whatsapp.templates.aiDrafted': 'AI 초안이 준비되었습니다',
   'whatsapp.templates.aiDraftFailed': 'AI가 본문을 작성하지 못했습니다',
   'whatsapp.ai.error.draftGoal': '메시지의 목적을 적거나 개선할 본문을 입력하세요',

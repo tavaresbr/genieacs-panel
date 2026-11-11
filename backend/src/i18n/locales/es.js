@@ -734,6 +734,7 @@ export default {
   'whatsapp.aiKnowledge.answerRequired': 'Indique la respuesta del elemento',
   'whatsapp.aiKnowledge.notFound': 'Elemento no encontrado',
   'whatsapp.aiKnowledge.exampleUnedited': 'Edite el texto de ejemplo antes de activarlo',
+  'whatsapp.lead.invalid': 'Resultado de la venta no válido',
   'whatsapp.templates.aiDrafted': 'Borrador de la IA listo',
   'whatsapp.templates.aiDraftFailed': 'La IA no pudo escribir el texto',
   'whatsapp.ai.error.draftGoal': 'Describe qué debe hacer el mensaje o escribe un texto para mejorar',

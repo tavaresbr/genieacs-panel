@@ -754,6 +754,7 @@ export default {
   'whatsapp.aiKnowledge.answerRequired': 'Enter the item answer',
   'whatsapp.aiKnowledge.notFound': 'Item not found',
   'whatsapp.aiKnowledge.exampleUnedited': 'Edit the example text before turning it on',
+  'whatsapp.lead.invalid': 'Invalid sale outcome',
   'whatsapp.templates.aiDrafted': 'Brouillon de l\'IA prêt',
   'whatsapp.templates.aiDraftFailed': 'L\'IA n\'a pas pu rédiger le texte',
   'whatsapp.ai.error.draftGoal': 'Décrivez ce que le message doit faire, ou écrivez un texte à améliorer',
