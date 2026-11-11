@@ -90,6 +90,7 @@ export const SEM_DADO_DE_ASSINANTE = Object.freeze({
   tenant_addons: 'os add-ons que o provedor contratou conosco, nenhum assinante',
   push_subscriptions: 'os aparelhos da equipe inscritos nas notificações push, nenhum assinante',
   push_preferences: 'os avisos push que cada pessoa da equipe escolheu receber, nenhum assinante',
+  operator_profiles: 'o cadastro da equipe (nome, CPF cifrado, contato, endereço e dados de trabalho), nenhum assinante',
   outage_events: 'rompimentos por caixa do mapa — só a caixa e contagens, nenhum assinante',
   outage_incidents: 'quedas em massa por nó do mapa — quem foi atingido sai em outage_incident_devices',
   maintenance_windows: 'manutenções programadas por nó do mapa — quem foi avisado sai em maintenance_window_devices'

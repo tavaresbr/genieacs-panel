@@ -4285,6 +4285,7 @@ const zhCN: Dictionary = {
   'platform.member.revokeConfirm': '结束 {username} 的所有会话？此人需要在所有设备上重新登录。',
   'platform.member.sessionsRevoked': '所有会话已结束。',
   'audit.action.operatorUpdated': '平台编辑了操作员账户',
+  'audit.action.operatorProfileUpdated': '运营人员资料已编辑',
   'audit.action.operatorPasswordLinkIssued': '平台生成了新的密码链接',
   'audit.action.operatorPasswordSet': '平台设置了操作员密码',
   'audit.action.operatorSessionsRevoked': '平台结束了操作员会话',

@@ -196,7 +196,11 @@ export const SCOPED_TABLES = new Set([
   // receber (0130). O endpoint é a credencial do aparelho, e o aviso de um
   // provedor não pode chegar ao celular de quem só trabalha no outro.
   'push_subscriptions',
-  'push_preferences'
+  'push_preferences',
+  // O cadastro da equipe (0134): CPF, endereço, telefone e dados de trabalho
+  // que ESTE provedor tem de cada pessoa. A pessoa (`users`) é compartilhada;
+  // o que um provedor sabe dela não é do outro.
+  'operator_profiles'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

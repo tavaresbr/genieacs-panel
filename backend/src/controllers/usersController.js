@@ -5,6 +5,8 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
+import OperatorProfile, { summary as profileSummary } from '../models/OperatorProfile.js';
+import { validateProfileInput } from '../utils/operatorProfileValidation.js';
 import MfaService from '../services/mfaService.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import { newPasswordProblem } from '../utils/passwordPolicy.js';
@@ -62,7 +64,7 @@ const presentRole = normalizeRole;
  * and be an ordinary operator at the one they consult for, and this endpoint
  * answers for one provider at a time.
  */
-function present(member) {
+function present(member, profile = null) {
   return {
     id: member.id,
     username: member.username,
@@ -75,7 +77,10 @@ function present(member) {
     // quando o dono exige o 2FA, e para oferecer o destravar.
     mfaEnabled: Boolean(member.totp_enabled_at),
     createdAt: member.created_at,
-    updatedAt: member.updated_at
+    updatedAt: member.updated_at,
+    // O resumo do cadastro (nome, cargo, telefone, CPF mascarado): a lista não
+    // decifra nada — o CPF inteiro só sai por `GET /users/:id/profile`.
+    profile: profileSummary(profile)
   };
 }
 
@@ -106,8 +111,9 @@ class UsersController {
   static async list(req, res) {
     try {
       const members = await TenantUser.listForTenant(tenantOf(req));
+      const perfis = await OperatorProfile.summaries();
       return res.json(createResponse(req.t('users.listed'), {
-        users: members.map(present)
+        users: members.map((member) => present(member, perfis.get(Number(member.id)) ?? null))
       }));
     } catch (error) {
       console.error('List users error:', error);
@@ -250,7 +256,10 @@ class UsersController {
 
       const nextRole = req.body?.role;
       const nextPassword = req.body?.password;
-      if (nextRole === undefined && nextPassword === undefined) {
+      const nextUsername = req.body?.username === undefined ? undefined : normalizeUsername(req.body.username);
+      const nextEmail = req.body?.email === undefined ? undefined : User.normalizeEmail(req.body.email);
+      if (nextRole === undefined && nextPassword === undefined
+        && nextUsername === undefined && nextEmail === undefined) {
         return res.status(400).json(
           createErrorResponse(req.t('users.nothingToUpdate'))
         );
@@ -284,6 +293,42 @@ class UsersController {
         return res.status(409).json(
           createErrorResponse(req.t('users.passwordPlatform'), null, 'password_platform')
         );
+      }
+
+      // Usuário e e-mail são o LOGIN da pessoa, e a pessoa é uma só em todos os
+      // provedores. As mesmas portas fechadas da senha, antes de qualquer
+      // escrita: dono só por dono, a si mesmo pelo perfil, quem trabalha em
+      // outro provedor ou administra a plataforma só pela própria mão — senão
+      // trocar o e-mail de alguém seria o caminho para tomar a conta dela.
+      const trocaLogin = nextUsername !== undefined || nextEmail !== undefined;
+      let loginMudou = false;
+      if (trocaLogin) {
+        if (presentRole(membership.role) === 'owner' && presentRole(req.user.role) !== 'owner') {
+          return res.status(403).json(createErrorResponse(req.t('users.ownerOnly')));
+        }
+        if (id === req.user.userId) {
+          return res.status(400).json(createErrorResponse(req.t('users.loginSelf'), null, 'login_self'));
+        }
+        if (await PlatformAdmin.has(id)) {
+          return res.status(409).json(createErrorResponse(req.t('users.loginPlatform'), null, 'login_platform'));
+        }
+        if ((await TenantUser.listForUser(id)).length > 1) {
+          return res.status(409).json(createErrorResponse(req.t('users.loginElsewhere'), null, 'login_elsewhere'));
+        }
+        if (nextUsername !== undefined && (nextUsername.length < 3 || nextUsername.length > 64)) {
+          return res.status(400).json(createErrorResponse(req.t('auth.usernameLength')));
+        }
+        if (nextEmail !== undefined && (!nextEmail || !isValidEmail(nextEmail))) {
+          return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+        }
+        const conflito = await User.loginConflict({
+          username: nextUsername === user.username ? null : nextUsername,
+          email: nextEmail === (user.email ?? null) ? null : nextEmail,
+          exceptId: id
+        });
+        if (conflito) {
+          return res.status(409).json(createErrorResponse(req.t('users.loginUnavailable')));
+        }
       }
 
       if (nextRole !== undefined) {
@@ -372,16 +417,130 @@ class UsersController {
         });
       }
 
+      if (trocaLogin) {
+        const campos = [];
+        if (nextUsername !== undefined && nextUsername !== user.username) {
+          await User.updateUsername(id, nextUsername);
+          campos.push('username');
+        }
+        if (nextEmail !== undefined && nextEmail !== (user.email ?? null)) {
+          await User.updateEmail(id, nextEmail);
+          campos.push('email');
+        }
+        if (campos.length) {
+          loginMudou = true;
+          // O login mudou: as sessões abertas com o antigo caem.
+          await User.revokeSessions(id);
+          await AuditLog.fromRequest(req, {
+            action: AuditLog.ACTIONS.OPERATOR_UPDATED,
+            subjectType: 'tenant_user',
+            subjectId: id,
+            detail: { fields: campos }
+          });
+        }
+      }
+
       const updated = await User.findById(id);
       const current = await TenantUser.find(tenantId, id);
       return res.json(createResponse(req.t('users.updated'), {
-        user: present({ ...updated, role: current?.role })
+        user: present({ ...updated, role: current?.role }, null),
+        loginChanged: loginMudou
       }));
     } catch (error) {
       console.error('Update user error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('users.updateFailed'), error.message)
       );
+    }
+  }
+
+  /**
+   * Quem pode ver/editar o cadastro de `id`: a própria pessoa, ou quem
+   * administra a equipe (`operators.manage`) — e o cadastro de um `owner` só o
+   * próprio ou outro `owner`, a mesma régua do papel e da senha. Quem não é
+   * daqui responde como inexistente.
+   *
+   * Devolve `{ membership, user }` ou escreve a recusa e devolve null.
+   */
+  static async profileTarget(req, res) {
+    const tenantId = tenantOf(req);
+    const id = Number(req.params?.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json(createErrorResponse(req.t('users.invalidId')));
+      return null;
+    }
+    const self = id === req.user.userId;
+    if (!self && !roleHas(req.user.role, 'operators.manage')) {
+      res.status(403).json(createErrorResponse(req.t('auth.insufficientPermissions')));
+      return null;
+    }
+    const membership = await TenantUser.find(tenantId, id);
+    const user = membership ? await User.findById(id) : null;
+    if (!membership || !user) {
+      res.status(404).json(createErrorResponse(req.t('users.notFound')));
+      return null;
+    }
+    if (!self && presentRole(membership.role) === 'owner' && presentRole(req.user.role) !== 'owner') {
+      res.status(403).json(createErrorResponse(req.t('users.ownerOnly')));
+      return null;
+    }
+    return { id, membership, user };
+  }
+
+  static async getProfile(req, res) {
+    try {
+      const alvo = await UsersController.profileTarget(req, res);
+      if (!alvo) return undefined;
+      const profile = await OperatorProfile.get(alvo.id);
+      return res.json(createResponse(null, {
+        profile: profile ?? { userId: alvo.id, profileComplete: false }
+      }));
+    } catch (error) {
+      console.error('Get operator profile error:', error);
+      return res.status(500).json(createErrorResponse(req.t('users.profile.loadFailed'), error.message));
+    }
+  }
+
+  static async updateProfile(req, res) {
+    try {
+      // A personificação (suporte da plataforma) não edita dado pessoal da equipe.
+      if (req.user.impersonation) {
+        return res.status(403).json(createErrorResponse(req.t('auth.impersonationReadOnly'), null, 'impersonation_read_only'));
+      }
+      const alvo = await UsersController.profileTarget(req, res);
+      if (!alvo) return undefined;
+
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const { values, cpf, error } = validateProfileInput(body);
+      if (error) {
+        return res.status(400).json(createErrorResponse(req.t(error.key), null, error.code));
+      }
+      if (!Object.keys(values).length && cpf === undefined) {
+        return res.status(400).json(createErrorResponse(req.t('users.nothingToUpdate')));
+      }
+      if (cpf) {
+        // Aviso de CPF repetido na equipe. Nomeia só que já existe — não quem.
+        if (await OperatorProfile.findCpfConflict(cpf, alvo.id)) {
+          return res.status(409).json(createErrorResponse(req.t('users.profile.cpfInUse'), null, 'cpf_in_use'));
+        }
+      }
+
+      const campos = await OperatorProfile.upsert(alvo.id, values, cpf);
+      if (campos.length) {
+        // Campos, nunca valores: a trilha não pode virar uma segunda cópia do CPF.
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.OPERATOR_PROFILE_UPDATED,
+          subjectType: 'tenant_user',
+          subjectId: alvo.id,
+          detail: { fields: campos }
+        });
+      }
+      return res.json(createResponse(req.t('users.profile.saved'), {
+        profile: await OperatorProfile.get(alvo.id)
+      }));
+    } catch (error) {
+      console.error('Update operator profile error:', error);
+      return res.status(500).json(createErrorResponse(req.t('users.profile.saveFailed'), error.message));
     }
   }
 
@@ -429,6 +588,8 @@ class UsersController {
       }
 
       await TenantUser.remove(tenantId, id);
+      // O cadastro (CPF, endereço…) é deste provedor e acaba com o vínculo.
+      await OperatorProfile.remove(id);
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.OPERATOR_REMOVED,
         subjectType: 'tenant_user',

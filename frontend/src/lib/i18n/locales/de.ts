@@ -4289,6 +4289,7 @@ const de: Dictionary = {
   'platform.member.revokeConfirm': 'Alle Sitzungen von {username} beenden? Die Person muss sich auf allen Geräten neu anmelden.',
   'platform.member.sessionsRevoked': 'Alle Sitzungen beendet.',
   'audit.action.operatorUpdated': 'Operatorkonto von der Plattform bearbeitet',
+  'audit.action.operatorProfileUpdated': 'Operator-Datensatz bearbeitet',
   'audit.action.operatorPasswordLinkIssued': 'Neuer Passwort-Link von der Plattform erzeugt',
   'audit.action.operatorPasswordSet': 'Operatorpasswort von der Plattform festgelegt',
   'audit.action.operatorSessionsRevoked': 'Operatorsitzungen von der Plattform beendet',

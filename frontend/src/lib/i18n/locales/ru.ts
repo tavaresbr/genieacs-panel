@@ -4293,6 +4293,7 @@ const ru: Dictionary = {
   'platform.member.revokeConfirm': 'Завершить все сеансы {username}? Придётся войти заново на всех устройствах.',
   'platform.member.sessionsRevoked': 'Все сеансы завершены.',
   'audit.action.operatorUpdated': 'Учётная запись оператора изменена платформой',
+  'audit.action.operatorProfileUpdated': 'Данные оператора изменены',
   'audit.action.operatorPasswordLinkIssued': 'Платформа создала новую ссылку для пароля',
   'audit.action.operatorPasswordSet': 'Платформа задала пароль оператора',
   'audit.action.operatorSessionsRevoked': 'Платформа завершила сеансы оператора',

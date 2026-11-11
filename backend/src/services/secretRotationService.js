@@ -121,6 +121,13 @@ const COLUNAS = Object.freeze([
     prefixo: 'secret',
     versao: 'secret_key_version',
     contexto: 'skygenpanel-push-subscription-v1'
+  },
+  {
+    // O CPF do cadastro da equipe (0134) — ver `OperatorProfile`.
+    tabela: 'operator_profiles',
+    prefixo: 'cpf',
+    versao: 'cpf_key_version',
+    contexto: 'skygenpanel-operator-cpf-v1'
   }
 ]);
 

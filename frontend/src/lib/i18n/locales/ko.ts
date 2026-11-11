@@ -4292,6 +4292,7 @@ const ko: Dictionary = {
   'platform.member.revokeConfirm': '{username}의 모든 세션을 종료할까요? 모든 기기에서 다시 로그인해야 합니다.',
   'platform.member.sessionsRevoked': '모든 세션을 종료했습니다.',
   'audit.action.operatorUpdated': '플랫폼이 운영자 계정을 편집함',
+  'audit.action.operatorProfileUpdated': '운영자 정보 수정',
   'audit.action.operatorPasswordLinkIssued': '플랫폼이 새 비밀번호 링크를 발급함',
   'audit.action.operatorPasswordSet': '플랫폼이 운영자 비밀번호를 설정함',
   'audit.action.operatorSessionsRevoked': '플랫폼이 운영자 세션을 종료함',

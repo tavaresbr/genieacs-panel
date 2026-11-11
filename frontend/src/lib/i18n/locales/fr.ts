@@ -4285,6 +4285,7 @@ const fr: Dictionary = {
   'platform.member.revokeConfirm': 'Fermer toutes les sessions de {username} ? La personne devra se reconnecter sur tous les appareils.',
   'platform.member.sessionsRevoked': 'Toutes les sessions ont été fermées.',
   'audit.action.operatorUpdated': 'Compte opérateur modifié par la plateforme',
+  'audit.action.operatorProfileUpdated': 'Fiche d\'opérateur modifiée',
   'audit.action.operatorPasswordLinkIssued': 'Nouveau lien de mot de passe généré par la plateforme',
   'audit.action.operatorPasswordSet': 'Mot de passe opérateur défini par la plateforme',
   'audit.action.operatorSessionsRevoked': 'Sessions opérateur fermées par la plateforme',

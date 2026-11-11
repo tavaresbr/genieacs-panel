@@ -4294,6 +4294,7 @@ const ar: Dictionary = {
   'platform.member.revokeConfirm': 'إنهاء كل جلسات {username}؟ سيتعيّن عليه تسجيل الدخول من جديد على كل الأجهزة.',
   'platform.member.sessionsRevoked': 'تم إنهاء كل الجلسات.',
   'audit.action.operatorUpdated': 'عدّلت المنصة حساب المشغّل',
+  'audit.action.operatorProfileUpdated': 'تم تعديل سجل المشغّل',
   'audit.action.operatorPasswordLinkIssued': 'أنشأت المنصة رابط كلمة مرور جديدًا',
   'audit.action.operatorPasswordSet': 'عيّنت المنصة كلمة مرور المشغّل',
   'audit.action.operatorSessionsRevoked': 'أنهت المنصة جلسات المشغّل',

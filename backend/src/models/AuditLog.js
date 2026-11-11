@@ -266,6 +266,9 @@ class AuditLog {
     // telefone, papel — o detalhe diz quais), um link de senha novo gerado, a
     // senha definida na hora e as sessões encerradas. Nunca o segredo.
     OPERATOR_UPDATED: 'operator.updated',
+    // O cadastro da equipe (0134). O detalhe guarda os NOMES dos campos
+    // mudados, nunca os valores — o CPF não pode ter uma segunda cópia aqui.
+    OPERATOR_PROFILE_UPDATED: 'operator.profile_updated',
     OPERATOR_PASSWORD_LINK_ISSUED: 'operator.password_link_issued',
     OPERATOR_PASSWORD_SET: 'operator.password_set',
     OPERATOR_SESSIONS_REVOKED: 'operator.sessions_revoked',

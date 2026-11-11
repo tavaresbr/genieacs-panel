@@ -4286,6 +4286,7 @@ const zhTW: Dictionary = {
   'platform.member.revokeConfirm': '結束 {username} 的所有工作階段？此人需要在所有裝置上重新登入。',
   'platform.member.sessionsRevoked': '所有工作階段已結束。',
   'audit.action.operatorUpdated': '平台編輯了操作員帳戶',
+  'audit.action.operatorProfileUpdated': '操作員資料已編輯',
   'audit.action.operatorPasswordLinkIssued': '平台產生了新的密碼連結',
   'audit.action.operatorPasswordSet': '平台設定了操作員密碼',
   'audit.action.operatorSessionsRevoked': '平台結束了操作員工作階段',
