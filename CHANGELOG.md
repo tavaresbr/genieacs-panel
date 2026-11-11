@@ -7,6 +7,34 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.34.0] - 2026-11-11
+
+### New
+
+- Trava por conta, auditoria e reautenticação no portal do assinante (`7db53341`)
+
+### Fixed
+
+- Separa o sufixo key$ da regex de segredos (CodeQL) (`d033a05a`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/6158d0fa2984...d77cd7acf59d)
+
+## [1.33.0] - 2026-11-11
+
+### New
+
+- Cadastro da equipe (CPF, contato, endereço, trabalho) e edição de login (`0a7b2b6e`)
+
+### Changed
+
+- Consultas de segurança do login sempre rodam, o corpo só escolhe a recusa (`ac93478f`)
+
+### Maintenance
+
+- Senhas de teste de baixa entropia (gitleaks) (`c4e82393`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/3e0785fb4495...7b8813ea74b1)
+
 ## [1.32.0] - 2026-11-11
 
 ### New

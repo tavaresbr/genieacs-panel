@@ -3791,6 +3791,62 @@ const PUSH_TABLES = [
 ];
 
 /**
+ * O cadastro de cada pessoa da equipe NAQUELE provedor (0134) — ver
+ * `models/OperatorProfile.js`.
+ *
+ *   operator_profiles  nome completo, documento, contato, endereço e dados de
+ *                      trabalho de quem é da equipe. Escopada por provedor, de
+ *                      propósito: `users` é a pessoa e é compartilhada entre
+ *                      provedores, e o CPF e o endereço que um provedor tem
+ *                      de alguém não são do outro. Sai no export e na exclusão
+ *                      do provedor.
+ *
+ * O CPF não fica legível: `cpf_*` é o envelope do secretBox (lido só ao abrir a
+ * edição), `cpf_hash` é um HMAC só para avisar de CPF repetido na equipe — não
+ * se busca por ele na tela — e `cpf_last4` deixa a lista mostrar o CPF
+ * mascarado sem decifrar nada.
+ */
+const operatorProfilesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.string('full_name', 160).nullable();
+  t.string('birth_date', 10).nullable();
+  t.string('rg', 32).nullable();
+  t.text('cpf_ciphertext').nullable();
+  t.string('cpf_iv', 32).nullable();
+  t.string('cpf_tag', 32).nullable();
+  t.integer('cpf_key_version').nullable();
+  t.string('cpf_hash', 64).nullable();
+  t.string('cpf_last4', 4).nullable();
+  t.string('phone', 32).nullable();
+  t.string('whatsapp', 32).nullable();
+  t.string('personal_email', 190).nullable();
+  t.string('zip', 8).nullable();
+  t.string('street', 160).nullable();
+  t.string('number', 20).nullable();
+  t.string('complement', 80).nullable();
+  t.string('district', 100).nullable();
+  t.string('city', 100).nullable();
+  t.string('state', 2).nullable();
+  t.string('job_title', 100).nullable();
+  t.string('admitted_at', 10).nullable();
+  t.string('emergency_name', 120).nullable();
+  t.string('emergency_phone', 32).nullable();
+  t.text('notes').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'user_id'], 'operator_profiles_user_uq');
+  t.index(['tenant_id', 'cpf_hash'], 'operator_profiles_cpf_idx');
+};
+
+const OPERATOR_PROFILE_TABLES = [
+  ['operator_profiles', operatorProfilesTable]
+];
+
+/**
  * Every table the schema owns, in creation order — which is also the order the
  * foreign keys require, so it is safe to insert along and to delete against.
  *
@@ -3843,7 +3899,8 @@ export const SCHEMA_TABLES = [
   ...REFRESH_TOKEN_TABLES,
   ...PUSH_TABLES,
   ...WA_SALES_PLAN_TABLES,
-  ...WA_AI_KNOWLEDGE_TABLES
+  ...WA_AI_KNOWLEDGE_TABLES,
+  ...OPERATOR_PROFILE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -7663,8 +7720,22 @@ export const migrations = [
     }
   },
   {
+    /** O cadastro da equipe por provedor — ver `OPERATOR_PROFILE_TABLES`. */
+    id: '0134_operator_profiles',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('operator_profiles');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of OPERATOR_PROFILE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
     /** As sugestões da IA para a base — ver `WA_CONVERSATION_LEARNED_COLUMNS`. */
-    id: '0134_wa_conversation_learned',
+    id: '0135_wa_conversation_learned',
     async isApplied(db) {
       if (!(await db.schema.hasTable('wa_conversations'))) return true;
       return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_LEARNED_COLUMNS)).length === 0;

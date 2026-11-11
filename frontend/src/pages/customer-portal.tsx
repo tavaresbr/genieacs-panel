@@ -147,6 +147,10 @@ export default function CustomerPortal() {
   const [visibleSavedPasswordIndex, setVisibleSavedPasswordIndex] = useState<number | null>(null)
   const [revealedWifiPasswords, setRevealedWifiPasswords] = useState<Record<number, string>>({})
   const [revealingWifiPasswordIndex, setRevealingWifiPasswordIndex] = useState<number | null>(null)
+  // Ver a senha da rede pede a senha do portal de novo: o índice da rede que
+  // está pedindo e o que foi digitado (nunca guardado depois do envio).
+  const [reauthIndex, setReauthIndex] = useState<number | null>(null)
+  const [reauthPassword, setReauthPassword] = useState('')
   const [billing, setBilling] = useState<PortalBilling | null>(null)
   const [providerContact, setProviderContact] = useState<ProviderContact | null>(null)
   const [billingLoading, setBillingLoading] = useState(false)
@@ -381,11 +385,24 @@ export default function CustomerPortal() {
       setVisibleSavedPasswordIndex(index)
       return
     }
+    // Primeira vez: pede a senha do portal antes de falar com o servidor.
+    setWifiFeedback(null)
+    setReauthPassword('')
+    setReauthIndex((current) => (current === index ? null : index))
+  }
 
+  const confirmRevealWifiPassword = async (event: FormEvent, index: number) => {
+    event.preventDefault()
+    const typed = reauthPassword
+    if (!typed.trim()) return
     setRevealingWifiPasswordIndex(index)
     setWifiFeedback(null)
     try {
-      const result = await portalRequest<{ password: string }>(`/wifi/${index}/password`)
+      const result = await portalRequest<{ password: string }>(`/wifi/${index}/password`, {
+        method: 'POST',
+        body: JSON.stringify({ password: typed })
+      })
+      setReauthPassword('')
       if (!result.success || !result.data?.password) {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
@@ -399,6 +416,7 @@ export default function CustomerPortal() {
         [index]: result.data!.password
       }))
       setVisibleSavedPasswordIndex(index)
+      setReauthIndex(null)
     } catch {
       setWifiFeedback({
         type: 'error',
@@ -754,6 +772,34 @@ export default function CustomerPortal() {
                             </button>
                           )}
                         </div>
+                        {reauthIndex === network.index && (
+                          <form
+                            className="mt-2 flex items-end gap-2"
+                            onSubmit={(event) => void confirmRevealWifiPassword(event, network.index)}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <label className="field-label" htmlFor={`wifi-reauth-${network.index}`}>{t('portal.wifi.reauthLabel')}</label>
+                              <input
+                                id={`wifi-reauth-${network.index}`}
+                                className="modern-input font-mono"
+                                type="password"
+                                value={reauthPassword}
+                                maxLength={32}
+                                onChange={(event) => setReauthPassword(event.target.value)}
+                                autoComplete="current-password"
+                                autoFocus
+                                required
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              className="modern-button"
+                              disabled={revealingWifiPasswordIndex === network.index}
+                            >
+                              {t('portal.wifi.reauthConfirm')}
+                            </button>
+                          </form>
+                        )}
                         <p className="mt-1.5 text-[0.68rem] leading-5 text-muted-foreground">
                           {t('portal.wifi.savedPasswordHint')}
                         </p>

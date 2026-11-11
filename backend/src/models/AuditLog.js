@@ -24,6 +24,13 @@ class AuditLog {
   static ACTIONS = Object.freeze({
     PORTAL_PASSWORD_REVEALED: 'portal_password.revealed',
     PORTAL_PASSWORD_RESET: 'portal_password.reset',
+    // O ASSINANTE, pelo portal dele (autor `system`, com o ID do cliente em `actor_username`): travou por
+    // tentativas erradas, trocou o Wi-Fi ou revelou a senha salva da rede. O
+    // `detail` guarda o índice da rede e se a senha mudou, nunca senha nem SSID.
+    PORTAL_CUSTOMER_LOCKED: 'portal_customer.account_locked',
+    PORTAL_CUSTOMER_WIFI_UPDATED: 'portal_customer.wifi_updated',
+    PORTAL_CUSTOMER_WIFI_REVEALED: 'portal_customer.wifi_revealed',
+    PORTAL_CUSTOMER_TRUST_UNLOCK: 'portal_customer.trust_unlock',
     GENIEACS_URL_CHANGED: 'genieacs.url_changed',
     GENIEACS_AUTH_CHANGED: 'genieacs.auth_changed',
     GENIEACS_CONNECTION_CHANGED: 'genieacs.connection_changed',
@@ -266,6 +273,9 @@ class AuditLog {
     // telefone, papel — o detalhe diz quais), um link de senha novo gerado, a
     // senha definida na hora e as sessões encerradas. Nunca o segredo.
     OPERATOR_UPDATED: 'operator.updated',
+    // O cadastro da equipe (0134). O detalhe guarda os NOMES dos campos
+    // mudados, nunca os valores — o CPF não pode ter uma segunda cópia aqui.
+    OPERATOR_PROFILE_UPDATED: 'operator.profile_updated',
     OPERATOR_PASSWORD_LINK_ISSUED: 'operator.password_link_issued',
     OPERATOR_PASSWORD_SET: 'operator.password_set',
     OPERATOR_SESSIONS_REVOKED: 'operator.sessions_revoked',

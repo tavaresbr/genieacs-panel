@@ -11,3 +11,7 @@ d262f606f1b0cd8e47ca3586d309bbb24593cb3c:backend/test/contact-teiah.test.js:gene
 # Senha do usuário de teste do selo de risco (teiah-contact-filter.test.js),
 # trocada por uma constante no commit seguinte.
 23f85d42696fbb9e50f6400c2e6715741bd84dcc:backend/test/teiah-contact-filter.test.js:generic-api-key:27
+# Senhas de teste do cadastro da equipe (operator-profile.test.js), trocadas
+# por valores de baixa entropia no commit seguinte; o commit do PR continua no histórico.
+0a7b2b6e8fe3694c1e679c8df011fb885841d792:backend/test/operator-profile.test.js:generic-api-key:23
+0a7b2b6e8fe3694c1e679c8df011fb885841d792:backend/test/operator-profile.test.js:generic-api-key:35

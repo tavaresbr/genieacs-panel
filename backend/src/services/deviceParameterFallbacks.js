@@ -350,8 +350,10 @@ export const WAN_SERVICE_NAMES = /^(?:x_[a-z0-9-]+_)?service_?list$/i;
 /** How many rows a parameter listing hands back at most. */
 const PARAMETER_LIST_LIMIT = 500;
 
-/** Values that are credentials, and so are never shown back. */
-const SECRET_NAMES = /password|passwd|passphrase|secret|presharedkey|keypassphrase|wepkey/i;
+/** Values that are credentials, and so are never shown back. Broad on purpose: `LoginSuperPass` is as much a credential as `Password`. */
+const SECRET_NAMES = /pass|presharedkey|senha|secret|wepkey/i;
+const SECRET_KEY_SUFFIX = /key$/i;
+const isSecretName = (name) => SECRET_NAMES.test(name) || SECRET_KEY_SUFFIX.test(name);
 
 /**
  * Every parameter in a GenieACS device document, one row per leaf, filtered
@@ -373,7 +375,7 @@ export function listDocumentParameters(item, search = '') {
       if (!needle || path.toLowerCase().includes(needle)) {
         total += 1;
         if (rows.length < PARAMETER_LIST_LIMIT) {
-          const secret = SECRET_NAMES.test(path.split('.').at(-1));
+          const secret = isSecretName(path.split('.').at(-1));
           rows.push({
             path,
             value: !isLeaf ? null : secret ? '******' : node._value,

@@ -331,6 +331,18 @@ describe('the parameter listing for one ONT', () => {
     assert.equal(rows[0].value, '******');
   });
 
+  it('masks the installer-default ACS credential too', () => {
+    const item = {
+      _id: 'x',
+      VirtualParameters: { LoginSuperPass: param('super-segredo'), LoginSuperUser: param('admin') }
+    };
+    const { rows } = listDocumentParameters(item, 'Login');
+    const pass = rows.find((row) => row.path.endsWith('LoginSuperPass'));
+    const user = rows.find((row) => row.path.endsWith('LoginSuperUser'));
+    assert.equal(pass.value, '******');
+    assert.equal(user.value, 'admin');
+  });
+
   it('tells a parameter nobody read apart from one that is missing', () => {
     const { rows } = listDocumentParameters(nokiaWithAluNames(), 'ConnectionType');
     assert.equal(rows.length, 1);

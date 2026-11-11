@@ -103,7 +103,9 @@ describe('every portal answer carries a machine-readable code', () => {
 
   it('labels a password that was never saved', async () => {
     const { status, body } = await call(`${portalUrl}/api/customer/wifi/1/password`, {
-      headers: { Cookie: cookie }
+      method: 'POST',
+      headers: { Cookie: cookie },
+      body: { password }
     });
     assert.equal(status, 404);
     assert.equal(body.code, 'wifi_password_not_saved');
