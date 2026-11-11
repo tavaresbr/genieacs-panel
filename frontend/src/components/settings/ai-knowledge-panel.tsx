@@ -86,10 +86,53 @@ export function AiKnowledgePanel() {
     await gravarLugares([...lugares, nome])
   }
 
+  const pendentes = (itens ?? []).filter((i) => i.origin === 'sugerida' && !i.active)
+  const demais = (itens ?? []).filter((i) => !(i.origin === 'sugerida' && !i.active))
+
+  const aprovar = async (item: AiKnowledgeItem) => {
+    const res = await whatsappAPI.updateAiKnowledge(item.id, { active: true })
+    if (res.success) { toast.success(t('settings.chatbot.sugApproved')); await carregar() }
+    else toast.error(res.message || whatsappErrorMessage(t, res.code))
+  }
+
+  const rejeitar = async (item: AiKnowledgeItem) => {
+    if (!window.confirm(t('settings.chatbot.sugRejectConfirm', { name: item.title }))) return
+    const res = await whatsappAPI.deleteAiKnowledge(item.id)
+    if (res.success) { toast.success(t('settings.chatbot.sugRejected')); await carregar() }
+    else toast.error(res.message || whatsappErrorMessage(t, res.code))
+  }
+
   const patch = (parte: Partial<Rascunho>) => setRascunho((atual) => (atual ? { ...atual, ...parte } : atual))
 
   return (
     <>
+      {pendentes.length > 0 && (
+        <section className="modern-card p-5 sm:p-6" aria-labelledby="ai-sug-title">
+          <h2 id="ai-sug-title" className="section-heading">{t('settings.chatbot.sugTitle')}</h2>
+          <p className="field-hint mt-1">{t('settings.chatbot.sugIntro')}</p>
+          <ul className="mt-4 grid gap-3">
+            {pendentes.map((item) => (
+              <li key={item.id} className="rounded-md border border-dashed border-border p-3">
+                <p className="flex flex-wrap items-center gap-2 font-medium">
+                  <span className={`${KIND_CLASS[item.kind]} whitespace-nowrap text-xs`}>{t(KIND_KEY[item.kind])}</span>
+                  <span className="wrap-anywhere">{item.title}</span>
+                </p>
+                {item.triggers && <p className="field-hint wrap-anywhere">{t('settings.chatbot.kbTriggerLabel', { list: item.triggers })}</p>}
+                <p className="mt-1 text-sm wrap-anywhere">{item.answer}</p>
+                <p className="field-hint mt-1">{t('settings.chatbot.sugReview')}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" className="modern-button" onClick={() => void aprovar(item)}>{t('settings.chatbot.sugApprove')}</button>
+                  <button type="button" className="modern-button-secondary" onClick={() => setRascunho({ id: item.id, kind: item.kind, title: item.title, triggers: item.triggers, answer: item.answer })}>
+                    {t('settings.chatbot.kbEdit')}
+                  </button>
+                  <button type="button" className="modern-button-secondary" onClick={() => void rejeitar(item)}>{t('settings.chatbot.sugReject')}</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="modern-card p-5 sm:p-6" aria-labelledby="ai-kb-title">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -101,11 +144,11 @@ export function AiKnowledgePanel() {
           </button>
         </div>
 
-        {itens !== null && itens.length === 0 && <p className="mt-4 text-sm text-muted-foreground">{t('settings.chatbot.kbEmpty')}</p>}
+        {itens !== null && demais.length === 0 && <p className="mt-4 text-sm text-muted-foreground">{t('settings.chatbot.kbEmpty')}</p>}
 
-        {itens !== null && itens.length > 0 && (
+        {itens !== null && demais.length > 0 && (
           <ul className="mt-4 divide-y divide-border">
-            {itens.map((item) => (
+            {demais.map((item) => (
               <li key={item.id} className={`flex flex-wrap items-start justify-between gap-3 py-3 ${item.active ? '' : 'opacity-60'}`}>
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium">
