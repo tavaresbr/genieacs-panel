@@ -1,15 +1,33 @@
 {
-  "version": "1.37.0",
-  "build": 1638,
-  "sourceCommit": "80fc204206e5",
+  "version": "1.38.0",
+  "build": 1646,
+  "sourceCommit": "6a0858ca67e6",
   "releasedAt": "2026-11-12",
-  "basedOnTag": "v1.36.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/40afc9df5809...80fc204206e5",
+  "basedOnTag": "v1.37.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/e874a8fd887f...6a0858ca67e6",
   "changes": [
     {
-      "shortHash": "f22318ab",
+      "shortHash": "b5c7be0e",
       "date": "2026-11-12",
-      "title": "Cidades em que cada plano está disponível",
+      "title": "Busca de operadores e diálogo do painel no lugar do confirm()",
+      "category": "New"
+    },
+    {
+      "shortHash": "497c0139",
+      "date": "2026-11-12",
+      "title": "Foto do operador (backend)",
+      "category": "New"
+    },
+    {
+      "shortHash": "bd512d34",
+      "date": "2026-11-12",
+      "title": "Foto do operador (tela)",
+      "category": "New"
+    },
+    {
+      "shortHash": "3b820f9a",
+      "date": "2026-11-12",
+      "title": "Botão para a IA sugerir (ou melhorar) a resposta de um item da base",
       "category": "New"
     }
   ]

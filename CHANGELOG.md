@@ -7,6 +7,17 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.38.0] - 2026-11-12
+
+### New
+
+- Busca de operadores e diálogo do painel no lugar do confirm() (`b5c7be0e`)
+- Foto do operador (backend) (`497c0139`)
+- Foto do operador (tela) (`bd512d34`)
+- Botão para a IA sugerir (ou melhorar) a resposta de um item da base (`3b820f9a`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/e874a8fd887f...6a0858ca67e6)
+
 ## [1.37.0] - 2026-11-12
 
 ### New
