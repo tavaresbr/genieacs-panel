@@ -1633,6 +1633,8 @@ const it: Dictionary = {
   'settings.operators.createdAt': 'Creato',
   'settings.operators.loading': 'Caricamento degli operatori…',
   'settings.operators.empty': 'Nessun operatore registrato',
+  'settings.operators.search': 'Cerca per nome, utente, e-mail o mansione',
+  'settings.operators.searchEmpty': 'Nessun operatore corrisponde a questa ricerca.',
   'settings.operators.loadFailed': 'Impossibile caricare l’elenco degli operatori',
   'settings.operators.you': 'Tu',
   'settings.operators.emailMissing': 'Senza e-mail',

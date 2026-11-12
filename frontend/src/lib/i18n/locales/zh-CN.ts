@@ -1631,6 +1631,8 @@ const zhCN: Dictionary = {
   'settings.operators.createdAt': '创建时间',
   'settings.operators.loading': '正在加载运维人员…',
   'settings.operators.empty': '尚未注册运维人员',
+  'settings.operators.search': '按姓名、用户名、邮箱或职位搜索',
+  'settings.operators.searchEmpty': '没有符合此搜索的运营人员。',
   'settings.operators.loadFailed': '无法加载运维人员列表',
   'settings.operators.you': '本人',
   'settings.operators.emailMissing': '无邮箱',

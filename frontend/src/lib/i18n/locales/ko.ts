@@ -1631,6 +1631,8 @@ const ko: Dictionary = {
   'settings.operators.createdAt': '생성 일시',
   'settings.operators.loading': '운영자를 불러오는 중…',
   'settings.operators.empty': '아직 등록된 운영자가 없습니다',
+  'settings.operators.search': '이름, 사용자 이름, 이메일 또는 직책으로 검색',
+  'settings.operators.searchEmpty': '검색과 일치하는 운영자가 없습니다.',
   'settings.operators.loadFailed': '운영자 목록을 불러오지 못했습니다',
   'settings.operators.you': '본인',
   'settings.operators.emailMissing': '이메일 없음',

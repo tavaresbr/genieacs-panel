@@ -1631,6 +1631,8 @@ const es: Dictionary = {
   'settings.operators.createdAt': 'Creado',
   'settings.operators.loading': 'Cargando operadores…',
   'settings.operators.empty': 'Todavía no hay operadores registrados',
+  'settings.operators.search': 'Buscar por nombre, usuario, correo o cargo',
+  'settings.operators.searchEmpty': 'Ningún operador coincide con esta búsqueda.',
   'settings.operators.loadFailed': 'No se pudo cargar la lista de operadores',
   'settings.operators.you': 'Tú',
   'settings.operators.emailMissing': 'Sin correo',

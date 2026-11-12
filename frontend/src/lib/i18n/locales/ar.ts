@@ -1611,6 +1611,8 @@ const ar: Dictionary = {
   'settings.operators.createdAt': 'تاريخ الإنشاء',
   'settings.operators.loading': 'جارٍ تحميل المشغّلين…',
   'settings.operators.empty': 'لا يوجد مشغّلون مسجّلون بعد',
+  'settings.operators.search': 'ابحث بالاسم أو اسم المستخدم أو البريد أو المسمى الوظيفي',
+  'settings.operators.searchEmpty': 'لا يوجد مشغّل يطابق هذا البحث.',
   'settings.operators.loadFailed': 'تعذّر تحميل قائمة المشغّلين',
   'settings.operators.you': 'أنت',
   'settings.operators.resetPassword': 'إعادة تعيين كلمة المرور',

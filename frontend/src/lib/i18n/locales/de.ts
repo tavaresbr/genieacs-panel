@@ -1634,6 +1634,8 @@ const de: Dictionary = {
   'settings.operators.createdAt': 'Erstellt',
   'settings.operators.loading': 'Operatoren werden geladen…',
   'settings.operators.empty': 'Noch keine Operatoren registriert',
+  'settings.operators.search': 'Nach Name, Benutzername, E-Mail oder Position suchen',
+  'settings.operators.searchEmpty': 'Kein Operator entspricht dieser Suche.',
   'settings.operators.loadFailed': 'Die Operatorenliste konnte nicht geladen werden',
   'settings.operators.you': 'Sie',
   'settings.operators.emailMissing': 'Keine E-Mail',

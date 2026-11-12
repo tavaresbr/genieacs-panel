@@ -1631,6 +1631,8 @@ const ja: Dictionary = {
   'settings.operators.createdAt': '作成日',
   'settings.operators.loading': 'オペレーターを読み込んでいます…',
   'settings.operators.empty': 'まだオペレーターが登録されていません',
+  'settings.operators.search': '名前・ユーザー名・メール・役職で検索',
+  'settings.operators.searchEmpty': 'この検索に一致するオペレーターはいません。',
   'settings.operators.loadFailed': 'オペレーターの一覧を読み込めませんでした',
   'settings.operators.you': '自分',
   'settings.operators.emailMissing': 'メールなし',

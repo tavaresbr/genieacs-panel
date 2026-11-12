@@ -1611,6 +1611,8 @@ const hi: Dictionary = {
   'settings.operators.createdAt': 'बनाया गया',
   'settings.operators.loading': 'ऑपरेटर लोड हो रहे हैं…',
   'settings.operators.empty': 'अभी कोई ऑपरेटर पंजीकृत नहीं है',
+  'settings.operators.search': 'नाम, उपयोगकर्ता नाम, ईमेल या पद से खोजें',
+  'settings.operators.searchEmpty': 'इस खोज से कोई ऑपरेटर मेल नहीं खाता।',
   'settings.operators.loadFailed': 'ऑपरेटर सूची लोड नहीं हो सकी',
   'settings.operators.you': 'आप',
   'settings.operators.resetPassword': 'पासवर्ड रीसेट करें',

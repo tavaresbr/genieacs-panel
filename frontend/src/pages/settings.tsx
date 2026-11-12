@@ -65,6 +65,8 @@ import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType
 import { MfaCard } from '@/components/mfa-card'
 import { ActiveSessionsCard } from '@/components/active-sessions-card'
 import { OperatorEditDialog } from '@/components/settings/operator-edit-dialog'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { filterOperators } from '@/lib/operator-profile'
 import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-panel'
@@ -152,6 +154,9 @@ export default function Settings() {
   // de lint não distingue o callback que roda depois do que roda agora — por
   // isso ela exige a ordem, e a ordem custa nada.
   const toast = useToast()
+  // O "tem certeza?" do painel, no lugar do `window.confirm`: `askConfirm` resolve
+  // com a resposta e `confirmElement` (no fim do JSX) é o que o mostra.
+  const { confirm: askConfirm, element: confirmElement } = useConfirm()
   const loadingCtl = useLoading()
   const isOwner = currentUser?.role === 'owner'
   // Se quem está na tela já usa o 2FA — o cartão da exigência precisa saber,
@@ -572,7 +577,7 @@ export default function Settings() {
   }
 
   const handleSgpClearToken = async () => {
-    if (!confirm(t('settings.sgp.clearTokenConfirm'))) return
+    if (!(await askConfirm(t('settings.sgp.clearTokenConfirm'), { danger: true }))) return
     setSgpSaving(true)
     try {
       const res = await sgpAPI.updateConfig({ enabled: false, token: '' })
@@ -692,7 +697,7 @@ export default function Settings() {
       ? t('settings.db.sqlite')
       : t('settings.db.mysql', { database: String(dbForm.database), host: String(dbForm.host) })
     const dataNotice = dbForm.migrateData ? t('settings.db.confirmCopy') : t('settings.db.confirmNoCopy')
-    if (!confirm(t('settings.db.confirmSwitch', { label, dataNotice }))) return
+    if (!(await askConfirm(t('settings.db.confirmSwitch', { label, dataNotice }), { danger: true }))) return
     setDbSwitching(true)
     try {
       const res = await databaseAPI.switch(dbForm)
@@ -924,6 +929,7 @@ export default function Settings() {
     role: 'viewer'
   })
   const [editingOperator, setEditingOperator] = useState<Operator | null>(null)
+  const [operatorQuery, setOperatorQuery] = useState('')
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null)
   const [resetPasswordValue, setResetPasswordValue] = useState('')
 
@@ -1063,7 +1069,7 @@ export default function Settings() {
   // que acontece: o 2FA sai, as sessões caem, e a senha sozinha volta a entrar
   // (num provedor que exige, a pessoa é levada a ativar de novo).
   const resetOperatorMfa = async (operator: Operator) => {
-    if (!confirm(t('settings.operators.confirmMfaReset', { username: operator.username }))) return
+    if (!(await askConfirm(t('settings.operators.confirmMfaReset', { username: operator.username }), { danger: true }))) return
     setOperatorBusyId(operator.id)
     try {
       const res = await usersAPI.resetMfa(operator.id)
@@ -1080,7 +1086,7 @@ export default function Settings() {
   }
 
   const deleteOperator = async (operator: Operator) => {
-    if (!confirm(t('settings.operators.confirmDelete', { username: operator.username }))) return
+    if (!(await askConfirm(t('settings.operators.confirmDelete', { username: operator.username }), { danger: true }))) return
     setOperatorBusyId(operator.id)
     try {
       const res = await usersAPI.remove(operator.id)
@@ -1351,7 +1357,7 @@ export default function Settings() {
 
   const deleteVendor = async (id: number) => {
     const vendor = vendorList.find((item) => item.id === id)
-    if (!confirm(t('settings.vendors.confirmDelete', { name: vendor?.name || id }))) return
+    if (!(await askConfirm(t('settings.vendors.confirmDelete', { name: vendor?.name || id }), { danger: true }))) return
     const res = await vendorsAPI.delete(id)
     if (res.success) {
       setVendorList(prev => prev.filter(v => v.id !== id))
@@ -1423,7 +1429,7 @@ export default function Settings() {
 
   const deleteWifiConfig = async (id: number) => {
     const config = wifiConfigs.find((item) => item.id === id)
-    if (!confirm(t('settings.wifi.confirmDelete', { name: config?.product_class || id }))) return
+    if (!(await askConfirm(t('settings.wifi.confirmDelete', { name: config?.product_class || id }), { danger: true }))) return
     const res = await vendorsAPI.deleteWifiSecurityConfig(id)
     if (res.success) {
       setWifiConfigs(prev => prev.filter(c => c.id !== id))
@@ -1439,7 +1445,7 @@ export default function Settings() {
    * onde a cópia do provedor nasceu da caixa: na self-hosted não há padrão.
    */
   const resetCatalogueRow = async (kind: 'vendor' | 'wifi', id: number, name: string) => {
-    if (!confirm(t('settings.catalogue.resetConfirm', { name }))) return
+    if (!(await askConfirm(t('settings.catalogue.resetConfirm', { name }), { danger: true }))) return
     const res = kind === 'vendor'
       ? await vendorsAPI.reset(id)
       : await vendorsAPI.resetWifiSecurityConfig(id)
@@ -1735,6 +1741,8 @@ export default function Settings() {
       </button>
     </div>
   )
+
+  const visibleOperators = filterOperators(operators, operatorQuery)
 
   return (
     <div className="page-shell">
@@ -3395,6 +3403,21 @@ export default function Settings() {
                 {/* No celular a conta vira cartão: a tabela de cinco colunas
                     só cabia rolando de lado, com as ações fora da vista — no
                     tablet também, por isso o corte é o lg e não o md. */}
+                {operators.length > 0 && (
+                  <div className="mb-3">
+                    <label htmlFor="operator-search" className="sr-only">{t('settings.operators.search')}</label>
+                    <input
+                      id="operator-search"
+                      type="search"
+                      value={operatorQuery}
+                      onChange={(event) => setOperatorQuery(event.target.value)}
+                      placeholder={t('settings.operators.search')}
+                      className="modern-input w-full sm:max-w-sm"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+
                 <ul className="space-y-3 lg:hidden" aria-busy={operatorsLoading}>
                   {operatorsLoading ? (
                     <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.operators.loading')}</li>
@@ -3404,8 +3427,10 @@ export default function Settings() {
                     </li>
                   ) : operators.length === 0 ? (
                     <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.operators.empty')}</li>
+                  ) : visibleOperators.length === 0 ? (
+                    <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.operators.searchEmpty')}</li>
                   ) : (
-                    operators.map((operator) => {
+                    visibleOperators.map((operator) => {
                       const isSelf = currentUser?.id === operator.id
                       const lockedByOwner = operator.role === 'owner' && !isOwner
                       return (
@@ -3474,8 +3499,14 @@ export default function Settings() {
                             {t('settings.operators.empty')}
                           </td>
                         </tr>
+                      ) : visibleOperators.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                            {t('settings.operators.searchEmpty')}
+                          </td>
+                        </tr>
                       ) : (
-                        operators.map((operator) => {
+                        visibleOperators.map((operator) => {
                           const isSelf = currentUser?.id === operator.id
                           // Mexer no papel de um `owner` é dele para dele: o
                           // backend responde 403 a qualquer outro, para dar e
@@ -4056,6 +4087,7 @@ export default function Settings() {
           </div>
         )}
       </div>
+      {confirmElement}
     </div>
   )
 }

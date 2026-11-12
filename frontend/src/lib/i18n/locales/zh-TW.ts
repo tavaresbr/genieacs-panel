@@ -1631,6 +1631,8 @@ const zhTW: Dictionary = {
   'settings.operators.createdAt': '建立時間',
   'settings.operators.loading': '正在載入維運人員…',
   'settings.operators.empty': '尚未註冊維運人員',
+  'settings.operators.search': '依姓名、使用者名稱、電子郵件或職稱搜尋',
+  'settings.operators.searchEmpty': '沒有符合此搜尋的操作員。',
   'settings.operators.loadFailed': '無法載入維運人員清單',
   'settings.operators.you': '本人',
   'settings.operators.emailMissing': '無電子郵件',

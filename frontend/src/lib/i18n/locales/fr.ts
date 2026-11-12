@@ -1631,6 +1631,8 @@ const fr: Dictionary = {
   'settings.operators.createdAt': 'Créé le',
   'settings.operators.loading': 'Chargement des opérateurs…',
   'settings.operators.empty': 'Aucun opérateur enregistré pour l’instant',
+  'settings.operators.search': 'Rechercher par nom, identifiant, e-mail ou poste',
+  'settings.operators.searchEmpty': 'Aucun opérateur ne correspond à cette recherche.',
   'settings.operators.loadFailed': 'La liste des opérateurs n’a pas pu être chargée',
   'settings.operators.you': 'Vous',
   'settings.operators.emailMissing': 'Sans e-mail',

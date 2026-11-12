@@ -1634,6 +1634,8 @@ const ru: Dictionary = {
   'settings.operators.createdAt': 'Создан',
   'settings.operators.loading': 'Загрузка операторов…',
   'settings.operators.empty': 'Операторы ещё не зарегистрированы',
+  'settings.operators.search': 'Поиск по имени, логину, e-mail или должности',
+  'settings.operators.searchEmpty': 'Нет операторов, подходящих под этот поиск.',
   'settings.operators.loadFailed': 'Не удалось загрузить список операторов',
   'settings.operators.you': 'Вы',
   'settings.operators.emailMissing': 'Без почты',

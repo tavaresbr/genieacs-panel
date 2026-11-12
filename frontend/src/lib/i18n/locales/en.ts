@@ -1633,6 +1633,8 @@ const en = {
   'settings.operators.createdAt': 'Created',
   'settings.operators.loading': 'Loading operators…',
   'settings.operators.empty': 'No operators registered yet',
+  'settings.operators.search': 'Search by name, username, email or job title',
+  'settings.operators.searchEmpty': 'No operator matches this search.',
   'settings.operators.loadFailed': 'The operator list could not be loaded',
   'settings.operators.you': 'You',
   'settings.operators.emailMissing': 'No email',

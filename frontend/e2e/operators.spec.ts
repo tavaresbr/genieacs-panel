@@ -45,4 +45,29 @@ test.describe('o cadastro do operador', () => {
     await page.getByRole('button', { name: /^Editar cadastro de / }).first().click()
     await expect(page.getByTestId('operator-edit').getByLabel('CPF')).toHaveValue('529.982.247-25')
   })
+
+  test('a busca filtra a lista e o "excluir" pergunta num diálogo do painel', async ({ page }) => {
+    await loginViaForm(page, PROVIDER)
+    await page.goto('/settings?tab=security')
+
+    const busca = page.getByLabel('Buscar por nome, usuário, e-mail ou cargo')
+    await expect(busca).toBeVisible()
+
+    // Uma busca sem resposta mostra o aviso, e limpar traz a lista de volta.
+    await busca.fill('zzz-ninguem-tem-isso')
+    await expect(page.getByText('Nenhum operador encontrado para essa busca.').filter({ visible: true })).toBeVisible()
+    await busca.fill('')
+    await expect(page.getByText('Nenhum operador encontrado para essa busca.')).toBeHidden()
+
+    // O botão de excluir abre o diálogo do painel (e não o do navegador);
+    // cancelar não apaga ninguém. Só há um operador no seed, então o servidor
+    // recusaria de qualquer modo: o que se prova aqui é o diálogo.
+    let dialogoDoNavegador = false
+    page.on('dialog', (dialog) => { dialogoDoNavegador = true; void dialog.dismiss() })
+    await page.getByRole('button', { name: /^Excluir / }).filter({ visible: true }).first().click()
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(page.getByTestId('confirm-dialog')).toBeHidden()
+    expect(dialogoDoNavegador).toBe(false)
+  })
 })

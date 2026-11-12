@@ -1631,6 +1631,8 @@ const ptBR: Dictionary = {
   'settings.operators.createdAt': 'Criado em',
   'settings.operators.loading': 'Carregando operadores…',
   'settings.operators.empty': 'Nenhum operador cadastrado ainda',
+  'settings.operators.search': 'Buscar por nome, usuário, e-mail ou cargo',
+  'settings.operators.searchEmpty': 'Nenhum operador encontrado para essa busca.',
   'settings.operators.loadFailed': 'Não foi possível carregar a lista de operadores',
   'settings.operators.you': 'Você',
   'settings.operators.emailMissing': 'Sem e-mail',
