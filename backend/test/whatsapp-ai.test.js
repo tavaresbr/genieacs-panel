@@ -443,6 +443,50 @@ describe('a IA atendendo', () => {
   });
 
   describe('vendas: registrar_interesse_comercial', () => {
+    it('trava de preço: valor fora do catálogo não sai; o do catálogo e o das instruções passam; cliente com contrato não é barrado', async () => {
+      const { default: WaSalesPlanService } = await import('../src/services/waSalesPlanService.js');
+      const plano = await asTenant(() => WaSalesPlanService.create({ name: 'Fibra Trava', priceCents: 8990, speedMbps: 300, profile: 'equilibrado' }));
+      const notasDe = async (telefone) => {
+        const c = await conversaDe(telefone);
+        return getDb()('wa_messages').where({ conversation_id: c.id, is_note: true }).orderBy('id').pluck('body');
+      };
+      try {
+        // 1. valor inventado: nada com preço sai; passagem padrão e nota para a equipe
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'O plano de 300 Mega custa R$ 49,90 por mês!' }];
+        await receber(DESCONHECIDO, 'quanto custa?');
+        const saidas = await respostas(DESCONHECIDO);
+        assert.equal(saidas.length, 1, JSON.stringify(saidas));
+        assert.doesNotMatch(saidas[0], /49,90/);
+        assert.match(saidas[0], /atendente vai te responder/i);
+        const notas = await notasDe(DESCONHECIDO);
+        assert.match(notas.at(-1), /NÃO foi enviada/);
+        assert.match(notas.at(-1), /R\$ 49,90/);
+        const c1 = await conversaDe(DESCONHECIDO);
+        assert.ok(new Date(c1.bot_paused_until) > new Date(), 'o bot ficou em pausa');
+
+        // 2. valor do catálogo passa
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'O Fibra Trava custa R$ 89,90 por mês.' }];
+        await receber(DESCONHECIDO, 'e o fibra?');
+        assert.deepEqual(await respostas(DESCONHECIDO), ['O Fibra Trava custa R$ 89,90 por mês.']);
+
+        // 3. valor escrito nas instruções da empresa passa
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'O de 500 mega custa R$ 99,90 por mês.' }];
+        await receber(DESCONHECIDO, 'e o de 500?');
+        assert.deepEqual(await respostas(DESCONHECIDO), ['O de 500 mega custa R$ 99,90 por mês.']);
+
+        // 4. cliente com contrato: o valor não é barrado
+        await limparFio(ASSINANTE);
+        roteiro = [{ content: 'Sua fatura é de R$ 49,90.' }];
+        await receber(ASSINANTE, 'quanto é minha fatura?');
+        assert.deepEqual(await respostas(ASSINANTE), ['Sua fatura é de R$ 49,90.']);
+      } finally {
+        await asTenant(() => WaSalesPlanService.remove(plano.id));
+      }
+    });
+
     it('a IA escreve a resposta de um item da base: só rascunho, com o contexto do item, sem inventar fato', async () => {
       await salvarIa({ instructions: 'Planos: 500 mega R$ 99,90. Atendemos em Itaituba.' });
       roteiro = [{ content: '```\n"Entendo! Nosso plano inclui **Wi-Fi 6**. [escreva o prazo real]"\n```' }];

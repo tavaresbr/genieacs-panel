@@ -142,6 +142,12 @@ class WaSalesPlanService {
     return Number(total) || 0;
   }
 
+  /** Os preços (centavos) de todos os planos ativos: a lista que a IA pode citar. */
+  static async precosDoCatalogo() {
+    const linhas = await tdb('wa_sales_plans').where({ active: true }).where('price_cents', '>', 0).select('price_cents');
+    return new Set(linhas.map((l) => Number(l.price_cents)));
+  }
+
   /**
    * Os planos que a ferramenta `consultar_planos` devolve (0 a 2). Com planos que
    * variam por cidade, a oferta depende da cidade: sem ela, `precisaCidade`; com
