@@ -62,7 +62,7 @@ export function SalesPlansPanel() {
   useEffect(() => {
     if (abertoId === undefined) return
     // As cidades marcáveis vêm de "Onde você atende", que pode ter mudado desde que a tela abriu.
-    void whatsappAPI.getBotConfig().then((res) => { if (res.success && res.data) setCoverage(res.data.ai.coverage ?? []) }).catch(() => {})
+    void whatsappAPI.getBotConfig().then((res) => { if (res.success && res.data) setCoverage((res.data.ai.coverage ?? []).map((lugar) => lugar.name)) }).catch(() => {})
     formRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     nameRef.current?.focus({ preventScroll: true })
   }, [abertoId])

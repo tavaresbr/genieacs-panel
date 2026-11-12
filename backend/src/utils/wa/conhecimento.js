@@ -59,11 +59,17 @@ export function escolherConhecimento(itens, conversa, limite = LIMITE_DO_PROMPT)
   return { itens: escolhidos, texto, usados: escolhidos.filter((i) => porGatilho.includes(i)) };
 }
 
-/** A regra de cobertura; vazia quando o provedor não cadastrou lugares. */
+/** Um lugar da cobertura como texto para a IA: "Itaituba (também: Itaitu, ITB)". */
+const lugarEmTexto = (lugar) => {
+  const { name, aliases } = typeof lugar === 'string' ? { name: lugar, aliases: [] } : lugar;
+  return aliases?.length ? `${name} (também: ${aliases.join(', ')})` : name;
+};
+
+/** A regra de cobertura; vazia quando o provedor não cadastrou lugares. Aceita `{name, aliases}` ou texto. */
 export function blocoCobertura(lugares) {
-  const lista = (lugares ?? []).filter(Boolean);
+  const lista = (lugares ?? []).filter((l) => (typeof l === 'string' ? l : l?.name));
   if (!lista.length) return '';
-  return `Lugares atendidos pela empresa: ${lista.join(', ')}. Se a pessoa citar uma cidade ou bairro que NÃO está nesta lista, não confirme nem negue a cobertura: diga que vai conferir e use transferir_para_atendente. Se o lugar está na lista, pode confirmar que atende.`;
+  return `Lugares atendidos pela empresa: ${lista.map(lugarEmTexto).join(', ')}. Se a pessoa citar uma cidade ou bairro que NÃO está nesta lista (nem entre os nomes "também"), não confirme nem negue a cobertura: diga que vai conferir e use transferir_para_atendente. Se o lugar está na lista, pode confirmar que atende.`;
 }
 
 /** A lista de lugares do formulário: texto limpo, sem repetido (sem ligar para caixa), no limite. */
@@ -93,3 +99,47 @@ export const EXEMPLOS = Object.freeze([
   { kind: 'objecao', title: 'Vou pensar', triggers: 'vou pensar, depois, mais tarde', answer: 'Agradeça, deixe a porta aberta e ofereça mandar as informações para ele ver com calma.' },
   { kind: 'faq', title: 'Tem fidelidade?', triggers: 'fidelidade, multa, contrato, cancelar', answer: 'Escreva aqui a sua regra real de fidelidade e de cancelamento.' }
 ]);
+
+const APELIDOS_MAX = 10;
+
+/**
+ * A cobertura do formulário: `{ name, aliases[] }` por lugar. Aceita também o
+ * formato antigo (só o texto do nome). Sem repetir nome (sem ligar para caixa
+ * ou acento), sem apelido igual ao nome ou ao de outro lugar, nos limites.
+ *
+ * @returns {{name: string, aliases: string[]}[]|null} `null` se não for lista
+ */
+export function limparCobertura(valor) {
+  if (!Array.isArray(valor)) return null;
+  const nomes = [];
+  for (const bruto of valor) {
+    const origem = typeof bruto === 'object' && bruto !== null ? bruto : { name: bruto };
+    const name = String(origem.name ?? '').replace(/\s+/g, ' ').trim().slice(0, LUGAR_MAX);
+    if (name) nomes.push({ name, aliases: Array.isArray(origem.aliases) ? origem.aliases : [] });
+  }
+  // Os nomes valem primeiro: um apelido nunca toma o lugar do nome de outro.
+  const usados = new Set();
+  const lugares = [];
+  for (const { name, aliases } of nomes) {
+    const chave = normalizar(name);
+    if (usados.has(chave)) continue;
+    usados.add(chave);
+    lugares.push({ name, aliases });
+    if (lugares.length >= LUGARES_MAX) break;
+  }
+  return lugares.map(({ name, aliases }) => {
+    const proprios = [];
+    for (const bruto of aliases) {
+      const apelido = String(bruto ?? '').replace(/\s+/g, ' ').trim().slice(0, LUGAR_MAX);
+      const chave = normalizar(apelido);
+      if (!apelido || usados.has(chave)) continue;
+      usados.add(chave);
+      proprios.push(apelido);
+      if (proprios.length >= APELIDOS_MAX) break;
+    }
+    return { name, aliases: proprios };
+  });
+}
+
+/** O nome do lugar e os apelidos: tudo o que o cliente pode escrever para se referir a ele. */
+export const nomesDoLugar = (lugar) => (typeof lugar === 'string' ? [lugar] : [lugar.name, ...(lugar.aliases ?? [])]);

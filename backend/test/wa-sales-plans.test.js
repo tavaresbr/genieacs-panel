@@ -126,3 +126,39 @@ describe('planos por cidade', () => {
     }
   });
 });
+
+describe('planos por cidade com apelidos', () => {
+  const cobertura = [
+    { name: 'Jardim das Araras', aliases: ['Araras', 'Jd. Araras'] },
+    { name: 'Itaituba', aliases: [] }
+  ];
+  const plano = { name: 'Rádio Araras', cities: JSON.stringify(['Jardim das Araras']) };
+
+  it('o plano marcado num lugar vale para o nome e para os apelidos dele', () => {
+    assert.equal(planoVaiNaCidade(plano, 'Jardim das Araras', cobertura), true);
+    assert.equal(planoVaiNaCidade(plano, 'Araras', cobertura), true);
+    assert.equal(planoVaiNaCidade(plano, 'jd araras', cobertura), true, 'contém o apelido Araras');
+    assert.equal(planoVaiNaCidade(plano, 'Jd. Araras', cobertura), true);
+    assert.equal(planoVaiNaCidade(plano, 'moro no Jd. Araras, perto da escola', cobertura), true);
+    assert.equal(planoVaiNaCidade(plano, 'Itaituba', cobertura), false);
+    assert.equal(planoVaiNaCidade(plano, 'Jd. Araras', []), false, 'sem a cobertura, só o nome marcado vale');
+    assert.deepEqual(planosDaCidade([plano, { name: 'Todas' }], 'Araras', cobertura).map((p) => p.name), ['Rádio Araras', 'Todas']);
+  });
+
+  it('a IA recebe o plano quando o cliente usa um apelido da cobertura salva', async () => {
+    const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
+    const criado = await asTenant(() => WaSalesPlanService.create({ name: 'Rádio Araras', priceCents: 5990, profile: 'economico', cities: ['Jardim das Araras'] }));
+    try {
+      await asTenant(() => WaBotConfigService.saveConfig({ ai: { coverage: ['Itaituba', { name: 'Jardim das Araras', aliases: ['Araras'] }] } }));
+      const { ai } = await asTenant(() => WaBotConfigService.getConfig());
+      assert.deepEqual(ai.coverage[1], { name: 'Jardim das Araras', aliases: ['Araras'] });
+      const comApelido = await asTenant(() => WaSalesPlanService.paraIa('economico', 'Araras'));
+      assert.deepEqual(comApelido.planos.map((p) => p.name), ['Rádio Araras']);
+      const fora = await asTenant(() => WaSalesPlanService.paraIa('economico', 'Itaituba'));
+      assert.deepEqual(fora.planos, [], 'o plano é só do Jardim das Araras');
+    } finally {
+      await asTenant(() => WaBotConfigService.saveConfig({ ai: { coverage: [] } }));
+      await asTenant(() => WaSalesPlanService.remove(criado.id));
+    }
+  });
+});

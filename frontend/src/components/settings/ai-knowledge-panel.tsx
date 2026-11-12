@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { whatsappAPI, type AiKnowledgeItem, type AiKnowledgeKind } from '@/lib/api'
+import { whatsappAPI, type AiKnowledgeItem, type AiKnowledgeKind, type CoveragePlace } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -35,7 +35,9 @@ export function AiKnowledgePanel() {
   const toast = useToast()
   const [itens, setItens] = useState<AiKnowledgeItem[] | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
-  const [lugares, setLugares] = useState<string[]>([])
+  const [lugares, setLugares] = useState<CoveragePlace[]>([])
+  const [editandoApelidos, setEditandoApelidos] = useState<string | null>(null)
+  const [apelidos, setApelidos] = useState('')
   const [novoLugar, setNovoLugar] = useState('')
   const [busy, setBusy] = useState(false)
   const [temChaveIa, setTemChaveIa] = useState(true)
@@ -91,7 +93,7 @@ export function AiKnowledgePanel() {
     else toast.error(res.message || whatsappErrorMessage(t, res.code))
   }
 
-  const gravarLugares = async (proximos: string[]) => {
+  const gravarLugares = async (proximos: CoveragePlace[]) => {
     const res = await whatsappAPI.updateBotConfig({ ai: { coverage: proximos } })
     if (res.success && res.data) { setLugares(res.data.ai.coverage ?? []); toast.success(t('settings.chatbot.coverageSaved')) }
     else toast.error(res.message || whatsappErrorMessage(t, res.code))
@@ -101,7 +103,18 @@ export function AiKnowledgePanel() {
     const nome = novoLugar.trim()
     if (!nome) return
     setNovoLugar('')
-    await gravarLugares([...lugares, nome])
+    await gravarLugares([...lugares, { name: nome, aliases: [] }])
+  }
+
+  const abrirApelidos = (lugar: CoveragePlace) => {
+    setEditandoApelidos(lugar.name)
+    setApelidos(lugar.aliases.join(', '))
+  }
+
+  const salvarApelidos = async (lugar: CoveragePlace) => {
+    const lista = apelidos.split(',').map((a) => a.trim()).filter(Boolean)
+    await gravarLugares(lugares.map((l) => (l.name === lugar.name ? { name: l.name, aliases: lista } : l)))
+    setEditandoApelidos(null)
   }
 
   const pendentes = (itens ?? []).filter((i) => i.origin === 'sugerida' && !i.active)
@@ -264,18 +277,45 @@ export function AiKnowledgePanel() {
         <h2 id="ai-coverage-title" className="section-heading">{t('settings.chatbot.coverageTitle')}</h2>
         <p className="field-hint mt-1">{t('settings.chatbot.coverageIntro')}</p>
         {lugares.length > 0 && (
-          <ul className="mt-3 flex flex-wrap gap-2">
+          <ul className="mt-3 grid gap-2">
             {lugares.map((lugar) => (
-              <li key={lugar} className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-sm">
-                <span className="wrap-anywhere">{lugar}</span>
-                <button
-                  type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
-                  aria-label={t('settings.chatbot.coverageRemove', { name: lugar })}
-                  onClick={() => void gravarLugares(lugares.filter((l) => l !== lugar))}
-                >
-                  ×
-                </button>
+              <li key={lugar.name} className="rounded-md border border-border px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="min-w-0 flex-1 wrap-anywhere">
+                    <span className="font-medium">{lugar.name}</span>
+                    {lugar.aliases.length > 0 && <span className="text-muted-foreground"> · {t('settings.chatbot.coverageAlso', { list: lugar.aliases.join(', ') })}</span>}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button type="button" className="min-h-10 rounded-md px-2 text-sm underline underline-offset-2 lg:min-h-0" onClick={() => (editandoApelidos === lugar.name ? setEditandoApelidos(null) : abrirApelidos(lugar))}>
+                      {t('settings.chatbot.coverageAliases')}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:text-foreground lg:h-6 lg:w-6"
+                      aria-label={t('settings.chatbot.coverageRemove', { name: lugar.name })}
+                      onClick={() => void gravarLugares(lugares.filter((l) => l.name !== lugar.name))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                {editandoApelidos === lugar.name && (
+                  <form className="mt-2 grid gap-2" onSubmit={(event) => { event.preventDefault(); void salvarApelidos(lugar) }}>
+                    <label htmlFor={`aliases-${lugar.name}`} className="field-label">{t('settings.chatbot.coverageAliasesLabel', { name: lugar.name })}</label>
+                    <input
+                      id={`aliases-${lugar.name}`}
+                      className="modern-input w-full"
+                      placeholder={t('settings.chatbot.coverageAliasesPlaceholder')}
+                      value={apelidos}
+                      onChange={(e) => setApelidos(e.target.value)}
+                    />
+                    <p className="field-hint">{t('settings.chatbot.coverageAliasesHint')}</p>
+                    <div className="flex gap-2">
+                      <button type="submit" className="modern-button">{t('settings.chatbot.coverageAliasesSave')}</button>
+                      <button type="button" className="modern-button-secondary" onClick={() => setEditandoApelidos(null)}>{t('common.cancel')}</button>
+                    </div>
+                  </form>
+                )}
               </li>
             ))}
           </ul>

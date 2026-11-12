@@ -7,7 +7,7 @@
  * plano de entrada e o equilibrado. Plano inativo ou sem preço nunca sai.
  */
 
-import { normalizar } from './conhecimento.js';
+import { normalizar, nomesDoLugar } from './conhecimento.js';
 
 export const PERFIS_DE_PLANO = Object.freeze(['economico', 'equilibrado', 'premium']);
 
@@ -80,14 +80,24 @@ function mesmaCidade(dita, cadastrada) {
   return (b.length >= 4 && a.includes(b)) || (a.length >= 4 && b.includes(a));
 }
 
-/** Plano sem cidade marcada vale para todas; com cidades, só para elas. */
-export function planoVaiNaCidade(plano, cidade) {
-  const cidades = cidadesDoPlano(plano);
-  if (!cidades.length) return true;
-  return cidades.some((c) => mesmaCidade(cidade, c));
+/**
+ * Os nomes que valem para uma cidade marcada no plano: o próprio nome mais os
+ * apelidos do lugar de mesmo nome na cobertura (ou que o tenha como apelido).
+ */
+function nomesDaCidadeMarcada(marcada, cobertura) {
+  const chave = normalizar(marcada);
+  const lugar = (cobertura ?? []).find((l) => nomesDoLugar(l).some((n) => normalizar(n) === chave));
+  return lugar ? [...new Set([marcada, ...nomesDoLugar(lugar)])] : [marcada];
 }
 
-export const planosDaCidade = (planos, cidade) => (planos ?? []).filter((p) => planoVaiNaCidade(p, cidade));
+/** Plano sem cidade marcada vale para todas; com cidades, só para elas e seus apelidos. */
+export function planoVaiNaCidade(plano, cidade, cobertura = []) {
+  const cidades = cidadesDoPlano(plano);
+  if (!cidades.length) return true;
+  return cidades.some((c) => nomesDaCidadeMarcada(c, cobertura).some((nome) => mesmaCidade(cidade, nome)));
+}
+
+export const planosDaCidade = (planos, cidade, cobertura = []) => (planos ?? []).filter((p) => planoVaiNaCidade(p, cidade, cobertura));
 
 /** Algum plano tem cidade marcada: então a oferta depende de saber onde a pessoa mora. */
 export const variaPorCidade = (planos) => (planos ?? []).some((p) => cidadesDoPlano(p).length > 0);
