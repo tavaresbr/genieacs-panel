@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { whatsappAPI, type AiKnowledgeItem, type AiKnowledgeKind } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -38,6 +38,17 @@ export function AiKnowledgePanel() {
   const [lugares, setLugares] = useState<string[]>([])
   const [novoLugar, setNovoLugar] = useState('')
   const [busy, setBusy] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
+
+  // Abrir o formulário leva a tela até ele e põe o cursor no título: sem isso, quem edita um
+  // item do meio de uma lista longa não vê nada acontecer.
+  const abertoId = rascunho === null ? undefined : (rascunho.id ?? 'novo')
+  useEffect(() => {
+    if (abertoId === undefined) return
+    formRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    titleRef.current?.focus({ preventScroll: true })
+  }, [abertoId])
 
   const carregar = useCallback(async () => {
     const [lista, config] = await Promise.all([whatsappAPI.listAiKnowledge(), whatsappAPI.getBotConfig()])
@@ -104,6 +115,38 @@ export function AiKnowledgePanel() {
 
   const patch = (parte: Partial<Rascunho>) => setRascunho((atual) => (atual ? { ...atual, ...parte } : atual))
 
+  const formulario = rascunho ? (
+    <form ref={formRef} className="grid gap-4 rounded-md border border-border p-4" onSubmit={(event) => { event.preventDefault(); void salvar() }}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="kb-kind" className="field-label">{t('settings.chatbot.kbKind')}</label>
+          <select id="kb-kind" className="modern-input w-full" value={rascunho.kind} onChange={(e) => patch({ kind: e.target.value as AiKnowledgeKind })}>
+            {KINDS.map((k) => <option key={k} value={k}>{t(KIND_KEY[k])}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="kb-title" className="field-label">{t('settings.chatbot.kbItemTitle')}</label>
+          <input id="kb-title" ref={titleRef} className="modern-input w-full" maxLength={120} required value={rascunho.title} onChange={(e) => patch({ title: e.target.value })} />
+        </div>
+      </div>
+      {rascunho.kind !== 'vantagem' && (
+        <div>
+          <label htmlFor="kb-triggers" className="field-label">{t('settings.chatbot.kbTriggers')}</label>
+          <input id="kb-triggers" className="modern-input w-full" maxLength={300} value={rascunho.triggers} onChange={(e) => patch({ triggers: e.target.value })} />
+          <p className="field-hint">{t('settings.chatbot.kbTriggersHint')}</p>
+        </div>
+      )}
+      <div>
+        <label htmlFor="kb-answer" className="field-label">{t('settings.chatbot.kbAnswer')}</label>
+        <textarea id="kb-answer" className="modern-input w-full text-sm" rows={3} maxLength={600} required value={rascunho.answer} onChange={(e) => patch({ answer: e.target.value })} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" className="modern-button" disabled={busy}>{t('settings.chatbot.kbSave')}</button>
+        <button type="button" className="modern-button-secondary" onClick={() => setRascunho(null)}>{t('common.cancel')}</button>
+      </div>
+    </form>
+  ) : null
+
   return (
     <>
       {pendentes.length > 0 && (
@@ -111,7 +154,7 @@ export function AiKnowledgePanel() {
           <h2 id="ai-sug-title" className="section-heading">{t('settings.chatbot.sugTitle')}</h2>
           <p className="field-hint mt-1">{t('settings.chatbot.sugIntro')}</p>
           <ul className="mt-4 grid gap-3">
-            {pendentes.map((item) => (
+            {pendentes.map((item) => (rascunho?.id === item.id ? <li key={item.id}>{formulario}</li> : (
               <li key={item.id} className="rounded-md border border-dashed border-border p-3">
                 <p className="flex flex-wrap items-center gap-2 font-medium">
                   <span className={`${KIND_CLASS[item.kind]} whitespace-nowrap text-xs`}>{t(KIND_KEY[item.kind])}</span>
@@ -128,7 +171,7 @@ export function AiKnowledgePanel() {
                   <button type="button" className="modern-button-secondary" onClick={() => void rejeitar(item)}>{t('settings.chatbot.sugReject')}</button>
                 </div>
               </li>
-            ))}
+            )))}
           </ul>
         </section>
       )}
@@ -144,11 +187,13 @@ export function AiKnowledgePanel() {
           </button>
         </div>
 
+        {rascunho?.id === null && <div className="mt-4">{formulario}</div>}
+
         {itens !== null && demais.length === 0 && <p className="mt-4 text-sm text-muted-foreground">{t('settings.chatbot.kbEmpty')}</p>}
 
         {itens !== null && demais.length > 0 && (
           <ul className="mt-4 divide-y divide-border">
-            {demais.map((item) => (
+            {demais.map((item) => (rascunho?.id === item.id ? <li key={item.id} className="py-3">{formulario}</li> : (
               <li key={item.id} className={`flex flex-wrap items-start justify-between gap-3 py-3 ${item.active ? '' : 'opacity-60'}`}>
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium">
@@ -170,41 +215,10 @@ export function AiKnowledgePanel() {
                   <button type="button" className="modern-button-secondary" onClick={() => void apagar(item)}>{t('settings.chatbot.kbDelete')}</button>
                 </div>
               </li>
-            ))}
+            )))}
           </ul>
         )}
 
-        {rascunho && (
-          <form className="mt-4 grid gap-4 rounded-md border border-border p-4" onSubmit={(event) => { event.preventDefault(); void salvar() }}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="kb-kind" className="field-label">{t('settings.chatbot.kbKind')}</label>
-                <select id="kb-kind" className="modern-input w-full" value={rascunho.kind} onChange={(e) => patch({ kind: e.target.value as AiKnowledgeKind })}>
-                  {KINDS.map((k) => <option key={k} value={k}>{t(KIND_KEY[k])}</option>)}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="kb-title" className="field-label">{t('settings.chatbot.kbItemTitle')}</label>
-                <input id="kb-title" className="modern-input w-full" maxLength={120} required value={rascunho.title} onChange={(e) => patch({ title: e.target.value })} />
-              </div>
-            </div>
-            {rascunho.kind !== 'vantagem' && (
-              <div>
-                <label htmlFor="kb-triggers" className="field-label">{t('settings.chatbot.kbTriggers')}</label>
-                <input id="kb-triggers" className="modern-input w-full" maxLength={300} value={rascunho.triggers} onChange={(e) => patch({ triggers: e.target.value })} />
-                <p className="field-hint">{t('settings.chatbot.kbTriggersHint')}</p>
-              </div>
-            )}
-            <div>
-              <label htmlFor="kb-answer" className="field-label">{t('settings.chatbot.kbAnswer')}</label>
-              <textarea id="kb-answer" className="modern-input w-full text-sm" rows={3} maxLength={600} required value={rascunho.answer} onChange={(e) => patch({ answer: e.target.value })} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="submit" className="modern-button" disabled={busy}>{t('settings.chatbot.kbSave')}</button>
-              <button type="button" className="modern-button-secondary" onClick={() => setRascunho(null)}>{t('common.cancel')}</button>
-            </div>
-          </form>
-        )}
       </section>
 
       <section className="modern-card p-5 sm:p-6" aria-labelledby="ai-coverage-title">
