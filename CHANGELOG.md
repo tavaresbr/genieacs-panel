@@ -7,6 +7,15 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.39.0] - 2026-11-12
+
+### New
+
+- Trava de preço inventado para quem ainda não é cliente (`c8223d8c`)
+- Redes Wi-Fi visíveis configuráveis e senha admin do ONT mascarada no detalhe (`f6532ed3`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/b5bf202050ba...d675712faeb4)
+
 ## [1.38.0] - 2026-11-12
 
 ### New
