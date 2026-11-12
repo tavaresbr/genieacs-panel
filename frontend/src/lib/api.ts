@@ -6565,6 +6565,8 @@ export interface SalesPlan {
   active: boolean
   sortOrder: number
   sgpPlanId: number | null
+  /** Cidades em que está disponível; vazia = todas. */
+  cities: string[]
 }
 
 export type SalesPlanInput = Partial<Omit<SalesPlan, 'id' | 'sgpPlanId'>>

@@ -29,9 +29,10 @@ interface Rascunho {
   includes: string
   profile: SalesPlanProfile
   active: boolean
+  cities: string[]
 }
 
-const vazio = (): Rascunho => ({ id: null, name: '', speed: '', price: '', includes: '', profile: 'equilibrado', active: true })
+const vazio = (): Rascunho => ({ id: null, name: '', speed: '', price: '', includes: '', profile: 'equilibrado', active: true, cities: [] })
 
 const doPlano = (plano: SalesPlan): Rascunho => ({
   id: plano.id,
@@ -40,7 +41,8 @@ const doPlano = (plano: SalesPlan): Rascunho => ({
   price: plano.priceCents === null ? '' : (plano.priceCents / 100).toFixed(2).replace('.', ','),
   includes: plano.includes,
   profile: plano.profile,
-  active: plano.active
+  active: plano.active,
+  cities: plano.cities ?? []
 })
 
 /** O catálogo de planos que a IA de vendas oferece (no máximo 2 por conversa). */
@@ -50,6 +52,7 @@ export function SalesPlansPanel() {
   const [planos, setPlanos] = useState<SalesPlan[] | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
   const [busy, setBusy] = useState(false)
+  const [coverage, setCoverage] = useState<string[]>([])
   const formRef = useRef<HTMLFormElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
 
@@ -58,6 +61,8 @@ export function SalesPlansPanel() {
   const abertoId = rascunho === null ? undefined : (rascunho.id ?? 'novo')
   useEffect(() => {
     if (abertoId === undefined) return
+    // As cidades marcáveis vêm de "Onde você atende", que pode ter mudado desde que a tela abriu.
+    void whatsappAPI.getBotConfig().then((res) => { if (res.success && res.data) setCoverage(res.data.ai.coverage ?? []) }).catch(() => {})
     formRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     nameRef.current?.focus({ preventScroll: true })
   }, [abertoId])
@@ -81,7 +86,8 @@ export function SalesPlansPanel() {
       priceCents,
       includes: rascunho.includes,
       profile: rascunho.profile,
-      active: rascunho.active
+      active: rascunho.active,
+      cities: rascunho.cities
     }
     setBusy(true)
     const res = rascunho.id === null ? await whatsappAPI.createSalesPlan(input) : await whatsappAPI.updateSalesPlan(rascunho.id, input)
@@ -109,6 +115,9 @@ export function SalesPlansPanel() {
   }
 
   const patch = (parte: Partial<Rascunho>) => setRascunho((atual) => (atual ? { ...atual, ...parte } : atual))
+
+  // As cidades de "Onde você atende" mais as que o plano já tinha (uma cidade tirada da lista não some do plano sem querer).
+  const opcoesDeCidade = [...new Set([...coverage, ...(rascunho?.cities ?? [])])]
 
   const formulario = rascunho ? (
     <form
@@ -141,6 +150,33 @@ export function SalesPlansPanel() {
         <input id="plan-includes" className="modern-input w-full" maxLength={300} value={rascunho.includes} onChange={(e) => patch({ includes: e.target.value })} />
         <p className="field-hint">{t('settings.chatbot.plansIncludesHint')}</p>
       </div>
+      <fieldset>
+        <legend className="field-label">{t('settings.chatbot.plansCities')}</legend>
+        {opcoesDeCidade.length === 0 ? (
+          <p className="field-hint">{t('settings.chatbot.plansCitiesNoCoverage')}</p>
+        ) : (
+          <div className="mt-1 flex flex-wrap gap-2">
+            {opcoesDeCidade.map((cidade) => {
+              const marcada = rascunho.cities.includes(cidade)
+              return (
+                <label
+                  key={cidade}
+                  className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm lg:min-h-0 lg:py-1 ${marcada ? 'border-[hsl(var(--primary))] bg-[hsl(var(--surface-subtle))] font-medium' : 'border-border'}`}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[hsl(var(--primary))]"
+                    checked={marcada}
+                    onChange={(e) => patch({ cities: e.target.checked ? [...rascunho.cities, cidade] : rascunho.cities.filter((c) => c !== cidade) })}
+                  />
+                  {cidade}
+                </label>
+              )
+            })}
+          </div>
+        )}
+        <p className="field-hint mt-1">{t('settings.chatbot.plansCitiesHint')}</p>
+      </fieldset>
       <label className="flex min-h-10 cursor-pointer items-center gap-3 lg:min-h-0">
         <input type="checkbox" className="h-5 w-5 accent-[hsl(var(--primary))]" checked={rascunho.active} onChange={(e) => patch({ active: e.target.checked })} />
         <span className="text-sm">{t('settings.chatbot.plansActive')}</span>
@@ -196,6 +232,11 @@ export function SalesPlansPanel() {
                       : formatMoney(plano.priceCents, 'BRL')}
                   </p>
                   {plano.includes && <p className="field-hint wrap-anywhere">{plano.includes}</p>}
+                  <p className="mt-1 flex flex-wrap gap-1 text-xs">
+                    {plano.cities.length === 0
+                      ? <span className="text-muted-foreground">{t('settings.chatbot.plansAllCities')}</span>
+                      : plano.cities.map((c) => <span key={c} className="rounded-full bg-[hsl(var(--surface-subtle))] px-2 py-0.5">{c}</span>)}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" className="modern-button-secondary" onClick={() => setRascunho(doPlano(plano))}>{t('settings.chatbot.plansEdit')}</button>
