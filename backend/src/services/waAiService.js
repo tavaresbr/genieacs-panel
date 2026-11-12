@@ -22,6 +22,8 @@ import {
 } from '../utils/wa/waModeloIa.js';
 import { MENSAGEM_MAX, limparMensagem, mensagemTemContexto, promptDeMensagem } from '../utils/wa/waMensagemIa.js';
 import { blocoVendas, linhaPersona } from '../utils/wa/vendasPrompt.js';
+import { limparResposta, pedidoDeResposta, promptDeResposta } from '../utils/wa/conhecimentoIa.js';
+import { TIPOS_DE_CONHECIMENTO } from '../utils/wa/conhecimento.js';
 import { descreverPlano, perfilDoCliente } from '../utils/wa/planosVenda.js';
 import WaSalesPlanService from './waSalesPlanService.js';
 import WaAiKnowledgeService from './waAiKnowledgeService.js';
@@ -373,6 +375,45 @@ class WaAiService {
       if (!texto) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
       await WaBotConfigService.recordAiError(null);
       return { text: texto, warnings: { removed: removidas, mirrors: espelhos } };
+    } catch (error) {
+      if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code, error.details);
+      throw error;
+    }
+  }
+
+  /**
+   * A resposta de um item da base de conhecimento, escrita (ou melhorada) pela IA.
+   * Só rascunho: nada é gravado, o texto volta para a caixa do formulário.
+   *
+   * @returns {Promise<{text: string}>}
+   */
+  static async draftKnowledge({ kind, title, triggers, current } = {}) {
+    const titulo = String(title ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!titulo) throw new WaError('whatsapp.aiKnowledge.titleRequired', { code: 'ai_knowledge_title_required', status: 400 });
+    const ai = await WaBotConfigService.aiSettings();
+    if (!ai.apiKey) throw new WaError('whatsapp.ai.error.keyRequired', { code: 'ai_key_required', status: 409 });
+    const tipo = TIPOS_DE_CONHECIMENTO.includes(kind) ? kind : 'faq';
+    try {
+      const { content } = await WaAiClient.chat({
+        provider: ai.provider,
+        baseUrl: ai.baseUrl,
+        apiKey: ai.apiKey,
+        workspaceId: ai.workspaceId,
+        model: ai.model,
+        messages: [
+          { role: 'system', content: promptDeResposta({ empresa: await nomeDaEmpresa(), tipo, informacoes: ai.instructions || '' }) },
+          { role: 'user', content: pedidoDeResposta({
+            title: titulo,
+            triggers: String(triggers ?? '').replace(/\s+/g, ' ').trim().slice(0, 300),
+            current: String(current ?? '').replace(/\s+/g, ' ').trim().slice(0, 600)
+          }) }
+        ],
+        maxTokens: 400
+      });
+      const texto = limparResposta(content);
+      if (!texto) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
+      await WaBotConfigService.recordAiError(null);
+      return { text: texto };
     } catch (error) {
       if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code, error.details);
       throw error;

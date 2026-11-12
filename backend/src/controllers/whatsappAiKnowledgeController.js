@@ -1,4 +1,6 @@
 import WaAiKnowledgeService from '../services/waAiKnowledgeService.js';
+import WaAiService from '../services/waAiService.js';
+import { aiError } from './whatsappController.js';
 import AuditLog from '../models/AuditLog.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -25,6 +27,24 @@ class WhatsAppAiKnowledgeController {
       const itens = await WaAiKnowledgeService.list();
       return res.json(createResponse(req.t('whatsapp.aiKnowledge.loaded', { count: itens.length }), itens));
     } catch (error) { return handleError(req, res, error); }
+  }
+
+  /** `POST /api/whatsapp/ai-knowledge/ai-draft` — a IA escreve (ou melhora) a resposta; nada é gravado. */
+  static async draft(req, res) {
+    try {
+      const body = req.body ?? {};
+      const resultado = await WaAiService.draftKnowledge({ kind: body.kind, title: body.title, triggers: body.triggers, current: body.current });
+      // Só que a IA foi usada, e para qual tipo; o texto nunca vai para a Trilha.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_AI_KNOWLEDGE_CHANGED,
+        subjectType: 'ai_knowledge',
+        subjectId: null,
+        detail: { op: 'ai_draft', kind: String(body.kind ?? '').slice(0, 16), improved: Boolean(String(body.current ?? '').trim()) }
+      });
+      return res.json(createResponse(req.t('whatsapp.ai.improveOk'), resultado));
+    } catch (error) {
+      return aiError(req, res, error);
+    }
   }
 
   static async create(req, res) {

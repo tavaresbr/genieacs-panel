@@ -6622,6 +6622,9 @@ export const whatsappAPI = {
   improveBotMessage: (payload: { key: BotMessageKey; text: string }) =>
     apiClient.post<{ text: string }>('/whatsapp/bot-config/ai-improve-message', payload),
 
+  /** A IA escreve (ou melhora) a resposta de um item da base; nada é gravado. */
+  draftAiKnowledge: (input: { kind: AiKnowledgeKind; title: string; triggers?: string; current?: string }) =>
+    apiClient.post<{ text: string }>('/whatsapp/ai-knowledge/ai-draft', input),
   listAiKnowledge: () => apiClient.get<AiKnowledgeItem[]>('/whatsapp/ai-knowledge'),
   createAiKnowledge: (input: AiKnowledgeInput) => apiClient.post<AiKnowledgeItem>('/whatsapp/ai-knowledge', input),
   updateAiKnowledge: (id: number, input: AiKnowledgeInput) => apiClient.put<AiKnowledgeItem>(`/whatsapp/ai-knowledge/${id}`, input),
