@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { tenantAPI, type TenantSecurity } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
@@ -17,13 +18,17 @@ export function MfaPolicyCard({ selfMfaEnabled }: { selfMfaEnabled: boolean }) {
   const toast = useToast()
   const [security, setSecurity] = useState<TenantSecurity | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const [erro, setErro] = useState(false)
+  const { confirm: perguntar, element: confirmElement } = useConfirm()
 
   const carregar = useCallback(async () => {
-    try {
-      const res = await tenantAPI.security()
-      if (res.success && res.data) setSecurity(res.data)
-    } catch {
-      /* sem o estado, o cartão não aparece; nada do resto da tela depende dele */
+    // O cliente da API não lança: a falha volta como `success: false`.
+    const res = await tenantAPI.security()
+    if (res.success && res.data) {
+      setSecurity(res.data)
+      setErro(false)
+    } else {
+      setErro(true)
     }
   }, [])
 
@@ -31,14 +36,30 @@ export function MfaPolicyCard({ selfMfaEnabled }: { selfMfaEnabled: boolean }) {
     void carregar()
   }, [carregar])
 
-  if (!security) return null
+  if (!security) {
+    if (!erro) return null
+    return (
+      <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+        <h3 className="flex items-center gap-2 font-semibold text-foreground">
+          <Icon name="contacts" size={17} />
+          {t('settings.mfaPolicy.title')}
+        </h3>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-destructive">{t('settings.mfaPolicy.loadFailed')}</p>
+          <button type="button" className="modern-button-secondary" onClick={() => void carregar()}>
+            {t('common.retry')}
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   const estado = mfaPolicyState(security, selfMfaEnabled)
   const ligado = security.requireMfa
 
   const alternar = async () => {
     const pedido = !ligado
-    if (pedido && !confirm(t('settings.mfaPolicy.confirmOn', { count: String(security.membersWithoutMfa) }))) return
+    if (pedido && !(await perguntar(t('settings.mfaPolicy.confirmOn', { count: String(security.membersWithoutMfa) })))) return
     setOcupado(true)
     try {
       const res = await tenantAPI.updateSecurity(pedido)
@@ -90,6 +111,7 @@ export function MfaPolicyCard({ selfMfaEnabled }: { selfMfaEnabled: boolean }) {
           </button>
         </div>
       )}
+      {confirmElement}
     </section>
   )
 }

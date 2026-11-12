@@ -34,6 +34,37 @@ test.describe('a sessão por cookie', () => {
     await outra.close()
   })
 
+  test('"Sair dos outros" encerra só os outros aparelhos, depois de confirmar', async ({ page, browser }) => {
+    await loginViaForm(page, PROVIDER)
+
+    // Um segundo navegador entra com a mesma conta: é um aparelho a mais.
+    const contexto = await browser.newContext({ locale: 'pt-BR' })
+    const outro = await contexto.newPage()
+    await loginViaForm(outro, PROVIDER)
+
+    await page.goto('/settings?tab=security')
+    const cartao = page.getByTestId('active-sessions')
+    const botao = cartao.getByRole('button', { name: 'Sair dos outros' })
+    await expect(botao).toBeVisible()
+    const antes = await cartao.getByRole('listitem').count()
+    expect(antes).toBeGreaterThanOrEqual(2)
+
+    // Cancelar não encerra nada.
+    await botao.click()
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(cartao.getByRole('listitem')).toHaveCount(antes)
+
+    // Confirmar encerra os outros; este aparelho fica.
+    await botao.click()
+    await page.getByTestId('confirm-dialog-confirm').click()
+    await expect(cartao.getByRole('listitem')).toHaveCount(1)
+    await expect(cartao.getByText('Este aparelho', { exact: true })).toBeVisible()
+    await expect(botao).toBeHidden()
+    await shot(page, 'session-02-revoke-others')
+    await contexto.close()
+  })
+
   test('as sessões ativas listam este aparelho, e "Sair" leva ao login', async ({ page }) => {
     await loginViaForm(page, PROVIDER)
     await page.goto('/settings?tab=security')
@@ -45,9 +76,10 @@ test.describe('a sessão por cookie', () => {
 
     // Encerrar a sessão deste aparelho pela lista leva ao login, e um F5
     // depois disso não volta para dentro.
-    page.once('dialog', (dialog) => { void dialog.accept() })
     const atual = cartao.getByRole('listitem').filter({ hasText: 'Este aparelho' })
     await atual.getByRole('button', { name: 'Encerrar' }).click()
+    // A confirmação é um diálogo do painel (não o `window.confirm`).
+    await page.getByTestId('confirm-dialog-confirm').click()
     await expect(page).toHaveURL(/\/login/)
     await page.reload()
     await expect(page).toHaveURL(/\/login/)

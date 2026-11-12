@@ -235,6 +235,11 @@ export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
           <p className="text-sm text-muted-foreground">
             {t('settings.mfa.recoveryRemaining', { count: String(status?.recoveryRemaining ?? 0) })}
           </p>
+          {(status?.recoveryRemaining ?? 0) <= 2 && (
+            <p className="text-sm font-medium text-[hsl(var(--status-warning))]" role="status">
+              {t('settings.mfa.recoveryLow')}
+            </p>
+          )}
           {acao === null ? (
             <div className="flex flex-wrap gap-2">
               <button type="button" className="modern-button-secondary" onClick={() => { setAcao('trocar'); limparCampos() }}>

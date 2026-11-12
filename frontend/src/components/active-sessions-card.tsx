@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { apiClient, authAPI, type ActiveSession } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
+
+/**
+ * 127.0.0.1 / ::1 não diz nada sobre o aparelho: é o proxy reverso falando com
+ * o painel. Acontece quando o `TRUST_PROXY` não está ligado (ou o proxy não
+ * repassa o `X-Forwarded-For`); melhor esconder do que mostrar um IP enganoso.
+ */
+function ipDeLoopback(ip: string): boolean {
+  return /^(::ffff:)?127\./.test(ip) || ip === '::1'
+}
 
 /**
  * "Sessões ativas" (0129): os aparelhos em que esta conta está conectada.
@@ -15,18 +25,10 @@ import { formatDate, formatRelativeTime } from '@/lib/utils'
  *
  * "Sair" no menu continua encerrando só este aparelho.
  */
-/**
- * 127.0.0.1 / ::1 não diz nada sobre o aparelho: é o proxy reverso falando com
- * o painel. Acontece quando o `TRUST_PROXY` não está ligado (ou o proxy não
- * repassa o `X-Forwarded-For`); melhor esconder do que mostrar um IP enganoso.
- */
-function ipDeLoopback(ip: string): boolean {
-  return /^(::ffff:)?127\./.test(ip) || ip === '::1'
-}
-
 export function ActiveSessionsCard() {
   const { t } = useTranslation()
   const toast = useToast()
+  const { confirm, element: confirmElement } = useConfirm()
   const [sessoes, setSessoes] = useState<ActiveSession[] | null>(null)
   const [erro, setErro] = useState(false)
   const [ocupado, setOcupado] = useState<string | null>(null)
@@ -44,10 +46,14 @@ export function ActiveSessionsCard() {
 
   useEffect(() => {
     void carregar()
+    // Quem voltou de outra aba vê a lista de agora, não a de quando saiu.
+    const onVisible = () => { if (document.visibilityState === 'visible') void carregar() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [carregar])
 
   const encerrar = async (sessao: ActiveSession) => {
-    if (sessao.current && !window.confirm(t('settings.sessions.confirmCurrent'))) return
+    if (sessao.current && !(await confirm(t('settings.sessions.confirmCurrent'), { danger: true }))) return
     setOcupado(sessao.id)
     try {
       const res = await authAPI.revokeSession(sessao.id)
@@ -67,7 +73,7 @@ export function ActiveSessionsCard() {
   }
 
   const sairDeTodos = async () => {
-    if (!window.confirm(t('settings.sessions.confirmAll'))) return
+    if (!(await confirm(t('settings.sessions.confirmAll'), { danger: true }))) return
     setOcupado('all')
     try {
       const res = await authAPI.revokeAllSessions()
@@ -77,6 +83,22 @@ export function ActiveSessionsCard() {
       }
       toast.success(t('settings.sessions.revokedAll'))
       apiClient.clearTokens()
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  const sairDosOutros = async () => {
+    const outras = (sessoes ?? []).filter((sessao) => !sessao.current)
+    if (!outras.length) return
+    if (!(await confirm(t('settings.sessions.confirmOthers', { count: String(outras.length) }), { danger: true }))) return
+    setOcupado('others')
+    try {
+      // Sem rota própria: é o mesmo "Encerrar" de cada linha, uma a uma.
+      const resultados = await Promise.all(outras.map((sessao) => authAPI.revokeSession(sessao.id)))
+      if (resultados.some((res) => !res.success)) toast.error(t('settings.sessions.revokeFailed'))
+      else toast.success(t('settings.sessions.revokedOthers'))
+      await carregar()
     } finally {
       setOcupado(null)
     }
@@ -93,14 +115,26 @@ export function ActiveSessionsCard() {
           <h3 id="active-sessions-title" className="font-semibold text-foreground">{t('settings.sessions.title')}</h3>
           <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.sessions.description')}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => { void sairDeTodos() }}
-          disabled={ocupado !== null || !sessoes?.length}
-          className="modern-button-secondary shrink-0"
-        >
-          {t('settings.sessions.revokeAll')}
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {(sessoes ?? []).some((sessao) => !sessao.current) && (
+            <button
+              type="button"
+              onClick={() => { void sairDosOutros() }}
+              disabled={ocupado !== null}
+              className="modern-button-secondary"
+            >
+              {t('settings.sessions.revokeOthers')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => { void sairDeTodos() }}
+            disabled={ocupado !== null || !sessoes?.length}
+            className="modern-button-secondary"
+          >
+            {t('settings.sessions.revokeAll')}
+          </button>
+        </div>
       </div>
 
       {erro && (
@@ -151,6 +185,7 @@ export function ActiveSessionsCard() {
           ))}
         </ul>
       )}
+      {confirmElement}
     </section>
   )
 }
