@@ -1093,7 +1093,47 @@ export interface EmailReadiness {
 // ele é uma linha de `tenant_users`, enquanto a sessão pode não ter (a do
 // console não trabalha em provedor nenhum). Sem este estreitamento, toda tela
 // que lista operadores teria que tratar um nulo que não acontece ali.
-export type Operator = User & { role: OperatorRole }
+export type Operator = User & { role: OperatorRole; profile?: OperatorProfileSummary }
+
+/** O que a lista de operadores mostra do cadastro: o CPF vem mascarado. */
+export interface OperatorProfileSummary {
+  fullName: string | null
+  jobTitle: string | null
+  phone: string | null
+  cpfMasked: string | null
+  profileComplete: boolean
+}
+
+/**
+ * O cadastro completo de uma pessoa da equipe (`GET /users/:id/profile`). O CPF
+ * só vem inteiro aqui, para a tela de edição; sem cadastro ainda, o servidor
+ * devolve só `userId` e `profileComplete: false`.
+ */
+export interface OperatorProfile {
+  userId: number
+  fullName: string | null
+  birthDate: string | null
+  rg: string | null
+  cpf: string | null
+  cpfMasked: string | null
+  phone: string | null
+  whatsapp: string | null
+  personalEmail: string | null
+  zip: string | null
+  street: string | null
+  number: string | null
+  complement: string | null
+  district: string | null
+  city: string | null
+  state: string | null
+  jobTitle: string | null
+  admittedAt: string | null
+  emergencyName: string | null
+  emergencyPhone: string | null
+  notes: string | null
+  profileComplete: boolean
+  updatedAt: string | null
+}
 export type { OperatorRole }
 
 /**
@@ -3311,9 +3351,17 @@ export const usersAPI = {
   create: (payload: { username: string; password: string; email: string; role: OperatorRole }) =>
     apiClient.post<{ user: Operator }>('/users', payload),
 
-  /** Sends only what changes: a role, a new password, or both. */
-  update: (id: number, payload: { role?: OperatorRole; password?: string }) =>
-    apiClient.requestWithBody<{ user: Operator }>('PATCH', `/users/${id}`, payload),
+  /** Sends only what changes: a role, a new password, the login (username/email), or any mix. */
+  update: (id: number, payload: { role?: OperatorRole; password?: string; username?: string; email?: string }) =>
+    apiClient.requestWithBody<{ user: Operator; loginChanged?: boolean }>('PATCH', `/users/${id}`, payload),
+
+  /** O cadastro completo (CPF inteiro incluído): da própria pessoa ou de quem administra a equipe. */
+  profile: (id: number) =>
+    apiClient.get<{ profile: OperatorProfile }>(`/users/${id}/profile`),
+
+  /** Só os campos que mudaram; `null` apaga um campo (e o CPF). */
+  updateProfile: (id: number, payload: Record<string, string | null>) =>
+    apiClient.requestWithBody<{ profile: OperatorProfile }>('PATCH', `/users/${id}/profile`, payload),
 
   remove: (id: number) =>
     apiClient.delete<{ id: number }>(`/users/${id}`),

@@ -64,6 +64,7 @@ const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INS
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 import { MfaCard } from '@/components/mfa-card'
 import { ActiveSessionsCard } from '@/components/active-sessions-card'
+import { OperatorEditDialog } from '@/components/settings/operator-edit-dialog'
 import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-panel'
@@ -922,6 +923,7 @@ export default function Settings() {
     password: '',
     role: 'viewer'
   })
+  const [editingOperator, setEditingOperator] = useState<Operator | null>(null)
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null)
   const [resetPasswordValue, setResetPasswordValue] = useState('')
 
@@ -1555,8 +1557,32 @@ export default function Settings() {
     </>
   )
 
+  /** Nome completo e cargo (do cadastro) e o selo de cadastro incompleto, sob o usuário. */
+  const renderOperatorProfile = (operator: Operator) => {
+    const profile = operator.profile
+    const line = [profile?.fullName, profile?.jobTitle].filter(Boolean).join(' · ')
+    return (
+      <>
+        {line && <p className="mt-0.5 text-sm text-muted-foreground wrap-anywhere">{line}</p>}
+        {profile && !profile.profileComplete && (
+          <span className="modern-badge mt-1 inline-block">{t('settings.operators.profile.incomplete')}</span>
+        )}
+      </>
+    )
+  }
+
   const renderOperatorActions = (operator: Operator, isSelf: boolean) => (
     <div className="flex shrink-0 items-center gap-1 md:gap-2">
+      {(canManageOperators || isSelf) && (operator.role !== 'owner' || isOwner || isSelf) && (
+        <button
+          onClick={() => setEditingOperator(operator)}
+          className={`${ICON_ACTION} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`}
+          title={t('settings.operators.profile.edit')}
+          aria-label={t('settings.operators.profile.editFor', { username: operator.username })}
+        >
+          <Icon name="edit" size={18} />
+        </button>
+      )}
       {canOfferPasswordReset(operator, { isOwner, isSelf }) && (
         <button
           onClick={() => {
@@ -3211,6 +3237,14 @@ export default function Settings() {
                 )}
               </section>
 
+              {editingOperator && (
+                <OperatorEditDialog
+                  operator={editingOperator}
+                  isSelf={currentUser?.id === editingOperator.id}
+                  onClose={() => setEditingOperator(null)}
+                  onSaved={() => { void fetchOperators() }}
+                />
+              )}
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -3393,6 +3427,7 @@ export default function Settings() {
                               ? <span className="text-muted-foreground">{operator.email}</span>
                               : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
                           </p>
+                          {renderOperatorProfile(operator)}
                           <div className="mt-3">
                             {renderOperatorRole(operator, lockedByOwner, 'w-full')}
                           </div>
@@ -3470,6 +3505,7 @@ export default function Settings() {
                                       ? <span className="text-muted-foreground wrap-anywhere">{operator.email}</span>
                                       : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
                                   </div>
+                                  {renderOperatorProfile(operator)}
                                 </td>
                                 <td className="w-56 xl:w-64">{renderOperatorRole(operator, lockedByOwner, 'w-full max-w-60')}</td>
                                 <td className="w-28 text-sm text-muted-foreground xl:w-auto xl:whitespace-nowrap">{formatDateTime(operator.createdAt)}</td>
