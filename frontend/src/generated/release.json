@@ -1,21 +1,33 @@
 {
-  "version": "1.34.0",
-  "build": 1622,
-  "sourceCommit": "d77cd7acf59d",
-  "releasedAt": "2026-11-11",
-  "basedOnTag": "v1.33.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/6158d0fa2984...d77cd7acf59d",
+  "version": "1.35.0",
+  "build": 1629,
+  "sourceCommit": "d8eea2c3ac8f",
+  "releasedAt": "2026-11-12",
+  "basedOnTag": "v1.34.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/349c7bc142d5...d8eea2c3ac8f",
   "changes": [
     {
-      "shortHash": "7db53341",
+      "shortHash": "8ce33815",
       "date": "2026-11-11",
-      "title": "Trava por conta, auditoria e reautenticação no portal do assinante",
+      "title": "Sugestões da IA para a base de conhecimento, com aprovação",
       "category": "New"
     },
     {
-      "shortHash": "d033a05a",
+      "shortHash": "92e1c070",
       "date": "2026-11-11",
-      "title": "Separa o sufixo key$ da regex de segredos (CodeQL)",
+      "title": "Sugestão com espaço a preencher entre colchetes não ativa sem edição",
+      "category": "New"
+    },
+    {
+      "shortHash": "8a12180c",
+      "date": "2026-11-11",
+      "title": "Conta só as sugestões desta venda",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f5b77156",
+      "date": "2026-11-11",
+      "title": "Log das sugestões não carrega texto de fora sem tratar",
       "category": "Fixed"
     }
   ]

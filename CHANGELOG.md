@@ -7,6 +7,23 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.35.0] - 2026-11-12
+
+### New
+
+- Sugestões da IA para a base de conhecimento, com aprovação (`8ce33815`)
+- Sugestão com espaço a preencher entre colchetes não ativa sem edição (`92e1c070`)
+
+### Fixed
+
+- Log das sugestões não carrega texto de fora sem tratar (`f5b77156`)
+
+### Maintenance
+
+- Conta só as sugestões desta venda (`8a12180c`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/349c7bc142d5...d8eea2c3ac8f)
+
 ## [1.34.0] - 2026-11-11
 
 ### New
