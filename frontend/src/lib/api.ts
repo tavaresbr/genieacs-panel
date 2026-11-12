@@ -8537,6 +8537,9 @@ export const pushAPI = {
     apiClient.post<{ devices: number }>('/push/subscribe', { subscription }),
   unsubscribe: (endpoint: string) =>
     apiClient.post<{ removed: number; devices: number }>('/push/unsubscribe', { endpoint }),
+  /** O mesmo, em nome de uma sessão que está saindo (o token dela na mão). */
+  unsubscribeAs: (token: string, endpoint: string) =>
+    apiClient.postAs<{ removed: number; devices: number }>(token, '/push/unsubscribe', { endpoint }),
   /** 409 `push_no_device` quando nenhum aparelho desta pessoa está inscrito. */
   test: () => apiClient.post<{ sent: number }>('/push/test', {}),
   preferences: () => apiClient.get<PushPreferences>('/push/preferences'),
