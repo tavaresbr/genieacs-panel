@@ -1,13 +1,15 @@
 import { tdb, tinsertReturningId } from '../config/database.js';
 import SgpService from './sgpService.js';
 import { WaError } from './whatsappConfigService.js';
-import { PERFIS_DE_PLANO, escolherPlanos } from '../utils/wa/planosVenda.js';
+import { PERFIS_DE_PLANO, cidadesDoPlano, escolherPlanos, planosDaCidade, variaPorCidade } from '../utils/wa/planosVenda.js';
+import { limparLugares } from '../utils/wa/conhecimento.js';
 
 const NAME_LIMIT = 80;
 const INCLUDES_LIMIT = 300;
 const SPEED_MAX = 100000;
 const PRICE_MAX_CENTS = 10_000_000;
 
+const limpar = (valor) => String(valor ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
 const invalido = (codigo) => new WaError('whatsapp.salesPlans.invalid', { code: codigo, status: 400 });
 
 const inteiroOuNulo = (valor, max, codigo) => {
@@ -41,6 +43,11 @@ function ler(corpo, { parcial }) {
     dados.profile = corpo.profile;
   }
   if (corpo.active !== undefined) dados.active = corpo.active === true;
+  if (corpo.cities !== undefined) {
+    const cidades = corpo.cities === null ? [] : limparLugares(corpo.cities);
+    if (cidades === null) throw invalido('sales_plan_cities_invalid');
+    dados.cities = cidades.length ? JSON.stringify(cidades) : null;
+  }
   const ordem = inteiroOuNulo(corpo.sortOrder, 1000, 'sales_plan_order_invalid');
   if (ordem !== undefined && ordem !== null) dados.sort_order = ordem;
   return dados;
@@ -55,7 +62,9 @@ const publico = (linha) => ({
   profile: linha.profile,
   active: Boolean(linha.active),
   sortOrder: linha.sort_order ?? 0,
-  sgpPlanId: linha.sgp_plan_id ?? null
+  sgpPlanId: linha.sgp_plan_id ?? null,
+  /** Cidades em que está disponível; vazia = todas. */
+  cities: cidadesDoPlano(linha)
 });
 
 const jaExiste = (error) => /unique|duplicate/i.test(String(error?.code ?? '') + String(error?.message ?? ''));
@@ -133,10 +142,19 @@ class WaSalesPlanService {
     return Number(total) || 0;
   }
 
-  /** Os 0 a 2 planos que a ferramenta `consultar_planos` devolve. */
-  static async paraIa(perfil) {
+  /**
+   * Os planos que a ferramenta `consultar_planos` devolve (0 a 2). Com planos que
+   * variam por cidade, a oferta depende da cidade: sem ela, `precisaCidade`; com
+   * ela, só os planos daquela cidade (ou de todas).
+   *
+   * @returns {Promise<{ precisaCidade: boolean, planos: object[] }>}
+   */
+  static async paraIa(perfil, cidade = null) {
     const linhas = await tdb('wa_sales_plans').where({ active: true }).where('price_cents', '>', 0);
-    return escolherPlanos(linhas, perfil);
+    const nome = limpar(cidade);
+    if (!nome && variaPorCidade(linhas)) return { precisaCidade: true, planos: [] };
+    const daCidade = nome ? planosDaCidade(linhas, nome) : linhas;
+    return { precisaCidade: false, planos: escolherPlanos(daCidade, perfil) };
   }
 }
 

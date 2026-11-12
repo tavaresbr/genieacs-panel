@@ -7,6 +7,8 @@
  * plano de entrada e o equilibrado. Plano inativo ou sem preço nunca sai.
  */
 
+import { normalizar } from './conhecimento.js';
+
 export const PERFIS_DE_PLANO = Object.freeze(['economico', 'equilibrado', 'premium']);
 
 /** O que a IA diz sobre o cliente → o perfil de plano que atende. */
@@ -59,3 +61,33 @@ export function descreverPlano(plano) {
   if (plano.includes) partes.push(`inclui: ${plano.includes}`);
   return partes.join(' — ');
 }
+
+/** As cidades de um plano: lista, ou o JSON gravado; vazia = vale para todas. */
+export function cidadesDoPlano(plano) {
+  let lista = plano?.cities;
+  if (typeof lista === 'string') {
+    try { lista = JSON.parse(lista); } catch { lista = []; }
+  }
+  return Array.isArray(lista) ? lista.map((c) => String(c ?? '').trim()).filter(Boolean) : [];
+}
+
+/** O que a pessoa disse bate com uma cidade cadastrada: igual, ou uma contida na outra ("centro de Itaituba"). */
+function mesmaCidade(dita, cadastrada) {
+  const a = normalizar(dita);
+  const b = normalizar(cadastrada);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return (b.length >= 4 && a.includes(b)) || (a.length >= 4 && b.includes(a));
+}
+
+/** Plano sem cidade marcada vale para todas; com cidades, só para elas. */
+export function planoVaiNaCidade(plano, cidade) {
+  const cidades = cidadesDoPlano(plano);
+  if (!cidades.length) return true;
+  return cidades.some((c) => mesmaCidade(cidade, c));
+}
+
+export const planosDaCidade = (planos, cidade) => (planos ?? []).filter((p) => planoVaiNaCidade(p, cidade));
+
+/** Algum plano tem cidade marcada: então a oferta depende de saber onde a pessoa mora. */
+export const variaPorCidade = (planos) => (planos ?? []).some((p) => cidadesDoPlano(p).length > 0);

@@ -1,27 +1,15 @@
 {
-  "version": "1.36.0",
-  "build": 1635,
-  "sourceCommit": "bd3cb79b4dae",
+  "version": "1.37.0",
+  "build": 1638,
+  "sourceCommit": "80fc204206e5",
   "releasedAt": "2026-11-12",
-  "basedOnTag": "v1.35.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/0c1402b2cd59...bd3cb79b4dae",
+  "basedOnTag": "v1.36.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/40afc9df5809...80fc204206e5",
   "changes": [
     {
-      "shortHash": "91f04cef",
+      "shortHash": "f22318ab",
       "date": "2026-11-12",
-      "title": "Editar plano ou item da base abre o formulário no próprio lugar",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "39ccd57c",
-      "date": "2026-11-12",
-      "title": "Tela para editar o cadastro da equipe (CPF, contato, endereço, trabalho)",
-      "category": "New"
-    },
-    {
-      "shortHash": "f24b7558",
-      "date": "2026-11-12",
-      "title": "Melhorias da aba Acesso da conta — confirmação no painel, sair dos outros, avisos",
+      "title": "Cidades em que cada plano está disponível",
       "category": "New"
     }
   ]

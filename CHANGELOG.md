@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.37.0] - 2026-11-12
+
+### New
+
+- Cidades em que cada plano está disponível (`f22318ab`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/40afc9df5809...80fc204206e5)
+
 ## [1.36.0] - 2026-11-12
 
 ### New
