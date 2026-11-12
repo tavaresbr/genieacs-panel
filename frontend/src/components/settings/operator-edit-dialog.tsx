@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { tenantAPI, usersAPI, type Operator } from '@/lib/api'
+import { OperatorAvatar } from '@/components/settings/operator-avatar'
+import { AVATAR_ACCEPT, avatarFileProblem, fileToAvatarDataUrl } from '@/lib/avatar-image'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { applyCep, emptyAddressForm } from '@/lib/contact-address'
@@ -91,6 +93,9 @@ export function OperatorEditDialog({ operator, isSelf, onClose, onSaved }: {
   const [lookingUp, setLookingUp] = useState(false)
   const [invalid, setInvalid] = useState<ProfileFormKey | null>(null)
   const first = useRef<HTMLInputElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [avatar, setAvatar] = useState<string | null>(operator.profile?.avatar ?? null)
+  const [avatarBusy, setAvatarBusy] = useState(false)
 
   const load = async () => {
     setLoadFailed(false)
@@ -99,6 +104,7 @@ export function OperatorEditDialog({ operator, isSelf, onClose, onSaved }: {
       const loaded = profileFormFrom(res.data.profile)
       setInitial(loaded)
       setForm(loaded)
+      setAvatar(res.data.profile.avatar ?? null)
     } else {
       setLoadFailed(true)
     }
@@ -148,6 +154,53 @@ export function OperatorEditDialog({ operator, isSelf, onClose, onSaved }: {
       setForm((current) => ({ ...current, street: next.street, district: next.district, city: next.city, state: next.state }))
     } finally {
       setLookingUp(false)
+    }
+  }
+
+  /** A foto grava na hora (rota própria), sem esperar o "Salvar" do resto do cadastro. */
+  const chooseAvatar = async (file: File | undefined) => {
+    if (!file) return
+    const problem = avatarFileProblem(file)
+    if (problem) {
+      toast.error(t(problem === 'size' ? k('avatarTooBig') : k('avatarType')))
+      return
+    }
+    setAvatarBusy(true)
+    try {
+      let image: string
+      try {
+        image = await fileToAvatarDataUrl(file)
+      } catch {
+        toast.error(t(k('avatarType')))
+        return
+      }
+      const res = await usersAPI.setAvatar(operator.id, image)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t(k('saveFailed')))
+        return
+      }
+      setAvatar(res.data.profile.avatar ?? null)
+      toast.success(t(k('avatarSaved')))
+      onSaved()
+    } finally {
+      setAvatarBusy(false)
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
+
+  const clearAvatar = async () => {
+    setAvatarBusy(true)
+    try {
+      const res = await usersAPI.removeAvatar(operator.id)
+      if (!res.success) {
+        toast.error(res.message || t(k('saveFailed')))
+        return
+      }
+      setAvatar(null)
+      toast.success(t(k('avatarRemoved')))
+      onSaved()
+    } finally {
+      setAvatarBusy(false)
     }
   }
 
@@ -205,6 +258,31 @@ export function OperatorEditDialog({ operator, isSelf, onClose, onSaved }: {
 
           {initial && (
             <>
+              <section className="flex items-center gap-4">
+                <OperatorAvatar src={avatar} name={form.fullName || operator.username} size={72} />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button" className="modern-button-secondary" disabled={avatarBusy}
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      {avatarBusy ? t('common.saving') : t(avatar ? k('avatarChange') : k('avatarChoose'))}
+                    </button>
+                    {avatar && (
+                      <button type="button" className="modern-button-secondary" disabled={avatarBusy} onClick={() => void clearAvatar()}>
+                        {t(k('avatarRemove'))}
+                      </button>
+                    )}
+                  </div>
+                  <p className="field-hint mt-1">{t(k('avatarHint'))}</p>
+                  <input
+                    ref={fileInput} type="file" accept={AVATAR_ACCEPT} className="sr-only" tabIndex={-1}
+                    aria-label={t(k('avatarChoose'))} data-testid="operator-avatar-file"
+                    onChange={(event) => void chooseAvatar(event.target.files?.[0])}
+                  />
+                </div>
+              </section>
+
               <section>
                 <h3 className="mb-2 text-sm font-semibold text-foreground">{t(k('sectionAccess'))}</h3>
                 <div className="grid gap-3 sm:grid-cols-2">

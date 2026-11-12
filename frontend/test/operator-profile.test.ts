@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { Operator } from '@/lib/api'
 import {
-  emptyProfileForm, isValidCpf, isValidPhone, maskCpf, maskPhone, profileFormFrom, profilePayload, profileProblem
+  emptyProfileForm, filterOperators, isValidCpf, isValidPhone, maskCpf, maskPhone, profileFormFrom, profilePayload, profileProblem
 } from '@/lib/operator-profile'
 
 describe('máscaras', () => {
@@ -59,5 +60,35 @@ describe('corpo do PATCH', () => {
 
   it('apaga o CPF com null', () => {
     expect(profilePayload({ ...loaded, cpf: '' }, loaded)).toEqual({ cpf: null })
+  })
+})
+
+describe('busca de operadores', () => {
+  const op = (id: number, username: string, email: string | null, fullName: string | null, jobTitle: string | null) => ({
+    id, username, email, role: 'viewer',
+    profile: { fullName, jobTitle, phone: null, cpfMasked: null, profileComplete: false }
+  }) as unknown as Operator
+  const list = [
+    op(1, 'ana.silva', 'ana@alfa.test', 'Ana Souza da Silva', 'Técnica de campo'),
+    op(2, 'joao', 'joao@alfa.test', 'João Pereira', 'Financeiro'),
+    op(3, 'semperfil', null, null, null)
+  ]
+
+  it('devolve a lista inteira com busca vazia', () => {
+    expect(filterOperators(list, '')).toBe(list)
+    expect(filterOperators(list, '   ')).toBe(list)
+  })
+
+  it('acha por usuário, e-mail, nome e cargo, sem acento nem caixa', () => {
+    expect(filterOperators(list, 'JOAO').map((o) => o.id)).toEqual([2])
+    expect(filterOperators(list, 'joão pereira').map((o) => o.id)).toEqual([2])
+    expect(filterOperators(list, 'tecnica').map((o) => o.id)).toEqual([1])
+    expect(filterOperators(list, 'alfa.test').map((o) => o.id)).toEqual([1, 2])
+    expect(filterOperators(list, 'semperfil').map((o) => o.id)).toEqual([3])
+  })
+
+  it('exige todas as palavras, em qualquer ordem', () => {
+    expect(filterOperators(list, 'silva ana').map((o) => o.id)).toEqual([1])
+    expect(filterOperators(list, 'ana financeiro')).toEqual([])
   })
 })

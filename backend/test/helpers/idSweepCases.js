@@ -85,6 +85,23 @@ export const casos = [
     tabela: 'users'
   },
   {
+    // A foto do operador: mesmo 404 para o id do vizinho, antes de olhar a imagem.
+    // O corpo é um PNG 1×1 válido, para o controle (o próprio operador) chegar a gravar.
+    chave: 'user',
+    label: 'PUT /api/users/:id/avatar',
+    method: 'PUT',
+    path: (id) => `/api/users/${id}/avatar`,
+    body: { image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' },
+    tabela: 'users'
+  },
+  {
+    chave: 'user',
+    label: 'DELETE /api/users/:id/avatar',
+    method: 'DELETE',
+    path: (id) => `/api/users/${id}/avatar`,
+    tabela: 'users'
+  },
+  {
     chave: 'user',
     label: 'DELETE /api/users/:id',
     method: 'DELETE',

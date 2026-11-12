@@ -3851,6 +3851,21 @@ const operatorProfilesTable = (db) => (t) => {
   t.index(['tenant_id', 'cpf_hash'], 'operator_profiles_cpf_idx');
 };
 
+/**
+ * A foto do operador (0137): `avatar_data` é a imagem em base64 (já reduzida no
+ * navegador, com teto de `AVATAR_MAX_BYTES` no servidor), `avatar_mime` o tipo
+ * que os primeiros bytes provaram — nunca o que o cliente declarou — e
+ * `avatar_updated_at` a versão, para a tela saber quando trocou. Sem disco nem
+ * rota estática: a imagem viaja dentro do JSON do cadastro. SVG fica de fora,
+ * como na logo da plataforma: serve-se da mesma origem do painel e carregaria
+ * script. Colunas só por migração, como as de `wa_conversations`.
+ */
+const OPERATOR_AVATAR_COLUMNS = [
+  ['avatar_mime', (t) => t.string('avatar_mime', 32).nullable()],
+  ['avatar_data', (t) => t.text('avatar_data').nullable()],
+  ['avatar_updated_at', (t) => t.timestamp('avatar_updated_at').nullable()]
+];
+
 const OPERATOR_PROFILE_TABLES = [
   ['operator_profiles', operatorProfilesTable]
 ];
@@ -7770,6 +7785,22 @@ export const migrations = [
       const missing = await missingColumns(db, 'wa_sales_plans', WA_SALES_PLAN_CITIES_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('wa_sales_plans', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** A foto do operador — ver `OPERATOR_AVATAR_COLUMNS`. */
+    id: '0137_operator_avatar',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('operator_profiles'))) return true;
+      return (await missingColumns(db, 'operator_profiles', OPERATOR_AVATAR_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('operator_profiles'))) return;
+      const missing = await missingColumns(db, 'operator_profiles', OPERATOR_AVATAR_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('operator_profiles', (t) => {
         for (const add of missing) add(t);
       });
     }

@@ -5,7 +5,7 @@
  * instância — `utils/operatorProfileValidation.js`. A validação daqui só poupa
  * a ida ao servidor e aponta o campo errado; o algoritmo do CPF é o mesmo.
  */
-import type { OperatorProfile } from '@/lib/api'
+import type { Operator, OperatorProfile } from '@/lib/api'
 import { maskCep } from '@/lib/contact-address'
 
 export const onlyDigits = (value: string | null | undefined) => String(value ?? '').replace(/\D/g, '')
@@ -115,4 +115,22 @@ export function profileProblem(form: ProfileForm): { key: ProfileFormKey; messag
     return { key: 'personalEmail', message: 'settings.operators.profile.emailInvalid' }
   }
   return null
+}
+
+/** Minúsculas e sem acento: "joao" acha "João". */
+const fold = (value: string | null | undefined) =>
+  String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+/**
+ * A busca da lista de operadores: cada palavra digitada tem que aparecer em
+ * algum de usuário, e-mail, nome completo ou cargo (nenhuma ordem importa).
+ * Busca vazia devolve a lista como veio.
+ */
+export function filterOperators(operators: Operator[], query: string): Operator[] {
+  const words = fold(query).split(/\s+/).filter(Boolean)
+  if (!words.length) return operators
+  return operators.filter((operator) => {
+    const haystack = fold([operator.username, operator.email, operator.profile?.fullName, operator.profile?.jobTitle].join(' '))
+    return words.every((word) => haystack.includes(word))
+  })
 }

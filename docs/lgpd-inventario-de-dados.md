@@ -23,7 +23,7 @@ e a divisória está no schema, não numa opinião:
 | --- | --- | --- | --- |
 | Assinante de um ISP (quem tem a ONT) | **o ISP** | **nós** | as 56 tabelas escopadas por `tenant_id` |
 | Operador do painel (quem faz login) | **nós** | — | `users`, `tenant_users` |
-| Cadastro da equipe de um ISP (CPF, endereço, contato, dados de trabalho) | **o ISP** | **nós** | `operator_profiles` (escopada por `tenant_id`; o CPF fica cifrado e só a tela de edição o lê) |
+| Cadastro da equipe de um ISP (CPF, foto, endereço, contato, dados de trabalho) | **o ISP** | **nós** | `operator_profiles` (escopada por `tenant_id`; o CPF fica cifrado e só a tela de edição o lê) |
 | Interessado que pediu contato na vitrine | **nós** | — | `leads` |
 | Cadastro fiscal do ISP | **nós** | — | colunas `billing_*` de `tenants` |
 
