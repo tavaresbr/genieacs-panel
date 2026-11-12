@@ -443,6 +443,36 @@ describe('a IA atendendo', () => {
   });
 
   describe('vendas: registrar_interesse_comercial', () => {
+    it('a IA escreve a resposta de um item da base: só rascunho, com o contexto do item, sem inventar fato', async () => {
+      await salvarIa({ instructions: 'Planos: 500 mega R$ 99,90. Atendemos em Itaituba.' });
+      roteiro = [{ content: '```\n"Entendo! Nosso plano inclui **Wi-Fi 6**. [escreva o prazo real]"\n```' }];
+      const res = await api('/ai-knowledge/ai-draft', { method: 'POST', body: { kind: 'objecao', title: 'Acha caro', triggers: 'caro, preço alto', current: '' } });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.body.data.text, 'Entendo! Nosso plano inclui Wi-Fi 6. [escreva o prazo real]');
+      const enviado = pedidosIa.at(-1).payload.messages;
+      assert.match(enviado[0].content, /OBJEÇÃO/);
+      assert.match(enviado[0].content, /NÃO invente preço/);
+      assert.match(enviado[0].content, /Atendemos em Itaituba/, 'usa as informações da empresa');
+      assert.match(enviado[1].content, /Título do item: Acha caro/);
+      assert.match(enviado[1].content, /caro, preço alto/);
+      assert.match(enviado[1].content, /primeira versão/);
+      assert.equal(pedidosIa.at(-1).payload.tools, undefined, 'sem ferramentas');
+      const nada = await api('/ai-knowledge');
+      assert.ok(!nada.body.data.some((i) => i.title === 'Acha caro' && i.origin === 'manual' && /Wi-Fi 6/.test(i.answer)), 'nada foi gravado');
+
+      roteiro = [{ content: 'Melhor texto.' }];
+      await api('/ai-knowledge/ai-draft', { method: 'POST', body: { kind: 'faq', title: 'Fidelidade', current: 'Tem fidelidade de 12 meses.' } });
+      assert.match(pedidosIa.at(-1).payload.messages[1].content, /melhore.*Tem fidelidade de 12 meses/s);
+    });
+
+    it('a resposta do item: sem título é 400, e quem só atende não escreve', async () => {
+      const semTitulo = await api('/ai-knowledge/ai-draft', { method: 'POST', body: { kind: 'faq', title: '  ' } });
+      assert.equal(semTitulo.status, 400);
+      assert.equal(pedidosIa.length, 0, 'nenhuma chamada paga sem título');
+      const anonimo = await call(`${panelUrl}/api/whatsapp/ai-knowledge/ai-draft`, { method: 'POST', body: { kind: 'faq', title: 'x' } });
+      assert.equal(anonimo.status, 401);
+    });
+
     it('a base de conhecimento e a cobertura entram no prompt de quem não é cliente', async () => {
       const { default: WaAiKnowledgeService } = await import('../src/services/waAiKnowledgeService.js');
       const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');

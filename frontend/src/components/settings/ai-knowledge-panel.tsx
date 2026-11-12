@@ -38,6 +38,9 @@ export function AiKnowledgePanel() {
   const [lugares, setLugares] = useState<string[]>([])
   const [novoLugar, setNovoLugar] = useState('')
   const [busy, setBusy] = useState(false)
+  const [temChaveIa, setTemChaveIa] = useState(true)
+  const [escrevendo, setEscrevendo] = useState(false)
+  const [textoAnterior, setTextoAnterior] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
 
@@ -45,6 +48,7 @@ export function AiKnowledgePanel() {
   // item do meio de uma lista longa não vê nada acontecer.
   const abertoId = rascunho === null ? undefined : (rascunho.id ?? 'novo')
   useEffect(() => {
+    setTextoAnterior(null)
     if (abertoId === undefined) return
     formRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     titleRef.current?.focus({ preventScroll: true })
@@ -54,7 +58,10 @@ export function AiKnowledgePanel() {
     const [lista, config] = await Promise.all([whatsappAPI.listAiKnowledge(), whatsappAPI.getBotConfig()])
     if (lista.success && lista.data) setItens(lista.data)
     else toast.error(lista.message || t('settings.chatbot.kbLoadFailed'))
-    if (config.success && config.data) setLugares(config.data.ai.coverage ?? [])
+    if (config.success && config.data) {
+      setLugares(config.data.ai.coverage ?? [])
+      setTemChaveIa(config.data.ai.hasApiKey)
+    }
   }, [t, toast])
 
   useEffect(() => { void carregar() }, [carregar])
@@ -115,6 +122,20 @@ export function AiKnowledgePanel() {
 
   const patch = (parte: Partial<Rascunho>) => setRascunho((atual) => (atual ? { ...atual, ...parte } : atual))
 
+  // A IA escreve (ou melhora) a resposta. Só rascunho: o texto cai na caixa, e o "Desfazer" devolve o anterior.
+  const sugerirResposta = async () => {
+    if (!rascunho || !rascunho.title.trim()) return
+    setEscrevendo(true)
+    const res = await whatsappAPI.draftAiKnowledge({ kind: rascunho.kind, title: rascunho.title, triggers: rascunho.triggers, current: rascunho.answer })
+    setEscrevendo(false)
+    if (res.success && res.data?.text) {
+      setTextoAnterior(rascunho.answer)
+      patch({ answer: res.data.text })
+      toast.success(t('settings.chatbot.kbDraftDone'))
+    } else toast.error(res.message || whatsappErrorMessage(t, res.code))
+  }
+
+
   const formulario = rascunho ? (
     <form ref={formRef} className="grid gap-4 rounded-md border border-border p-4" onSubmit={(event) => { event.preventDefault(); void salvar() }}>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -139,6 +160,24 @@ export function AiKnowledgePanel() {
       <div>
         <label htmlFor="kb-answer" className="field-label">{t('settings.chatbot.kbAnswer')}</label>
         <textarea id="kb-answer" className="modern-input w-full text-sm" rows={3} maxLength={600} required value={rascunho.answer} onChange={(e) => patch({ answer: e.target.value })} />
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="modern-button-secondary"
+            disabled={escrevendo || !temChaveIa || !rascunho.title.trim()}
+            onClick={() => void sugerirResposta()}
+          >
+            {escrevendo ? t('settings.chatbot.kbDrafting') : rascunho.answer.trim() ? t('settings.chatbot.kbImprove') : t('settings.chatbot.kbDraft')}
+          </button>
+          {textoAnterior !== null && !escrevendo && (
+            <button type="button" className="text-sm underline underline-offset-2" onClick={() => { patch({ answer: textoAnterior }); setTextoAnterior(null) }}>
+              {t('settings.chatbot.kbDraftUndo')}
+            </button>
+          )}
+        </div>
+        <p className="field-hint mt-1">
+          {!temChaveIa ? t('settings.chatbot.kbDraftNeedsKey') : !rascunho.title.trim() ? t('settings.chatbot.kbDraftNeedsTitle') : t('settings.chatbot.kbDraftHint')}
+        </p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="submit" className="modern-button" disabled={busy}>{t('settings.chatbot.kbSave')}</button>
