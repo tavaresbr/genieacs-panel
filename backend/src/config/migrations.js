@@ -3760,6 +3760,15 @@ const waSalesPlansTable = (db) => (t) => {
 const WA_SALES_PLAN_TABLES = [['wa_sales_plans', waSalesPlansTable]];
 
 /**
+ * As cidades em que um plano de venda está disponível (0136): lista em JSON
+ * (`["Itaituba","Miritituba"]`); vazio ou nulo = vale para todas. A IA só
+ * oferece o plano a quem mora numa das cidades.
+ */
+const WA_SALES_PLAN_CITIES_COLUMNS = [
+  ['cities', (t) => t.text('cities').nullable()]
+];
+
+/**
  * A base de conhecimento da IA de vendas (0132): o que a empresa tem de bom
  * (`vantagem`), como responder a uma dúvida ou objeção (`objecao`, `faq`) e as
  * palavras (`triggers`, separadas por vírgula) que fazem o item entrar na
@@ -7745,6 +7754,22 @@ export const migrations = [
       const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_LEARNED_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** As cidades de cada plano de venda — ver `WA_SALES_PLAN_CITIES_COLUMNS`. */
+    id: '0136_wa_sales_plans_cities',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_sales_plans'))) return true;
+      return (await missingColumns(db, 'wa_sales_plans', WA_SALES_PLAN_CITIES_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_sales_plans'))) return;
+      const missing = await missingColumns(db, 'wa_sales_plans', WA_SALES_PLAN_CITIES_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_sales_plans', (t) => {
         for (const add of missing) add(t);
       });
     }

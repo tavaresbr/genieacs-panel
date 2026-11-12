@@ -114,7 +114,10 @@ const FERRAMENTAS = {
     description: 'Busca no catálogo da empresa os planos (no máximo dois) que mais combinam com o perfil do cliente. Use só depois de entender o que a pessoa precisa, e cite apenas o que voltar daqui.',
     parameters: {
       type: 'object',
-      properties: { perfil: { type: 'string', enum: ['economico', 'equilibrado', 'qualidade'], description: 'O que pesa mais para a pessoa, se deu para perceber' } },
+      properties: {
+        perfil: { type: 'string', enum: ['economico', 'equilibrado', 'qualidade'], description: 'O que pesa mais para a pessoa, se deu para perceber' },
+        cidade: { type: 'string', description: 'A cidade ou bairro onde a pessoa mora, como ela disse. Os planos variam por cidade.' }
+      },
       additionalProperties: false
     }
   },
@@ -567,7 +570,11 @@ class WaAiService {
         case 'liberar_em_confianca':
           return await this.liberar({ conversation, link });
         case 'consultar_planos': {
-          const planos = await WaSalesPlanService.paraIa(perfilDoCliente(chamada.arguments?.perfil) ? chamada.arguments.perfil : null);
+          const cidade = String(chamada.arguments?.cidade ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+          const { precisaCidade, planos } = await WaSalesPlanService.paraIa(perfilDoCliente(chamada.arguments?.perfil) ? chamada.arguments.perfil : null, cidade);
+          // Os planos variam por cidade e a pessoa ainda não disse onde mora: perguntar vem antes do preço.
+          if (precisaCidade) return { paraModelo: 'Os planos variam por cidade. Pergunte em que cidade ou bairro a pessoa mora e chame consultar_planos de novo com a cidade. Não cite preço antes disso.' };
+          if (!planos.length && cidade) return { paraModelo: `Nenhum plano está cadastrado como disponível em "${cidade}". Não ofereça plano nem preço: diga que vai conferir e use transferir_para_atendente.` };
           if (!planos.length) return { paraModelo: 'Nenhum plano cadastrado para oferecer agora. Não cite preços: diga que um consultor passa os valores.' };
           return { paraModelo: `Planos para oferecer (cite só estes, no máximo dois, explicando por que combinam):\n${planos.map((p) => `- ${descreverPlano(p)}`).join('\n')}` };
         }

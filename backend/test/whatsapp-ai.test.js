@@ -476,6 +476,39 @@ describe('a IA atendendo', () => {
       }
     });
 
+    it('planos por cidade: sem a cidade pergunta, com ela filtra, e fora de todas chama atendente', async () => {
+      const { default: WaSalesPlanService } = await import('../src/services/waSalesPlanService.js');
+      const ids = [];
+      try {
+        for (const dados of [
+          { name: 'Fibra Itaituba', priceCents: 8990, speedMbps: 300, profile: 'equilibrado', cities: ['Itaituba'] },
+          { name: 'Rádio Moraes', priceCents: 5990, speedMbps: 20, profile: 'economico', cities: ['Moraes Almeida'] }
+        ]) ids.push((await asTenant(() => WaSalesPlanService.create(dados))).id);
+        const tool = (args) => ({ tool: 'consultar_planos', args, content: 'ok' });
+        const voltaDe = () => pedidosIa.at(-1).payload.messages.filter((m) => m.role === 'tool').at(-1).content;
+
+        await limparFio(DESCONHECIDO);
+        roteiro = [tool({ perfil: 'economico' })];
+        await receber(DESCONHECIDO, 'quero um plano');
+        assert.match(voltaDe(), /variam por cidade.*Pergunte/s);
+        assert.doesNotMatch(voltaDe(), /R\$/);
+
+        await limparFio(DESCONHECIDO);
+        roteiro = [tool({ perfil: 'economico', cidade: 'Itaituba' })];
+        await receber(DESCONHECIDO, 'moro em Itaituba');
+        assert.match(voltaDe(), /Fibra Itaituba/);
+        assert.doesNotMatch(voltaDe(), /Rádio Moraes/);
+
+        await limparFio(DESCONHECIDO);
+        roteiro = [tool({ cidade: 'Santarém' })];
+        await receber(DESCONHECIDO, 'moro em Santarém');
+        assert.match(voltaDe(), /Nenhum plano está cadastrado como disponível em "Santarém".*transferir_para_atendente/s);
+        assert.doesNotMatch(voltaDe(), /R\$/);
+      } finally {
+        for (const id of ids) await asTenant(() => WaSalesPlanService.remove(id));
+      }
+    });
+
     it('com planos no catálogo, a IA ganha consultar_planos e recebe no máximo dois, sem o inativo', async () => {
       const { default: WaSalesPlanService } = await import('../src/services/waSalesPlanService.js');
       const ids = [];

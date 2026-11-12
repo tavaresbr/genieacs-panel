@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { asTenant, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WaSalesPlanService } = await import('../src/services/waSalesPlanService.js');
-const { escolherPlanos, perfilDoCliente, descreverPlano, reais } = await import('../src/utils/wa/planosVenda.js');
+const { escolherPlanos, perfilDoCliente, descreverPlano, reais, cidadesDoPlano, planoVaiNaCidade, planosDaCidade, variaPorCidade } = await import('../src/utils/wa/planosVenda.js');
 
 before(async () => { await startTestServers(); });
 after(async () => { await stopTestServers(); });
@@ -76,10 +76,53 @@ describe('o catálogo do provedor', () => {
     assert.equal(await asTenant(() => WaSalesPlanService.contarOfereciveis()), 0, 'inativo não conta');
     await asTenant(() => WaSalesPlanService.update(criado.id, { active: true }));
     assert.equal(await asTenant(() => WaSalesPlanService.contarOfereciveis()), 1);
-    assert.deepEqual((await asTenant(() => WaSalesPlanService.paraIa('economico'))).map((p) => p.name), ['Fibra Família']);
+    assert.deepEqual((await asTenant(() => WaSalesPlanService.paraIa('economico'))).planos.map((p) => p.name), ['Fibra Família']);
 
     await asTenant(() => WaSalesPlanService.remove(criado.id));
     await assert.rejects(asTenant(() => WaSalesPlanService.update(criado.id, { name: 'Z' })), { code: 'sales_plan_not_found' });
     await assert.rejects(asTenant(() => WaSalesPlanService.remove(criado.id)), { code: 'sales_plan_not_found' });
+  });
+});
+
+describe('planos por cidade', () => {
+  it('sem cidade marcada vale para todas; com cidades, só para elas (sem acento, com sobrenome)', () => {
+    const todas = { name: 'A', cities: null };
+    const so = { name: 'B', cities: JSON.stringify(['Itaituba', 'Moraes Almeida']) };
+    assert.deepEqual(cidadesDoPlano(todas), []);
+    assert.deepEqual(cidadesDoPlano(so), ['Itaituba', 'Moraes Almeida']);
+    assert.deepEqual(cidadesDoPlano({ cities: 'quebrado' }), []);
+    assert.equal(planoVaiNaCidade(todas, 'Qualquer lugar'), true);
+    assert.equal(planoVaiNaCidade(so, 'itaituba'), true);
+    assert.equal(planoVaiNaCidade(so, 'ITAITUBÁ-PA'), true);
+    assert.equal(planoVaiNaCidade(so, 'centro de Itaituba'), true);
+    assert.equal(planoVaiNaCidade(so, 'Santarém'), false);
+    assert.equal(planoVaiNaCidade(so, ''), false);
+    assert.deepEqual(planosDaCidade([todas, so], 'Santarém').map((p) => p.name), ['A']);
+    assert.equal(variaPorCidade([todas]), false);
+    assert.equal(variaPorCidade([todas, so]), true);
+  });
+
+  it('o catálogo guarda as cidades e a IA só recebe os planos do lugar', async () => {
+    const a = await asTenant(() => WaSalesPlanService.create({ name: 'Fibra Itaituba', priceCents: 8990, profile: 'equilibrado', cities: ['Itaituba', ' itaituba ', 'Miritituba'] }));
+    assert.deepEqual(a.cities, ['Itaituba', 'Miritituba'], 'limpo e sem repetido');
+    const b = await asTenant(() => WaSalesPlanService.create({ name: 'Rádio Moraes', priceCents: 5990, profile: 'economico', cities: ['Moraes Almeida'] }));
+    const c = await asTenant(() => WaSalesPlanService.create({ name: 'Essencial Todas', priceCents: 6990, profile: 'economico' }));
+    assert.deepEqual(c.cities, []);
+    try {
+      const sem = await asTenant(() => WaSalesPlanService.paraIa('economico', null));
+      assert.equal(sem.precisaCidade, true, 'há plano que varia por cidade: precisa saber onde mora');
+      assert.deepEqual(sem.planos, []);
+      const it = await asTenant(() => WaSalesPlanService.paraIa('economico', 'Itaituba'));
+      assert.deepEqual(it.planos.map((p) => p.name).sort(), ['Essencial Todas', 'Fibra Itaituba']);
+      const mo = await asTenant(() => WaSalesPlanService.paraIa('economico', 'Moraes Almeida'));
+      assert.deepEqual(mo.planos.map((p) => p.name).sort(), ['Essencial Todas', 'Rádio Moraes']);
+      const fora = await asTenant(() => WaSalesPlanService.paraIa('economico', 'Santarém'));
+      assert.deepEqual(fora.planos.map((p) => p.name), ['Essencial Todas'], 'só o plano de todas as cidades');
+      await assert.rejects(asTenant(() => WaSalesPlanService.update(a.id, { cities: 'Itaituba' })), { code: 'sales_plan_cities_invalid' });
+      const limpo = await asTenant(() => WaSalesPlanService.update(a.id, { cities: [] }));
+      assert.deepEqual(limpo.cities, [], 'sem nenhuma volta a valer para todas');
+    } finally {
+      for (const p of [a, b, c]) await asTenant(() => WaSalesPlanService.remove(p.id));
+    }
   });
 });
