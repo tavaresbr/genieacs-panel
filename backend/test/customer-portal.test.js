@@ -273,3 +273,56 @@ describe('portal account lockout and re-authentication', () => {
     assert.match(response.headers.get('cache-control') || '', /no-store/);
   });
 });
+
+describe('portal logout and password change', () => {
+  const dave = { customerId: 'CSG-DAVEDAV-234570', password: null, id: null };
+  const login = (account, password = account.password) => call(`${portalUrl}/api/customer/login`, {
+    method: 'POST',
+    body: { customerId: account.customerId, password }
+  });
+
+  before(async () => {
+    await createAccount(dave, 4);
+  });
+
+  it('a copied cookie stops working after logout', async () => {
+    const opened = await login(dave);
+    const cookie = cookieHeader(sessionCookie(opened.response));
+    assert.equal((await call(`${portalUrl}/api/customer/session`, { headers: { Cookie: cookie } })).status, 200);
+    const out = await call(`${portalUrl}/api/customer/logout`, { method: 'POST', headers: { Cookie: cookie } });
+    assert.equal(out.status, 200);
+    const replay = await call(`${portalUrl}/api/customer/session`, { headers: { Cookie: cookie } });
+    assert.equal(replay.status, 401);
+  });
+
+  it('refuses a weak, malformed or unchanged new password and a wrong current one', async () => {
+    const cookie = cookieHeader(sessionCookie((await login(dave)).response));
+    const send = (body) => call(`${portalUrl}/api/customer/password`, {
+      method: 'POST', headers: { Cookie: cookie }, body
+    });
+    assert.equal((await send({ currentPassword: 'WRONGPASS1', newPassword: 'NOVASENHA2026X' })).status, 401);
+    assert.equal((await send({ currentPassword: dave.password, newPassword: 'CURTA1' })).body.code, 'invalid_new_password');
+    assert.equal((await send({ currentPassword: dave.password, newPassword: 'ABC-123-456-7' })).body.code, 'invalid_new_password');
+    assert.equal((await send({ currentPassword: dave.password, newPassword: 'SENHA12345' })).body.code, 'weak_new_password');
+    assert.equal((await send({ currentPassword: dave.password, newPassword: dave.password })).body.code, 'same_password');
+  });
+
+  it('changes the password, keeps this session, drops the old one, stores only the hash', async () => {
+    const opened = await login(dave);
+    const cookie = cookieHeader(sessionCookie(opened.response));
+    const other = cookieHeader(sessionCookie((await login(dave)).response));
+    const changed = await call(`${portalUrl}/api/customer/password`, {
+      method: 'POST',
+      headers: { Cookie: cookie },
+      body: { currentPassword: dave.password, newPassword: 'minha7senha8nova' }
+    });
+    assert.equal(changed.status, 200, JSON.stringify(changed.body));
+    const fresh = cookieHeader(sessionCookie(changed.response));
+    assert.equal((await call(`${portalUrl}/api/customer/session`, { headers: { Cookie: fresh } })).status, 200);
+    assert.equal((await call(`${portalUrl}/api/customer/session`, { headers: { Cookie: other } })).status, 401);
+    assert.equal((await login(dave)).status, 401);
+    assert.equal((await login(dave, 'minha7senha8nova')).status, 200);
+    const row = await getDb()('customer_accounts').where({ id: dave.id }).first();
+    assert.equal(row.password_ciphertext, null);
+  });
+});

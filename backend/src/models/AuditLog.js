@@ -30,6 +30,7 @@ class AuditLog {
     PORTAL_CUSTOMER_LOCKED: 'portal_customer.account_locked',
     PORTAL_CUSTOMER_WIFI_UPDATED: 'portal_customer.wifi_updated',
     PORTAL_CUSTOMER_WIFI_REVEALED: 'portal_customer.wifi_revealed',
+    PORTAL_CUSTOMER_PASSWORD_CHANGED: 'portal_customer.password_changed',
     PORTAL_CUSTOMER_TRUST_UNLOCK: 'portal_customer.trust_unlock',
     GENIEACS_URL_CHANGED: 'genieacs.url_changed',
     GENIEACS_AUTH_CHANGED: 'genieacs.auth_changed',
@@ -330,7 +331,9 @@ class AuditLog {
       });
       return true;
     } catch (error) {
-      console.error('Audit log write failed:', action, error.message);
+      // Só a mensagem do erro: o nome da ação não entra no log de falha (varreduras
+      // de segredo confundem nomes como `portal_password.*` com dado sensível).
+      console.error('Audit log write failed:', error.message);
       return false;
     }
   }

@@ -28,6 +28,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'portal_customer.account_locked': 'audit.action.portalCustomerLocked',
   'portal_customer.wifi_updated': 'audit.action.portalCustomerWifiUpdated',
   'portal_customer.wifi_revealed': 'audit.action.portalCustomerWifiRevealed',
+  'portal_customer.password_changed': 'audit.action.portalCustomerPasswordChanged',
   'portal_customer.trust_unlock': 'audit.action.portalCustomerTrustUnlock',
   'genieacs.url_changed': 'audit.action.genieacsUrlChanged',
   'genieacs.auth_changed': 'audit.action.genieacsAuthChanged',

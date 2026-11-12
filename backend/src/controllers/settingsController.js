@@ -127,6 +127,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'portalContactEmail',
   // Quais redes Wi-Fi (índices 1-8, "1,5") o assinante vê e edita no portal; vazio = todas.
   'portalWifiIndexes',
+  // Avisar o assinante por WhatsApp quando o Wi-Fi dele for trocado pelo portal.
+  'portalWifiChangeNotice',
   // Como as datas aparecem em todo o painel e no portal. Ver utils/dateFormat.js.
   'dateFormat'
 ]);
@@ -175,6 +177,9 @@ function validateSetting(key, value) {
     const parts = text.split(',').map((item) => item.trim());
     if (!parts.every((item) => /^[1-8]$/.test(item))) return { errorKey: 'settings.validation.portalWifiIndexes' };
     return { value: [...new Set(parts)].sort().join(',') };
+  }
+  if (key === 'portalWifiChangeNotice' && !['true', 'false'].includes(normalized)) {
+    return { errorKey: 'settings.validation.portalContactToggle' };
   }
   if (key === 'portalShowProviderContact' && !['true', 'false'].includes(normalized)) {
     return { errorKey: 'settings.validation.portalContactToggle' };

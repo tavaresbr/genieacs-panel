@@ -185,6 +185,7 @@ export default function Settings() {
     portalContactWhatsapp: '',
     portalContactEmail: '',
     portalWifiIndexes: '',
+    portalWifiChangeNotice: 'false',
     // Como as datas aparecem em todo o painel e no portal; `auto` segue o idioma.
     dateFormat: 'auto' as string,
     ...INSTALLER_VIRTUAL_PARAMETERS
@@ -2298,6 +2299,24 @@ export default function Settings() {
                 placeholder="1,5" value={settings.portalWifiIndexes}
                 onChange={(event) => setSettings((current) => ({ ...current, portalWifiIndexes: event.target.value }))} />
               <p className="field-hint">{t('settings.portal.wifiIndexesHint')}</p>
+            </div>
+
+            <div className="mt-5 rounded-md border border-border p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                  checked={settings.portalWifiChangeNotice === 'true'}
+                  onChange={(event) => setSettings((current) => ({
+                    ...current,
+                    portalWifiChangeNotice: event.target.checked ? 'true' : 'false'
+                  }))}
+                />
+                <span>
+                  <span className="block font-semibold">{t('settings.portal.wifiNotice')}</span>
+                  <span className="mt-1 block text-sm leading-6 text-muted-foreground">{t('settings.portal.wifiNoticeHint')}</span>
+                </span>
+              </label>
             </div>
           </div>
         )}

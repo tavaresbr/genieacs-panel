@@ -18,6 +18,8 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { readDateFormat } from '../utils/dateFormat.js';
 import AccountLockout from '../models/AccountLockout.js';
 import AuditLog from '../models/AuditLog.js';
+import { notifyWifiChanged } from '../services/portalWifiNoticeService.js';
+import { newPasswordProblem } from '../utils/passwordPolicy.js';
 
 /**
  * Uma linha na trilha do provedor sobre o que o ASSINANTE fez no portal. O
@@ -285,6 +287,8 @@ class CustomerPortalController {
         index: wifiIndex,
         passwordChanged: Boolean(password)
       });
+      // Sem `await`: o WhatsApp não atrasa a resposta, e a função nunca lança.
+      void notifyWifiChanged({ accountId: req.customer.id, deviceId: req.customer.device_id });
 
       return res.json(createResponse(
         req.t('portal.wifiUpdateQueued'),
@@ -418,7 +422,58 @@ class CustomerPortalController {
     }
   }
 
+  /**
+   * `POST /api/customer/password` com `{ currentPassword, newPassword }`.
+   *
+   * A senha nova segue o formato que o login aceita (letras e números, sem
+   * diferença de caixa), com o mínimo de 10 e a lista de senhas comuns do
+   * painel. A atual é conferida na mesma trava por conta do login. Trocar a
+   * senha encerra as outras sessões (a impressão do hash muda); a deste
+   * aparelho recebe um cookie novo.
+   */
+  static async changePassword(req, res) {
+    try {
+      const current = String(req.body?.currentPassword ?? '').trim().toUpperCase();
+      const next = String(req.body?.newPassword ?? '').trim().toUpperCase();
+      const tentativa = await AccountLockout.attempt(
+        AccountLockout.forIdentifier(`portal:${currentTenantId()}:${req.customer.customer_id}`)
+      );
+      if (!tentativa.allowed) {
+        await CustomerPortalPasswordService.rejectUnknownAccount(current);
+        return AccountLockout.lockedResponse(req, res, tentativa);
+      }
+      if (!/^[A-Z0-9]{6,32}$/.test(current) || !(await CustomerPortalPasswordService.verify(req.customer, current))) {
+        await AccountLockout.failure(tentativa);
+        return res.status(401).json(createErrorResponse(req.t('portal.reauthRequired'), null, 'reauth_required'));
+      }
+      await AccountLockout.clear(tentativa.subject);
+
+      if (!/^[A-Z0-9]{10,32}$/.test(next)) {
+        return res.status(400).json(createErrorResponse(req.t('portal.newPasswordFormat'), null, 'invalid_new_password'));
+      }
+      if (newPasswordProblem(next, { username: req.customer.customer_id })) {
+        return res.status(400).json(createErrorResponse(req.t('portal.newPasswordWeak'), null, 'weak_new_password'));
+      }
+      if (next === current) {
+        return res.status(400).json(createErrorResponse(req.t('portal.newPasswordSame'), null, 'same_password'));
+      }
+
+      await CustomerPortalPasswordService.setChosen(req.customer.id, next);
+      const fresh = await CustomerAccount.getById(req.customer.id);
+      res.cookie(PORTAL_COOKIE_NAME, signPortalSession(fresh), portalCookieOptions(req));
+      await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_PASSWORD_CHANGED, {});
+      return res.json(createResponse(req.t('portal.passwordChanged'), null, 'password_changed'));
+    } catch (error) {
+      console.error('Customer portal password change error:', error);
+      return res.status(500).json(createErrorResponse(req.t('portal.passwordChangeFailed'), null, 'password_change_failed'));
+    }
+  }
+
   static async logout(req, res) {
+    // Encerra também o cookie que alguém tenha copiado: sobe a versão da sessão.
+    await CustomerAccount.bumpSession(req.customer.id).catch((error) => {
+      console.error('Customer portal logout bump failed:', error.message);
+    });
     res.clearCookie(PORTAL_COOKIE_NAME, portalClearCookieOptions(req));
     return res.json(createResponse(req.t('portal.sessionEnded'), null, 'logout_ok'));
   }

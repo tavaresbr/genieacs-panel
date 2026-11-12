@@ -96,6 +96,8 @@ export function signPortalSession(account) {
       tenantId: Number(account.tenant_id),
       // Ver `passwordFingerprint`: redefinir a senha encerra este cookie.
       pwd: passwordFingerprint(account),
+      // Ver `CustomerAccount.bumpSession`: o "sair" encerra este cookie.
+      sv: Number(account.session_version ?? 0),
       tokenType: 'customer'
     },
     portalSecret,
@@ -166,6 +168,8 @@ export async function authenticatePortalCustomer(req, res, next) {
       || !account.active
       || account.customer_id !== decoded.customerId
       || !sessionMatchesPassword(decoded, account)
+      // Cookies de antes do campo não o trazem e valem até vencer.
+      || (decoded.sv !== undefined && Number(decoded.sv) !== Number(account.session_version ?? 0))
     ) {
       return res.status(401).json({
         success: false,
