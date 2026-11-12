@@ -1101,6 +1101,8 @@ export interface OperatorProfileSummary {
   jobTitle: string | null
   phone: string | null
   cpfMasked: string | null
+  /** A foto como data URL (`data:image/jpeg;base64,…`), ou `null`. */
+  avatar: string | null
   profileComplete: boolean
 }
 
@@ -1131,6 +1133,7 @@ export interface OperatorProfile {
   emergencyName: string | null
   emergencyPhone: string | null
   notes: string | null
+  avatar: string | null
   profileComplete: boolean
   updatedAt: string | null
 }
@@ -3358,6 +3361,13 @@ export const usersAPI = {
   /** O cadastro completo (CPF inteiro incluído): da própria pessoa ou de quem administra a equipe. */
   profile: (id: number) =>
     apiClient.get<{ profile: OperatorProfile }>(`/users/${id}/profile`),
+
+  /** A foto, já reduzida no navegador (`fileToAvatarDataUrl`): data URL JPEG/PNG/WebP. */
+  setAvatar: (id: number, image: string) =>
+    apiClient.requestWithBody<{ profile: OperatorProfile }>('PUT', `/users/${id}/avatar`, { image }),
+
+  removeAvatar: (id: number) =>
+    apiClient.delete<{ profile: OperatorProfile }>(`/users/${id}/avatar`),
 
   /** Só os campos que mudaram; `null` apaga um campo (e o CPF). */
   updateProfile: (id: number, payload: Record<string, string | null>) =>

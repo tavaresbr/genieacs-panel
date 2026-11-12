@@ -67,6 +67,7 @@ import { ActiveSessionsCard } from '@/components/active-sessions-card'
 import { OperatorEditDialog } from '@/components/settings/operator-edit-dialog'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { filterOperators } from '@/lib/operator-profile'
+import { OperatorAvatar } from '@/components/settings/operator-avatar'
 import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-panel'
@@ -3436,7 +3437,8 @@ export default function Settings() {
                       return (
                         <li key={operator.id} className="rounded-md border border-border bg-card p-3">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
+                            <OperatorAvatar src={operator.profile?.avatar} name={operator.profile?.fullName || operator.username} size={40} />
+                            <div className="min-w-0 flex-1">
                               <p className="wrap-break-word font-medium text-foreground">{operator.username}</p>
                               <div className="mt-1 flex flex-wrap gap-1.5">
                                 {isSelf && <span className="modern-badge">{t('settings.operators.you')}</span>}
@@ -3517,6 +3519,9 @@ export default function Settings() {
                             <Fragment key={operator.id}>
                               <tr>
                                 <td className="min-w-0">
+                                  <div className="flex items-start gap-3">
+                                    <OperatorAvatar src={operator.profile?.avatar} name={operator.profile?.fullName || operator.username} size={40} />
+                                    <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <span className="font-medium wrap-anywhere">{operator.username}</span>
                                     {isSelf && (
@@ -3537,6 +3542,8 @@ export default function Settings() {
                                       : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
                                   </div>
                                   {renderOperatorProfile(operator)}
+                                    </div>
+                                  </div>
                                 </td>
                                 <td className="w-56 xl:w-64">{renderOperatorRole(operator, lockedByOwner, 'w-full max-w-60')}</td>
                                 <td className="w-28 text-sm text-muted-foreground xl:w-auto xl:whitespace-nowrap">{formatDateTime(operator.createdAt)}</td>
