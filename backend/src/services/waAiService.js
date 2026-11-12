@@ -23,6 +23,7 @@ import {
 import { MENSAGEM_MAX, limparMensagem, mensagemTemContexto, promptDeMensagem } from '../utils/wa/waMensagemIa.js';
 import { blocoVendas, linhaPersona } from '../utils/wa/vendasPrompt.js';
 import { limparResposta, pedidoDeResposta, promptDeResposta } from '../utils/wa/conhecimentoIa.js';
+import { formatarReais, valoresEmCentavos, valoresForaDaLista } from '../utils/wa/guardaDePreco.js';
 import { TIPOS_DE_CONHECIMENTO } from '../utils/wa/conhecimento.js';
 import { descreverPlano, perfilDoCliente } from '../utils/wa/planosVenda.js';
 import WaSalesPlanService from './waSalesPlanService.js';
@@ -278,6 +279,10 @@ class WaAiService {
       const resultado = await this.conversar({ ai, conversation: conversa, link, modo: 'atendimento' });
       await WaBotConfigService.recordAiError(null);
 
+      // Quem ainda não é cliente nunca recebe um valor que o provedor não cadastrou.
+      const inventado = await this.valoresInventados({ ai, link, texto: resultado.texto });
+      if (inventado.length) return await this.barrarPrecoInventado({ conversation, texto: resultado.texto, valores: inventado });
+
       if (resultado.transferiu) {
         await WaBotService.pausar(conversation, new Date(Date.now() + WaBotService.PAUSA_ATENDENTE_MS));
         const passagem = await WaBotService.textoPassagem('handoffQueued');
@@ -303,6 +308,36 @@ class WaAiService {
       await WaBotConfigService.recordAiError(code, error?.details, { automatico: true });
       return null;
     }
+  }
+
+  /**
+   * Os valores em reais que a IA citou para quem ainda não é cliente e que não
+   * estão no catálogo de planos nem no texto das instruções (que o próprio
+   * provedor escreveu). Vazio para cliente com contrato (o valor da fatura vem
+   * de ferramenta) e com as vendas da IA desligadas.
+   */
+  static async valoresInventados({ ai, link, texto }) {
+    if (link?.contract || ai.sales === false) return [];
+    if (!valoresEmCentavos(texto).length) return [];
+    const permitidos = await WaSalesPlanService.precosDoCatalogo();
+    for (const valor of valoresEmCentavos(ai.instructions)) permitidos.add(valor);
+    return valoresForaDaLista(texto, permitidos);
+  }
+
+  /**
+   * O texto da IA com valor fora do catálogo não sai: a conversa vai para a
+   * equipe com a passagem padrão, e uma nota interna diz o que foi barrado.
+   */
+  static async barrarPrecoInventado({ conversation, texto, valores }) {
+    const nota = [
+      'A IA citou um valor que não está no catálogo de planos, e a mensagem NÃO foi enviada ao cliente.',
+      `Valor(es): ${valores.map(formatarReais).join(', ')}`,
+      `Texto barrado: ${String(texto ?? '').replace(/\s+/g, ' ').trim().slice(0, 400)}`
+    ].join('\n');
+    await WaSendService.enqueue({ conversationId: conversation.id, body: nota, isNote: true, userId: null, source: 'bot' });
+    await WaBotService.pausar(conversation, new Date(Date.now() + WaBotService.PAUSA_ATENDENTE_MS));
+    await WaBotService.responderCom(conversation, (await WaBotService.textoPassagem('handoffQueued')).slice(0, RESPOSTA_MAX));
+    return { replied: true, intent: 'atendente', from: 'ia' };
   }
 
   /**
