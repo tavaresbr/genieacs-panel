@@ -78,6 +78,22 @@ class CustomerPortalPasswordService {
     return password;
   }
 
+  /**
+   * A senha que o PRÓPRIO assinante escolheu. Só o hash é guardado: a cópia
+   * reversível existe para o operador devolver uma senha gerada pela máquina, e
+   * não faz sentido guardar em claro cifrado o que a pessoa escolheu. Sem ela,
+   * o operador não consegue "ver" a senha, só redefinir.
+   */
+  static async setChosen(accountId, password) {
+    await CustomerAccount.updatePassword(accountId, {
+      password_hash: await bcrypt.hash(password, BCRYPT_ROUNDS),
+      password_ciphertext: null,
+      password_iv: null,
+      password_tag: null,
+      password_updated_at: new Date()
+    });
+  }
+
   static reveal(account) {
     return secretBox().decrypt(account);
   }

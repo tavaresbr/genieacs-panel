@@ -3866,6 +3866,15 @@ const OPERATOR_AVATAR_COLUMNS = [
   ['avatar_updated_at', (t) => t.timestamp('avatar_updated_at').nullable()]
 ];
 
+/**
+ * A versão da sessão do assinante no portal (0138): o "sair" sobe o número e
+ * todo cookie emitido antes dele deixa de valer, sem esperar os 30 minutos.
+ * Linhas antigas ficam em 0, que é o que um cookie sem o campo já presume.
+ */
+const CUSTOMER_SESSION_COLUMNS = [
+  ['session_version', (t) => t.integer('session_version').notNullable().defaultTo(0)]
+];
+
 const OPERATOR_PROFILE_TABLES = [
   ['operator_profiles', operatorProfilesTable]
 ];
@@ -7801,6 +7810,22 @@ export const migrations = [
       const missing = await missingColumns(db, 'operator_profiles', OPERATOR_AVATAR_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('operator_profiles', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** A versão da sessão do portal — ver `CUSTOMER_SESSION_COLUMNS`. */
+    id: '0138_customer_session_version',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('customer_accounts'))) return true;
+      return (await missingColumns(db, 'customer_accounts', CUSTOMER_SESSION_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('customer_accounts'))) return;
+      const missing = await missingColumns(db, 'customer_accounts', CUSTOMER_SESSION_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('customer_accounts', (t) => {
         for (const add of missing) add(t);
       });
     }

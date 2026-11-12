@@ -151,6 +151,11 @@ export default function CustomerPortal() {
   // está pedindo e o que foi digitado (nunca guardado depois do envio).
   const [reauthIndex, setReauthIndex] = useState<number | null>(null)
   const [reauthPassword, setReauthPassword] = useState('')
+  // Troca da senha do portal (formulário recolhido até o cliente abrir).
+  const [pwOpen, setPwOpen] = useState(false)
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwFeedback, setPwFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [billing, setBilling] = useState<PortalBilling | null>(null)
   const [providerContact, setProviderContact] = useState<ProviderContact | null>(null)
   const [billingLoading, setBillingLoading] = useState(false)
@@ -357,6 +362,34 @@ export default function CustomerPortal() {
       setError(t('portal.error.retry'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const changePortalPassword = async (event: FormEvent) => {
+    event.preventDefault()
+    if (pwForm.next !== pwForm.confirm) {
+      setPwFeedback({ type: 'error', message: t('portal.password.mismatch') })
+      return
+    }
+    setPwSaving(true)
+    setPwFeedback(null)
+    try {
+      const result = await portalRequest('/password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next })
+      })
+      if (!result.success) {
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
+        setPwFeedback({ type: 'error', message: result.message || t('portal.error.retry') })
+        return
+      }
+      setPwFeedback({ type: 'success', message: result.message || '' })
+      setPwForm({ current: '', next: '', confirm: '' })
+      setPwOpen(false)
+    } catch {
+      setPwFeedback({ type: 'error', message: t('portal.error.retry') })
+    } finally {
+      setPwSaving(false)
     }
   }
 
@@ -1072,6 +1105,58 @@ export default function CustomerPortal() {
               </div>
             </section>
           )}
+
+          <section className="modern-card mt-5 p-4 sm:p-5" aria-labelledby="portal-password-title">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="portal-password-title" className="section-heading">{t('portal.password.title')}</h2>
+              {!pwOpen && (
+                <button type="button" className="modern-button-secondary" onClick={() => { setPwOpen(true); setPwFeedback(null) }}>
+                  {t('portal.password.title')}
+                </button>
+              )}
+            </div>
+            {pwFeedback && (
+              <p
+                className={`mt-3 rounded-md border p-3 text-sm ${
+                  pwFeedback.type === 'success'
+                    ? 'border-[hsl(var(--status-success))]/40 bg-[hsl(var(--status-success))]/10'
+                    : 'border-destructive/40 bg-destructive/10'
+                }`}
+                role={pwFeedback.type === 'error' ? 'alert' : 'status'}
+              >
+                {pwFeedback.message}
+              </p>
+            )}
+            {pwOpen && (
+              <form className="mt-4 grid gap-4 sm:max-w-md" onSubmit={changePortalPassword}>
+                <div>
+                  <label className="field-label" htmlFor="pw-current">{t('portal.password.current')}</label>
+                  <input id="pw-current" type="password" className="modern-input font-mono" maxLength={32} required
+                    autoComplete="current-password" value={pwForm.current}
+                    onChange={(event) => setPwForm((c) => ({ ...c, current: event.target.value }))} />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="pw-new">{t('portal.password.new')}</label>
+                  <input id="pw-new" type="password" className="modern-input font-mono" minLength={10} maxLength={32} required
+                    autoComplete="new-password" value={pwForm.next}
+                    onChange={(event) => setPwForm((c) => ({ ...c, next: event.target.value }))} />
+                  <p className="field-hint">{t('portal.password.hint')}</p>
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="pw-confirm">{t('portal.password.confirm')}</label>
+                  <input id="pw-confirm" type="password" className="modern-input font-mono" minLength={10} maxLength={32} required
+                    autoComplete="new-password" value={pwForm.confirm}
+                    onChange={(event) => setPwForm((c) => ({ ...c, confirm: event.target.value }))} />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="modern-button" disabled={pwSaving}>{t('portal.password.save')}</button>
+                  <button type="button" className="modern-button-secondary" onClick={() => { setPwOpen(false); setPwForm({ current: '', next: '', confirm: '' }) }}>
+                    {t('portal.password.cancel')}
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
 
           {hasContact(providerContact) && (
             <section className="modern-card mt-5 p-4 sm:p-5" aria-labelledby="portal-contact-title">

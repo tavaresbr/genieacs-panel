@@ -44,6 +44,8 @@ export const DEFAULT_SETTINGS = {
   portalContactEmail: '',
   // Redes Wi-Fi que o assinante enxerga no portal ("1,5"); vazio = todas.
   portalWifiIndexes: '',
+  // Aviso por WhatsApp ao assinante quando o Wi-Fi é trocado pelo portal; desligado até o provedor ligar.
+  portalWifiChangeNotice: 'false',
   // Como as datas aparecem no painel e no portal (utils/dateFormat.js).
   // `auto` segue o idioma de quem olha — o que o painel sempre fez.
   dateFormat: 'auto'

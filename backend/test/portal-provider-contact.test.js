@@ -174,3 +174,19 @@ describe('Tenant.PORTAL_CONTACT_COLUMNS', () => {
     }
   });
 });
+
+describe('aviso de troca de Wi-Fi (portalWifiChangeNotice)', () => {
+  it('só aceita true ou false e vem desligado', async () => {
+    assert.equal((await salvar('portalWifiChangeNotice', 'talvez')).status, 400);
+    assert.equal((await salvar('portalWifiChangeNotice', 'false')).status, 200);
+    const { notifyWifiChanged } = await import('../src/services/portalWifiNoticeService.js');
+    assert.equal(await asTenant(() => notifyWifiChanged({ accountId: 1, deviceId: 'x' })), false);
+  });
+
+  it('ligado, sem telefone ou sem conta de WhatsApp, não envia e não lança', async () => {
+    assert.equal((await salvar('portalWifiChangeNotice', 'true')).status, 200);
+    const { notifyWifiChanged } = await import('../src/services/portalWifiNoticeService.js');
+    assert.equal(await asTenant(() => notifyWifiChanged({ accountId: 2, deviceId: 'sem-vinculo' })), false);
+    assert.equal((await salvar('portalWifiChangeNotice', 'false')).status, 200);
+  });
+});

@@ -30,6 +30,7 @@ class AuditLog {
     PORTAL_CUSTOMER_LOCKED: 'portal_customer.account_locked',
     PORTAL_CUSTOMER_WIFI_UPDATED: 'portal_customer.wifi_updated',
     PORTAL_CUSTOMER_WIFI_REVEALED: 'portal_customer.wifi_revealed',
+    PORTAL_CUSTOMER_PASSWORD_CHANGED: 'portal_customer.password_changed',
     PORTAL_CUSTOMER_TRUST_UNLOCK: 'portal_customer.trust_unlock',
     GENIEACS_URL_CHANGED: 'genieacs.url_changed',
     GENIEACS_AUTH_CHANGED: 'genieacs.auth_changed',

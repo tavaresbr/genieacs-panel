@@ -249,7 +249,7 @@ Revisão focada no portal (`portalApp`, `customerPortalController.js`, `portalAu
 | PORT-01 | Média | Login do portal só tinha limite por endereço; palpites distribuídos não eram contidos. | **corrigido**: `AccountLockout` por (provedor, ID), mesma resposta para ID inexistente. Preço conhecido: quem sabe um ID consegue trancá-lo por 15 min; o limitador por endereço segue na frente. |
 | PORT-02 | Média | Nenhuma trilha das ações do assinante. | **corrigido**: `portal_customer.account_locked`, `.wifi_updated`, `.wifi_revealed`, `.trust_unlock`. |
 | PORT-03 | Média | Revelar a senha Wi-Fi só exigia a sessão de 30 min. | **corrigido**: `POST` com a senha do portal, contada na mesma trava. O `GET` antigo deixou de existir. |
-| PORT-04 | Baixa | Logout só apaga o cookie; JWT copiado vale até 30 min. | **proposto**: coluna `session_version` em `customer_accounts` (exige migração). |
+| PORT-04 | Baixa | Logout só apaga o cookie; JWT copiado vale até 30 min. | **corrigido** (migração `0138_customer_session_version`): o "sair" sobe `session_version` e todo cookie anterior deixa de valer. |
 | PORT-05 | Baixa | SSID sem normalização Unicode. | **corrigido** (NFC). |
 | PORT-06 | Baixa | Sem `Cache-Control: no-store` explícito nas respostas autenticadas do portal. | **corrigido**. |
 | PORT-07 | Info | Senha de 10 símbolos (~50 bits), gerada pela máquina. Com a trava, a entropia basta. | aceito |
@@ -257,3 +257,8 @@ Revisão focada no portal (`portalApp`, `customerPortalController.js`, `portalAu
 | PORT-09 | Média | A listagem de parâmetros (`/api/devices/parameters`) não mascarava `LoginSuperPass` (o padrão do instalador). | **corrigido**: máscara ampla, a mesma de `provisioningService.js`. |
 
 Propostas que ficam: sessão revogável no servidor (PORT-04), 2FA/OTP no portal, o assinante trocar a própria senha, aviso por WhatsApp quando o Wi-Fi mudar, e restringir as redes (índices) que o portal pode editar. O papel `tech` enxerga as senhas de superadmin/useradmin do ONT em `GET /api/devices/:id`; decidir se isso continua assim.
+
+**Terceira rodada (PORT-12 a PORT-14):**
+- **PORT-12, corrigido:** logout revogável (migração `0138`, coluna `session_version`, claim `sv` no cookie). Cookies emitidos antes da coluna valem até vencer.
+- **PORT-13, novo:** o assinante troca a própria senha em `POST /api/customer/password` (senha atual conferida na trava por conta; nova com 10 a 32 letras/números, lista de senhas comuns). Só o hash é guardado: sem cópia reversível, então o operador não consegue "ver" a senha escolhida, só redefinir. Trocar encerra as outras sessões.
+- **PORT-14, novo:** aviso por WhatsApp quando o Wi-Fi é trocado pelo portal (`portalWifiChangeNotice`, desligado por padrão; máx. 1 a cada 30 min por conta; sem nome de rede nem senha; respeita o "não perturbe" de serviço). Limitação: sem modelo da Meta ligado a este aviso, em número oficial só sai dentro da janela de 24 h.

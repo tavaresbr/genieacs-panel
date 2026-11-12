@@ -99,6 +99,11 @@ class CustomerAccount {
     return this.getById(id);
   }
 
+  /** Encerra toda sessão aberta do portal desta conta (o "sair"). */
+  static async bumpSession(id) {
+    await tdb('customer_accounts').where({ id }).increment('session_version', 1);
+  }
+
   static async getWithoutPassword(limit = 25) {
     return tdb('customer_accounts')
       .select('id')

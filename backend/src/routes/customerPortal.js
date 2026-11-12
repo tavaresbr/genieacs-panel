@@ -69,6 +69,13 @@ router.post(
   CustomerPortalController.trustUnlock
 );
 router.post(
+  '/password',
+  authenticatePortalCustomer,
+  portalAccountLimiter,
+  portalMutationLimiter,
+  CustomerPortalController.changePassword
+);
+router.post(
   '/logout',
   authenticatePortalCustomer,
   portalAccountLimiter,
