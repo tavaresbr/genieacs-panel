@@ -527,7 +527,7 @@ describe('a IA atendendo', () => {
           { kind: 'objecao', title: 'Acha caro', triggers: 'caro, preço alto', answer: 'O plano inclui Wi-Fi 6 e suporte.' },
           { kind: 'objecao', title: 'Cai', triggers: 'cai, instável', answer: 'Rede em fibra monitorada.' }
         ]) ids.push((await asTenant(() => WaAiKnowledgeService.create(dados))).id);
-        await asTenant(() => WaBotConfigService.saveConfig({ ai: { coverage: ['Itaituba', 'Moraes Almeida'] } }));
+        await asTenant(() => WaBotConfigService.saveConfig({ ai: { coverage: ['Itaituba', { name: 'Moraes Almeida', aliases: ['Moraes', 'Vila Moraes'] }] } }));
 
         await limparFio(DESCONHECIDO);
         roteiro = [{ content: 'Entendo!' }];
@@ -537,7 +537,7 @@ describe('a IA atendendo', () => {
         assert.match(sistema, /Atendemos de segunda a domingo/, 'vantagens sempre');
         assert.match(sistema, /O plano inclui Wi-Fi 6/, 'objeção com gatilho');
         assert.doesNotMatch(sistema, /Rede em fibra monitorada/, 'sem o gatilho, fora');
-        assert.match(sistema, /Lugares atendidos pela empresa: Itaituba, Moraes Almeida/);
+        assert.match(sistema, /Lugares atendidos pela empresa: Itaituba, Moraes Almeida \(também: Moraes, Vila Moraes\)\./);
         assert.match(sistema, /não confirme nem negue/);
 
         await limparFio(ASSINANTE);

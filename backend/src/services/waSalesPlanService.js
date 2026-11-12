@@ -3,6 +3,7 @@ import SgpService from './sgpService.js';
 import { WaError } from './whatsappConfigService.js';
 import { PERFIS_DE_PLANO, cidadesDoPlano, escolherPlanos, planosDaCidade, variaPorCidade } from '../utils/wa/planosVenda.js';
 import { limparLugares } from '../utils/wa/conhecimento.js';
+import WaBotConfigService from './waBotConfigService.js';
 
 const NAME_LIMIT = 80;
 const INCLUDES_LIMIT = 300;
@@ -159,7 +160,8 @@ class WaSalesPlanService {
     const linhas = await tdb('wa_sales_plans').where({ active: true }).where('price_cents', '>', 0);
     const nome = limpar(cidade);
     if (!nome && variaPorCidade(linhas)) return { precisaCidade: true, planos: [] };
-    const daCidade = nome ? planosDaCidade(linhas, nome) : linhas;
+    const { ai } = await WaBotConfigService.getConfig();
+    const daCidade = nome ? planosDaCidade(linhas, nome, ai.coverage) : linhas;
     return { precisaCidade: false, planos: escolherPlanos(daCidade, perfil) };
   }
 }

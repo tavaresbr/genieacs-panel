@@ -6436,6 +6436,12 @@ export function aiCreditsUrl(provider: BotAiProvider, baseUrl: string): string |
   return null
 }
 
+/** Um lugar da cobertura: o nome e os outros nomes que o cliente usa para ele. */
+export interface CoveragePlace {
+  name: string
+  aliases: string[]
+}
+
 export interface BotAiConfig {
   enabled: boolean
   suggest: boolean
@@ -6447,8 +6453,8 @@ export interface BotAiConfig {
   instructions: string
   /** Nome e jeito do atendente nas conversas de venda. */
   persona: string
-  /** Cidades e bairros atendidos; fora da lista a IA chama um atendente. */
-  coverage: string[]
+  /** Cidades e bairros atendidos, com os outros nomes de cada um; fora da lista a IA chama um atendente. */
+  coverage: CoveragePlace[]
   hasApiKey: boolean
   /** O id de workspace enviado à Anthropic quando a chave não pertence a um; vazio na maioria dos casos. */
   workspaceId: string
@@ -6468,7 +6474,7 @@ export interface BotAiInput {
   model?: string
   instructions?: string
   persona?: string
-  coverage?: string[]
+  coverage?: Array<CoveragePlace | string>
   apiKey?: string
   workspaceId?: string
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { asTenant, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WaAiKnowledgeService } = await import('../src/services/waAiKnowledgeService.js');
-const { escolherConhecimento, blocoCobertura, limparLugares, lerGatilhos, normalizar, EXEMPLOS } = await import('../src/utils/wa/conhecimento.js');
+const { escolherConhecimento, blocoCobertura, limparLugares, limparCobertura, nomesDoLugar, lerGatilhos, normalizar, EXEMPLOS } = await import('../src/utils/wa/conhecimento.js');
 
 before(async () => { await startTestServers(); });
 after(async () => { await stopTestServers(); });
@@ -43,6 +43,39 @@ describe('o que entra na conversa', () => {
     assert.equal(limparLugares('x'), null);
     assert.equal(blocoCobertura([]), '');
     assert.match(blocoCobertura(['Itaituba']), /Itaituba.*NÃO está nesta lista.*transferir_para_atendente/s);
+  });
+});
+
+describe('a cobertura com apelidos', () => {
+  it('aceita o formato antigo (texto) e o novo, sem repetir nome nem apelido', () => {
+    assert.deepEqual(limparCobertura(['Itaituba', ' itaituba ', 'Moraes Almeida']), [
+      { name: 'Itaituba', aliases: [] }, { name: 'Moraes Almeida', aliases: [] }
+    ]);
+    const lista = limparCobertura([
+      { name: 'Jardim das Araras', aliases: ['Araras', ' jd. araras ', 'ARARAS', 'Jardim das Araras', ''] },
+      { name: 'Centro', aliases: ['Araras', 'Centrão'] },
+      'Miritituba'
+    ]);
+    assert.deepEqual(lista, [
+      { name: 'Jardim das Araras', aliases: ['Araras', 'jd. araras'] },
+      { name: 'Centro', aliases: ['Centrão'] },
+      { name: 'Miritituba', aliases: [] }
+    ], 'um apelido não é repetido em outro lugar, nem repete o nome');
+    assert.equal(limparCobertura('x'), null);
+    assert.deepEqual(nomesDoLugar(lista[0]), ['Jardim das Araras', 'Araras', 'jd. araras']);
+    assert.deepEqual(nomesDoLugar('Itaituba'), ['Itaituba']);
+  });
+  it('limita o tamanho: 100 lugares, 10 apelidos de 80 caracteres', () => {
+    const muitos = Array.from({ length: 150 }, (_, i) => ({ name: `Lugar ${i}` }));
+    assert.equal(limparCobertura(muitos).length, 100);
+    const [um] = limparCobertura([{ name: 'A', aliases: Array.from({ length: 15 }, (_, i) => `apelido ${i}`.padEnd(120, 'x')) }]);
+    assert.equal(um.aliases.length, 10);
+    assert.ok(um.aliases.every((a) => a.length <= 80));
+  });
+  it('o prompt lista os apelidos; sem apelido a linha é a de sempre', () => {
+    assert.match(blocoCobertura([{ name: 'Itaituba', aliases: ['Itaitu', 'ITB'] }, { name: 'Moraes Almeida', aliases: [] }]),
+      /Itaituba \(também: Itaitu, ITB\), Moraes Almeida\./);
+    assert.match(blocoCobertura(['Itaituba', 'Moraes Almeida']), /Lugares atendidos pela empresa: Itaituba, Moraes Almeida\./);
   });
 });
 
