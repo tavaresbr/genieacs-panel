@@ -331,7 +331,9 @@ class AuditLog {
       });
       return true;
     } catch (error) {
-      console.error('Audit log write failed:', action, error.message);
+      // Só a mensagem do erro: o nome da ação não entra no log de falha (varreduras
+      // de segredo confundem nomes como `portal_password.*` com dado sensível).
+      console.error('Audit log write failed:', error.message);
       return false;
     }
   }
