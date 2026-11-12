@@ -182,3 +182,78 @@ describe('profile lifecycle', () => {
     assert.equal(await getDb()('operator_profiles').where({ user_id: techId }).first(), undefined);
   });
 });
+
+/** Um PNG 1×1 de verdade, e um JPEG/WebP só com os primeiros bytes (o servidor confere o tipo, não decodifica). */
+const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const png = `data:image/png;base64,${PNG_1X1}`;
+const avatar = (id, token, image) => call(`${panelUrl}/api/users/${id}/avatar`, {
+  method: 'PUT', headers: authHeaders(token), body: { image }
+});
+
+describe('operator avatar', () => {
+  it('saves a photo, returns it as a data URL and shows it in the list', async () => {
+    const res = await avatar(adminId, ownerToken, png);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.profile.avatar, png);
+    const { body } = await call(`${panelUrl}/api/users`, { headers: authHeaders(ownerToken) });
+    assert.equal(body.data.users.find((u) => u.id === adminId).profile.avatar, png);
+  });
+
+  it('trusts the bytes and not the declared type', async () => {
+    // Declarado JPEG, mas os bytes são PNG: vale o que os bytes provam.
+    const res = await avatar(adminId, ownerToken, `data:image/jpeg;base64,${PNG_1X1}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.profile.avatar, png);
+  });
+
+  it('refuses SVG, other types and garbage', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>').toString('base64');
+    for (const bad of [
+      `data:image/svg+xml;base64,${svg}`,
+      `data:image/png;base64,${svg}`,
+      `data:text/html;base64,${svg}`,
+      'not a data url', '', null, 123,
+      'data:image/png;base64,!!!!'
+    ]) {
+      const res = await avatar(adminId, ownerToken, bad);
+      assert.equal(res.status, 400, `${String(bad).slice(0, 40)} should be refused`);
+      assert.equal(res.body.code, 'avatarInvalid');
+    }
+  });
+
+  it('refuses a photo over the size cap with 413', async () => {
+    const big = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(100 * 1024)]);
+    const res = await avatar(adminId, ownerToken, `data:image/png;base64,${big.toString('base64')}`);
+    assert.equal(res.status, 413);
+    assert.equal(res.body.code, 'avatarTooLarge');
+  });
+
+  it('follows the same permissions as the record', async () => {
+    // O técnico do começo já foi apagado e teve o login trocado; um leitor novo
+    // faz o papel de "pessoa sem permissão de administrar".
+    const leitor = { username: 'leitor', password: 'senha-teste-4444', email: 'leitor@exemplo.test' };
+    const created = await call(`${panelUrl}/api/users`, {
+      method: 'POST', headers: authHeaders(ownerToken), body: { ...leitor, role: 'viewer' }
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const leitorId = created.body.data.user.id;
+    const leitorToken = (await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: leitor })).body.data.token;
+
+    assert.equal((await avatar(leitorId, leitorToken, png)).status, 200);
+    assert.equal((await avatar(adminId, leitorToken, png)).status, 403);
+    assert.equal((await avatar(ownerId, adminToken, png)).status, 403);
+    assert.equal((await avatar(999999, ownerToken, png)).status, 404);
+  });
+
+  it('removes the photo, and audits the field name only', async () => {
+    const res = await call(`${panelUrl}/api/users/${adminId}/avatar`, { method: 'DELETE', headers: authHeaders(ownerToken) });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.profile.avatar, null);
+    const row = await getDb()('operator_profiles').where({ user_id: adminId }).first();
+    assert.equal(row.avatar_data, null);
+    const rows = await getDb()('audit_log')
+      .where({ tenant_id: await defaultTenantId(), action: 'operator.profile_updated' });
+    assert.ok(!JSON.stringify(rows).includes(PNG_1X1));
+  });
+});
+

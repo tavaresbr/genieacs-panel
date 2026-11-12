@@ -6,7 +6,7 @@ import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import OperatorProfile, { summary as profileSummary } from '../models/OperatorProfile.js';
-import { validateProfileInput } from '../utils/operatorProfileValidation.js';
+import { validateProfileInput, parseAvatarDataUrl } from '../utils/operatorProfileValidation.js';
 import MfaService from '../services/mfaService.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import { newPasswordProblem } from '../utils/passwordPolicy.js';
@@ -546,6 +546,59 @@ class UsersController {
       }));
     } catch (error) {
       console.error('Update operator profile error:', error);
+      return res.status(500).json(createErrorResponse(req.t('users.profile.saveFailed'), error.message));
+    }
+  }
+
+  /** `PUT /users/:id/avatar` — `{ image: "data:image/jpeg;base64,…" }`. As mesmas regras do cadastro. */
+  static async setAvatar(req, res) {
+    try {
+      if (req.user.impersonation) {
+        return res.status(403).json(createErrorResponse(req.t('auth.impersonationReadOnly'), null, 'impersonation_read_only'));
+      }
+      const alvo = await UsersController.profileTarget(req, res);
+      if (!alvo) return undefined;
+      const parsed = parseAvatarDataUrl(req.body?.image);
+      if (parsed.error) {
+        return res.status(parsed.error.status).json(createErrorResponse(req.t(parsed.error.key), null, parsed.error.code));
+      }
+      await OperatorProfile.setAvatar(alvo.id, parsed);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_PROFILE_UPDATED,
+        subjectType: 'tenant_user',
+        subjectId: alvo.id,
+        detail: { fields: ['avatar'] }
+      });
+      return res.json(createResponse(req.t('users.profile.avatarSaved'), {
+        profile: await OperatorProfile.get(alvo.id)
+      }));
+    } catch (error) {
+      console.error('Set operator avatar error:', error);
+      return res.status(500).json(createErrorResponse(req.t('users.profile.saveFailed'), error.message));
+    }
+  }
+
+  static async removeAvatar(req, res) {
+    try {
+      if (req.user.impersonation) {
+        return res.status(403).json(createErrorResponse(req.t('auth.impersonationReadOnly'), null, 'impersonation_read_only'));
+      }
+      const alvo = await UsersController.profileTarget(req, res);
+      if (!alvo) return undefined;
+      const mudou = await OperatorProfile.removeAvatar(alvo.id);
+      if (mudou) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.OPERATOR_PROFILE_UPDATED,
+          subjectType: 'tenant_user',
+          subjectId: alvo.id,
+          detail: { fields: ['avatar'] }
+        });
+      }
+      return res.json(createResponse(req.t('users.profile.avatarRemoved'), {
+        profile: await OperatorProfile.get(alvo.id)
+      }));
+    } catch (error) {
+      console.error('Remove operator avatar error:', error);
       return res.status(500).json(createErrorResponse(req.t('users.profile.saveFailed'), error.message));
     }
   }

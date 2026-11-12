@@ -14,6 +14,9 @@ router.post('/', operatorCreateLimiter, authenticateToken, requirePermission('op
 // no controlador (`profileTarget`), porque depende de QUEM é o alvo.
 router.get('/:id/profile', authenticateToken, UsersController.getProfile);
 router.patch('/:id/profile', authenticateToken, UsersController.updateProfile);
+// A foto: JSON com a imagem em data URL (já reduzida no navegador). Mesma regra do cadastro.
+router.put('/:id/avatar', authenticateToken, UsersController.setAvatar);
+router.delete('/:id/avatar', authenticateToken, UsersController.removeAvatar);
 router.patch('/:id', authenticateToken, requirePermission('operators.manage'), UsersController.update);
 router.delete('/:id', authenticateToken, requirePermission('operators.manage'), UsersController.remove);
 // Desliga o 2FA de quem perdeu o celular e os códigos. As regras (dono, outro

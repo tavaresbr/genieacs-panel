@@ -145,3 +145,36 @@ export function maskCpf(last4) {
   if (!last4 || !/^\d{4}$/.test(last4)) return null;
   return `***.***.*${last4.slice(0, 2)}-${last4.slice(2)}`;
 }
+
+/** Teto da foto, já decodificada: o navegador entrega ~20 KB (192×192), isto é folga. */
+export const AVATAR_MAX_BYTES = 96 * 1024;
+
+/** O tipo que os PRIMEIROS BYTES provam, ou null. SVG não entra de propósito. */
+export function sniffAvatar(buffer) {
+  const b = buffer;
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (b.length >= 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+/**
+ * A foto como o navegador manda: `data:image/<tipo>;base64,<bytes>`.
+ * O `Content-Type` e o tipo do prefixo são só declaração — vale o que os bytes
+ * provam.
+ * @returns {{ buffer: Buffer, mime: string } | { error: { key: string, code: string, status: number } }}
+ */
+export function parseAvatarDataUrl(value) {
+  const bad = (code, status = 400) => ({ error: { key: `users.profile.${code}`, code, status } });
+  if (typeof value !== 'string') return bad('avatarInvalid');
+  const match = /^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match) return bad('avatarInvalid');
+  // Barra o enorme ANTES de decodificar: três quartos do base64 são os bytes.
+  if (Math.floor((match[1].length * 3) / 4) > AVATAR_MAX_BYTES) return bad('avatarTooLarge', 413);
+  const buffer = Buffer.from(match[1], 'base64');
+  if (buffer.length === 0) return bad('avatarInvalid');
+  if (buffer.length > AVATAR_MAX_BYTES) return bad('avatarTooLarge', 413);
+  const mime = sniffAvatar(buffer);
+  if (!mime) return bad('avatarInvalid');
+  return { buffer, mime };
+}

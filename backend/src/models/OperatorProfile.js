@@ -44,8 +44,13 @@ const PUBLIC_COLUMNS = [
   'id', 'user_id', 'full_name', 'birth_date', 'rg', 'cpf_last4', 'phone', 'whatsapp',
   'personal_email', 'zip', 'street', 'number', 'complement', 'district', 'city', 'state',
   'job_title', 'admitted_at', 'emergency_name', 'emergency_phone', 'notes',
-  'created_at', 'updated_at'
+  'avatar_mime', 'avatar_data', 'avatar_updated_at', 'created_at', 'updated_at'
 ];
+
+/** A foto como o navegador a usa num <img>; o tipo vem do que foi provado ao gravar. */
+export function avatarDataUrl(row) {
+  return row?.avatar_data && row?.avatar_mime ? `data:${row.avatar_mime};base64,${row.avatar_data}` : null;
+}
 
 /** Quanto do cadastro conta como "completo" na lista. */
 const REQUIRED_FOR_COMPLETE = ['full_name', 'cpf_last4', 'phone', 'zip', 'street', 'city', 'state'];
@@ -56,12 +61,13 @@ export function isComplete(row) {
 
 /** O que a lista mostra: sem CPF decifrado, sem observações. */
 export function summary(row) {
-  if (!row) return { fullName: null, jobTitle: null, phone: null, cpfMasked: null, profileComplete: false };
+  if (!row) return { fullName: null, jobTitle: null, phone: null, cpfMasked: null, avatar: null, profileComplete: false };
   return {
     fullName: row.full_name ?? null,
     jobTitle: row.job_title ?? null,
     phone: row.phone ?? null,
     cpfMasked: maskCpf(row.cpf_last4),
+    avatar: avatarDataUrl(row),
     profileComplete: isComplete(row)
   };
 }
@@ -89,6 +95,7 @@ function present(row, cpf) {
     emergencyName: row.emergency_name ?? null,
     emergencyPhone: row.emergency_phone ?? null,
     notes: row.notes ?? null,
+    avatar: avatarDataUrl(row),
     profileComplete: isComplete(row),
     updatedAt: row.updated_at ?? null
   };
@@ -163,6 +170,21 @@ class OperatorProfile {
       await tdb('operator_profiles').where({ user_id: userId }).update({ ...patch, updated_at: now });
     }
     return changed;
+  }
+
+  /** Grava a foto (já validada); cria o cadastro vazio se a pessoa ainda não tem. */
+  static async setAvatar(userId, { mime, buffer }) {
+    const now = new Date();
+    const patch = { avatar_mime: mime, avatar_data: buffer.toString('base64'), avatar_updated_at: now, updated_at: now };
+    const existing = await tdb('operator_profiles').where({ user_id: userId }).first('id');
+    if (existing) await tdb('operator_profiles').where({ user_id: userId }).update(patch);
+    else await tinsert('operator_profiles', { user_id: userId, created_at: now, ...patch });
+  }
+
+  static async removeAvatar(userId) {
+    return tdb('operator_profiles').where({ user_id: userId }).update({
+      avatar_mime: null, avatar_data: null, avatar_updated_at: null, updated_at: new Date()
+    });
   }
 
   /** O vínculo acabou: o cadastro deste provedor sai junto. */
