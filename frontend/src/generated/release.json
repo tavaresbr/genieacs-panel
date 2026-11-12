@@ -1,34 +1,28 @@
 {
-  "version": "1.35.0",
-  "build": 1629,
-  "sourceCommit": "d8eea2c3ac8f",
+  "version": "1.36.0",
+  "build": 1635,
+  "sourceCommit": "bd3cb79b4dae",
   "releasedAt": "2026-11-12",
-  "basedOnTag": "v1.34.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/349c7bc142d5...d8eea2c3ac8f",
+  "basedOnTag": "v1.35.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/0c1402b2cd59...bd3cb79b4dae",
   "changes": [
     {
-      "shortHash": "8ce33815",
-      "date": "2026-11-11",
-      "title": "Sugestões da IA para a base de conhecimento, com aprovação",
-      "category": "New"
-    },
-    {
-      "shortHash": "92e1c070",
-      "date": "2026-11-11",
-      "title": "Sugestão com espaço a preencher entre colchetes não ativa sem edição",
-      "category": "New"
-    },
-    {
-      "shortHash": "8a12180c",
-      "date": "2026-11-11",
-      "title": "Conta só as sugestões desta venda",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f5b77156",
-      "date": "2026-11-11",
-      "title": "Log das sugestões não carrega texto de fora sem tratar",
+      "shortHash": "91f04cef",
+      "date": "2026-11-12",
+      "title": "Editar plano ou item da base abre o formulário no próprio lugar",
       "category": "Fixed"
+    },
+    {
+      "shortHash": "39ccd57c",
+      "date": "2026-11-12",
+      "title": "Tela para editar o cadastro da equipe (CPF, contato, endereço, trabalho)",
+      "category": "New"
+    },
+    {
+      "shortHash": "f24b7558",
+      "date": "2026-11-12",
+      "title": "Melhorias da aba Acesso da conta — confirmação no painel, sair dos outros, avisos",
+      "category": "New"
     }
   ]
 }
