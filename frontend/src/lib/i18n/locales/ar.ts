@@ -1488,6 +1488,8 @@ const ar: Dictionary = {
   'settings.portal.contactWhatsapp': 'واتساب',
   'settings.portal.contactEmail': 'البريد الإلكتروني',
   'settings.portal.contactFieldsHint': 'إذا تُركت فارغة، تستخدم البوابة هاتف وبريد ملف المزوّد (تبويب عام). ويأتي العنوان دائمًا من الملف.',
+  'settings.portal.wifiIndexes': 'شبكات Wi-Fi الظاهرة في البوابة',
+  'settings.portal.wifiIndexesHint': 'أرقام الشبكات (من 1 إلى 8) مفصولة بفاصلة، مثل 1,5. اتركها فارغة لإظهار كل الشبكات التي يبلغ عنها ONT. استخدمها لإخفاء شبكات الضيوف أو IPTV أو الإدارة.',
   'settings.security.title': 'بيانات اعتماد المدير',
   'settings.security.description': 'تنطبق التغييرات على جلسة الدخول إلى اللوحة، لا على بيانات اعتماد الأجهزة أو GenieACS.',
   'settings.mfa.title': 'تسجيل الدخول بخطوتين',

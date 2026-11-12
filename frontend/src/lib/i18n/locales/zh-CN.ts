@@ -1496,6 +1496,8 @@ const zhCN: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': '邮箱',
   'settings.portal.contactFieldsHint': '留空时，门户使用服务商资料（常规选项卡）中的电话和邮箱。地址始终来自服务商资料。',
+  'settings.portal.wifiIndexes': '门户中显示的Wi-Fi网络',
+  'settings.portal.wifiIndexesHint': '网络编号（1 到 8），用逗号分隔，例如 1,5。留空则显示 ONT 上报的所有网络。可用于隐藏访客、IPTV 或管理网络。',
   'settings.security.title': '管理员凭据',
   'settings.security.description': '此处的修改仅作用于面板登录会话，不影响设备或 GenieACS 的凭据。',
   'settings.mfa.title': '两步登录',

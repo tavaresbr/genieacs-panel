@@ -184,6 +184,7 @@ export default function Settings() {
     portalContactPhone: '',
     portalContactWhatsapp: '',
     portalContactEmail: '',
+    portalWifiIndexes: '',
     // Como as datas aparecem em todo o painel e no portal; `auto` segue o idioma.
     dateFormat: 'auto' as string,
     ...INSTALLER_VIRTUAL_PARAMETERS
@@ -2289,6 +2290,14 @@ export default function Settings() {
                   <p className="field-hint sm:col-span-3">{t('settings.portal.contactFieldsHint')}</p>
                 </div>
               )}
+            </div>
+
+            <div className="mt-5 rounded-md border border-border p-4">
+              <label htmlFor="portal-wifi-indexes" className="field-label">{t('settings.portal.wifiIndexes')}</label>
+              <input id="portal-wifi-indexes" type="text" maxLength={15} className="modern-input w-full sm:max-w-xs"
+                placeholder="1,5" value={settings.portalWifiIndexes}
+                onChange={(event) => setSettings((current) => ({ ...current, portalWifiIndexes: event.target.value }))} />
+              <p className="field-hint">{t('settings.portal.wifiIndexesHint')}</p>
             </div>
           </div>
         )}

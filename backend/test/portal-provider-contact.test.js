@@ -136,6 +136,28 @@ describe('GET /api/customer/provider', () => {
   });
 });
 
+describe('redes Wi-Fi visíveis no portal (portalWifiIndexes)', () => {
+  it('valida o formato e normaliza a lista', async () => {
+    assert.equal((await salvar('portalWifiIndexes', '9')).status, 400);
+    assert.equal((await salvar('portalWifiIndexes', '1;5')).status, 400);
+    assert.equal((await salvar('portalWifiIndexes', 'a')).status, 400);
+    assert.equal((await salvar('portalWifiIndexes', '5, 1,5')).status, 200);
+    assert.equal(await asTenant(() => Setting.getByKey('portalWifiIndexes')), '1,5');
+  });
+
+  it('com a lista preenchida, trocar uma rede fora dela é 404', async () => {
+    assert.equal((await salvar('portalWifiIndexes', '5')).status, 200);
+    const res = await call(`${portalUrl}/api/customer/wifi`, {
+      method: 'PUT',
+      headers: { Cookie: cookie },
+      body: { index: 2, ssid: 'rede' }
+    });
+    assert.equal(res.status, 404);
+    assert.equal(res.body.code, 'wifi_network_not_found');
+    assert.equal((await salvar('portalWifiIndexes', '')).status, 200);
+  });
+});
+
 describe('validação das configurações do contato', () => {
   it('recusa telefone, e-mail e chave fora do formato', async () => {
     assert.equal((await salvar('portalShowProviderContact', 'sim')).status, 400);

@@ -1499,6 +1499,8 @@ const de: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'E-Mail',
   'settings.portal.contactFieldsHint': 'Leer verwendet das Portal Telefon und E-Mail aus dem Anbieterprofil (Tab Allgemein). Die Adresse stammt immer aus dem Profil.',
+  'settings.portal.wifiIndexes': 'Im Portal angezeigte WLAN-Netzwerke',
+  'settings.portal.wifiIndexesHint': 'Netzwerknummern (1 bis 8), durch Komma getrennt, z. B. 1,5. Leer zeigt alle vom ONT gemeldeten Netzwerke. Zum Ausblenden von Gäste-, IPTV- oder Verwaltungsnetzen.',
   'settings.security.title': 'Administrator-Zugangsdaten',
   'settings.security.description': 'Die Änderungen gelten für die Panel-Anmeldung, nicht für Geräte- oder GenieACS-Zugangsdaten.',
   'settings.mfa.title': 'Zwei-Schritt-Anmeldung',

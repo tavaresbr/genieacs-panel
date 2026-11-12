@@ -125,6 +125,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'portalContactPhone',
   'portalContactWhatsapp',
   'portalContactEmail',
+  // Quais redes Wi-Fi (índices 1-8, "1,5") o assinante vê e edita no portal; vazio = todas.
+  'portalWifiIndexes',
   // Como as datas aparecem em todo o painel e no portal. Ver utils/dateFormat.js.
   'dateFormat'
 ]);
@@ -166,6 +168,13 @@ function validateSetting(key, value) {
   }
   if (key === 'dateFormat' && !isDateFormat(normalized)) {
     return { errorKey: 'settings.validation.dateFormat' };
+  }
+  if (key === 'portalWifiIndexes') {
+    const text = normalized.trim();
+    if (!text) return { value: '' };
+    const parts = text.split(',').map((item) => item.trim());
+    if (!parts.every((item) => /^[1-8]$/.test(item))) return { errorKey: 'settings.validation.portalWifiIndexes' };
+    return { value: [...new Set(parts)].sort().join(',') };
   }
   if (key === 'portalShowProviderContact' && !['true', 'false'].includes(normalized)) {
     return { errorKey: 'settings.validation.portalContactToggle' };

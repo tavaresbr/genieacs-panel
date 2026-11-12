@@ -1496,6 +1496,8 @@ const zhTW: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': '電子郵件',
   'settings.portal.contactFieldsHint': '留空時，入口網站使用服務商資料（一般分頁）中的電話和電子郵件。地址一律來自服務商資料。',
+  'settings.portal.wifiIndexes': '入口網站顯示的Wi-Fi網路',
+  'settings.portal.wifiIndexesHint': '網路編號（1 到 8），以逗號分隔，例如 1,5。留空則顯示 ONT 回報的所有網路。可用來隱藏訪客、IPTV 或管理網路。',
   'settings.security.title': '管理員憑證',
   'settings.security.description': '此處的變更僅作用於面板登入的工作階段，不影響設備或 GenieACS 的憑證。',
   'settings.mfa.title': '兩步驟登入',

@@ -1488,6 +1488,8 @@ const hi: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'ईमेल',
   'settings.portal.contactFieldsHint': 'खाली छोड़ने पर पोर्टल प्रदाता प्रोफ़ाइल (सामान्य टैब) का फ़ोन और ईमेल उपयोग करता है। पता हमेशा प्रोफ़ाइल से आता है।',
+  'settings.portal.wifiIndexes': 'पोर्टल में दिखने वाले Wi-Fi नेटवर्क',
+  'settings.portal.wifiIndexesHint': 'नेटवर्क नंबर (1 से 8) कॉमा से अलग करके, जैसे 1,5। खाली रखने पर ONT द्वारा बताए सभी नेटवर्क दिखेंगे। गेस्ट, IPTV या प्रबंधन नेटवर्क छिपाने के लिए उपयोग करें।',
   'settings.security.title': 'प्रशासक क्रेडेंशियल',
   'settings.security.description': 'ये बदलाव पैनल के लॉगिन सत्र पर लागू होते हैं, उपकरण या GenieACS के क्रेडेंशियल पर नहीं।',
   'settings.mfa.title': 'दो-चरण लॉगिन',

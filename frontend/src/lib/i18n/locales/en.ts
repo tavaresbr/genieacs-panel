@@ -1498,6 +1498,8 @@ const en = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'Email',
   'settings.portal.contactFieldsHint': 'Left blank, the portal uses the phone and email from the provider profile (General tab). The address always comes from the profile.',
+  'settings.portal.wifiIndexes': 'Wi-Fi networks shown in the portal',
+  'settings.portal.wifiIndexesHint': 'Network numbers (1 to 8) separated by comma, e.g. 1,5. Empty shows every network the ONT reports. Use it to hide guest, IPTV or management networks.',
   'settings.security.title': 'Administrator credentials',
   'settings.security.description': 'The changes apply to the panel login session, not to device or GenieACS credentials.',
   'settings.mfa.title': 'Two-step login',

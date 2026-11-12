@@ -257,6 +257,7 @@ export default {
   'settings.validation.appName': '应用名称需为 1 至 80 个字符',
   "settings.validation.auditRetentionDays": "审计轨迹的保留期限必须是 30 到 3650 之间的整数天",
   'settings.validation.portalContactToggle': "显示服务商联系方式必须为 true 或 false",
+  'settings.validation.portalWifiIndexes': '请使用 1 到 8 的网络编号，以逗号分隔，例如 1,5。',
   'settings.validation.dateFormat': "未知的日期格式",
   'settings.validation.portalContactPhone': "电话无效：请填写区号和号码（10 到 13 位数字）",
   'settings.validation.portalContactEmail': "联系邮箱无效",

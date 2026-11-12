@@ -257,6 +257,7 @@ export default {
   'settings.validation.appName': 'The application name must be between 1 and 80 characters',
   "settings.validation.auditRetentionDays": "The audit trail retention must be a whole number of days between 30 and 3650",
   'settings.validation.portalContactToggle': "Show provider contact must be true or false",
+  'settings.validation.portalWifiIndexes': 'Use network numbers from 1 to 8 separated by commas, e.g. 1,5.',
   'settings.validation.dateFormat': "Unknown date format",
   'settings.validation.portalContactPhone': "Invalid phone: use area code and number (10 to 13 digits)",
   'settings.validation.portalContactEmail': "Invalid contact email",

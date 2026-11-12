@@ -1496,6 +1496,8 @@ const fr: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'E-mail',
   'settings.portal.contactFieldsHint': 'Vides, le portail utilise le téléphone et l\'e-mail de la fiche du fournisseur (onglet Général). L\'adresse vient toujours de la fiche.',
+  'settings.portal.wifiIndexes': 'Réseaux Wi-Fi affichés dans le portail',
+  'settings.portal.wifiIndexesHint': 'Numéros de réseau (1 à 8) séparés par des virgules, ex. 1,5. Vide : tous les réseaux signalés par l’ONT. Sert à masquer les réseaux invité, IPTV ou gestion.',
   'settings.security.title': 'Identifiants administrateur',
   'settings.security.description': 'Les modifications s’appliquent à la session de connexion au panneau, pas aux identifiants des équipements ni à ceux de GenieACS.',
   'settings.mfa.title': 'Connexion en deux étapes',

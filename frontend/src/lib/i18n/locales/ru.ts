@@ -1499,6 +1499,8 @@ const ru: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'E-mail',
   'settings.portal.contactFieldsHint': 'Если поля пусты, портал берёт телефон и e-mail из профиля провайдера (вкладка «Общие»). Адрес всегда берётся из профиля.',
+  'settings.portal.wifiIndexes': 'Сети Wi-Fi в портале',
+  'settings.portal.wifiIndexesHint': 'Номера сетей (от 1 до 8) через запятую, например 1,5. Пусто — все сети, которые сообщает ONT. Скрывает гостевые, IPTV и служебные сети.',
   'settings.security.title': 'Учётные данные администратора',
   'settings.security.description': 'Изменения относятся к сессии входа в панель, а не к учётным данным устройств или GenieACS.',
   'settings.mfa.title': 'Двухэтапный вход',

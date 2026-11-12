@@ -1496,6 +1496,8 @@ const es: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'Correo',
   'settings.portal.contactFieldsHint': 'En blanco, el portal usa el teléfono y el correo del registro del proveedor (pestaña General). La dirección siempre viene del registro.',
+  'settings.portal.wifiIndexes': 'Redes Wi-Fi visibles en el portal',
+  'settings.portal.wifiIndexesHint': 'Números de red (1 a 8) separados por coma, p. ej. 1,5. Vacío muestra todas las que reporte la ONT. Úselo para ocultar redes de invitados, IPTV o gestión.',
   'settings.security.title': 'Credenciales de administrador',
   'settings.security.description': 'Los cambios aplican al inicio de sesión del panel, no a las credenciales de los equipos ni de GenieACS.',
   'settings.mfa.title': 'Inicio de sesión en dos pasos',

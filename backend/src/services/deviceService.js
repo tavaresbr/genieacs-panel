@@ -1455,6 +1455,9 @@ class DeviceService {
     };
 
     const getVPValue = getValue;
+    // A senha de administração do ONT nunca sai do servidor: a tela só precisa
+    // saber se existe uma, e o JSON do detalhe é lido por quem tem `devices.inspect`.
+    const maskSecret = (value) => (value === null || value === undefined || value === '' ? value : '******');
 
     const getRelativeNode = (obj, path) => {
       if (!path || !obj) return null;
@@ -1535,7 +1538,7 @@ class DeviceService {
       },
       superPassword: {
         path: virtualParams.vpSuperPassword,
-        value: getVPValue(virtualParams.vpSuperPassword)
+        value: maskSecret(getVPValue(virtualParams.vpSuperPassword))
       },
       userAdmin: {
         path: virtualParams.vpUserAdmin,
@@ -1543,7 +1546,7 @@ class DeviceService {
       },
       userPassword: {
         path: virtualParams.vpUserPassword,
-        value: getVPValue(virtualParams.vpUserPassword)
+        value: maskSecret(getVPValue(virtualParams.vpUserPassword))
       }
     };
 

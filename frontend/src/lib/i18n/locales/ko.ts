@@ -1496,6 +1496,8 @@ const ko: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': '이메일',
   'settings.portal.contactFieldsHint': '비워 두면 포털은 공급자 정보(일반 탭)의 전화와 이메일을 사용합니다. 주소는 항상 공급자 정보에서 가져옵니다.',
+  'settings.portal.wifiIndexes': '포털에 표시할 Wi-Fi 네트워크',
+  'settings.portal.wifiIndexesHint': '네트워크 번호(1~8)를 쉼표로 구분(예: 1,5). 비워 두면 ONT가 보고하는 모든 네트워크를 표시합니다. 게스트, IPTV, 관리용 네트워크를 숨길 때 사용하세요.',
   'settings.security.title': '관리자 인증 정보',
   'settings.security.description': '여기서의 변경은 패널 로그인 세션에만 적용되며, 장비나 GenieACS의 인증 정보에는 영향을 주지 않습니다.',
   'settings.mfa.title': '2단계 로그인',

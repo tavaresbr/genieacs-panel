@@ -1496,6 +1496,8 @@ const ja: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'メール',
   'settings.portal.contactFieldsHint': '空欄の場合、ポータルはプロバイダー情報（一般タブ）の電話とメールを使用します。住所は常にプロバイダー情報から取得されます。',
+  'settings.portal.wifiIndexes': 'ポータルに表示するWi-Fiネットワーク',
+  'settings.portal.wifiIndexesHint': 'ネットワーク番号（1〜8）をカンマ区切りで入力（例: 1,5）。空欄ならONTが報告するすべてを表示します。ゲスト、IPTV、管理用ネットワークを隠すのに使います。',
   'settings.security.title': '管理者の認証情報',
   'settings.security.description': 'この変更はパネルへのログインセッションに適用され、機器や GenieACS の認証情報には影響しません。',
   'settings.mfa.title': '2 段階ログイン',
