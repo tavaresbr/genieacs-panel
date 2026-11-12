@@ -257,6 +257,7 @@ export default {
   'settings.validation.appName': '應用程式名稱需為 1 至 80 個字元',
   "settings.validation.auditRetentionDays": "稽核軌跡的保留期限必須是 30 到 3650 之間的整數天",
   'settings.validation.portalContactToggle': "顯示服務商聯絡方式必須為 true 或 false",
+  'settings.validation.portalWifiIndexes': '請使用 1 到 8 的網路編號，以逗號分隔，例如 1,5。',
   'settings.validation.dateFormat': "未知的日期格式",
   'settings.validation.portalContactPhone': "電話無效：請填寫區碼和號碼（10 到 13 位數字）",
   'settings.validation.portalContactEmail': "聯絡電子郵件無效",

@@ -41,6 +41,19 @@ function auditPortal(req, action, detail, customer = req.customer) {
 // entry for every account that has ever signed in.
 const OVERVIEW_CACHE_SWEEP_AT = 500;
 
+/**
+ * As redes Wi-Fi que o assinante pode ver e editar no portal. A configuração
+ * `portalWifiIndexes` ("1,5") é do provedor; vazia, vale tudo o que o ONT
+ * reportar (o comportamento de sempre). Existe para o provedor esconder redes
+ * que não são do cliente: convidado, IPTV, gerência.
+ */
+async function allowedWifiIndexes() {
+  const raw = String(await Setting.getByKey('portalWifiIndexes') ?? '').trim();
+  if (!raw) return null;
+  const indexes = raw.split(',').map((item) => Number(item.trim())).filter((n) => Number.isInteger(n) && n >= 1 && n <= 8);
+  return indexes.length > 0 ? new Set(indexes) : null;
+}
+
 class CustomerPortalController {
   static overviewCache = new Map();
 
@@ -188,9 +201,10 @@ class CustomerPortalController {
       const savedCredentials = await CustomerWifiCredentialService.getSavedPasswordStatus(
         req.customer.id
       );
+      const allowed = await allowedWifiIndexes();
       const data = {
         ...deviceData,
-        wifi: deviceData.wifi.map((network) => ({
+        wifi: deviceData.wifi.filter((network) => !allowed || allowed.has(Number(network.index))).map((network) => ({
           ...network,
           hasSavedPassword: Boolean(
             savedCredentials.get(Number(network.index))?.hasPassword
@@ -233,6 +247,13 @@ class CustomerPortalController {
       if (password && !/^[\x20-\x7e]{8,63}$/.test(password)) {
         return res.status(400).json(createErrorResponse(
           req.t('portal.wifiPasswordInvalid'), null, 'invalid_wifi_password'
+        ));
+      }
+
+      const allowed = await allowedWifiIndexes();
+      if (allowed && !allowed.has(wifiIndex)) {
+        return res.status(404).json(createErrorResponse(
+          req.t('portal.wifiNotReported'), null, 'wifi_network_not_found'
         ));
       }
 

@@ -1499,6 +1499,8 @@ const it: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'E-mail',
   'settings.portal.contactFieldsHint': 'Se vuoti, il portale usa telefono ed e-mail dell\'anagrafica del provider (scheda Generale). L\'indirizzo viene sempre dall\'anagrafica.',
+  'settings.portal.wifiIndexes': 'Reti Wi-Fi mostrate nel portale',
+  'settings.portal.wifiIndexesHint': 'Numeri di rete (da 1 a 8) separati da virgola, es. 1,5. Vuoto mostra tutte le reti riportate dall’ONT. Serve a nascondere reti ospiti, IPTV o gestione.',
   'settings.security.title': 'Credenziali di amministratore',
   'settings.security.description': 'Le modifiche valgono per l’accesso al pannello, non per le credenziali degli apparati o di GenieACS.',
   'settings.mfa.title': 'Accesso in due passaggi',

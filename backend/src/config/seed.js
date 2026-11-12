@@ -42,6 +42,8 @@ export const DEFAULT_SETTINGS = {
   portalContactPhone: '',
   portalContactWhatsapp: '',
   portalContactEmail: '',
+  // Redes Wi-Fi que o assinante enxerga no portal ("1,5"); vazio = todas.
+  portalWifiIndexes: '',
   // Como as datas aparecem no painel e no portal (utils/dateFormat.js).
   // `auto` segue o idioma de quem olha — o que o painel sempre fez.
   dateFormat: 'auto'

@@ -1496,6 +1496,8 @@ const ptBR: Dictionary = {
   'settings.portal.contactWhatsapp': 'WhatsApp',
   'settings.portal.contactEmail': 'E-mail',
   'settings.portal.contactFieldsHint': 'Em branco, o portal usa o telefone e o e-mail do cadastro do provedor (aba Geral). O endereço vem sempre do cadastro.',
+  'settings.portal.wifiIndexes': 'Redes Wi-Fi exibidas no portal',
+  'settings.portal.wifiIndexesHint': 'Números das redes (1 a 8) separados por vírgula, ex.: 1,5. Vazio mostra todas as redes que o ONT reportar. Use para esconder redes de convidado, IPTV ou gerência.',
   'settings.security.title': 'Credenciais de administrador',
   'settings.security.description': 'As alterações valem para o login do painel, não para as credenciais dos equipamentos ou do GenieACS.',
   'settings.mfa.title': 'Login em duas etapas',

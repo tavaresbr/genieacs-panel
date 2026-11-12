@@ -254,6 +254,7 @@ export default {
   'settings.validation.appName': 'O nome do aplicativo deve ter entre 1 e 80 caracteres',
   "settings.validation.auditRetentionDays": "O prazo da trilha deve ser um número inteiro de dias entre 30 e 3650",
   'settings.validation.portalContactToggle': "Mostrar contato do provedor deve ser true ou false",
+  'settings.validation.portalWifiIndexes': 'Use números de rede de 1 a 8 separados por vírgula, ex.: 1,5.',
   'settings.validation.dateFormat': "Formato de data desconhecido",
   'settings.validation.portalContactPhone': "Telefone inválido: use DDD e número (10 a 13 dígitos)",
   'settings.validation.portalContactEmail': "E-mail de contato inválido",

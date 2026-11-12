@@ -257,6 +257,7 @@ export default {
   'settings.validation.appName': 'アプリケーション名は 1〜80 文字で入力してください',
   "settings.validation.auditRetentionDays": "監査証跡の保存期間は 30 から 3650 日までの整数でなければなりません",
   'settings.validation.portalContactToggle': "プロバイダー連絡先の表示は true または false である必要があります",
+  'settings.validation.portalWifiIndexes': '1〜8のネットワーク番号をカンマ区切りで指定してください（例: 1,5）。',
   'settings.validation.dateFormat': "不明な日付形式",
   'settings.validation.portalContactPhone': "電話番号が無効です：市外局番と番号（10〜13桁）を入力してください",
   'settings.validation.portalContactEmail': "連絡先メールアドレスが無効です",

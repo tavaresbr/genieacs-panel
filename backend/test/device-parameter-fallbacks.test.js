@@ -309,6 +309,27 @@ describe('a temperature found by its own name', () => {
   });
 });
 
+describe('the ONT admin password in the device detail', () => {
+  it('never leaves the server, only that one is set', async () => {
+    const device = nokiaWithAluNames();
+    device.VirtualParameters = {
+      LoginSuperUser: param('admin'),
+      LoginSuperPass: param('super-segredo-123')
+    };
+    genieAcs.fleet = [device];
+    await asTenant(() => Setting.upsert('vpSuperAdmin', 'VirtualParameters.LoginSuperUser'));
+    await asTenant(() => Setting.upsert('vpSuperPassword', 'VirtualParameters.LoginSuperPass'));
+    const { status, body } = await call(`${panelUrl}/api/devices/${encodeURIComponent(device._id)}`, {
+      headers: authHeaders(token)
+    });
+    assert.equal(status, 200);
+    assert.ok(!JSON.stringify(body).includes('super-segredo-123'));
+    const vp = body.data?.virtualParameters ?? body.data?.device?.virtualParameters;
+    assert.equal(vp?.superPassword?.value, '******');
+    assert.equal(vp?.superAdmin?.value, 'admin');
+  });
+});
+
 describe('a WAN VLAN under a vendor name', () => {
   it('is found on the connection device above the PPPoE connection', () => {
     const path = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';

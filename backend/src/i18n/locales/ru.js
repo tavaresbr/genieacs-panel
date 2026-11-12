@@ -257,6 +257,7 @@ export default {
   'settings.validation.appName': 'Название приложения должно содержать от 1 до 80 символов',
   "settings.validation.auditRetentionDays": "Срок хранения журнала аудита должен быть целым числом дней от 30 до 3650",
   'settings.validation.portalContactToggle': "Параметр показа контактов провайдера должен быть true или false",
+  'settings.validation.portalWifiIndexes': 'Укажите номера сетей от 1 до 8 через запятую, например 1,5.',
   'settings.validation.dateFormat': "Неизвестный формат даты",
   'settings.validation.portalContactPhone': "Неверный телефон: укажите код и номер (от 10 до 13 цифр)",
   'settings.validation.portalContactEmail': "Неверный контактный e-mail",
