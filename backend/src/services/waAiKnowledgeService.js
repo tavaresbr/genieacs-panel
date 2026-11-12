@@ -7,6 +7,8 @@ const TITLE_LIMIT = 120;
 const TRIGGERS_LIMIT = 300;
 const ANSWER_LIMIT = 600;
 const SEEDED_KEY = 'wa_ai_knowledge_seeded';
+/** Um trecho entre colchetes é um espaço a preencher ("[escreva o seu prazo]"): a IA o repetiria ao cliente. */
+const ESPACO_A_PREENCHER = /\[[^\]]*\]/;
 
 const invalido = (codigo) => new WaError('whatsapp.aiKnowledge.invalid', { code: codigo, status: 400 });
 const limpar = (valor) => String(valor ?? '').replace(/\s+/g, ' ').trim();
@@ -75,6 +77,9 @@ class WaAiKnowledgeService {
 
   static async create(corpo) {
     const dados = ler(corpo ?? {}, { parcial: false });
+    if (dados.active !== false && ESPACO_A_PREENCHER.test(dados.answer)) {
+      throw new WaError('whatsapp.aiKnowledge.placeholder', { code: 'ai_knowledge_placeholder', status: 409 });
+    }
     const agora = new Date();
     const id = await tinsertReturningId('wa_ai_knowledge', {
       active: true, ...dados, origin: 'manual', created_at: agora, updated_at: agora
@@ -89,6 +94,10 @@ class WaAiKnowledgeService {
     const editou = ['kind', 'title', 'answer', 'triggers'].some((c) => dados[c] !== undefined && dados[c] !== atual[c]);
     if (atual.origin === 'exemplo' && dados.active === true && !editou) {
       throw new WaError('whatsapp.aiKnowledge.exampleUnedited', { code: 'ai_knowledge_example_unedited', status: 409 });
+    }
+    const respostaFinal = dados.answer ?? atual.answer;
+    if (dados.active === true && ESPACO_A_PREENCHER.test(respostaFinal)) {
+      throw new WaError('whatsapp.aiKnowledge.placeholder', { code: 'ai_knowledge_placeholder', status: 409 });
     }
     // Editar um exemplo o torna do operador: só então ele pode valer.
     const origin = atual.origin === 'exemplo' && editou ? 'manual' : atual.origin;

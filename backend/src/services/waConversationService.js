@@ -9,6 +9,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
+import WaAiLearningService from './waAiLearningService.js';
 import WaAssignmentService from './waAssignmentService.js';
 import WaTagService from './waTagService.js';
 import { tdb } from '../config/database.js';
@@ -744,6 +745,8 @@ class WaConversationService {
     // `survey: false` é o atendente escolhendo não mandar: o cliente respondia
     // "obrigado" à pesquisa e a conversa reabria, sem nunca acabar.
     if (closing && wasOpen && survey !== false) await WaSatisfactionService.onClosed(updated, { userId });
+    // A venda terminou: a IA propõe itens para a base (inativos, a equipe aprova). Segue sozinho; nunca lança.
+    if (resultado) void WaAiLearningService.sugerir(updated.id);
     return this.decorate(updated);
   }
 

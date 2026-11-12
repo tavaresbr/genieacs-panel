@@ -1807,6 +1807,15 @@ const WA_CONVERSATION_LEAD_COLUMNS = [
   ['lead_plan_id', (t) => t.integer('lead_plan_id').unsigned().nullable()]
 ];
 
+/**
+ * O aprendizado supervisionado (0134): `lead_learned_at` marca a venda cujas
+ * sugestões para a base de conhecimento já foram pedidas à IA, para uma
+ * conversa reaberta e encerrada de novo não gastar outra chamada.
+ */
+const WA_CONVERSATION_LEARNED_COLUMNS = [
+  ['lead_learned_at', (t) => t.timestamp('lead_learned_at').nullable()]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -7722,6 +7731,22 @@ export const migrations = [
       for (const [name, builder] of OPERATOR_PROFILE_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
+    }
+  },
+  {
+    /** As sugestões da IA para a base — ver `WA_CONVERSATION_LEARNED_COLUMNS`. */
+    id: '0135_wa_conversation_learned',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_LEARNED_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_LEARNED_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];
