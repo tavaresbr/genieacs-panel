@@ -96,6 +96,70 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   }
 }
 
+/**
+ * De quem é a inscrição deste navegador (`sessionOwner`). O push mora no
+ * service worker da origem, não na sessão: sem essa marca, quem entrasse
+ * depois no mesmo navegador seguia recebendo os avisos de quem saiu — e o
+ * cartão dizia "Ativo" para uma inscrição que é de outra pessoa.
+ */
+export const PUSH_OWNER_KEY = 'push.owner'
+
+function lerDono(): string | null {
+  try {
+    return localStorage.getItem(PUSH_OWNER_KEY)
+  } catch {
+    return null
+  }
+}
+
+function gravarDono(owner: string | null) {
+  try {
+    if (owner) localStorage.setItem(PUSH_OWNER_KEY, owner)
+    else localStorage.removeItem(PUSH_OWNER_KEY)
+  } catch {
+    // Sem storage não há marca; o logout ainda desfaz a inscrição.
+  }
+}
+
+export type PushOwnerAction = 'keep' | 'adopt' | 'drop'
+
+/**
+ * O que fazer com a inscrição deste navegador quando uma sessão começa.
+ * Sem marca (inscrição de antes da marca existir) ela é adotada, para não
+ * desligar o push de todo mundo na atualização.
+ */
+export function pushOwnerAction(stored: string | null, owner: string, hasSubscription: boolean): PushOwnerAction {
+  if (!hasSubscription) return 'keep'
+  if (stored === null) return 'adopt'
+  return stored === owner ? 'keep' : 'drop'
+}
+
+/**
+ * A sessão de `owner` começou neste navegador: uma inscrição de outra pessoa
+ * é desfeita no navegador (o aviso dela deixa de ter para onde ir).
+ */
+export async function reconcilePushOwner(owner: string): Promise<void> {
+  const sub = await currentSubscription()
+  const acao = pushOwnerAction(lerDono(), owner, Boolean(sub))
+  if (acao === 'adopt') gravarDono(owner)
+  if (acao === 'drop') {
+    await sub?.unsubscribe().catch(() => false)
+    gravarDono(null)
+  }
+}
+
+/**
+ * Quem sai leva o push deste aparelho junto: do servidor (com o token da
+ * sessão que sai, antes de ela ser revogada) e do navegador. Melhor esforço.
+ */
+export async function dropPushOnLogout(token: string | null): Promise<void> {
+  const sub = await currentSubscription()
+  if (!sub) return
+  if (token) await pushAPI.unsubscribeAs(token, sub.endpoint).catch(() => null)
+  await sub.unsubscribe().catch(() => false)
+  gravarDono(null)
+}
+
 export type EnableResult = 'enabled' | 'denied' | 'no-worker' | 'failed'
 
 /**
@@ -103,7 +167,7 @@ export type EnableResult = 'enabled' | 'denied' | 'no-worker' | 'failed'
  * Uma inscrição antiga com OUTRA chave (o mesmo navegador noutro provedor) é
  * desfeita antes: o navegador recusa assinar duas vezes com chaves diferentes.
  */
-export async function enablePush(): Promise<{ result: EnableResult; message?: string }> {
+export async function enablePush(owner: string | null): Promise<{ result: EnableResult; message?: string }> {
   const permissao = await Notification.requestPermission()
   if (permissao !== 'granted') return { result: 'denied' }
   const reg = await registro()
@@ -121,6 +185,7 @@ export async function enablePush(): Promise<{ result: EnableResult; message?: st
     const payload = subscriptionPayload(sub.toJSON())
     if (!payload) return { result: 'failed' }
     const res = await pushAPI.subscribe(payload)
+    if (res.success) gravarDono(owner)
     return res.success ? { result: 'enabled' } : { result: 'failed', message: res.message }
   } catch {
     return { result: 'failed' }
@@ -133,5 +198,6 @@ export async function disablePush(): Promise<boolean> {
   if (!sub) return true
   const res = await pushAPI.unsubscribe(sub.endpoint)
   await sub.unsubscribe().catch(() => false)
+  gravarDono(null)
   return res.success
 }

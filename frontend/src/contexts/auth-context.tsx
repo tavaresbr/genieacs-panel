@@ -10,7 +10,8 @@ import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
-import { clearSessionScopedStorage } from '@/lib/session-owner'
+import { clearSessionScopedStorage, sessionOwner } from '@/lib/session-owner'
+import { dropPushOnLogout, reconcilePushOwner } from '@/lib/push'
 import { setActiveDateFormat } from '@/lib/date-format'
 
 interface AuthContextType {
@@ -270,8 +271,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const indisponivel = roleHas(user?.role, 'whatsapp.send')
       ? whatsappAPI.setAvailability(false).catch(() => null)
       : Promise.resolve(null)
+    // O push deste aparelho sai junto (antes da revogação, com o token na
+    // mão): senão quem entrasse depois no navegador recebia os avisos de quem
+    // saiu. A aba de personificação não mexe nele — não é dela.
     if (!daAba) {
       void indisponivel
+        .then(() => dropPushOnLogout(token))
+        .catch(() => {})
         .then(() => authAPI.logout(token ?? undefined, kind))
         .catch(() => {})
     }
@@ -280,6 +286,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsAuthenticated(false)
     navigate('/login')
   }
+
+  // Uma inscrição de push de outra pessoa neste navegador (a sessão dela
+  // venceu em vez de sair) é desfeita quando esta sessão começa.
+  const owner = isAuthenticated ? sessionOwner(user) : null
+  useEffect(() => {
+    if (!owner || apiClient.isTabScoped()) return
+    void reconcilePushOwner(owner).catch(() => {})
+  }, [owner])
 
   // O formato de data do provedor desta sessão. Lido de novo a cada troca de
   // provedor (personificação, outro login); sem provedor, segue o idioma.

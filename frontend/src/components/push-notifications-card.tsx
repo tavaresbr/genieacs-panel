@@ -3,6 +3,8 @@ import { pushAPI, type PushEvent, type PushPreferences } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import { useAuth } from '@/contexts/auth-context'
+import { sessionOwner } from '@/lib/session-owner'
 import {
   PUSH_EVENT_ORDER,
   currentPushSupport,
@@ -34,6 +36,7 @@ export function PushNotificationsCard() {
   const { t } = useTranslation()
   const toast = useToast()
   const pwa = usePwa()
+  const { user } = useAuth()
   const [suporte] = useState<PushSupport>(() => currentPushSupport())
   const [ativo, setAtivo] = useState(false)
   const [prefs, setPrefs] = useState<PushPreferences | null>(null)
@@ -59,7 +62,7 @@ export function PushNotificationsCard() {
   const ativar = async () => {
     setOcupado(true)
     try {
-      const { result, message } = await enablePush()
+      const { result, message } = await enablePush(sessionOwner(user))
       if (result === 'enabled') {
         setAtivo(true)
         toast.success(t('settings.push.enabled'))

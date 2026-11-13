@@ -3,7 +3,7 @@ import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 
-import { isIos, pushSupport, sameKey, subscriptionPayload, urlBase64ToUint8Array, PUSH_EVENT_ORDER } from '@/lib/push'
+import { isIos, pushOwnerAction, pushSupport, sameKey, subscriptionPayload, urlBase64ToUint8Array, PUSH_EVENT_ORDER } from '@/lib/push'
 import { isStandalone, serviceWorkerUrl } from '@/lib/pwa'
 
 const AQUI = path.dirname(new URL(import.meta.url).pathname)
@@ -137,5 +137,24 @@ describe('o service worker', () => {
   it('o painel aponta para o manifest', () => {
     const index = readFileSync(path.join(AQUI, '..', 'index.html'), 'utf8')
     expect(index).toMatch(/<link rel="manifest" href="\/manifest\.webmanifest" \/>/)
+  })
+})
+
+describe('de quem é a inscrição deste navegador', () => {
+  it('sem inscrição não há o que fazer', () => {
+    expect(pushOwnerAction('acme:1', 'beta:2', false)).toBe('keep')
+  })
+
+  it('a mesma pessoa mantém o push', () => {
+    expect(pushOwnerAction('acme:1', 'acme:1', true)).toBe('keep')
+  })
+
+  it('outra pessoa (outro provedor ou outro usuário) desfaz a inscrição de quem saiu', () => {
+    expect(pushOwnerAction('acme:1', 'beta:2', true)).toBe('drop')
+    expect(pushOwnerAction('acme:1', 'acme:3', true)).toBe('drop')
+  })
+
+  it('inscrição sem marca (de antes da marca) é adotada, não desligada', () => {
+    expect(pushOwnerAction(null, 'acme:1', true)).toBe('adopt')
   })
 })
