@@ -72,6 +72,7 @@ export const SEM_DADO_DE_ASSINANTE = Object.freeze({
   provisioning_profiles: 'perfis de provisionamento',
   whatsapp_accounts: 'instâncias de WhatsApp do provedor',
   wa_templates: 'modelos de mensagem',
+  wa_ai_usage: 'contadores de uso da IA por dia e tarefa (sem texto, sem assinante)',
   wa_ai_knowledge: 'base de conhecimento da IA de vendas (texto do provedor, sem assinante)',
   wa_sales_plans: 'catálogo de planos que a IA de vendas oferece (do provedor, sem assinante)',
   wa_meta_templates: 'modelos aprovados da Meta (texto do provedor, sem assinante)',

@@ -2,6 +2,7 @@ import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js
 import { deploymentIsShared } from './genieacsEgress.js';
 import { WaError } from './whatsappConfigService.js';
 import { AI_ADAPTERS, AI_PROVIDERS, AI_PROVIDER_OPENAI, aiProviderOrDefault } from './waAiAdapters.js';
+import WaAiUsageService from './waAiUsageService.js';
 
 /**
  * O cliente da IA do atendimento: uma API compatível com OpenAI
@@ -71,9 +72,9 @@ class WaAiClient {
   /**
    * Uma volta da conversa com o modelo.
    *
-   * @returns {Promise<{content: string|null, toolCalls: {id: string, name: string, arguments: object}[], message: object}>}
+   * @returns {Promise<{content: string|null, toolCalls: {id: string, name: string, arguments: object}[], message: object, usage: {input: number, output: number, cacheRead: number, cacheWrite: number}|null}>}
    */
-  static async chat({ provider, baseUrl, apiKey, workspaceId = '', model, messages, tools = null, maxTokens = 600 }) {
+  static async chat({ provider, baseUrl, apiKey, workspaceId = '', model, messages, tools = null, maxTokens = 600, task = 'outro' }) {
     if (!apiKey) throw erro('ai_key_required', 400);
     const id = aiProviderOrDefault(provider);
     const adapter = AI_ADAPTERS[id];
@@ -140,6 +141,8 @@ class WaAiClient {
     }
     const parsed = adapter.parse(data);
     if (!parsed) throw erro('ai_bad_response');
+    // O consumo por tarefa, em segundo plano: contar não atrasa nem derruba a resposta.
+    void WaAiUsageService.registrar({ task, model: model || AI_PROVIDERS[id].defaultModel, usage: parsed.usage });
     return parsed;
   }
 }

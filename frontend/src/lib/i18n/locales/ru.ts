@@ -1199,6 +1199,8 @@ const ru: Dictionary = {
   'settings.chatbot.aiBaseUrlHint': 'Обычный ключ z.ai: api.z.ai/api/paas/v4. GLM Coding Plan: api.z.ai/api/coding/paas/v4. Ключ bigmodel.cn: open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Fixed Anthropic address; change it only if you use your own proxy.',
   'settings.chatbot.aiModelHintAnthropic': 'E.g. claude-sonnet-5-5, claude-haiku-5-5 (cheaper), claude-opus-5-5.',
+  'settings.chatbot.aiFastModel': 'Fast model (optional)',
+  'settings.chatbot.aiFastModelHint': 'Used for summaries, rewrites and classification. E.g. claude-haiku-5-5. Empty = uses the model above.',
   'settings.chatbot.aiBuyCredits': 'Buy credits',
   'settings.chatbot.aiWorkspaceId': 'Workspace ID (Anthropic)',
   'settings.chatbot.aiWorkspaceIdHint': 'Leave empty unless Anthropic rejects the key with “not scoped to a workspace”. Then paste the workspace ID, or create the API key inside a workspace.',

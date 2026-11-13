@@ -37,9 +37,20 @@ const parseArgs = (raw) => {
   }
 };
 
+/**
+ * O conteúdo de uma mensagem como texto, para quem só lê texto (a API
+ * compatível com a OpenAI): partes de texto viram linhas; imagem e PDF ficam de fora.
+ */
+const achatar = (mensagem, separador = '\n') => {
+  if (!Array.isArray(mensagem?.content)) return mensagem;
+  const texto = mensagem.content.map((p) => (typeof p === 'string' ? p : (p?.type === undefined || p?.type === 'text' ? p?.text ?? '' : ''))).filter(Boolean).join(separador);
+  return { ...mensagem, content: texto };
+};
+
 const openai = {
   path: '/chat/completions',
-  buildRequest({ apiKey, model, messages, tools, maxTokens, hostname = '' }) {
+  buildRequest({ apiKey, model, messages: bruto, tools, maxTokens, hostname = '' }) {
+    const messages = (bruto || []).map((m) => achatar(m, m.role === 'system' ? '\n\n' : '\n'));
     // A OpenAI de verdade (GPT-5, série "o") recusa `max_tokens` e `temperature`
     // diferente do padrão; a z.ai e os compatíveis seguem com os dois.
     const oficial = hostname === 'api.openai.com';
@@ -70,7 +81,18 @@ const openai = {
       });
     }
     const content = typeof message.content === 'string' ? message.content.trim() : null;
-    return { content: content || null, toolCalls, message };
+    const uso = data?.usage;
+    return {
+      content: content || null,
+      toolCalls,
+      message,
+      usage: uso ? {
+        input: Number(uso.prompt_tokens) || 0,
+        output: Number(uso.completion_tokens) || 0,
+        cacheRead: Number(uso.prompt_tokens_details?.cached_tokens) || 0,
+        cacheWrite: 0
+      } : null
+    };
   }
 };
 
@@ -79,6 +101,31 @@ const textOf = (content) => {
   if (Array.isArray(content)) return content.map((p) => (typeof p === 'string' ? p : p?.text ?? '')).join('\n');
   return '';
 };
+
+const MIDIA_SUPORTADA = {
+  image: /^image\/(?:jpeg|png|gif|webp)$/i,
+  document: /^application\/pdf$/i
+};
+
+/**
+ * O conteúdo de um turno do cliente como blocos da Anthropic: texto, imagem e
+ * PDF (`{type:'image'|'document', mediaType, data}` em base64). Mídia de tipo
+ * que a API não lê é descartada.
+ */
+function paraBlocos(content) {
+  if (typeof content === 'string') return content.trim() ? [{ type: 'text', text: content.trim() }] : [];
+  const blocos = [];
+  for (const p of Array.isArray(content) ? content : []) {
+    if (typeof p === 'string') {
+      if (p.trim()) blocos.push({ type: 'text', text: p.trim() });
+    } else if (p?.type === undefined || p.type === 'text') {
+      if (String(p?.text ?? '').trim()) blocos.push({ type: 'text', text: String(p.text).trim() });
+    } else if ((p.type === 'image' || p.type === 'document') && p.data && MIDIA_SUPORTADA[p.type].test(String(p.mediaType))) {
+      blocos.push({ type: p.type, source: { type: 'base64', media_type: p.mediaType, data: p.data } });
+    }
+  }
+  return blocos;
+}
 
 /** Anthropic exige alternar user/assistant: turnos seguidos do mesmo papel viram um. */
 function pushTurn(turns, role, blocks) {
@@ -96,11 +143,17 @@ function pushTurn(turns, role, blocks) {
  */
 export function toAnthropicMessages(messages, { comFerramentas = true } = {}) {
   const system = [];
+  const systemBlocks = [];
   const turns = [];
   for (const m of messages || []) {
     if (m.role === 'system') {
-      const t = textOf(m.content).trim();
-      if (t) system.push(t);
+      // Partes `{text, cache}`: o fim de uma parte com `cache` vira ponto de cache do prompt.
+      for (const p of Array.isArray(m.content) ? m.content : [m.content]) {
+        const t = String(typeof p === 'string' ? p : p?.text ?? '').trim();
+        if (!t) continue;
+        system.push(t);
+        systemBlocks.push({ text: t, cache: Boolean(p?.cache) });
+      }
     } else if (m.role === 'assistant') {
       const blocks = [];
       const t = textOf(m.content).trim();
@@ -123,19 +176,22 @@ export function toAnthropicMessages(messages, { comFerramentas = true } = {}) {
         ? { type: 'tool_result', tool_use_id: String(m.tool_call_id), content: textOf(m.content) }
         : { type: 'text', text: `[resultado da ferramenta] ${textOf(m.content)}` }]);
     } else {
-      const t = textOf(m.content).trim();
-      if (t) pushTurn(turns, 'user', [{ type: 'text', text: t }]);
+      pushTurn(turns, 'user', paraBlocos(m.content));
     }
   }
   // A conversa tem de começar por um turno do usuário.
   if (turns.length && turns[0].role !== 'user') turns.unshift({ role: 'user', content: [{ type: 'text', text: '.' }] });
-  return { system: system.join('\n\n'), messages: turns };
+  return { system: system.join('\n\n'), systemBlocks, messages: turns };
 }
 
 const anthropic = {
   path: '/v1/messages',
   buildRequest({ apiKey, model, messages, tools, maxTokens, workspaceId = '' }) {
-    const { system, messages: turns } = toAnthropicMessages(messages, { comFerramentas: Boolean(tools?.length) });
+    const { system, systemBlocks, messages: turns } = toAnthropicMessages(messages, { comFerramentas: Boolean(tools?.length) });
+    // Com pontos de cache, o sistema vai em blocos (o que vem até um ponto, ferramentas incluídas, é lido do cache nas próximas chamadas); sem, a string de sempre.
+    const sistema = systemBlocks.some((b) => b.cache)
+      ? systemBlocks.map((b) => ({ type: 'text', text: b.text, ...(b.cache ? { cache_control: { type: 'ephemeral' } } : {}) }))
+      : system;
     // Nos modelos atuais o pensamento vem ligado e gasta o mesmo `max_tokens`
     // da resposta: esforço baixo e folga, para a resposta não sair vazia ou
     // cortada. `temperature` nem é enviada: os modelos da família 5 recusam
@@ -152,7 +208,7 @@ const anthropic = {
         model,
         max_tokens: atual ? maxTokens + ANTHROPIC_FOLGA_PENSAMENTO : maxTokens,
         ...(atual ? { output_config: { effort: 'low' } } : {}),
-        ...(system ? { system } : {}),
+        ...(sistema.length ? { system: sistema } : {}),
         messages: turns,
         ...(tools?.length
           ? {
@@ -197,7 +253,19 @@ const anthropic = {
           }
         : {})
     };
-    return { content: content || null, toolCalls, message };
+    const uso = data.usage;
+    return {
+      content: content || null,
+      toolCalls,
+      message,
+      usage: uso ? {
+        // `input_tokens` não inclui o que veio do cache nem o que foi gravado nele.
+        input: Number(uso.input_tokens) || 0,
+        output: Number(uso.output_tokens) || 0,
+        cacheRead: Number(uso.cache_read_input_tokens) || 0,
+        cacheWrite: Number(uso.cache_creation_input_tokens) || 0
+      } : null
+    };
   }
 };
 

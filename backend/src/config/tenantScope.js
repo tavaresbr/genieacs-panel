@@ -104,6 +104,8 @@ export const SCOPED_TABLES = new Set([
   'wa_sales_plans',
   // O que a IA de vendas sabe da empresa: vantagens, objeções e perguntas frequentes.
   'wa_ai_knowledge',
+  // O consumo da IA do WhatsApp por dia e tarefa (só contadores, nenhum texto).
+  'wa_ai_usage',
   // Os modelos aprovados na conta da Meta de cada número oficial.
   'wa_meta_templates',
   'wa_broadcasts',
