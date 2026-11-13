@@ -92,6 +92,8 @@ function padroes() {
       instructions: '',
       // Nome e jeito do atendente nas conversas de venda (ex.: "Ana, simpática e informal").
       persona: '',
+      // Modelo menor e mais barato para as tarefas simples (resumir, reescrever, classificar); vazio = o principal.
+      fastModel: '',
       // Cidades e bairros que a empresa atende; fora da lista a IA chama um atendente.
       coverage: []
     }
@@ -146,6 +148,8 @@ function lerIa(raw, atual) {
   if (!WORKSPACE_ID.test(workspaceId) && workspaceId !== '') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai_workspace');
   const instructions = raw.instructions === undefined ? atual.instructions : String(raw.instructions ?? '').trim();
   if (instructions.length > AI_INSTRUCTIONS_MAX) throw invalido('whatsapp.error.invalidBotConfig', 'bot_message_too_long');
+  const fastModel = raw.fastModel === undefined ? String(atual.fastModel ?? '').trim() : String(raw.fastModel ?? '').trim();
+  if (fastModel.length > AI_MODEL_MAX) throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai');
   const persona = raw.persona === undefined ? limparPersona(atual.persona) : limparPersona(raw.persona);
   const coverage = raw.coverage === undefined ? (limparCobertura(atual.coverage) ?? []) : limparCobertura(raw.coverage);
   if (coverage === null) throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai_coverage');
@@ -160,6 +164,7 @@ function lerIa(raw, atual) {
     workspaceId,
     instructions,
     persona,
+    fastModel,
     coverage
   };
   // Ligar sem chave seria uma IA que falha a cada mensagem.

@@ -1196,6 +1196,8 @@ const ptBR: Dictionary = {
   'settings.chatbot.aiBaseUrlHint': 'Chave comum da z.ai: api.z.ai/api/paas/v4. GLM Coding Plan: api.z.ai/api/coding/paas/v4. Chave do bigmodel.cn: open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Endereço fixo da Anthropic; só mude se usar um proxy próprio.',
   'settings.chatbot.aiModelHintAnthropic': 'Ex.: claude-sonnet-5-5, claude-haiku-5-5 (mais barato), claude-opus-5-5.',
+  'settings.chatbot.aiFastModel': 'Modelo rápido (opcional)',
+  'settings.chatbot.aiFastModelHint': 'Usado em resumos, reescritas e classificação. Ex.: claude-haiku-5-5. Vazio = usa o modelo acima.',
   'settings.chatbot.aiBuyCredits': 'Comprar créditos',
   'settings.chatbot.aiWorkspaceId': 'ID do workspace (Anthropic)',
   'settings.chatbot.aiWorkspaceIdHint': 'Deixe em branco, a menos que a Anthropic recuse com “not scoped to a workspace”. Nesse caso cole o ID do workspace, ou crie a chave de API dentro de um workspace.',

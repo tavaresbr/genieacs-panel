@@ -207,6 +207,7 @@ export function ChatbotTab() {
           workspaceId: config.ai.workspaceId,
           baseUrl: config.ai.baseUrl,
           model: config.ai.model,
+          fastModel: config.ai.fastModel,
           instructions: config.ai.instructions,
           persona: config.ai.persona,
           ...(aiKey.trim() ? { apiKey: aiKey.trim() } : aiKeyRemove ? { apiKey: '' } : {})
@@ -343,6 +344,17 @@ export function ChatbotTab() {
                   ? t('settings.chatbot.aiModelHintAnthropic')
                   : t('settings.chatbot.aiModelHint')}
               </p>
+            </div>
+            <div>
+              <label htmlFor="bot-ai-fast-model" className="field-label">{t('settings.chatbot.aiFastModel')}</label>
+              <input
+                id="bot-ai-fast-model"
+                className="modern-input w-full"
+                maxLength={64}
+                value={config.ai.fastModel}
+                onChange={(event) => patchAi({ fastModel: event.target.value })}
+              />
+              <p className="field-hint">{t('settings.chatbot.aiFastModelHint')}</p>
             </div>
           </div>
           <div>

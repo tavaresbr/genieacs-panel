@@ -640,6 +640,11 @@ class SchedulerService {
         .catch((error) => {
           console.warn(`Could not prune bot events: ${error.message}`);
         });
+      // O consumo da IA: o painel olha 30 dias; 180 sobram.
+      await tdb('wa_ai_usage').where('day', '<', new Date(Date.now() - BOT_EVENTS_RETENTION_DAYS * 24 * 3600_000).toISOString().slice(0, 10)).del()
+        .catch((error) => {
+          console.warn(`Could not prune AI usage: ${error.message}`);
+        });
       // A trilha de auditoria, pelo prazo DESTE provedor. Ver
       // `auditRetentionDays`: o padrão continua sendo um ano, e agora é padrão
       // e não sentença.

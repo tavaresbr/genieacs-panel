@@ -6450,6 +6450,8 @@ export interface BotAiConfig {
   provider: BotAiProvider
   baseUrl: string
   model: string
+  /** Modelo mais barato para resumo, reescrita e classificação; vazio usa `model`. */
+  fastModel: string
   instructions: string
   /** Nome e jeito do atendente nas conversas de venda. */
   persona: string
@@ -6472,6 +6474,7 @@ export interface BotAiInput {
   provider?: BotAiProvider
   baseUrl?: string
   model?: string
+  fastModel?: string
   instructions?: string
   persona?: string
   coverage?: Array<CoveragePlace | string>

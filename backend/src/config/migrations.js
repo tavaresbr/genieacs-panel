@@ -3794,6 +3794,29 @@ const waAiKnowledgeTable = (db) => (t) => {
 
 const WA_AI_KNOWLEDGE_TABLES = [['wa_ai_knowledge', waAiKnowledgeTable]];
 
+/**
+ * O uso da IA do WhatsApp (0139): uma linha por dia, tarefa e modelo, com as
+ * chamadas e os tokens (entrada, saída e cache), para o painel mostrar o que a
+ * IA consome sem guardar nenhum texto de conversa. Escopada por provedor.
+ */
+const waAiUsageTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('day', 10).notNullable();
+  t.string('task', 16).notNullable();
+  t.string('model', 64).notNullable().defaultTo('');
+  t.integer('calls').unsigned().notNullable().defaultTo(0);
+  t.bigInteger('input_tokens').unsigned().notNullable().defaultTo(0);
+  t.bigInteger('output_tokens').unsigned().notNullable().defaultTo(0);
+  t.bigInteger('cache_read_tokens').unsigned().notNullable().defaultTo(0);
+  t.bigInteger('cache_write_tokens').unsigned().notNullable().defaultTo(0);
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'day', 'task', 'model'], 'wa_ai_usage_key_uq');
+};
+
+const WA_AI_USAGE_TABLES = [['wa_ai_usage', waAiUsageTable]];
+
 const PUSH_TABLES = [
   ['push_subscriptions', pushSubscriptionsTable],
   ['push_preferences', pushPreferencesTable]
@@ -3933,7 +3956,8 @@ export const SCHEMA_TABLES = [
   ...PUSH_TABLES,
   ...WA_SALES_PLAN_TABLES,
   ...WA_AI_KNOWLEDGE_TABLES,
-  ...OPERATOR_PROFILE_TABLES
+  ...OPERATOR_PROFILE_TABLES,
+  ...WA_AI_USAGE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -7828,6 +7852,20 @@ export const migrations = [
       await db.schema.alterTable('customer_accounts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** O uso da IA do WhatsApp — ver `WA_AI_USAGE_TABLES`. */
+    id: '0139_wa_ai_usage',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_ai_usage');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of WA_AI_USAGE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];
