@@ -7,6 +7,21 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.40.0] - 2026-11-13
+
+### New
+
+- Apelidos de cada lugar em "Onde você atende" (`63cc51f6`)
+- Logout revogável, troca de senha pelo assinante e aviso de troca de Wi-Fi (`18e0338e`)
+- Base para o Claude: cache de prompt, uso por tarefa e modelo rápido (`428c8ac5`)
+
+### Fixed
+
+- Não registra o nome da ação no log de falha da auditoria (CodeQL) (`bb085df4`)
+- Notificações do aparelho não ficam com quem saiu (`4b752d37`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/bb2afdd35a0e...92bc82870a07)
+
 ## [1.39.0] - 2026-11-12
 
 ### New

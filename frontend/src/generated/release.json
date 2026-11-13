@@ -1,21 +1,39 @@
 {
-  "version": "1.39.0",
-  "build": 1651,
-  "sourceCommit": "d675712faeb4",
-  "releasedAt": "2026-11-12",
-  "basedOnTag": "v1.38.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/b5bf202050ba...d675712faeb4",
+  "version": "1.40.0",
+  "build": 1661,
+  "sourceCommit": "92bc82870a07",
+  "releasedAt": "2026-11-13",
+  "basedOnTag": "v1.39.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bb2afdd35a0e...92bc82870a07",
   "changes": [
     {
-      "shortHash": "c8223d8c",
+      "shortHash": "63cc51f6",
       "date": "2026-11-12",
-      "title": "Trava de preço inventado para quem ainda não é cliente",
+      "title": "Apelidos de cada lugar em \"Onde você atende\"",
       "category": "New"
     },
     {
-      "shortHash": "f6532ed3",
+      "shortHash": "18e0338e",
       "date": "2026-11-12",
-      "title": "Redes Wi-Fi visíveis configuráveis e senha admin do ONT mascarada no detalhe",
+      "title": "Logout revogável, troca de senha pelo assinante e aviso de troca de Wi-Fi",
+      "category": "New"
+    },
+    {
+      "shortHash": "bb085df4",
+      "date": "2026-11-12",
+      "title": "Não registra o nome da ação no log de falha da auditoria (CodeQL)",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "4b752d37",
+      "date": "2026-11-12",
+      "title": "Notificações do aparelho não ficam com quem saiu",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "428c8ac5",
+      "date": "2026-11-13",
+      "title": "Base para o Claude: cache de prompt, uso por tarefa e modelo rápido",
       "category": "New"
     }
   ]
