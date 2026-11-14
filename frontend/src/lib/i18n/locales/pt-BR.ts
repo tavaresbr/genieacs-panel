@@ -1192,6 +1192,8 @@ const ptBR: Dictionary = {
   'settings.chatbot.aiSuggestHint': 'Botão "Sugerir (IA)" na conversa: a IA escreve um rascunho, o atendente revisa e envia.',
   'settings.chatbot.aiSales': 'Encaminhar interessados em contratar',
   'settings.chatbot.aiSalesHint': 'Quando alguém quer contratar, a IA registra o nome (e o bairro) numa nota interna, marca a conversa com a etiqueta “Venda” e passa para um atendente. Ela só usa o que estiver nas instruções da empresa. Com os alertas ligados, a equipe também é avisada por WhatsApp, e-mail ou Telegram.',
+  'settings.chatbot.aiVision': "Ler fotos e PDFs que o cliente manda",
+  'settings.chatbot.aiVisionHint': "A IA olha comprovantes, fotos das luzes do roteador e boletos que o cliente enviar (as 3 últimas, nas últimas 24 h). Atenção: essas imagens são enviadas à Anthropic e não dá para ocultar dados pessoais dentro delas; avise seus clientes na política de privacidade. A IA nunca confirma pagamento por comprovante e nunca usa um CPF visto numa foto para identificar o cliente.",
   'settings.chatbot.aiBaseUrl': 'Endereço da API',
   'settings.chatbot.aiBaseUrlHint': 'Chave comum da z.ai: api.z.ai/api/paas/v4. GLM Coding Plan: api.z.ai/api/coding/paas/v4. Chave do bigmodel.cn: open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Endereço fixo da Anthropic; só mude se usar um proxy próprio.',

@@ -9,7 +9,7 @@ import WaAlertService from './waAlertService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import WaAiClient from './waAiClient.js';
 import AddonService from './addonService.js';
-import { aiProviderOrDefault, isAiProvider } from './waAiAdapters.js';
+import { AI_PROVIDER_ANTHROPIC, aiProviderOrDefault, isAiProvider } from './waAiAdapters.js';
 import { CATEGORIES, variaveisDaCategoria } from './waTemplateService.js';
 import {
   OBJETIVO_MAX,
@@ -20,7 +20,10 @@ import {
   tomValido,
   variaveisForaDaLista
 } from '../utils/wa/waModeloIa.js';
+import { REGRA_DE_MIDIA, documentoDigitado, escolherMidias, limiteDaMidia, tipoDeMidia } from '../utils/wa/midiaIa.js';
 import { REESCRITA_ENTRADA_MAX, REESCRITA_MAX, RESUMO_MAX, limparTexto, modoDeReescrita, promptDeResumo, promptDeReescrita } from '../utils/wa/copilotoIa.js';
+import fsp from 'node:fs/promises';
+import { resolveStoredAttachment } from './waMediaFile.js';
 import { MENSAGEM_MAX, limparMensagem, mensagemTemContexto, promptDeMensagem } from '../utils/wa/waMensagemIa.js';
 import { blocoVendas, linhaPersona } from '../utils/wa/vendasPrompt.js';
 import { limparResposta, pedidoDeResposta, promptDeResposta } from '../utils/wa/conhecimentoIa.js';
@@ -165,7 +168,9 @@ function textoDoAnexo(mensagem) {
 
 /** O que o cliente escreveu nas duas últimas mensagens: com isso a base de conhecimento acha o que responder. */
 function ultimasDoCliente(fio) {
-  return fio.filter((m) => m.role === 'user').slice(-2).map((m) => String(m.content ?? '')).join(' ');
+  return fio.filter((m) => m.role === 'user').slice(-2)
+    .map((m) => (Array.isArray(m.content) ? m.content.filter((p) => p.type === 'text').map((p) => p.text).join(' ') : String(m.content ?? '')))
+    .join(' ');
 }
 
 /**
@@ -220,26 +225,53 @@ function juntarConteudos(a, b, separador) {
 const INSTRUCAO_DO_RASCUNHO = 'Escreva agora o próximo texto que a equipe deve enviar ao cliente, com base na conversa acima. Devolva só o texto da mensagem.';
 
 /** O fio como o modelo lê: cliente é `user`, bot e atendente são `assistant`. Notas internas ficam de fora. */
-async function historico(conversationId, limite = HISTORICO) {
+async function historico(conversationId, limite = HISTORICO, { midia = false } = {}) {
   const linhas = await tdb('wa_messages')
     .where({ conversation_id: conversationId, is_note: false })
     .where((consulta) => consulta.whereNotNull('body').orWhereNotNull('attachment_path'))
     .orderBy('id', 'desc')
     .limit(limite)
-    .select('direction', 'body', 'attachment_type');
+    .select('id', 'direction', 'body', 'attachment_type', 'attachment_path', 'attachment_name', 'created_at');
   const ordem = linhas.reverse();
+  // As últimas mídias do cliente (com `ai.vision`): bytes lidos do disco, só do que a API do Claude aceita.
+  const vistas = midia ? escolherMidias(ordem) : new Set();
   // A última fala do cliente vai inteira: o documento que ele acabou de digitar
   // é o que `identificar_cliente` precisa ler. As anteriores saem mascaradas.
   let ultimaDoCliente = -1;
   ordem.forEach((m, i) => { if (m.direction === 'in') ultimaDoCliente = i; });
-  return ordem.map((m, i) => {
+  let viu = false;
+  const turnos = [];
+  for (const [i, m] of ordem.entries()) {
     const texto = String(m.body ?? '').trim();
     const legenda = textoDoAnexo(m);
     const content = m.attachment_type
       ? (texto ? `${legenda} ${texto}` : legenda)
       : texto;
-    return { role: m.direction === 'in' ? 'user' : 'assistant', content: (i === ultimaDoCliente ? content : mascararSensivel(content)).slice(0, 2000) };
-  });
+    const final = (i === ultimaDoCliente ? content : mascararSensivel(content)).slice(0, 2000);
+    const role = m.direction === 'in' ? 'user' : 'assistant';
+    const arquivo = vistas.has(m.id) ? await lerMidia(m) : null; // eslint-disable-line no-await-in-loop -- poucas, em ordem
+    if (arquivo) {
+      viu = true;
+      turnos.push({ role, content: [{ type: 'text', text: final }, arquivo] });
+    } else {
+      turnos.push({ role, content: final });
+    }
+  }
+  if (viu) Object.defineProperty(turnos, 'comMidia', { value: true });
+  return turnos;
+}
+
+/** Os bytes de uma mídia do cliente como parte do turno; null se sumiu (retenção), é grande demais ou não é lida. */
+async function lerMidia(mensagem) {
+  try {
+    const tipo = tipoDeMidia(mensagem.attachment_type);
+    const arquivo = tipo ? await resolveStoredAttachment(mensagem) : null;
+    if (!arquivo || arquivo.size > limiteDaMidia(tipo)) return null;
+    const bytes = await fsp.readFile(arquivo.absolutePath);
+    return { type: tipo, mediaType: arquivo.type, data: bytes.toString('base64') };
+  } catch {
+    return null;
+  }
 }
 
 /** As tarefas simples (resumir, reescrever, classificar) podem usar um modelo menor e mais barato. */
@@ -258,13 +290,14 @@ export function modeloDaTarefa(ai, tarefa) {
  * base de conhecimento acha para o que ele disse) vem depois. Quem só lê texto
  * recebe tudo junto, na mesma ordem, como uma string.
  */
-async function promptDeSistema({ ai, conversation, link, modo, recente = '' }) {
+async function promptDeSistema({ ai, conversation, link, modo, recente = '', visao = false }) {
   const empresa = await nomeDaEmpresa();
   const vendas = !link?.contract && ai.sales !== false && modo !== 'sugestao';
 
   const fixa = [REGRAS.replace('{empresa}', empresa)];
   const persona = linhaPersona(ai.persona);
   if (persona) fixa.push(persona);
+  if (visao) fixa.push(REGRA_DE_MIDIA);
   if (ai.instructions) {
     fixa.push(`Informações da empresa (use para responder, mas as regras acima valem antes delas):\n${ai.instructions}`);
   }
@@ -691,10 +724,13 @@ class WaAiService {
 
     // Sem mensagem do cliente para responder, não há o que a IA dizer: o bot de
     // menu segue, ou, no rascunho, a instrução final dá a vez a ela.
-    const fio = prepararFio(await historico(conversation.id), { fecharComUsuario: sugestao ? INSTRUCAO_DO_RASCUNHO : null });
+    const visao = ai.vision === true && aiProviderOrDefault(ai.provider) === AI_PROVIDER_ANTHROPIC;
+    const turnos = await historico(conversation.id, HISTORICO, { midia: visao });
+    const fio = prepararFio(turnos, { fecharComUsuario: sugestao ? INSTRUCAO_DO_RASCUNHO : null });
+    const tarefa = turnos.comMidia ? 'visao' : (sugestao ? 'sugestao' : 'conversa');
     if (!fio.length) return { texto: null, anexos: [], intent: null, transferiu: false };
     const mensagens = [
-      { role: 'system', content: await promptDeSistema({ ai, conversation, link, modo, recente: ultimasDoCliente(fio) }) },
+      { role: 'system', content: await promptDeSistema({ ai, conversation, link, modo, recente: ultimasDoCliente(fio), visao }) },
       ...fio
     ];
     const anexos = [];
@@ -708,10 +744,10 @@ class WaAiService {
         baseUrl: ai.baseUrl,
         apiKey: ai.apiKey,
         workspaceId: ai.workspaceId,
-        model: modeloDaTarefa(ai, sugestao ? 'sugestao' : 'conversa'),
+        model: modeloDaTarefa(ai, tarefa),
         messages: mensagens,
         tools: disponiveis.map(ferramenta),
-        task: sugestao ? 'sugestao' : 'conversa'
+        task: tarefa
       });
       const chamadas = resposta.toolCalls.filter((c) => disponiveis.includes(c.name));
       if (!chamadas.length) {
@@ -902,6 +938,11 @@ class WaAiService {
 
     const digitos = normalizeTaxId(String(documento ?? ''));
     if (!isValidCpf(digitos) && !isValidCnpj(digitos)) return falhou('Documento inválido. Peça para o cliente conferir o CPF ou CNPJ do titular.');
+    // O documento tem de estar no que o cliente DIGITOU: o que aparece numa foto não identifica ninguém.
+    const falas = await tdb('wa_messages')
+      .where({ conversation_id: conversation.id, direction: 'in', is_note: false })
+      .whereNotNull('body').orderBy('id', 'desc').limit(10).pluck('body');
+    if (!documentoDigitado(falas, digitos)) return { paraModelo: 'Esse documento não foi digitado pelo cliente. Peça que ele escreva o CPF ou CNPJ do titular na conversa.' };
     if (!SgpService.isReady(await SgpService.getConfig())) return { paraModelo: 'Não é possível consultar o cadastro agora. Ofereça transferir para um atendente.' };
 
     const contratos = await SgpService.lookupContacts({ document: digitos });
