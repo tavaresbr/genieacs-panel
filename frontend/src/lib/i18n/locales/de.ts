@@ -1195,6 +1195,8 @@ const de: Dictionary = {
   'settings.chatbot.aiSuggestHint': 'Schaltfläche „Vorschlagen (KI)“ im Chat: Die KI schreibt einen Entwurf, der Mitarbeiter prüft und sendet ihn.',
   'settings.chatbot.aiSales': 'Hand off people who want to sign up',
   'settings.chatbot.aiSalesHint': 'When someone wants to sign up, the AI records their name (and neighbourhood) in an internal note, tags the conversation “Venda” and hands it to an agent. It only uses what is in the company instructions. With alerts turned on, the team is also notified by WhatsApp, email or Telegram.',
+  'settings.chatbot.aiVision': "Read photos and PDFs the customer sends",
+  'settings.chatbot.aiVisionHint': "The AI looks at payment receipts, photos of the router lights and bills the customer sends (the last 3, from the last 24 h). Note: these images are sent to Anthropic and personal data inside them cannot be masked; tell your customers in your privacy policy. The AI never confirms a payment from a receipt and never uses an ID number seen in a photo to identify the customer.",
   'settings.chatbot.aiBaseUrl': 'API-Adresse',
   'settings.chatbot.aiBaseUrlHint': 'Normaler z.ai-Schlüssel: api.z.ai/api/paas/v4. GLM Coding Plan: api.z.ai/api/coding/paas/v4. bigmodel.cn-Schlüssel: open.bigmodel.cn/api/paas/v4.',
   'settings.chatbot.aiBaseUrlHintAnthropic': 'Fixed Anthropic address; change it only if you use your own proxy.',

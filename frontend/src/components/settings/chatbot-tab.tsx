@@ -203,6 +203,7 @@ export function ChatbotTab() {
           enabled: config.ai.enabled,
           suggest: config.ai.suggest,
           sales: config.ai.sales,
+          vision: config.ai.vision,
           provider: config.ai.provider,
           workspaceId: config.ai.workspaceId,
           baseUrl: config.ai.baseUrl,
@@ -289,6 +290,14 @@ export function ChatbotTab() {
             title={t('settings.chatbot.aiSales')}
             hint={t('settings.chatbot.aiSalesHint')}
           />
+          {config.ai.provider === 'anthropic' && (
+            <Caixa
+              checked={config.ai.vision}
+              onChange={(value) => patchAi({ vision: value })}
+              title={t('settings.chatbot.aiVision')}
+              hint={t('settings.chatbot.aiVisionHint')}
+            />
+          )}
           <div>
             <label htmlFor="bot-ai-provider" className="field-label">{t('settings.chatbot.aiProvider')}</label>
             <select

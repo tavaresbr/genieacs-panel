@@ -6455,6 +6455,8 @@ export interface BotAiConfig {
   model: string
   /** Modelo mais barato para resumo, reescrita e classificação; vazio usa `model`. */
   fastModel: string
+  /** A IA lê as fotos e PDFs que o cliente manda (só Claude); começa desligado. */
+  vision: boolean
   instructions: string
   /** Nome e jeito do atendente nas conversas de venda. */
   persona: string
@@ -6478,6 +6480,7 @@ export interface BotAiInput {
   baseUrl?: string
   model?: string
   fastModel?: string
+  vision?: boolean
   instructions?: string
   persona?: string
   coverage?: Array<CoveragePlace | string>

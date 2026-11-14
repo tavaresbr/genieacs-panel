@@ -94,6 +94,8 @@ function padroes() {
       persona: '',
       // Modelo menor e mais barato para as tarefas simples (resumir, reescrever, classificar); vazio = o principal.
       fastModel: '',
+      // A IA lê as fotos e PDFs que o cliente manda (só Claude). Desligado: as imagens vão para a Anthropic e não dá para ocultar dados nelas.
+      vision: false,
       // Cidades e bairros que a empresa atende; fora da lista a IA chama um atendente.
       coverage: []
     }
@@ -150,6 +152,7 @@ function lerIa(raw, atual) {
   if (instructions.length > AI_INSTRUCTIONS_MAX) throw invalido('whatsapp.error.invalidBotConfig', 'bot_message_too_long');
   const fastModel = raw.fastModel === undefined ? String(atual.fastModel ?? '').trim() : String(raw.fastModel ?? '').trim();
   if (fastModel.length > AI_MODEL_MAX) throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai');
+  const vision = raw.vision === undefined ? atual.vision === true : raw.vision === true;
   const persona = raw.persona === undefined ? limparPersona(atual.persona) : limparPersona(raw.persona);
   const coverage = raw.coverage === undefined ? (limparCobertura(atual.coverage) ?? []) : limparCobertura(raw.coverage);
   if (coverage === null) throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_ai_coverage');
@@ -165,6 +168,7 @@ function lerIa(raw, atual) {
     instructions,
     persona,
     fastModel,
+    vision,
     coverage
   };
   // Ligar sem chave seria uma IA que falha a cada mensagem.
