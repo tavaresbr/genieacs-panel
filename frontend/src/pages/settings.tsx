@@ -202,7 +202,7 @@ export default function Settings() {
   // gravar uma das duas metades; quem não pode abre em "Painel e ACS".
   const canEditProvider = can('settings.write') || can('map.write')
   const [activeTab, setActiveTab] = useState(() => {
-    const fallback = canEditProvider ? 'provider' : 'general'
+    const fallback = 'integrations'
     try {
       const wanted = new URLSearchParams(window.location.search).get('tab')
       if (wanted === 'provider' && !canEditProvider) return 'general'
@@ -1760,6 +1760,18 @@ export default function Settings() {
 
         <div className="mb-6">
           <div ref={tabRailRef} className="tab-rail" role="tablist" aria-label={t('settings.sectionsAria')}>
+            {/* As integrações (SGP, TeiaH, WhatsApp, chatbot) moram numa aba
+                só, em cards; é a primeira da trilha e a que a tela abre. A trilha
+                a acende enquanto uma delas está aberta. */}
+            <button
+              onClick={() => setActiveTab('integrations')}
+              className="tab-button"
+              data-active={activeTab === 'integrations' || INTEGRATION_TABS.includes(activeTab)}
+              role="tab"
+              aria-selected={activeTab === 'integrations' || INTEGRATION_TABS.includes(activeTab)}
+            >
+              {t('settings.tab.integrations')}
+            </button>
             {canEditProvider && (
               <button
                 onClick={() => setActiveTab('provider')}
@@ -1803,17 +1815,6 @@ export default function Settings() {
               aria-selected={activeTab === 'customer-portal'}
             >
               {t('settings.tab.customerPortal')}
-            </button>
-            {/* As integrações (SGP, TeiaH, WhatsApp, chatbot) moram numa aba
-                só, em cards; a trilha a acende enquanto uma delas está aberta. */}
-            <button
-              onClick={() => setActiveTab('integrations')}
-              className="tab-button"
-              data-active={activeTab === 'integrations' || INTEGRATION_TABS.includes(activeTab)}
-              role="tab"
-              aria-selected={activeTab === 'integrations' || INTEGRATION_TABS.includes(activeTab)}
-            >
-              {t('settings.tab.integrations')}
             </button>
             <button
               onClick={() => setActiveTab('provisioning')}
