@@ -20,6 +20,7 @@ import {
   tomValido,
   variaveisForaDaLista
 } from '../utils/wa/waModeloIa.js';
+import { REESCRITA_ENTRADA_MAX, REESCRITA_MAX, RESUMO_MAX, limparTexto, modoDeReescrita, promptDeResumo, promptDeReescrita } from '../utils/wa/copilotoIa.js';
 import { MENSAGEM_MAX, limparMensagem, mensagemTemContexto, promptDeMensagem } from '../utils/wa/waMensagemIa.js';
 import { blocoVendas, linhaPersona } from '../utils/wa/vendasPrompt.js';
 import { limparResposta, pedidoDeResposta, promptDeResposta } from '../utils/wa/conhecimentoIa.js';
@@ -404,6 +405,78 @@ class WaAiService {
       await WaBotConfigService.recordAiError(null);
       const texto = [resultado.texto, ...resultado.anexos.filter(Boolean)].filter(Boolean).join('\n\n').trim();
       if (!texto) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
+      return { text: texto };
+    } catch (error) {
+      if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code, error.details);
+      throw error;
+    }
+  }
+
+  /**
+   * O resumo da conversa para o atendente que vai assumir. Tudo mascarado
+   * (CPF, PIX…) antes de sair; nada é gravado: o texto volta para a tela.
+   *
+   * @returns {Promise<{text: string}>}
+   */
+  static async resumir(conversationId) {
+    const conversa = await WaConversationService.get(conversationId);
+    const ai = await WaBotConfigService.aiSettings();
+    if (!ai.apiKey) throw new WaError('whatsapp.ai.error.keyRequired', { code: 'ai_key_required', status: 409 });
+    const fio = (await historico(conversa.id, 40)).map((turno) => ({
+      role: turno.role,
+      content: mascararSensivel(typeof turno.content === 'string' ? turno.content : '')
+    })).filter((turno) => turno.content);
+    if (!fio.length) throw new WaError('whatsapp.ai.error.emptyConversation', { code: 'ai_empty_conversation', status: 400 });
+    const transcricao = fio.map((turno) => `${turno.role === 'user' ? 'Cliente' : 'Equipe'}: ${turno.content}`).join('\n');
+    return this.copiloto({
+      ai,
+      task: 'resumo',
+      system: promptDeResumo({ empresa: await nomeDaEmpresa() }),
+      user: transcricao,
+      max: RESUMO_MAX,
+      maxTokens: 500
+    });
+  }
+
+  /**
+   * O texto que o atendente digitou, reescrito no modo pedido. A conversa é
+   * conferida antes (a de outro provedor é "não existe"); o texto não é gravado.
+   *
+   * @returns {Promise<{text: string}>}
+   */
+  static async reescrever(conversationId, { text, mode } = {}) {
+    await WaConversationService.get(conversationId);
+    if (!modoDeReescrita(mode)) throw new WaError('whatsapp.ai.error.rewriteMode', { code: 'ai_rewrite_mode', status: 400 });
+    const atual = String(text ?? '').trim().slice(0, REESCRITA_ENTRADA_MAX);
+    if (!atual) throw new WaError('whatsapp.ai.error.rewriteEmpty', { code: 'ai_rewrite_empty', status: 400 });
+    const ai = await WaBotConfigService.aiSettings();
+    if (!ai.apiKey) throw new WaError('whatsapp.ai.error.keyRequired', { code: 'ai_key_required', status: 409 });
+    return this.copiloto({
+      ai,
+      task: 'reescrever',
+      system: promptDeReescrita({ empresa: await nomeDaEmpresa(), modo: mode }),
+      user: atual,
+      max: REESCRITA_MAX,
+      maxTokens: 700
+    });
+  }
+
+  /** A chamada comum do copiloto: modelo rápido quando há, erro registrado como nos vizinhos. */
+  static async copiloto({ ai, task, system, user, max, maxTokens }) {
+    try {
+      const { content } = await WaAiClient.chat({
+        provider: ai.provider,
+        baseUrl: ai.baseUrl,
+        apiKey: ai.apiKey,
+        workspaceId: ai.workspaceId,
+        model: modeloDaTarefa(ai, task),
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+        maxTokens,
+        task
+      });
+      const texto = limparTexto(content, max);
+      if (!texto) throw new WaError('whatsapp.ai.error.badResponse', { code: 'ai_bad_response', status: 502 });
+      await WaBotConfigService.recordAiError(null);
       return { text: texto };
     } catch (error) {
       if (error?.code && String(error.code).startsWith('ai_')) await WaBotConfigService.recordAiError(error.code, error.details);

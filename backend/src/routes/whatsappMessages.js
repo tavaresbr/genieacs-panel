@@ -71,6 +71,25 @@ router.post(
   WhatsAppMessageController.suggestReply
 );
 
+// O copiloto do atendente: resumir a conversa e reescrever o que ele digitou.
+// Mesmo desenho do "Sugerir (IA)": o texto volta para a tela, nada é enviado.
+router.post(
+  '/conversations/:id/ai-summary',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  requireAddon('ai'),
+  whatsappSendLimiter,
+  WhatsAppMessageController.aiSummary
+);
+router.post(
+  '/conversations/:id/ai-rewrite',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  requireAddon('ai'),
+  whatsappSendLimiter,
+  WhatsAppMessageController.aiRewrite
+);
+
 // Mensagens novas para a notificação do navegador, desde o último cursor.
 router.get('/notifications', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listNotifications);
 

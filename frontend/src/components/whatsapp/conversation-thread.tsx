@@ -13,6 +13,7 @@ import { AccountChip, conversationAddress, conversationTitle } from '@/component
 import { accountTag } from '@/lib/wa-account-color'
 import { BILLING_BADGE, billingLabel } from '@/lib/wa-billing-status'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
+import { AiSummaryPanel } from '@/components/whatsapp/ai-summary-panel'
 import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
 import { useToast } from '@/components/ui/toast'
@@ -52,6 +53,10 @@ interface ConversationThreadProps {
    * a time; on a wide screen the list is right there.
    */
   onBack?: () => void
+  /** O copiloto: o resumo da conversa. Ausente, o botão "Resumir" não aparece. */
+  onSummarize?: () => Promise<string | null>
+  /** Leva o resumo para a caixa de resposta como nota interna. */
+  onSummaryToNote?: (text: string) => void
   /** Teclado aberto no celular: o cabeçalho vira uma linha (voltar + nome). */
   compact?: boolean
 }
@@ -84,11 +89,15 @@ export function ConversationThread({
   onToggleSgpPanel,
   onLinked,
   onBack,
+  onSummarize,
+  onSummaryToNote,
   compact = false
 }: ConversationThreadProps) {
   const { t } = useTranslation()
   const { can } = useAuth()
   const [linkerOpen, setLinkerOpen] = useState(false)
+  // `null` = a IA ainda escreve; `undefined` = painel fechado.
+  const [summary, setSummary] = useState<string | null | undefined>(undefined)
   const closed = Boolean(conversation.closedAt)
   const scrollRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
@@ -131,6 +140,7 @@ export function ConversationThread({
   useEffect(() => {
     const box = scrollRef.current
     setLinkerOpen(false)
+    setSummary(undefined)
     if (!box) return
     stick.current = true
     box.scrollTop = box.scrollHeight
@@ -335,6 +345,28 @@ export function ConversationThread({
               <span className={labelClass}>{t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}</span>
             </button>
 
+            {onSummarize && (
+              <button
+                type="button"
+                className={actionClass}
+                aria-expanded={summary !== undefined}
+                aria-label={t('whatsapp.ai.copilot.summarize')}
+                title={t('whatsapp.ai.copilot.summarizeHint')}
+                disabled={summary === null}
+                onClick={() => {
+                  if (summary !== undefined) {
+                    setSummary(undefined)
+                    return
+                  }
+                  setSummary(null)
+                  void onSummarize().then((text) => setSummary(text ?? undefined))
+                }}
+              >
+                <Icon name="sparkles" size={16} className={summary === null ? 'animate-pulse' : ''} />
+                <span className={labelClass}>{t('whatsapp.ai.copilot.summarize')}</span>
+              </button>
+            )}
+
             {/* Ligar pelo aparelho do atendente: o painel não carrega voz. */}
             {callHref(conversation.waPhoneE164) && (
               <a
@@ -386,6 +418,10 @@ export function ConversationThread({
             onLinked(linked)
           }}
         />
+      )}
+
+      {summary !== undefined && onSummaryToNote && (
+        <AiSummaryPanel text={summary} onNote={onSummaryToNote} onClose={() => setSummary(undefined)} />
       )}
 
       <div

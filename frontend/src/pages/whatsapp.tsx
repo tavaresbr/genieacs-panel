@@ -197,11 +197,14 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   // "Sugerir (IA)": só para quem responde, e só com a sugestão ligada na aba Chatbot.
   const canSuggest = can('whatsapp.send')
   const [aiSuggest, setAiSuggest] = useState(false)
+  const [aiCopilot, setAiCopilot] = useState(false)
   useEffect(() => {
     if (!canSuggest) return
     let vivo = true
     void whatsappAPI.getAiStatus().then((res) => {
-      if (vivo) setAiSuggest(Boolean(res.success && res.data?.suggest))
+      if (!vivo) return
+      setAiSuggest(Boolean(res.success && res.data?.suggest))
+      setAiCopilot(Boolean(res.success && res.data?.copilot))
     })
     return () => {
       vivo = false
@@ -223,7 +226,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   }, [])
   const showSgpPanel = canSeeSgp && sgpPanelOpen
   // What the SGP module hands the reply box — the second copy's text.
-  const [draft, setDraft] = useState<{ id: number; text: string } | null>(null)
+  const [draft, setDraft] = useState<{ id: number; text: string; note?: boolean } | null>(null)
 
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   // Os números do provedor, para cada conversa dizer por qual deles chegou.
@@ -1171,6 +1174,13 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
                     onToggleSgpPanel={canSeeSgp ? toggleSgpPanel : undefined}
                     onLinked={linked}
                     onBack={closeThread}
+                    onSummarize={canSuggest && aiCopilot ? async () => {
+                      const res = await whatsappAPI.summarizeConversation(conversation.id)
+                      if (res.success && res.data) return res.data.text
+                      toast.error(res.message || whatsappErrorMessage(t, res.code))
+                      return null
+                    } : undefined}
+                    onSummaryToNote={(text) => setDraft({ id: Date.now(), text, note: true })}
                     compact={keyboardHeight !== null}
                   />
                   <ThreadComposer
@@ -1187,6 +1197,12 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
                     onSendTemplate={sendTemplate}
                     onSuggest={canSuggest && aiSuggest ? async () => {
                       const res = await whatsappAPI.suggestReply(conversation.id)
+                      if (res.success && res.data) return res.data.text
+                      toast.error(res.message || whatsappErrorMessage(t, res.code))
+                      return null
+                    } : undefined}
+                    onRewrite={canSuggest && aiCopilot ? async (text, mode) => {
+                      const res = await whatsappAPI.rewriteReply(conversation.id, text, mode)
                       if (res.success && res.data) return res.data.text
                       toast.error(res.message || whatsappErrorMessage(t, res.code))
                       return null

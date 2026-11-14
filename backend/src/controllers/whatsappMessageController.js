@@ -239,7 +239,7 @@ class WhatsAppMessageController {
   static async aiStatus(req, res) {
     try {
       const ai = await WaBotConfigService.aiSettings();
-      return res.json(createResponse(req.t('whatsapp.configLoaded'), { suggest: Boolean(ai.suggest && ai.apiKey), templates: Boolean(ai.apiKey) }));
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), { suggest: Boolean(ai.suggest && ai.apiKey), templates: Boolean(ai.apiKey), copilot: Boolean(ai.apiKey) }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');
     }
@@ -250,6 +250,26 @@ class WhatsAppMessageController {
     try {
       const result = await WaAiService.suggest(req.params?.id);
       return res.json(createResponse(req.t('whatsapp.ai.suggested'), result));
+    } catch (error) {
+      if (String(error?.code || '').startsWith('ai_')) return aiError(req, res, error);
+      return handleError(req, res, error, 'whatsapp.ai.error.failed');
+    }
+  }
+
+  /** `POST /conversations/:id/ai-summary` — o resumo da conversa para quem assume; nada é gravado. */
+  static async aiSummary(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.ai.suggested'), await WaAiService.resumir(req.params?.id)));
+    } catch (error) {
+      if (String(error?.code || '').startsWith('ai_')) return aiError(req, res, error);
+      return handleError(req, res, error, 'whatsapp.ai.error.failed');
+    }
+  }
+
+  /** `POST /conversations/:id/ai-rewrite` — o texto da caixa reescrito (`mode`); nada é enviado nem gravado. */
+  static async aiRewrite(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.ai.suggested'), await WaAiService.reescrever(req.params?.id, { text: req.body?.text, mode: req.body?.mode })));
     } catch (error) {
       if (String(error?.code || '').startsWith('ai_')) return aiError(req, res, error);
       return handleError(req, res, error, 'whatsapp.ai.error.failed');
