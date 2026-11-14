@@ -1,22 +1,22 @@
 {
-  "version": "1.41.0",
-  "build": 1666,
-  "sourceCommit": "041f3dc29611",
+  "version": "1.42.0",
+  "build": 1671,
+  "sourceCommit": "87c227b69066",
   "releasedAt": "2026-11-14",
-  "basedOnTag": "v1.40.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/47a5fcf0d616...041f3dc29611",
+  "basedOnTag": "v1.41.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/2ea0df63734b...87c227b69066",
   "changes": [
     {
-      "shortHash": "83214724",
+      "shortHash": "c3460f66",
       "date": "2026-11-14",
-      "title": "Copiloto do atendente: resumir a conversa e reescrever a resposta",
-      "category": "New"
+      "title": "Open settings on Integrações tab and list it first",
+      "category": "Maintenance"
     },
     {
-      "shortHash": "714564ce",
+      "shortHash": "91f57544",
       "date": "2026-11-14",
-      "title": "O que um provedor faz com a equipe não derruba a pessoa nos outros",
-      "category": "Fixed"
+      "title": "A IA lê fotos e PDFs que o cliente manda (opt-in, só Claude)",
+      "category": "New"
     }
   ]
 }

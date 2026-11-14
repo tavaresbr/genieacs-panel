@@ -7,6 +7,18 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.42.0] - 2026-11-14
+
+### New
+
+- A IA lê fotos e PDFs que o cliente manda (opt-in, só Claude) (`91f57544`)
+
+### Maintenance
+
+- Open settings on Integrações tab and list it first (`c3460f66`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/2ea0df63734b...87c227b69066)
+
 ## [1.41.0] - 2026-11-14
 
 ### New
