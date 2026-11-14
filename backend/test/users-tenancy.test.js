@@ -1,6 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import {
   authHeaders,
   call,
@@ -406,5 +407,29 @@ describe('a person who works for two providers', () => {
     assert.equal(body.data.user.role, 'admin');
     assert.equal((await membershipOf(alfa, carolId)).role, 'admin');
     assert.equal((await membershipOf(beta, carolId)).role, beforeAtBeta.role, 'beta decides beta');
+  });
+
+  it('loses only the sessions open here when this provider changes their role', async () => {
+    const entrar = async (tenantId) => {
+      const res = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { ...CAROL, tenantId } });
+      assert.equal(res.status, 200);
+      return jwt.decode(res.body.data.token).sid;
+    };
+    const aqui = await entrar(alfa);
+    const la = await entrar(beta);
+    const versao = Number((await personOf(carolId)).token_version);
+
+    const { status } = await call(`${panelUrl}/api/users/${carolId}`, {
+      method: 'PATCH',
+      headers: authHeaders(ownerToken),
+      body: { role: 'viewer' }
+    });
+    assert.equal(status, 200);
+
+    const familia = (sid) => getDb()('refresh_tokens').where({ family_id: sid }).whereNull('revoked_at').first();
+    assert.equal(await familia(aqui), undefined, 'the session open at alfa ends');
+    assert.ok(await familia(la), "the session at beta is beta's, and stays");
+    assert.equal(Number((await personOf(carolId)).token_version), versao,
+      'no bump of the person-wide version, which would sign her out everywhere');
   });
 });

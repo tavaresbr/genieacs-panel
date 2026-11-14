@@ -322,6 +322,22 @@ class RefreshToken {
     return Boolean(row);
   }
 
+  /**
+   * Encerra as sessões desta pessoa em UM provedor. O que um provedor faz com
+   * a equipe dele (mudar o papel, tirar alguém) derruba só as sessões abertas
+   * nele: a mesma pessoa trabalhando para outro provedor segue logada lá.
+   * Basta a família: o token de acesso dela para na próxima requisição
+   * (`familyActive`), e o papel/vínculo são relidos a cada uma.
+   */
+  static async revokeForTenant(userId, tenantId, now = new Date()) {
+    const tenant = Number(tenantId);
+    if (!Number.isInteger(tenant) || tenant <= 0) return 0;
+    return getDb()('refresh_tokens')
+      .where({ user_id: Number(userId), tenant_id: tenant })
+      .whereNull('revoked_at')
+      .update({ revoked_at: wholeSecond(now) });
+  }
+
   static async revokeAllForUser(userId, now = new Date()) {
     return getDb()('refresh_tokens')
       .where({ user_id: Number(userId) })
