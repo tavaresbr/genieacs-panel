@@ -853,6 +853,7 @@ export default {
   'whatsapp.tags.defaultSupport': 'Soporte técnico',
   'whatsapp.tags.defaultSales': 'Venta',
   'whatsapp.tags.defaultCancel': 'Cancelación',
+  'whatsapp.tags.defaultComplaint': 'Reclamación',
   'whatsapp.tags.defaultReceipt': "Comprobante",
   'whatsapp.tags.saved': 'Etiquetas guardadas',
   'whatsapp.tags.deleted': 'Etiqueta eliminada',

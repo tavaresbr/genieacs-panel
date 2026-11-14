@@ -1808,6 +1808,18 @@ const WA_CONVERSATION_LEAD_COLUMNS = [
 ];
 
 /**
+ * A classificação automática da conversa (0140): assunto, urgência e humor que
+ * a IA marcou (`ai_topic`, `ai_urgency`, `ai_mood`) e quando (`ai_classified_at`,
+ * que também limita a uma classificação a cada 6 horas).
+ */
+const WA_CONVERSATION_CLASSIFY_COLUMNS = [
+  ['ai_topic', (t) => t.string('ai_topic', 16).nullable()],
+  ['ai_urgency', (t) => t.string('ai_urgency', 8).nullable()],
+  ['ai_mood', (t) => t.string('ai_mood', 12).nullable()],
+  ['ai_classified_at', (t) => t.timestamp('ai_classified_at').nullable()]
+];
+
+/**
  * O aprendizado supervisionado (0134): `lead_learned_at` marca a venda cujas
  * sugestões para a base de conhecimento já foram pedidas à IA, para uma
  * conversa reaberta e encerrada de novo não gastar outra chamada.
@@ -7866,6 +7878,22 @@ export const migrations = [
       for (const [name, builder] of WA_AI_USAGE_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
+    }
+  },
+  {
+    /** A classificação automática da conversa — ver `WA_CONVERSATION_CLASSIFY_COLUMNS`. */
+    id: '0140_wa_conversation_classify',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_CLASSIFY_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_CLASSIFY_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

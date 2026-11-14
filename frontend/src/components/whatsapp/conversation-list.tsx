@@ -4,6 +4,7 @@ import { TagChip } from '@/components/whatsapp/tags'
 import { BILLING_BADGE, billingLabel } from '@/lib/wa-billing-status'
 import { WAIT_BADGE, WAIT_BAR, waitBand } from '@/lib/wa-wait-band'
 import { useEffect, useState } from 'react'
+import { AiChips } from '@/components/whatsapp/ai-chips'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation } from '@/lib/api'
@@ -213,6 +214,7 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                     {t('whatsapp.waiting.badge', { minutes: waiting.get(conversation.id) ?? 0 })}
                   </span>
                 )}
+                <AiChips conversation={conversation} />
                 {(conversation.tags ?? []).map((tag) => <TagChip key={tag.id} tag={tag} />)}
                 {conversation.assignedTo ? (
                   <span className="modern-badge" title={t('whatsapp.assign.agent')}>

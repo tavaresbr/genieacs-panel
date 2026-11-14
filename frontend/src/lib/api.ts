@@ -6085,6 +6085,11 @@ export interface WhatsAppConversation {
   leadAt?: string | null
   /** Como a venda terminou, quando o atendente já disse. */
   leadOutcome?: 'won' | 'lost' | null
+  /** O que a IA marcou (opt-in): assunto, urgência e humor. */
+  aiTopic?: 'fatura' | 'suporte' | 'comercial' | 'cancelamento' | 'reclamacao' | 'elogio' | 'outro' | null
+  aiUrgency?: 'baixa' | 'media' | 'alta' | null
+  aiMood?: 'calmo' | 'irritado' | 'satisfeito' | null
+  aiClassifiedAt?: string | null
   /** The contact asked not to be contacted. Replying is still allowed. */
   optedOut: boolean
   /** Pediu para não receber promoção: desde quando e por onde. Só a promoção para. */
@@ -6457,6 +6462,8 @@ export interface BotAiConfig {
   fastModel: string
   /** A IA lê as fotos e PDFs que o cliente manda (só Claude); começa desligado. */
   vision: boolean
+  /** A IA marca assunto, urgência e humor de cada conversa; começa desligado. */
+  classify: boolean
   instructions: string
   /** Nome e jeito do atendente nas conversas de venda. */
   persona: string
@@ -6481,6 +6488,7 @@ export interface BotAiInput {
   model?: string
   fastModel?: string
   vision?: boolean
+  classify?: boolean
   instructions?: string
   persona?: string
   coverage?: Array<CoveragePlace | string>

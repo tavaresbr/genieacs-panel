@@ -145,6 +145,30 @@ class WaTagService {
     }
   }
 
+  /**
+   * Uma etiqueta pelo nome padrão (`whatsapp.tags.*`): achada, ou criada se
+   * ainda couber. Só acrescenta, e nunca lança.
+   */
+  static async tagByKey(conversationId, key, color = 'gray') {
+    try {
+      if (!conversationId) return null;
+      await this.seedOnce();
+      const nome = translatorFor(DEFAULT_LOCALE)(key);
+      const rows = await tdb('wa_tags').select('id', 'name');
+      let tagId = rows.find((r) => r.name.toLowerCase() === nome.toLowerCase())?.id ?? null;
+      if (!tagId) {
+        if (rows.length >= MAX_TAGS) return null;
+        tagId = await tinsertReturningId('wa_tags', { name: nome, color, created_at: new Date() });
+      }
+      const ja = await tdb('wa_conversation_tags').where({ conversation_id: conversationId, tag_id: tagId }).first('id');
+      if (!ja) await tinsert('wa_conversation_tags', { conversation_id: conversationId, tag_id: tagId, created_at: new Date() });
+      return Number(tagId);
+    } catch (error) {
+      console.warn(`WhatsApp tag failed: ${error.message}`);
+      return null;
+    }
+  }
+
   static async list() {
     await this.seedOnce();
     const rows = await tdb('wa_tags').orderBy('name').select('id', 'name', 'color');

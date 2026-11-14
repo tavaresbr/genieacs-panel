@@ -20,6 +20,7 @@ import {
   tomValido,
   variaveisForaDaLista
 } from '../utils/wa/waModeloIa.js';
+import { CLASSIFICACAO_INTERVALO_MS, lerClassificacao, promptDeClassificacao } from '../utils/wa/classificacaoIa.js';
 import { REGRA_DE_MIDIA, documentoDigitado, escolherMidias, limiteDaMidia, tipoDeMidia } from '../utils/wa/midiaIa.js';
 import { REESCRITA_ENTRADA_MAX, REESCRITA_MAX, RESUMO_MAX, limparTexto, modoDeReescrita, promptDeResumo, promptDeReescrita } from '../utils/wa/copilotoIa.js';
 import fsp from 'node:fs/promises';
@@ -492,6 +493,58 @@ class WaAiService {
       max: REESCRITA_MAX,
       maxTokens: 700
     });
+  }
+
+  /**
+   * Marca assunto, urgência e humor da conversa (opt-in `ai.classify`).
+   *
+   * No máximo uma vez a cada 6 h por conversa: a vaga é tomada ANTES da
+   * chamada, com um UPDATE condicional, para duas mensagens seguidas não
+   * gastarem duas chamadas. Só as últimas mensagens, mascaradas. O que o
+   * modelo devolve é validado contra listas fixas. Nunca lança: o webhook que
+   * trouxe a mensagem não pode falhar por causa disso.
+   */
+  static async classificar(conversation) {
+    try {
+      const ai = await WaBotConfigService.aiSettings();
+      if (!ai.classify || !ai.apiKey || !conversation?.id) return null;
+      const agora = new Date();
+      const corte = new Date(agora.getTime() - CLASSIFICACAO_INTERVALO_MS);
+      const tomou = await tdb('wa_conversations')
+        .where({ id: conversation.id })
+        .where((q) => q.whereNull('ai_classified_at').orWhere('ai_classified_at', '<', corte))
+        .update({ ai_classified_at: agora });
+      if (!tomou) return null;
+      const fio = (await historico(conversation.id, 6))
+        .map((t) => ({ role: t.role, content: mascararSensivel(typeof t.content === 'string' ? t.content : '') }))
+        .filter((t) => t.content);
+      if (!fio.length) return null;
+      const { content } = await WaAiClient.chat({
+        provider: ai.provider,
+        baseUrl: ai.baseUrl,
+        apiKey: ai.apiKey,
+        workspaceId: ai.workspaceId,
+        model: modeloDaTarefa(ai, 'classificar'),
+        messages: [
+          { role: 'system', content: promptDeClassificacao({ empresa: await nomeDaEmpresa() }) },
+          { role: 'user', content: fio.map((t) => `${t.role === 'user' ? 'Cliente' : 'Equipe'}: ${t.content}`).join('\n') }
+        ],
+        maxTokens: 200,
+        task: 'classificar'
+      });
+      const marca = lerClassificacao(content);
+      if (!marca) return null;
+      await tdb('wa_conversations').where({ id: conversation.id }).update({
+        ai_topic: marca.topic, ai_urgency: marca.urgency, ai_mood: marca.mood
+      });
+      if (marca.topic === 'cancelamento') await WaTagService.tagByKey(conversation.id, 'whatsapp.tags.defaultCancel', 'orange');
+      if (marca.topic === 'reclamacao') await WaTagService.tagByKey(conversation.id, 'whatsapp.tags.defaultComplaint', 'pink');
+      if (marca.topic === 'comercial') await WaTagService.tagSales(conversation.id);
+      return marca;
+    } catch (error) {
+      console.warn(`[wa] IA: classificação não feita: ${error?.code || error?.message}`);
+      return null;
+    }
   }
 
   /** A chamada comum do copiloto: modelo rápido quando há, erro registrado como nos vizinhos. */

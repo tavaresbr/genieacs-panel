@@ -11,6 +11,7 @@ import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import WaMediaService, { desembrulhar } from './waMediaService.js';
 import { resumoSemTexto } from '../utils/wa/waSemTexto.js';
 import WaBotService from './waBotService.js';
+import WaAiService from './waAiService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
 import WaAssignmentService from './waAssignmentService.js';
 import WaConversationService from './waConversationService.js';
@@ -494,6 +495,8 @@ async function gravarMensagem(account, item) {
     // conversa tem atendente. Solto de propósito: o webhook não espera o
     // serviço de push de ninguém, e `avisarPorPush` nunca lança.
     void avisarPorPush(conversation.id);
+    // 12. A classificação por IA (opt-in), solta: nunca atrasa nem derruba o webhook.
+    if (String(texto ?? '').trim()) void WaAiService.classificar(conversation);
   }
 
   return { handled: true, conversationId: conversation.id, direction: linha.direction };
