@@ -3,6 +3,7 @@ import SubscriptionService, { PlanLimitError } from '../services/subscriptionSer
 import { planLimitResponse } from '../utils/planLimit.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import RefreshToken from '../models/RefreshToken.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import OperatorProfile, { summary as profileSummary } from '../models/OperatorProfile.js';
@@ -96,15 +97,16 @@ function present(member, profile = null) {
  * só é honesto enquanto a pessoa trabalha para este provedor sozinho: com
  * várias memberships uma coluna não guarda dois papéis, e escrevê-la deixaria
  * este provedor mudar o que aquela pessoa pode fazer em outro. Aí a coluna fica
- * como está e só as sessões caem.
+ * como está e só as sessões caem — as DESTE provedor (`tenantId`): as que a
+ * pessoa tem em outro provedor não são deste para encerrar.
  */
-export async function applyRoleSideEffects(userId, role) {
+export async function applyRoleSideEffects(userId, role, tenantId) {
   const memberships = await TenantUser.listForUser(userId);
   if (memberships.length <= 1) {
     await User.updateRole(userId, role);
     return;
   }
-  await User.revokeSessions(userId);
+  await RefreshToken.revokeForTenant(userId, tenantId);
 }
 
 class UsersController {
@@ -385,7 +387,7 @@ class UsersController {
           );
         }
         await TenantUser.setRole(tenantId, id, nextRole);
-        await applyRoleSideEffects(id, nextRole);
+        await applyRoleSideEffects(id, nextRole, tenantId);
         await AuditLog.fromRequest(req, {
           action: AuditLog.ACTIONS.OPERATOR_ROLE_CHANGED,
           subjectType: 'tenant_user',
@@ -655,10 +657,11 @@ class UsersController {
         subjectId: id,
         detail: { role: presentRole(membership.role) }
       });
-      // Their open sessions were sessions here. Revocation lives on the person,
-      // so this signs them out of their other providers too — the blunt end of
-      // one `token_version` per person, and the safe direction of the two.
-      await User.revokeSessions(id);
+      // Their open sessions here end now. Only here: the same person may work
+      // for another provider, and those sessions are not this provider's to
+      // end. The membership is re-read on every request, so even a session
+      // without a refresh family stops at its next call.
+      await RefreshToken.revokeForTenant(id, tenantId);
       return res.json(createResponse(req.t('users.deleted'), { id }));
     } catch (error) {
       console.error('Delete user error:', error);

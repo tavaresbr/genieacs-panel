@@ -774,7 +774,7 @@ class PlatformMemberController {
 
       if (mudancas.role) {
         await TenantUser.setRole(tenantId, userId, corpo.role);
-        await applyRoleSideEffects(userId, corpo.role);
+        await applyRoleSideEffects(userId, corpo.role, tenantId);
       }
       if (mudancas.username) await User.updateUsername(userId, username);
       if (mudancas.email) await User.updateEmail(userId, email);

@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { formatBrPhone } from '@/lib/phone'
 import { isSafeExternalUrl } from '@/lib/sgp'
 import { loadContactFilters, saveContactFilters } from '@/lib/contact-filters'
+import { sessionOwner } from '@/lib/session-owner'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
 import { NewContactModal } from '@/components/whatsapp/new-contact-modal'
@@ -54,7 +55,8 @@ interface ContactsPanelProps {
  */
 export function ContactsPanel({ onOpenConversation, defaultState = '', persistKey }: ContactsPanelProps) {
   const { t, intlLocale, formatDateTime, formatNumber } = useTranslation()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
+  const owner = sessionOwner(user)
   const toast = useToast()
 
   const [contacts, setContacts] = useState<WhatsAppContact[]>([])
@@ -62,7 +64,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   // Where the filters were left, when this panel keeps them between visits.
   const [saved] = useState(() => {
     const base = { search: '', state: defaultState, noPhone: false, imported: false, device: '' as ContactDeviceFilter, asaas: false, teiahHigh: false }
-    return persistKey ? loadContactFilters(persistKey, base) : base
+    return persistKey ? loadContactFilters(persistKey, base, owner) : base
   })
   const [search, setSearch] = useState(saved.search)
   const [debounced, setDebounced] = useState(saved.search.trim())
@@ -87,8 +89,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   // Só quem a última consulta da TeiaH deu risco alto.
   const [teiahHigh, setTeiahHigh] = useState(saved.teiahHigh === true)
   useEffect(() => {
-    if (persistKey) saveContactFilters(persistKey, { search, state: stateFilter, noPhone, imported, device, asaas, teiahHigh })
-  }, [persistKey, search, stateFilter, noPhone, imported, device, asaas, teiahHigh])
+    if (persistKey) saveContactFilters(persistKey, { search, state: stateFilter, noPhone, imported, device, asaas, teiahHigh }, owner)
+  }, [persistKey, owner, search, stateFilter, noPhone, imported, device, asaas, teiahHigh])
   // Quantos contatos cada filtro mostraria; vazio até a primeira leitura.
   const [counts, setCounts] = useState<WhatsAppContactCounts | null>(null)
 
