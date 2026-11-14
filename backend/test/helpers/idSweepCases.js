@@ -702,6 +702,26 @@ export const casos = [
   },
   {
     chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/ai-summary',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/ai-summary`,
+    body: {},
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/ai-rewrite',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/ai-rewrite`,
+    body: { text: 'oi', mode: 'curto' },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
     label: 'POST /api/whatsapp/conversations/:id/subscriber/unbind',
     method: 'POST',
     path: (id) => `/api/whatsapp/conversations/${id}/subscriber/unbind`,

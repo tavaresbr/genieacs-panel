@@ -6437,6 +6437,9 @@ export function aiCreditsUrl(provider: BotAiProvider, baseUrl: string): string |
 }
 
 /** Um lugar da cobertura: o nome e os outros nomes que o cliente usa para ele. */
+/** Como o copiloto reescreve o texto da caixa de resposta. */
+export type RewriteMode = 'educado' | 'direto' | 'curto' | 'corrigir' | 'traduzir'
+
 export interface CoveragePlace {
   name: string
   aliases: string[]
@@ -6658,7 +6661,7 @@ export const whatsappAPI = {
 
   /** Se o botão "Sugerir (IA)" aparece para quem atende. */
   getAiStatus: () =>
-    apiClient.get<{ suggest: boolean; templates?: boolean }>('/whatsapp/ai/status'),
+    apiClient.get<{ suggest: boolean; templates?: boolean; copilot?: boolean }>('/whatsapp/ai/status'),
 
   /** A IA escreve (ou melhora) o texto de um modelo; só rascunho, nada é gravado. */
   draftTemplate: (payload: { category: string; goal: string; tone: string; current: string }) =>
@@ -6667,6 +6670,14 @@ export const whatsappAPI = {
   /** Um rascunho da IA para a caixa de resposta; nada é enviado. */
   suggestReply: (conversationId: number) =>
     apiClient.post<{ text: string }>(`/whatsapp/conversations/${conversationId}/suggest-reply`, {}),
+
+  /** O copiloto: o resumo da conversa para quem assume. Nada é gravado. */
+  summarizeConversation: (conversationId: number) =>
+    apiClient.post<{ text: string }>(`/whatsapp/conversations/${conversationId}/ai-summary`, {}),
+
+  /** O copiloto: o texto da caixa reescrito no modo pedido. Nada é enviado nem gravado. */
+  rewriteReply: (conversationId: number, text: string, mode: RewriteMode) =>
+    apiClient.post<{ text: string }>(`/whatsapp/conversations/${conversationId}/ai-rewrite`, { text, mode }),
 
   getSalesReport: (days: 7 | 30 | 90) =>
     apiClient.get<SalesReport>(`/whatsapp/sales-report?days=${days}`),

@@ -5,7 +5,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { useTranslation } from '@/contexts/language-context'
-import { whatsappAPI, type MetaTemplatePayload, type WhatsAppMessage, type WhatsAppMetaTemplate } from '@/lib/api'
+import { whatsappAPI, type MetaTemplatePayload, type RewriteMode, type WhatsAppMessage, type WhatsAppMetaTemplate } from '@/lib/api'
 import { formatFileSize } from '@/lib/firmware'
 import {
   MAX_ATTACHMENT_MB,
@@ -51,7 +51,7 @@ interface ThreadComposerProps {
    * presses Send. `id` changes on every hand-over, so the same text twice is
    * two hand-overs.
    */
-  draft?: { id: number; text: string } | null
+  draft?: { id: number; text: string; note?: boolean } | null
   /**
    * As respostas rápidas (modelos da categoria `atendimento`). `null` quando
    * quem está logado não pode listá-las: nem o "/" nem o botão aparecem.
@@ -73,6 +73,8 @@ interface ThreadComposerProps {
    * atendente lê, corrige e aperta Enviar. Ausente, o botão não aparece.
    */
   onSuggest?: () => Promise<string | null>
+  /** O copiloto: reescreve o texto da caixa no modo pedido (`null` = falhou, o aviso já saiu). */
+  onRewrite?: (text: string, mode: RewriteMode) => Promise<string | null>
   /** Teclado aberto no celular: some o que é só informativo e a nota vira só o cadeado. */
   compact?: boolean
   /**
@@ -102,6 +104,15 @@ interface PickedFile {
 
 /** Arrastar texto ou um link da própria página não é anexar. */
 const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).includes('Files')
+
+/** Os modos do menu "Reescrever" e o texto de cada um. */
+const REWRITE_MODES = [
+  ['educado', 'whatsapp.ai.copilot.modeEducado'],
+  ['direto', 'whatsapp.ai.copilot.modeDireto'],
+  ['curto', 'whatsapp.ai.copilot.modeCurto'],
+  ['corrigir', 'whatsapp.ai.copilot.modeCorrigir'],
+  ['traduzir', 'whatsapp.ai.copilot.modeTraduzir']
+] as const
 
 /**
  * The reply box.
@@ -137,11 +148,15 @@ const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).
  * modo nota continua ligado, porque o resto do lote ainda é nota e virar
  * resposta no meio do caminho é justamente a direção perigosa.
  */
-export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCancelReply, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate, onSuggest, templates = null, onPickTemplate, compact = false }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCancelReply, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate, onSuggest, onRewrite, templates = null, onPickTemplate, compact = false }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
   const [isNote, setIsNote] = useState(false)
+  const [rewriting, setRewriting] = useState(false)
+  const [rewriteMenu, setRewriteMenu] = useState(false)
+  // O que a caixa tinha antes da reescrita, e o que a IA pôs: o "Desfazer" some assim que o texto muda.
+  const [rewritten, setRewritten] = useState<{ before: string; after: string } | null>(null)
   const [items, setItems] = useState<PickedFile[]>([])
   const [working, setWorking] = useState(false)
   const [progress, setProgress] = useState<{ n: number; total: number } | null>(null)
@@ -176,13 +191,14 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
   }, [])
 
   // Taken in during render rather than in an effect, so the box never paints
-  // one frame with the old text. A draft is a reply, never a note: a billing
-  // text filed as an internal note would be a customer waiting for nothing.
+  // one frame with the old text. A draft is a reply, never a note — except
+  // the AI summary, which the operator asked to keep as one: a billing text
+  // filed as an internal note would be a customer waiting for nothing.
   const [takenDraft, setTakenDraft] = useState<number | null>(draft?.id ?? null)
   if (draft && draft.id !== takenDraft) {
     setTakenDraft(draft.id)
     setBody(draft.text)
-    setIsNote(false)
+    setIsNote(Boolean(draft.note))
   }
   useEffect(() => {
     if (draft) boxRef.current?.focus()
@@ -693,6 +709,73 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
             >
               <Icon name="sparkles" size={16} />
               <span className="hidden @4xl:inline">{suggesting ? t('whatsapp.ai.suggesting') : t('whatsapp.ai.suggest')}</span>
+            </button>
+          )}
+          {!compact && onRewrite && !isNote && (
+            <div
+              className="relative shrink-0"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRewriteMenu(false)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setRewriteMenu(false)
+              }}
+            >
+              <button
+                type="button"
+                className="modern-button-secondary px-3 @4xl:px-4 max-sm:h-10 max-sm:w-8 max-sm:min-h-0 max-sm:px-0"
+                aria-label={t('whatsapp.ai.copilot.rewrite')}
+                title={body.trim() ? t('whatsapp.ai.copilot.rewrite') : t('whatsapp.ai.copilot.needText')}
+                aria-haspopup="menu"
+                aria-expanded={rewriteMenu}
+                disabled={busy || rewriting || !body.trim()}
+                onClick={() => setRewriteMenu((open) => !open)}
+              >
+                <Icon name="edit" size={16} />
+                <span className="hidden @4xl:inline">{rewriting ? t('whatsapp.ai.copilot.rewriting') : t('whatsapp.ai.copilot.rewrite')}</span>
+              </button>
+              {rewriteMenu && (
+                <ul role="menu" className="absolute bottom-full left-0 z-20 mb-1 w-52 rounded-lg border border-border bg-card p-1 shadow-lg">
+                  {REWRITE_MODES.map(([mode, label]) => (
+                    <li key={mode} role="none">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[hsl(var(--surface-subtle))] focus-visible:bg-[hsl(var(--surface-subtle))]"
+                        onClick={() => {
+                          setRewriteMenu(false)
+                          const before = body
+                          setRewriting(true)
+                          void onRewrite(before, mode)
+                            .then((texto) => {
+                              if (!texto) return
+                              setBody(texto)
+                              setRewritten({ before, after: texto })
+                              boxRef.current?.focus()
+                            })
+                            .finally(() => setRewriting(false))
+                        }}
+                      >
+                        {t(label)}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          {!compact && rewritten && rewritten.after === body && (
+            <button
+              type="button"
+              className="modern-button-secondary shrink-0 px-3 max-sm:h-10 max-sm:min-h-0"
+              onClick={() => {
+                setBody(rewritten.before)
+                setRewritten(null)
+                boxRef.current?.focus()
+              }}
+            >
+              <Icon name="refresh" size={16} />
+              <span className="hidden @4xl:inline">{t('whatsapp.ai.copilot.undo')}</span>
             </button>
           )}
           {!compact && canRecord && !isNote && (
