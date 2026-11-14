@@ -7,6 +7,18 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.41.0] - 2026-11-14
+
+### New
+
+- Copiloto do atendente: resumir a conversa e reescrever a resposta (`83214724`)
+
+### Fixed
+
+- O que um provedor faz com a equipe não derruba a pessoa nos outros (`714564ce`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/47a5fcf0d616...041f3dc29611)
+
 ## [1.40.0] - 2026-11-13
 
 ### New

@@ -1,40 +1,22 @@
 {
-  "version": "1.40.0",
-  "build": 1661,
-  "sourceCommit": "92bc82870a07",
-  "releasedAt": "2026-11-13",
-  "basedOnTag": "v1.39.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bb2afdd35a0e...92bc82870a07",
+  "version": "1.41.0",
+  "build": 1666,
+  "sourceCommit": "041f3dc29611",
+  "releasedAt": "2026-11-14",
+  "basedOnTag": "v1.40.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/47a5fcf0d616...041f3dc29611",
   "changes": [
     {
-      "shortHash": "63cc51f6",
-      "date": "2026-11-12",
-      "title": "Apelidos de cada lugar em \"Onde você atende\"",
+      "shortHash": "83214724",
+      "date": "2026-11-14",
+      "title": "Copiloto do atendente: resumir a conversa e reescrever a resposta",
       "category": "New"
     },
     {
-      "shortHash": "18e0338e",
-      "date": "2026-11-12",
-      "title": "Logout revogável, troca de senha pelo assinante e aviso de troca de Wi-Fi",
-      "category": "New"
-    },
-    {
-      "shortHash": "bb085df4",
-      "date": "2026-11-12",
-      "title": "Não registra o nome da ação no log de falha da auditoria (CodeQL)",
+      "shortHash": "714564ce",
+      "date": "2026-11-14",
+      "title": "O que um provedor faz com a equipe não derruba a pessoa nos outros",
       "category": "Fixed"
-    },
-    {
-      "shortHash": "4b752d37",
-      "date": "2026-11-12",
-      "title": "Notificações do aparelho não ficam com quem saiu",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "428c8ac5",
-      "date": "2026-11-13",
-      "title": "Base para o Claude: cache de prompt, uso por tarefa e modelo rápido",
-      "category": "New"
     }
   ]
 }
