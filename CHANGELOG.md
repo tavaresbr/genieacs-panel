@@ -7,6 +7,18 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.43.0] - 2026-11-15
+
+### New
+
+- Classificar conversas sozinho (assunto, urgência e humor) (`4896d35a`)
+
+### Fixed
+
+- Log da classificação passa por logSafe (CodeQL: log injection) (`52edbf18`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/d9522256b47a...d9980da7a83d)
+
 ## [1.42.0] - 2026-11-14
 
 ### New
