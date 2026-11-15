@@ -24,6 +24,7 @@ import { CLASSIFICACAO_INTERVALO_MS, lerClassificacao, promptDeClassificacao } f
 import { REGRA_DE_MIDIA, documentoDigitado, escolherMidias, limiteDaMidia, tipoDeMidia } from '../utils/wa/midiaIa.js';
 import { REESCRITA_ENTRADA_MAX, REESCRITA_MAX, RESUMO_MAX, limparTexto, modoDeReescrita, promptDeResumo, promptDeReescrita } from '../utils/wa/copilotoIa.js';
 import fsp from 'node:fs/promises';
+import { logSafe } from '../utils/logger.js';
 import { resolveStoredAttachment } from './waMediaFile.js';
 import { MENSAGEM_MAX, limparMensagem, mensagemTemContexto, promptDeMensagem } from '../utils/wa/waMensagemIa.js';
 import { blocoVendas, linhaPersona } from '../utils/wa/vendasPrompt.js';
@@ -542,7 +543,7 @@ class WaAiService {
       if (marca.topic === 'comercial') await WaTagService.tagSales(conversation.id);
       return marca;
     } catch (error) {
-      console.warn(`[wa] IA: classificação não feita: ${error?.code || error?.message}`);
+      console.warn(`[wa] IA: classificação não feita: ${JSON.stringify(logSafe(error?.code || error?.message, 200))}`);
       return null;
     }
   }
