@@ -1407,7 +1407,8 @@ export interface InvitePreview {
 /**
  * O corpo do aceite. `existingAccount: true` é "já tenho conta": prova com a
  * senha (e o código, se houver 2FA) e não manda e-mail. Sem ele, é conta nova,
- * e o servidor exige e-mail e a regra da senha antes de olhar o banco.
+ * e o servidor exige e-mail e a regra da senha antes de olhar o banco. A
+ * bandeira não vai ao servidor: ela escolhe a rota (`invitesAPI.accept`).
  */
 export type InviteAcceptPayload =
   | { existingAccount: true; username: string; password: string; totpCode?: string }
@@ -1439,9 +1440,15 @@ export const invitesAPI = {
    * Aceita, com a conta que a pessoa já tem (`existingAccount: true`) ou com
    * uma nova (o padrão, que exige `email`). Devolve a sessão. Ver
    * `inviteAcceptPayload`: a tela monta o corpo por lá.
+   *
+   * O caminho vai na ROTA (`/token/join` para a conta que existe), e não no
+   * corpo: o servidor não deixa um campo do cliente escolher qual prova pedir.
    */
-  accept: (token: string, payload: InviteAcceptPayload) =>
-    apiClient.post<LoginResponse>('/invites/token/accept', { ...payload, token })
+  accept: (token: string, payload: InviteAcceptPayload) => {
+    const { existingAccount, ...corpo } = payload
+    const rota = existingAccount ? '/invites/token/join' : '/invites/token/accept'
+    return apiClient.post<LoginResponse>(rota, { ...corpo, token })
+  }
 }
 
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'suspended' | 'canceled'

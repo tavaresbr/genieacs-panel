@@ -53,11 +53,13 @@ describe('as chamadas que mudam credencial', () => {
     expect(post).toHaveBeenCalledWith('/auth/mfa/enable', { password: 'minha-senha', code: '123456' })
   })
 
-  it('o aceite leva o token no corpo, com a bandeira que a tela escolheu', async () => {
+  it('o aceite leva o token no corpo, e "já tenho conta" vai pela rota da conta existente', async () => {
     const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ success: false })
     await invitesAPI.accept('tok', inviteAcceptPayload('existing', form))
-    expect(post).toHaveBeenCalledWith('/invites/token/accept', {
-      existingAccount: true, username: 'consultor', password: 'senha-antiga', token: 'tok'
+    expect(post).toHaveBeenCalledWith('/invites/token/join', {
+      username: 'consultor', password: 'senha-antiga', token: 'tok'
     })
+    await invitesAPI.accept('tok', inviteAcceptPayload('new', form))
+    expect(post).toHaveBeenLastCalledWith('/invites/token/accept', expect.objectContaining({ token: 'tok', username: 'consultor' }))
   })
 })

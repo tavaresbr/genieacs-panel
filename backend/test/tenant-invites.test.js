@@ -215,16 +215,16 @@ describe('aceitar', () => {
     // ISPs. Ninguém aqui escolhe a senha dele.
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'viewer' });
 
-    const errada = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'chute-errado-1', existingAccount: true }
+    const errada = await callAs(BETA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'chute-errado-1' }
     });
     assert.equal(errada.status, 401, 'sem a senha, não entra');
     // E o convite continua de pé: uma tentativa errada não pode queimá-lo, ou
     // qualquer um com o link derrubaria o convite de quem foi convidado.
     assert.equal((await callAs(BETA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token: token } })).status, 200);
 
-    const certa = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', existingAccount: true }
+    const certa = await callAs(BETA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1' }
     });
     assert.equal(certa.status, 201, JSON.stringify(certa.body));
     assert.equal(Number(certa.body.data.user.tenantId), Number(beta));
@@ -240,9 +240,9 @@ describe('aceitar', () => {
 
   it('a regra da senha nova não se pula por um campo do corpo', async () => {
     const { token } = await convidar(ALFA, alfaAdminToken, { role: 'viewer' });
-    // Bandeiras inventadas não mudam nada: sem `existingAccount: true`, é conta
-    // nova, e a regra vale inteira.
-    const inventadas = { existing: true, accountExists: true, skipPolicy: true };
+    // Bandeiras no corpo não mudam nada: quem escolhe o caminho é a ROTA
+    // (`/token/accept` conta nova, `/token/join` conta que já existe).
+    const inventadas = { existing: true, accountExists: true, existingAccount: true, skipPolicy: true };
     for (const password of ['curta-1', 'password123']) {
       const r = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
         method: 'POST', body: { token, username: 'sem-atalho', password, email: 'sem-atalho@exemplo.test', ...inventadas }
@@ -250,16 +250,16 @@ describe('aceitar', () => {
       assert.equal(r.status, 400, `${password}: ${JSON.stringify(r.body)}`);
       assert.ok(['password_length', 'password_too_common'].includes(r.body.code), JSON.stringify(r.body));
     }
-    // E a bandeira de verdade, numa conta que NÃO existe, não cria conta com
+    // E a rota de verdade, numa conta que NÃO existe, não cria conta com
     // senha fraca: "já tenho conta" só anexa quem prova a senha que já tem.
-    const fingindo = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token, username: 'sem-atalho', password: 'curta-1', email: 'sem-atalho@exemplo.test', existingAccount: true }
+    const fingindo = await callAs(ALFA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token, username: 'sem-atalho', password: 'curta-1', email: 'sem-atalho@exemplo.test' }
     });
     assert.equal(fingindo.status, 401, JSON.stringify(fingindo.body));
     assert.equal(await getDb()('users').where({ username: 'sem-atalho' }).first(), undefined);
     // O teto vale também para quem diz já ter conta, antes de qualquer bcrypt.
-    const gigante = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token, username: 'plantao-novo', password: 'x'.repeat(129), existingAccount: true }
+    const gigante = await callAs(ALFA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token, username: 'plantao-novo', password: 'x'.repeat(129) }
     });
     assert.equal(gigante.status, 400);
     // E o convite segue de pé.
@@ -268,8 +268,8 @@ describe('aceitar', () => {
 
   it('não anexa duas vezes', async () => {
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'admin' });
-    const { status, body } = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', existingAccount: true }
+    const { status, body } = await callAs(BETA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1' }
     });
     assert.equal(status, 409, JSON.stringify(body));
   });
@@ -368,8 +368,8 @@ describe('o aceite não diz quem tem conta', () => {
    * "e-mail inválido" se não existia, quantas vezes se quisesse, e cada 401
    * gastava uma tentativa da trava da vítima.
    */
-  async function sondar(token, username, extra = {}) {
-    return callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+  async function sondar(token, username, extra = {}, rota = 'accept') {
+    return callAs(ALFA, `${panelUrl}/api/invites/token/${rota}`, {
       method: 'POST', body: { token, username, password: 'qualquer-coisa', ...extra }
     });
   }
@@ -404,16 +404,16 @@ describe('o aceite não diz quem tem conta', () => {
 
   it('"já tenho conta": senha errada e conta inexistente respondem byte a byte igual', async () => {
     const { token } = await convidar(ALFA, alfaAdminToken);
-    const existe = await sondar(token, 'dona-do-beta', { existingAccount: true });
-    const naoExiste = await sondar(token, 'ninguem-com-este-nome', { existingAccount: true });
+    const existe = await sondar(token, 'dona-do-beta', {}, 'join');
+    const naoExiste = await sondar(token, 'ninguem-com-este-nome', {}, 'join');
     assert.equal(existe.status, 401, JSON.stringify(existe.body));
     assert.equal(naoExiste.status, 401, JSON.stringify(naoExiste.body));
     assert.equal(existe.raw, naoExiste.raw, 'os corpos têm que ser idênticos');
   });
 
-  it('a bandeira só vale como booleano: "true" em texto é pedido de conta nova', async () => {
+  it('uma bandeira no corpo não leva o aceite de conta nova ao caminho da conta que existe', async () => {
     const { token } = await convidar(ALFA, alfaAdminToken);
-    const r = await sondar(token, 'dona-do-beta', { existingAccount: 'true' });
+    const r = await sondar(token, 'dona-do-beta', { existingAccount: true });
     assert.equal(r.status, 400, JSON.stringify(r.body));
   });
 });
@@ -581,15 +581,15 @@ describe('a linha guardada', () => {
 // URL justamente para não chegar a servidor nenhum.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('por onde o token do convite viaja', () => {
-  it('as duas rotas não têm parâmetro nenhum no caminho', async () => {
+  it('as rotas do token não têm parâmetro nenhum no caminho', async () => {
     const { listRoutes } = await import('./helpers/routeInventory.js');
     const doConvite = listRoutes().filter((r) => r.path.includes('/invites/token'));
 
-    assert.equal(doConvite.length, 2, 'esperava a prévia e o aceite');
+    assert.equal(doConvite.length, 3, 'esperava a prévia e os dois aceites (conta nova e conta existente)');
     for (const rota of doConvite) {
       // Um `:` no caminho é um segredo indo para o log.
       assert.ok(!rota.path.includes(':'), `${rota.path} ainda carrega o token no caminho`);
-      // E as duas são POST, porque é o corpo que carrega o token agora — a
+      // E todas são POST, porque é o corpo que carrega o token agora — a
       // prévia inclusive, apesar de não escrever nada.
       assert.equal(rota.method, 'POST', rota.path);
     }

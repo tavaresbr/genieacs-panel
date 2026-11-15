@@ -183,10 +183,10 @@ class InviteController {
    *
    * Os dois caminhos, e por que os dois têm que existir:
    *
-   * - **Conta nova** (o padrão: `username` + `email` + `password`): a pessoa
+   * - **Conta nova** (`POST /token/accept`: `username` + `email` + `password`): a pessoa
    *   escolhe a própria senha. O administrador que convidou nunca a vê, que é
    *   a diferença inteira entre isto e `POST /api/users`.
-   * - **Com a conta que já tem** (`existingAccount: true` + `username` +
+   * - **Com a conta que já tem** (`POST /token/join`: `username` +
    *   `password`, e `totpCode` se ela usa 2FA): é o consultor que atende dois
    *   ISPs. Ninguém aqui escolhe a senha dele — ele prova quem é com a que já
    *   usa, e é essa prova que a onda 12 exigia e que o endpoint de criação não
@@ -212,10 +212,19 @@ class InviteController {
    *   existe, pelo identificador quem não existe. Daqui não sai nada que o
    *   formulário de entrada já não diga a quem bate nele.
    *
-   * O campo é um booleano estrito: só `true` escolhe o caminho da conta que
-   * existe. Qualquer outra coisa é conta nova, com a regra da senha inteira.
+   * O caminho é escolhido pela ROTA, nunca por um campo do corpo: um valor
+   * que o cliente manda não decide qual prova a requisição precisa dar.
    */
-  static async accept(req, res) {
+  static accept(req, res) {
+    return InviteController.aceitar(req, res, { comContaExistente: false });
+  }
+
+  /** `POST /token/join`: o mesmo aceite, pelo caminho da conta que já existe. */
+  static join(req, res) {
+    return InviteController.aceitar(req, res, { comContaExistente: true });
+  }
+
+  static async aceitar(req, res, { comContaExistente }) {
     try {
       const invite = await InviteController.usableInvite(req);
       if (!invite) return res.status(404).json(createErrorResponse(req.t('invite.notFound')));
@@ -223,7 +232,6 @@ class InviteController {
       const username = String(req.body?.username ?? '').trim();
       const password = String(req.body?.password ?? '');
       const email = User.normalizeEmail(req.body?.email);
-      const comContaExistente = req.body?.existingAccount === true;
       if (username.length < 3 || username.length > 64) {
         return res.status(400).json(createErrorResponse(req.t('auth.usernameLength')));
       }

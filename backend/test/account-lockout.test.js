@@ -377,8 +377,8 @@ describe('o convite', () => {
       method: 'POST', headers: authHeaders(donaToken), body: { role: 'tech' }
     });
     assert.equal(convite.status, 201, JSON.stringify(convite.body));
-    const aceitar = (password) => call(`${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: convite.body.data.token, username: alvo.username, password, existingAccount: true }
+    const aceitar = (password) => call(`${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: convite.body.data.token, username: alvo.username, password }
     });
 
     for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS; i += 1) {
@@ -419,13 +419,13 @@ describe('o convite', () => {
     const inventado = 'ninguem-pelo-convite';
     for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS; i += 1) {
       // eslint-disable-next-line no-await-in-loop
-      const { status } = await call(`${panelUrl}/api/invites/token/accept`, {
-        method: 'POST', body: { token: convite.body.data.token, username: inventado, password: ERRADA, existingAccount: true }
+      const { status } = await call(`${panelUrl}/api/invites/token/join`, {
+        method: 'POST', body: { token: convite.body.data.token, username: inventado, password: ERRADA }
       });
       assert.equal(status, 401);
     }
-    assertTravada(await call(`${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: convite.body.data.token, username: inventado, password: ERRADA, existingAccount: true }
+    assertTravada(await call(`${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: convite.body.data.token, username: inventado, password: ERRADA }
     }));
   });
 });

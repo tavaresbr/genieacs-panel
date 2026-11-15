@@ -231,9 +231,9 @@ describe('entrar com 2FA', () => {
     // código aqui, uma senha vazada entraria pela porta do convite.
     const convite = await post('/api/invites', { role: 'tech' });
     assert.equal(convite.status, 201, JSON.stringify(convite.body));
-    const aceitar = (extra = {}) => call(`${panelUrl}/api/invites/token/accept`, {
+    const aceitar = (extra = {}) => call(`${panelUrl}/api/invites/token/join`, {
       method: 'POST',
-      body: { token: convite.body.data.token, username: USUARIO, password: SENHA, existingAccount: true, ...extra }
+      body: { token: convite.body.data.token, username: USUARIO, password: SENHA, ...extra }
     });
     const semCodigo = await aceitar();
     assert.equal(semCodigo.status, 401, JSON.stringify(semCodigo.body));

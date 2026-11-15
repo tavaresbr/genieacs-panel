@@ -1847,9 +1847,9 @@ class AuthController {
       // falha nele fica no log — a resposta já era a mesma de qualquer jeito.
       responder();
       void AuthController.registrarEEnviarRedefinicao(req, user, tenantDoPedido, email)
-        // Só o código do erro: o que falhou aqui pode trazer a mensagem que ia
-        // sair, e ela leva o link de redefinição.
-        .catch((error) => console.error('Password reset delivery error:', error?.code || error?.name || 'unknown'));
+        // Nada do erro vai ao log: o que falhou aqui pode trazer a mensagem que
+        // ia sair, e ela leva o link de redefinição.
+        .catch(() => console.error('Password reset delivery failed'));
       return undefined;
     } catch (error) {
       // Até o erro responde igual. Um 500 que só acontece para identificador
