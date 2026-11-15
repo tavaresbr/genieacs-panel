@@ -15,7 +15,7 @@ const asList = (text: string) => text.split('\n').map((word) => word.trim()).fil
  * e o que o painel responde a ele. Fica ao lado da configuração do WhatsApp
  * porque vale para todos os números, por QR e oficiais.
  */
-export function MarketingOptOutPanel() {
+export function MarketingOptOutPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation()
   const toast = useToast()
   const [config, setConfig] = useState<WhatsAppMarketingOptOutConfig | null>(null)
@@ -70,7 +70,7 @@ export function MarketingOptOutPanel() {
   }
 
   return (
-    <div className="modern-card mt-6 max-w-3xl p-5 sm:p-6" data-testid="marketing-opt-out-panel">
+    <div className={embedded ? 'max-w-3xl' : 'modern-card mt-6 max-w-3xl p-5 sm:p-6'} data-testid="marketing-opt-out-panel">
       <p className="page-kicker">{t('settings.marketingOptOut.kicker')}</p>
       <h2 className="section-heading">{t('settings.marketingOptOut.title')}</h2>
       <p className="section-description mb-6">{t('settings.marketingOptOut.description')}</p>

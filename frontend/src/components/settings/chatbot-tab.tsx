@@ -9,6 +9,7 @@ import { TagsManager } from '@/components/whatsapp/tags'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SalesPlansPanel } from '@/components/settings/sales-plans-panel'
 import { AiKnowledgePanel } from '@/components/settings/ai-knowledge-panel'
+import { SectionTabs, type SectionTab } from '@/components/settings/section-tabs'
 
 const AI_INSTRUCTIONS_MAX = 4000
 const PERSONA_MAX = 200
@@ -67,6 +68,7 @@ export function ChatbotTab() {
   const toast = useToast()
   const [config, setConfig] = useState<BotConfig | null>(null)
   const [saving, setSaving] = useState(false)
+  const [section, setSection] = useState('general')
   const [tagOptions, setTagOptions] = useState<WhatsAppTag[]>([])
   // A chave digitada (vazia = manter a salva) e o pedido de apagar a salva.
   const [aiKey, setAiKey] = useState('')
@@ -245,406 +247,472 @@ export function ChatbotTab() {
     }
   }
 
+  const tabs: SectionTab[] = [
+    {
+      id: 'general',
+      label: t('settings.integrations.tabs.general'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('settings.chatbot.title')}</h2>
+            <p className="field-hint mt-1">{t('settings.chatbot.description')}</p>
+            <div className="mt-4 grid gap-4">
+              <Caixa
+                checked={config.enabled}
+                onChange={(value) => patch({ enabled: value })}
+                title={t('settings.whatsapp.botEnabled')}
+                hint={t('settings.whatsapp.botEnabledHint')}
+              />
+              <Caixa
+                checked={config.unlockEnabled}
+                disabled={!config.enabled}
+                onChange={(value) => patch({ unlockEnabled: value })}
+                title={t('settings.whatsapp.botUnlockEnabled')}
+                hint={t('settings.whatsapp.botUnlockEnabledHint')}
+              />
+            </div>
+          </section>
+        </div>
+      )
+    },
+    {
+      id: 'ai',
+      label: t('settings.integrations.tabs.ai'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('settings.chatbot.aiTitle')}</h2>
+            <p className="field-hint mt-1">{t('settings.chatbot.aiIntro')}</p>
+            <div className="mt-4 grid gap-4">
+              <Caixa
+                checked={config.ai.enabled}
+                disabled={!config.enabled}
+                onChange={(value) => patchAi({ enabled: value })}
+                title={t('settings.chatbot.aiEnabled')}
+                hint={t('settings.chatbot.aiEnabledHint')}
+              />
+              <Caixa
+                checked={config.ai.suggest}
+                onChange={(value) => patchAi({ suggest: value })}
+                title={t('settings.chatbot.aiSuggest')}
+                hint={t('settings.chatbot.aiSuggestHint')}
+              />
+              <Caixa
+                checked={config.ai.sales}
+                disabled={!config.ai.enabled}
+                onChange={(value) => patchAi({ sales: value })}
+                title={t('settings.chatbot.aiSales')}
+                hint={t('settings.chatbot.aiSalesHint')}
+              />
+              <Caixa
+                checked={config.ai.classify}
+                disabled={!config.ai.enabled}
+                onChange={(value) => patchAi({ classify: value })}
+                title={t('settings.chatbot.aiClassify')}
+                hint={t('settings.chatbot.aiClassifyHint')}
+              />
+              {config.ai.provider === 'anthropic' && (
+                <Caixa
+                  checked={config.ai.vision}
+                  onChange={(value) => patchAi({ vision: value })}
+                  title={t('settings.chatbot.aiVision')}
+                  hint={t('settings.chatbot.aiVisionHint')}
+                />
+              )}
+              <div>
+                <label htmlFor="bot-ai-provider" className="field-label">{t('settings.chatbot.aiProvider')}</label>
+                <select
+                  id="bot-ai-provider"
+                  className="modern-input w-full"
+                  value={config.ai.provider}
+                  onChange={(event) => {
+                    const provider = event.target.value as BotAiProvider
+                    patchAi({ provider, ...BOT_AI_PROVIDERS[provider] })
+                  }}
+                >
+                  <option value="openai-compatible">{t('settings.chatbot.aiProviderOpenai')}</option>
+                  <option value="anthropic">{t('settings.chatbot.aiProviderAnthropic')}</option>
+                </select>
+                <p className="field-hint">{t('settings.chatbot.aiProviderHint')}</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="bot-ai-url" className="field-label">{t('settings.chatbot.aiBaseUrl')}</label>
+                  <input
+                    id="bot-ai-url"
+                    className="modern-input w-full"
+                    value={config.ai.baseUrl}
+                    onChange={(event) => patchAi({ baseUrl: event.target.value })}
+                  />
+                  <p className="field-hint">
+                    {config.ai.provider === 'anthropic'
+                      ? t('settings.chatbot.aiBaseUrlHintAnthropic')
+                      : t('settings.chatbot.aiBaseUrlHint')}
+                  </p>
+                  {creditsUrl && (
+                    <a
+                      href={creditsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-block text-sm underline"
+                    >
+                      {t('settings.chatbot.aiBuyCredits')} ↗
+                    </a>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor="bot-ai-model" className="field-label">{t('settings.chatbot.aiModel')}</label>
+                  <input
+                    id="bot-ai-model"
+                    className="modern-input w-full"
+                    maxLength={64}
+                    value={config.ai.model}
+                    onChange={(event) => patchAi({ model: event.target.value })}
+                  />
+                  <p className="field-hint">
+                    {config.ai.provider === 'anthropic'
+                      ? t('settings.chatbot.aiModelHintAnthropic')
+                      : t('settings.chatbot.aiModelHint')}
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="bot-ai-fast-model" className="field-label">{t('settings.chatbot.aiFastModel')}</label>
+                  <input
+                    id="bot-ai-fast-model"
+                    className="modern-input w-full"
+                    maxLength={64}
+                    value={config.ai.fastModel}
+                    onChange={(event) => patchAi({ fastModel: event.target.value })}
+                  />
+                  <p className="field-hint">{t('settings.chatbot.aiFastModelHint')}</p>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="bot-ai-key" className="field-label">{t('settings.chatbot.aiKey')}</label>
+                {config.ai.hasApiKey && !aiKeyRemove && (
+                  <p className="mb-1 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="modern-badge-success">{t('settings.chatbot.aiKeySaved')}</span>
+                    {config.ai.keyHint && (
+                      <span className="font-mono text-xs text-muted-foreground">{t('settings.chatbot.aiKeyEnds', { hint: config.ai.keyHint })}</span>
+                    )}
+                    <button type="button" className="min-h-10 text-sm underline sm:min-h-0" onClick={() => setAiKeyRemove(true)}>
+                      {t('settings.chatbot.aiKeyRemove')}
+                    </button>
+                  </p>
+                )}
+                {aiKeyRemove && (
+                  <p className="mb-1 text-sm text-[hsl(var(--status-warning))]">{t('settings.chatbot.aiKeyWillRemove')}</p>
+                )}
+                <input
+                  id="bot-ai-key"
+                  // Texto mascarado e não `password`: num campo de senha o Chrome
+                  // ignora o autocomplete e preenche a senha do painel, que aí era
+                  // gravada como chave da IA.
+                  type="text"
+                  name="ai-api-key"
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  data-1p-ignore=""
+                  data-lpignore="true"
+                  className="modern-input w-full font-mono [-webkit-text-security:disc]"
+                  value={aiKey}
+                  placeholder={config.ai.hasApiKey ? t('settings.chatbot.aiKeyReplace') : t('settings.chatbot.aiKeyPlaceholder')}
+                  onChange={(event) => { const v = event.target.value.trim(); setAiKey(v); if (v) setAiKeyRemove(false) }}
+                />
+              </div>
+              {config.ai.provider === 'anthropic' && (
+                <div>
+                  <label htmlFor="bot-ai-workspace" className="field-label">{t('settings.chatbot.aiWorkspaceId')}</label>
+                  <input
+                    id="bot-ai-workspace"
+                    className="modern-input w-full font-mono text-sm"
+                    maxLength={100}
+                    autoComplete="off"
+                    value={config.ai.workspaceId}
+                    onChange={(event) => patchAi({ workspaceId: event.target.value })}
+                  />
+                  <p className="field-hint">{t('settings.chatbot.aiWorkspaceIdHint')}</p>
+                </div>
+              )}
+              <div>
+                <label htmlFor="bot-ai-persona" className="field-label">{t('settings.chatbot.aiPersona')}</label>
+                <input
+                  id="bot-ai-persona"
+                  className="modern-input w-full text-sm"
+                  maxLength={PERSONA_MAX}
+                  value={config.ai.persona}
+                  placeholder={t('settings.chatbot.aiPersonaPlaceholder')}
+                  onChange={(event) => patchAi({ persona: event.target.value })}
+                />
+                <p className="field-hint">{t('settings.chatbot.aiPersonaHint')}</p>
+              </div>
+              <div>
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="bot-ai-instructions" className="field-label mb-0">{t('settings.chatbot.aiInstructions')}</label>
+                  <span className="text-xs tabular-nums text-muted-foreground">{config.ai.instructions.length}/{AI_INSTRUCTIONS_MAX}</span>
+                </div>
+                <textarea
+                  id="bot-ai-instructions"
+                  className="modern-input w-full text-sm"
+                  rows={6}
+                  maxLength={AI_INSTRUCTIONS_MAX}
+                  value={config.ai.instructions}
+                  placeholder={t('settings.chatbot.aiInstructionsPlaceholder')}
+                  onChange={(event) => patchAi({ instructions: event.target.value })}
+                />
+                <p className="field-hint">{t('settings.chatbot.aiInstructionsHint')}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="modern-button-secondary"
+                  disabled={aiTesting || (!config.ai.hasApiKey && !aiKey.trim())}
+                  onClick={() => void testarIa()}
+                >
+                  {aiTesting ? t('common.loading') : t('settings.chatbot.aiTest')}
+                </button>
+                {config.ai.lastError && (
+                  <span className="min-w-0 text-sm text-[hsl(var(--status-danger))] wrap-anywhere">
+                    {t('settings.chatbot.aiLastError', {
+                      when: formatDateTime(config.ai.lastError.at),
+                      reason: config.ai.lastError.detail
+                        ? `${whatsappErrorMessage(t, config.ai.lastError.code)} (${config.ai.lastError.detail})`
+                        : whatsappErrorMessage(t, config.ai.lastError.code)
+                    })}
+                  </span>
+                )}
+              </div>
+              <p className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm text-muted-foreground">
+                {t('settings.chatbot.aiPrivacy')}
+              </p>
+            </div>
+          </section>
+
+          <SalesPlansPanel />
+
+          <AiKnowledgePanel />
+        </div>
+      )
+    },
+    {
+      id: 'menu',
+      label: t('settings.integrations.tabs.menu'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('settings.chatbot.optionsTitle')}</h2>
+            <p className="field-hint mt-1">{t('settings.chatbot.optionsHint')}</p>
+            <div className="mt-4 grid gap-6 md:grid-cols-2">
+              <div className="grid content-start gap-4">
+                <Caixa checked={config.options.invoice} onChange={(v) => setOption('invoice', v)} title={t('settings.chatbot.option.invoice')} />
+                <Caixa checked={config.options.signal} onChange={(v) => setOption('signal', v)} title={t('settings.chatbot.option.signal')} />
+                <Caixa
+                  checked={config.options.human}
+                  onChange={(v) => setOption('human', v)}
+                  title={t('settings.chatbot.option.human')}
+                  hint={t('settings.chatbot.option.humanHint')}
+                />
+                <Caixa
+                  checked={config.options.document}
+                  onChange={(v) => setOption('document', v)}
+                  title={t('settings.chatbot.option.document')}
+                  hint={t('settings.chatbot.option.documentHint')}
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-sm font-medium">{t('settings.chatbot.preview')}</p>
+                <pre className="whitespace-pre-wrap wrap-anywhere rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm leading-6">
+                  {preview}
+                </pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      )
+    },
+    {
+      id: 'messages',
+      label: t('settings.integrations.tabs.messages'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('settings.chatbot.messagesTitle')}</h2>
+            <p className="field-hint mt-1">{t('settings.chatbot.messagesHint')}</p>
+            <div className="mt-3">
+              <button type="button" className="modern-button-secondary" onClick={preencherComSugestoes}>
+                {t('settings.chatbot.fillSuggestions')}
+              </button>
+              <p className="field-hint mt-1">{t('settings.chatbot.fillSuggestionsHint')}</p>
+            </div>
+            <div className="mt-4 grid gap-5">
+              {MESSAGE_KEYS.map((key) => campoDeTexto(key))}
+            </div>
+          </section>
+        </div>
+      )
+    },
+    {
+      id: 'tags',
+      label: t('settings.integrations.tabs.tags'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('whatsapp.tags.manageTitle')}</h2>
+            <p className="field-hint mt-1">{t('whatsapp.tags.manageHint')}</p>
+            <div className="mt-4"><TagsManager /></div>
+            <div className="mt-6 grid gap-4 border-t border-border pt-5">
+              <Caixa
+                checked={config.autoTags.enabled}
+                onChange={(value) => patch({ autoTags: { ...config.autoTags, enabled: value } })}
+                title={t('settings.chatbot.autoTagsEnabled')}
+                hint={t('settings.chatbot.autoTagsHint')}
+              />
+              {([
+                ['invoice', 'settings.chatbot.autoTagsInvoice'],
+                ['signal', 'settings.chatbot.autoTagsSignal']
+              ] as const).map(([grupo, rotulo]) => (
+                <label key={grupo} className="grid max-w-md gap-1 text-sm">
+                  <span className="font-medium">{t(rotulo)}</span>
+                  <select
+                    className="modern-input"
+                    disabled={!config.autoTags.enabled}
+                    value={config.autoTags[grupo] ?? ''}
+                    onChange={(event) => patch({
+                      autoTags: { ...config.autoTags, [grupo]: event.target.value ? Number(event.target.value) : null }
+                    })}
+                  >
+                    <option value="">{t('settings.chatbot.autoTagsNone')}</option>
+                    {tagOptions.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                  </select>
+                </label>
+              ))}
+            </div>
+          </section>
+        </div>
+      )
+    },
+    {
+      id: 'distribution',
+      label: t('settings.integrations.tabs.distribution'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('settings.chatbot.distributionTitle')}</h2>
+            <p className="field-hint mt-1">{t('settings.chatbot.distributionHint')}</p>
+            <div className="mt-4">
+              <Caixa
+                checked={config.distribution.enabled}
+                onChange={(value) => patch({ distribution: { ...config.distribution, enabled: value } })}
+                title={t('settings.chatbot.distributionEnabled')}
+                hint={t('settings.chatbot.distributionEnabledHint')}
+              />
+            </div>
+          </section>
+        </div>
+      )
+    },
+    {
+      id: 'survey',
+      label: t('settings.integrations.tabs.survey'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('settings.chatbot.surveyTitle')}</h2>
+            <p className="field-hint mt-1">{t('settings.chatbot.surveyHint')}</p>
+            <div className="mt-4 grid gap-5">
+              <Caixa
+                checked={config.satisfaction.enabled}
+                onChange={(value) => patch({ satisfaction: { ...config.satisfaction, enabled: value } })}
+                title={t('settings.chatbot.surveyEnabled')}
+                hint={t('settings.chatbot.surveyEnabledHint')}
+              />
+              {SURVEY_KEYS.map((key) => campoDeTexto(key, !config.satisfaction.enabled))}
+            </div>
+          </section>
+        </div>
+      )
+    },
+    {
+      id: 'hours',
+      label: t('settings.integrations.tabs.hours'),
+      content: (
+        <div className="grid gap-6">
+          <section className="modern-card p-5 sm:p-6">
+            <h2 className="section-heading">{t('settings.chatbot.hoursTitle')}</h2>
+            <p className="field-hint mt-1">{t('settings.chatbot.hoursHint')}</p>
+            <div className="mt-4 grid gap-4">
+              <Caixa
+                checked={config.hours.enabled}
+                onChange={(value) => patch({ hours: { ...config.hours, enabled: value } })}
+                title={t('settings.chatbot.hoursEnabled')}
+              />
+              <div className="max-w-xs">
+                <label htmlFor="bot-timezone" className="mb-1 block text-sm font-medium">{t('settings.chatbot.timezone')}</label>
+                <select
+                  id="bot-timezone"
+                  className="modern-input w-full"
+                  value={config.hours.timezone}
+                  disabled={!config.hours.enabled}
+                  onChange={(event) => patch({ hours: { ...config.hours, timezone: event.target.value } })}
+                >
+                  {timezones.map((tz) => <option key={tz} value={tz}>{tz.replace('America/', '').replace('_', ' ')}</option>)}
+                </select>
+              </div>
+              <div className="grid gap-2">
+                {DAY_ORDER.map((day) => {
+                  const regra = config.hours.week.find((d) => d.day === day)
+                  if (!regra) return null
+                  const inativo = !config.hours.enabled || regra.closed
+                  return (
+                    // No celular: dia e "Fechado" numa linha, abre — fecha na de baixo.
+                    <div key={day} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:flex sm:flex-wrap sm:gap-3">
+                      <span className="col-span-2 text-sm capitalize sm:w-32">{dayName(day)}</span>
+                      <label className="flex min-h-10 items-center gap-2 justify-self-end text-sm sm:min-h-0">
+                        <input
+                          type="checkbox"
+                          checked={regra.closed}
+                          disabled={!config.hours.enabled}
+                          onChange={(event) => setDay(day, { closed: event.target.checked })}
+                        />
+                        {t('settings.chatbot.closed')}
+                      </label>
+                      <input
+                        type="time"
+                        aria-label={`${dayName(day)} — ${t('settings.chatbot.opens')}`}
+                        className="modern-input w-full sm:w-32"
+                        value={regra.open}
+                        disabled={inativo}
+                        onChange={(event) => setDay(day, { open: event.target.value })}
+                      />
+                      <span className="text-sm text-muted-foreground">—</span>
+                      <input
+                        type="time"
+                        aria-label={`${dayName(day)} — ${t('settings.chatbot.closes')}`}
+                        className="modern-input w-full sm:w-32"
+                        value={regra.close}
+                        disabled={inativo}
+                        onChange={(event) => setDay(day, { close: event.target.value })}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+        </div>
+      )
+    }
+  ]
+
   return (
     <div className="grid max-w-4xl gap-6">
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('settings.chatbot.title')}</h2>
-        <p className="field-hint mt-1">{t('settings.chatbot.description')}</p>
-        <div className="mt-4 grid gap-4">
-          <Caixa
-            checked={config.enabled}
-            onChange={(value) => patch({ enabled: value })}
-            title={t('settings.whatsapp.botEnabled')}
-            hint={t('settings.whatsapp.botEnabledHint')}
-          />
-          <Caixa
-            checked={config.unlockEnabled}
-            disabled={!config.enabled}
-            onChange={(value) => patch({ unlockEnabled: value })}
-            title={t('settings.whatsapp.botUnlockEnabled')}
-            hint={t('settings.whatsapp.botUnlockEnabledHint')}
-          />
-        </div>
-      </section>
-
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('settings.chatbot.aiTitle')}</h2>
-        <p className="field-hint mt-1">{t('settings.chatbot.aiIntro')}</p>
-        <div className="mt-4 grid gap-4">
-          <Caixa
-            checked={config.ai.enabled}
-            disabled={!config.enabled}
-            onChange={(value) => patchAi({ enabled: value })}
-            title={t('settings.chatbot.aiEnabled')}
-            hint={t('settings.chatbot.aiEnabledHint')}
-          />
-          <Caixa
-            checked={config.ai.suggest}
-            onChange={(value) => patchAi({ suggest: value })}
-            title={t('settings.chatbot.aiSuggest')}
-            hint={t('settings.chatbot.aiSuggestHint')}
-          />
-          <Caixa
-            checked={config.ai.sales}
-            disabled={!config.ai.enabled}
-            onChange={(value) => patchAi({ sales: value })}
-            title={t('settings.chatbot.aiSales')}
-            hint={t('settings.chatbot.aiSalesHint')}
-          />
-          <Caixa
-            checked={config.ai.classify}
-            disabled={!config.ai.enabled}
-            onChange={(value) => patchAi({ classify: value })}
-            title={t('settings.chatbot.aiClassify')}
-            hint={t('settings.chatbot.aiClassifyHint')}
-          />
-          {config.ai.provider === 'anthropic' && (
-            <Caixa
-              checked={config.ai.vision}
-              onChange={(value) => patchAi({ vision: value })}
-              title={t('settings.chatbot.aiVision')}
-              hint={t('settings.chatbot.aiVisionHint')}
-            />
-          )}
-          <div>
-            <label htmlFor="bot-ai-provider" className="field-label">{t('settings.chatbot.aiProvider')}</label>
-            <select
-              id="bot-ai-provider"
-              className="modern-input w-full"
-              value={config.ai.provider}
-              onChange={(event) => {
-                const provider = event.target.value as BotAiProvider
-                patchAi({ provider, ...BOT_AI_PROVIDERS[provider] })
-              }}
-            >
-              <option value="openai-compatible">{t('settings.chatbot.aiProviderOpenai')}</option>
-              <option value="anthropic">{t('settings.chatbot.aiProviderAnthropic')}</option>
-            </select>
-            <p className="field-hint">{t('settings.chatbot.aiProviderHint')}</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label htmlFor="bot-ai-url" className="field-label">{t('settings.chatbot.aiBaseUrl')}</label>
-              <input
-                id="bot-ai-url"
-                className="modern-input w-full"
-                value={config.ai.baseUrl}
-                onChange={(event) => patchAi({ baseUrl: event.target.value })}
-              />
-              <p className="field-hint">
-                {config.ai.provider === 'anthropic'
-                  ? t('settings.chatbot.aiBaseUrlHintAnthropic')
-                  : t('settings.chatbot.aiBaseUrlHint')}
-              </p>
-              {creditsUrl && (
-                <a
-                  href={creditsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 inline-block text-sm underline"
-                >
-                  {t('settings.chatbot.aiBuyCredits')} ↗
-                </a>
-              )}
-            </div>
-            <div>
-              <label htmlFor="bot-ai-model" className="field-label">{t('settings.chatbot.aiModel')}</label>
-              <input
-                id="bot-ai-model"
-                className="modern-input w-full"
-                maxLength={64}
-                value={config.ai.model}
-                onChange={(event) => patchAi({ model: event.target.value })}
-              />
-              <p className="field-hint">
-                {config.ai.provider === 'anthropic'
-                  ? t('settings.chatbot.aiModelHintAnthropic')
-                  : t('settings.chatbot.aiModelHint')}
-              </p>
-            </div>
-            <div>
-              <label htmlFor="bot-ai-fast-model" className="field-label">{t('settings.chatbot.aiFastModel')}</label>
-              <input
-                id="bot-ai-fast-model"
-                className="modern-input w-full"
-                maxLength={64}
-                value={config.ai.fastModel}
-                onChange={(event) => patchAi({ fastModel: event.target.value })}
-              />
-              <p className="field-hint">{t('settings.chatbot.aiFastModelHint')}</p>
-            </div>
-          </div>
-          <div>
-            <label htmlFor="bot-ai-key" className="field-label">{t('settings.chatbot.aiKey')}</label>
-            {config.ai.hasApiKey && !aiKeyRemove && (
-              <p className="mb-1 flex flex-wrap items-center gap-2 text-sm">
-                <span className="modern-badge-success">{t('settings.chatbot.aiKeySaved')}</span>
-                {config.ai.keyHint && (
-                  <span className="font-mono text-xs text-muted-foreground">{t('settings.chatbot.aiKeyEnds', { hint: config.ai.keyHint })}</span>
-                )}
-                <button type="button" className="min-h-10 text-sm underline sm:min-h-0" onClick={() => setAiKeyRemove(true)}>
-                  {t('settings.chatbot.aiKeyRemove')}
-                </button>
-              </p>
-            )}
-            {aiKeyRemove && (
-              <p className="mb-1 text-sm text-[hsl(var(--status-warning))]">{t('settings.chatbot.aiKeyWillRemove')}</p>
-            )}
-            <input
-              id="bot-ai-key"
-              // Texto mascarado e não `password`: num campo de senha o Chrome
-              // ignora o autocomplete e preenche a senha do painel, que aí era
-              // gravada como chave da IA.
-              type="text"
-              name="ai-api-key"
-              autoComplete="new-password"
-              spellCheck={false}
-              data-1p-ignore=""
-              data-lpignore="true"
-              className="modern-input w-full font-mono [-webkit-text-security:disc]"
-              value={aiKey}
-              placeholder={config.ai.hasApiKey ? t('settings.chatbot.aiKeyReplace') : t('settings.chatbot.aiKeyPlaceholder')}
-              onChange={(event) => { const v = event.target.value.trim(); setAiKey(v); if (v) setAiKeyRemove(false) }}
-            />
-          </div>
-          {config.ai.provider === 'anthropic' && (
-            <div>
-              <label htmlFor="bot-ai-workspace" className="field-label">{t('settings.chatbot.aiWorkspaceId')}</label>
-              <input
-                id="bot-ai-workspace"
-                className="modern-input w-full font-mono text-sm"
-                maxLength={100}
-                autoComplete="off"
-                value={config.ai.workspaceId}
-                onChange={(event) => patchAi({ workspaceId: event.target.value })}
-              />
-              <p className="field-hint">{t('settings.chatbot.aiWorkspaceIdHint')}</p>
-            </div>
-          )}
-          <div>
-            <label htmlFor="bot-ai-persona" className="field-label">{t('settings.chatbot.aiPersona')}</label>
-            <input
-              id="bot-ai-persona"
-              className="modern-input w-full text-sm"
-              maxLength={PERSONA_MAX}
-              value={config.ai.persona}
-              placeholder={t('settings.chatbot.aiPersonaPlaceholder')}
-              onChange={(event) => patchAi({ persona: event.target.value })}
-            />
-            <p className="field-hint">{t('settings.chatbot.aiPersonaHint')}</p>
-          </div>
-          <div>
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="bot-ai-instructions" className="field-label mb-0">{t('settings.chatbot.aiInstructions')}</label>
-              <span className="text-xs tabular-nums text-muted-foreground">{config.ai.instructions.length}/{AI_INSTRUCTIONS_MAX}</span>
-            </div>
-            <textarea
-              id="bot-ai-instructions"
-              className="modern-input w-full text-sm"
-              rows={6}
-              maxLength={AI_INSTRUCTIONS_MAX}
-              value={config.ai.instructions}
-              placeholder={t('settings.chatbot.aiInstructionsPlaceholder')}
-              onChange={(event) => patchAi({ instructions: event.target.value })}
-            />
-            <p className="field-hint">{t('settings.chatbot.aiInstructionsHint')}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className="modern-button-secondary"
-              disabled={aiTesting || (!config.ai.hasApiKey && !aiKey.trim())}
-              onClick={() => void testarIa()}
-            >
-              {aiTesting ? t('common.loading') : t('settings.chatbot.aiTest')}
-            </button>
-            {config.ai.lastError && (
-              <span className="min-w-0 text-sm text-[hsl(var(--status-danger))] wrap-anywhere">
-                {t('settings.chatbot.aiLastError', {
-                  when: formatDateTime(config.ai.lastError.at),
-                  reason: config.ai.lastError.detail
-                    ? `${whatsappErrorMessage(t, config.ai.lastError.code)} (${config.ai.lastError.detail})`
-                    : whatsappErrorMessage(t, config.ai.lastError.code)
-                })}
-              </span>
-            )}
-          </div>
-          <p className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm text-muted-foreground">
-            {t('settings.chatbot.aiPrivacy')}
-          </p>
-        </div>
-      </section>
-
-      <SalesPlansPanel />
-
-      <AiKnowledgePanel />
-
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('settings.chatbot.optionsTitle')}</h2>
-        <p className="field-hint mt-1">{t('settings.chatbot.optionsHint')}</p>
-        <div className="mt-4 grid gap-6 md:grid-cols-2">
-          <div className="grid content-start gap-4">
-            <Caixa checked={config.options.invoice} onChange={(v) => setOption('invoice', v)} title={t('settings.chatbot.option.invoice')} />
-            <Caixa checked={config.options.signal} onChange={(v) => setOption('signal', v)} title={t('settings.chatbot.option.signal')} />
-            <Caixa
-              checked={config.options.human}
-              onChange={(v) => setOption('human', v)}
-              title={t('settings.chatbot.option.human')}
-              hint={t('settings.chatbot.option.humanHint')}
-            />
-            <Caixa
-              checked={config.options.document}
-              onChange={(v) => setOption('document', v)}
-              title={t('settings.chatbot.option.document')}
-              hint={t('settings.chatbot.option.documentHint')}
-            />
-          </div>
-          <div>
-            <p className="mb-1 text-sm font-medium">{t('settings.chatbot.preview')}</p>
-            <pre className="whitespace-pre-wrap wrap-anywhere rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm leading-6">
-              {preview}
-            </pre>
-          </div>
-        </div>
-      </section>
-
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('settings.chatbot.messagesTitle')}</h2>
-        <p className="field-hint mt-1">{t('settings.chatbot.messagesHint')}</p>
-        <div className="mt-3">
-          <button type="button" className="modern-button-secondary" onClick={preencherComSugestoes}>
-            {t('settings.chatbot.fillSuggestions')}
-          </button>
-          <p className="field-hint mt-1">{t('settings.chatbot.fillSuggestionsHint')}</p>
-        </div>
-        <div className="mt-4 grid gap-5">
-          {MESSAGE_KEYS.map((key) => campoDeTexto(key))}
-        </div>
-      </section>
-
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('whatsapp.tags.manageTitle')}</h2>
-        <p className="field-hint mt-1">{t('whatsapp.tags.manageHint')}</p>
-        <div className="mt-4"><TagsManager /></div>
-        <div className="mt-6 grid gap-4 border-t border-border pt-5">
-          <Caixa
-            checked={config.autoTags.enabled}
-            onChange={(value) => patch({ autoTags: { ...config.autoTags, enabled: value } })}
-            title={t('settings.chatbot.autoTagsEnabled')}
-            hint={t('settings.chatbot.autoTagsHint')}
-          />
-          {([
-            ['invoice', 'settings.chatbot.autoTagsInvoice'],
-            ['signal', 'settings.chatbot.autoTagsSignal']
-          ] as const).map(([grupo, rotulo]) => (
-            <label key={grupo} className="grid max-w-md gap-1 text-sm">
-              <span className="font-medium">{t(rotulo)}</span>
-              <select
-                className="modern-input"
-                disabled={!config.autoTags.enabled}
-                value={config.autoTags[grupo] ?? ''}
-                onChange={(event) => patch({
-                  autoTags: { ...config.autoTags, [grupo]: event.target.value ? Number(event.target.value) : null }
-                })}
-              >
-                <option value="">{t('settings.chatbot.autoTagsNone')}</option>
-                {tagOptions.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-              </select>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('settings.chatbot.distributionTitle')}</h2>
-        <p className="field-hint mt-1">{t('settings.chatbot.distributionHint')}</p>
-        <div className="mt-4">
-          <Caixa
-            checked={config.distribution.enabled}
-            onChange={(value) => patch({ distribution: { ...config.distribution, enabled: value } })}
-            title={t('settings.chatbot.distributionEnabled')}
-            hint={t('settings.chatbot.distributionEnabledHint')}
-          />
-        </div>
-      </section>
-
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('settings.chatbot.surveyTitle')}</h2>
-        <p className="field-hint mt-1">{t('settings.chatbot.surveyHint')}</p>
-        <div className="mt-4 grid gap-5">
-          <Caixa
-            checked={config.satisfaction.enabled}
-            onChange={(value) => patch({ satisfaction: { ...config.satisfaction, enabled: value } })}
-            title={t('settings.chatbot.surveyEnabled')}
-            hint={t('settings.chatbot.surveyEnabledHint')}
-          />
-          {SURVEY_KEYS.map((key) => campoDeTexto(key, !config.satisfaction.enabled))}
-        </div>
-      </section>
-
-      <section className="modern-card p-5 sm:p-6">
-        <h2 className="section-heading">{t('settings.chatbot.hoursTitle')}</h2>
-        <p className="field-hint mt-1">{t('settings.chatbot.hoursHint')}</p>
-        <div className="mt-4 grid gap-4">
-          <Caixa
-            checked={config.hours.enabled}
-            onChange={(value) => patch({ hours: { ...config.hours, enabled: value } })}
-            title={t('settings.chatbot.hoursEnabled')}
-          />
-          <div className="max-w-xs">
-            <label htmlFor="bot-timezone" className="mb-1 block text-sm font-medium">{t('settings.chatbot.timezone')}</label>
-            <select
-              id="bot-timezone"
-              className="modern-input w-full"
-              value={config.hours.timezone}
-              disabled={!config.hours.enabled}
-              onChange={(event) => patch({ hours: { ...config.hours, timezone: event.target.value } })}
-            >
-              {timezones.map((tz) => <option key={tz} value={tz}>{tz.replace('America/', '').replace('_', ' ')}</option>)}
-            </select>
-          </div>
-          <div className="grid gap-2">
-            {DAY_ORDER.map((day) => {
-              const regra = config.hours.week.find((d) => d.day === day)
-              if (!regra) return null
-              const inativo = !config.hours.enabled || regra.closed
-              return (
-                // No celular: dia e "Fechado" numa linha, abre — fecha na de baixo.
-                <div key={day} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 sm:flex sm:flex-wrap sm:gap-3">
-                  <span className="col-span-2 text-sm capitalize sm:w-32">{dayName(day)}</span>
-                  <label className="flex min-h-10 items-center gap-2 justify-self-end text-sm sm:min-h-0">
-                    <input
-                      type="checkbox"
-                      checked={regra.closed}
-                      disabled={!config.hours.enabled}
-                      onChange={(event) => setDay(day, { closed: event.target.checked })}
-                    />
-                    {t('settings.chatbot.closed')}
-                  </label>
-                  <input
-                    type="time"
-                    aria-label={`${dayName(day)} — ${t('settings.chatbot.opens')}`}
-                    className="modern-input w-full sm:w-32"
-                    value={regra.open}
-                    disabled={inativo}
-                    onChange={(event) => setDay(day, { open: event.target.value })}
-                  />
-                  <span className="text-sm text-muted-foreground">—</span>
-                  <input
-                    type="time"
-                    aria-label={`${dayName(day)} — ${t('settings.chatbot.closes')}`}
-                    className="modern-input w-full sm:w-32"
-                    value={regra.close}
-                    disabled={inativo}
-                    onChange={(event) => setDay(day, { close: event.target.value })}
-                  />
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
+      <SectionTabs
+        tabs={tabs}
+        active={section}
+        onChange={setSection}
+        ariaLabel={t('settings.integrations.tabs.chatbotAria')}
+        idPrefix="chatbot"
+      />
       <div>
         <button type="button" className="modern-button" disabled={saving} onClick={() => void salvar()}>
           {saving ? t('common.saving') : t('common.save')}
