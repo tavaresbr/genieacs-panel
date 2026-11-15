@@ -191,7 +191,10 @@ class WhatsAppController {
     try {
       return res.json(createResponse(
         req.t('whatsapp.configLoaded'),
-        await WhatsAppConfigService.getPublicConfig()
+        await WhatsAppConfigService.getPublicConfig({
+          // A mesma regra da escrita, logo abaixo.
+          allowServerFields: !req.user?.impersonation && await PlatformAdmin.has(req.user?.userId)
+        })
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');

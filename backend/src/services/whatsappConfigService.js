@@ -254,9 +254,12 @@ class WhatsAppConfigService {
   }
 
   /** The shape the browser is allowed to see: no secret, ever. */
-  static async getPublicConfig() {
+  static async getPublicConfig({ allowServerFields = true } = {}) {
     const config = await this.getConfig();
     const { managedAdminKey, cloudVerifyToken, ...rest } = config;
+    // Na caixa da plataforma o token de verificação da Meta é o de todo
+    // provedor: quem não pode trocá-lo (ver `saveConfig`) também não o lê.
+    const revelaToken = allowServerFields || !(await this.isPlatformBox());
     return {
       ...rest,
       managed: Boolean(config.managedUrl),
@@ -273,7 +276,7 @@ class WhatsAppConfigService {
         ? { auto: true }
         : {
           callbackUrl: this.cloudCallbackUrl(config),
-          verifyToken: cloudVerifyToken || ''
+          verifyToken: revelaToken ? (cloudVerifyToken || '') : ''
         },
       ready: this.isReady(config)
     };

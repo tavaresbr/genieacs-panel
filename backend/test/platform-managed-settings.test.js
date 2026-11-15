@@ -463,6 +463,9 @@ describe('o servidor da caixa, pela rota', () => {
   it('mas salva o resto da tela, com o servidor intacto no formulário', async () => {
     // O que a tela manda: o formulário inteiro, servidor incluído, como lido.
     const { body: lido } = await doMembro('/whatsapp/config');
+    // O token de verificação da Meta da caixa é o de todo provedor: quem não
+    // pode trocá-lo também não o lê.
+    assert.equal(lido.data.cloudWebhook.verifyToken, '', 'o token da caixa não sai para quem não é da plataforma');
     const { status, body } = await doMembro('/whatsapp/config', {
       method: 'PUT',
       body: {
@@ -471,7 +474,6 @@ describe('o servidor da caixa, pela rota', () => {
         allowedHosts: lido.data.allowedHosts.join('\n'),
         managedUrl: lido.data.managedUrl,
         cloudCallbackUrl: lido.data.cloudCallbackUrl,
-        cloudVerifyToken: lido.data.cloudWebhook.verifyToken,
         rejectCallMessage: 'A caixa só atende por texto.'
       }
     });
