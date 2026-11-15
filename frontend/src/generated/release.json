@@ -1,22 +1,16 @@
 {
-  "version": "1.43.0",
-  "build": 1675,
-  "sourceCommit": "d9980da7a83d",
+  "version": "1.44.0",
+  "build": 1678,
+  "sourceCommit": "abc7812d76fc",
   "releasedAt": "2026-11-15",
-  "basedOnTag": "v1.42.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/d9522256b47a...d9980da7a83d",
+  "basedOnTag": "v1.43.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bdbe5113f1a9...abc7812d76fc",
   "changes": [
     {
-      "shortHash": "4896d35a",
-      "date": "2026-11-14",
-      "title": "Classificar conversas sozinho (assunto, urgência e humor)",
-      "category": "New"
-    },
-    {
-      "shortHash": "52edbf18",
+      "shortHash": "6f92216c",
       "date": "2026-11-15",
-      "title": "Log da classificação passa por logSafe (CodeQL: log injection)",
-      "category": "Fixed"
+      "title": "Painel Uso da IA (chamadas e tokens por tarefa)",
+      "category": "New"
     }
   ]
 }

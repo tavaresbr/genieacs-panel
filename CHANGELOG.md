@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.44.0] - 2026-11-15
+
+### New
+
+- Painel Uso da IA (chamadas e tokens por tarefa) (`6f92216c`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/bdbe5113f1a9...abc7812d76fc)
+
 ## [1.43.0] - 2026-11-15
 
 ### New
