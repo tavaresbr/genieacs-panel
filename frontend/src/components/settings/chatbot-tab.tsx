@@ -204,6 +204,7 @@ export function ChatbotTab() {
           suggest: config.ai.suggest,
           sales: config.ai.sales,
           vision: config.ai.vision,
+          classify: config.ai.classify,
           provider: config.ai.provider,
           workspaceId: config.ai.workspaceId,
           baseUrl: config.ai.baseUrl,
@@ -289,6 +290,13 @@ export function ChatbotTab() {
             onChange={(value) => patchAi({ sales: value })}
             title={t('settings.chatbot.aiSales')}
             hint={t('settings.chatbot.aiSalesHint')}
+          />
+          <Caixa
+            checked={config.ai.classify}
+            disabled={!config.ai.enabled}
+            onChange={(value) => patchAi({ classify: value })}
+            title={t('settings.chatbot.aiClassify')}
+            hint={t('settings.chatbot.aiClassifyHint')}
           />
           {config.ai.provider === 'anthropic' && (
             <Caixa

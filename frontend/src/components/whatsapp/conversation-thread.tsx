@@ -13,6 +13,7 @@ import { AccountChip, conversationAddress, conversationTitle } from '@/component
 import { accountTag } from '@/lib/wa-account-color'
 import { BILLING_BADGE, billingLabel } from '@/lib/wa-billing-status'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
+import { AiChips } from '@/components/whatsapp/ai-chips'
 import { AiSummaryPanel } from '@/components/whatsapp/ai-summary-panel'
 import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
@@ -300,6 +301,7 @@ export function ConversationThread({
               <AssigneeControl conversation={conversation} onChange={onLinked} />
               <TagPicker conversation={conversation} onChange={onLinked} />
               <MarketingOptOutControl conversation={conversation} onChange={onLinked} />
+              <AiChips conversation={conversation} />
               {closed && (
                 <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
                   <Icon name="check" size={12} />

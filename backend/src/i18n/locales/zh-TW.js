@@ -855,6 +855,7 @@ export default {
   'whatsapp.tags.defaultSupport': '技術支援',
   'whatsapp.tags.defaultSales': '銷售',
   'whatsapp.tags.defaultCancel': '退訂',
+  'whatsapp.tags.defaultComplaint': 'Complaint',
   'whatsapp.tags.defaultReceipt': "付款憑證",
   'whatsapp.tags.saved': '標籤已儲存',
   'whatsapp.tags.deleted': '標籤已刪除',

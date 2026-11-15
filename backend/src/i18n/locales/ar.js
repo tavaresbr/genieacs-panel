@@ -854,6 +854,7 @@ export default {
   'whatsapp.tags.defaultSupport': 'الدعم الفني',
   'whatsapp.tags.defaultSales': 'المبيعات',
   'whatsapp.tags.defaultCancel': 'الإلغاء',
+  'whatsapp.tags.defaultComplaint': 'Complaint',
   'whatsapp.tags.defaultReceipt': "إيصال",
   'whatsapp.tags.saved': 'تم حفظ الوسوم',
   'whatsapp.tags.deleted': 'تم حذف الوسم',

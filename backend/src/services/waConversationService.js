@@ -409,6 +409,11 @@ class WaConversationService {
       // A IA entregou esta conversa como venda (interesse registrado), e o resultado, se já dado.
       leadAt: row.lead_at || null,
       leadOutcome: row.lead_outcome || null,
+      // O que a IA marcou (opt-in): assunto, urgência e humor, e quando.
+      aiTopic: row.ai_topic || null,
+      aiUrgency: row.ai_urgency || null,
+      aiMood: row.ai_mood || null,
+      aiClassifiedAt: row.ai_classified_at || null,
       optedOut: extra.optedOut ?? false,
       // Só quando o bloqueio é parcial: os tipos que ele cobre.
       optOutCategories: extra.optOutCategories ?? null,

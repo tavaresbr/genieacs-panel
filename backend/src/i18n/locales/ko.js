@@ -854,6 +854,7 @@ export default {
   'whatsapp.tags.defaultSupport': '기술 지원',
   'whatsapp.tags.defaultSales': '영업',
   'whatsapp.tags.defaultCancel': '해지',
+  'whatsapp.tags.defaultComplaint': 'Complaint',
   'whatsapp.tags.defaultReceipt': "영수증",
   'whatsapp.tags.saved': '태그를 저장했습니다',
   'whatsapp.tags.deleted': '태그를 삭제했습니다',

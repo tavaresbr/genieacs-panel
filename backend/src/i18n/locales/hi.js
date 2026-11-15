@@ -857,6 +857,7 @@ export default {
   'whatsapp.tags.defaultSupport': 'तकनीकी सहायता',
   'whatsapp.tags.defaultSales': 'बिक्री',
   'whatsapp.tags.defaultCancel': 'रद्दीकरण',
+  'whatsapp.tags.defaultComplaint': 'Complaint',
   'whatsapp.tags.defaultReceipt': "रसीद",
   'whatsapp.tags.saved': 'टैग सहेजे गए',
   'whatsapp.tags.deleted': 'टैग हटाया गया',

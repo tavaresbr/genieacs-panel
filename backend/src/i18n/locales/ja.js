@@ -848,6 +848,7 @@ export default {
   'whatsapp.tags.defaultSupport': '技術サポート',
   'whatsapp.tags.defaultSales': '営業',
   'whatsapp.tags.defaultCancel': '解約',
+  'whatsapp.tags.defaultComplaint': 'Complaint',
   'whatsapp.tags.defaultReceipt': "受領証",
   'whatsapp.tags.saved': 'タグを保存しました',
   'whatsapp.tags.deleted': 'タグを削除しました',

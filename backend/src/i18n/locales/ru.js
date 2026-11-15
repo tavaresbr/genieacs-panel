@@ -857,6 +857,7 @@ export default {
   'whatsapp.tags.defaultSupport': 'Техподдержка',
   'whatsapp.tags.defaultSales': 'Продажи',
   'whatsapp.tags.defaultCancel': 'Расторжение',
+  'whatsapp.tags.defaultComplaint': 'Complaint',
   'whatsapp.tags.defaultReceipt': "Квитанция",
   'whatsapp.tags.saved': 'Метки сохранены',
   'whatsapp.tags.deleted': 'Метка удалена',
