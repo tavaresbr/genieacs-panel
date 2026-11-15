@@ -78,7 +78,12 @@ export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
   const confirmarAtivacao = async () => {
     setOcupado(true)
     try {
-      const res = await authAPI.mfaEnable(cleanSecondFactor(codigo))
+      // A senha atual, como em desligar e trocar os códigos: sem ela, quem
+      // tivesse só a sessão (uma aba esquecida aberta, um token roubado)
+      // cadastraria o próprio autenticador e trancaria a dona fora da conta.
+      // Vale também na ativação obrigatória — quem está nela acabou de
+      // digitar a senha no login.
+      const res = await authAPI.mfaEnable(senha, cleanSecondFactor(codigo))
       if (res.success && res.data) {
         setPendente(null)
         setCodigosNovos(res.data.recoveryCodes)
@@ -218,8 +223,20 @@ export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
                 placeholder="123 456"
               />
             </div>
+            <div>
+              <label htmlFor="mfa-enable-password" className="field-label">{t('settings.mfa.password')}</label>
+              <input
+                id="mfa-enable-password"
+                type="password"
+                autoComplete="current-password"
+                className="modern-input w-full sm:w-72"
+                value={senha}
+                onChange={(event) => setSenha(event.target.value)}
+              />
+              <p className="field-hint">{t('settings.mfa.enablePasswordHint')}</p>
+            </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="modern-button" disabled={ocupado || !codigo.trim()} onClick={() => void confirmarAtivacao()}>
+              <button type="button" className="modern-button" disabled={ocupado || !senha || !codigo.trim()} onClick={() => void confirmarAtivacao()}>
                 {t('settings.mfa.confirm')}
               </button>
               <button type="button" className="modern-button-secondary" disabled={ocupado} onClick={() => { setPendente(null); limparCampos() }}>

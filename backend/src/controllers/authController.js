@@ -909,8 +909,53 @@ class AuthController {
     }
   }
 
+  /**
+   * Ativar o 2FA pede a senha atual, como desligar e trocar os códigos.
+   *
+   * Sem ela, uma sessão sequestrada bastava para cadastrar o autenticador DO
+   * ATACANTE na conta da vítima: a partir daí o login dela passa a pedir um
+   * código que só o outro tem, e ela fica trancada do lado de fora da própria
+   * conta — com o `token_version` subindo junto, a sessão dela cai na hora. A
+   * senha é o que separa "quem está na aba" de "dono da conta".
+   *
+   * A conferência passa pela MESMA trava do login, como em `changePassword`:
+   * para quem só tem o token, este campo é um oráculo da senha, e o limitador
+   * do 2FA conta por pessoa, não por palpite na senha. Errar aqui soma aos
+   * palpites do formulário de entrada.
+   *
+   * A ativação obrigatória (o provedor exige 2FA e a pessoa acabou de entrar
+   * sem ele) passa por aqui também: quem está nela acabou de digitar a senha
+   * no login, e a tela pede de novo.
+   */
   static async mfaEnable(req, res) {
     try {
+      const password = req.body?.password;
+      if (typeof password !== 'string' || !password) {
+        return res.status(400).json(
+          createErrorResponse(req.t('auth.confirmPasswordRequired'), null, 'password_required')
+        );
+      }
+      const user = await User.findById(req.user.userId);
+      if (!user) {
+        return res.status(404).json(createErrorResponse(req.t('auth.userNotFound'), null, 'user_not_found'));
+      }
+      const tentativa = await AccountLockout.attempt(AccountLockout.forUser(user.id));
+      if (!tentativa.allowed) {
+        return AccountLockout.refuse(req, res, tentativa, password, { user, via: 'mfa_enable' });
+      }
+      // O teto de 128 é o mesmo da entrada: além dele o bcrypt nem olha, e uma
+      // senha assim não é de ninguém.
+      if (password.length > 128 || !await bcrypt.compare(password, user.password)) {
+        await AccountLockout.failed(req, tentativa, { user, via: 'mfa_enable' });
+        return res.status(401).json(
+          createErrorResponse(req.t('auth.currentPasswordIncorrect'), null, 'invalid_password')
+        );
+      }
+      // A senha está provada: a contagem some aqui, e não só depois do código.
+      // O código é do autenticador que a própria pessoa acabou de ler — errá-lo
+      // não é palpite em segredo nenhum dela, e não pode trancá-la.
+      await AccountLockout.clear(tentativa.subject);
+
       const result = await MfaService.enable(req.user.userId, req.body?.code);
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_ENABLED, subjectType: 'user', subjectId: String(req.user.userId)

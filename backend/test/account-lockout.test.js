@@ -19,7 +19,9 @@ import assert from 'node:assert/strict';
 const {
   authHeaders, call, getDb, startTestServers, stopTestServers
 } = await import('./helpers/harness.js');
-const { authLimiter, tenantIpKey } = await import('../src/middleware/rateLimit.js');
+const {
+  authLimiter, inviteAcceptLimiter, mfaLimiter, tenantIpKey
+} = await import('../src/middleware/rateLimit.js');
 const { totpCode, totpStep } = await import('../src/utils/totp.js');
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const {
@@ -46,7 +48,11 @@ after(async () => {
 /** Cada tentativa como se viesse de um (host, IP) que o limitador nunca viu. */
 async function baldeNovo() {
   const host = new URL(panelUrl).host;
-  await authLimiter.resetKey(tenantIpKey({ ip: '127.0.0.1', headers: { host } }));
+  const chave = tenantIpKey({ ip: '127.0.0.1', headers: { host } });
+  await authLimiter.resetKey(chave);
+  // O aceite de convite tem o balde dele, com a mesma chave: os casos do
+  // convite abaixo passam das trinta tentativas somados.
+  await inviteAcceptLimiter.resetKey(chave);
 }
 beforeEach(baldeNovo);
 
@@ -236,7 +242,7 @@ describe('o segundo fator', () => {
     });
     const segredo = setup.body.data.secret;
     const ligado = await call(`${panelUrl}/api/auth/mfa/enable`, {
-      method: 'POST', headers: authHeaders(token), body: { code: totpCode(segredo, totpStep()) }
+      method: 'POST', headers: authHeaders(token), body: { password: alvo.password, code: totpCode(segredo, totpStep()) }
     });
     assert.equal(ligado.status, 200, JSON.stringify(ligado.body));
 
@@ -254,6 +260,70 @@ describe('o segundo fator', () => {
     const linhas = await travasNaTrilha(alvo.id);
     assert.equal(linhas.length, 1);
     assert.equal(JSON.parse(linhas[0].detail).via, 'login_mfa');
+  });
+});
+
+describe('ativar o 2FA', () => {
+  /**
+   * A senha pedida na ativação é um oráculo para quem só tem a sessão — e é
+   * exatamente quem ela existe para parar: uma sessão sequestrada que cadastra
+   * o autenticador do atacante tranca a dona fora da própria conta. Os
+   * palpites daqui têm que somar aos do login, como os da troca de senha.
+   *
+   * O limitador do 2FA é esvaziado a cada tentativa pelo mesmo motivo do
+   * `authLimiter` lá em cima: o que este caso prende é a trava por conta, e não
+   * o limite por pessoa que vem antes dela.
+   */
+  it('a senha errada conta na mesma trava do login, e travada não liga nem com a certa', async () => {
+    const alvo = await pessoa();
+    const token = (await entrar(alvo.username, alvo.password)).body.data.token;
+    const setup = await call(`${panelUrl}/api/auth/mfa/setup`, {
+      method: 'POST', headers: authHeaders(token), body: {}
+    });
+    assert.equal(setup.status, 200, JSON.stringify(setup.body));
+    const segredo = setup.body.data.secret;
+    const ativar = async (password) => {
+      await mfaLimiter.resetKey(`user:${alvo.id}`);
+      return call(`${panelUrl}/api/auth/mfa/enable`, {
+        method: 'POST', headers: authHeaders(token), body: { password, code: totpCode(segredo, totpStep()) }
+      });
+    };
+
+    for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const { status, body } = await ativar(ERRADA);
+      assert.equal(status, 401, JSON.stringify(body));
+      assert.equal(body.code, 'invalid_password');
+    }
+    assertTravada(await ativar(alvo.password));
+    assertTravada(await entrar(alvo.username, alvo.password));
+    const { totp_enabled_at: ligadoEm } = await getDb()('users').where({ id: alvo.id }).first('totp_enabled_at');
+    assert.equal(ligadoEm, null, 'travada, a ativação não pode ter acontecido');
+    const linhas = await travasNaTrilha(alvo.id);
+    assert.equal(JSON.parse(linhas[0].detail).via, 'mfa_enable');
+  });
+
+  it('a senha certa zera a contagem, mesmo que o código venha errado', async () => {
+    const alvo = await pessoa();
+    const token = (await entrar(alvo.username, alvo.password)).body.data.token;
+    await call(`${panelUrl}/api/auth/mfa/setup`, { method: 'POST', headers: authHeaders(token), body: {} });
+    for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS - 1; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await mfaLimiter.resetKey(`user:${alvo.id}`);
+      // eslint-disable-next-line no-await-in-loop
+      await call(`${panelUrl}/api/auth/mfa/enable`, {
+        method: 'POST', headers: authHeaders(token), body: { password: ERRADA, code: '000000' }
+      });
+    }
+    await mfaLimiter.resetKey(`user:${alvo.id}`);
+    const { status, body } = await call(`${panelUrl}/api/auth/mfa/enable`, {
+      method: 'POST', headers: authHeaders(token), body: { password: alvo.password, code: 'nao-e-codigo' }
+    });
+    // O código é do autenticador que a própria pessoa acabou de ler: errá-lo
+    // não é palpite em segredo dela, e não pode deixá-la a um passo da trava.
+    assert.equal(status, 400, JSON.stringify(body));
+    assert.equal(body.code, 'mfa_invalid');
+    assert.equal(await linha(AccountLockout.forUser(alvo.id)), undefined);
   });
 });
 
@@ -308,7 +378,7 @@ describe('o convite', () => {
     });
     assert.equal(convite.status, 201, JSON.stringify(convite.body));
     const aceitar = (password) => call(`${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: convite.body.data.token, username: alvo.username, password }
+      method: 'POST', body: { token: convite.body.data.token, username: alvo.username, password, existingAccount: true }
     });
 
     for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS; i += 1) {
@@ -320,6 +390,43 @@ describe('o convite', () => {
     assertTravada(await entrar(alvo.username, alvo.password));
     const linhas = await travasNaTrilha(alvo.id);
     assert.equal(JSON.parse(linhas[0].detail).via, 'invite');
+  });
+
+  it('o pedido de conta nova com o nome de alguém não gasta a trava dessa pessoa', async () => {
+    // A sonda antiga: nome da vítima, senha qualquer, sem e-mail. Cada uma
+    // custava uma tentativa da trava DELA. Agora o pedido de conta nova não
+    // confere senha de ninguém — esbarra no e-mail antes de olhar o banco.
+    const alvo = await pessoa();
+    const convite = await call(`${panelUrl}/api/invites`, {
+      method: 'POST', headers: authHeaders(donaToken), body: { role: 'tech' }
+    });
+    for (let i = 0; i < 3; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const { status, body } = await call(`${panelUrl}/api/invites/token/accept`, {
+        method: 'POST', body: { token: convite.body.data.token, username: alvo.username, password: ERRADA }
+      });
+      assert.equal(status, 400, JSON.stringify(body));
+    }
+    assert.equal(await linha(AccountLockout.forUser(alvo.id)), undefined);
+  });
+
+  it('com "já tenho conta", um login inventado trava igual, como no /login', async () => {
+    const convite = await call(`${panelUrl}/api/invites`, {
+      method: 'POST', headers: authHeaders(donaToken), body: { role: 'tech' }
+    });
+    // Outro nome que o do caso do /login lá em cima: o sujeito é o mesmo nos
+    // dois caminhos (é o ponto), e aquele já está travado.
+    const inventado = 'ninguem-pelo-convite';
+    for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const { status } = await call(`${panelUrl}/api/invites/token/accept`, {
+        method: 'POST', body: { token: convite.body.data.token, username: inventado, password: ERRADA, existingAccount: true }
+      });
+      assert.equal(status, 401);
+    }
+    assertTravada(await call(`${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token: convite.body.data.token, username: inventado, password: ERRADA, existingAccount: true }
+    }));
   });
 });
 

@@ -10,6 +10,7 @@ const {
 const { hashRecoveryCode, normalizeRecoveryCode } = await import('../src/services/mfaService.js');
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const { cookieFrom, cookieHeaders } = await import('./helpers/sessionCookies.js');
+const { mfaLimiter } = await import('../src/middleware/rateLimit.js');
 
 /**
  * Login em duas etapas com app autenticador.
@@ -120,9 +121,31 @@ describe('ativar', () => {
     assert.equal((await call(`${panelUrl}/api/auth/mfa`, { headers: authHeaders(token) })).body.data.enabled, false);
   });
 
+  it('sem a senha atual não liga, nem com o código certo', async () => {
+    // A sessão sozinha não basta: quem a sequestrou cadastraria o próprio
+    // autenticador e trancaria a dona fora da conta.
+    const semSenha = await post('/api/auth/mfa/enable', { code: agora() });
+    assert.equal(semSenha.status, 400, JSON.stringify(semSenha.body));
+    assert.equal(semSenha.body.code, 'password_required');
+
+    const errada = await post('/api/auth/mfa/enable', { password: 'nao-e-a-senha-1', code: agora() });
+    assert.equal(errada.status, 401, JSON.stringify(errada.body));
+    assert.equal(errada.body.code, 'invalid_password');
+    assert.equal(errada.body.data?.recoveryCodes, undefined);
+
+    assert.equal((await call(`${panelUrl}/api/auth/mfa`, { headers: authHeaders(token) })).body.data.enabled, false);
+    assert.equal((await login()).status, 200, 'o login segue sem pedir código');
+
+    // As duas recusas acima entram no balde do 2FA (dez por pessoa), que o
+    // resto deste arquivo já usa quase inteiro. Devolvidas aqui, para que este
+    // caso não mude o que os de baixo provam.
+    const { id } = await getDb()('users').where({ username: USUARIO }).first('id');
+    await mfaLimiter.resetKey(`user:${id}`);
+  });
+
   it('código errado não liga', async () => {
     const errado = String((Number(agora()) + 1) % 1_000_000).padStart(6, '0');
-    const { status, body } = await post('/api/auth/mfa/enable', { code: errado });
+    const { status, body } = await post('/api/auth/mfa/enable', { password: SENHA, code: errado });
     assert.equal(status, 400);
     assert.equal(body.code, 'mfa_invalid');
   });
@@ -132,7 +155,7 @@ describe('ativar', () => {
     const velho = token;
     // Outro aparelho, logado antes da ativação: a família dele tem que cair.
     const outroAparelho = cookieFrom((await login()).response);
-    const { status, body } = await post('/api/auth/mfa/enable', { code: agora() });
+    const { status, body } = await post('/api/auth/mfa/enable', { password: SENHA, code: agora() });
     assert.equal(status, 200, JSON.stringify(body));
     recuperacao = body.data.recoveryCodes;
 
@@ -210,7 +233,7 @@ describe('entrar com 2FA', () => {
     assert.equal(convite.status, 201, JSON.stringify(convite.body));
     const aceitar = (extra = {}) => call(`${panelUrl}/api/invites/token/accept`, {
       method: 'POST',
-      body: { token: convite.body.data.token, username: USUARIO, password: SENHA, email: 'operator@exemplo.test', ...extra }
+      body: { token: convite.body.data.token, username: USUARIO, password: SENHA, existingAccount: true, ...extra }
     });
     const semCodigo = await aceitar();
     assert.equal(semCodigo.status, 401, JSON.stringify(semCodigo.body));

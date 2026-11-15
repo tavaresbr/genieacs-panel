@@ -133,6 +133,12 @@ class MfaService {
    * desconfiar da senha — uma sessão que outra pessoa abriu com ela não pode
    * sobreviver ao 2FA que veio fechá-la. A aba de quem pediu não cai: a rota
    * devolve tokens novos (ver `AuthController.mfaEnable`).
+   *
+   * A senha atual NÃO é conferida aqui, e não por esquecimento: ela passa pela
+   * trava por conta (`AccountLockout`), que precisa do request para responder
+   * e escrever a trilha, então quem chama — `AuthController.mfaEnable` — a
+   * confere antes. Quem chamar isto de outro lugar herda essa obrigação: sem a
+   * senha, uma sessão sequestrada cadastra o autenticador do atacante.
    */
   static async enable(userId, code) {
     const user = await this.findUser(userId);

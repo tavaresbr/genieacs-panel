@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
@@ -29,6 +29,7 @@ const { tinsertReturningId } = await import('../src/config/database.js');
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
 const { default: TenantInvite } = await import('../src/models/TenantInvite.js');
+const { inviteAcceptLimiter, tenantIpKey } = await import('../src/middleware/rateLimit.js');
 
 /** Requisição com `Host` escolhido — `fetch` não faz isto. Ver `tenant-subdomain`. */
 function callAs(host, url, { method = 'GET', headers = {}, body } = {}) {
@@ -215,7 +216,7 @@ describe('aceitar', () => {
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'viewer' });
 
     const errada = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'chute-errado-1', email: 'plantao-novo@exemplo.test' }
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'chute-errado-1', existingAccount: true }
     });
     assert.equal(errada.status, 401, 'sem a senha, não entra');
     // E o convite continua de pé: uma tentativa errada não pode queimá-lo, ou
@@ -223,7 +224,7 @@ describe('aceitar', () => {
     assert.equal((await callAs(BETA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token: token } })).status, 200);
 
     const certa = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', email: 'plantao-novo@exemplo.test' }
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', existingAccount: true }
     });
     assert.equal(certa.status, 201, JSON.stringify(certa.body));
     assert.equal(Number(certa.body.data.user.tenantId), Number(beta));
@@ -237,21 +238,28 @@ describe('aceitar', () => {
     assert.deepEqual(vinculos.map((v) => v.role), ['tech', 'viewer']);
   });
 
-  it('a regra da senha nova não se pula por um campo do corpo: quem decide é o banco', async () => {
+  it('a regra da senha nova não se pula por um campo do corpo', async () => {
     const { token } = await convidar(ALFA, alfaAdminToken, { role: 'viewer' });
-    // Conta que NÃO existe, com o corpo dizendo que existe: a regra vale igual.
-    const bandeiras = { existing: true, existingAccount: true, accountExists: true, skipPolicy: true };
+    // Bandeiras inventadas não mudam nada: sem `existingAccount: true`, é conta
+    // nova, e a regra vale inteira.
+    const inventadas = { existing: true, accountExists: true, skipPolicy: true };
     for (const password of ['curta-1', 'password123']) {
       const r = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
-        method: 'POST', body: { token, username: 'sem-atalho', password, email: 'sem-atalho@exemplo.test', ...bandeiras }
+        method: 'POST', body: { token, username: 'sem-atalho', password, email: 'sem-atalho@exemplo.test', ...inventadas }
       });
       assert.equal(r.status, 400, `${password}: ${JSON.stringify(r.body)}`);
       assert.ok(['password_length', 'password_too_common'].includes(r.body.code), JSON.stringify(r.body));
     }
+    // E a bandeira de verdade, numa conta que NÃO existe, não cria conta com
+    // senha fraca: "já tenho conta" só anexa quem prova a senha que já tem.
+    const fingindo = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token, username: 'sem-atalho', password: 'curta-1', email: 'sem-atalho@exemplo.test', existingAccount: true }
+    });
+    assert.equal(fingindo.status, 401, JSON.stringify(fingindo.body));
     assert.equal(await getDb()('users').where({ username: 'sem-atalho' }).first(), undefined);
     // O teto vale também para quem diz já ter conta, antes de qualquer bcrypt.
     const gigante = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token, username: 'plantao-novo', password: 'x'.repeat(129) }
+      method: 'POST', body: { token, username: 'plantao-novo', password: 'x'.repeat(129), existingAccount: true }
     });
     assert.equal(gigante.status, 400);
     // E o convite segue de pé.
@@ -260,10 +268,24 @@ describe('aceitar', () => {
 
   it('não anexa duas vezes', async () => {
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'admin' });
-    const { status } = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', email: 'plantao-novo@exemplo.test' }
+    const { status, body } = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', existingAccount: true }
     });
-    assert.equal(status, 409);
+    assert.equal(status, 409, JSON.stringify(body));
+  });
+
+  it('pedir conta nova com um nome que já existe não toca na conta: é o 409 do cadastro', async () => {
+    // Sem "já tenho conta", nada de conferir senha nem anexar: quem pediu conta
+    // nova com o nome de alguém recebe o mesmo "nome em uso" do cadastro
+    // público — e só depois de mandar um corpo de conta nova inteiro e válido.
+    const { token } = await convidar(ALFA, alfaAdminToken, { role: 'viewer' });
+    const r = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token, username: 'dona-do-beta', password: 'senha-da-dona-2', email: 'outra@exemplo.test' }
+    });
+    assert.equal(r.status, 409, JSON.stringify(r.body));
+    assert.ok(!r.body?.data?.token, 'nenhuma sessão');
+    const dona = await getDb()('users').where({ username: 'dona-do-beta' }).first();
+    assert.equal((await getDb()('tenant_users').where({ user_id: dona.id, tenant_id: alfa })).length, 0);
   });
 
   /**
@@ -335,6 +357,64 @@ describe('aceitar', () => {
     // acima, não neste.
     const orfa = await getDb()('users').where({ username: 'segundo-a-clicar' }).first();
     assert.equal(orfa, undefined, 'a pessoa não pode sobrar sem vínculo');
+  });
+});
+
+describe('o aceite não diz quem tem conta', () => {
+  /**
+   * A sonda: com um convite válido na mão — no SaaS qualquer um abre um
+   * provedor e cunha os seus —, o nome (ou e-mail) de outra pessoa, uma senha
+   * qualquer e nenhum e-mail. Antes respondia 401 se a conta existia e 400
+   * "e-mail inválido" se não existia, quantas vezes se quisesse, e cada 401
+   * gastava uma tentativa da trava da vítima.
+   */
+  async function sondar(token, username, extra = {}) {
+    return callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token, username, password: 'qualquer-coisa', ...extra }
+    });
+  }
+
+  // O balde do aceite (trinta por quarto de hora, por host e endereço) é
+  // dividido com o resto do arquivo. Estes casos sondam de propósito, e não
+  // podem deixar os de baixo sem tentativas — nem herdar as de cima.
+  const baldeNovo = () => inviteAcceptLimiter.resetKey(tenantIpKey({ ip: '127.0.0.1', headers: { host: ALFA } }));
+  beforeEach(baldeNovo);
+  afterEach(baldeNovo);
+
+  it('pedido de conta nova: a mesma resposta para quem existe e quem não existe', async () => {
+    const { token } = await convidar(ALFA, alfaAdminToken);
+    const existe = await sondar(token, 'dona-do-beta');
+    const naoExiste = await sondar(token, 'ninguem-com-este-nome');
+    assert.equal(existe.status, 400, JSON.stringify(existe.body));
+    assert.equal(existe.status, naoExiste.status);
+    assert.equal(existe.raw, naoExiste.raw, 'os corpos têm que ser idênticos');
+
+    // Com e-mail mas senha fora da regra: também igual, antes de olhar o banco.
+    const fracaExiste = await sondar(token, 'dona-do-beta', { email: 'x@exemplo.test', password: 'curta' });
+    const fracaNaoExiste = await sondar(token, 'ninguem-com-este-nome', { email: 'x@exemplo.test', password: 'curta' });
+    assert.equal(fracaExiste.status, 400);
+    assert.equal(fracaExiste.raw, fracaNaoExiste.raw);
+
+    // E a trava da dona não ficou sabendo de nada disso.
+    const dona = await getDb()('users').where({ username: 'dona-do-beta' }).first();
+    assert.equal(await getDb()('account_lockouts').where({ subject: `user:${dona.id}` }).first(), undefined);
+    // Nem o convite: segue de pé.
+    assert.equal((await callAs(ALFA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token } })).status, 200);
+  });
+
+  it('"já tenho conta": senha errada e conta inexistente respondem byte a byte igual', async () => {
+    const { token } = await convidar(ALFA, alfaAdminToken);
+    const existe = await sondar(token, 'dona-do-beta', { existingAccount: true });
+    const naoExiste = await sondar(token, 'ninguem-com-este-nome', { existingAccount: true });
+    assert.equal(existe.status, 401, JSON.stringify(existe.body));
+    assert.equal(naoExiste.status, 401, JSON.stringify(naoExiste.body));
+    assert.equal(existe.raw, naoExiste.raw, 'os corpos têm que ser idênticos');
+  });
+
+  it('a bandeira só vale como booleano: "true" em texto é pedido de conta nova', async () => {
+    const { token } = await convidar(ALFA, alfaAdminToken);
+    const r = await sondar(token, 'dona-do-beta', { existingAccount: 'true' });
+    assert.equal(r.status, 400, JSON.stringify(r.body));
   });
 });
 

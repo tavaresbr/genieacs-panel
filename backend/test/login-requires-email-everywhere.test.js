@@ -89,7 +89,7 @@ describe('com a chave ligada, o aceite de convite', () => {
   it('recusa uma conta sem e-mail, e não emite sessão', async () => {
     const token = await convite();
     const r = await call(`${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: LEGADO.username, password: LEGADO.password }
+      method: 'POST', body: { token: token, username: LEGADO.username, password: LEGADO.password, existingAccount: true }
     });
     assert.equal(r.status, 401);
     assert.ok(!r.body?.data?.token, 'nenhuma sessão pode ter sido emitida');
@@ -102,7 +102,7 @@ describe('com a chave ligada, o aceite de convite', () => {
   it('ainda aceita uma conta que já tem e-mail', async () => {
     const token = await convite();
     const r = await call(`${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: MIGRADO.email, password: MIGRADO.password }
+      method: 'POST', body: { token: token, username: MIGRADO.email, password: MIGRADO.password, existingAccount: true }
     });
     assert.equal(r.status, 201, JSON.stringify(r.body));
     assert.ok(r.body.data.token);

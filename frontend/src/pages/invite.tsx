@@ -10,6 +10,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { cleanSecondFactor, mfaStepDaResposta } from '@/lib/login-mfa'
+import { inviteAcceptPayload, inviteFormProblem, type InviteMode } from '@/lib/invite-accept'
 
 
 
@@ -22,11 +23,11 @@ import { cleanSecondFactor, mfaStepDaResposta } from '@/lib/login-mfa'
  * proxy, nem no `Referer` de uma imagem que a página venha a carregar. É a
  * mesma escolha do bilhete de personificação, pelo mesmo motivo.
  *
- * Um formulário só para os dois caminhos, porque do lado de quem preenche é a
- * mesma coisa: nome e senha. Quem já tem conta prova quem é com a senha que já
- * usa; quem não tem escolhe a dela e informa um e-mail. Quem decide qual é o
- * caso é o banco, e não uma caixinha que a pessoa marcaria adivinhando se já
- * existe no deploy.
+ * Dois caminhos, escolhidos pela pessoa: "criar conta" (nome, e-mail e uma
+ * senha nova) ou "já tenho conta" (nome ou e-mail e a senha que já usa, mais o
+ * código se ela tiver 2FA). Já foi um formulário só, com o banco decidindo —
+ * e era isso que fazia do aceite um oráculo de quem tem conta no deploy, para
+ * qualquer um com um convite na mão. Ver `invite-accept.ts`.
  */
 export default function Invite() {
   const { t } = useTranslation()
@@ -36,6 +37,7 @@ export default function Invite() {
   const [token] = useState(() => window.location.hash.slice(1))
   const [preview, setPreview] = useState<InvitePreview | null>(null)
   const [loading, setLoading] = useState(true)
+  const [modo, setModo] = useState<InviteMode>('new')
   const [form, setForm] = useState({ username: '', email: '', password: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -58,25 +60,15 @@ export default function Invite() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
-    if (form.username.trim().length < 3) return setError(t('setup.error.usernameTooShort'))
-    // Sem mínimo aqui: quem já tem conta digita a senha que JÁ tem, e ela pode
-    // ser de antes da regra de 10 caracteres. A regra da senha nova é do
-    // servidor, que só a aplica a quem está criando conta por este convite.
-    if (!form.password) return setError(t('setup.error.passwordTooShort'))
-    // O e-mail é exigido de quem está criando conta aqui. Como esta tela não
-    // sabe (nem deve saber) se a pessoa já existe no deploy, ela pede sempre e
-    // deixa o backend ignorá-lo quando a conta já existe — perguntar seria
-    // dizer a um estranho se um nome tem conta.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setError(t('setup.error.emailInvalid'))
+    const problema = inviteFormProblem(modo, form)
+    if (problema) return setError(t(problema))
 
     setSubmitting(true)
     try {
-      const res = await invitesAPI.accept(token, {
-        username: form.username.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        ...(pedindoCodigo && codigo.trim() ? { totpCode: cleanSecondFactor(codigo) } : {})
-      })
+      const res = await invitesAPI.accept(
+        token,
+        inviteAcceptPayload(modo, form, pedindoCodigo && codigo.trim() ? cleanSecondFactor(codigo) : undefined)
+      )
       const passo = mfaStepDaResposta(res)
       if (passo) {
         setPedindoCodigo(true)
@@ -142,6 +134,34 @@ export default function Invite() {
                   </div>
                 )}
 
+                <fieldset>
+                  <legend className="sr-only">{t('invite.modeLabel')}</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['new', 'existing'] as const).map((opcao) => (
+                      <button
+                        key={opcao}
+                        type="button"
+                        aria-pressed={modo === opcao}
+                        onClick={() => {
+                          setModo(opcao)
+                          setError('')
+                          // O código é da conta que já existe: trocar de aba
+                          // recomeça o passo dele.
+                          setPedindoCodigo(false)
+                          setCodigo('')
+                        }}
+                        className={`min-h-10 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
+                          modo === opcao
+                            ? 'border-primary bg-primary/10 text-foreground'
+                            : 'border-border text-muted-foreground hover:border-primary/50'
+                        }`}
+                      >
+                        {t(opcao === 'new' ? 'invite.modeNew' : 'invite.modeExisting')}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+
                 <div>
                   <label htmlFor="invite-username" className="field-label">{t('login.identifier')}</label>
                   <input
@@ -150,23 +170,26 @@ export default function Invite() {
                     onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
                   />
                 </div>
-                <div>
-                  <label htmlFor="invite-email" className="field-label">{t('setup.email')}</label>
-                  <input
-                    id="invite-email" type="email" className="modern-input" required autoComplete="email"
-                    placeholder={t('setup.emailPlaceholder')}
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  />
-                </div>
+                {modo === 'new' && (
+                  <div>
+                    <label htmlFor="invite-email" className="field-label">{t('setup.email')}</label>
+                    <input
+                      id="invite-email" type="email" className="modern-input" required autoComplete="email"
+                      placeholder={t('setup.emailPlaceholder')}
+                      value={form.email}
+                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    />
+                  </div>
+                )}
                 <div>
                   <label htmlFor="invite-password" className="field-label">{t('login.password')}</label>
                   <input
-                    id="invite-password" type="password" className="modern-input" required autoComplete="current-password"
+                    id="invite-password" type="password" className="modern-input" required
+                    autoComplete={modo === 'new' ? 'new-password' : 'current-password'}
                     value={form.password}
                     onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                   />
-                  <p className="field-hint">{t('invite.passwordHint')}</p>
+                  <p className="field-hint">{t(modo === 'new' ? 'invite.passwordHintNew' : 'invite.passwordHintExisting')}</p>
                 </div>
                 {pedindoCodigo && (
                   <div>

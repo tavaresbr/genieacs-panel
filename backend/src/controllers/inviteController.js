@@ -23,6 +23,13 @@ import {
 
 const BCRYPT_ROUNDS = 12;
 
+/**
+ * O hash contra o qual a senha é conferida quando o login digitado não tem
+ * conta. Mesmo custo das senhas de verdade: é ele que faz "não existe" levar o
+ * mesmo tempo que "senha errada" (ver `provarContaExistente`).
+ */
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invite-placeholder', BCRYPT_ROUNDS);
+
 class InviteController {
   /** Os convites em aberto deste provedor. */
   static async list(req, res) {
@@ -176,17 +183,37 @@ class InviteController {
    *
    * Os dois caminhos, e por que os dois têm que existir:
    *
-   * - **Com senha da conta que já tem** (`username` + `password`): é o
-   *   consultor que atende dois ISPs. Ninguém aqui escolhe a senha dele — ele
-   *   prova quem é com a que já usa, e é essa prova que a onda 12 exigia e que
-   *   o endpoint de criação não conseguia dar.
-   * - **Conta nova** (`username` + `password` de alguém que não existe): a
-   *   pessoa escolhe a própria senha. O administrador que convidou nunca a vê,
-   *   que é a diferença inteira entre isto e `POST /api/users`.
+   * - **Conta nova** (o padrão: `username` + `email` + `password`): a pessoa
+   *   escolhe a própria senha. O administrador que convidou nunca a vê, que é
+   *   a diferença inteira entre isto e `POST /api/users`.
+   * - **Com a conta que já tem** (`existingAccount: true` + `username` +
+   *   `password`, e `totpCode` se ela usa 2FA): é o consultor que atende dois
+   *   ISPs. Ninguém aqui escolhe a senha dele — ele prova quem é com a que já
+   *   usa, e é essa prova que a onda 12 exigia e que o endpoint de criação não
+   *   conseguia dar.
    *
-   * O mesmo corpo serve aos dois porque, do lado de quem preenche, é a mesma
-   * tela: nome e senha. Quem decide qual caminho é o banco, e não um campo que
-   * a pessoa teria de marcar sabendo de antemão se já existe no deploy.
+   * **Quem escolhe o caminho é a pessoa, e não o banco.** Antes, o mesmo corpo
+   * servia aos dois e a busca pelo login decidia — e isso fazia desta rota um
+   * oráculo de quem tem conta no deploy: com um convite válido (no SaaS,
+   * qualquer um abre um provedor e cunha os seus), `username` de outra pessoa,
+   * senha qualquer e nenhum e-mail respondiam 401 se a conta existia e 400
+   * "e-mail inválido" se não existia, de novo e de novo, sem gastar o convite —
+   * e cada 401 ainda queimava uma tentativa da trava DA VÍTIMA.
+   *
+   * Agora:
+   * - a conta nova valida TUDO (e-mail, regra da senha) antes de olhar o banco,
+   *   e nunca confere senha de ninguém: não toca na trava de conta nenhuma. O
+   *   que sobra é o 409 de nome tomado — o mesmo do cadastro público —, e para
+   *   chegar nele é preciso um corpo inteiro válido; quando o nome está livre,
+   *   a conta é criada e o convite gasto, então não é uma sonda repetível.
+   * - a conta existente responde igual (401 `invalidCredentials`, mesmo corpo,
+   *   bcrypt gasto nos dois casos) para conta que não existe e senha errada, e
+   *   conta na trava do mesmo jeito que o `/login`: por `user:<id>` quem
+   *   existe, pelo identificador quem não existe. Daqui não sai nada que o
+   *   formulário de entrada já não diga a quem bate nele.
+   *
+   * O campo é um booleano estrito: só `true` escolhe o caminho da conta que
+   * existe. Qualquer outra coisa é conta nova, com a regra da senha inteira.
    */
   static async accept(req, res) {
     try {
@@ -196,6 +223,7 @@ class InviteController {
       const username = String(req.body?.username ?? '').trim();
       const password = String(req.body?.password ?? '');
       const email = User.normalizeEmail(req.body?.email);
+      const comContaExistente = req.body?.existingAccount === true;
       if (username.length < 3 || username.length > 64) {
         return res.status(400).json(createErrorResponse(req.t('auth.usernameLength')));
       }
@@ -208,54 +236,13 @@ class InviteController {
       }
 
       const role = normalizeRole(invite.role);
-      // Nome OU e-mail, pelo mesmo motivo do plano de controle: quem já tem
-      // conta e já migrou vai digitar o endereço, não o nome antigo — e sem
-      // isto o convite tentaria criar uma segunda conta para ela e esbarraria
-      // no índice único, com uma mensagem que não explica nada.
-      const existente = await User.findByLogin(username);
+      let existente = null;
       let userId;
 
-      if (existente) {
-        // A senha é a prova de que é ela mesma. Sem esta conferência o convite
-        // seria uma tomada de conta: quem tivesse o link digitaria o nome de
-        // qualquer pessoa do deploy e a anexaria a este provedor sem que ela
-        // soubesse — e o papel viria junto.
-        //
-        // E é um oráculo da senha para quem tem o link: o balde desta rota é
-        // por endereço, trinta por quarto de hora, e um convite vale dias. Por
-        // isso a conferência passa pela mesma trava por conta do login — a
-        // senha é a mesma, e os palpites daqui somam aos de lá.
-        const tentativa = await AccountLockout.attempt(AccountLockout.forUser(existente.id));
-        if (!tentativa.allowed) {
-          return AccountLockout.refuse(req, res, tentativa, password, { user: existente, via: 'invite' });
-        }
-        if (!await bcrypt.compare(password, existente.password)) {
-          await AccountLockout.failed(req, tentativa, { user: existente, via: 'invite' });
-          return res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
-        }
-        // A mesma regra do `/login`, e DEPOIS da senha pelo mesmo motivo de lá:
-        // com `LOGIN_REQUIRES_EMAIL` ligado, uma conta sem e-mail não entra por
-        // caminho nenhum, e este é um caminho que emite sessão. Sem esta linha
-        // o convite era a porta dos fundos da chave.
-        if (!acceptsIdentifier(username, existente)) {
-          return res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
-        }
-        // O segundo fator, pela mesma razão da linha de cima: aceitar o
-        // convite emite sessão, e sem isto quem tivesse a senha vazada de uma
-        // conta com 2FA entraria por aqui sem o código. Gasto já aqui — este
-        // caminho não tem uma segunda ida como a escolha de provedor do login.
-        if (mfaEnabled(existente)) {
-          const { totpCode } = req.body || {};
-          if (totpCode === undefined || totpCode === null || totpCode === '') {
-            return res.status(401).json(createErrorResponse(req.t('auth.mfaRequired'), null, 'mfa_required'));
-          }
-          if (!(await MfaService.verifySecondFactor(existente, totpCode)).ok) {
-            await AccountLockout.failed(req, tentativa, { user: existente, via: 'invite_mfa' });
-            return res.status(401).json(createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid'));
-          }
-        }
-        // Senha e código conferidos: a prova terminou, a contagem some.
-        await AccountLockout.clear(tentativa.subject);
+      if (comContaExistente) {
+        existente = await InviteController.provarContaExistente(req, res, { username, password });
+        // `null`: a resposta (401, 429 ou o pedido do código) já foi dada.
+        if (!existente) return undefined;
         // Já trabalha aqui: o convite não some e não vira erro. É o caso do
         // link clicado duas vezes, e a resposta certa para "me põe na equipe"
         // de quem já está na equipe é "pronto".
@@ -263,23 +250,29 @@ class InviteController {
           return res.status(409).json(createErrorResponse(req.t('invite.alreadyMember')));
         }
         userId = existente.id;
-      }
-
-      // O e-mail só é exigido de quem está criando conta AQUI. Quem já tem
-      // conta entra com a que tem, e o endereço dela — cadastrado ou não — é
-      // assunto do perfil dela, não deste convite: pedi-lo agora faria o
-      // convite de um provedor mexer no login que a pessoa usa em outro.
-      if (!existente && (!email || !isValidEmail(email))) {
-        return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
-      }
-      if (!existente) {
+      } else {
+        // Conta nova: tudo o que o corpo precisa ter é conferido ANTES de o
+        // banco ser consultado. É a ordem que impede a sonda — a resposta a um
+        // corpo incompleto não pode depender de o nome existir ou não.
+        //
+        // O e-mail só é exigido daqui. Quem já tem conta entra com a que tem,
+        // e o endereço dela — cadastrado ou não — é assunto do perfil dela, não
+        // deste convite: pedi-lo faria o convite de um provedor mexer no login
+        // que a pessoa usa em outro.
+        if (!email || !isValidEmail(email)) {
+          return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+        }
         const senhaRuim = newPasswordProblem(password, { username, email });
         if (senhaRuim) {
           return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
         }
-      }
-      if (!existente && await User.loginConflict({ username, email })) {
-        return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
+        // Nome OU e-mail, contra o espaço de nomes inteiro (ver
+        // `User.findByLogin`). Sem conferir senha nenhuma: quem já tem conta e
+        // caiu aqui por engano escolhe "já tenho conta" na tela, e a trava da
+        // conta dela não gasta nada com isso.
+        if (await User.loginConflict({ username, email })) {
+          return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
+        }
       }
 
       // O limite do plano, antes de abrir a transação: o convite continua de
@@ -364,6 +357,69 @@ class InviteController {
       console.error('Accept invite error:', error);
       return res.status(500).json(createErrorResponse(req.t('invite.acceptFailed'), error.message));
     }
+  }
+
+  /**
+   * A prova de quem diz já ter conta: senha, a regra do `LOGIN_REQUIRES_EMAIL`
+   * e o segundo fator. Devolve a conta provada, ou `null` com a resposta já
+   * dada.
+   *
+   * É o `/login` em miniatura, e de propósito: conta que não existe e senha
+   * errada saem pelo MESMO 401, com o mesmo corpo e o bcrypt gasto nos dois
+   * (contra o hash de enfeite quando não há conta), e a trava conta do mesmo
+   * jeito — `user:<id>` para quem existe, o identificador digitado para quem
+   * não existe. Assim esta porta não diz nada sobre quem tem conta que o
+   * formulário de entrada já não diga, e os palpites daqui somam aos de lá: a
+   * senha é a mesma, e um convite que vale dias não pode ser uma segunda fila
+   * de dez palpites.
+   */
+  static async provarContaExistente(req, res, { username, password }) {
+    // Nome OU e-mail, pelo mesmo motivo do plano de controle: quem já tem
+    // conta e já migrou vai digitar o endereço, não o nome antigo.
+    const conta = await User.findByLogin(username);
+    const tentativa = await AccountLockout.attempt(
+      conta ? AccountLockout.forUser(conta.id) : AccountLockout.forIdentifier(username)
+    );
+    if (!tentativa.allowed) {
+      await AccountLockout.refuse(req, res, tentativa, password, { user: conta, via: 'invite' });
+      return null;
+    }
+
+    // A senha é a prova de que é ela mesma. Sem esta conferência o convite
+    // seria uma tomada de conta: quem tivesse o link digitaria o nome de
+    // qualquer pessoa do deploy e a anexaria a este provedor sem que ela
+    // soubesse — e o papel viria junto. Conferida SEMPRE, mesmo sem conta, para
+    // que o tempo da resposta não separe os dois casos.
+    const senhaConfere = await bcrypt.compare(password, conta?.password || DUMMY_PASSWORD_HASH);
+    // A mesma regra do `/login`, e DEPOIS da senha pelo mesmo motivo de lá:
+    // com `LOGIN_REQUIRES_EMAIL` ligado, uma conta sem e-mail não entra por
+    // caminho nenhum, e este é um caminho que emite sessão. Sem esta linha o
+    // convite era a porta dos fundos da chave.
+    if (!conta || !senhaConfere || !acceptsIdentifier(username, conta)) {
+      await AccountLockout.failed(req, tentativa, { user: conta, via: 'invite' });
+      res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
+      return null;
+    }
+
+    // O segundo fator, pela mesma razão da linha de cima: aceitar o convite
+    // emite sessão, e sem isto quem tivesse a senha vazada de uma conta com
+    // 2FA entraria por aqui sem o código. Gasto já aqui — este caminho não tem
+    // uma segunda ida como a escolha de provedor do login.
+    if (mfaEnabled(conta)) {
+      const { totpCode } = req.body || {};
+      if (totpCode === undefined || totpCode === null || totpCode === '') {
+        res.status(401).json(createErrorResponse(req.t('auth.mfaRequired'), null, 'mfa_required'));
+        return null;
+      }
+      if (!(await MfaService.verifySecondFactor(conta, totpCode)).ok) {
+        await AccountLockout.failed(req, tentativa, { user: conta, via: 'invite_mfa' });
+        res.status(401).json(createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid'));
+        return null;
+      }
+    }
+    // Senha e código conferidos: a prova terminou, a contagem some.
+    await AccountLockout.clear(tentativa.subject);
+    return conta;
   }
 
   /**

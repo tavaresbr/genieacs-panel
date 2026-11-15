@@ -44,7 +44,7 @@ async function ativar(quem) {
   const setup = await post('/api/auth/mfa/setup', {}, tokens[quem]);
   assert.equal(setup.status, 200, JSON.stringify(setup.body));
   segredos[quem] = setup.body.data.secret;
-  const ligou = await post('/api/auth/mfa/enable', { code: totpCode(segredos[quem], totpStep()) }, tokens[quem]);
+  const ligou = await post('/api/auth/mfa/enable', { password: SENHA, code: totpCode(segredos[quem], totpStep()) }, tokens[quem]);
   assert.equal(ligou.status, 200, JSON.stringify(ligou.body));
   // Ativar derruba as sessões abertas antes; a de quem ativou segue com o
   // token que a própria resposta traz.
