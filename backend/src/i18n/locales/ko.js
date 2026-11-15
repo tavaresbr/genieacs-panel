@@ -560,6 +560,7 @@ export default {
   'whatsapp.accountsLoaded': 'WhatsApp 번호 {count}개',
   'whatsapp.accountsLoadFailed': 'WhatsApp 번호 목록을 조회하지 못했습니다',
   'whatsapp.error.incompleteConfig': '연동을 활성화하기 전에 공개 웹훅 URL을 입력하십시오. Evolution 서버는 이 주소로 QR 코드, 메시지, 수신 확인을 전달합니다',
+  'whatsapp.error.serverPlatformAdminOnly': '모든 공급자가 사용하는 WhatsApp 서버는 플랫폼 관리자만 변경할 수 있습니다',
   'whatsapp.error.invalidWebhookUrl': '웹훅 URL이 올바르지 않습니다',
   'whatsapp.error.publicUrlProtocol': '주소는 http 또는 https여야 합니다',
   'whatsapp.error.publicUrlCredentials': '주소에는 사용자 이름과 비밀번호를 포함할 수 없습니다',

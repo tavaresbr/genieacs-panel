@@ -557,6 +557,7 @@ export default {
   'whatsapp.accountsLoaded': '{count} WhatsApp नंबर',
   'whatsapp.accountsLoadFailed': 'WhatsApp नंबरों की सूची नहीं बन सकी',
   'whatsapp.error.incompleteConfig': 'एकीकरण सक्षम करने से पहले सार्वजनिक वेबहुक URL दर्ज करें: Evolution सर्वर इसी से QR कोड, संदेश और रसीदें लौटाता है',
+  'whatsapp.error.serverPlatformAdminOnly': 'सभी प्रदाताओं को सेवा देने वाला WhatsApp सर्वर केवल प्लेटफ़ॉर्म व्यवस्थापक ही बदल सकता है',
   'whatsapp.error.invalidWebhookUrl': 'वेबहुक URL अमान्य है',
   'whatsapp.error.publicUrlProtocol': 'पता http या https होना चाहिए',
   'whatsapp.error.publicUrlCredentials': 'पते में उपयोगकर्ता नाम और पासवर्ड नहीं हो सकते',

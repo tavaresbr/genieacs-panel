@@ -391,3 +391,118 @@ describe('o catálogo padrão, reenviado', () => {
     assert.ok(await getDb()('platform_audit').where({ action: 'catalogue.propagated' }).first());
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quem troca o servidor da caixa
+//
+// O servidor Evolution guardado na caixa da plataforma é o de TODO provedor:
+// endereço, chave, webhook, hosts e o token da Meta. `whatsapp.config` é de
+// qualquer `admin` da equipe da caixa, e com ela um membro da equipe que não
+// está no cadastro da plataforma redirecionava o WhatsApp de todos os clientes.
+// Trocar o servidor pela rota pede o cadastro; o resto da tela segue a regra
+// normal; e a personificação não conta como cadastro.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('o servidor da caixa, pela rota', () => {
+  let membroId;
+  let membroToken;
+  const doMembro = (path, options = {}) => call(`${panelUrl}/api${path}`, {
+    ...options,
+    headers: { ...authHeaders(membroToken), ...(options.headers || {}) }
+  });
+  const servidorDaCaixa = () => runInTenant(caixa, () => {
+    WhatsAppConfigService.invalidateConfigCache();
+    return WhatsAppConfigService.getConfig();
+  });
+
+  before(async () => {
+    const bcrypt = (await import('bcryptjs')).default;
+    const { default: UserModel } = await import('../src/models/User.js');
+    const { default: TenantUser } = await import('../src/models/TenantUser.js');
+    const { default: Subscription } = await import('../src/models/Subscription.js');
+    // A caixa precisa de assinatura para a rota responder alguma coisa além do
+    // 402 do portão; a do beta serve de molde.
+    const daBeta = await getDb()('subscriptions').where({ tenant_id: beta }).first();
+    if (!(await getDb()('subscriptions').where({ tenant_id: caixa }).first())) {
+      await runInTenant(caixa, () => Subscription.createCurrent({ plan_id: daBeta.plan_id, status: 'active' }));
+      SubscriptionService.invalidate(caixa);
+    }
+    membroId = await runInTenant(caixa, () => UserModel.create({
+      username: 'admin-da-caixa',
+      password: bcrypt.hashSync('senha-da-caixa-1', 10),
+      role: 'admin',
+      email: 'admin-da-caixa@exemplo.test'
+    }));
+    await runInTenant(caixa, () => TenantUser.create({ tenantId: caixa, userId: membroId, role: 'admin' }));
+    const login = await call(`${panelUrl}/api/auth/login`, {
+      method: 'POST', body: { username: 'admin-da-caixa', password: 'senha-da-caixa-1' }
+    });
+    assert.equal(login.status, 200, JSON.stringify(login.body));
+    membroToken = login.body.data.token;
+  });
+
+  it('o admin da equipe que não é da plataforma não troca o servidor', async () => {
+    const antes = await servidorDaCaixa();
+    for (const corpo of [
+      { managedUrl: 'https://evo.atacante.test' },
+      { managedAdminKey: 'chave-do-atacante' },
+      { webhookBaseUrl: 'https://atacante.test' },
+      { allowedHosts: 'atacante.test' },
+      { cloudVerifyToken: 'verifica-do-atacante' },
+      { cloudCallbackUrl: 'https://atacante.test/webhook/meta' }
+    ]) {
+      const { status, body } = await doMembro('/whatsapp/config', { method: 'PUT', body: corpo });
+      assert.equal(status, 403, `${Object.keys(corpo)[0]}: ${JSON.stringify(body)}`);
+      assert.equal(body.code, 'platform_admin_only');
+    }
+    const depois = await servidorDaCaixa();
+    for (const campo of ['managedUrl', 'managedAdminKey', 'webhookBaseUrl', 'allowedHosts', 'cloudVerifyToken', 'cloudCallbackUrl']) {
+      assert.deepEqual(depois[campo], antes[campo], `${campo} mudou`);
+    }
+  });
+
+  it('mas salva o resto da tela, com o servidor intacto no formulário', async () => {
+    // O que a tela manda: o formulário inteiro, servidor incluído, como lido.
+    const { body: lido } = await doMembro('/whatsapp/config');
+    const { status, body } = await doMembro('/whatsapp/config', {
+      method: 'PUT',
+      body: {
+        enabled: lido.data.enabled,
+        webhookBaseUrl: lido.data.webhookBaseUrl,
+        allowedHosts: lido.data.allowedHosts.join('\n'),
+        managedUrl: lido.data.managedUrl,
+        cloudCallbackUrl: lido.data.cloudCallbackUrl,
+        cloudVerifyToken: lido.data.cloudWebhook.verifyToken,
+        rejectCallMessage: 'A caixa só atende por texto.'
+      }
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.rejectCallMessage, 'A caixa só atende por texto.');
+  });
+
+  it('a personificação da caixa também não troca, mesmo sendo de quem tem a chave', async () => {
+    const { generateImpersonationToken } = await import('../src/middleware/auth.js');
+    const dono = await getDb()('users').where({ username: OWNER.username }).first();
+    const personificando = generateImpersonationToken(dono, caixa);
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {
+      method: 'PUT',
+      headers: authHeaders(personificando),
+      body: { managedUrl: 'https://evo.personificado.test' }
+    });
+    assert.equal(status, 403, JSON.stringify(body));
+    assert.equal(body.code, 'platform_admin_only', 'a recusa tem que ser esta guarda, não outro muro');
+    assert.notEqual((await servidorDaCaixa()).managedUrl, 'https://evo.personificado.test');
+  });
+
+  it('no cadastro da plataforma, troca', async () => {
+    await getDb()('platform_admins').insert({ user_id: membroId });
+    try {
+      const { status, body } = await doMembro('/whatsapp/config', {
+        method: 'PUT', body: { managedUrl: 'https://evo3.plataforma.test' }
+      });
+      assert.equal(status, 200, JSON.stringify(body));
+      assert.equal((await servidorDaCaixa()).managedUrl, 'https://evo3.plataforma.test');
+    } finally {
+      await getDb()('platform_admins').where({ user_id: membroId }).del();
+    }
+  });
+});

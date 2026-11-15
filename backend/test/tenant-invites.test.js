@@ -532,3 +532,88 @@ describe('por onde o token do convite viaja', () => {
     assert.equal(comToken.body.data.role, 'tech');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O convite não sobrevive à autoridade de quem o cunhou
+//
+// Um `admin` prestes a ser desligado cunharia um convite de `admin` com trinta
+// dias de validade, guardaria o link e, removido ou rebaixado, voltaria com uma
+// conta nova e o mesmo papel. Duas defesas, testadas separadamente: o aceite
+// reconfere quem convidou (vale mesmo se a revogação nunca rodar), e a remoção
+// e o rebaixamento revogam os convites que a pessoa não poderia mais cunhar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('o convite de quem saiu ou caiu', () => {
+  const aberto = async (id) => {
+    const linha = await getDb()('tenant_invites').where({ id }).first();
+    return !linha.revoked_at && !linha.accepted_at;
+  };
+  const aceitar = (token, username) => callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+    method: 'POST',
+    body: { token, username, password: `senha-de-${username}-1`, email: `${username}@exemplo.test` }
+  });
+
+  it('remover quem convidou revoga o convite, e o aceite responde como inexistente', async () => {
+    const saindoId = await criarOperador(alfa, 'admin-de-saida', 'senha-de-saida-1', 'admin');
+    const saindo = await entrar(ALFA, 'admin-de-saida', 'senha-de-saida-1');
+    const { id, token } = await convidar(ALFA, saindo, { role: 'admin', ttlMs: 30 * 24 * 60 * 60 * 1000 });
+
+    const remocao = await callAs(ALFA, `${panelUrl}/api/users/${saindoId}`, {
+      method: 'DELETE', headers: comToken(alfaOwnerToken)
+    });
+    assert.equal(remocao.status, 200, JSON.stringify(remocao.body));
+    assert.equal(await aberto(id), false, 'o convite de quem saiu ficou aberto');
+
+    const previa = await callAs(ALFA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token } });
+    assert.equal(previa.status, 404);
+    const aceite = await aceitar(token, 'admin-de-volta');
+    assert.equal(aceite.status, 404, JSON.stringify(aceite.body));
+    assert.equal(await User.findByLogin('admin-de-volta'), null);
+  });
+
+  it('o aceite recusa mesmo que a revogação não tenha rodado', async () => {
+    // O vínculo some por fora da rota — a revogação nunca acontece, e só a
+    // conferência no aceite está de pé.
+    const id = await criarOperador(alfa, 'admin-por-fora', 'senha-por-fora-1', 'admin');
+    const sessao = await entrar(ALFA, 'admin-por-fora', 'senha-por-fora-1');
+    const convite = await convidar(ALFA, sessao, { role: 'admin' });
+    await TenantUser.remove(alfa, id);
+    assert.equal(await aberto(convite.id), true, 'premissa: a linha continua aberta');
+
+    const aceite = await aceitar(convite.token, 'admin-por-fora-2');
+    assert.equal(aceite.status, 404, JSON.stringify(aceite.body));
+  });
+
+  it('rebaixar abaixo de quem administra revoga os convites dela', async () => {
+    const caindoId = await criarOperador(alfa, 'admin-rebaixado', 'senha-rebaixada-1', 'admin');
+    const caindo = await entrar(ALFA, 'admin-rebaixado', 'senha-rebaixada-1');
+    const convite = await convidar(ALFA, caindo, { role: 'tech' });
+    const deOutro = await convidar(ALFA, alfaAdminToken, { role: 'tech' });
+
+    const patch = await callAs(ALFA, `${panelUrl}/api/users/${caindoId}`, {
+      method: 'PATCH', headers: comToken(alfaOwnerToken), body: { role: 'tech' }
+    });
+    assert.equal(patch.status, 200, JSON.stringify(patch.body));
+    assert.equal(await aberto(convite.id), false, 'o convite de quem caiu ficou aberto');
+    assert.equal(await aberto(deOutro.id), true, 'o convite de outra pessoa não é desta conta');
+    assert.equal((await aceitar(convite.token, 'tech-do-rebaixado')).status, 404);
+  });
+
+  it('o owner que vira admin perde só os convites de owner', async () => {
+    const donaId = await criarOperador(alfa, 'segunda-dona', 'senha-segunda-dona-1', 'owner');
+    const dona = await entrar(ALFA, 'segunda-dona', 'senha-segunda-dona-1');
+    const deOwner = await convidar(ALFA, dona, { role: 'owner' });
+    const deAdmin = await convidar(ALFA, dona, { role: 'admin' });
+
+    const patch = await callAs(ALFA, `${panelUrl}/api/users/${donaId}`, {
+      method: 'PATCH', headers: comToken(alfaOwnerToken), body: { role: 'admin' }
+    });
+    assert.equal(patch.status, 200, JSON.stringify(patch.body));
+    assert.equal(await aberto(deOwner.id), false, 'o convite de owner sobreviveu ao rebaixamento');
+    assert.equal(await aberto(deAdmin.id), true, 'admin continua podendo convidar admin');
+
+    assert.equal((await aceitar(deOwner.token, 'owner-que-nao-veio')).status, 404);
+    const certo = await aceitar(deAdmin.token, 'admin-que-veio');
+    assert.equal(certo.status, 201, JSON.stringify(certo.body));
+    assert.equal(certo.body.data.user.role, 'admin');
+  });
+});

@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 import { runUnscoped } from '../config/tenantContext.js';
+import { normalizeRole, roleHas } from '../config/permissions.js';
+import TenantUser from './TenantUser.js';
+import PlatformAdmin from './PlatformAdmin.js';
 
 /**
  * O convite para entrar na equipe de um provedor.
@@ -145,6 +148,72 @@ class TenantInvite {
       .whereNull('revoked_at')
       .update({ revoked_at: new Date(), updated_at: new Date() });
     return changed > 0;
+  }
+
+  /**
+   * Se quem cunhou o convite AINDA poderia cunhá-lo, agora.
+   *
+   * O convite carrega a autoridade de quem o criou, e essa autoridade não é
+   * congelada no dia da criação: um `admin` prestes a ser desligado cunharia um
+   * convite de `admin` com trinta dias de validade, guardaria o link, e depois
+   * de removido (ou rebaixado) entraria de volta com uma conta nova e o mesmo
+   * papel. Por isso a regra é reaplicada no aceite, e é a mesma da criação em
+   * `inviteController.create`: precisa administrar a equipe
+   * (`operators.manage`) e, para um convite de `owner`, ser `owner`.
+   *
+   * Quem está no cadastro da plataforma passa: é o console
+   * (`platformMemberController.invite`) que entrega o provedor ao primeiro
+   * dono, e quem cunhou por lá não tem — nem precisa ter — vínculo com o
+   * provedor. A conferência é fresca, então tirar a pessoa do cadastro também
+   * mata os convites que ela cunhou pelo console.
+   *
+   * `created_by` nulo recusa: a coluna é `ON DELETE SET NULL`, então nulo é
+   * "quem convidou não existe mais", e um convite sem ninguém por trás não tem
+   * autoridade de quem herdar.
+   */
+  static async creatorCanGrant({ createdBy, tenantId, role }) {
+    const userId = Number(createdBy);
+    if (!Number.isInteger(userId) || userId <= 0) return false;
+    if (await PlatformAdmin.has(userId)) return true;
+    const membership = await TenantUser.find(tenantId, userId);
+    if (!membership) return false;
+    const creatorRole = normalizeRole(membership.role);
+    if (!roleHas(creatorRole, 'operators.manage')) return false;
+    if (normalizeRole(role) === 'owner' && creatorRole !== 'owner') return false;
+    return true;
+  }
+
+  /** `creatorCanGrant` sobre a linha do convite. */
+  static async creatorStillGrants(invite) {
+    if (!invite) return false;
+    return TenantInvite.creatorCanGrant({
+      createdBy: invite.created_by,
+      tenantId: invite.tenant_id,
+      role: invite.role
+    });
+  }
+
+  /**
+   * Revoga os convites em aberto que `userId` cunhou neste provedor e que ele
+   * não poderia mais cunhar — chamado quando o vínculo dele some ou o papel
+   * cai. É a metade "arrumar a casa" da regra de cima: o aceite já recusaria
+   * esses convites, mas deixá-los na lista como abertos mentiria para quem
+   * administra a tela. Devolve quantos foram revogados.
+   */
+  static async revokeUngrantableBy(userId, tenantId) {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) return 0;
+    const abertos = await tdb('tenant_invites')
+      .where({ created_by: id })
+      .whereNull('accepted_at')
+      .whereNull('revoked_at')
+      .select('id', 'role');
+    let revogados = 0;
+    for (const invite of abertos) {
+      if (await TenantInvite.creatorCanGrant({ createdBy: id, tenantId, role: invite.role })) continue;
+      if (await TenantInvite.revoke(invite.id)) revogados += 1;
+    }
+    return revogados;
   }
 
   /** Se a linha ainda pode ser usada. */

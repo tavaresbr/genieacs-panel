@@ -556,6 +556,7 @@ export default {
   'whatsapp.accountsLoaded': '{count} número(s) de WhatsApp',
   'whatsapp.accountsLoadFailed': 'No se pudieron listar los números de WhatsApp',
   'whatsapp.error.incompleteConfig': 'Indica la URL pública del webhook antes de activar la integración: es por donde el servidor Evolution devuelve QR, mensajes y recibos',
+  'whatsapp.error.serverPlatformAdminOnly': 'Solo un administrador de la plataforma puede cambiar el servidor de WhatsApp que atiende a todos los proveedores',
   'whatsapp.error.invalidWebhookUrl': 'La URL del webhook no es válida',
   'whatsapp.error.publicUrlProtocol': 'La dirección debe ser http o https',
   'whatsapp.error.publicUrlCredentials': 'La dirección no puede contener usuario y contraseña',

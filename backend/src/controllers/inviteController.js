@@ -396,6 +396,10 @@ class InviteController {
     const invite = await TenantInvite.findByToken(req.body?.token);
     if (!TenantInvite.isOpen(invite)) return null;
     if (Number(invite.tenant_id) !== Number(req.tenantId)) return null;
+    // Quem convidou precisa AINDA poder convidar para aquele papel: removido ou
+    // rebaixado depois de cunhar, o link dele não vale mais. Mesmo null, mesmo
+    // 404 — "o seu convite morreu porque quem o mandou saiu" também é oráculo.
+    if (!await TenantInvite.creatorStillGrants(invite)) return null;
     return invite;
   }
 }

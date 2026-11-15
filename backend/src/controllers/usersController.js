@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import RefreshToken from '../models/RefreshToken.js';
 import TenantUser from '../models/TenantUser.js';
+import TenantInvite from '../models/TenantInvite.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import OperatorProfile, { summary as profileSummary } from '../models/OperatorProfile.js';
 import { validateProfileInput, parseAvatarDataUrl } from '../utils/operatorProfileValidation.js';
@@ -388,6 +389,10 @@ class UsersController {
         }
         await TenantUser.setRole(tenantId, id, nextRole);
         await applyRoleSideEffects(id, nextRole, tenantId);
+        // Os convites em aberto que ela cunhou e que o papel novo não cunharia
+        // morrem junto: o aceite já os recusaria, mas a tela os mostraria
+        // abertos.
+        await TenantInvite.revokeUngrantableBy(id, tenantId);
         await AuditLog.fromRequest(req, {
           action: AuditLog.ACTIONS.OPERATOR_ROLE_CHANGED,
           subjectType: 'tenant_user',
@@ -649,6 +654,10 @@ class UsersController {
       }
 
       await TenantUser.remove(tenantId, id);
+      // Sem vínculo, nenhum convite que ela cunhou aqui vale mais: sem isto um
+      // `admin` desligado guardaria um link de `admin` e voltaria com conta
+      // nova. O aceite também confere; aqui a lista deixa de mentir.
+      await TenantInvite.revokeUngrantableBy(id, tenantId);
       // O cadastro (CPF, endereço…) é deste provedor e acaba com o vínculo.
       await OperatorProfile.remove(id);
       await AuditLog.fromRequest(req, {

@@ -559,6 +559,7 @@ export default {
   'whatsapp.accountsLoaded': 'номеров WhatsApp: {count}',
   'whatsapp.accountsLoadFailed': 'Не удалось получить список номеров WhatsApp',
   'whatsapp.error.incompleteConfig': 'Укажите публичный адрес webhook, прежде чем включать интеграцию: по нему сервер Evolution возвращает QR-коды, сообщения и подтверждения',
+  'whatsapp.error.serverPlatformAdminOnly': 'Только администратор платформы может изменить сервер WhatsApp, обслуживающий всех провайдеров',
   'whatsapp.error.invalidWebhookUrl': 'Адрес webhook указан неверно',
   'whatsapp.error.publicUrlProtocol': 'Адрес должен использовать http или https',
   'whatsapp.error.publicUrlCredentials': 'Адрес не может содержать имя пользователя и пароль',

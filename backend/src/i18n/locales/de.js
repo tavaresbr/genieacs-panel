@@ -512,6 +512,7 @@ export default {
   'whatsapp.accountsLoaded': '{count} WhatsApp-Nummer(n)',
   'whatsapp.accountsLoadFailed': 'WhatsApp-Nummern konnten nicht aufgelistet werden',
   'whatsapp.error.incompleteConfig': 'Gib die öffentliche Webhook-URL an, bevor du die Integration aktivierst: darüber liefert der Evolution-Server QR-Codes, Nachrichten und Empfangsbestätigungen zurück',
+  'whatsapp.error.serverPlatformAdminOnly': 'Nur ein Plattform-Administrator kann den WhatsApp-Server ändern, der alle Anbieter bedient',
   'whatsapp.error.invalidWebhookUrl': 'Die Webhook-URL ist ungültig',
   'whatsapp.error.publicUrlProtocol': 'Die Adresse muss http oder https sein',
   'whatsapp.error.publicUrlCredentials': 'Die Adresse darf keinen Benutzernamen und kein Passwort enthalten',

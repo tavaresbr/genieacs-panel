@@ -12,6 +12,7 @@ import WaSatisfactionService from '../services/waSatisfactionService.js';
 import WaResponseTimeService from '../services/waResponseTimeService.js';
 import WaHealthService from '../services/waHealthService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
+import PlatformAdmin from '../models/PlatformAdmin.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 import AuditLog from '../models/AuditLog.js';
@@ -222,6 +223,13 @@ class WhatsAppController {
         // confere. O token segue a regra da chave: ausente mantém, "" apaga.
         cloudCallbackUrl: body.cloudCallbackUrl,
         cloudVerifyToken: body.cloudVerifyToken === undefined ? undefined : body.cloudVerifyToken
+      }, {
+        // O servidor Evolution da caixa da plataforma é o de todo provedor, e
+        // `whatsapp.config` não basta para trocá-lo: precisa estar no cadastro
+        // da plataforma, lido fresco. A personificação não conta — ela já é de
+        // um administrador da plataforma, mas é uma sessão de atendimento
+        // DENTRO de um provedor, e o servidor se troca pela sessão dela mesma.
+        allowServerFields: !req.user?.impersonation && await PlatformAdmin.has(req.user?.userId)
       });
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.WHATSAPP_CONFIG_SAVED,
