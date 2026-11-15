@@ -6,6 +6,7 @@ import User from '../models/User.js';
 import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
+import { developmentFallbackAllowed } from '../config/runtimeEnv.js';
 import { CONSOLE_AUDIENCE, PANEL_AUDIENCE, decodeOwnSessionToken, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
 import RefreshToken, { describeUserAgent } from '../models/RefreshToken.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from '../middleware/sessionCookie.js';
@@ -233,6 +234,18 @@ async function respostaDoConsole(req, res, user) {
  */
 const SIGNUP_NAME_MAX = 128;
 const BCRYPT_ROUNDS = 12;
+
+/**
+ * Na edição hospedada a primeira conta é também dona do plano de controle de
+ * TODOS os provedores (`User.createInitialAdmin`). Sem `SETUP_TOKEN`, a tela de
+ * instalação fica aberta a quem chegar primeiro entre o deploy subir e quem
+ * opera rodar `scripts/grant-platform-admin.js` — o caminho documentado. Ali,
+ * então, a instalação pela tela só existe com o código; sem ele, é como se não
+ * existisse. Desenvolvimento e teste seguem como sempre.
+ */
+function setupClosedWithoutToken() {
+  return IS_SAAS && !process.env.SETUP_TOKEN && !developmentFallbackAllowed();
+}
 
 class AuthController {
   /**
@@ -943,7 +956,7 @@ class AuthController {
       const count = await User.count();
       return res.json(
         createResponse(req.t('auth.setupStatusRetrieved'), {
-          needsSetup: count === 0,
+          needsSetup: count === 0 && !setupClosedWithoutToken(),
           // Só diz SE a tela deve pedir o código, nunca o código.
           tokenRequired: count === 0 && Boolean(process.env.SETUP_TOKEN)
         })
@@ -961,6 +974,9 @@ class AuthController {
       // Proteção de primeiro uso: com `SETUP_TOKEN` no ambiente, quem cria a
       // primeira conta precisa saber o código. Sem ela, numa instalação exposta
       // antes do cadastro, o primeiro visitante vira dono do painel.
+      if (setupClosedWithoutToken()) {
+        return res.status(404).json(createErrorResponse(req.t('common.notFound'), null, 'not_found'));
+      }
       if (process.env.SETUP_TOKEN) {
         const enviado = req.body?.setupToken ?? req.headers['x-setup-token'];
         if (!segredosIguais(process.env.SETUP_TOKEN, enviado)) {
@@ -1779,36 +1795,47 @@ class AuthController {
       if (!membership) return responder();
       const tenantDoPedido = Number(membership.tenant_id);
 
-      // A trilha é do provedor e vem ANTES do envio, porque ela registra o
-      // pedido e não a entrega: um SMTP que recusa não apaga o fato de alguém
-      // ter pedido uma senha nova para esta conta.
-      await runInTenant(tenantDoPedido, () => AuditLog.record({
-        action: AuditLog.ACTIONS.PASSWORD_RESET_REQUESTED,
-        actorUserId: user.id,
-        actorUsername: user.username,
-        subjectType: 'user',
-        subjectId: user.id,
-        ip: req.ip ?? null
-      }));
-
-      await enviarBilhete({
-        req,
-        purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
-        userId: user.id,
-        tenantId: tenantDoPedido,
-        email,
-        rota: '/reset-password',
-        assunto: 'auth.passwordResetMailSubject',
-        corpo: 'auth.passwordResetMailBody'
-      });
-
-      return responder();
+      // A resposta sai AGORA, antes da trilha e do envio. Esperar pelo SMTP só
+      // para a conta que existe fazia o tempo da resposta dizer o que o corpo
+      // dela esconde: quem existe demorava o tempo de um envio, quem não existe
+      // voltava depois de uma consulta. O resto segue em segundo plano, e uma
+      // falha nele fica no log — a resposta já era a mesma de qualquer jeito.
+      responder();
+      void AuthController.registrarEEnviarRedefinicao(req, user, tenantDoPedido, email)
+        .catch((error) => console.error('Password reset delivery error:', error));
+      return undefined;
     } catch (error) {
       // Até o erro responde igual. Um 500 que só acontece para identificador
       // que existe é a mesma pista que as mensagens diferentes seriam.
       console.error('Password reset request error:', error);
       return responder();
     }
+  }
+
+  /** O que o pedido de redefinição faz depois de responder — ver acima. */
+  static async registrarEEnviarRedefinicao(req, user, tenantDoPedido, email) {
+    // A trilha é do provedor e vem ANTES do envio, porque ela registra o
+    // pedido e não a entrega: um SMTP que recusa não apaga o fato de alguém
+    // ter pedido uma senha nova para esta conta.
+    await runInTenant(tenantDoPedido, () => AuditLog.record({
+      action: AuditLog.ACTIONS.PASSWORD_RESET_REQUESTED,
+      actorUserId: user.id,
+      actorUsername: user.username,
+      subjectType: 'user',
+      subjectId: user.id,
+      ip: req.ip ?? null
+    }));
+
+    await enviarBilhete({
+      req,
+      purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
+      userId: user.id,
+      tenantId: tenantDoPedido,
+      email,
+      rota: '/reset-password',
+      assunto: 'auth.passwordResetMailSubject',
+      corpo: 'auth.passwordResetMailBody'
+    });
   }
 
   /**

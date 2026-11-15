@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import AccountLockout from '../models/AccountLockout.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
@@ -11,7 +10,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import DeviceSwap, { publicSwap } from '../models/DeviceSwap.js';
 import TenantUser from '../models/TenantUser.js';
-import User from '../models/User.js';
+import { ownPasswordMatches } from '../middleware/confirmPassword.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 import { exportDevicesCsv } from '../services/deviceExport.js';
@@ -104,9 +103,9 @@ async function swapAcknowledgers(req, swaps) {
 
 /** Se `password` é a senha de quem está logado. */
 async function senhaDoOperadorConfere(req, password) {
-  const user = await User.findById(req.user?.userId);
-  return Boolean(user?.password)
-    && await bcrypt.compare(String(password).slice(0, 128), user.password);
+  // A mesma conferência (e a mesma trava por conta) das outras telas que
+  // pedem a senha de novo.
+  return ownPasswordMatches(req, String(password), { via: 'device_confirm' });
 }
 
 class DeviceController {

@@ -142,6 +142,8 @@ server {
     # (`express.json`). As exceções têm `location` e teto próprios logo abaixo:
     # importação de contatos, anexos do WhatsApp e envio de firmware.
     client_max_body_size 2m;
+    # Sem a versão do nginx nas páginas de erro e no cabeçalho `Server`.
+    server_tokens off;
 
     # --- O agente do GenieACS (WebSocket) ---------------------------------
     #
@@ -259,6 +261,24 @@ server {
         proxy_send_timeout 180s;
     }
 
+    # O webhook do Evolution leva o token na URL (`?t=…`), e o log padrão do
+    # nginx grava a URL inteira: quem lesse /var/log/nginx teria o token de
+    # cada número e poderia forjar mensagens recebidas. Esta rota não entra no
+    # log de acesso; o painel registra as recusas do seu lado, sem o token.
+    location = /api/whatsapp-webhook {
+        proxy_pass http://127.0.0.1:5890;
+        access_log off;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_read_timeout 120s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:5890;
 
@@ -289,6 +309,8 @@ server {
     ssl_prefer_server_ciphers off;
 
     client_max_body_size 2m;
+    # Sem a versão do nginx nas páginas de erro e no cabeçalho `Server`.
+    server_tokens off;
 
     # O agente do GenieACS: o mesmo bloco do ápice, e pelo mesmo motivo — o
     # `Connection ""` do `location /` abaixo apagaria o upgrade do WebSocket.
@@ -391,6 +413,24 @@ server {
         proxy_request_buffering off;
         proxy_read_timeout 180s;
         proxy_send_timeout 180s;
+    }
+
+    # O webhook do Evolution leva o token na URL (`?t=…`), e o log padrão do
+    # nginx grava a URL inteira: quem lesse /var/log/nginx teria o token de
+    # cada número e poderia forjar mensagens recebidas. Esta rota não entra no
+    # log de acesso; o painel registra as recusas do seu lado, sem o token.
+    location = /api/whatsapp-webhook {
+        proxy_pass http://127.0.0.1:5890;
+        access_log off;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_read_timeout 120s;
     }
 
     location / {

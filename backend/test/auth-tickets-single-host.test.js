@@ -164,6 +164,21 @@ after(async () => {
   await new Promise((resolve) => smtp.close(resolve));
 });
 
+/**
+ * O pedido de redefinição responde ANTES de mandar (o tempo da resposta não
+ * pode dizer quem tem conta), então a mensagem chega depois dele: espera até
+ * `n` mensagens na caixa, ou o prazo. `silencio` é o par para provar que nada
+ * saiu: espera o bastante para um envio que fosse sair ter saído.
+ */
+async function aguardarCaixa(n = 1, prazo = 5000) {
+  const fim = Date.now() + prazo;
+  while (recebidas.length < n && Date.now() < fim) {
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+const silencio = (ms = 400) => new Promise((r) => setTimeout(r, ms));
+
 describe('redefinição de senha num deploy de host único', () => {
   it('manda o link para quem trabalha em outro provedor que não o primeiro', async () => {
     recebidas.length = 0;
@@ -174,6 +189,7 @@ describe('redefinição de senha num deploy de host único', () => {
     // A resposta é a mesma sempre — é o que impede a rota de virar oráculo —,
     // então o que prova a correção é a mensagem ter saído.
     assert.equal(status, 200, JSON.stringify(body));
+    await aguardarCaixa();
     assert.equal(recebidas.length, 1, 'nenhuma mensagem saiu para quem não é do primeiro provedor');
     assert.match(ultimaMensagem(), /do-segundo@exemplo\.test/);
   });
@@ -181,6 +197,7 @@ describe('redefinição de senha num deploy de host único', () => {
   it('arquiva o pedido na trilha do provedor da pessoa, não na do endereço', async () => {
     recebidas.length = 0;
     await api('/api/auth/password-reset', { method: 'POST', body: { identifier: 'do-segundo' } });
+    await aguardarCaixa();
 
     const noSegundo = await runInTenant(segundo, () => AuditLog.list({ limit: 20 }));
     const linha = (noSegundo.items ?? noSegundo).find(
@@ -198,6 +215,7 @@ describe('redefinição de senha num deploy de host único', () => {
   it('o link cunhado para outro provedor é resgatável no host único', async () => {
     recebidas.length = 0;
     await api('/api/auth/password-reset', { method: 'POST', body: { identifier: 'do-segundo' } });
+    await aguardarCaixa();
     const bilhete = bilheteDaMensagem('/reset-password');
 
     const trocada = await api('/api/auth/password-reset/confirm', {

@@ -1,8 +1,8 @@
 import MappingNode from '../models/MappingNode.js';
 import MappingEdge from '../models/MappingEdge.js';
-import User from '../models/User.js';
-import bcrypt from 'bcryptjs';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { roleHas } from '../config/permissions.js';
+import { ownPasswordMatches } from '../middleware/confirmPassword.js';
 import { searchPlaces } from '../services/addressLookupService.js';
 import MapStatusService from '../services/mapStatusService.js';
 import OutageEvent from '../models/OutageEvent.js';
@@ -647,15 +647,19 @@ class MappingController {
         );
       }
 
-      const user = await User.findById(req.user.userId);
-      
-      if (!user || user.role !== 'admin') {
+      // Apagar o mapa inteiro é de quem administra o provedor: o papel da
+      // membership (o do token), e não `users.role`, que é da pessoa e não diz
+      // nada sobre ESTE provedor — por ela o dono era recusado e um admin de
+      // outro provedor passava.
+      if (!roleHas(req.user?.role, 'operators.manage')) {
         return res.status(403).json(
           createErrorResponse(req.t('auth.insufficientPermissions'))
         );
       }
 
-      const isPasswordValid = await bcrypt.compare(password, user.password);
+      // A mesma conferência (e a mesma trava por conta) das outras telas que
+      // pedem a senha de novo.
+      const isPasswordValid = await ownPasswordMatches(req, String(password), { via: 'mapping_reset' });
       
       if (!isPasswordValid) {
         return res.status(400).json(

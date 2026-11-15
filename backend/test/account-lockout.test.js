@@ -322,3 +322,37 @@ describe('o convite', () => {
     assert.equal(JSON.parse(linhas[0].detail).via, 'invite');
   });
 });
+
+describe('as telas que pedem a senha de novo', () => {
+  const zerarMapa = (token, password) => call(`${panelUrl}/api/mapping-data/reset`, {
+    method: 'DELETE', headers: authHeaders(token), body: { password }
+  });
+
+  it('a senha errada conta na mesma trava do login, e travada a certa não passa', async () => {
+    const alvo = await pessoa();
+    const token = (await entrar(alvo.username, alvo.password)).body.data.token;
+    for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const { status, body } = await zerarMapa(token, ERRADA);
+      assert.equal(status, 400, JSON.stringify(body));
+    }
+    // Travada, a senha certa recebe a mesma recusa — a tela não vira oráculo.
+    const travada = await zerarMapa(token, alvo.password);
+    assert.equal(travada.status, 400, JSON.stringify(travada.body));
+    assertTravada(await entrar(alvo.username, alvo.password));
+    const linhas = await travasNaTrilha(alvo.id);
+    assert.equal(JSON.parse(linhas[0].detail).via, 'mapping_reset');
+  });
+
+  it('a senha certa zera a contagem: quem confirma sempre não se tranca', async () => {
+    const alvo = await pessoa();
+    const token = (await entrar(alvo.username, alvo.password)).body.data.token;
+    for (let i = 0; i < LOCKOUT_MAX_ATTEMPTS - 1; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await zerarMapa(token, ERRADA);
+    }
+    const ok = await zerarMapa(token, alvo.password);
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(await linha(AccountLockout.forUser(alvo.id)), undefined);
+  });
+});

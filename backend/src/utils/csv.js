@@ -13,7 +13,10 @@ export function csvCell(value) {
   let text = value === null || value === undefined ? '' : String(value);
   // Um número puro — `-27`, `-19,8` — não é fórmula, e o apóstrofo o tornaria
   // texto com o apóstrofo à vista: o RX de toda ONT começa com `-`.
-  if (/^[=+\-@\t\r]/.test(text) && !NUMERO.test(text)) text = `'${text}`;
+  // Também depois de espaço ou quebra de linha no começo (` =HYPERLINK(…)`):
+  // há planilhas que aparam o espaço e leem a fórmula. A mesma regra das
+  // planilhas que a tela monta (`frontend/src/lib/tenant-charges.ts`).
+  if (/^\s*[=+\-@]|^[\t\r\n]/.test(text) && !NUMERO.test(text)) text = `'${text}`;
   return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
