@@ -81,7 +81,7 @@ describe('saas edition, first-run setup in production', () => {
   });
 
   it('with SETUP_TOKEN the code is required', async () => {
-    await emProducao({ SETUP_TOKEN: 'codigo-de-instalacao-bem-comprido-1234' }, async () => {
+    await emProducao({ SETUP_TOKEN: 'x'.repeat(32) }, async () => {
       const { status } = await call(`${panelUrl}/api/auth/setup`, {
         method: 'POST', body: { ...conta, setupToken: 'errado' }
       });
