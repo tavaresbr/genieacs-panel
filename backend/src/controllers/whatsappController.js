@@ -7,6 +7,7 @@ import WaBotConfigService from '../services/waBotConfigService.js';
 import WaMarketingOptOutService from '../services/waMarketingOptOutService.js';
 import WaAiService from '../services/waAiService.js';
 import WaSalesReportService from '../services/waSalesReportService.js';
+import WaAiUsageService from '../services/waAiUsageService.js';
 import WaBotReportService from '../services/waBotReportService.js';
 import WaSatisfactionService from '../services/waSatisfactionService.js';
 import WaResponseTimeService from '../services/waResponseTimeService.js';
@@ -105,6 +106,17 @@ class WhatsAppController {
         req.t('whatsapp.configLoaded'),
         await WaSalesReportService.report({ days: Number(req.query?.days) })
       ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `GET /api/whatsapp/ai-usage?days=` — chamadas e tokens da IA por tarefa. Só contagem, sem texto nem dinheiro. */
+  static async getAiUsage(req, res) {
+    try {
+      const days = [7, 30, 90].includes(Number(req.query?.days)) ? Number(req.query.days) : 30;
+      const [uso, ai] = await Promise.all([WaAiUsageService.resumo({ days }), WaBotConfigService.getConfig()]);
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), { ...uso, fastModelSet: Boolean(ai.ai?.fastModel) }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');
     }

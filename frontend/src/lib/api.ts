@@ -6571,6 +6571,16 @@ export type SaleResult =
   | { outcome: 'lost'; reason: SaleLostReason }
 
 /** `GET /whatsapp/sales-report`: as vendas que a IA entregou e como terminaram. */
+/** `GET /whatsapp/ai-usage`: chamadas e tokens da IA por tarefa. Só contagem. */
+export interface AiUsageReport {
+  days: 7 | 30 | 90
+  tasks: Array<{ task: string; calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number }>
+  total: { calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number }
+  /** Da leitura de entrada, quanto veio do cache (%); null sem leitura. */
+  cacheHitRate: number | null
+  fastModelSet: boolean
+}
+
 export interface SalesReport {
   days: 7 | 30 | 90
   leads: number
@@ -6689,6 +6699,9 @@ export const whatsappAPI = {
   /** O copiloto: o texto da caixa reescrito no modo pedido. Nada é enviado nem gravado. */
   rewriteReply: (conversationId: number, text: string, mode: RewriteMode) =>
     apiClient.post<{ text: string }>(`/whatsapp/conversations/${conversationId}/ai-rewrite`, { text, mode }),
+
+  getAiUsage: (days: 7 | 30 | 90) =>
+    apiClient.get<AiUsageReport>(`/whatsapp/ai-usage?days=${days}`),
 
   getSalesReport: (days: 7 | 30 | 90) =>
     apiClient.get<SalesReport>(`/whatsapp/sales-report?days=${days}`),
