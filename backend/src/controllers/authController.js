@@ -298,9 +298,10 @@ async function responderEmailJaCadastrado({ req, res, slug, name, email, passwor
       text: req.t('auth.signupExistingMailBody', { product: PRODUCT_NAME })
     }).catch(() => false);
   }
-  // Sem o endereço no log: o log não pode virar a lista que a resposta deixou
-  // de ser.
-  console.info(`Signup: the e-mail already has an account; answered as created and notified it (slug ${slug}).`);
+  // Nada do pedido no log (nem o endereço, nem o subdomínio digitado): o log
+  // não pode virar a lista que a resposta deixou de ser, nem receber linha
+  // forjada.
+  console.info('Signup: the e-mail already has an account; answered as created and notified it.');
   return res.status(201).json(createResponse(req.t('auth.signupCreated'), {
     tenant: { slug, name },
     panelUrl,
