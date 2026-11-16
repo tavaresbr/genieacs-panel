@@ -29,6 +29,9 @@ router.delete('/:id', authenticateToken, requirePermission('operators.manage'), 
 // nada: é o preço de não deixar a credencial no caminho, que o `requestLogger`
 // grava inteiro. Ver `usableInvite` para o resto do motivo.
 router.post('/token/preview', inviteAcceptLimiter, InviteController.preview);
+// Duas rotas, uma por caminho: quem escolhe entre criar conta e provar a que
+// já tem é a ROTA, e não um campo do corpo — ver `InviteController.accept`.
 router.post('/token/accept', inviteAcceptLimiter, InviteController.accept);
+router.post('/token/join', inviteAcceptLimiter, InviteController.join);
 
 export default router;

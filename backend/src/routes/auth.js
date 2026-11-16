@@ -77,7 +77,11 @@ router.post('/change-password', authenticateToken, passwordChangeLimiter, AuthCo
 
 // Login em duas etapas da própria conta. O limite vem DEPOIS da sessão, para
 // contar por pessoa: é ele que segura quem tenta adivinhar os 6 dígitos numa
-// sessão roubada para desligar o 2FA.
+// sessão roubada para desligar o 2FA. Ativar, desligar e trocar os códigos
+// pedem também a senha atual (`password` no corpo): sem ela, quem roubou a
+// sessão cadastraria o próprio autenticador e trancaria a dona fora. O
+// `setup` não pede — ele só gera um segredo pendente, que não vale nada até a
+// ativação.
 router.get('/mfa', authenticateToken, AuthController.mfaStatus);
 router.post('/mfa/setup', authenticateToken, mfaLimiter, AuthController.mfaSetup);
 router.post('/mfa/enable', authenticateToken, mfaLimiter, AuthController.mfaEnable);

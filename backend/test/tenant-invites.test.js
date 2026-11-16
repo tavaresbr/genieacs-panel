@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
@@ -29,6 +29,7 @@ const { tinsertReturningId } = await import('../src/config/database.js');
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
 const { default: TenantInvite } = await import('../src/models/TenantInvite.js');
+const { inviteAcceptLimiter, tenantIpKey } = await import('../src/middleware/rateLimit.js');
 
 /** Requisição com `Host` escolhido — `fetch` não faz isto. Ver `tenant-subdomain`. */
 function callAs(host, url, { method = 'GET', headers = {}, body } = {}) {
@@ -214,16 +215,16 @@ describe('aceitar', () => {
     // ISPs. Ninguém aqui escolhe a senha dele.
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'viewer' });
 
-    const errada = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'chute-errado-1', email: 'plantao-novo@exemplo.test' }
+    const errada = await callAs(BETA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'chute-errado-1' }
     });
     assert.equal(errada.status, 401, 'sem a senha, não entra');
     // E o convite continua de pé: uma tentativa errada não pode queimá-lo, ou
     // qualquer um com o link derrubaria o convite de quem foi convidado.
     assert.equal((await callAs(BETA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token: token } })).status, 200);
 
-    const certa = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', email: 'plantao-novo@exemplo.test' }
+    const certa = await callAs(BETA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1' }
     });
     assert.equal(certa.status, 201, JSON.stringify(certa.body));
     assert.equal(Number(certa.body.data.user.tenantId), Number(beta));
@@ -237,20 +238,27 @@ describe('aceitar', () => {
     assert.deepEqual(vinculos.map((v) => v.role), ['tech', 'viewer']);
   });
 
-  it('a regra da senha nova não se pula por um campo do corpo: quem decide é o banco', async () => {
+  it('a regra da senha nova não se pula por um campo do corpo', async () => {
     const { token } = await convidar(ALFA, alfaAdminToken, { role: 'viewer' });
-    // Conta que NÃO existe, com o corpo dizendo que existe: a regra vale igual.
-    const bandeiras = { existing: true, existingAccount: true, accountExists: true, skipPolicy: true };
+    // Bandeiras no corpo não mudam nada: quem escolhe o caminho é a ROTA
+    // (`/token/accept` conta nova, `/token/join` conta que já existe).
+    const inventadas = { existing: true, accountExists: true, existingAccount: true, skipPolicy: true };
     for (const password of ['curta-1', 'password123']) {
       const r = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
-        method: 'POST', body: { token, username: 'sem-atalho', password, email: 'sem-atalho@exemplo.test', ...bandeiras }
+        method: 'POST', body: { token, username: 'sem-atalho', password, email: 'sem-atalho@exemplo.test', ...inventadas }
       });
       assert.equal(r.status, 400, `${password}: ${JSON.stringify(r.body)}`);
       assert.ok(['password_length', 'password_too_common'].includes(r.body.code), JSON.stringify(r.body));
     }
+    // E a rota de verdade, numa conta que NÃO existe, não cria conta com
+    // senha fraca: "já tenho conta" só anexa quem prova a senha que já tem.
+    const fingindo = await callAs(ALFA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token, username: 'sem-atalho', password: 'curta-1', email: 'sem-atalho@exemplo.test' }
+    });
+    assert.equal(fingindo.status, 401, JSON.stringify(fingindo.body));
     assert.equal(await getDb()('users').where({ username: 'sem-atalho' }).first(), undefined);
     // O teto vale também para quem diz já ter conta, antes de qualquer bcrypt.
-    const gigante = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+    const gigante = await callAs(ALFA, `${panelUrl}/api/invites/token/join`, {
       method: 'POST', body: { token, username: 'plantao-novo', password: 'x'.repeat(129) }
     });
     assert.equal(gigante.status, 400);
@@ -260,10 +268,24 @@ describe('aceitar', () => {
 
   it('não anexa duas vezes', async () => {
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'admin' });
-    const { status } = await callAs(BETA, `${panelUrl}/api/invites/token/accept`, {
-      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1', email: 'plantao-novo@exemplo.test' }
+    const { status, body } = await callAs(BETA, `${panelUrl}/api/invites/token/join`, {
+      method: 'POST', body: { token: token, username: 'plantao-novo', password: 'senha-do-plantao-1' }
     });
-    assert.equal(status, 409);
+    assert.equal(status, 409, JSON.stringify(body));
+  });
+
+  it('pedir conta nova com um nome que já existe não toca na conta: é o 409 do cadastro', async () => {
+    // Sem "já tenho conta", nada de conferir senha nem anexar: quem pediu conta
+    // nova com o nome de alguém recebe o mesmo "nome em uso" do cadastro
+    // público — e só depois de mandar um corpo de conta nova inteiro e válido.
+    const { token } = await convidar(ALFA, alfaAdminToken, { role: 'viewer' });
+    const r = await callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token, username: 'dona-do-beta', password: 'senha-da-dona-2', email: 'outra@exemplo.test' }
+    });
+    assert.equal(r.status, 409, JSON.stringify(r.body));
+    assert.ok(!r.body?.data?.token, 'nenhuma sessão');
+    const dona = await getDb()('users').where({ username: 'dona-do-beta' }).first();
+    assert.equal((await getDb()('tenant_users').where({ user_id: dona.id, tenant_id: alfa })).length, 0);
   });
 
   /**
@@ -335,6 +357,64 @@ describe('aceitar', () => {
     // acima, não neste.
     const orfa = await getDb()('users').where({ username: 'segundo-a-clicar' }).first();
     assert.equal(orfa, undefined, 'a pessoa não pode sobrar sem vínculo');
+  });
+});
+
+describe('o aceite não diz quem tem conta', () => {
+  /**
+   * A sonda: com um convite válido na mão — no SaaS qualquer um abre um
+   * provedor e cunha os seus —, o nome (ou e-mail) de outra pessoa, uma senha
+   * qualquer e nenhum e-mail. Antes respondia 401 se a conta existia e 400
+   * "e-mail inválido" se não existia, quantas vezes se quisesse, e cada 401
+   * gastava uma tentativa da trava da vítima.
+   */
+  async function sondar(token, username, extra = {}, rota = 'accept') {
+    return callAs(ALFA, `${panelUrl}/api/invites/token/${rota}`, {
+      method: 'POST', body: { token, username, password: 'qualquer-coisa', ...extra }
+    });
+  }
+
+  // O balde do aceite (trinta por quarto de hora, por host e endereço) é
+  // dividido com o resto do arquivo. Estes casos sondam de propósito, e não
+  // podem deixar os de baixo sem tentativas — nem herdar as de cima.
+  const baldeNovo = () => inviteAcceptLimiter.resetKey(tenantIpKey({ ip: '127.0.0.1', headers: { host: ALFA } }));
+  beforeEach(baldeNovo);
+  afterEach(baldeNovo);
+
+  it('pedido de conta nova: a mesma resposta para quem existe e quem não existe', async () => {
+    const { token } = await convidar(ALFA, alfaAdminToken);
+    const existe = await sondar(token, 'dona-do-beta');
+    const naoExiste = await sondar(token, 'ninguem-com-este-nome');
+    assert.equal(existe.status, 400, JSON.stringify(existe.body));
+    assert.equal(existe.status, naoExiste.status);
+    assert.equal(existe.raw, naoExiste.raw, 'os corpos têm que ser idênticos');
+
+    // Com e-mail mas senha fora da regra: também igual, antes de olhar o banco.
+    const fracaExiste = await sondar(token, 'dona-do-beta', { email: 'x@exemplo.test', password: 'curta' });
+    const fracaNaoExiste = await sondar(token, 'ninguem-com-este-nome', { email: 'x@exemplo.test', password: 'curta' });
+    assert.equal(fracaExiste.status, 400);
+    assert.equal(fracaExiste.raw, fracaNaoExiste.raw);
+
+    // E a trava da dona não ficou sabendo de nada disso.
+    const dona = await getDb()('users').where({ username: 'dona-do-beta' }).first();
+    assert.equal(await getDb()('account_lockouts').where({ subject: `user:${dona.id}` }).first(), undefined);
+    // Nem o convite: segue de pé.
+    assert.equal((await callAs(ALFA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token } })).status, 200);
+  });
+
+  it('"já tenho conta": senha errada e conta inexistente respondem byte a byte igual', async () => {
+    const { token } = await convidar(ALFA, alfaAdminToken);
+    const existe = await sondar(token, 'dona-do-beta', {}, 'join');
+    const naoExiste = await sondar(token, 'ninguem-com-este-nome', {}, 'join');
+    assert.equal(existe.status, 401, JSON.stringify(existe.body));
+    assert.equal(naoExiste.status, 401, JSON.stringify(naoExiste.body));
+    assert.equal(existe.raw, naoExiste.raw, 'os corpos têm que ser idênticos');
+  });
+
+  it('uma bandeira no corpo não leva o aceite de conta nova ao caminho da conta que existe', async () => {
+    const { token } = await convidar(ALFA, alfaAdminToken);
+    const r = await sondar(token, 'dona-do-beta', { existingAccount: true });
+    assert.equal(r.status, 400, JSON.stringify(r.body));
   });
 });
 
@@ -501,15 +581,15 @@ describe('a linha guardada', () => {
 // URL justamente para não chegar a servidor nenhum.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('por onde o token do convite viaja', () => {
-  it('as duas rotas não têm parâmetro nenhum no caminho', async () => {
+  it('as rotas do token não têm parâmetro nenhum no caminho', async () => {
     const { listRoutes } = await import('./helpers/routeInventory.js');
     const doConvite = listRoutes().filter((r) => r.path.includes('/invites/token'));
 
-    assert.equal(doConvite.length, 2, 'esperava a prévia e o aceite');
+    assert.equal(doConvite.length, 3, 'esperava a prévia e os dois aceites (conta nova e conta existente)');
     for (const rota of doConvite) {
       // Um `:` no caminho é um segredo indo para o log.
       assert.ok(!rota.path.includes(':'), `${rota.path} ainda carrega o token no caminho`);
-      // E as duas são POST, porque é o corpo que carrega o token agora — a
+      // E todas são POST, porque é o corpo que carrega o token agora — a
       // prévia inclusive, apesar de não escrever nada.
       assert.equal(rota.method, 'POST', rota.path);
     }
@@ -530,5 +610,90 @@ describe('por onde o token do convite viaja', () => {
     });
     assert.equal(comToken.status, 200);
     assert.equal(comToken.body.data.role, 'tech');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O convite não sobrevive à autoridade de quem o cunhou
+//
+// Um `admin` prestes a ser desligado cunharia um convite de `admin` com trinta
+// dias de validade, guardaria o link e, removido ou rebaixado, voltaria com uma
+// conta nova e o mesmo papel. Duas defesas, testadas separadamente: o aceite
+// reconfere quem convidou (vale mesmo se a revogação nunca rodar), e a remoção
+// e o rebaixamento revogam os convites que a pessoa não poderia mais cunhar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('o convite de quem saiu ou caiu', () => {
+  const aberto = async (id) => {
+    const linha = await getDb()('tenant_invites').where({ id }).first();
+    return !linha.revoked_at && !linha.accepted_at;
+  };
+  const aceitar = (token, username) => callAs(ALFA, `${panelUrl}/api/invites/token/accept`, {
+    method: 'POST',
+    body: { token, username, password: `senha-de-${username}-1`, email: `${username}@exemplo.test` }
+  });
+
+  it('remover quem convidou revoga o convite, e o aceite responde como inexistente', async () => {
+    const saindoId = await criarOperador(alfa, 'admin-de-saida', 'senha-de-saida-1', 'admin');
+    const saindo = await entrar(ALFA, 'admin-de-saida', 'senha-de-saida-1');
+    const { id, token } = await convidar(ALFA, saindo, { role: 'admin', ttlMs: 30 * 24 * 60 * 60 * 1000 });
+
+    const remocao = await callAs(ALFA, `${panelUrl}/api/users/${saindoId}`, {
+      method: 'DELETE', headers: comToken(alfaOwnerToken)
+    });
+    assert.equal(remocao.status, 200, JSON.stringify(remocao.body));
+    assert.equal(await aberto(id), false, 'o convite de quem saiu ficou aberto');
+
+    const previa = await callAs(ALFA, `${panelUrl}/api/invites/token/preview`, { method: 'POST', body: { token } });
+    assert.equal(previa.status, 404);
+    const aceite = await aceitar(token, 'admin-de-volta');
+    assert.equal(aceite.status, 404, JSON.stringify(aceite.body));
+    assert.equal(await User.findByLogin('admin-de-volta'), null);
+  });
+
+  it('o aceite recusa mesmo que a revogação não tenha rodado', async () => {
+    // O vínculo some por fora da rota — a revogação nunca acontece, e só a
+    // conferência no aceite está de pé.
+    const id = await criarOperador(alfa, 'admin-por-fora', 'senha-por-fora-1', 'admin');
+    const sessao = await entrar(ALFA, 'admin-por-fora', 'senha-por-fora-1');
+    const convite = await convidar(ALFA, sessao, { role: 'admin' });
+    await TenantUser.remove(alfa, id);
+    assert.equal(await aberto(convite.id), true, 'premissa: a linha continua aberta');
+
+    const aceite = await aceitar(convite.token, 'admin-por-fora-2');
+    assert.equal(aceite.status, 404, JSON.stringify(aceite.body));
+  });
+
+  it('rebaixar abaixo de quem administra revoga os convites dela', async () => {
+    const caindoId = await criarOperador(alfa, 'admin-rebaixado', 'senha-rebaixada-1', 'admin');
+    const caindo = await entrar(ALFA, 'admin-rebaixado', 'senha-rebaixada-1');
+    const convite = await convidar(ALFA, caindo, { role: 'tech' });
+    const deOutro = await convidar(ALFA, alfaAdminToken, { role: 'tech' });
+
+    const patch = await callAs(ALFA, `${panelUrl}/api/users/${caindoId}`, {
+      method: 'PATCH', headers: comToken(alfaOwnerToken), body: { role: 'tech' }
+    });
+    assert.equal(patch.status, 200, JSON.stringify(patch.body));
+    assert.equal(await aberto(convite.id), false, 'o convite de quem caiu ficou aberto');
+    assert.equal(await aberto(deOutro.id), true, 'o convite de outra pessoa não é desta conta');
+    assert.equal((await aceitar(convite.token, 'tech-do-rebaixado')).status, 404);
+  });
+
+  it('o owner que vira admin perde só os convites de owner', async () => {
+    const donaId = await criarOperador(alfa, 'segunda-dona', 'senha-segunda-dona-1', 'owner');
+    const dona = await entrar(ALFA, 'segunda-dona', 'senha-segunda-dona-1');
+    const deOwner = await convidar(ALFA, dona, { role: 'owner' });
+    const deAdmin = await convidar(ALFA, dona, { role: 'admin' });
+
+    const patch = await callAs(ALFA, `${panelUrl}/api/users/${donaId}`, {
+      method: 'PATCH', headers: comToken(alfaOwnerToken), body: { role: 'admin' }
+    });
+    assert.equal(patch.status, 200, JSON.stringify(patch.body));
+    assert.equal(await aberto(deOwner.id), false, 'o convite de owner sobreviveu ao rebaixamento');
+    assert.equal(await aberto(deAdmin.id), true, 'admin continua podendo convidar admin');
+
+    assert.equal((await aceitar(deOwner.token, 'owner-que-nao-veio')).status, 404);
+    const certo = await aceitar(deAdmin.token, 'admin-que-veio');
+    assert.equal(certo.status, 201, JSON.stringify(certo.body));
+    assert.equal(certo.body.data.user.role, 'admin');
   });
 });

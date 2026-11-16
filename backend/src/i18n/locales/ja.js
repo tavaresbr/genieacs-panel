@@ -558,6 +558,7 @@ export default {
   'whatsapp.accountsLoaded': 'WhatsApp の番号 {count} 件',
   'whatsapp.accountsLoadFailed': 'WhatsApp の番号を一覧できませんでした',
   'whatsapp.error.incompleteConfig': '連携を有効にする前に、公開 Webhook の URL を入力してください。Evolution サーバーはこの URL を通じて QR コード、メッセージ、受信確認を返します',
+  'whatsapp.error.serverPlatformAdminOnly': 'すべてのプロバイダーが使う WhatsApp サーバーを変更できるのはプラットフォーム管理者だけです',
   'whatsapp.error.invalidWebhookUrl': 'Webhook の URL が無効です',
   'whatsapp.error.publicUrlProtocol': 'このアドレスは http または https である必要があります',
   'whatsapp.error.publicUrlCredentials': 'このアドレスにユーザー名とパスワードを含めることはできません',

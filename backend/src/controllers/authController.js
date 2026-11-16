@@ -6,6 +6,7 @@ import User from '../models/User.js';
 import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
+import { developmentFallbackAllowed } from '../config/runtimeEnv.js';
 import { CONSOLE_AUDIENCE, PANEL_AUDIENCE, decodeOwnSessionToken, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
 import RefreshToken, { describeUserAgent } from '../models/RefreshToken.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from '../middleware/sessionCookie.js';
@@ -68,8 +69,10 @@ async function enviarBilhete({ req, purpose, userId, tenantId, email, rota, assu
     // vira oráculo —, nenhuma mensagem sai, e não há onde ler o porquê. Num
     // deploy de host único o endereço do painel não se deduz de subdomínio
     // nenhum, e `PUBLIC_BASE_URL` é a única fonte que resta.
+    // Sem o propósito no texto: o CodeQL lê o nome dele (redefinição de senha)
+    // como dado sensível. O provedor basta para achar a configuração faltando.
     console.warn(
-      `Cannot send ${purpose} ticket: no panel URL for tenant ${tenantId}. ` +
+      `Cannot send auth ticket: no panel URL for tenant ${tenantId}. ` +
       'Set PUBLIC_BASE_URL (deployments without TENANT_BASE_DOMAIN) or TENANT_BASE_DOMAIN.'
     );
     return false;
@@ -233,6 +236,18 @@ async function respostaDoConsole(req, res, user) {
  */
 const SIGNUP_NAME_MAX = 128;
 const BCRYPT_ROUNDS = 12;
+
+/**
+ * Na edição hospedada a primeira conta é também dona do plano de controle de
+ * TODOS os provedores (`User.createInitialAdmin`). Sem `SETUP_TOKEN`, a tela de
+ * instalação fica aberta a quem chegar primeiro entre o deploy subir e quem
+ * opera rodar `scripts/grant-platform-admin.js` — o caminho documentado. Ali,
+ * então, a instalação pela tela só existe com o código; sem ele, é como se não
+ * existisse. Desenvolvimento e teste seguem como sempre.
+ */
+function setupClosedWithoutToken() {
+  return IS_SAAS && !process.env.SETUP_TOKEN && !developmentFallbackAllowed();
+}
 
 class AuthController {
   /**
@@ -896,8 +911,53 @@ class AuthController {
     }
   }
 
+  /**
+   * Ativar o 2FA pede a senha atual, como desligar e trocar os códigos.
+   *
+   * Sem ela, uma sessão sequestrada bastava para cadastrar o autenticador DO
+   * ATACANTE na conta da vítima: a partir daí o login dela passa a pedir um
+   * código que só o outro tem, e ela fica trancada do lado de fora da própria
+   * conta — com o `token_version` subindo junto, a sessão dela cai na hora. A
+   * senha é o que separa "quem está na aba" de "dono da conta".
+   *
+   * A conferência passa pela MESMA trava do login, como em `changePassword`:
+   * para quem só tem o token, este campo é um oráculo da senha, e o limitador
+   * do 2FA conta por pessoa, não por palpite na senha. Errar aqui soma aos
+   * palpites do formulário de entrada.
+   *
+   * A ativação obrigatória (o provedor exige 2FA e a pessoa acabou de entrar
+   * sem ele) passa por aqui também: quem está nela acabou de digitar a senha
+   * no login, e a tela pede de novo.
+   */
   static async mfaEnable(req, res) {
     try {
+      const password = req.body?.password;
+      if (typeof password !== 'string' || !password) {
+        return res.status(400).json(
+          createErrorResponse(req.t('auth.confirmPasswordRequired'), null, 'password_required')
+        );
+      }
+      const user = await User.findById(req.user.userId);
+      if (!user) {
+        return res.status(404).json(createErrorResponse(req.t('auth.userNotFound'), null, 'user_not_found'));
+      }
+      const tentativa = await AccountLockout.attempt(AccountLockout.forUser(user.id));
+      if (!tentativa.allowed) {
+        return AccountLockout.refuse(req, res, tentativa, password, { user, via: 'mfa_enable' });
+      }
+      // O teto de 128 é o mesmo da entrada: além dele o bcrypt nem olha, e uma
+      // senha assim não é de ninguém.
+      if (password.length > 128 || !await bcrypt.compare(password, user.password)) {
+        await AccountLockout.failed(req, tentativa, { user, via: 'mfa_enable' });
+        return res.status(401).json(
+          createErrorResponse(req.t('auth.currentPasswordIncorrect'), null, 'invalid_password')
+        );
+      }
+      // A senha está provada: a contagem some aqui, e não só depois do código.
+      // O código é do autenticador que a própria pessoa acabou de ler — errá-lo
+      // não é palpite em segredo nenhum dela, e não pode trancá-la.
+      await AccountLockout.clear(tentativa.subject);
+
       const result = await MfaService.enable(req.user.userId, req.body?.code);
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_ENABLED, subjectType: 'user', subjectId: String(req.user.userId)
@@ -943,7 +1003,7 @@ class AuthController {
       const count = await User.count();
       return res.json(
         createResponse(req.t('auth.setupStatusRetrieved'), {
-          needsSetup: count === 0,
+          needsSetup: count === 0 && !setupClosedWithoutToken(),
           // Só diz SE a tela deve pedir o código, nunca o código.
           tokenRequired: count === 0 && Boolean(process.env.SETUP_TOKEN)
         })
@@ -961,6 +1021,9 @@ class AuthController {
       // Proteção de primeiro uso: com `SETUP_TOKEN` no ambiente, quem cria a
       // primeira conta precisa saber o código. Sem ela, numa instalação exposta
       // antes do cadastro, o primeiro visitante vira dono do painel.
+      if (setupClosedWithoutToken()) {
+        return res.status(404).json(createErrorResponse(req.t('common.notFound'), null, 'not_found'));
+      }
       if (process.env.SETUP_TOKEN) {
         const enviado = req.body?.setupToken ?? req.headers['x-setup-token'];
         if (!segredosIguais(process.env.SETUP_TOKEN, enviado)) {
@@ -1779,36 +1842,49 @@ class AuthController {
       if (!membership) return responder();
       const tenantDoPedido = Number(membership.tenant_id);
 
-      // A trilha é do provedor e vem ANTES do envio, porque ela registra o
-      // pedido e não a entrega: um SMTP que recusa não apaga o fato de alguém
-      // ter pedido uma senha nova para esta conta.
-      await runInTenant(tenantDoPedido, () => AuditLog.record({
-        action: AuditLog.ACTIONS.PASSWORD_RESET_REQUESTED,
-        actorUserId: user.id,
-        actorUsername: user.username,
-        subjectType: 'user',
-        subjectId: user.id,
-        ip: req.ip ?? null
-      }));
-
-      await enviarBilhete({
-        req,
-        purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
-        userId: user.id,
-        tenantId: tenantDoPedido,
-        email,
-        rota: '/reset-password',
-        assunto: 'auth.passwordResetMailSubject',
-        corpo: 'auth.passwordResetMailBody'
-      });
-
-      return responder();
+      // A resposta sai AGORA, antes da trilha e do envio. Esperar pelo SMTP só
+      // para a conta que existe fazia o tempo da resposta dizer o que o corpo
+      // dela esconde: quem existe demorava o tempo de um envio, quem não existe
+      // voltava depois de uma consulta. O resto segue em segundo plano, e uma
+      // falha nele fica no log — a resposta já era a mesma de qualquer jeito.
+      responder();
+      void AuthController.registrarEEnviarRedefinicao(req, user, tenantDoPedido, email)
+        // Nada do erro vai ao log: o que falhou aqui pode trazer a mensagem que
+        // ia sair, e ela leva o link de redefinição.
+        .catch(() => console.error('Password reset delivery failed'));
+      return undefined;
     } catch (error) {
       // Até o erro responde igual. Um 500 que só acontece para identificador
       // que existe é a mesma pista que as mensagens diferentes seriam.
       console.error('Password reset request error:', error);
       return responder();
     }
+  }
+
+  /** O que o pedido de redefinição faz depois de responder — ver acima. */
+  static async registrarEEnviarRedefinicao(req, user, tenantDoPedido, email) {
+    // A trilha é do provedor e vem ANTES do envio, porque ela registra o
+    // pedido e não a entrega: um SMTP que recusa não apaga o fato de alguém
+    // ter pedido uma senha nova para esta conta.
+    await runInTenant(tenantDoPedido, () => AuditLog.record({
+      action: AuditLog.ACTIONS.PASSWORD_RESET_REQUESTED,
+      actorUserId: user.id,
+      actorUsername: user.username,
+      subjectType: 'user',
+      subjectId: user.id,
+      ip: req.ip ?? null
+    }));
+
+    await enviarBilhete({
+      req,
+      purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
+      userId: user.id,
+      tenantId: tenantDoPedido,
+      email,
+      rota: '/reset-password',
+      assunto: 'auth.passwordResetMailSubject',
+      corpo: 'auth.passwordResetMailBody'
+    });
   }
 
   /**

@@ -559,6 +559,7 @@ export default {
   'whatsapp.accountsLoaded': '{count} numéro(s) WhatsApp',
   'whatsapp.accountsLoadFailed': 'Impossible de lister les numéros WhatsApp',
   'whatsapp.error.incompleteConfig': 'Saisissez l’URL publique du webhook avant d’activer l’intégration : c’est par elle que le serveur Evolution renvoie les QR codes, les messages et les accusés',
+  'whatsapp.error.serverPlatformAdminOnly': 'Seul un administrateur de la plateforme peut modifier le serveur WhatsApp qui dessert tous les fournisseurs',
   'whatsapp.error.invalidWebhookUrl': 'L’URL du webhook est invalide',
   'whatsapp.error.invalidBaseUrl': 'L’URL du serveur Evolution n’est pas configurée',
   'whatsapp.error.insecureBaseUrl': 'Le serveur Evolution doit utiliser https : sa clé voyage à chaque requête',

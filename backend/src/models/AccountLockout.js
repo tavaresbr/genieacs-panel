@@ -187,6 +187,16 @@ class AccountLockout {
   }
 
   /**
+   * `refuse` sem a resposta: gasta o bcrypt de enfeite e escreve a trilha se
+   * foi esta a que fechou a trava. Para quem confere a senha no meio de outra
+   * ação e responde do seu jeito (`ownPasswordMatches`).
+   */
+  static async refuseQuietly(req, tentativa, senha, { user = null, via } = {}) {
+    await bcrypt.compare(String(senha ?? '').slice(0, 128), DUMMY_PASSWORD_HASH);
+    await AccountLockout.refused(req, tentativa, { user, via });
+  }
+
+  /**
    * A tentativa voltou recusada por `attempt`. Se foi ela quem fechou a trava
    * (a rajada que passou do teto), escreve a trilha; senão, nada.
    */

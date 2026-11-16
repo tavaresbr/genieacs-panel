@@ -48,3 +48,44 @@ describe('saas edition', () => {
     assert.equal(status, 401);
   });
 });
+
+// Na edição hospedada a primeira conta ganha o plano de controle de todos os
+// provedores. Em produção, sem `SETUP_TOKEN`, a instalação pela tela não
+// existe — a primeira conta nasce no servidor (`grant-platform-admin.js`).
+describe('saas edition, first-run setup in production', () => {
+  async function emProducao(env, fn) {
+    const antes = { APP_ENV: process.env.APP_ENV, NODE_ENV: process.env.NODE_ENV, SETUP_TOKEN: process.env.SETUP_TOKEN };
+    process.env.APP_ENV = 'production';
+    process.env.NODE_ENV = 'production';
+    if (env.SETUP_TOKEN === undefined) delete process.env.SETUP_TOKEN;
+    else process.env.SETUP_TOKEN = env.SETUP_TOKEN;
+    try {
+      return await fn();
+    } finally {
+      for (const [k, v] of Object.entries(antes)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  }
+  const conta = { username: 'primeira', password: 'senha-da-primeira-1', email: 'primeira@exemplo.test' };
+
+  it('without SETUP_TOKEN the setup route answers as nonexistent', async () => {
+    await emProducao({}, async () => {
+      const { status } = await call(`${panelUrl}/api/auth/setup`, { method: 'POST', body: conta });
+      assert.equal(status, 404);
+      const estado = await call(`${panelUrl}/api/auth/setup-status`);
+      assert.equal(estado.status, 200);
+      assert.equal(estado.body.data.needsSetup, false, 'the screen must not offer the setup');
+    });
+  });
+
+  it('with SETUP_TOKEN the code is required', async () => {
+    await emProducao({ SETUP_TOKEN: 'x'.repeat(32) }, async () => {
+      const { status } = await call(`${panelUrl}/api/auth/setup`, {
+        method: 'POST', body: { ...conta, setupToken: 'errado' }
+      });
+      assert.equal(status, 403);
+    });
+  });
+});

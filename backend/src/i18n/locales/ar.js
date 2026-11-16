@@ -560,6 +560,7 @@ export default {
   'whatsapp.accountsLoaded': '{count} رقم WhatsApp',
   'whatsapp.accountsLoadFailed': 'تعذّر جلب قائمة أرقام WhatsApp',
   'whatsapp.error.incompleteConfig': 'أدخل عنوان webhook العام قبل تفعيل التكامل: فعبره يعيد خادم Evolution رموز QR والرسائل وإشعارات التسليم',
+  'whatsapp.error.serverPlatformAdminOnly': 'لا يمكن تغيير خادم WhatsApp الذي يخدم جميع المزودين إلا لمسؤول المنصة',
   'whatsapp.error.invalidWebhookUrl': 'عنوان webhook غير صالح',
   'whatsapp.error.publicUrlProtocol': 'يجب أن يكون العنوان بصيغة http أو https',
   'whatsapp.error.publicUrlCredentials': 'لا يجوز أن يحمل العنوان اسم مستخدم وكلمة مرور',

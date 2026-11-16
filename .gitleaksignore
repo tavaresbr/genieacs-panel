@@ -15,3 +15,6 @@ d262f606f1b0cd8e47ca3586d309bbb24593cb3c:backend/test/contact-teiah.test.js:gene
 # por valores de baixa entropia no commit seguinte; o commit do PR continua no histórico.
 0a7b2b6e8fe3694c1e679c8df011fb885841d792:backend/test/operator-profile.test.js:generic-api-key:23
 0a7b2b6e8fe3694c1e679c8df011fb885841d792:backend/test/operator-profile.test.js:generic-api-key:35
+# Código de instalação de teste (edition-saas.test.js), trocado por valor de
+# baixa entropia no commit seguinte; o commit do PR continua no histórico.
+b67e95a9a74cf1a7b2f98b06f9ad51d8e79447e3:backend/test/edition-saas.test.js:generic-api-key:84

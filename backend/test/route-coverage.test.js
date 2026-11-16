@@ -64,7 +64,8 @@ const PUBLICAS = new Map([
   ['POST /api/auth/console/refresh', 'o refresh do console pelo cookie DELE (outro nome, Path /api/auth/console), só no endereço da plataforma; mesma rotação e guarda do painel'],
   ['POST /api/auth/console/logout', 'a saída do console pelo cookie dele; só revoga a família, com a guarda de CSRF'],
   ['POST /api/invites/token/preview', 'o token do convite É a credencial, vai no corpo e é conferido por hash'],
-  ['POST /api/invites/token/accept', 'idem, e a senha da pessoa é conferida quando a conta já existe'],
+  ['POST /api/invites/token/accept', 'idem: cria a conta nova de quem foi convidado'],
+  ['POST /api/invites/token/join', 'idem, e a senha da pessoa é conferida: é a conta que já existe'],
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor; duas credenciais, o token da instância e o bilhete da sonda de configuração, que só devolve o nonce recebido'],
   ['POST /api/billing-webhook', 'entrega do gateway de pagamento, montada antes do resolvedor e autenticada pelo token do deploy'],
@@ -359,6 +360,7 @@ describe('toda rota sem sessão', () => {
       // token é conferido por HMAC e pelo host antes de abrir o escopo.
       'POST /api/customer/referral',
       'POST /api/invites/token/accept',
+      'POST /api/invites/token/join',
       // A prévia do convite NÃO escreve nada: ela é POST só porque o token
       // saiu do caminho e foi para o corpo, para não acabar no log do
       // servidor, que grava o caminho inteiro. Aparece nesta lista porque a

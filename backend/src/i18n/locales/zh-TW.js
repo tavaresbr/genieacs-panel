@@ -558,6 +558,7 @@ export default {
   'whatsapp.accountsLoaded': '{count} 個 WhatsApp 號碼',
   'whatsapp.accountsLoadFailed': '無法列出 WhatsApp 號碼',
   'whatsapp.error.incompleteConfig': '啟用整合前請填寫公開 Webhook 位址：Evolution 伺服器透過它回傳 QR Code、訊息與回條',
+  'whatsapp.error.serverPlatformAdminOnly': '只有平台管理員才能變更為所有服務商提供服務的 WhatsApp 伺服器',
   'whatsapp.error.invalidWebhookUrl': 'Webhook 位址無效',
   'whatsapp.error.publicUrlProtocol': '該位址需使用 http 或 https',
   'whatsapp.error.publicUrlCredentials': '該位址不能夾帶使用者名稱與密碼',

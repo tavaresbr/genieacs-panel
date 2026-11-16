@@ -128,6 +128,21 @@ async function entrar() {
   donaToken = body.data.token;
 }
 
+/**
+ * O pedido de redefinição responde ANTES de mandar (o tempo da resposta não
+ * pode dizer quem tem conta), então a mensagem chega depois dele: espera até
+ * `n` mensagens na caixa, ou o prazo. `silencio` é o par para provar que nada
+ * saiu: espera o bastante para um envio que fosse sair ter saído.
+ */
+async function aguardarCaixa(n = 1, prazo = 5000) {
+  const fim = Date.now() + prazo;
+  while (recebidas.length < n && Date.now() < fim) {
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+const silencio = (ms = 400) => new Promise((r) => setTimeout(r, ms));
+
 /** A última mensagem recebida, já legível. */
 function ultimaMensagem() {
   assert.ok(recebidas.length > 0, 'nenhuma mensagem chegou ao SMTP');
@@ -179,6 +194,7 @@ async function pedirRedefinicao(identifier = 'dona') {
     method: 'POST', body: { identifier }
   });
   assert.equal(status, 200, JSON.stringify(body));
+  await aguardarCaixa();
   return bilheteDaMensagem('/reset-password');
 }
 
@@ -389,12 +405,14 @@ describe('pedir a redefinição', () => {
     const existe = await naCasa('/api/auth/password-reset', {
       method: 'POST', body: { identifier: 'dona' }
     });
+    await aguardarCaixa();
     const enviadasDepoisDaReal = recebidas.length;
 
     recebidas.length = 0;
     const naoExiste = await naCasa('/api/auth/password-reset', {
       method: 'POST', body: { identifier: 'ninguem-com-esse-nome' }
     });
+    await silencio();
 
     assert.equal(existe.status, 200);
     assert.equal(naoExiste.status, naoExiste.status);
@@ -414,6 +432,7 @@ describe('pedir a redefinição', () => {
     });
     assert.equal(status, 200);
     assert.ok(body.success, 'a resposta continua sendo a de sempre');
+    await silencio();
     assert.equal(recebidas.length, 0, 'endereço não provado não recebe senha nova');
 
     await verificarEnderecoDaDona();
@@ -427,6 +446,7 @@ describe('pedir a redefinição', () => {
       method: 'POST', body: { identifier: 'so-do-beta@exemplo.test' }
     });
     assert.equal(status, 200);
+    await silencio();
     assert.equal(recebidas.length, 0);
 
     // E no painel dela, recebe.
@@ -434,6 +454,7 @@ describe('pedir a redefinição', () => {
       method: 'POST', body: { identifier: 'so-do-beta@exemplo.test' }
     });
     assert.equal(noDela.status, 200);
+    await aguardarCaixa();
     assert.equal(recebidas.length, 1);
     assert.match(ultimaMensagem(), /beta\.painel\.test\/reset-password/);
   });

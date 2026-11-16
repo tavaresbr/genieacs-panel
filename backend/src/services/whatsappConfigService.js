@@ -254,9 +254,12 @@ class WhatsAppConfigService {
   }
 
   /** The shape the browser is allowed to see: no secret, ever. */
-  static async getPublicConfig() {
+  static async getPublicConfig({ allowServerFields = true } = {}) {
     const config = await this.getConfig();
     const { managedAdminKey, cloudVerifyToken, ...rest } = config;
+    // Na caixa da plataforma o token de verificação da Meta é o de todo
+    // provedor: quem não pode trocá-lo (ver `saveConfig`) também não o lê.
+    const revelaToken = allowServerFields || !(await this.isPlatformBox());
     return {
       ...rest,
       managed: Boolean(config.managedUrl),
@@ -273,7 +276,7 @@ class WhatsAppConfigService {
         ? { auto: true }
         : {
           callbackUrl: this.cloudCallbackUrl(config),
-          verifyToken: cloudVerifyToken || ''
+          verifyToken: revelaToken ? (cloudVerifyToken || '') : ''
         },
       ready: this.isReady(config)
     };
@@ -290,7 +293,25 @@ class WhatsAppConfigService {
     return Boolean(config.enabled && config.webhookBaseUrl);
   }
 
-  static async saveConfig(input = {}) {
+  /**
+   * Se o tenant em escopo é a caixa da plataforma NA SAAS — a que guarda o
+   * servidor Evolution de todos os provedores. No self-hosted não há caixa: o
+   * servidor é de quem opera a instalação, e quem o configura é o dono dela.
+   */
+  static async isPlatformBox() {
+    if (!IS_SAAS) return false;
+    return (await Tenant.findById(currentTenantId()))?.kind === 'platform';
+  }
+
+  /**
+   * `allowServerFields: false` diz que quem pede NÃO pode trocar o servidor
+   * Evolution — é o caso de quem administra a equipe da caixa da plataforma sem
+   * estar no cadastro de administradores da plataforma (ver
+   * `WhatsAppController.updateConfig`). O padrão é `true` porque os outros
+   * chamadores são o próprio código (os interruptores do bot, o seed), que não
+   * falam de servidor.
+   */
+  static async saveConfig(input = {}, { allowServerFields = true } = {}) {
     // Provedor gerenciado não escreve o servidor: os campos dele são ignorados
     // em vez de recusados, porque a tela manda o formulário inteiro e o que
     // importa é que eles não sejam gravados — nem aqui, nem por cima dos da
@@ -374,6 +395,34 @@ class WhatsAppConfigService {
     let cloudVerifyToken = current.cloudVerifyToken;
     if (patch.cloudVerifyToken !== undefined) cloudVerifyToken = String(patch.cloudVerifyToken).trim().slice(0, 255);
 
+    // Na caixa da plataforma, o servidor é o de TODO provedor: trocar o
+    // endereço, a chave, o webhook, os hosts ou o token da Meta daqui redireciona
+    // o WhatsApp de todos. Isso é do administrador da plataforma, não de
+    // qualquer `admin` da equipe da caixa. Recusa, e não ignora como no
+    // provedor gerenciado: aqui quem pede está na tela que edita o servidor e
+    // precisa saber que não gravou.
+    //
+    // O que conta é MUDAR, não mandar: a tela envia o formulário inteiro, e
+    // salvar a mensagem de recusa de chamada com o servidor intacto ao lado tem
+    // que continuar passando. A chave admin é a exceção — ela nunca volta ao
+    // navegador, então a tela só a manda quando alguém a digitou, e comparar o
+    // valor faria desta rota um oráculo da chave.
+    if (!allowServerFields && !managed && await this.isPlatformBox()) {
+      // Pela lista de `platformManaged.js`, e não campo a campo: um campo de
+      // servidor que entrar lá amanhã fica protegido aqui sem ninguém lembrar.
+      // `?? ''` porque o segredo ausente é `null` guardado e `""` no formulário.
+      const gravado = { ...next, managedAdminKey, cloudVerifyToken };
+      const trocaServidor = WA_SERVER_FIELDS.some((campo) => (campo === 'managedAdminKey'
+        ? patch.managedAdminKey !== undefined
+        : JSON.stringify(gravado[campo] ?? '') !== JSON.stringify(current[campo] ?? '')));
+      if (trocaServidor) {
+        throw new WaError('whatsapp.error.serverPlatformAdminOnly', {
+          code: 'platform_admin_only',
+          status: 403
+        });
+      }
+    }
+
     // O servidor do provedor gerenciado é o da plataforma: é ELE que precisa
     // de webhook. O que o provedor tinha guardado de antes fica como estava —
     // não é lido enquanto a plataforma manda, e apagar seria destruir o que
@@ -394,7 +443,7 @@ class WhatsAppConfigService {
     // A caixa da plataforma, na SaaS, acabou de trocar o servidor de TODO
     // provedor — cada um guarda a sua cópia mesclada no cache, então aqui é
     // `clear` e não `invalidate`.
-    if (IS_SAAS && !managed && (await Tenant.findById(currentTenantId()))?.kind === 'platform') {
+    if (!managed && await this.isPlatformBox()) {
       this.configCache.clear();
     } else {
       this.invalidateConfigCache();

@@ -559,6 +559,7 @@ export default {
   'whatsapp.accountsLoaded': '{count} 个 WhatsApp 号码',
   'whatsapp.accountsLoadFailed': '无法列出 WhatsApp 号码',
   'whatsapp.error.incompleteConfig': '启用集成前请填写公网 Webhook 地址：Evolution 服务器通过它返回二维码、消息和回执',
+  'whatsapp.error.serverPlatformAdminOnly': '只有平台管理员才能更改为所有服务商提供服务的 WhatsApp 服务器',
   'whatsapp.error.invalidWebhookUrl': 'Webhook 地址无效',
   'whatsapp.error.publicUrlProtocol': '该地址需使用 http 或 https',
   'whatsapp.error.publicUrlCredentials': '该地址不能携带用户名和密码',

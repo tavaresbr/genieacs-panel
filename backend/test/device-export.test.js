@@ -72,7 +72,7 @@ const trilha = () => getDb()('audit_log').where({ action: AuditLog.ACTIONS.DEVIC
 
 describe('a célula', () => {
   it('o que a planilha leria como fórmula sai com apóstrofo', () => {
-    for (const perigo of ['=1+1', '+55', '-1+2', '-A1', '@SUM(A1)']) {
+    for (const perigo of ['=1+1', '+55', '-1+2', '-A1', '@SUM(A1)', ' =HYPERLINK("x")', '\n=1+1', '\t@A1']) {
       assert.equal(csvCell(perigo).replace(/^"|"$/g, '')[0], "'", perigo);
     }
     // Número puro não é fórmula: o RX de toda ONT começa com `-`.
