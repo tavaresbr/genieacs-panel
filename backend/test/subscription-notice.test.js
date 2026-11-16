@@ -289,6 +289,22 @@ describe('o que a mensagem leva', () => {
     assert.match(texto, /\d{4}-\d{2}-\d{2}/);
   });
 
+  it('os dias são de calendário em São Paulo, e não horas arredondadas para cima', async () => {
+    // O `after` sai segundos depois de prazo + 3 dias: são três dias, e não
+    // quatro (o `ceil` de 3,0001).
+    await comAssinatura({ renews_at: new Date('2026-11-13T15:00:00Z') });
+    const depois = await avisar(new Date('2026-11-16T15:00:05Z'));
+    assert.equal(depois.step, 'after', JSON.stringify(depois));
+    assert.match(ultima(), /vencido em 2026-11-13 \(h\S{1,2} 3 dia\(s\)\)/);
+    // O `before` às 12h para um prazo às 13h, três dias adiante: "daqui a 3",
+    // o mesmo que a data mostrada diz.
+    await getDb()('subscription_reminder_sends').del();
+    await comAssinatura({ renews_at: new Date('2026-11-19T16:00:00Z') });
+    const antes = await avisar(new Date('2026-11-16T15:00:00Z'));
+    assert.equal(antes.step, 'before', JSON.stringify(antes));
+    assert.match(ultima(), /renova em 2026-11-19 \S{1,4} daqui a 3 dia\(s\)/);
+  });
+
   it('para o e-mail de cobrança, quando ele existe; senão para os donos', async () => {
     await comAssinatura({ renews_at: new Date(Date.now() + 2 * DIA) });
     await avisar(new Date());
