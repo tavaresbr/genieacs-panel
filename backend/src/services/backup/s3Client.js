@@ -206,16 +206,65 @@ export class S3Client {
     // `host` não vai nos cabeçalhos do fetch (é proibido lá): ele sai da URL,
     // igual ao assinado.
     const { host: _host, ...enviados } = assinados;
+    // O prazo é de INATIVIDADE, e não da requisição inteira: no undici o
+    // `signal` também corta o corpo, e um `AbortSignal.timeout` fixo derrubava
+    // o download de um backup grande (e o PUT de até 64 MB) num link lento
+    // que nunca parou de andar. O relógio volta a zero a cada pedaço enviado,
+    // na chegada dos cabeçalhos e a cada pedaço recebido — só uma conexão
+    // parada por `timeoutMs` é abortada.
+    const prazo = new AbortController();
+    let relogio = null;
+    const parar = () => clearTimeout(relogio);
+    const rearmar = () => {
+      parar();
+      relogio = setTimeout(() => {
+        prazo.abort(new DOMException(`S3 request idle for ${this.timeoutMs} ms`, 'TimeoutError'));
+      }, this.timeoutMs);
+      // O relógio não segura o processo vivo (o script do host sai ao terminar);
+      // enquanto há transferência, o socket é que segura.
+      relogio.unref?.();
+    };
+    let corpo;
+    const extras = {};
+    if (body) {
+      // O corpo vai como stream em pedaços, para cada pedaço enviado contar
+      // como progresso. O `content-length` explícito mantém o envio sem
+      // `chunked` — o S3 recusa PUT sem tamanho.
+      const buf = Buffer.isBuffer(body) ? body : Buffer.from(body);
+      let pos = 0;
+      corpo = new ReadableStream({
+        pull(ctrl) {
+          if (pos >= buf.length) { ctrl.close(); return; }
+          rearmar();
+          ctrl.enqueue(buf.subarray(pos, pos + 64 * 1024));
+          pos += 64 * 1024;
+        }
+      }, { highWaterMark: 0 });
+      extras['content-length'] = String(buf.length);
+    }
     let resposta;
+    rearmar();
     try {
       resposta = await this.fetch(url, {
         method,
-        headers: { ...enviados, authorization },
-        body: body ?? undefined,
-        signal: AbortSignal.timeout(this.timeoutMs)
+        headers: { ...enviados, ...extras, authorization },
+        body: corpo,
+        ...(corpo ? { duplex: 'half' } : {}),
+        signal: prazo.signal
       });
     } catch (error) {
+      parar();
       throw new S3Error(`Could not reach the S3 endpoint (${error.cause?.code || error.name || 'network error'})`, { code: 'unreachable' });
+    }
+    if (resposta.body && typeof resposta.body.pipeThrough === 'function') {
+      rearmar();
+      const medido = resposta.body.pipeThrough(new TransformStream({
+        transform(pedaco, ctrl) { rearmar(); ctrl.enqueue(pedaco); },
+        flush() { parar(); }
+      }));
+      resposta = new Response(medido, { status: resposta.status, statusText: resposta.statusText, headers: resposta.headers });
+    } else {
+      parar();
     }
     if (!expect.includes(resposta.status)) {
       const texto = method === 'HEAD' ? '' : await resposta.text().catch(() => '');
