@@ -59,6 +59,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Nuovi codici di recupero generati; i vecchi non valgono più',
   'auth.mfaEnrollmentRequired': 'Questo provider richiede l\'accesso in due passaggi. Attivalo per continuare',
   'auth.mfaRequiredByProvider': 'Un provider per cui lavori richiede l\'accesso in due passaggi; non può essere disattivato',
+  'auth.platformMfaEnrollmentRequired': 'La piattaforma richiede l\'accesso in due passaggi ai suoi amministratori. Attivalo per continuare',
+  'auth.mfaRequiredByPlatform': 'La piattaforma richiede l\'accesso in due passaggi ai suoi amministratori; non può essere disattivato',
   'auth.passwordUpdated': 'Password aggiornata correttamente',
 
   // Limite di richieste

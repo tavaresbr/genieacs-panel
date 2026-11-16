@@ -32,8 +32,12 @@ describe('quando a casca dá lugar à ativação', () => {
     expect(mustEnroll(null)).toBe(false)
   })
 
-  it('nunca no console nem numa personificação', () => {
-    expect(mustEnroll({ mfaEnrollmentRequired: true, platform: true })).toBe(false)
+  it('no console também, quando a plataforma exige', () => {
+    expect(mustEnroll({ mfaEnrollmentRequired: true, platform: true })).toBe(true)
+    expect(mustEnroll({ mfaEnrollmentRequired: false, platform: true })).toBe(false)
+  })
+
+  it('nunca numa personificação', () => {
     expect(mustEnroll({
       mfaEnrollmentRequired: true,
       impersonation: { tenantId: 1, platformUserId: 2, expiresAt: null } as never

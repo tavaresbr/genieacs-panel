@@ -1572,6 +1572,8 @@ const de: Dictionary = {
   'mfaEnrollment.title': 'Aktivieren Sie die Anmeldung in zwei Schritten',
   'mfaEnrollment.description': '{name} verlangt die Anmeldung in zwei Schritten vom ganzen Team. Aktivieren Sie sie mit der Authenticator-App auf dem Handy, um das Panel weiter zu nutzen.',
   'mfaEnrollment.lostPhone': 'Handy nach dem Aktivieren verloren? Wer das Team verwaltet, kann Ihre Anmeldung in zwei Schritten in der Teamliste ausschalten.',
+  'mfaEnrollment.platformDescription': 'Die Plattform verlangt von allen, die die Konsole bedienen, die Anmeldung in zwei Schritten. Aktivieren Sie sie mit der Authenticator-App auf Ihrem Telefon, um fortzufahren.',
+  'mfaEnrollment.platformLostPhone': 'Telefon nach der Aktivierung verloren? Wer den Server betreibt, kann Ihre Anmeldung in zwei Schritten mit dem Befehl reset-mfa ausschalten.',
   'mfaEnrollment.logout': 'Abmelden',
   'settings.security.changeUsername': 'Benutzernamen ändern',
   'settings.security.changeUsernameHint': 'Geben Sie den aktuellen Benutzernamen ein, um den Kontobesitz zu bestätigen.',

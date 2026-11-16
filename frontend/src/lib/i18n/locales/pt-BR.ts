@@ -1569,6 +1569,8 @@ const ptBR: Dictionary = {
   'mfaEnrollment.title': 'Ative o login em duas etapas',
   'mfaEnrollment.description': '{name} exige o login em duas etapas de toda a equipe. Ative-o com o app autenticador do celular para continuar usando o painel.',
   'mfaEnrollment.lostPhone': 'Perdeu o celular depois de ativar? Quem administra a equipe pode desligar o seu login em duas etapas na lista da equipe.',
+  'mfaEnrollment.platformDescription': 'A plataforma exige o login em duas etapas de quem opera o console. Ative-o com o app autenticador do celular para continuar.',
+  'mfaEnrollment.platformLostPhone': 'Perdeu o celular depois de ativar? Quem opera o servidor pode desligar o seu login em duas etapas com o comando reset-mfa.',
   'mfaEnrollment.logout': 'Sair',
   'settings.security.changeUsername': 'Alterar usuário',
   'settings.security.changeUsernameHint': 'Informe o usuário atual para confirmar que a conta é sua.',

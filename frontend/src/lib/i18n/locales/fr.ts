@@ -1569,6 +1569,8 @@ const fr: Dictionary = {
   'mfaEnrollment.title': 'Activez la connexion en deux étapes',
   'mfaEnrollment.description': '{name} exige la connexion en deux étapes de toute l’équipe. Activez-la avec l’application d’authentification de votre téléphone pour continuer à utiliser le panneau.',
   'mfaEnrollment.lostPhone': 'Téléphone perdu après l’activation ? La personne qui gère l’équipe peut désactiver votre connexion en deux étapes depuis la liste de l’équipe.',
+  'mfaEnrollment.platformDescription': 'La plateforme exige la connexion en deux étapes de toute personne qui utilise la console. Activez-la avec l\'application d\'authentification de votre téléphone pour continuer.',
+  'mfaEnrollment.platformLostPhone': 'Vous avez perdu votre téléphone après l\'activation ? La personne qui gère le serveur peut désactiver votre connexion en deux étapes avec la commande reset-mfa.',
   'mfaEnrollment.logout': 'Se déconnecter',
   'settings.security.changeUsername': 'Changer le nom d’utilisateur',
   'settings.security.changeUsernameHint': 'Saisissez le nom d’utilisateur actuel pour confirmer que le compte vous appartient.',

@@ -60,6 +60,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'تم إنشاء رموز استرداد جديدة؛ الرموز القديمة لم تعد صالحة',
   'auth.mfaEnrollmentRequired': 'يشترط هذا المزود تسجيل الدخول بخطوتين. فعّله للمتابعة',
   'auth.mfaRequiredByProvider': 'مزود تعمل لديه يشترط تسجيل الدخول بخطوتين؛ لا يمكن إيقافه',
+  'auth.platformMfaEnrollmentRequired': 'تشترط المنصة تسجيل الدخول بخطوتين لمسؤوليها. فعّله للمتابعة',
+  'auth.mfaRequiredByPlatform': 'تشترط المنصة تسجيل الدخول بخطوتين لمسؤوليها؛ لا يمكن إيقافه',
   'auth.passwordUpdated': 'تم تحديث كلمة المرور',
 
   // حدود المعدّل

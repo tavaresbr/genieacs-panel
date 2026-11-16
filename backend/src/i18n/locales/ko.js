@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': '새 복구 코드를 만들었습니다. 이전 코드는 더 이상 사용할 수 없습니다',
   'auth.mfaEnrollmentRequired': '이 공급자는 2단계 로그인을 요구합니다. 계속하려면 켜 주세요',
   'auth.mfaRequiredByProvider': '소속 공급자가 2단계 로그인을 요구하므로 끌 수 없습니다',
+  'auth.platformMfaEnrollmentRequired': '플랫폼은 관리자에게 2단계 로그인을 요구합니다. 계속하려면 켜 주세요',
+  'auth.mfaRequiredByPlatform': '플랫폼은 관리자에게 2단계 로그인을 요구하므로 끌 수 없습니다',
   'auth.passwordUpdated': '비밀번호를 변경했습니다',
 
   // 요청 제한

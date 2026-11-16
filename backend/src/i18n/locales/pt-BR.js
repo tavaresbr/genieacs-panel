@@ -59,6 +59,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Novos códigos de recuperação gerados; os antigos deixaram de valer',
   'auth.mfaEnrollmentRequired': 'Este provedor exige o login em duas etapas. Ative-o para continuar',
   'auth.mfaRequiredByProvider': 'Um provedor em que você trabalha exige o login em duas etapas; ele não pode ser desligado',
+  'auth.platformMfaEnrollmentRequired': 'A plataforma exige o login em duas etapas de quem a administra. Ative-o para continuar',
+  'auth.mfaRequiredByPlatform': 'A plataforma exige o login em duas etapas de quem a administra; ele não pode ser desligado',
   'auth.passwordUpdated': 'Senha atualizada com sucesso',
 
   // Limite de requisições

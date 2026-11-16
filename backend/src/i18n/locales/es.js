@@ -59,6 +59,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Se generaron nuevos códigos de recuperación; los anteriores ya no sirven',
   'auth.mfaEnrollmentRequired': 'Este proveedor exige el inicio de sesión en dos pasos. Actívelo para continuar',
   'auth.mfaRequiredByProvider': 'Un proveedor en el que trabaja exige el inicio de sesión en dos pasos; no se puede desactivar',
+  'auth.platformMfaEnrollmentRequired': 'La plataforma exige el inicio de sesión en dos pasos a sus administradores. Actívelo para continuar',
+  'auth.mfaRequiredByPlatform': 'La plataforma exige el inicio de sesión en dos pasos a sus administradores; no se puede desactivar',
   'auth.passwordUpdated': 'Contraseña actualizada correctamente',
 
   // Límite de solicitudes

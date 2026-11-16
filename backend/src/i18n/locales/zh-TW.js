@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': '已產生新的復原代碼；舊代碼不再有效',
   'auth.mfaEnrollmentRequired': '此服務商要求兩步驟登入。請啟用後繼續',
   'auth.mfaRequiredByProvider': '您所在的服務商要求兩步驟登入，無法關閉',
+  'auth.platformMfaEnrollmentRequired': '平台要求其管理員使用兩步驟登入。請啟用後繼續',
+  'auth.mfaRequiredByPlatform': '平台要求其管理員使用兩步驟登入，無法關閉',
   'auth.passwordUpdated': '密碼已更新',
 
   // 速率限制

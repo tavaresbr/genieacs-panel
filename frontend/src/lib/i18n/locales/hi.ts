@@ -1561,6 +1561,8 @@ const hi: Dictionary = {
   'mfaEnrollment.title': 'दो-चरणीय लॉगिन चालू करें',
   'mfaEnrollment.description': '{name} पूरी टीम से दो-चरणीय लॉगिन अनिवार्य करता है। पैनल का उपयोग जारी रखने के लिए फ़ोन के ऑथेंटिकेटर ऐप से इसे चालू करें।',
   'mfaEnrollment.lostPhone': 'चालू करने के बाद फ़ोन खो गया? टीम का प्रबंधक टीम सूची से आपका दो-चरणीय लॉगिन बंद कर सकता है।',
+  'mfaEnrollment.platformDescription': 'प्लेटफ़ॉर्म कंसोल चलाने वाले हर व्यक्ति के लिए दो-चरणीय लॉगिन अनिवार्य करता है। जारी रखने के लिए इसे अपने फ़ोन के ऑथेंटिकेटर ऐप से चालू करें।',
+  'mfaEnrollment.platformLostPhone': 'चालू करने के बाद फ़ोन खो गया? सर्वर चलाने वाला व्यक्ति reset-mfa कमांड से आपका दो-चरणीय लॉगिन बंद कर सकता है।',
   'mfaEnrollment.logout': 'साइन आउट',
   'settings.security.changeUsername': 'उपयोगकर्ता नाम बदलें',
   'settings.security.changeUsernameHint': 'खाते का स्वामित्व पुष्ट करने के लिए मौजूदा उपयोगकर्ता नाम दर्ज करें।',

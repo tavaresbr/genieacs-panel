@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Nouveaux codes de récupération générés ; les anciens ne sont plus valables',
   'auth.mfaEnrollmentRequired': 'Ce fournisseur exige la connexion en deux étapes. Activez-la pour continuer',
   'auth.mfaRequiredByProvider': 'Un fournisseur pour lequel vous travaillez exige la connexion en deux étapes ; elle ne peut pas être désactivée',
+  'auth.platformMfaEnrollmentRequired': 'La plateforme exige la connexion en deux étapes pour ses administrateurs. Activez-la pour continuer',
+  'auth.mfaRequiredByPlatform': 'La plateforme exige la connexion en deux étapes pour ses administrateurs ; elle ne peut pas être désactivée',
   'auth.passwordUpdated': 'Mot de passe mis à jour',
 
   // Limitation de débit

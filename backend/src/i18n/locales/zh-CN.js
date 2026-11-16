@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': '已生成新的恢复代码；旧代码不再有效',
   'auth.mfaEnrollmentRequired': '该服务商要求两步登录。请启用后继续',
   'auth.mfaRequiredByProvider': '您所在的服务商要求两步登录，无法关闭',
+  'auth.platformMfaEnrollmentRequired': '平台要求其管理员使用两步登录。请启用后继续',
+  'auth.mfaRequiredByPlatform': '平台要求其管理员使用两步登录，无法关闭',
   'auth.passwordUpdated': '密码已更新',
 
   // 频率限制

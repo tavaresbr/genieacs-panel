@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': '新しい復旧コードを生成しました。古いコードは使えません',
   'auth.mfaEnrollmentRequired': 'このプロバイダーでは2段階ログインが必須です。続行するには有効にしてください',
   'auth.mfaRequiredByProvider': '所属するプロバイダーが2段階ログインを必須にしているため、無効にできません',
+  'auth.platformMfaEnrollmentRequired': 'プラットフォームは管理者に2段階ログインを必須にしています。続行するには有効にしてください',
+  'auth.mfaRequiredByPlatform': 'プラットフォームは管理者に2段階ログインを必須にしているため、無効にできません',
   'auth.passwordUpdated': 'パスワードを更新しました',
 
   // レート制限

@@ -1569,6 +1569,8 @@ const ja: Dictionary = {
   'mfaEnrollment.title': '2段階ログインを有効にしてください',
   'mfaEnrollment.description': '{name} はチーム全員に2段階ログインを必須にしています。パネルを引き続き使うには、スマートフォンの認証アプリで有効にしてください。',
   'mfaEnrollment.lostPhone': '有効化後にスマートフォンを紛失したら、チームの管理者がチーム一覧からあなたの2段階ログインを無効にできます。',
+  'mfaEnrollment.platformDescription': 'プラットフォームは、コンソールを操作するすべての人に2段階ログインを必須にしています。続行するには、スマートフォンの認証アプリで有効にしてください。',
+  'mfaEnrollment.platformLostPhone': '有効にした後でスマートフォンを紛失しましたか？サーバーを運用している人が reset-mfa コマンドで2段階ログインを無効にできます。',
   'mfaEnrollment.logout': 'ログアウト',
   'settings.security.changeUsername': 'ユーザー名を変更',
   'settings.security.changeUsernameHint': 'アカウントの所有者であることを確認するため、現在のユーザー名を入力してください。',

@@ -22,13 +22,17 @@ export function isMfaEnrollmentRefusal(status: number, code: unknown): boolean {
 }
 
 /**
- * Se a casca do painel deve dar lugar à ativação obrigatória.
+ * Se a casca (do painel ou do console) deve dar lugar à ativação obrigatória.
  *
- * A personificação e o console ficam de fora: são sessões da plataforma, a que
- * a exigência do provedor não se aplica — e o servidor também não as recusa.
+ * Vale para as duas exigências: a do provedor (`require_mfa`) na sessão do
+ * painel, e a da plataforma (`PLATFORM_REQUIRE_MFA`) na sessão do console. Quem
+ * decide é o servidor — a marca só vem quando ele recusa o resto —, e a tela
+ * apenas obedece. A personificação fica de fora: é uma sessão de leitura aberta
+ * DE DENTRO do console, que já passou pela exigência, e o servidor não a
+ * recusa por isso.
  */
 export function mustEnroll(user: Pick<User, 'mfaEnrollmentRequired' | 'platform' | 'impersonation'> | null | undefined): boolean {
-  if (!user || user.platform || user.impersonation) return false
+  if (!user || user.impersonation) return false
   return Boolean(user.mfaEnrollmentRequired)
 }
 

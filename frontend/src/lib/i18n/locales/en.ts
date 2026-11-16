@@ -1571,6 +1571,8 @@ const en = {
   'mfaEnrollment.title': 'Turn on two-step login',
   'mfaEnrollment.description': '{name} requires two-step login from the whole team. Turn it on with the authenticator app on your phone to keep using the panel.',
   'mfaEnrollment.lostPhone': 'Lost your phone after turning it on? Whoever manages the team can turn off your two-step login from the team list.',
+  'mfaEnrollment.platformDescription': 'The platform requires two-step login from everyone who operates the console. Turn it on with the authenticator app on your phone to continue.',
+  'mfaEnrollment.platformLostPhone': 'Lost your phone after turning it on? Whoever runs the server can turn off your two-step login with the reset-mfa command.',
   'mfaEnrollment.logout': 'Sign out',
   'settings.security.changeUsername': 'Change username',
   'settings.security.changeUsernameHint': 'Enter the current username to confirm account ownership.',

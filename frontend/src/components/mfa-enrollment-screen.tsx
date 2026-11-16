@@ -6,7 +6,8 @@ import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
 
 /**
- * A casca do painel enquanto a pessoa não ativa o 2FA que o provedor exige.
+ * A casca do painel enquanto a pessoa não ativa o 2FA que o provedor exige — ou
+ * a do console, quando quem exige é a plataforma (`PLATFORM_REQUIRE_MFA`).
  *
  * Toma o lugar do menu e das telas, e não é uma rota: o servidor recusa tudo o
  * que não for a própria conta, então qualquer tela que abrisse mostraria só
@@ -18,7 +19,12 @@ export function MfaEnrollmentScreen() {
   const { t } = useTranslation()
   const { user, refreshUser, logout } = useAuth()
   const { name: tenantName } = useTenant()
-  const provedor = user?.tenant?.name || tenantName
+  // Na sessão do console não há provedor: quem exige é a plataforma, e o nome
+  // do host (o da plataforma) não diria isso. As frases mudam junto — o "quem
+  // administra a equipe" do provedor não existe aqui; quem destrava é o
+  // servidor.
+  const daPlataforma = Boolean(user?.platform)
+  const provedor = daPlataforma ? t('console.header') : (user?.tenant?.name || tenantName)
 
   return (
     <div className="min-h-screen bg-background px-4 py-6 sm:py-10">
@@ -35,10 +41,12 @@ export function MfaEnrollmentScreen() {
         <div className="modern-card space-y-4 p-5 sm:p-6">
           <div>
             <h1 className="section-heading">{t('mfaEnrollment.title')}</h1>
-            <p className="section-description mt-1">{t('mfaEnrollment.description', { name: provedor })}</p>
+            <p className="section-description mt-1">
+              {daPlataforma ? t('mfaEnrollment.platformDescription') : t('mfaEnrollment.description', { name: provedor })}
+            </p>
           </div>
           <MfaCard onRecoveryCodesSaved={() => void refreshUser()} />
-          <p className="field-hint">{t('mfaEnrollment.lostPhone')}</p>
+          <p className="field-hint">{t(daPlataforma ? 'mfaEnrollment.platformLostPhone' : 'mfaEnrollment.lostPhone')}</p>
         </div>
       </div>
     </div>

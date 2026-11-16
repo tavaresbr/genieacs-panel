@@ -1569,6 +1569,8 @@ const zhCN: Dictionary = {
   'mfaEnrollment.title': '启用两步登录',
   'mfaEnrollment.description': '{name} 要求整个团队使用两步登录。请用手机上的身份验证器应用启用，以继续使用面板。',
   'mfaEnrollment.lostPhone': '启用后丢了手机？团队管理员可以在团队列表中关闭您的两步登录。',
+  'mfaEnrollment.platformDescription': '平台要求所有操作控制台的人使用两步登录。请用手机上的身份验证器应用启用后继续。',
+  'mfaEnrollment.platformLostPhone': '启用后手机丢了？运维服务器的人可以用 reset-mfa 命令关闭你的两步登录。',
   'mfaEnrollment.logout': '退出',
   'settings.security.changeUsername': '修改用户名',
   'settings.security.changeUsernameHint': '请输入当前用户名，以确认账号归属。',

@@ -1569,6 +1569,8 @@ const zhTW: Dictionary = {
   'mfaEnrollment.title': '啟用兩步驟登入',
   'mfaEnrollment.description': '{name} 要求整個團隊使用兩步驟登入。請用手機上的驗證器應用程式啟用，以繼續使用面板。',
   'mfaEnrollment.lostPhone': '啟用後遺失手機？團隊管理員可以在團隊列表中關閉您的兩步驟登入。',
+  'mfaEnrollment.platformDescription': '平台要求所有操作主控台的人使用兩步驟登入。請用手機上的驗證器應用程式啟用後繼續。',
+  'mfaEnrollment.platformLostPhone': '啟用後手機遺失了？維運伺服器的人可以用 reset-mfa 指令關閉你的兩步驟登入。',
   'mfaEnrollment.logout': '登出',
   'settings.security.changeUsername': '變更使用者名稱',
   'settings.security.changeUsernameHint': '請輸入目前的使用者名稱，以確認帳號歸屬。',

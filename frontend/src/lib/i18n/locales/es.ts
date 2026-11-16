@@ -1569,6 +1569,8 @@ const es: Dictionary = {
   'mfaEnrollment.title': 'Active el inicio de sesión en dos pasos',
   'mfaEnrollment.description': '{name} exige el inicio de sesión en dos pasos a todo el equipo. Actívelo con la app autenticadora del móvil para seguir usando el panel.',
   'mfaEnrollment.lostPhone': '¿Perdió el móvil después de activarlo? Quien administra el equipo puede desactivar su inicio de sesión en dos pasos en la lista del equipo.',
+  'mfaEnrollment.platformDescription': 'La plataforma exige el inicio de sesión en dos pasos a quien opera la consola. Actívelo con la app de autenticación del móvil para continuar.',
+  'mfaEnrollment.platformLostPhone': '¿Perdió el móvil después de activarlo? Quien opera el servidor puede desactivar su inicio de sesión en dos pasos con el comando reset-mfa.',
   'mfaEnrollment.logout': 'Salir',
   'settings.security.changeUsername': 'Cambiar usuario',
   'settings.security.changeUsernameHint': 'Ingresa el usuario actual para confirmar que la cuenta es tuya.',

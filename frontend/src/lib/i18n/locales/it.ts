@@ -1572,6 +1572,8 @@ const it: Dictionary = {
   'mfaEnrollment.title': 'Attiva l’accesso in due passaggi',
   'mfaEnrollment.description': '{name} richiede l’accesso in due passaggi a tutto il team. Attivalo con l’app di autenticazione del telefono per continuare a usare il pannello.',
   'mfaEnrollment.lostPhone': 'Hai perso il telefono dopo l’attivazione? Chi gestisce il team può disattivare il tuo accesso in due passaggi dall’elenco del team.',
+  'mfaEnrollment.platformDescription': 'La piattaforma richiede l\'accesso in due passaggi a chi gestisce la console. Attivalo con l\'app di autenticazione del telefono per continuare.',
+  'mfaEnrollment.platformLostPhone': 'Hai perso il telefono dopo l\'attivazione? Chi gestisce il server può disattivare il tuo accesso in due passaggi con il comando reset-mfa.',
   'mfaEnrollment.logout': 'Esci',
   'settings.security.changeUsername': 'Cambia il nome utente',
   'settings.security.changeUsernameHint': 'Inserisci il nome utente attuale per confermare la proprietà dell’account.',

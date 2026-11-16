@@ -1561,6 +1561,8 @@ const ar: Dictionary = {
   'mfaEnrollment.title': 'فعّل تسجيل الدخول بخطوتين',
   'mfaEnrollment.description': 'يشترط {name} تسجيل الدخول بخطوتين على الفريق كله. فعّله بتطبيق المصادقة على هاتفك لمواصلة استخدام اللوحة.',
   'mfaEnrollment.lostPhone': 'فقدت هاتفك بعد التفعيل؟ يستطيع من يدير الفريق إيقاف تسجيل الدخول بخطوتين الخاص بك من قائمة الفريق.',
+  'mfaEnrollment.platformDescription': 'تشترط المنصة تسجيل الدخول بخطوتين لكل من يدير وحدة التحكم. فعّله باستخدام تطبيق المصادقة على هاتفك للمتابعة.',
+  'mfaEnrollment.platformLostPhone': 'فقدت هاتفك بعد التفعيل؟ يمكن لمن يدير الخادم إيقاف تسجيل الدخول بخطوتين لحسابك باستخدام الأمر reset-mfa.',
   'mfaEnrollment.logout': 'تسجيل الخروج',
   'settings.security.changeUsername': 'تغيير اسم المستخدم',
   'settings.security.changeUsernameHint': 'أدخل اسم المستخدم الحالي لتأكيد ملكية الحساب.',

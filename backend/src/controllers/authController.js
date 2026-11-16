@@ -7,6 +7,7 @@ import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../conf
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
 import { developmentFallbackAllowed } from '../config/runtimeEnv.js';
+import { platformRequiresMfa } from '../config/platformMfa.js';
 import { CONSOLE_AUDIENCE, PANEL_AUDIENCE, decodeOwnSessionToken, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
 import RefreshToken, { describeUserAgent } from '../models/RefreshToken.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from '../middleware/sessionCookie.js';
@@ -219,6 +220,9 @@ async function respostaDoConsole(req, res, user) {
         tenantId: null,
         platform: true,
         isPlatformAdmin: true,
+        // A plataforma exige o 2FA e esta pessoa ainda não ativou: a tela vai
+        // direto para a ativação, como no login do provedor que o exige.
+        mfaEnrollmentRequired: !mfaEnabled(user) && platformRequiresMfa(),
         createdAt: user.created_at,
         updatedAt: user.updated_at
       },

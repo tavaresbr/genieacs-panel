@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Neue Wiederherstellungscodes erzeugt; die alten gelten nicht mehr',
   'auth.mfaEnrollmentRequired': 'Dieser Anbieter verlangt die Anmeldung in zwei Schritten. Aktivieren Sie sie, um fortzufahren',
   'auth.mfaRequiredByProvider': 'Ein Anbieter, für den Sie arbeiten, verlangt die Anmeldung in zwei Schritten; sie kann nicht ausgeschaltet werden',
+  'auth.platformMfaEnrollmentRequired': 'Die Plattform verlangt von ihren Administratoren die Anmeldung in zwei Schritten. Aktivieren Sie sie, um fortzufahren',
+  'auth.mfaRequiredByPlatform': 'Die Plattform verlangt von ihren Administratoren die Anmeldung in zwei Schritten; sie kann nicht ausgeschaltet werden',
   'auth.passwordUpdated': 'Passwort erfolgreich aktualisiert',
 
   // Ratenbegrenzung

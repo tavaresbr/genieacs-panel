@@ -1569,6 +1569,8 @@ const ko: Dictionary = {
   'mfaEnrollment.title': '2단계 로그인을 켜세요',
   'mfaEnrollment.description': '{name}은(는) 팀 전체에 2단계 로그인을 요구합니다. 패널을 계속 쓰려면 휴대폰의 인증 앱으로 켜세요.',
   'mfaEnrollment.lostPhone': '켠 뒤 휴대폰을 잃어버렸다면 팀 관리자가 팀 목록에서 2단계 로그인을 꺼 줄 수 있습니다.',
+  'mfaEnrollment.platformDescription': '플랫폼은 콘솔을 운영하는 모든 사람에게 2단계 로그인을 요구합니다. 계속하려면 휴대폰의 인증 앱으로 켜 주세요.',
+  'mfaEnrollment.platformLostPhone': '켠 뒤에 휴대폰을 잃어버렸나요? 서버를 운영하는 사람이 reset-mfa 명령으로 2단계 로그인을 끌 수 있습니다.',
   'mfaEnrollment.logout': '로그아웃',
   'settings.security.changeUsername': '사용자 이름 변경',
   'settings.security.changeUsernameHint': '계정 소유를 확인하기 위해 현재 사용자 이름을 입력하십시오.',

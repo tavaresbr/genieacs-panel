@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'New recovery codes generated; the old ones no longer work',
   'auth.mfaEnrollmentRequired': 'This provider requires two-step login. Turn it on to continue',
   'auth.mfaRequiredByProvider': 'A provider you work for requires two-step login; it cannot be turned off',
+  'auth.platformMfaEnrollmentRequired': 'The platform requires two-step login for its administrators. Turn it on to continue',
+  'auth.mfaRequiredByPlatform': 'The platform requires two-step login for its administrators; it cannot be turned off',
   'auth.passwordUpdated': 'Password updated successfully',
 
   // Rate limiting
