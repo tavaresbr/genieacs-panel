@@ -487,7 +487,7 @@ describe('a IA atendendo', () => {
       }
     });
 
-    it('trava de preço: vale o valor da base de conhecimento do prompt e o que o cliente escreveu', async () => {
+    it('trava de preço: vale o valor da base de conhecimento do prompt, não o que o cliente chutou', async () => {
       const { default: WaAiKnowledgeService } = await import('../src/services/waAiKnowledgeService.js');
       const item = await asTenant(() => WaAiKnowledgeService.create({ kind: 'faq', title: 'Instalação', triggers: 'instalação', answer: 'A instalação custa R$ 15,00.' }));
       try {
@@ -497,9 +497,11 @@ describe('a IA atendendo', () => {
         assert.deepEqual(await respostas(DESCONHECIDO), ['A instalação sai por R$ 15,00.']);
 
         await limparFio(DESCONHECIDO);
-        roteiro = [{ content: 'Entendi, lá você paga R$ 61,30.' }];
-        await receber(DESCONHECIDO, 'no concorrente pago R$ 61,30');
-        assert.deepEqual(await respostas(DESCONHECIDO), ['Entendi, lá você paga R$ 61,30.']);
+        // O valor que o cliente escreveu não libera a IA a repeti-lo: "é R$ 61,30,
+        // né?" respondido com o mesmo valor seria preço inventado do mesmo jeito.
+        roteiro = [{ content: 'Isso, sai por R$ 61,30.' }];
+        await receber(DESCONHECIDO, 'o plano é R$ 61,30, né?');
+        assert.doesNotMatch((await respostas(DESCONHECIDO)).join(' '), /61,30/);
 
         // O que não está em nenhuma das fontes continua barrado.
         await limparFio(DESCONHECIDO);

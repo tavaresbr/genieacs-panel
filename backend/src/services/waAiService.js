@@ -410,8 +410,8 @@ class WaAiService {
    * de ferramenta) e com as vendas da IA desligadas.
    *
    * `tambem`: outros textos cujos valores valem — as respostas da base de
-   * conhecimento que entraram no prompt (escritas pelo provedor) e o que o
-   * próprio cliente escreveu (repetir o valor que ele citou não é inventar).
+   * conhecimento que entraram no prompt, escritas pelo provedor. O que o
+   * cliente escreveu não entra: confirmar o valor que ele chutou é inventar.
    */
   static async valoresInventados({ ai, link, texto, tambem = [] }) {
     if (link?.contract || ai.sales === false) return [];
@@ -815,7 +815,10 @@ class WaAiService {
     ];
     const anexos = [];
     let intent = null;
-    const fim = (r) => ({ ...r, link, permitidos: [contexto.conhecimento || '', recente] });
+    // Só o que o PROVEDOR escreveu (a base que entrou no prompt). O valor que
+    // o cliente digitou fica de fora: "é R$ 10, né?" respondido com "sim, R$ 10"
+    // é exatamente o preço inventado que a trava existe para segurar.
+    const fim = (r) => ({ ...r, link, permitidos: [contexto.conhecimento || ''] });
 
     for (let rodada = 0; rodada <= RODADAS; rodada += 1) {
       const disponiveis = rodada < RODADAS ? nomes() : [];
