@@ -30,6 +30,23 @@ const BCRYPT_ROUNDS = 12;
  */
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invite-placeholder', BCRYPT_ROUNDS);
 
+/**
+ * Uma recusa do aceite, com a resposta pronta. As conferências do corpo e da
+ * prova de conta lançam isto, e `aceitar` só responde: o fluxo principal fica
+ * sem `if` sobre o que o cliente mandou — cada regra mora numa função própria,
+ * e a que cria conta ou abre sessão não é guardada por valor do pedido.
+ */
+class RecusaDoAceite extends Error {
+  constructor(responder) {
+    super('invite accept refused');
+    this.responder = responder;
+  }
+
+  static json(status, key, code = null) {
+    return new RecusaDoAceite((req, res) => res.status(status).json(createErrorResponse(req.t(key), null, code)));
+  }
+}
+
 class InviteController {
   /** Os convites em aberto deste provedor. */
   static async list(req, res) {
@@ -226,61 +243,26 @@ class InviteController {
 
   static async aceitar(req, res, { comContaExistente }) {
     try {
-      const invite = await InviteController.usableInvite(req);
-      if (!invite) return res.status(404).json(createErrorResponse(req.t('invite.notFound')));
+      const invite = await InviteController.conviteOuRecusa(req);
 
-      const username = String(req.body?.username ?? '').trim();
-      const password = String(req.body?.password ?? '');
-      const email = User.normalizeEmail(req.body?.email);
-      if (username.length < 3 || username.length > 64) {
-        return res.status(400).json(createErrorResponse(req.t('auth.usernameLength')));
-      }
-      // Aqui só o teto: a senha pode ser a de uma conta que JÁ existe, e essa
-      // é aceita como estiver. A regra da senha nova vale mais abaixo, só
-      // para quem está criando conta por este convite.
-      const senhaForaDoTeto = suppliedPasswordProblem(password);
-      if (senhaForaDoTeto) {
-        return res.status(400).json(createErrorResponse(req.t(senhaForaDoTeto.key)));
-      }
-
+      const corpo = InviteController.lerCorpoDoAceite(req, { contaNova: !comContaExistente });
+      const { username, password, email } = corpo;
       const role = normalizeRole(invite.role);
-      let existente = null;
-      let userId;
+      let userId = null;
 
       if (comContaExistente) {
-        existente = await InviteController.provarContaExistente(req, res, { username, password });
-        // `null`: a resposta (401, 429 ou o pedido do código) já foi dada.
-        if (!existente) return undefined;
+        const existente = await InviteController.provarContaExistente(req, corpo);
         // Já trabalha aqui: o convite não some e não vira erro. É o caso do
         // link clicado duas vezes, e a resposta certa para "me põe na equipe"
         // de quem já está na equipe é "pronto".
-        if (await TenantUser.find(invite.tenant_id, existente.id)) {
-          return res.status(409).json(createErrorResponse(req.t('invite.alreadyMember')));
-        }
+        await InviteController.recusarQuemJaEstaNaEquipe(invite, existente);
         userId = existente.id;
       } else {
-        // Conta nova: tudo o que o corpo precisa ter é conferido ANTES de o
-        // banco ser consultado. É a ordem que impede a sonda — a resposta a um
-        // corpo incompleto não pode depender de o nome existir ou não.
-        //
-        // O e-mail só é exigido daqui. Quem já tem conta entra com a que tem,
-        // e o endereço dela — cadastrado ou não — é assunto do perfil dela, não
-        // deste convite: pedi-lo faria o convite de um provedor mexer no login
-        // que a pessoa usa em outro.
-        if (!email || !isValidEmail(email)) {
-          return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
-        }
-        const senhaRuim = newPasswordProblem(password, { username, email });
-        if (senhaRuim) {
-          return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
-        }
         // Nome OU e-mail, contra o espaço de nomes inteiro (ver
         // `User.findByLogin`). Sem conferir senha nenhuma: quem já tem conta e
         // caiu aqui por engano escolhe "já tenho conta" na tela, e a trava da
         // conta dela não gasta nada com isso.
-        if (await User.loginConflict({ username, email })) {
-          return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
-        }
+        await InviteController.recusarNomeTomado(corpo);
       }
 
       // O limite do plano, antes de abrir a transação: o convite continua de
@@ -294,7 +276,7 @@ class InviteController {
 
       const trx = await getDb().transaction();
       try {
-        if (!existente) {
+        if (!comContaExistente) {
           userId = await User.create({
             username,
             password: await bcrypt.hash(password, BCRYPT_ROUNDS),
@@ -336,7 +318,7 @@ class InviteController {
         actorUsername: user.username,
         subjectType: 'invite',
         subjectId: invite.id,
-        detail: { role, createdNewAccount: !existente },
+        detail: { role, createdNewAccount: !comContaExistente },
         ip: req.ip ?? null
       });
 
@@ -362,6 +344,7 @@ class InviteController {
         token: accessToken
       }));
     } catch (error) {
+      if (error instanceof RecusaDoAceite) return await error.responder(req, res);
       console.error('Accept invite error:', error);
       return res.status(500).json(createErrorResponse(req.t('invite.acceptFailed'), error.message));
     }
@@ -381,17 +364,14 @@ class InviteController {
    * senha é a mesma, e um convite que vale dias não pode ser uma segunda fila
    * de dez palpites.
    */
-  static async provarContaExistente(req, res, { username, password }) {
+  static async provarContaExistente(req, { username, password }) {
     // Nome OU e-mail, pelo mesmo motivo do plano de controle: quem já tem
     // conta e já migrou vai digitar o endereço, não o nome antigo.
     const conta = await User.findByLogin(username);
     const tentativa = await AccountLockout.attempt(
       conta ? AccountLockout.forUser(conta.id) : AccountLockout.forIdentifier(username)
     );
-    if (!tentativa.allowed) {
-      await AccountLockout.refuse(req, res, tentativa, password, { user: conta, via: 'invite' });
-      return null;
-    }
+    InviteController.recusarSeTravada(tentativa, { conta, password });
 
     // A senha é a prova de que é ela mesma. Sem esta conferência o convite
     // seria uma tomada de conta: quem tivesse o link digitaria o nome de
@@ -403,31 +383,93 @@ class InviteController {
     // com `LOGIN_REQUIRES_EMAIL` ligado, uma conta sem e-mail não entra por
     // caminho nenhum, e este é um caminho que emite sessão. Sem esta linha o
     // convite era a porta dos fundos da chave.
-    if (!conta || !senhaConfere || !acceptsIdentifier(username, conta)) {
-      await AccountLockout.failed(req, tentativa, { user: conta, via: 'invite' });
-      res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
-      return null;
-    }
+    await InviteController.recusarSenhaErrada(req, tentativa, {
+      conta, aceita: Boolean(conta) && senhaConfere && acceptsIdentifier(username, conta)
+    });
 
     // O segundo fator, pela mesma razão da linha de cima: aceitar o convite
     // emite sessão, e sem isto quem tivesse a senha vazada de uma conta com
     // 2FA entraria por aqui sem o código. Gasto já aqui — este caminho não tem
     // uma segunda ida como a escolha de provedor do login.
-    if (mfaEnabled(conta)) {
-      const { totpCode } = req.body || {};
-      if (totpCode === undefined || totpCode === null || totpCode === '') {
-        res.status(401).json(createErrorResponse(req.t('auth.mfaRequired'), null, 'mfa_required'));
-        return null;
-      }
-      if (!(await MfaService.verifySecondFactor(conta, totpCode)).ok) {
-        await AccountLockout.failed(req, tentativa, { user: conta, via: 'invite_mfa' });
-        res.status(401).json(createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid'));
-        return null;
-      }
-    }
+    await InviteController.provarSegundoFator(req, tentativa, conta);
     // Senha e código conferidos: a prova terminou, a contagem some.
     await AccountLockout.clear(tentativa.subject);
     return conta;
+  }
+
+  /** O convite que o pedido nomeia, ou o 404 de sempre (ver `usableInvite`). */
+  static async conviteOuRecusa(req) {
+    const invite = await InviteController.usableInvite(req);
+    if (!invite) throw RecusaDoAceite.json(404, 'invite.notFound');
+    return invite;
+  }
+
+  /** Travada: a resposta é a da trava, sem olhar a senha (ver `AccountLockout.refuse`). */
+  static recusarSeTravada(tentativa, { conta, password }) {
+    if (tentativa.allowed) return;
+    throw new RecusaDoAceite((req, res) => AccountLockout.refuse(req, res, tentativa, password, { user: conta, via: 'invite' }));
+  }
+
+  /** Conta que não existe e senha errada: o MESMO 401, e a tentativa conta. */
+  static async recusarSenhaErrada(req, tentativa, { conta, aceita }) {
+    if (aceita) return;
+    await AccountLockout.failed(req, tentativa, { user: conta, via: 'invite' });
+    throw RecusaDoAceite.json(401, 'auth.invalidCredentials');
+  }
+
+  /**
+   * O código do 2FA de quem usa. Conferido sempre que a conta tem 2FA; sem
+   * código, a resposta pede o código (e não conta na trava), com código
+   * errado, conta.
+   */
+  static async provarSegundoFator(req, tentativa, conta) {
+    if (!mfaEnabled(conta)) return;
+    const { totpCode } = req.body || {};
+    const prova = await MfaService.verifySecondFactor(conta, totpCode);
+    if (prova.ok) return;
+    if (String(totpCode ?? '').trim() === '') {
+      throw RecusaDoAceite.json(401, 'auth.mfaRequired', 'mfa_required');
+    }
+    await AccountLockout.failed(req, tentativa, { user: conta, via: 'invite_mfa' });
+    throw RecusaDoAceite.json(401, 'auth.mfaInvalid', 'mfa_invalid');
+  }
+
+  static async recusarQuemJaEstaNaEquipe(invite, conta) {
+    if (await TenantUser.find(invite.tenant_id, conta.id)) {
+      throw RecusaDoAceite.json(409, 'invite.alreadyMember');
+    }
+  }
+
+  static async recusarNomeTomado({ username, email }) {
+    if (await User.loginConflict({ username, email })) {
+      throw RecusaDoAceite.json(409, 'auth.usernameTaken');
+    }
+  }
+
+  /**
+   * O corpo do aceite, conferido inteiro ANTES de o banco ser consultado. É a
+   * ordem que impede a sonda: a resposta a um corpo incompleto não pode
+   * depender de o nome existir ou não. Lança `RecusaDoAceite`.
+   *
+   * O e-mail e a regra da senha nova são só da conta nova. Quem já tem conta
+   * entra com a que tem, e a senha dela é aceita como estiver (só o teto vale):
+   * pedir o endereço faria o convite de um provedor mexer no login que a
+   * pessoa usa em outro.
+   */
+  static lerCorpoDoAceite(req, { contaNova }) {
+    const username = String(req.body?.username ?? '').trim();
+    const password = String(req.body?.password ?? '');
+    const email = User.normalizeEmail(req.body?.email);
+    if (username.length < 3 || username.length > 64) {
+      throw RecusaDoAceite.json(400, 'auth.usernameLength');
+    }
+    const senhaForaDoTeto = suppliedPasswordProblem(password);
+    if (senhaForaDoTeto) throw RecusaDoAceite.json(400, senhaForaDoTeto.key);
+    if (!contaNova) return { username, password, email: null };
+    if (!email || !isValidEmail(email)) throw RecusaDoAceite.json(400, 'auth.emailInvalid');
+    const senhaRuim = newPasswordProblem(password, { username, email });
+    if (senhaRuim) throw RecusaDoAceite.json(400, senhaRuim.key, senhaRuim.code);
+    return { username, password, email };
   }
 
   /**
