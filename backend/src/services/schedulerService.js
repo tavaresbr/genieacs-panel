@@ -464,7 +464,9 @@ class SchedulerService {
       // SGP, reconciliação, contatos, TeiaH, régua) não rodava em tick nenhum.
       // O relógio anda mesmo na falha, para não martelar o ACS a cada minuto.
       summary.provisioning = await ProvisioningService.processDue({}).catch((error) => {
-        console.warn(`Provisioning pass failed: ${error.message}`);
+        // Sem quebra de linha: a mensagem pode trazer texto do GenieACS, e uma
+        // linha a mais no log seria uma entrada forjada.
+        console.warn('Provisioning pass failed:', String(error?.message ?? error).replace(/[\r\n]+/g, ' '));
         return { error: error.message };
       });
       await this.writeState({ lastProvisioningAt: new Date().toISOString() });
