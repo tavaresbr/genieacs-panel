@@ -996,6 +996,9 @@ class BillingCharge {
       amountCents: Number(row.amount_cents),
       // O crédito abatido nela (0106) — o preço do plano é a soma dos dois.
       creditCents: BillingCharge.creditReservedOf(row),
+      // O ciclo que ela paga (0104): é ele que diz quantos dias um estorno
+      // desfaz (o anual, um ano) na prévia do console. Nulo nas de antes.
+      billingCycle: row.billing_cycle ?? null,
       currency: row.currency,
       status: row.status,
       dueDate: isoDateOf(row.due_date),

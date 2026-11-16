@@ -177,6 +177,20 @@ describe("a provider's subscription", () => {
     assert.equal((await platform(`/tenants/${beta}/subscription`, { method: 'PUT', body: {} })).status, 400);
   });
 
+  it('mudar o status de quem não tem assinatura é 404 com código, e não 500', async () => {
+    const antes = await getDb()('subscriptions').where({ tenant_id: beta }).first();
+    await getDb()('subscriptions').where({ tenant_id: beta }).delete();
+    await SubscriptionService.invalidate(beta);
+    try {
+      const res = await platform(`/tenants/${beta}/subscription`, { method: 'PUT', body: { status: 'suspended' } });
+      assert.equal(res.status, 404, JSON.stringify(res.body));
+      assert.equal(res.body.code, 'no_subscription');
+    } finally {
+      await getDb()('subscriptions').insert(antes);
+      await SubscriptionService.invalidate(beta);
+    }
+  });
+
   it('a payment on a suspended provider is recorded but does not reactivate it', async () => {
     const res = await platform(`/tenants/${beta}/payments`, {
       method: 'POST', body: { amountCents: 19990, currency: 'BRL', reference: 'PIX-001' }

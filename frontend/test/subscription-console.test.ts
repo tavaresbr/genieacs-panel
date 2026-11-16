@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { ChargeConsoleView, SubscriptionConsoleRow, SubscriptionStatus } from '@/lib/api'
 import {
+  billingDeadlineOf,
   centsToInput,
   chargeActions,
+  chargeGrossCents,
   computeChargeAmount,
   dayInputValue,
   dayKeySaoPaulo,
@@ -18,6 +20,7 @@ import {
   parseDay,
   parseExtendDays,
   parsePercent,
+  refundPeriodDays,
   refundPreview,
   saoPauloDay,
   summaryStatusCards,
@@ -185,6 +188,13 @@ describe('chargeActions', () => {
     expect(chargeActions(c({ status: 'failed', periodEnd: '2026-10-01' }), { gateway: asaas, subscription: trial }).reissue).toBe(true)
   })
 
+  it('em teste com renovação gravada, o período atual é o da renovação — a ordem do backend', () => {
+    const trial = sub({ status: 'trial', storedStatus: 'trial', trialEndsAt: '2026-10-01' })
+    const contexto = { gateway: asaas, subscription: trial }
+    expect(chargeActions(c({ status: 'failed' }), contexto).reissue).toBe(true)
+    expect(chargeActions(c({ status: 'failed', periodEnd: '2026-10-01' }), contexto).reissue).toBe(false)
+  })
+
   it('paga oferece só o estorno, com gateway ou manual', () => {
     for (const context of [ctx, { gateway: manual, subscription: sub() }, { gateway: asaas, subscription: null }]) {
       const acoes = chargeActions(c({ status: 'paid' }), context)
@@ -230,6 +240,47 @@ describe('refundPreview', () => {
   })
 })
 
+describe('refundPeriodDays', () => {
+  it('a avulsa não comprou período: o estorno não devolve dia nenhum', () => {
+    for (const kind of ['proration', 'overage', 'addon'] as const) {
+      expect(refundPeriodDays({ kind, billingCycle: 'annual' }, 'annual', 30)).toBe(0)
+    }
+  })
+
+  it('a do ciclo anual desfaz um ano; a mensal, os dias do plano', () => {
+    expect(refundPeriodDays({ kind: 'renewal', billingCycle: 'annual' }, 'monthly', 30)).toBe(365)
+    expect(refundPeriodDays({ kind: 'renewal', billingCycle: 'monthly' }, 'annual', 31)).toBe(31)
+    // Nulo é a de antes do anual: mensal, seja qual for o ciclo de hoje.
+    expect(refundPeriodDays({ kind: 'renewal', billingCycle: null }, 'annual', 30)).toBe(30)
+  })
+
+  it('sem o ciclo na cobrança (servidor antigo), vale o da assinatura', () => {
+    expect(refundPeriodDays({}, 'annual', 30)).toBe(365)
+    expect(refundPeriodDays({}, 'monthly', 30)).toBe(30)
+    expect(refundPeriodDays({}, undefined, 30)).toBe(30)
+  })
+
+  it('com zero dias, a prévia não inventa prazo novo', () => {
+    expect(refundPreview('2026-10-10', refundPeriodDays({ kind: 'proration' }, 'monthly', 30))).toBeNull()
+  })
+})
+
+describe('chargeGrossCents', () => {
+  it('soma o crédito reservado ao valor já abatido', () => {
+    expect(chargeGrossCents({ amountCents: 7000, creditCents: 3000 })).toBe(10000)
+    expect(chargeGrossCents({ amountCents: 7000 })).toBe(7000)
+    expect(chargeGrossCents({ amountCents: 7000, creditCents: 0 })).toBe(7000)
+  })
+
+  it('o desconto sai do preço antes do crédito, não do valor abatido', () => {
+    // Plano 100, crédito 30 reservado: 10 de desconto dá 90 — e o crédito
+    // volta ao saldo para a próxima fatura (o servidor o devolve).
+    const bruto = chargeGrossCents({ amountCents: 7000, creditCents: 3000 })
+    expect(computeChargeAmount(bruto, 'discountAmount', '10')).toEqual({ ok: true, amountCents: 9000 })
+    expect(computeChargeAmount(bruto, 'discountPercent', '10')).toEqual({ ok: true, amountCents: 9000 })
+  })
+})
+
 describe('calendário de São Paulo', () => {
   it('hoje é o dia de São Paulo, não o do navegador', () => {
     // 01:30 UTC do dia 29 ainda é 22:30 do dia 28 em São Paulo (UTC-3).
@@ -262,6 +313,16 @@ describe('openTotalsByCurrency', () => {
       { currency: 'USD', cents: 500 }
     ])
     expect(openTotalsByCurrency([])).toEqual([])
+  })
+
+  it('o total do servidor (de TODAS as em aberto) vence a soma das linhas', () => {
+    const servidor = [{ currency: 'usd', cents: 900 }, { currency: 'BRL', cents: 3000 }]
+    expect(openTotalsByCurrency([com('BRL', 1000), com('USD', 500)], servidor)).toEqual([
+      { currency: 'BRL', cents: 3000 },
+      { currency: 'USD', cents: 900 }
+    ])
+    expect(openTotalsByCurrency([com('BRL', 1000)], [])).toEqual([])
+    expect(openTotalsByCurrency([com('BRL', 1000)], null)).toEqual([{ currency: 'BRL', cents: 1000 }])
   })
 })
 
@@ -364,6 +425,14 @@ describe('datas', () => {
     expect(isChargeLate({ status: 'pending', dueDate: '2026-09-28' }, agora)).toBe(false)
     expect(isChargeLate({ status: 'overdue', dueDate: null }, agora)).toBe(true)
     expect(isChargeLate({ status: 'paid', dueDate: '2020-01-01' }, agora)).toBe(false)
+  })
+
+  it('o prazo da emissão é renewsAt ?? trialEndsAt, em qualquer estado', () => {
+    const base = row(1, 'X', 'trial').subscription!
+    expect(billingDeadlineOf({ ...base, trialEndsAt: '2026-10-01', renewsAt: '2026-11-01' })).toBe('2026-11-01')
+    expect(billingDeadlineOf({ ...base, trialEndsAt: '2026-10-01', renewsAt: null })).toBe('2026-10-01')
+    expect(billingDeadlineOf({ ...base, trialEndsAt: null, renewsAt: null })).toBeNull()
+    expect(billingDeadlineOf(null)).toBeNull()
   })
 
   it('o prazo da linha é o fim do teste em teste, e a renovação nos demais', () => {

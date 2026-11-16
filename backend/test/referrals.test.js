@@ -485,6 +485,33 @@ describe('o crédito na fatura de quem indicou', () => {
     const linha = await cobranca(casa, charge.id);
     assert.equal(Number(linha.amount_cents), 10000);
     assert.equal(linha.credit_reserved_cents, null);
+    // A tela lê o quanto voltou, e a cobrança não diz mais crédito nenhum.
+    assert.equal(res.body.data.creditReleasedCents, 5000);
+    assert.equal(res.body.data.charge.creditCents, 0);
+  });
+
+  it('o console vê o crédito reservado na cobrança (o preço do plano é a soma)', async () => {
+    await darCredito(casa, 5000);
+    const { charge } = await emitir(casa);
+    const res = await noConsole(`/api/platform/tenants/${casa}/charges`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const vista = res.body.data.charges.find((c) => c.id === charge.id);
+    assert.equal(vista.amountCents, 14990);
+    assert.equal(vista.creditCents, 5000);
+  });
+
+  it('só a data mudada não mexe na reserva', async () => {
+    await darCredito(casa, 5000);
+    const { charge } = await emitir(casa);
+    const amanha = new Date(Date.now() + 3 * DAY).toISOString().slice(0, 10);
+    const res = await noConsole(`/api/platform/tenants/${casa}/charges/${charge.id}`, {
+      method: 'PATCH', body: { dueDate: amanha }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.creditReleasedCents, 0);
+    const linha = await cobranca(casa, charge.id);
+    assert.equal(Number(linha.credit_reserved_cents), 5000);
+    assert.equal(await saldo(casa), 0);
   });
 });
 

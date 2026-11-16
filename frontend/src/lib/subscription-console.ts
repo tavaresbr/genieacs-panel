@@ -1,6 +1,7 @@
 import { formatDayPart, getActiveDateFormat } from '@/lib/date-format'
 import { getIntlLocale } from '@/lib/i18n'
 import type {
+  BillingCycle,
   ChargeConsoleView,
   SubscriptionConsoleRow,
   SubscriptionConsoleStatus,
@@ -77,11 +78,11 @@ export function chargeActions(
   const bloqueada = !sub
     || sub.storedStatus === 'suspended' || sub.storedStatus === 'canceled'
     || sub.status === 'suspended' || sub.status === 'canceled'
-  const prazo = deadlineOf(sub)
+  const prazo = billingDeadlineOf(sub)
   // Isento não recebe fatura: reemitir geraria justamente a cobrança que a
   // isenção cancelou (o backend recusa).
   const isento = isBillingExempt(sub)
-  const periodoAtual = prazo !== null && dayKeySaoPaulo(prazo.date) === dayKeySaoPaulo(charge.periodEnd)
+  const periodoAtual = prazo !== null && dayKeySaoPaulo(prazo) === dayKeySaoPaulo(charge.periodEnd)
   return {
     openInvoice: link,
     copyLink: link,
@@ -134,6 +135,42 @@ export function refundPreview(
   if (Number.isNaN(instante.getTime())) return null
   const novo = new Date(instante.getTime() - dias * DIA_MS)
   return { renewsAt: novo.toISOString(), past: novo.getTime() <= now.getTime() }
+}
+
+/** Os dias que um pagamento do ciclo anual compra — o `ANNUAL_PERIOD_DAYS` do backend. */
+export const ANNUAL_PERIOD_DAYS = 365
+
+/** Os tipos de cobrança avulsa: pagos, não compram período nenhum (ver `recordPayment`). */
+const AVULSAS: readonly string[] = ['proration', 'overage', 'addon']
+
+/**
+ * Quantos dias o estorno desta cobrança desfaz, para `refundPreview` — o
+ * espelho de `duracaoCreditada` no backend:
+ *
+ * - a avulsa (pró-rata, excedente, add-on) não empurrou prazo nenhum: zero;
+ * - a do ciclo anual comprou um ano (365);
+ * - as demais, os dias do plano.
+ *
+ * O ciclo é o da COBRANÇA (nulo nas de antes do anual, que são mensais); sem
+ * o campo (servidor antigo), o da assinatura de hoje.
+ */
+export function refundPeriodDays(
+  charge: Pick<ChargeConsoleView, 'kind' | 'billingCycle'>,
+  subscriptionCycle: BillingCycle | null | undefined,
+  planPeriodDays: number
+): number {
+  if (charge.kind && AVULSAS.includes(charge.kind)) return 0
+  const ciclo = charge.billingCycle !== undefined ? charge.billingCycle : subscriptionCycle
+  return ciclo === 'annual' ? ANNUAL_PERIOD_DAYS : planPeriodDays
+}
+
+/**
+ * O preço da cobrança ANTES do crédito reservado nela (0106): `amountCents` já
+ * vem abatido, e é sobre o preço cheio que um desconto se faz — o valor novo
+ * digitado no console é o final, e o crédito volta ao saldo.
+ */
+export function chargeGrossCents(charge: Pick<ChargeConsoleView, 'amountCents' | 'creditCents'>) {
+  return charge.amountCents + Math.max(0, Number(charge.creditCents) || 0)
 }
 
 export type AmountMode = 'value' | 'discountAmount' | 'discountPercent'
@@ -304,6 +341,18 @@ export function gatewayBadge(gateway: SubscriptionConsoleRow['gateway']): Gatewa
  * Qual prazo a linha mostra: o fim do teste para quem está em teste, a data até
  * a qual está pago para os demais.
  */
+/**
+ * O prazo que a EMISSÃO lê para saber qual é o período atual: `renews_at ??
+ * trial_ends_at`, na ordem do backend (`reissue`/`issueCurrent`). Não é o da
+ * célula (`deadlineOf`), que mostra o fim do teste a quem está em teste: num
+ * teste com `renewsAt` gravado, o período que a emissão cobra é o do
+ * `renewsAt`, e o botão Reemitir tem de concordar com ela.
+ */
+export function billingDeadlineOf(subscription: SubscriptionConsoleRow['subscription']): string | null {
+  if (!subscription) return null
+  return subscription.renewsAt ?? subscription.trialEndsAt ?? null
+}
+
 export function deadlineOf(subscription: SubscriptionConsoleRow['subscription']) {
   if (!subscription) return null
   if (subscription.storedStatus === 'trial' && subscription.trialEndsAt) {
@@ -431,18 +480,30 @@ export const CHARGE_STATUS_LABEL_KEYS: Record<ChargeStatus, TranslationKey> = {
 }
 
 /**
- * O total em aberto por moeda, somado das cobranças em aberto das linhas.
+ * O total em aberto por moeda.
  *
- * O resumo do backend traz um número só; somar centavos de moedas diferentes
- * daria um valor que não existe. Quando as linhas mostram mais de uma moeda, a
- * tela troca o total único por este, uma linha por moeda.
+ * Somar centavos de moedas diferentes daria um valor que não existe. Quando há
+ * mais de uma moeda, a tela troca o total único por este, uma linha por moeda.
+ * Vale o do servidor (`summary.openTotals`, de TODAS as em aberto); sem ele
+ * (servidor antigo), a soma da cobrança em aberto mais recente de cada linha —
+ * que deixa de fora a velha esquecida.
  */
-export function openTotalsByCurrency(rows: readonly Pick<SubscriptionConsoleRow, 'openCharge'>[]) {
+export function openTotalsByCurrency(
+  rows: readonly Pick<SubscriptionConsoleRow, 'openCharge'>[],
+  serverTotals?: SubscriptionConsoleSummary['openTotals'] | null
+) {
   const totais = new Map<string, number>()
-  for (const row of rows) {
-    if (!row.openCharge) continue
-    const moeda = (row.openCharge.currency || 'BRL').toUpperCase()
-    totais.set(moeda, (totais.get(moeda) ?? 0) + (Number(row.openCharge.amountCents) || 0))
+  if (Array.isArray(serverTotals)) {
+    for (const total of serverTotals) {
+      const moeda = (total.currency || 'BRL').toUpperCase()
+      totais.set(moeda, (totais.get(moeda) ?? 0) + (Number(total.cents) || 0))
+    }
+  } else {
+    for (const row of rows) {
+      if (!row.openCharge) continue
+      const moeda = (row.openCharge.currency || 'BRL').toUpperCase()
+      totais.set(moeda, (totais.get(moeda) ?? 0) + (Number(row.openCharge.amountCents) || 0))
+    }
   }
   return [...totais.entries()]
     .sort(([a], [b]) => (a === 'BRL' ? -1 : b === 'BRL' ? 1 : a.localeCompare(b)))
