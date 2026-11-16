@@ -1,5 +1,6 @@
 'use client'
 
+import { ChatNumberMenu, useConnectedAccounts } from '@/components/whatsapp/chat-number-menu'
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
@@ -848,6 +849,7 @@ export default function DeviceDetailPage() {
   const [sgpTicketEnabled, setSgpTicketEnabled] = useState(false)
   const [sgpUrl, setSgpUrl] = useState<string | null>(null)
   const [openingWhatsApp, setOpeningWhatsApp] = useState(false)
+  const whatsappNumbers = useConnectedAccounts(can('whatsapp.send'))
   const [ticketOpen, setTicketOpen] = useState(false)
   const [ticketText, setTicketText] = useState('')
   const [ticketSending, setTicketSending] = useState(false)
@@ -1430,11 +1432,11 @@ export default function DeviceDetailPage() {
    * one on the contract's number — and lands on it in the inbox. The route
    * refuses a contract with no number on record, and says so.
    */
-  const openWhatsApp = async () => {
+  const openWhatsApp = async (accountId?: number) => {
     if (!sgpLink) return
     setOpeningWhatsApp(true)
     try {
-      const res = await whatsappAPI.openContactConversation(sgpLink.contract)
+      const res = await whatsappAPI.openContactConversation(sgpLink.contract, undefined, accountId)
       if (!res.success || !res.data) {
         toast.error(res.message || t('api.requestFailed'))
         return
@@ -1568,16 +1570,21 @@ export default function DeviceDetailPage() {
       key: 'whatsapp',
       label: t('detail.sgp.openWhatsapp'),
       render: () => (
-        <button
-          key="whatsapp"
-          type="button"
-          className="modern-button-secondary"
-          disabled={openingWhatsApp}
-          onClick={() => void openWhatsApp()}
-        >
-          <Icon name="phone" size={16} />
-          {t('detail.sgp.openWhatsapp')}
-        </button>
+        <ChatNumberMenu key="whatsapp" accounts={whatsappNumbers} onChoose={(accountId) => void openWhatsApp(accountId)}>
+          {({ onClick, expanded }) => (
+            <button
+              type="button"
+              className="modern-button-secondary"
+              disabled={openingWhatsApp}
+              aria-haspopup={whatsappNumbers.length > 1 ? 'menu' : undefined}
+              aria-expanded={whatsappNumbers.length > 1 ? expanded : undefined}
+              onClick={onClick}
+            >
+              <Icon name="phone" size={16} />
+              {t('detail.sgp.openWhatsapp')}
+            </button>
+          )}
+        </ChatNumberMenu>
       )
     }] : [])
   ].sort((a, b) => a.label.localeCompare(b.label, intlLocale, { sensitivity: 'base' }))

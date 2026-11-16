@@ -3336,6 +3336,8 @@ const de: Dictionary = {
   'whatsapp.notify.unknownContact': 'Kunde',
   'whatsapp.ai.suggest': 'Vorschlagen (KI)',
   'whatsapp.ai.suggesting': 'Wird erstellt…',
+  'whatsapp.chatNumber.title': "Chat from which number?",
+  'whatsapp.chatNumber.default': "default",
   'whatsapp.aiUsage.title': "AI usage",
   'whatsapp.aiUsage.description': "How much the AI worked. Only counts of calls and tokens, no money values (prices change).",
   'whatsapp.aiUsage.calls': "Calls",

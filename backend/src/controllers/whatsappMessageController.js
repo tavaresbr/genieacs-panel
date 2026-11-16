@@ -415,7 +415,13 @@ class WhatsAppMessageController {
   static async openContactConversation(req, res) {
     try {
       const phone = typeof req.body?.phone === 'string' ? req.body.phone : null;
-      const { conversation, created } = await WaContactService.openConversation(req.params?.contract, { phone });
+      // O número do provedor que o atendente escolheu (opcional).
+      const rawAccount = req.body?.accountId;
+      const accountId = rawAccount === undefined || rawAccount === null ? null : Number(rawAccount);
+      if (accountId !== null && !(Number.isInteger(accountId) && accountId > 0)) {
+        throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 400 });
+      }
+      const { conversation, created } = await WaContactService.openConversation(req.params?.contract, { phone, accountId });
       return res.status(created ? 201 : 200).json(createResponse(
         req.t('whatsapp.conversationOpened'),
         conversation

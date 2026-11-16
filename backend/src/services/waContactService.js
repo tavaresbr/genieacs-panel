@@ -563,15 +563,31 @@ class WaContactService {
    * into; nothing leaves the panel until they press send, and then it leaves
    * through the same queue, opt-out check and all, as any other reply.
    *
+   * `accountId` é o número do provedor que o atendente escolheu para falar: só
+   * um número CONECTADO do próprio provedor. Cada número tem a sua conversa com
+   * o assinante, então escolher o B abre a conversa do B (ou cria uma, se ainda
+   * não existir), mesmo que já haja uma no A. Sem `accountId`, vale o que
+   * sempre valeu: a conversa que existe, ou um número de propósito `general`.
+   *
    * @returns {Promise<{ conversation: object, created: boolean }>}
    */
-  static async openConversation(contract, { phone = null } = {}) {
+  static async openConversation(contract, { phone = null, accountId = null } = {}) {
     const subscriber = await this.subscriberFor(contract);
     if (!subscriber) {
       throw new WaError('whatsapp.error.subscriberNotFound', {
         code: 'subscriber_not_found',
         status: 404
       });
+    }
+
+    // O número escolhido, conferido antes de qualquer coisa: `getById` já só
+    // enxerga os números deste provedor, e um desconectado não serve para falar.
+    let chosen = null;
+    if (accountId !== null && accountId !== undefined) {
+      chosen = await WhatsAppAccount.getById(accountId);
+      if (!chosen || chosen.status !== 'connected') {
+        throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 400 });
+      }
     }
 
     // Another of the client's numbers, picked from its record. Only a number
@@ -596,7 +612,9 @@ class WaContactService {
       // Only a thread on the subscriber's number is reused: one left on an
       // old number (the record changed) would send to the wrong phone, so a
       // new thread opens on the current one.
-      const reusable = contact.conversationId
+      // Com um número escolhido não há atalho: a conversa é a DAQUELE número,
+      // achada (ou criada) mais abaixo.
+      const reusable = !chosen && contact.conversationId
         ? await WaConversation.getById(contact.conversationId)
         : null;
       const onNumber = reusable
@@ -619,17 +637,24 @@ class WaContactService {
         status: 409
       });
     }
-    const account = await WhatsAppAccount.getForPurpose('general');
+    const account = chosen || await WhatsAppAccount.getForPurpose('general');
     if (!account) {
       throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 400 });
     }
+
+    const externalThreadId = `${number}@s.whatsapp.net`;
+    // Só com número escolhido: a conversa daquele número já existia?
+    const prior = chosen
+      ? (await WaConversation.getByThread(account.id, externalThreadId))
+        || (await WaConversation.getByPhoneSpelling(account.id, externalThreadId))
+      : null;
 
     const conversation = await WaConversation.ensure({
       accountId: account.id,
       // The canonical form the inbound handler builds, so the subscriber's
       // answer lands in this thread — `ensure` also finds it under the other
       // spelling of the ninth digit.
-      externalThreadId: `${number}@s.whatsapp.net`,
+      externalThreadId,
       waPhone: number,
       pushName: subscriber.clientName || null
     });
@@ -651,7 +676,7 @@ class WaContactService {
         // to write, and inventing one would send billing looking for invoices
         // under it.
         : { sgp_contact_id: subscriber.contactId, ...engaged });
-    return { conversation: await WaConversationService.decorate(bound), created: true };
+    return { conversation: await WaConversationService.decorate(bound), created: !prior };
   }
 }
 

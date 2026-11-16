@@ -3431,6 +3431,8 @@ const ar: Dictionary = {
   'whatsapp.notify.unknownContact': 'عميل',
   'whatsapp.ai.suggest': 'اقتراح (ذكاء اصطناعي)',
   'whatsapp.ai.suggesting': 'جارٍ الإنشاء…',
+  'whatsapp.chatNumber.title': "Chat from which number?",
+  'whatsapp.chatNumber.default': "default",
   'whatsapp.aiUsage.title': "AI usage",
   'whatsapp.aiUsage.description': "How much the AI worked. Only counts of calls and tokens, no money values (prices change).",
   'whatsapp.aiUsage.calls': "Calls",

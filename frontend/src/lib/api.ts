@@ -7202,10 +7202,10 @@ export const whatsappAPI = {
   // nothing.
   // `phone`: another of the client's numbers, from its record, instead of its
   // WhatsApp number.
-  openContactConversation: (key: string, phone?: string) =>
+  openContactConversation: (key: string, phone?: string, accountId?: number) =>
     apiClient.post<WhatsAppConversation>(
       `/whatsapp/contacts/${encodeURIComponent(key)}/conversation`,
-      phone ? { phone } : undefined
+      phone || accountId ? { ...(phone ? { phone } : {}), ...(accountId ? { accountId } : {}) } : undefined
     ),
 
   // Reading a thread clears its unread count server-side — the operator looking
