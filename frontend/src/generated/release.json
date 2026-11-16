@@ -1,52 +1,16 @@
 {
-  "version": "1.46.0",
-  "build": 1732,
-  "sourceCommit": "c61e69e96213",
+  "version": "1.47.0",
+  "build": 1735,
+  "sourceCommit": "1c59a6420800",
   "releasedAt": "2026-11-16",
-  "basedOnTag": "v1.45.1",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/4ae64d6f87b8...c61e69e96213",
+  "basedOnTag": "v1.46.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/779ea42eb9f4...1c59a6420800",
   "changes": [
     {
-      "shortHash": "329a243c",
+      "shortHash": "352b9821",
       "date": "2026-11-16",
-      "title": "Com o carimbo exigido, só vale a assinatura sobre <timestamp>.<corpo>",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "f600946d",
-      "date": "2026-11-16",
-      "title": "O cadastro público não diz mais se um e-mail tem conta",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "72e89ff5",
-      "date": "2026-11-16",
-      "title": "Só o cadastro da plataforma escreve no catálogo padrão da caixa",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "bf8d779f",
-      "date": "2026-11-16",
-      "title": "2FA obrigatório para quem opera a plataforma",
+      "title": "Escolher o número do provedor ao clicar em Conversar",
       "category": "New"
-    },
-    {
-      "shortHash": "ccfecf3d",
-      "date": "2026-11-16",
-      "title": "O log do cadastro com e-mail tomado não leva nada do pedido",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "1c54e49f",
-      "date": "2026-11-16",
-      "title": "As recusas do login em funções próprias",
-      "category": "Changed"
-    },
-    {
-      "shortHash": "4bb852ff",
-      "date": "2026-11-16",
-      "title": "O formulário conferido numa função própria",
-      "category": "Changed"
     }
   ]
 }
