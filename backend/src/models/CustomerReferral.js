@@ -20,9 +20,12 @@ class CustomerReferral {
   }
 
   /** O mesmo indicado (telefone) pelo mesmo cliente: o cadastro repetido não duplica. */
+  /** `phone`: um número, ou as grafias dele (com e sem o nono dígito). */
   static async findDuplicate(referrerContract, phone) {
+    const phones = Array.isArray(phone) ? phone : [phone];
     return (await tdb('customer_referrals')
-      .where({ referrer_contract: String(referrerContract), phone_e164: phone })
+      .where({ referrer_contract: String(referrerContract) })
+      .whereIn('phone_e164', phones)
       .first()) || null;
   }
 

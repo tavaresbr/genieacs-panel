@@ -101,6 +101,19 @@ describe('a página pública', () => {
     const propria = await enviar({ t: t(), name: 'Eu mesmo', phone: '5593991110555' });
     assert.equal(propria.status, 400);
     assert.equal(propria.body.code, 'self_referral');
+    // O cadastro tem o 9; o cliente digitou sem. É o mesmo celular.
+    const semNove = await enviar({ t: t(), name: 'Eu mesmo', phone: '(93) 9111-0555' });
+    assert.equal(semNove.status, 400);
+    assert.equal(semNove.body.code, 'self_referral');
+  });
+
+  it('o mesmo indicado digitado sem o nono dígito não duplica', async () => {
+    const primeira = await enviar({ t: t(), name: 'Ana Costa', phone: '93991114444' });
+    assert.equal(primeira.status, 201, JSON.stringify(primeira.body));
+    const semNove = await enviar({ t: t(), name: 'Ana Costa', phone: '9391114444' });
+    assert.equal(semNove.body.data.created, false);
+    // A lista abaixo conta as indicações deste contrato.
+    await getDb()('customer_referrals').where({ phone_e164: '5593991114444' }).del();
   });
 
   it('com token inválido não grava nada', async () => {
