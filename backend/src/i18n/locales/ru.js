@@ -285,6 +285,7 @@ export default {
   'vendor.listFailed': 'Не удалось получить список производителей',
   'vendor.idRequired': 'Требуется идентификатор производителя',
   'vendor.notFound': 'Производитель не найден',
+  'vendor.platformAdminOnly': 'Только администратор платформы может изменить каталог по умолчанию, который наследуют все провайдеры',
   'vendor.retrieved': 'Данные производителя получены',
   'vendor.getFailed': 'Не удалось получить данные производителя',
   'vendor.fieldsRequired': 'Требуются name, manufacturer_patterns и product_patterns',

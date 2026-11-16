@@ -284,6 +284,7 @@ export default {
   'vendor.listFailed': '無法取得廠商清單',
   'vendor.idRequired': '需要提供廠商 ID',
   'vendor.notFound': '找不到該廠商',
+  'vendor.platformAdminOnly': '只有平台管理員可以修改所有服務商繼承的預設目錄',
   'vendor.retrieved': '已取得廠商資訊',
   'vendor.getFailed': '無法取得廠商資訊',
   'vendor.fieldsRequired': '需要提供 name、manufacturer_patterns 與 product_patterns',

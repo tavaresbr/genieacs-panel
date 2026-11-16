@@ -282,6 +282,7 @@ export default {
   'vendor.listFailed': 'No se pudieron obtener los fabricantes',
   'vendor.idRequired': 'El ID del fabricante es obligatorio',
   'vendor.notFound': 'Fabricante no encontrado',
+  'vendor.platformAdminOnly': 'Solo un administrador de la plataforma puede cambiar el catálogo predeterminado que heredan todos los proveedores',
   'vendor.retrieved': 'Fabricante obtenido correctamente',
   'vendor.getFailed': 'No se pudo obtener el fabricante',
   'vendor.fieldsRequired': 'El nombre, manufacturer_patterns y product_patterns son obligatorios',

@@ -285,6 +285,7 @@ export default {
   'vendor.listFailed': 'Die Hersteller konnten nicht abgerufen werden',
   'vendor.idRequired': 'Die Hersteller-ID ist erforderlich',
   'vendor.notFound': 'Hersteller nicht gefunden',
+  'vendor.platformAdminOnly': 'Nur ein Plattformadministrator kann den Standardkatalog ändern, den alle Anbieter übernehmen',
   'vendor.retrieved': 'Hersteller erfolgreich abgerufen',
   'vendor.getFailed': 'Der Hersteller konnte nicht abgerufen werden',
   'vendor.fieldsRequired': 'Die Felder name, manufacturer_patterns und product_patterns sind erforderlich',

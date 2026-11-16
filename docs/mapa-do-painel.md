@@ -121,7 +121,7 @@ um deploy hospedado de um self-hosted sem console nenhum.
 | **Trilha da plataforma** | ações sobre provedores |
 | **Configurações** | do deploy |
 | **Saúde do deploy** | edição, dialeto do banco, endereços, o que está configurado — nunca o valor |
-| **Catálogo padrão** | de onde o provedor novo herda o catálogo de equipamentos |
+| **Catálogo padrão** | de onde o provedor novo herda o catálogo de equipamentos. As linhas moram na caixa da plataforma, e só quem está em **Acesso à plataforma** as altera — `admin` da equipe da caixa sem a chave só lê (`403 platform_admin_only`) |
 
 Dentro da linha de um provedor, cinco painéis: equipe, plano, cadastro, gateway de pagamento
 e GenieACS.

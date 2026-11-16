@@ -285,6 +285,7 @@ export default {
   'vendor.listFailed': '无法获取厂商列表',
   'vendor.idRequired': '需要提供厂商 ID',
   'vendor.notFound': '找不到该厂商',
+  'vendor.platformAdminOnly': '只有平台管理员可以修改所有服务商继承的默认目录',
   'vendor.retrieved': '已获取厂商信息',
   'vendor.getFailed': '无法获取厂商信息',
   'vendor.fieldsRequired': '需要提供 name、manufacturer_patterns 和 product_patterns',

@@ -286,6 +286,7 @@ export default {
   'vendor.listFailed': '제조사 목록을 조회하지 못했습니다',
   'vendor.idRequired': '제조사 ID가 필요합니다',
   'vendor.notFound': '제조사를 찾을 수 없습니다',
+  'vendor.platformAdminOnly': '모든 공급자가 물려받는 기본 카탈로그는 플랫폼 관리자만 변경할 수 있습니다',
   'vendor.retrieved': '제조사 정보를 조회했습니다',
   'vendor.getFailed': '제조사 정보를 조회하지 못했습니다',
   'vendor.fieldsRequired': 'name, manufacturer_patterns, product_patterns이 필요합니다',

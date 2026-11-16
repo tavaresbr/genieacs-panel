@@ -284,6 +284,7 @@ export default {
   'vendor.listFailed': 'ベンダーを取得できませんでした',
   'vendor.idRequired': 'ベンダー ID が必要です',
   'vendor.notFound': 'ベンダーが見つかりません',
+  'vendor.platformAdminOnly': 'すべてのプロバイダーが引き継ぐ既定のカタログを変更できるのはプラットフォーム管理者だけです',
   'vendor.retrieved': 'ベンダーを取得しました',
   'vendor.getFailed': 'ベンダーを取得できませんでした',
   'vendor.fieldsRequired': 'name、manufacturer_patterns、product_patterns が必要です',

@@ -285,6 +285,7 @@ export default {
   'vendor.listFailed': 'Impossible d’obtenir les fabricants',
   'vendor.idRequired': 'L’ID du fabricant est requis',
   'vendor.notFound': 'Fabricant introuvable',
+  'vendor.platformAdminOnly': 'Seul un administrateur de la plateforme peut modifier le catalogue par défaut dont héritent tous les fournisseurs',
   'vendor.retrieved': 'Fabricant récupéré',
   'vendor.getFailed': 'Impossible d’obtenir le fabricant',
   'vendor.fieldsRequired': 'Les champs name, manufacturer_patterns et product_patterns sont requis',

@@ -283,6 +283,7 @@ export default {
   'vendor.listFailed': 'تعذّر جلب قائمة المصنّعين',
   'vendor.idRequired': 'معرّف المصنّع مطلوب',
   'vendor.notFound': 'المصنّع غير موجود',
+  'vendor.platformAdminOnly': 'لا يستطيع تعديل الكتالوج الافتراضي الذي يرثه كل مزود إلا مسؤول المنصة',
   'vendor.retrieved': 'تم جلب بيانات المصنّع',
   'vendor.getFailed': 'تعذّر جلب بيانات المصنّع',
   'vendor.fieldsRequired': 'الحقول name وmanufacturer_patterns وproduct_patterns مطلوبة',

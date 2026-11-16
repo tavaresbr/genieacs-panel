@@ -285,6 +285,7 @@ export default {
   'vendor.listFailed': 'Failed to get the vendors',
   'vendor.idRequired': 'The vendor ID is required',
   'vendor.notFound': 'Vendor not found',
+  'vendor.platformAdminOnly': 'Only a platform administrator can change the default catalogue that every provider inherits',
   'vendor.retrieved': 'Vendor retrieved successfully',
   'vendor.getFailed': 'Failed to get the vendor',
   'vendor.fieldsRequired': 'The name, manufacturer_patterns, and product_patterns are required',

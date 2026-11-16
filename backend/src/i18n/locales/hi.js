@@ -283,6 +283,7 @@ export default {
   'vendor.listFailed': 'विक्रेता सूची प्राप्त नहीं हो सकी',
   'vendor.idRequired': 'विक्रेता आईडी आवश्यक है',
   'vendor.notFound': 'विक्रेता नहीं मिला',
+  'vendor.platformAdminOnly': 'केवल प्लेटफ़ॉर्म व्यवस्थापक ही वह डिफ़ॉल्ट कैटलॉग बदल सकता है जो हर प्रदाता को मिलता है',
   'vendor.retrieved': 'विक्रेता की जानकारी प्राप्त हुई',
   'vendor.getFailed': 'विक्रेता की जानकारी प्राप्त नहीं हो सकी',
   'vendor.fieldsRequired': 'name, manufacturer_patterns और product_patterns आवश्यक हैं',
