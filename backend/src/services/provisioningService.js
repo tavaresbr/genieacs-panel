@@ -613,7 +613,12 @@ class ProvisioningService {
 
   static async executeRun(run) {
     const config = await this.getConfig();
-    await ProvisioningRun.update(run.id, { status: 'running', started_at: new Date() });
+    // Claimed, not just marked: another instance may have read the same row
+    // from `getDue` and be about to run it too. Whoever loses the claim (or
+    // finds it already `running`) leaves it alone and reports it as it is.
+    const claimed = run.status !== 'running'
+      && await ProvisioningRun.claim(run.id, run.status, { started_at: new Date() });
+    if (!claimed) return ProvisioningRun.getById(run.id);
 
     let plan;
     try {

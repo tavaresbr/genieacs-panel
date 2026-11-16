@@ -374,6 +374,22 @@ describe('provisioning poller', () => {
     assert.ok(!candidates.includes(DEVICE_ID), 'a successful run settles the device');
   });
 
+  it('two instances that read the same due run execute it once', async () => {
+    const run = await asTenant(() => ProvisioningRun.create({
+      device_id: 'stub-device-claim', trigger: 'poller', status: 'pending', attempt_count: 0
+    }));
+    assert.equal(await asTenant(() => ProvisioningRun.claim(run.id, 'pending')), true);
+    assert.equal(await asTenant(() => ProvisioningRun.claim(run.id, 'pending')), false, 'the second claim must lose');
+
+    // The other instance still holds the stale `pending` copy from `getDue`:
+    // it must leave the run alone, without a single call to GenieACS.
+    genie.state.tasks.length = 0;
+    const seen = await asTenant(() => ProvisioningService.executeRun(run));
+    assert.equal(seen.status, 'running');
+    assert.equal(genie.state.tasks.length, 0);
+    await getDb()('provisioning_runs').where({ id: run.id }).del();
+  });
+
   it('fails a run that was interrupted mid-flight', async () => {
     const run = await asTenant(() => ProvisioningRun.create({
       device_id: 'stub-device-3', trigger: 'poller', status: 'running'
