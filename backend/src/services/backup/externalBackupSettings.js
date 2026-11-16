@@ -265,9 +265,13 @@ export async function save(patch = {}) {
     conexao.forcePathStyle = patch.forcePathStyle;
     conexaoMudou = true;
   }
-  // Uma conexão que a chave atual não abre não é mesclada: reescrevê-la com só
-  // os campos do patch apagaria o resto em silêncio.
-  if (conexaoMudou && !legivel) {
+  // Uma conexão que a chave atual não abre não é mesclada (a `conexao` já
+  // partiu de {}): reescrevê-la com só alguns campos apagaria o resto em
+  // silêncio. Mas um patch que traz o bastante para uma conexão utilizável
+  // (bucket, access key e secret; endpoint e região têm padrão) a substitui —
+  // senão a conexão ilegível bloquearia toda gravação para sempre.
+  const substituiInteira = Boolean(conexao.bucket && conexao.accessKeyId && conexao.secretAccessKey);
+  if (conexaoMudou && !legivel && !substituiInteira) {
     throw new BackupSettingsError(
       'The stored connection cannot be decrypted with this server key; send every connection field to replace it',
       { code: 'connection_unreadable', status: 409 }

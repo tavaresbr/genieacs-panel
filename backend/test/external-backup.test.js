@@ -210,6 +210,28 @@ describe('a configuração pelo console', () => {
     await configurar();
   });
 
+  it('uma conexão que a chave não abre: recusa o remendo, aceita a substituição inteira', async () => {
+    const linha = await getDb()('app_state').where({ key: CONFIG_KEY }).first();
+    const guardado = JSON.parse(linha.value);
+    // Como se a chave da caixa de segredos tivesse mudado: o envelope não abre mais.
+    guardado.connection = { ...guardado.connection, password_ciphertext: Buffer.from('lixo-ilegivel').toString('base64') };
+    await getDb()('app_state').where({ key: CONFIG_KEY }).update({ value: JSON.stringify(guardado) });
+    assert.equal((await platform('/integrations/backup')).body.data.connectionReadable, false);
+
+    const remendo = await platform('/integrations/backup', { method: 'PUT', body: { bucket: BUCKET } });
+    assert.equal(remendo.status, 409);
+    assert.equal(remendo.body.code, 'connection_unreadable');
+
+    // O que não toca na conexão continua gravando.
+    const hora = await platform('/integrations/backup', { method: 'PUT', body: { hour: 3 } });
+    assert.equal(hora.status, 200);
+
+    await configurar();
+    const depois = await platform('/integrations/backup');
+    assert.equal(depois.body.data.connectionReadable, true);
+    assert.equal((await effectiveConfig()).connection.secretAccessKey, SECRET);
+  });
+
   it('a conexão entra na rotação da chave da caixa de segredos', () => {
     assert.ok(SecretRotationService.BLOBS.some((b) => b.chave === CONFIG_KEY && b.contexto === 'skygenpanel-external-backup-v1'));
   });
