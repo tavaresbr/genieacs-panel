@@ -23,10 +23,24 @@ export function affiliateCodeFromQuery(valor: string | null | undefined) {
   return /^[A-Z0-9]{3,13}$/.test(corpo) ? `A-${corpo}` : null
 }
 
-/** Pontos-base como porcentagem legível: 1000 → "10", 1250 → "12.5". */
+/**
+ * Pontos-base como a porcentagem do CAMPO: 1000 → "10", 1250 → "12.5". É o
+ * que volta ao formulário e o `percentToBp` lê de novo; para mostrar, ver
+ * `formatBpPercent`.
+ */
 export function bpToPercent(bp: number | null | undefined) {
   if (bp === null || bp === undefined || !Number.isFinite(bp)) return ''
   return String(Math.round(bp) / 100)
+}
+
+/**
+ * Pontos-base como porcentagem para LER, no idioma da tela: 1250 → "12,5" em
+ * pt-BR e "12.5" em inglês. O `bpToPercent` fica para o campo: no texto, o
+ * ponto decimal em português parecia milhar.
+ */
+export function formatBpPercent(bp: number | null | undefined, locale: string) {
+  if (bp === null || bp === undefined || !Number.isFinite(bp)) return ''
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(Math.round(bp) / 100)
 }
 
 /**

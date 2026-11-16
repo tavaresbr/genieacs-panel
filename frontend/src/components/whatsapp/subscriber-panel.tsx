@@ -109,6 +109,17 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   // The answer to an older request must not overwrite a newer one: switching
   // threads while SGP is slow is exactly when the two cross.
   const requestRef = useRef(0)
+  // Vincular, desvincular e salvar o telefone também respondem com o painel
+  // inteiro: entram na mesma fila do `load`, senão a resposta lenta de uma
+  // conversa caía no painel da seguinte (o componente não é remontado por
+  // conversa). Quem chega por último e ainda vale também encerra o "carregando"
+  // de um `load` que ela tornou velho.
+  const applyPanel = (request: number, data: WaSubscriberPanel) => {
+    if (request !== requestRef.current) return false
+    setPanel(data)
+    setLoading(false)
+    return true
+  }
   // The panel answer the list was last told about, so one answer is one reload.
   const notifiedRef = useRef<WaSubscriberPanel | null>(null)
 
@@ -187,6 +198,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   // registration itself, which the server checks against this same search.
   const bindRegistration = async (registration: { key: string; name: string | null }) => {
     setBusy('registration')
+    const request = ++requestRef.current
     try {
       const res = await whatsappAPI.bindSubscriber(conversationId, {
         contract: registration.key,
@@ -197,9 +209,9 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
         return
       }
       toast.success(t('whatsapp.sgp.registrationBound', { name: registration.name ?? '—' }))
-      setPanel(res.data)
-      setSearchedDocument(null)
       onBound?.()
+      if (!applyPanel(request, res.data)) return
+      setSearchedDocument(null)
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -210,6 +222,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const bind = async () => {
     if (!contract) return
     setBusy('bind')
+    const request = ++requestRef.current
     try {
       const res = await whatsappAPI.bindSubscriber(conversationId, {
         contract,
@@ -221,7 +234,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
       }
       toast.success(t('whatsapp.sgp.bound', { contract }))
       // The effect above tells the list: the new answer carries the new contract.
-      setPanel(res.data)
+      if (!applyPanel(request, res.data)) return
       setSearchedDocument(null)
     } catch {
       toast.error(t('api.requestFailed'))
@@ -235,6 +248,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const unbind = async () => {
     if (!window.confirm(t('whatsapp.sgp.unbindConfirm'))) return
     setBusy('unbind')
+    const request = ++requestRef.current
     try {
       const res = await whatsappAPI.unbindSubscriber(conversationId)
       if (!res.success || !res.data) {
@@ -242,9 +256,9 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
         return
       }
       toast.success(t('whatsapp.sgp.unbound'))
-      setPanel(res.data)
-      setSearchedDocument(null)
       onBound?.()
+      if (!applyPanel(request, res.data)) return
+      setSearchedDocument(null)
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -343,6 +357,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
     if (!contract) return
     if (!window.confirm(t('whatsapp.sgp.savePhoneConfirm', { contract }))) return
     setBusy('phone')
+    const request = ++requestRef.current
     try {
       const res = await whatsappAPI.subscriberSavePhone(conversationId, contract)
       if (!res.success || !res.data) {
@@ -350,7 +365,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
         return
       }
       toast.success(t('whatsapp.sgp.phoneSaved', { contract }))
-      setPanel(res.data)
+      applyPanel(request, res.data)
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {

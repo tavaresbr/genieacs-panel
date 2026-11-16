@@ -27,19 +27,30 @@ export function ChargePaymentModal({ chargeId, onClose }: { chargeId: number | n
   const [copied, setCopied] = useState<string | null>(null)
   const open = chargeId !== null
 
+  // Só a resposta do pedido mais recente vale: o gateway pode demorar, e a
+  // resposta atrasada da cobrança A não pode aparecer na janela da cobrança B
+  // (nem na janela já fechada).
+  const pedido = useRef(0)
+
   const load = useCallback(async (id: number) => {
+    const meu = ++pedido.current
     setLoading(true)
     setError(null)
     setInfo(null)
     const res = await subscriptionAPI.chargePaymentInfo(id)
+    if (meu !== pedido.current) return
     if (res.success && res.data) setInfo(res.data.paymentInfo)
     else setError(res.message || t('charges.secondCopy.failed'))
     setLoading(false)
   }, [t])
 
+  // Trocar de cobrança ou fechar a janela invalida o pedido em voo.
+  const esquecerPedido = useCallback(() => { pedido.current++ }, [])
+
   useEffect(() => {
     if (chargeId !== null) void load(chargeId)
-  }, [chargeId, load])
+    return esquecerPedido
+  }, [chargeId, load, esquecerPedido])
 
   useEffect(() => {
     if (!open) return

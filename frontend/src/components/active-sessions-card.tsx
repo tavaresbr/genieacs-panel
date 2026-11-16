@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/confirm-dialog'
-import { apiClient, authAPI, type ActiveSession } from '@/lib/api'
+import { apiClient, authAPI, whatsappAPI, type ActiveSession } from '@/lib/api'
+import { useAuth } from '@/contexts/auth-context'
+import { dropPushOnLogout } from '@/lib/push'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
@@ -32,6 +34,23 @@ export function ActiveSessionsCard() {
   const [sessoes, setSessoes] = useState<ActiveSession[] | null>(null)
   const [erro, setErro] = useState(false)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  const { can } = useAuth()
+
+  /**
+   * O que o `logout()` faz antes de sair, feito aqui ANTES de revogar: depois
+   * da revogação o token deste aparelho já não vale e o servidor recusaria
+   * as duas chamadas. Sem isso, encerrar este aparelho por aqui deixava o
+   * push inscrito (quem entrasse depois no navegador recebia os avisos) e o
+   * atendente "Disponível" na fila. Melhor esforço: falha não segura a saída.
+   * Se a revogação falhar depois, a sessão segue sem push e indisponível —
+   * o preço de não poder fazer isso depois; reativar é um clique.
+   * A aba de personificação não mexe no push — não é dela.
+   */
+  const prepararSaida = async () => {
+    const token = apiClient.getToken()
+    if (can('whatsapp.send')) await whatsappAPI.setAvailability(false).catch(() => null)
+    if (!apiClient.isTabScoped()) await dropPushOnLogout(token).catch(() => {})
+  }
 
   const carregar = useCallback(async () => {
     setErro(false)
@@ -56,6 +75,7 @@ export function ActiveSessionsCard() {
     if (sessao.current && !(await confirm(t('settings.sessions.confirmCurrent'), { danger: true }))) return
     setOcupado(sessao.id)
     try {
+      if (sessao.current) await prepararSaida()
       const res = await authAPI.revokeSession(sessao.id)
       if (!res.success) {
         toast.error(res.message || t('settings.sessions.revokeFailed'))
@@ -76,6 +96,7 @@ export function ActiveSessionsCard() {
     if (!(await confirm(t('settings.sessions.confirmAll'), { danger: true }))) return
     setOcupado('all')
     try {
+      await prepararSaida()
       const res = await authAPI.revokeAllSessions()
       if (!res.success) {
         toast.error(res.message || t('settings.sessions.revokeFailed'))

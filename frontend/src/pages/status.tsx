@@ -21,7 +21,7 @@ const REFRESH_MS = 60_000
  * provedor —, então a página só desenha o que recebe.
  */
 export default function StatusPage() {
-  const { t, locale, formatDateTime } = useTranslation()
+  const { t, locale, formatDate, formatDateTime } = useTranslation()
   const [dados, setDados] = useState<PublicStatus | null>(null)
   const [erro, setErro] = useState(false)
 
@@ -98,9 +98,12 @@ export default function StatusPage() {
         {componente.days.map((d) => (
           <span
             key={d.date}
+            // `d.date` é um dia (YYYY-MM-DD), não um instante: o `formatDate`
+            // o lê à meia-noite local (`toDate`), sem voltar um dia a oeste de
+            // Greenwich, e no formato de data desta tela.
             title={d.uptime === null
-              ? t('statusPage.dayNoData', { date: d.date })
-              : t('statusPage.dayTooltip', { date: d.date, value: formatUptime(d.uptime, locale) })}
+              ? t('statusPage.dayNoData', { date: formatDate(d.date) })
+              : t('statusPage.dayTooltip', { date: formatDate(d.date), value: formatUptime(d.uptime, locale) })}
             className={`min-w-0 flex-1 rounded-sm ${toneBg(dayTone(d.uptime))}`}
           />
         ))}
