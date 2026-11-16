@@ -72,6 +72,7 @@ import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-panel'
 import { IntegrationsHub } from '@/components/settings/integrations-hub'
+import { SectionTabs } from '@/components/settings/section-tabs'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@/lib/password-policy'
@@ -118,9 +119,31 @@ const SETTINGS_TABS = [
  */
 const INTEGRATION_TABS = ['sgp', 'asaas', 'teiah', 'focuschat', 'whatsapp', 'chatbot']
 
+/**
+ * Os painéis de dentro das abas do SGP já vêm com margem e linha em cima, de
+ * quando ficavam empilhados; como primeiro item da aba, isso sobra.
+ */
+const FIRST_BLOCK_FLUSH = '[&>:first-child]:mt-0 [&>:first-child]:border-t-0 [&>:first-child]:pt-0'
+
+/** A aba de dentro da integração que cada âncora (`#...`) mora. */
+const ANCHOR_SECTIONS: Record<string, { tab: 'sgp' | 'whatsapp'; section: string }> = {
+  [SGP_CONTACTS_ANCHOR]: { tab: 'sgp', section: 'contacts' },
+  'wa-accounts': { tab: 'whatsapp', section: 'numbers' }
+}
+
 // Botão só de ícone nas listas: 40px de alvo abaixo do desktop, onde o toque
 // precisa; no lg a linha da tabela volta ao tamanho do ícone.
 const ICON_ACTION = 'inline-flex h-10 w-10 items-center justify-center rounded-md lg:h-auto lg:w-auto'
+
+/** A aba de dentro da integração que o `#...` do endereço pede; a primeira, se nenhuma. */
+function sectionFromHash(tab: 'sgp' | 'whatsapp') {
+  try {
+    const found = ANCHOR_SECTIONS[window.location.hash.replace(/^#/, '')]
+    return found?.tab === tab ? found.section : 'connection'
+  } catch {
+    return 'connection'
+  }
+}
 
 /**
  * Scrolls to a section once its tab has rendered it. The tab loads its data
@@ -201,6 +224,9 @@ export default function Settings() {
   // A aba "Geral" (endereço e mapa do provedor) só existe para quem pode
   // gravar uma das duas metades; quem não pode abre em "Painel e ACS".
   const canEditProvider = can('settings.write') || can('map.write')
+  // A aba de dentro do SGP e do WhatsApp; a âncora do endereço escolhe uma delas.
+  const [sgpSection, setSgpSection] = useState(() => sectionFromHash('sgp'))
+  const [waSection, setWaSection] = useState(() => sectionFromHash('whatsapp'))
   const [activeTab, setActiveTab] = useState(() => {
     const fallback = 'integrations'
     try {
@@ -2342,322 +2368,362 @@ export default function Settings() {
               </span>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="sgp-base-url" className="field-label">{t('settings.sgp.baseUrl')}</label>
-                <input
-                  id="sgp-base-url"
-                  type="url"
-                  className="modern-input w-full"
-                  placeholder="https://provedor.sgp.net.br"
-                  value={sgpForm.baseUrl}
-                  onChange={(event) => setSgpForm((current) => ({ ...current, baseUrl: event.target.value }))}
-                />
-                <p className="field-hint">{t('settings.sgp.baseUrlHint')}</p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="sgp-app" className="field-label">{t('settings.sgp.app')}</label>
-                  <input
-                    id="sgp-app"
-                    type="text"
-                    className="modern-input w-full"
-                    placeholder="nome-do-app"
-                    value={sgpForm.app}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, app: event.target.value }))}
-                  />
-                  <p className="field-hint">{t('settings.sgp.appHint')}</p>
-                </div>
-                <div>
-                  <label htmlFor="sgp-token" className="field-label">{t('settings.sgp.token')}</label>
-                  <input
-                    id="sgp-token"
-                    type="password"
-                    autoComplete="new-password"
-                    className="modern-input w-full"
-                    placeholder={t(sgpConfig?.tokenConfigured ? 'settings.sgp.tokenPlaceholderStored' : 'settings.sgp.tokenPlaceholderEmpty')}
-                    value={sgpForm.token}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, token: event.target.value }))}
-                  />
-                  <p className="field-hint">{t('settings.sgp.tokenHint')}</p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="sgp-link-mode" className="field-label">{t('settings.sgp.linkMode')}</label>
-                  <select
-                    id="sgp-link-mode"
-                    className="modern-input w-full"
-                    value={sgpForm.linkMode}
-                    onChange={(event) => setSgpForm((current) => ({
-                      ...current,
-                      linkMode: event.target.value as SgpConfig['linkMode']
-                    }))}
-                  >
-                    <option value="pppoe">{t('settings.sgp.linkModePppoe')}</option>
-                    <option value="customer_id">{t('settings.sgp.linkModeCustomerId')}</option>
-                    <option value="manual">{t('settings.sgp.linkModeManual')}</option>
-                  </select>
-                  <p className="field-hint">{t('settings.sgp.linkModeHint')}</p>
-                </div>
-                <div>
-                  <label htmlFor="sgp-invoice-limit" className="field-label">{t('settings.sgp.invoiceLimit')}</label>
-                  <input
-                    id="sgp-invoice-limit"
-                    type="number"
-                    min={1}
-                    max={24}
-                    className="modern-input w-full"
-                    value={sgpForm.invoiceLimit}
-                    onChange={(event) => setSgpForm((current) => ({
-                      ...current,
-                      invoiceLimit: Number(event.target.value) || 1
-                    }))}
-                  />
-                  <p className="field-hint">{t('settings.sgp.invoiceLimitHint')}</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={sgpForm.enabled}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, enabled: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.sgp.enable')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.sgp.enableHint')}
-                    </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={sgpForm.portalBilling}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, portalBilling: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.sgp.portalBilling')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.sgp.portalBillingHint')}
-                    </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={sgpForm.portalUnlock}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, portalUnlock: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.sgp.portalUnlock')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.sgp.portalUnlockHint')}
-                    </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={sgpForm.ticketEnabled}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, ticketEnabled: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.sgp.ticket')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.sgp.ticketHint')}
-                    </span>
-                  </span>
-                </label>
-              </div>
-
-              {sgpForm.ticketEnabled && (
-                <div>
-                  <label htmlFor="sgp-occurrence-type" className="field-label">
-                    {t('settings.sgp.ticketOccurrenceType')}
-                  </label>
-                  <input
-                    id="sgp-occurrence-type"
-                    type="number"
-                    min={1}
-                    className="modern-input w-full"
-                    value={sgpForm.ticketOccurrenceType}
-                    onChange={(event) => setSgpForm((current) => ({
-                      ...current,
-                      ticketOccurrenceType: Number(event.target.value) || 1
-                    }))}
-                  />
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {t('settings.sgp.ticketOccurrenceTypeHint')}
-                  </p>
-                </div>
-              )}
-
-              <fieldset className="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2">
-                <legend className="px-1 font-semibold">{t('settings.sgp.settle')}</legend>
-                <p className="text-sm leading-6 text-muted-foreground sm:col-span-2">{t('settings.sgp.settleHint')}</p>
-                <div>
-                  <label htmlFor="sgp-settle-point" className="field-label">{t('settings.sgp.settleReceivingPoint')}</label>
-                  <input
-                    id="sgp-settle-point"
-                    type="number"
-                    min={0}
-                    className="modern-input w-full"
-                    value={sgpForm.settleReceivingPoint || ''}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, settleReceivingPoint: Math.max(Number(event.target.value) || 0, 0) }))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="sgp-settle-fees" className="field-label">{t('settings.sgp.settleFees')}</label>
-                  <input
-                    id="sgp-settle-fees"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="modern-input w-full"
-                    value={sgpForm.settleFees}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, settleFees: Math.max(Number(event.target.value) || 0, 0) }))}
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="sgp-settle-methods" className="field-label">{t('settings.sgp.settlePaymentMethods')}</label>
-                  <input
-                    id="sgp-settle-methods"
-                    type="text"
-                    className="modern-input w-full"
-                    value={sgpForm.settlePaymentMethods}
-                    onChange={(event) => setSgpForm((current) => ({ ...current, settlePaymentMethods: event.target.value }))}
-                  />
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.settlePaymentMethodsHint')}</p>
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="sgp-settle-path" className="field-label">{t('settings.sgp.settlePath')}</label>
-                  <input
-                    id="sgp-settle-path"
-                    type="text"
-                    className="modern-input w-full font-mono"
-                    value={sgpForm.settlePath}
-                    placeholder="/api/banco/titulo/{id}/baixar/"
-                    onChange={(event) => setSgpForm((current) => ({ ...current, settlePath: event.target.value }))}
-                  />
-                </div>
-              </fieldset>
-
-              <div>
-                <label htmlFor="sgp-sample" className="field-label">{t('settings.sgp.sample')}</label>
-                <input
-                  id="sgp-sample"
-                  type="text"
-                  className="modern-input w-full"
-                  placeholder={t('settings.sgp.samplePlaceholder')}
-                  value={sgpForm.sample}
-                  onChange={(event) => setSgpForm((current) => ({ ...current, sample: event.target.value }))}
-                />
-                <p className="field-hint">{t('settings.sgp.sampleHint')}</p>
-              </div>
-            </div>
-
-            {sgpTestResult && (
-              <div className={`mt-4 rounded-md p-4 ${
-                sgpTestResult.success
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
-                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
-              }`}>
-                <div className="flex items-center">
-                  <Icon name={sgpTestResult.success ? 'check' : 'x'} size={18} className="me-2" />
-                  <span className="font-medium">{sgpTestResult.message}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => void handleSgpTest()}
-                disabled={sgpTesting}
-                className="modern-button-secondary"
-              >
-                {sgpTesting ? t('settings.sgp.testing') : t('settings.sgp.test')}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSgpSave()}
-                disabled={sgpSaving}
-                className="modern-button"
-              >
-                {sgpSaving ? t('common.saving') : t('settings.sgp.save')}
-              </button>
-              {sgpConfig?.tokenConfigured && (
-                <button
-                  type="button"
-                  onClick={() => void handleSgpClearToken()}
-                  disabled={sgpSaving}
-                  className="modern-button-secondary"
-                >
-                  {t('settings.sgp.clearToken')}
-                </button>
-              )}
-            </div>
-
-            {sgpFleetAvailable && (
-              <div className="mt-6 border-t border-border pt-5">
-                <h3 className="font-semibold">{t('settings.sgp.fleetTitle')}</h3>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.fleetHint')}</p>
-                <button
-                  type="button"
-                  onClick={() => void handleSgpSyncAll()}
-                  disabled={sgpSyncing}
-                  className="modern-button-secondary mt-4"
-                >
-                  <Icon name="refresh" size={16} className={`me-2 ${sgpSyncing ? 'animate-spin' : ''}`} />
-                  {sgpSyncing ? t('settings.sgp.syncing') : t('settings.sgp.syncAll')}
-                </button>
-                {sgpSyncSummary ? (
-                  <>
-                    <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
-                      {([
-                        ['settings.sgp.syncTotal', sgpSyncSummary.total],
-                        ['settings.sgp.syncLinked', sgpSyncSummary.linked],
-                        ['settings.sgp.syncCreated', sgpSyncSummary.created],
-                        ['settings.sgp.syncUpdated', sgpSyncSummary.updated],
-                        ['settings.sgp.syncRelinked', sgpSyncSummary.relinked ?? 0],
-                        ['settings.sgp.syncSkipped', sgpSyncSummary.skipped],
-                        ['settings.sgp.syncFailedCount', sgpSyncSummary.failed]
-                      ] as const).map(([labelKey, value]) => (
-                        <div key={labelKey}>
-                          <dt className="metric-label">{t(labelKey)}</dt>
-                          <dd className="data-value mt-1">{value}</dd>
+            <SectionTabs
+              idPrefix="sgp"
+              ariaLabel={t('settings.integrations.tabs.sgpAria')}
+              active={sgpSection}
+              onChange={setSgpSection}
+              tabs={[
+                {
+                  id: 'connection',
+                  label: t('settings.integrations.tabs.connection'),
+                  content: (
+                    <>
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="sgp-base-url" className="field-label">{t('settings.sgp.baseUrl')}</label>
+                          <input
+                            id="sgp-base-url"
+                            type="url"
+                            className="modern-input w-full"
+                            placeholder="https://provedor.sgp.net.br"
+                            value={sgpForm.baseUrl}
+                            onChange={(event) => setSgpForm((current) => ({ ...current, baseUrl: event.target.value }))}
+                          />
+                          <p className="field-hint">{t('settings.sgp.baseUrlHint')}</p>
                         </div>
-                      ))}
-                    </dl>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      {t('settings.sgp.syncFinished', {
-                        time: formatDateTime(sgpSyncSummary.finishedAt),
-                        seconds: (sgpSyncSummary.durationMs / 1000).toFixed(1)
-                      })}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-4 text-sm text-muted-foreground">{t('settings.sgp.syncNever')}</p>
-                )}
-              </div>
-            )}
 
-            {/* Always there once the config has loaded — hidden until the
-                integration was ready, it was simply not found. It says itself
-                what is missing. */}
-            {sgpConfig && <SgpContactsSyncPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
-            {sgpConfig && <SgpPreRegistrationPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label htmlFor="sgp-app" className="field-label">{t('settings.sgp.app')}</label>
+                            <input
+                              id="sgp-app"
+                              type="text"
+                              className="modern-input w-full"
+                              placeholder="nome-do-app"
+                              value={sgpForm.app}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, app: event.target.value }))}
+                            />
+                            <p className="field-hint">{t('settings.sgp.appHint')}</p>
+                          </div>
+                          <div>
+                            <label htmlFor="sgp-token" className="field-label">{t('settings.sgp.token')}</label>
+                            <input
+                              id="sgp-token"
+                              type="password"
+                              autoComplete="new-password"
+                              className="modern-input w-full"
+                              placeholder={t(sgpConfig?.tokenConfigured ? 'settings.sgp.tokenPlaceholderStored' : 'settings.sgp.tokenPlaceholderEmpty')}
+                              value={sgpForm.token}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, token: event.target.value }))}
+                            />
+                            <p className="field-hint">{t('settings.sgp.tokenHint')}</p>
+                          </div>
+                        </div>
 
-            <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label htmlFor="sgp-link-mode" className="field-label">{t('settings.sgp.linkMode')}</label>
+                            <select
+                              id="sgp-link-mode"
+                              className="modern-input w-full"
+                              value={sgpForm.linkMode}
+                              onChange={(event) => setSgpForm((current) => ({
+                                ...current,
+                                linkMode: event.target.value as SgpConfig['linkMode']
+                              }))}
+                            >
+                              <option value="pppoe">{t('settings.sgp.linkModePppoe')}</option>
+                              <option value="customer_id">{t('settings.sgp.linkModeCustomerId')}</option>
+                              <option value="manual">{t('settings.sgp.linkModeManual')}</option>
+                            </select>
+                            <p className="field-hint">{t('settings.sgp.linkModeHint')}</p>
+                          </div>
+                          <div>
+                            <label htmlFor="sgp-invoice-limit" className="field-label">{t('settings.sgp.invoiceLimit')}</label>
+                            <input
+                              id="sgp-invoice-limit"
+                              type="number"
+                              min={1}
+                              max={24}
+                              className="modern-input w-full"
+                              value={sgpForm.invoiceLimit}
+                              onChange={(event) => setSgpForm((current) => ({
+                                ...current,
+                                invoiceLimit: Number(event.target.value) || 1
+                              }))}
+                            />
+                            <p className="field-hint">{t('settings.sgp.invoiceLimitHint')}</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                          <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                              checked={sgpForm.enabled}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, enabled: event.target.checked }))}
+                            />
+                            <span>
+                              <span className="block font-semibold">{t('settings.sgp.enable')}</span>
+                              <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                                {t('settings.sgp.enableHint')}
+                              </span>
+                            </span>
+                          </label>
+                          <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                              checked={sgpForm.portalBilling}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, portalBilling: event.target.checked }))}
+                            />
+                            <span>
+                              <span className="block font-semibold">{t('settings.sgp.portalBilling')}</span>
+                              <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                                {t('settings.sgp.portalBillingHint')}
+                              </span>
+                            </span>
+                          </label>
+                          <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                              checked={sgpForm.portalUnlock}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, portalUnlock: event.target.checked }))}
+                            />
+                            <span>
+                              <span className="block font-semibold">{t('settings.sgp.portalUnlock')}</span>
+                              <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                                {t('settings.sgp.portalUnlockHint')}
+                              </span>
+                            </span>
+                          </label>
+                          <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                              checked={sgpForm.ticketEnabled}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, ticketEnabled: event.target.checked }))}
+                            />
+                            <span>
+                              <span className="block font-semibold">{t('settings.sgp.ticket')}</span>
+                              <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                                {t('settings.sgp.ticketHint')}
+                              </span>
+                            </span>
+                          </label>
+                        </div>
+
+                        {sgpForm.ticketEnabled && (
+                          <div>
+                            <label htmlFor="sgp-occurrence-type" className="field-label">
+                              {t('settings.sgp.ticketOccurrenceType')}
+                            </label>
+                            <input
+                              id="sgp-occurrence-type"
+                              type="number"
+                              min={1}
+                              className="modern-input w-full"
+                              value={sgpForm.ticketOccurrenceType}
+                              onChange={(event) => setSgpForm((current) => ({
+                                ...current,
+                                ticketOccurrenceType: Number(event.target.value) || 1
+                              }))}
+                            />
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                              {t('settings.sgp.ticketOccurrenceTypeHint')}
+                            </p>
+                          </div>
+                        )}
+
+                        <fieldset className="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2">
+                          <legend className="px-1 font-semibold">{t('settings.sgp.settle')}</legend>
+                          <p className="text-sm leading-6 text-muted-foreground sm:col-span-2">{t('settings.sgp.settleHint')}</p>
+                          <div>
+                            <label htmlFor="sgp-settle-point" className="field-label">{t('settings.sgp.settleReceivingPoint')}</label>
+                            <input
+                              id="sgp-settle-point"
+                              type="number"
+                              min={0}
+                              className="modern-input w-full"
+                              value={sgpForm.settleReceivingPoint || ''}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, settleReceivingPoint: Math.max(Number(event.target.value) || 0, 0) }))}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="sgp-settle-fees" className="field-label">{t('settings.sgp.settleFees')}</label>
+                            <input
+                              id="sgp-settle-fees"
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="modern-input w-full"
+                              value={sgpForm.settleFees}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, settleFees: Math.max(Number(event.target.value) || 0, 0) }))}
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label htmlFor="sgp-settle-methods" className="field-label">{t('settings.sgp.settlePaymentMethods')}</label>
+                            <input
+                              id="sgp-settle-methods"
+                              type="text"
+                              className="modern-input w-full"
+                              value={sgpForm.settlePaymentMethods}
+                              onChange={(event) => setSgpForm((current) => ({ ...current, settlePaymentMethods: event.target.value }))}
+                            />
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.settlePaymentMethodsHint')}</p>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label htmlFor="sgp-settle-path" className="field-label">{t('settings.sgp.settlePath')}</label>
+                            <input
+                              id="sgp-settle-path"
+                              type="text"
+                              className="modern-input w-full font-mono"
+                              value={sgpForm.settlePath}
+                              placeholder="/api/banco/titulo/{id}/baixar/"
+                              onChange={(event) => setSgpForm((current) => ({ ...current, settlePath: event.target.value }))}
+                            />
+                          </div>
+                        </fieldset>
+
+                        <div>
+                          <label htmlFor="sgp-sample" className="field-label">{t('settings.sgp.sample')}</label>
+                          <input
+                            id="sgp-sample"
+                            type="text"
+                            className="modern-input w-full"
+                            placeholder={t('settings.sgp.samplePlaceholder')}
+                            value={sgpForm.sample}
+                            onChange={(event) => setSgpForm((current) => ({ ...current, sample: event.target.value }))}
+                          />
+                          <p className="field-hint">{t('settings.sgp.sampleHint')}</p>
+                        </div>
+                      </div>
+
+                      {sgpTestResult && (
+                        <div className={`mt-4 rounded-md p-4 ${
+                          sgpTestResult.success
+                            ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
+                            : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+                        }`}>
+                          <div className="flex items-center">
+                            <Icon name={sgpTestResult.success ? 'check' : 'x'} size={18} className="me-2" />
+                            <span className="font-medium">{sgpTestResult.message}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-6 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleSgpTest()}
+                          disabled={sgpTesting}
+                          className="modern-button-secondary"
+                        >
+                          {sgpTesting ? t('settings.sgp.testing') : t('settings.sgp.test')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSgpSave()}
+                          disabled={sgpSaving}
+                          className="modern-button"
+                        >
+                          {sgpSaving ? t('common.saving') : t('settings.sgp.save')}
+                        </button>
+                        {sgpConfig?.tokenConfigured && (
+                          <button
+                            type="button"
+                            onClick={() => void handleSgpClearToken()}
+                            disabled={sgpSaving}
+                            className="modern-button-secondary"
+                          >
+                            {t('settings.sgp.clearToken')}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )
+                },
+                ...(sgpFleetAvailable ? [{
+                  id: 'fleet',
+                  label: t('settings.integrations.tabs.fleet'),
+                  content: (
+                    <div className={FIRST_BLOCK_FLUSH}>
+                      <div className="mt-6 border-t border-border pt-5">
+                        <h3 className="font-semibold">{t('settings.sgp.fleetTitle')}</h3>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.fleetHint')}</p>
+                        <button
+                          type="button"
+                          onClick={() => void handleSgpSyncAll()}
+                          disabled={sgpSyncing}
+                          className="modern-button-secondary mt-4"
+                        >
+                          <Icon name="refresh" size={16} className={`me-2 ${sgpSyncing ? 'animate-spin' : ''}`} />
+                          {sgpSyncing ? t('settings.sgp.syncing') : t('settings.sgp.syncAll')}
+                        </button>
+                        {sgpSyncSummary ? (
+                          <>
+                            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
+                              {([
+                                ['settings.sgp.syncTotal', sgpSyncSummary.total],
+                                ['settings.sgp.syncLinked', sgpSyncSummary.linked],
+                                ['settings.sgp.syncCreated', sgpSyncSummary.created],
+                                ['settings.sgp.syncUpdated', sgpSyncSummary.updated],
+                                ['settings.sgp.syncRelinked', sgpSyncSummary.relinked ?? 0],
+                                ['settings.sgp.syncSkipped', sgpSyncSummary.skipped],
+                                ['settings.sgp.syncFailedCount', sgpSyncSummary.failed]
+                              ] as const).map(([labelKey, value]) => (
+                                <div key={labelKey}>
+                                  <dt className="metric-label">{t(labelKey)}</dt>
+                                  <dd className="data-value mt-1">{value}</dd>
+                                </div>
+                              ))}
+                            </dl>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              {t('settings.sgp.syncFinished', {
+                                time: formatDateTime(sgpSyncSummary.finishedAt),
+                                seconds: (sgpSyncSummary.durationMs / 1000).toFixed(1)
+                              })}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="mt-4 text-sm text-muted-foreground">{t('settings.sgp.syncNever')}</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                }] : []),
+                {
+                  id: 'contacts',
+                  label: t('settings.integrations.tabs.contacts'),
+                  content: (
+                    <div className={FIRST_BLOCK_FLUSH}>
+                      {sgpConfig && <SgpContactsSyncPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
+                    </div>
+                  )
+                },
+                {
+                  id: 'preRegistration',
+                  label: t('settings.integrations.tabs.preRegistration'),
+                  content: (
+                    <div className={FIRST_BLOCK_FLUSH}>
+                      {sgpConfig && <SgpPreRegistrationPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
+                    </div>
+                  )
+                },
+                {
+                  id: 'events',
+                  label: t('settings.integrations.tabs.events'),
+                  content: (
+                    <div className={FIRST_BLOCK_FLUSH}>
+                      <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
+                    </div>
+                  )
+                }
+              ]}
+            />
           </div>
         )}
 
@@ -2691,441 +2757,467 @@ export default function Settings() {
               )}
             </div>
 
-            {/* Na SaaS o servidor Evolution é um só, da plataforma: endereço,
-                chave, hosts e webhook são configurados na caixa dela. Aqui fica
-                o uso que o provedor faz dele. */}
-            {platformManaged && (
-              <div className="mb-5 flex items-start gap-2 rounded-md border border-border bg-muted/40 p-4">
-                <Icon name="lock" size={16} className="mt-0.5 shrink-0" />
-                <p className="text-sm leading-6">
-                  {t(waConfig?.managedUrl
-                    ? 'settings.platformManaged.whatsapp'
-                    : 'settings.platformManaged.whatsappMissing')}
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              {!platformManaged && (
-              <div>
-                <label htmlFor="wa-webhook-url" className="field-label">
-                  {t('settings.whatsapp.webhookUrl')}
-                </label>
-                {/* O exemplo mostrava só a origem, e o código usava o que
-                    fosse digitado como endereço COMPLETO. Quem seguia o exemplo
-                    gravava um endereço apontando para a RAIZ do painel: o POST
-                    cai no frontend, que responde 200 com HTML, e o Evolution
-                    registra entrega bem-sucedida enquanto nada chega. O backend
-                    agora acrescenta o caminho quando falta; o exemplo mostra o
-                    endereço inteiro para que a tela e o código digam a mesma
-                    coisa. */}
-                <input
-                  id="wa-webhook-url"
-                  type="url"
-                  className="modern-input w-full"
-                  placeholder="https://painel.exemplo.com/api/whatsapp-webhook"
-                  value={waForm.webhookBaseUrl}
-                  onChange={(event) => setWaForm((current) => ({ ...current, webhookBaseUrl: event.target.value }))}
-                />
-                <p className="field-hint">{t('settings.whatsapp.webhookUrlHint')}</p>
-              </div>
-              )}
-
-              <div>
-                <label htmlFor="wa-portal-url" className="field-label">
-                  {t('settings.whatsapp.portalUrl')}
-                </label>
-                <input
-                  id="wa-portal-url"
-                  type="url"
-                  className="modern-input w-full"
-                  placeholder="https://portal.exemplo.com"
-                  value={waForm.portalPublicUrl}
-                  onChange={(event) => setWaForm((current) => ({ ...current, portalPublicUrl: event.target.value }))}
-                />
-                <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
-              </div>
-
-
-              {!platformManaged && (
-              <>
-              <div>
-                <label htmlFor="wa-allowed-hosts" className="field-label">
-                  {t('settings.whatsapp.allowedHosts')}
-                </label>
-                <textarea
-                  id="wa-allowed-hosts"
-                  rows={4}
-                  className="modern-input w-full font-mono text-xs"
-                  placeholder={'evolution.exemplo.com\n*.exemplo.com'}
-                  value={waForm.allowedHosts}
-                  onChange={(event) => setWaForm((current) => ({ ...current, allowedHosts: event.target.value }))}
-                />
-                <p className="field-hint">{t('settings.whatsapp.allowedHostsHint')}</p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="wa-managed-url" className="field-label">
-                    {t('settings.whatsapp.managedUrl')}
-                  </label>
-                  <input
-                    id="wa-managed-url"
-                    type="url"
-                    className="modern-input w-full"
-                    placeholder="https://evolution.exemplo.com"
-                    value={waForm.managedUrl}
-                    onChange={(event) => setWaForm((current) => ({ ...current, managedUrl: event.target.value }))}
-                  />
-                  <p className="field-hint">{t('settings.whatsapp.managedUrlHint')}</p>
-                </div>
-                <div>
-                  <label htmlFor="wa-admin-key" className="field-label">
-                    {t('settings.whatsapp.adminKey')}
-                  </label>
-                  <input
-                    id="wa-admin-key"
-                    type="password"
-                    autoComplete="new-password"
-                    className="modern-input w-full"
-                    value={waForm.managedAdminKey}
-                    onChange={(event) => setWaForm((current) => ({ ...current, managedAdminKey: event.target.value }))}
-                  />
-                  <p className="field-hint">{t('settings.whatsapp.adminKeyHint')}</p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="wa-cloud-callback" className="field-label">
-                    {t('settings.whatsapp.cloudCallbackUrl')}
-                  </label>
-                  <input
-                    id="wa-cloud-callback"
-                    type="url"
-                    className="modern-input w-full"
-                    placeholder="https://evolution.exemplo.com/webhook/meta"
-                    value={waForm.cloudCallbackUrl}
-                    onChange={(event) => setWaForm((current) => ({ ...current, cloudCallbackUrl: event.target.value }))}
-                  />
-                  <p className="field-hint">{t('settings.whatsapp.cloudCallbackUrlHint')}</p>
-                </div>
-                <div>
-                  <label htmlFor="wa-cloud-verify" className="field-label">
-                    {t('settings.whatsapp.cloudVerifyToken')}
-                  </label>
-                  <input
-                    id="wa-cloud-verify"
-                    type="text"
-                    autoComplete="off"
-                    className="modern-input w-full font-mono"
-                    value={waForm.cloudVerifyToken}
-                    onChange={(event) => setWaForm((current) => ({ ...current, cloudVerifyToken: event.target.value }))}
-                  />
-                  <p className="field-hint">{t('settings.whatsapp.cloudVerifyTokenHint')}</p>
-                </div>
-              </div>
-              </>
-              )}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="wa-reject-call" className="field-label">
-                    {t('settings.whatsapp.rejectCallMessage')}
-                  </label>
-                  <input
-                    id="wa-reject-call"
-                    type="text"
-                    className="modern-input w-full"
-                    value={waForm.rejectCallMessage}
-                    onChange={(event) => setWaForm((current) => ({ ...current, rejectCallMessage: event.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="wa-rate-limit" className="field-label">
-                    {t('settings.whatsapp.rateLimit')}
-                  </label>
-                  <input
-                    id="wa-rate-limit"
-                    type="number"
-                    min={1}
-                    max={120}
-                    className="modern-input w-full"
-                    value={waForm.rateLimitPerMin}
-                    onChange={(event) => setWaForm((current) => ({
-                      ...current,
-                      rateLimitPerMin: Number(event.target.value) || 1
-                    }))}
-                  />
-                  <p className="field-hint">{t('settings.whatsapp.rateLimitHint')}</p>
-                </div>
-                <div className="sm:col-span-2">
-                  <p className="field-label">{t('settings.whatsapp.bulkPace')}</p>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div>
-                      <label htmlFor="wa-bulkIntervalMinSec" className="field-label">
-                        {t('settings.whatsapp.bulkPaceMin')}
-                      </label>
-                      <input
-                        id="wa-bulkIntervalMinSec"
-                        type="number"
-                        min={5}
-                        max={600}
-                        className="modern-input w-full"
-                        value={waForm.bulkIntervalMinSec}
-                        onChange={(event) => setWaForm((current) => ({
-                          ...current,
-                          bulkIntervalMinSec: Math.max(Number(event.target.value) || 5, 5)
-                        }))}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="wa-bulkIntervalMaxSec" className="field-label">
-                        {t('settings.whatsapp.bulkPaceMax')}
-                      </label>
-                      <input
-                        id="wa-bulkIntervalMaxSec"
-                        type="number"
-                        min={5}
-                        max={600}
-                        className="modern-input w-full"
-                        value={waForm.bulkIntervalMaxSec}
-                        onChange={(event) => setWaForm((current) => ({
-                          ...current,
-                          bulkIntervalMaxSec: Math.max(Number(event.target.value) || 5, 5)
-                        }))}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="wa-bulkBurstSize" className="field-label">
-                        {t('settings.whatsapp.bulkPaceBurst')}
-                      </label>
-                      <input
-                        id="wa-bulkBurstSize"
-                        type="number"
-                        min={0}
-                        max={500}
-                        className="modern-input w-full"
-                        value={waForm.bulkBurstSize}
-                        onChange={(event) => setWaForm((current) => ({
-                          ...current,
-                          bulkBurstSize: Math.max(Number(event.target.value) || 0, 0)
-                        }))}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="wa-bulkBurstPauseMin" className="field-label">
-                        {t('settings.whatsapp.bulkPacePause')}
-                      </label>
-                      <input
-                        id="wa-bulkBurstPauseMin"
-                        type="number"
-                        min={1}
-                        max={120}
-                        className="modern-input w-full"
-                        value={waForm.bulkBurstPauseMin}
-                        onChange={(event) => setWaForm((current) => ({
-                          ...current,
-                          bulkBurstPauseMin: Math.max(Number(event.target.value) || 1, 1)
-                        }))}
-                      />
-                    </div>
-                  </div>
-                  <p className="field-hint">
-                    {t('settings.whatsapp.bulkPaceHint', { perHour: bulkPerHour(waForm) })}
-                  </p>
-                </div>
-                <div>
-                  <label htmlFor="wa-media-retention" className="field-label">
-                    {t('settings.whatsapp.mediaRetention')}
-                  </label>
-                  <input
-                    id="wa-media-retention"
-                    type="number"
-                    min={0}
-                    max={retentionCaps?.media ?? 3650}
-                    className="modern-input w-full"
-                    value={waForm.mediaRetentionDays}
-                    onChange={(event) => setWaForm((current) => ({
-                      ...current,
-                      // `|| 1` would be wrong here, unlike on the rate limit
-                      // above: 0 is a real and meaningful value on this field —
-                      // it is the one that deletes nothing — and an emptied box
-                      // has to land on it rather than on a day of retention
-                      // nobody typed.
-                      mediaRetentionDays: Math.max(0, Math.trunc(Number(event.target.value)) || 0)
-                    }))}
-                  />
-                  <p className="field-hint">{t('settings.whatsapp.mediaRetentionHint')}</p>
-                  {retentionCaps?.media != null && (
-                    <p className={waRetentionAboveCap(waForm.mediaRetentionDays, retentionCaps.media) ? 'field-hint text-[hsl(var(--status-danger))]' : 'field-hint'}>
-                      {t('settings.retentionCap', { max: retentionCaps.media })}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="wa-message-retention" className="field-label">
-                    {t('settings.whatsapp.messageRetention')}
-                  </label>
-                  <input
-                    id="wa-message-retention"
-                    type="number"
-                    min={0}
-                    max={retentionCaps?.messages ?? 3650}
-                    className="modern-input w-full"
-                    value={waForm.messageRetentionDays}
-                    onChange={(event) => setWaForm((current) => ({
-                      ...current,
-                      // Same `|| 0` as its sibling above, for the same reason:
-                      // 0 is the value that deletes nothing, so an emptied box
-                      // has to land on it.
-                      messageRetentionDays: Math.max(0, Math.trunc(Number(event.target.value)) || 0)
-                    }))}
-                  />
-                  {/* Beside the attachment window rather than under its own
-                      heading, because the two are read together: a message
-                      whose attachment is still on disk is never deleted, so
-                      setting this one alone keeps every thread that ever
-                      carried a file. The hint is where that is said. */}
-                  <p className="field-hint">{t('settings.whatsapp.messageRetentionHint')}</p>
-                  {retentionCaps?.messages != null && (
-                    <p className={waRetentionAboveCap(waForm.messageRetentionDays, retentionCaps.messages) ? 'field-hint text-[hsl(var(--status-danger))]' : 'field-hint'}>
-                      {t('settings.retentionCap', { max: retentionCaps.messages })}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* O aviso só aparece quando algum dos dois é zero, e some no dia
-                  em que o operador define um prazo. As duas ajudas acima
-                  DESCREVEM o zero ("guarda para sempre, que é o padrão") e não
-                  dizem o que ele custa — e o custo é específico: destes dois
-                  prazos, e só destes, o padrão é nunca apagar. Telemetria,
-                  eventos do ERP, provisionamento e trilha todos nascem com
-                  prazo. Aqui é onde ficam o texto das conversas, as fotos e os
-                  documentos que o assinante mandou. */}
-              {((waForm.mediaRetentionDays === 0 && retentionCaps?.media == null)
-                || (waForm.messageRetentionDays === 0 && retentionCaps?.messages == null)) && (
-                <div className="mt-4 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning)/0.4)] bg-[hsl(var(--status-warning)/0.08)] p-4">
-                  <Icon name="info" size={18} className="mt-0.5 shrink-0 text-[hsl(var(--status-warning))]" />
-                  <p className="text-sm leading-6">{t('settings.whatsapp.retentionForeverWarning')}</p>
-                </div>
-              )}
-
-              <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={waForm.enabled}
-                    onChange={(event) => setWaForm((current) => ({ ...current, enabled: event.target.checked }))}
-                  />
-                  {/* No sub-hint here on purpose: turning this on without a
-                      webhook URL is refused by the API with `incomplete_config`,
-                      and the reason is already written under that field — saying
-                      it twice on one screen is noise, and the dictionary has no
-                      hint of its own for this toggle. */}
-                  <span className="block font-semibold">{t('settings.whatsapp.enable')}</span>
-                </label>
-              </div>
-            </div>
-
-            {(waTestResult || waTestError) && (
-              <div className="mt-4 rounded-md border border-border p-4">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <Icon
-                    name={waTestError || testOutcome(waTestResult) !== 'passed' ? 'warning' : 'check'}
-                    className={
-                      waTestError || testOutcome(waTestResult) === 'failed'
-                        ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
-                        : testOutcome(waTestResult) === 'warned'
-                          ? 'h-4 w-4 text-[hsl(var(--status-warning))]'
-                          : 'h-4 w-4 text-[hsl(var(--status-success))]'
-                    }
-                  />
-                  {t('settings.whatsapp.test.title')}
-                </p>
-
-                {waTestError ? (
-                  <p className="mt-2 text-sm text-[hsl(var(--status-danger))]">{waTestError}</p>
-                ) : (
-                  <>
-                    {/* Três estados e não dois: "está tudo certo" com um passo
-                        pulado afirma o que este botão existe para não afirmar,
-                        e "há passos que não passaram" sobre uma instância órfã
-                        manda procurar defeito que pode não existir. */}
-                    <p className="mt-2 text-sm font-medium">
-                      {t(
-                        testOutcome(waTestResult) === 'passed'
-                          ? 'settings.whatsapp.test.allPassed'
-                          : testOutcome(waTestResult) === 'warned'
-                            ? 'settings.whatsapp.test.someWarned'
-                            : 'settings.whatsapp.test.someFailed'
+            <SectionTabs
+              idPrefix="whatsapp"
+              ariaLabel={t('settings.integrations.tabs.whatsappAria')}
+              active={waSection}
+              onChange={setWaSection}
+              tabs={[
+                {
+                  id: 'connection',
+                  label: t('settings.integrations.tabs.connection'),
+                  content: (
+                    <>
+                      {/* Na SaaS o servidor Evolution é um só, da plataforma: endereço,
+                          chave, hosts e webhook são configurados na caixa dela. Aqui fica
+                          o uso que o provedor faz dele. */}
+                      {platformManaged && (
+                        <div className="mb-5 flex items-start gap-2 rounded-md border border-border bg-muted/40 p-4">
+                          <Icon name="lock" size={16} className="mt-0.5 shrink-0" />
+                          <p className="text-sm leading-6">
+                            {t(waConfig?.managedUrl
+                              ? 'settings.platformManaged.whatsapp'
+                              : 'settings.platformManaged.whatsappMissing')}
+                          </p>
+                        </div>
                       )}
-                    </p>
-                    {/* Uma linha por passo, e não um ✓/✗ único: o valor inteiro
-                        deste botão está em dizer QUAL dos seis falhou. */}
-                    <ul className="mt-3 space-y-2" role="list">
-                      {testNotes(waTestResult, t).map((note) => (
-                        <li
-                          key={note.key}
-                          className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs leading-5 ${TEST_TONE_CLASS[note.tone]}`}
+
+                      <div className="space-y-4">
+                        {!platformManaged && (
+                        <div>
+                          <label htmlFor="wa-webhook-url" className="field-label">
+                            {t('settings.whatsapp.webhookUrl')}
+                          </label>
+                          {/* O exemplo mostrava só a origem, e o código usava o que
+                              fosse digitado como endereço COMPLETO. Quem seguia o exemplo
+                              gravava um endereço apontando para a RAIZ do painel: o POST
+                              cai no frontend, que responde 200 com HTML, e o Evolution
+                              registra entrega bem-sucedida enquanto nada chega. O backend
+                              agora acrescenta o caminho quando falta; o exemplo mostra o
+                              endereço inteiro para que a tela e o código digam a mesma
+                              coisa. */}
+                          <input
+                            id="wa-webhook-url"
+                            type="url"
+                            className="modern-input w-full"
+                            placeholder="https://painel.exemplo.com/api/whatsapp-webhook"
+                            value={waForm.webhookBaseUrl}
+                            onChange={(event) => setWaForm((current) => ({ ...current, webhookBaseUrl: event.target.value }))}
+                          />
+                          <p className="field-hint">{t('settings.whatsapp.webhookUrlHint')}</p>
+                        </div>
+                        )}
+
+                        <div>
+                          <label htmlFor="wa-portal-url" className="field-label">
+                            {t('settings.whatsapp.portalUrl')}
+                          </label>
+                          <input
+                            id="wa-portal-url"
+                            type="url"
+                            className="modern-input w-full"
+                            placeholder="https://portal.exemplo.com"
+                            value={waForm.portalPublicUrl}
+                            onChange={(event) => setWaForm((current) => ({ ...current, portalPublicUrl: event.target.value }))}
+                          />
+                          <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
+                        </div>
+
+
+                        {!platformManaged && (
+                        <>
+                        <div>
+                          <label htmlFor="wa-allowed-hosts" className="field-label">
+                            {t('settings.whatsapp.allowedHosts')}
+                          </label>
+                          <textarea
+                            id="wa-allowed-hosts"
+                            rows={4}
+                            className="modern-input w-full font-mono text-xs"
+                            placeholder={'evolution.exemplo.com\n*.exemplo.com'}
+                            value={waForm.allowedHosts}
+                            onChange={(event) => setWaForm((current) => ({ ...current, allowedHosts: event.target.value }))}
+                          />
+                          <p className="field-hint">{t('settings.whatsapp.allowedHostsHint')}</p>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label htmlFor="wa-managed-url" className="field-label">
+                              {t('settings.whatsapp.managedUrl')}
+                            </label>
+                            <input
+                              id="wa-managed-url"
+                              type="url"
+                              className="modern-input w-full"
+                              placeholder="https://evolution.exemplo.com"
+                              value={waForm.managedUrl}
+                              onChange={(event) => setWaForm((current) => ({ ...current, managedUrl: event.target.value }))}
+                            />
+                            <p className="field-hint">{t('settings.whatsapp.managedUrlHint')}</p>
+                          </div>
+                          <div>
+                            <label htmlFor="wa-admin-key" className="field-label">
+                              {t('settings.whatsapp.adminKey')}
+                            </label>
+                            <input
+                              id="wa-admin-key"
+                              type="password"
+                              autoComplete="new-password"
+                              className="modern-input w-full"
+                              value={waForm.managedAdminKey}
+                              onChange={(event) => setWaForm((current) => ({ ...current, managedAdminKey: event.target.value }))}
+                            />
+                            <p className="field-hint">{t('settings.whatsapp.adminKeyHint')}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label htmlFor="wa-cloud-callback" className="field-label">
+                              {t('settings.whatsapp.cloudCallbackUrl')}
+                            </label>
+                            <input
+                              id="wa-cloud-callback"
+                              type="url"
+                              className="modern-input w-full"
+                              placeholder="https://evolution.exemplo.com/webhook/meta"
+                              value={waForm.cloudCallbackUrl}
+                              onChange={(event) => setWaForm((current) => ({ ...current, cloudCallbackUrl: event.target.value }))}
+                            />
+                            <p className="field-hint">{t('settings.whatsapp.cloudCallbackUrlHint')}</p>
+                          </div>
+                          <div>
+                            <label htmlFor="wa-cloud-verify" className="field-label">
+                              {t('settings.whatsapp.cloudVerifyToken')}
+                            </label>
+                            <input
+                              id="wa-cloud-verify"
+                              type="text"
+                              autoComplete="off"
+                              className="modern-input w-full font-mono"
+                              value={waForm.cloudVerifyToken}
+                              onChange={(event) => setWaForm((current) => ({ ...current, cloudVerifyToken: event.target.value }))}
+                            />
+                            <p className="field-hint">{t('settings.whatsapp.cloudVerifyTokenHint')}</p>
+                          </div>
+                        </div>
+                        </>
+                        )}
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label htmlFor="wa-reject-call" className="field-label">
+                              {t('settings.whatsapp.rejectCallMessage')}
+                            </label>
+                            <input
+                              id="wa-reject-call"
+                              type="text"
+                              className="modern-input w-full"
+                              value={waForm.rejectCallMessage}
+                              onChange={(event) => setWaForm((current) => ({ ...current, rejectCallMessage: event.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="wa-rate-limit" className="field-label">
+                              {t('settings.whatsapp.rateLimit')}
+                            </label>
+                            <input
+                              id="wa-rate-limit"
+                              type="number"
+                              min={1}
+                              max={120}
+                              className="modern-input w-full"
+                              value={waForm.rateLimitPerMin}
+                              onChange={(event) => setWaForm((current) => ({
+                                ...current,
+                                rateLimitPerMin: Number(event.target.value) || 1
+                              }))}
+                            />
+                            <p className="field-hint">{t('settings.whatsapp.rateLimitHint')}</p>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <p className="field-label">{t('settings.whatsapp.bulkPace')}</p>
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                              <div>
+                                <label htmlFor="wa-bulkIntervalMinSec" className="field-label">
+                                  {t('settings.whatsapp.bulkPaceMin')}
+                                </label>
+                                <input
+                                  id="wa-bulkIntervalMinSec"
+                                  type="number"
+                                  min={5}
+                                  max={600}
+                                  className="modern-input w-full"
+                                  value={waForm.bulkIntervalMinSec}
+                                  onChange={(event) => setWaForm((current) => ({
+                                    ...current,
+                                    bulkIntervalMinSec: Math.max(Number(event.target.value) || 5, 5)
+                                  }))}
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor="wa-bulkIntervalMaxSec" className="field-label">
+                                  {t('settings.whatsapp.bulkPaceMax')}
+                                </label>
+                                <input
+                                  id="wa-bulkIntervalMaxSec"
+                                  type="number"
+                                  min={5}
+                                  max={600}
+                                  className="modern-input w-full"
+                                  value={waForm.bulkIntervalMaxSec}
+                                  onChange={(event) => setWaForm((current) => ({
+                                    ...current,
+                                    bulkIntervalMaxSec: Math.max(Number(event.target.value) || 5, 5)
+                                  }))}
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor="wa-bulkBurstSize" className="field-label">
+                                  {t('settings.whatsapp.bulkPaceBurst')}
+                                </label>
+                                <input
+                                  id="wa-bulkBurstSize"
+                                  type="number"
+                                  min={0}
+                                  max={500}
+                                  className="modern-input w-full"
+                                  value={waForm.bulkBurstSize}
+                                  onChange={(event) => setWaForm((current) => ({
+                                    ...current,
+                                    bulkBurstSize: Math.max(Number(event.target.value) || 0, 0)
+                                  }))}
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor="wa-bulkBurstPauseMin" className="field-label">
+                                  {t('settings.whatsapp.bulkPacePause')}
+                                </label>
+                                <input
+                                  id="wa-bulkBurstPauseMin"
+                                  type="number"
+                                  min={1}
+                                  max={120}
+                                  className="modern-input w-full"
+                                  value={waForm.bulkBurstPauseMin}
+                                  onChange={(event) => setWaForm((current) => ({
+                                    ...current,
+                                    bulkBurstPauseMin: Math.max(Number(event.target.value) || 1, 1)
+                                  }))}
+                                />
+                              </div>
+                            </div>
+                            <p className="field-hint">
+                              {t('settings.whatsapp.bulkPaceHint', { perHour: bulkPerHour(waForm) })}
+                            </p>
+                          </div>
+                          <div>
+                            <label htmlFor="wa-media-retention" className="field-label">
+                              {t('settings.whatsapp.mediaRetention')}
+                            </label>
+                            <input
+                              id="wa-media-retention"
+                              type="number"
+                              min={0}
+                              max={retentionCaps?.media ?? 3650}
+                              className="modern-input w-full"
+                              value={waForm.mediaRetentionDays}
+                              onChange={(event) => setWaForm((current) => ({
+                                ...current,
+                                // `|| 1` would be wrong here, unlike on the rate limit
+                                // above: 0 is a real and meaningful value on this field —
+                                // it is the one that deletes nothing — and an emptied box
+                                // has to land on it rather than on a day of retention
+                                // nobody typed.
+                                mediaRetentionDays: Math.max(0, Math.trunc(Number(event.target.value)) || 0)
+                              }))}
+                            />
+                            <p className="field-hint">{t('settings.whatsapp.mediaRetentionHint')}</p>
+                            {retentionCaps?.media != null && (
+                              <p className={waRetentionAboveCap(waForm.mediaRetentionDays, retentionCaps.media) ? 'field-hint text-[hsl(var(--status-danger))]' : 'field-hint'}>
+                                {t('settings.retentionCap', { max: retentionCaps.media })}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label htmlFor="wa-message-retention" className="field-label">
+                              {t('settings.whatsapp.messageRetention')}
+                            </label>
+                            <input
+                              id="wa-message-retention"
+                              type="number"
+                              min={0}
+                              max={retentionCaps?.messages ?? 3650}
+                              className="modern-input w-full"
+                              value={waForm.messageRetentionDays}
+                              onChange={(event) => setWaForm((current) => ({
+                                ...current,
+                                // Same `|| 0` as its sibling above, for the same reason:
+                                // 0 is the value that deletes nothing, so an emptied box
+                                // has to land on it.
+                                messageRetentionDays: Math.max(0, Math.trunc(Number(event.target.value)) || 0)
+                              }))}
+                            />
+                            {/* Beside the attachment window rather than under its own
+                                heading, because the two are read together: a message
+                                whose attachment is still on disk is never deleted, so
+                                setting this one alone keeps every thread that ever
+                                carried a file. The hint is where that is said. */}
+                            <p className="field-hint">{t('settings.whatsapp.messageRetentionHint')}</p>
+                            {retentionCaps?.messages != null && (
+                              <p className={waRetentionAboveCap(waForm.messageRetentionDays, retentionCaps.messages) ? 'field-hint text-[hsl(var(--status-danger))]' : 'field-hint'}>
+                                {t('settings.retentionCap', { max: retentionCaps.messages })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* O aviso só aparece quando algum dos dois é zero, e some no dia
+                            em que o operador define um prazo. As duas ajudas acima
+                            DESCREVEM o zero ("guarda para sempre, que é o padrão") e não
+                            dizem o que ele custa — e o custo é específico: destes dois
+                            prazos, e só destes, o padrão é nunca apagar. Telemetria,
+                            eventos do ERP, provisionamento e trilha todos nascem com
+                            prazo. Aqui é onde ficam o texto das conversas, as fotos e os
+                            documentos que o assinante mandou. */}
+                        {((waForm.mediaRetentionDays === 0 && retentionCaps?.media == null)
+                          || (waForm.messageRetentionDays === 0 && retentionCaps?.messages == null)) && (
+                          <div className="mt-4 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning)/0.4)] bg-[hsl(var(--status-warning)/0.08)] p-4">
+                            <Icon name="info" size={18} className="mt-0.5 shrink-0 text-[hsl(var(--status-warning))]" />
+                            <p className="text-sm leading-6">{t('settings.whatsapp.retentionForeverWarning')}</p>
+                          </div>
+                        )}
+
+                        <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                          <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                              checked={waForm.enabled}
+                              onChange={(event) => setWaForm((current) => ({ ...current, enabled: event.target.checked }))}
+                            />
+                            {/* No sub-hint here on purpose: turning this on without a
+                                webhook URL is refused by the API with `incomplete_config`,
+                                and the reason is already written under that field — saying
+                                it twice on one screen is noise, and the dictionary has no
+                                hint of its own for this toggle. */}
+                            <span className="block font-semibold">{t('settings.whatsapp.enable')}</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {(waTestResult || waTestError) && (
+                        <div className="mt-4 rounded-md border border-border p-4">
+                          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <Icon
+                              name={waTestError || testOutcome(waTestResult) !== 'passed' ? 'warning' : 'check'}
+                              className={
+                                waTestError || testOutcome(waTestResult) === 'failed'
+                                  ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
+                                  : testOutcome(waTestResult) === 'warned'
+                                    ? 'h-4 w-4 text-[hsl(var(--status-warning))]'
+                                    : 'h-4 w-4 text-[hsl(var(--status-success))]'
+                              }
+                            />
+                            {t('settings.whatsapp.test.title')}
+                          </p>
+
+                          {waTestError ? (
+                            <p className="mt-2 text-sm text-[hsl(var(--status-danger))]">{waTestError}</p>
+                          ) : (
+                            <>
+                              {/* Três estados e não dois: "está tudo certo" com um passo
+                                  pulado afirma o que este botão existe para não afirmar,
+                                  e "há passos que não passaram" sobre uma instância órfã
+                                  manda procurar defeito que pode não existir. */}
+                              <p className="mt-2 text-sm font-medium">
+                                {t(
+                                  testOutcome(waTestResult) === 'passed'
+                                    ? 'settings.whatsapp.test.allPassed'
+                                    : testOutcome(waTestResult) === 'warned'
+                                      ? 'settings.whatsapp.test.someWarned'
+                                      : 'settings.whatsapp.test.someFailed'
+                                )}
+                              </p>
+                              {/* Uma linha por passo, e não um ✓/✗ único: o valor inteiro
+                                  deste botão está em dizer QUAL dos seis falhou. */}
+                              <ul className="mt-3 space-y-2" role="list">
+                                {testNotes(waTestResult, t).map((note) => (
+                                  <li
+                                    key={note.key}
+                                    className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs leading-5 ${TEST_TONE_CLASS[note.tone]}`}
+                                  >
+                                    <Icon name={note.icon} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    <span className="min-w-0">
+                                      <span className="font-semibold">{note.label}: </span>
+                                      <span className="wrap-break-word">{note.text}</span>
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                              {/* As duas ressalvas ficam no resultado, não num tooltip: um
+                                  diagnóstico que deixa o operador achar que provou mais do
+                                  que provou é o defeito que este botão existe para acabar. */}
+                              <p className="field-hint mt-3">{t('settings.whatsapp.test.fromPanel')}</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="mt-6 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleWhatsappTest()}
+                          disabled={waTesting}
+                          className="modern-button-secondary"
                         >
-                          <Icon name={note.icon} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          <span className="min-w-0">
-                            <span className="font-semibold">{note.label}: </span>
-                            <span className="wrap-break-word">{note.text}</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    {/* As duas ressalvas ficam no resultado, não num tooltip: um
-                        diagnóstico que deixa o operador achar que provou mais do
-                        que provou é o defeito que este botão existe para acabar. */}
-                    <p className="field-hint mt-3">{t('settings.whatsapp.test.fromPanel')}</p>
-                  </>
-                )}
-              </div>
-            )}
+                          {waTesting ? t('settings.whatsapp.test.testing') : t('settings.whatsapp.test.button')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleWhatsappSave()}
+                          disabled={waSaving}
+                          className="modern-button"
+                        >
+                          {waSaving ? t('common.saving') : t('common.save')}
+                        </button>
+                      </div>
+                      <p className="field-hint mt-2">{t('settings.whatsapp.test.savedOnly')}</p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => void handleWhatsappTest()}
-                disabled={waTesting}
-                className="modern-button-secondary"
-              >
-                {waTesting ? t('settings.whatsapp.test.testing') : t('settings.whatsapp.test.button')}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleWhatsappSave()}
-                disabled={waSaving}
-                className="modern-button"
-              >
-                {waSaving ? t('common.saving') : t('common.save')}
-              </button>
-            </div>
-            <p className="field-hint mt-2">{t('settings.whatsapp.test.savedOnly')}</p>
-
-            {/* A âncora da faixa de "número caído" (`#wa-accounts`). */}
-            <div id="wa-accounts" className="scroll-mt-24">
-              <WhatsAppConnection config={waConfig} />
-            </div>
-
-            {can('sgp.read') && (
-              <SgpContactsShortcut
-                onOpen={() => {
-                  setActiveTab('sgp')
-                  scrollToSection(SGP_CONTACTS_ANCHOR)
-                }}
-              />
-            )}
+                      {can('sgp.read') && (
+                        <SgpContactsShortcut
+                          onOpen={() => {
+                            setActiveTab('sgp')
+                            setSgpSection('contacts')
+                            scrollToSection(SGP_CONTACTS_ANCHOR)
+                          }}
+                        />
+                      )}
+                    </>
+                  )
+                },
+                {
+                  id: 'numbers',
+                  label: t('settings.integrations.tabs.numbers'),
+                  content: (
+                    <>
+                      {/* A âncora da faixa de "número caído" (`#wa-accounts`). */}
+                      <div id="wa-accounts" className="scroll-mt-24">
+                        <WhatsAppConnection config={waConfig} />
+                      </div>
+                    </>
+                  )
+                },
+                ...(can('whatsapp.config') ? [{
+                  id: 'marketing',
+                  label: t('settings.integrations.tabs.marketing'),
+                  content: <MarketingOptOutPanel embedded />
+                }] : [])
+              ]}
+            />
           </div>
         )}
-
-        {/* O "parar promoções" vale para todos os números, e mora junto. */}
-        {activeTab === 'whatsapp' && can('whatsapp.config') && <MarketingOptOutPanel />}
 
         {activeTab === 'security' && (
           <div className="modern-card max-w-5xl p-4 sm:p-6">
