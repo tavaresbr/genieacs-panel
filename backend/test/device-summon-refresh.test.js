@@ -16,6 +16,8 @@ const param = (value) => ({ _value: value, _writable: false });
 const genieAcs = {
   server: null,
   tasks: [],
+  /** O que ficou na fila de uma ONT inalcançável, como `GET /tasks` devolve. */
+  pending: [],
   refusedObjects: new Set(),
   /** An ONT behind CGNAT: GenieACS cannot call it back and only queues. */
   unreachable: false,
@@ -109,12 +111,16 @@ function startGenieAcsStub() {
       const url = new URL(req.url, 'http://127.0.0.1');
 
       if (req.method === 'POST' && url.pathname.endsWith('/tasks')) {
-        const task = await readBody(req);
+        const task = { ...await readBody(req), _id: `task-${genieAcs.tasks.length + 1}` };
         genieAcs.tasks.push({ ...task, connectionRequest: url.searchParams.has('connection_request') });
-        if (genieAcs.unreachable && url.searchParams.has('connection_request')) {
-          res.writeHead(202, 'Device is offline', { 'Content-Type': 'application/json' })
-            .end(JSON.stringify(task));
-          return;
+        if (genieAcs.unreachable) {
+          // Fica na fila até o próximo Inform, como no GenieACS.
+          genieAcs.pending.push(task);
+          if (url.searchParams.has('connection_request')) {
+            res.writeHead(202, 'Device is offline', { 'Content-Type': 'application/json' })
+              .end(JSON.stringify(task));
+            return;
+          }
         }
         if (task?.name === 'refreshObject' && genieAcs.refusedObjects.has(task.objectName)) {
           res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -122,6 +128,12 @@ function startGenieAcsStub() {
           return;
         }
         res.writeHead(200, { 'Content-Type': 'application/json' }).end('{}');
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/tasks') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+          .end(JSON.stringify(genieAcs.pending.map((task) => ({ _id: task._id }))));
         return;
       }
 
@@ -161,6 +173,7 @@ after(async () => {
 
 beforeEach(async () => {
   genieAcs.tasks = [];
+  genieAcs.pending = [];
   genieAcs.refusedObjects = new Set();
   genieAcs.unreachable = false;
   genieAcs.lastInform = null;
@@ -313,6 +326,18 @@ describe('summoning an ONT GenieACS cannot reach', () => {
       genieAcs.tasks.some((task) => task.name === 'refreshObject' && !task.connectionRequest),
       'the refreshes are still queued for the next Inform'
     );
+  });
+
+  it('does not stack another round of queued reads on every press', async () => {
+    genieAcs.unreachable = true;
+    await summon();
+    const primeira = genieAcs.tasks.filter((task) => task.name === 'refreshObject').length;
+    assert.ok(primeira > 0);
+
+    await summon();
+    await summon();
+    const refreshes = genieAcs.tasks.filter((task) => task.name === 'refreshObject').length;
+    assert.equal(refreshes, primeira, 'com a fila já ocupada, o clique não enfileira outra leva');
   });
 
   it('reports success when the ONT answers', async () => {

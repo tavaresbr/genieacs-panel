@@ -2573,13 +2573,16 @@ class DeviceService {
    * rodando de uma vez quando ela voltasse. Com tarefa na fila, não se pede
    * outra.
    */
-  static async hasPendingTask(deviceId) {
+  static async hasPendingTask(deviceId, { except = null } = {}) {
     try {
       const tasks = await this.fetchGenieAcsCollection('tasks', {
         query: JSON.stringify({ device: deviceId }),
         projection: '_id'
       });
-      return Array.isArray(tasks) && tasks.length > 0;
+      // `except`: a tarefa que quem pergunta acabou de enfileirar não conta
+      // como "já havia algo na fila".
+      return Array.isArray(tasks)
+        && tasks.some((task) => except === null || String(task?._id) !== String(except));
     } catch (error) {
       // Sem saber, não pede: é a escolha que não empilha.
       console.warn(`Unable to read the pending tasks of ${deviceId}: ${error.message}`);
@@ -2822,8 +2825,13 @@ class DeviceService {
       throw new Error(data.fault.faultString);
     }
 
-    const refreshed = await this.refreshSummonObjects(deviceId, { connectionRequest: reached });
-    await this.readSummonLeaves(deviceId, { connectionRequest: reached });
+    // Inalcançável, as leituras de acompanhamento só ficam na fila. Se a ONT
+    // já tinha tarefa esperando (outro clique antes deste), não se empilha mais
+    // uma leva a cada clique — como em `readDiagnostic`; a que acabamos de
+    // enfileirar não conta.
+    const followUps = reached || !(await this.hasPendingTask(deviceId, { except: data?._id ?? null }));
+    const refreshed = followUps ? await this.refreshSummonObjects(deviceId, { connectionRequest: reached }) : [];
+    if (followUps) await this.readSummonLeaves(deviceId, { connectionRequest: reached });
     if (refreshed.length > 0) await this.expectFreshRxPower();
 
     return {
