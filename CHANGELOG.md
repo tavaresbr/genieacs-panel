@@ -7,6 +7,40 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.45.1] - 2026-11-16
+
+### Fixed
+
+- Sessões, NPS/convite, corridas de resposta e formatação (`babee8a7`)
+- Cobrança removida não fica em aberto, e evento/página atrasados não desfazem o fechamento (`2cbab88e`)
+- Trava de preço, segundo lead, add-on na classificação e copiloto na conversa certa (`67c48c30`)
+- A trava de preço não libera o valor que o cliente chutou (`ef88ce74`)
+- Prazo do S3 por inatividade, não pela transferência inteira (`8d26af03`)
+- Dias do lembrete contados no calendário de São Paulo (`0ab20ca8`)
+- Falha do provisionamento não derruba o resto da passada (`5707ad8d`)
+- O upload do host espera a vez em vez de pular em silêncio (`53638e2c`)
+- Execução tomada com UPDATE condicional (`3f1a83e4`)
+- Backup interrompido no meio vira falha e o dia é tentado de novo (`cb92e3f6`)
+- Não embrulhar resposta 204/205/304 do S3 num Response com corpo (`45f052d4`)
+- Incidente de queda em manutenção não fecha com "normalizado" (`fdfedd48`)
+- Queda em massa julga o cliente pelo último equipamento a informar (`fc317ab9`)
+- RX do TR-181 (OpticalSignalLevel) em milésimos de dBm (`1eee6825`)
+- Página da URL preservada e releitura após Solicitar Inform (`84f4b28c`)
+- Solicitar Inform não empilha leituras na fila de ONT inalcançável (`e9ffc8c1`)
+- Reimportar a planilha depois do Excel não corrompe CPF e WhatsApp (`d5bef87f`)
+- Curingas do LIKE escapados em vez de removidos (`3b895e7e`)
+- Reconciliação não engole o segundo bloqueio do mesmo contrato (`04e3f281`)
+- Sinal e temperatura do assinante pela mesma leitura do painel (`407897b2`)
+- Auto-indicação e duplicata comparam com e sem o nono dígito (`020a66d3`)
+- Fila da ONT descontando a própria tarefa mesmo sem id na resposta (`4bab8c3f`)
+- Leituras ganham teto de 30 s para a lista de conversas não parar de atualizar (`45437b38`)
+- Falha do provisionamento no log sem quebra de linha (`15b72cb2`)
+- O log da falha do provisionamento leva só o tipo do erro (`91aaf272`)
+- O log da falha do provisionamento não leva nada do erro (`6a36bddb`)
+- Chave da reconciliação pelo último evento do contrato, não por horário (`b73a5e83`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/12c194a7c02f...2a0311eaff14)
+
 ## [1.45.0] - 2026-11-16
 
 ### New

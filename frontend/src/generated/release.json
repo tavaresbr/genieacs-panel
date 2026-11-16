@@ -1,76 +1,172 @@
 {
-  "version": "1.45.0",
-  "build": 1693,
-  "sourceCommit": "4001f006bac2",
+  "version": "1.45.1",
+  "build": 1723,
+  "sourceCommit": "2a0311eaff14",
   "releasedAt": "2026-11-16",
-  "basedOnTag": "v1.44.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/a51b633661bd...4001f006bac2",
+  "basedOnTag": "v1.45.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/12c194a7c02f...2a0311eaff14",
   "changes": [
     {
-      "shortHash": "b67e95a9",
-      "date": "2026-11-15",
-      "title": "Senha repetida trava a conta, instalação fechada no SaaS e mais",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "6792aa81",
-      "date": "2026-11-15",
-      "title": "Split SGP, WhatsApp and Chatbot integration pages into tabs",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "87362c28",
-      "date": "2026-11-15",
-      "title": "Convite morre com a autoridade de quem o cunhou; servidor WhatsApp da caixa só pelo admin da plataforma",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "57c18f49",
-      "date": "2026-11-15",
-      "title": "Token de verificação da Meta da caixa só para o admin da plataforma",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "5def020f",
-      "date": "2026-11-15",
-      "title": "Aceite de convite não revela contas e ativar 2FA pede a senha",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "8c1c6d4a",
-      "date": "2026-11-15",
-      "title": "Código de instalação de teste sem cara de segredo",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "86a06b09",
-      "date": "2026-11-15",
-      "title": "Cliente urgente e irritado entra no alerta de espera na metade do tempo",
-      "category": "New"
-    },
-    {
-      "shortHash": "348bde88",
-      "date": "2026-11-15",
-      "title": "O erro do envio da redefinição vai ao log só pelo código",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "2593de3c",
-      "date": "2026-11-15",
-      "title": "A rota escolhe entre conta nova e conta existente",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "5c313f97",
+      "shortHash": "babee8a7",
       "date": "2026-11-16",
-      "title": "Aviso de link sem endereço do painel sem o propósito do bilhete",
+      "title": "Sessões, NPS/convite, corridas de resposta e formatação",
       "category": "Fixed"
     },
     {
-      "shortHash": "07ae627a",
+      "shortHash": "2cbab88e",
       "date": "2026-11-16",
-      "title": "As recusas do aceite em funções próprias",
-      "category": "Changed"
+      "title": "Cobrança removida não fica em aberto, e evento/página atrasados não desfazem o fechamento",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "67c48c30",
+      "date": "2026-11-16",
+      "title": "Trava de preço, segundo lead, add-on na classificação e copiloto na conversa certa",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "ef88ce74",
+      "date": "2026-11-16",
+      "title": "A trava de preço não libera o valor que o cliente chutou",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "8d26af03",
+      "date": "2026-11-16",
+      "title": "Prazo do S3 por inatividade, não pela transferência inteira",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "0ab20ca8",
+      "date": "2026-11-16",
+      "title": "Dias do lembrete contados no calendário de São Paulo",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "5707ad8d",
+      "date": "2026-11-16",
+      "title": "Falha do provisionamento não derruba o resto da passada",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "53638e2c",
+      "date": "2026-11-16",
+      "title": "O upload do host espera a vez em vez de pular em silêncio",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "3f1a83e4",
+      "date": "2026-11-16",
+      "title": "Execução tomada com UPDATE condicional",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "cb92e3f6",
+      "date": "2026-11-16",
+      "title": "Backup interrompido no meio vira falha e o dia é tentado de novo",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "45f052d4",
+      "date": "2026-11-16",
+      "title": "Não embrulhar resposta 204/205/304 do S3 num Response com corpo",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "fdfedd48",
+      "date": "2026-11-16",
+      "title": "Incidente de queda em manutenção não fecha com \"normalizado\"",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "fc317ab9",
+      "date": "2026-11-16",
+      "title": "Queda em massa julga o cliente pelo último equipamento a informar",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "1eee6825",
+      "date": "2026-11-16",
+      "title": "RX do TR-181 (OpticalSignalLevel) em milésimos de dBm",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "84f4b28c",
+      "date": "2026-11-16",
+      "title": "Página da URL preservada e releitura após Solicitar Inform",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "e9ffc8c1",
+      "date": "2026-11-16",
+      "title": "Solicitar Inform não empilha leituras na fila de ONT inalcançável",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "d5bef87f",
+      "date": "2026-11-16",
+      "title": "Reimportar a planilha depois do Excel não corrompe CPF e WhatsApp",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "3b895e7e",
+      "date": "2026-11-16",
+      "title": "Curingas do LIKE escapados em vez de removidos",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "04e3f281",
+      "date": "2026-11-16",
+      "title": "Reconciliação não engole o segundo bloqueio do mesmo contrato",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "407897b2",
+      "date": "2026-11-16",
+      "title": "Sinal e temperatura do assinante pela mesma leitura do painel",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "020a66d3",
+      "date": "2026-11-16",
+      "title": "Auto-indicação e duplicata comparam com e sem o nono dígito",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "4bab8c3f",
+      "date": "2026-11-16",
+      "title": "Fila da ONT descontando a própria tarefa mesmo sem id na resposta",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "45437b38",
+      "date": "2026-11-16",
+      "title": "Leituras ganham teto de 30 s para a lista de conversas não parar de atualizar",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "15b72cb2",
+      "date": "2026-11-16",
+      "title": "Falha do provisionamento no log sem quebra de linha",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "91aaf272",
+      "date": "2026-11-16",
+      "title": "O log da falha do provisionamento leva só o tipo do erro",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "6a36bddb",
+      "date": "2026-11-16",
+      "title": "O log da falha do provisionamento não leva nada do erro",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "b73a5e83",
+      "date": "2026-11-16",
+      "title": "Chave da reconciliação pelo último evento do contrato, não por horário",
+      "category": "Fixed"
     }
   ]
 }
