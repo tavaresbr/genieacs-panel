@@ -3453,6 +3453,8 @@ const ptBR: Dictionary = {
   'whatsapp.notify.unknownContact': 'Cliente',
   'whatsapp.ai.suggest': 'Sugerir (IA)',
   'whatsapp.ai.suggesting': 'Gerando…',
+  'whatsapp.chatNumber.title': "Conversar por qual número?",
+  'whatsapp.chatNumber.default': "padrão",
   'whatsapp.aiUsage.title': "Uso da IA",
   'whatsapp.aiUsage.description': "Quanto a IA trabalhou. Só contagem de chamadas e tokens, sem valores em dinheiro (o preço muda).",
   'whatsapp.aiUsage.calls': "Chamadas",

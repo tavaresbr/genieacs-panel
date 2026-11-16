@@ -1,5 +1,6 @@
 'use client'
 
+import { ChatNumberMenu, useConnectedAccounts } from '@/components/whatsapp/chat-number-menu'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
@@ -180,11 +181,12 @@ export default function ContactDetailPage() {
 
   // The thread with this client in the panel's inbox: the one that exists, or
   // a new empty one. Opening sends nothing; the operator writes in the inbox.
-  const openConversation = async (phone?: string) => {
+  const numbers = useConnectedAccounts(can('whatsapp.send'))
+  const openConversation = async (phone?: string, accountId?: number) => {
     if (!profile) return
     setOpening(true)
     try {
-      const res = await whatsappAPI.openContactConversation(profile.key, phone)
+      const res = await whatsappAPI.openContactConversation(profile.key, phone, accountId)
       if (!res.success || !res.data) {
         toast.error(res.message || t('api.requestFailed'))
         return
@@ -320,15 +322,21 @@ export default function ContactDetailPage() {
             )}
             <DevicesButton contracts={profile.contracts} />
             {can('whatsapp.send') && (
-              <button
-                type="button"
-                className="modern-button-secondary"
-                disabled={opening || !profile.whatsappPhone}
-                title={profile.whatsappPhone ? undefined : t('contacts.profile.sendInvoiceNoPhone')}
-                onClick={() => void openConversation()}
-              >
-                <Icon name="chat" size={16} /> {t('contacts.profile.openConversation')}
-              </button>
+              <ChatNumberMenu accounts={numbers} onChoose={(accountId) => void openConversation(undefined, accountId)}>
+                {({ onClick, expanded }) => (
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    disabled={opening || !profile.whatsappPhone}
+                    title={profile.whatsappPhone ? undefined : t('contacts.profile.sendInvoiceNoPhone')}
+                    aria-haspopup={numbers.length > 1 ? 'menu' : undefined}
+                    aria-expanded={numbers.length > 1 ? expanded : undefined}
+                    onClick={onClick}
+                  >
+                    <Icon name="chat" size={16} /> {t('contacts.profile.openConversation')}
+                  </button>
+                )}
+              </ChatNumberMenu>
             )}
             {canEdit && (
               <button type="button" className="modern-button" onClick={() => setEditing(true)}>
@@ -419,16 +427,22 @@ export default function ContactDetailPage() {
                             </button>
                           )}
                         {can('whatsapp.send') && (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-primary hover:underline disabled:opacity-50 max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
-                            disabled={opening}
-                            title={t('contacts.profile.chatThisNumber')}
-                            aria-label={`${t('contacts.profile.chatThisNumber')} ${phoneText(phone)}`}
-                            onClick={() => void openConversation(phone)}
-                          >
-                            <Icon name="chat" size={14} /> {t('contacts.profile.chat')}
-                          </button>
+                          <ChatNumberMenu accounts={numbers} onChoose={(accountId) => void openConversation(phone, accountId)}>
+                            {({ onClick, expanded }) => (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-primary hover:underline disabled:opacity-50 max-sm:-my-2 max-sm:min-h-10 max-sm:px-2"
+                                disabled={opening}
+                                title={t('contacts.profile.chatThisNumber')}
+                                aria-label={`${t('contacts.profile.chatThisNumber')} ${phoneText(phone)}`}
+                                aria-haspopup={numbers.length > 1 ? 'menu' : undefined}
+                                aria-expanded={numbers.length > 1 ? expanded : undefined}
+                                onClick={onClick}
+                              >
+                                <Icon name="chat" size={14} /> {t('contacts.profile.chat')}
+                              </button>
+                            )}
+                          </ChatNumberMenu>
                         )}
                       </li>
                     ))}

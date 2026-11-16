@@ -1,5 +1,6 @@
 'use client'
 
+import { ChatNumberMenu, useConnectedAccounts } from '@/components/whatsapp/chat-number-menu'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { contactsAPI, type ContactImportResult, type ContactGoogleImportResult, type ContactWhatsappImportResult, whatsappAPI, type WhatsAppContactCounts, type ContactDeviceFilter, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
@@ -192,10 +193,10 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
     setTotal(res.data.total)
   }, [contacts.length, debounced, stateFilter, noPhone, imported, device, asaas, teiahHigh, t, toast])
 
-  const open = useCallback(async (contact: WhatsAppContact) => {
+  const open = useCallback(async (contact: WhatsAppContact, accountId?: number) => {
     setOpeningContract(contact.key)
     try {
-      const res = await whatsappAPI.openContactConversation(contact.key)
+      const res = await whatsappAPI.openContactConversation(contact.key, undefined, accountId)
       if (!alive.current) return
       if (!res.success || !res.data) {
         toast.error(whatsappErrorMessage(t, res.code))
@@ -215,6 +216,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
   }
 
   const canSend = can('whatsapp.send')
+
+  const numbers = useConnectedAccounts(canSend)
   const canOpenProfile = can('contacts.read')
   const canCreate = can('contacts.edit')
   const [creating, setCreating] = useState(false)
@@ -360,21 +363,27 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
 
   const actionOf = (contact: WhatsAppContact, extra = '') => (
     canSend && (contact.conversationId || contact.phone) ? (
-      <button
-        type="button"
-        className={`${contact.conversationId ? 'modern-button-secondary' : 'modern-button'}${extra ? ` ${extra}` : ''}`}
-        disabled={openingContract !== null}
-        onClick={() => void open(contact)}
-      >
-        <Icon
-          name={openingContract === contact.key ? 'refresh' : 'chat'}
-          size={16}
-          className={openingContract === contact.key ? 'animate-spin' : ''}
-        />
-        {t(contact.conversationId
-          ? 'whatsapp.contacts.openConversation'
-          : 'whatsapp.contacts.startConversation')}
-      </button>
+      <ChatNumberMenu accounts={numbers} onChoose={(accountId) => void open(contact, accountId)}>
+        {({ onClick, expanded }) => (
+          <button
+            type="button"
+            className={`${contact.conversationId ? 'modern-button-secondary' : 'modern-button'}${extra ? ` ${extra}` : ''}`}
+            disabled={openingContract !== null}
+            aria-haspopup={numbers.length > 1 ? 'menu' : undefined}
+            aria-expanded={numbers.length > 1 ? expanded : undefined}
+            onClick={onClick}
+          >
+            <Icon
+              name={openingContract === contact.key ? 'refresh' : 'chat'}
+              size={16}
+              className={openingContract === contact.key ? 'animate-spin' : ''}
+            />
+            {t(contact.conversationId
+              ? 'whatsapp.contacts.openConversation'
+              : 'whatsapp.contacts.startConversation')}
+          </button>
+        )}
+      </ChatNumberMenu>
     ) : null
   )
 

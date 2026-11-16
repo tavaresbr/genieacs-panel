@@ -3455,6 +3455,8 @@ const en = {
   'whatsapp.notify.unknownContact': 'Customer',
   'whatsapp.ai.suggest': 'Suggest (AI)',
   'whatsapp.ai.suggesting': 'Generating…',
+  'whatsapp.chatNumber.title': "Chat from which number?",
+  'whatsapp.chatNumber.default': "default",
   'whatsapp.aiUsage.title': "AI usage",
   'whatsapp.aiUsage.description': "How much the AI worked. Only counts of calls and tokens, no money values (prices change).",
   'whatsapp.aiUsage.calls': "Calls",

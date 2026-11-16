@@ -3461,6 +3461,8 @@ const ru: Dictionary = {
   'whatsapp.notify.unknownContact': 'Клиент',
   'whatsapp.ai.suggest': 'Предложить (ИИ)',
   'whatsapp.ai.suggesting': 'Генерация…',
+  'whatsapp.chatNumber.title': "Chat from which number?",
+  'whatsapp.chatNumber.default': "default",
   'whatsapp.aiUsage.title': "AI usage",
   'whatsapp.aiUsage.description': "How much the AI worked. Only counts of calls and tokens, no money values (prices change).",
   'whatsapp.aiUsage.calls': "Calls",
