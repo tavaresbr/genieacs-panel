@@ -563,7 +563,10 @@ class ExternalBackupService {
       this.lastPassAt = now.getTime();
       const config = await effectiveConfig();
       if (!config.configured || !config.enabled) return { skipped: 'disabled' };
-      const status = await readStatus();
+      let status = await readStatus();
+      if (status.lastRun?.status === 'running' && await this.recoverInterrupted({ now })) {
+        status = await readStatus();
+      }
       const relogio = saoPauloClock(now);
       if (config.runner === 'panel' && relogio.hour >= config.hour && status.lastAttemptDay !== relogio.day) {
         this.start(() => this.perform({ trigger: 'schedule', now }));
@@ -578,6 +581,50 @@ class ExternalBackupService {
     } catch (error) {
       log.warn('external backup scheduler pass failed', { err: { message: error?.message } });
       return { skipped: 'error' };
+    }
+  }
+
+  /**
+   * O backup que morreu no meio (reinício, deploy, OOM): `performLeased` já
+   * tinha gravado `lastAttemptDay` e `lastRun: running`, e nada mais os
+   * mudava — a tela mostrava "rodando" para sempre e o dia nunca era
+   * tentado de novo. Um envio vivo renova a vez (`withLeaseHeartbeat`) e só a
+   * solta depois de gravar o resultado; então, se ESTA instância consegue a
+   * vez e o estado (relido com ela na mão) ainda diz `running`, ninguém está
+   * rodando: a vez do morto venceu (`LEASE_TTL_MS`). Vira `failed`, com o
+   * `backup_failed` de sempre, e o dia agendado fica livre para nova
+   * tentativa. Devolve se recuperou algo. Nunca lança.
+   */
+  static async recoverInterrupted({ now = new Date() } = {}) {
+    const minha = await acquireLease(LEASE, { ttlMs: LEASE_TTL_MS, now }).catch(() => false);
+    if (!minha) return false;
+    try {
+      const status = await readStatus();
+      const morto = status.lastRun;
+      if (morto?.status !== 'running') return false;
+      const mensagem = 'The backup was interrupted (the process stopped before it finished)';
+      const inicio = Date.parse(morto.startedAt ?? '');
+      const doDia = morto.trigger === 'schedule' && Number.isFinite(inicio)
+        && status.lastAttemptDay === saoPauloClock(new Date(inicio)).day;
+      await writeStatus({
+        lastRun: {
+          ...morto,
+          status: 'failed',
+          finishedAt: now.toISOString(),
+          durationMs: Number.isFinite(inicio) ? Math.max(0, now.getTime() - inicio) : null,
+          error: mensagem,
+          code: 'interrupted'
+        },
+        ...(doDia ? { lastAttemptDay: null } : {})
+      });
+      log.warn('external backup interrupted', { startedAt: morto.startedAt ?? null, trigger: morto.trigger ?? null });
+      await this.alertFailure({ stage: 'backup', source: morto.source ?? 'panel', error: mensagem, now });
+      return true;
+    } catch (error) {
+      log.warn('could not recover an interrupted external backup', { err: { message: error?.message } });
+      return false;
+    } finally {
+      await releaseLease(LEASE).catch(() => {});
     }
   }
 

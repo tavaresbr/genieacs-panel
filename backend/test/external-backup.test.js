@@ -389,6 +389,40 @@ describe('o agendador', () => {
     assert.equal((await ExternalBackupService.schedulerPass({ now: agora, force: true })).skipped, 'nothing_due');
     await configurar();
   });
+
+  it('o backup que morreu no meio vira falha (com alerta) quando a vez dele vence, e o dia é tentado de novo', async () => {
+    const { acquireLease, releaseLease } = await import('../src/services/schedulerLease.js');
+    const { writeStatus } = await import('../src/services/backup/externalBackupSettings.js');
+    const { saoPauloClock } = await import('../src/services/platformAlertService.js');
+    await getDb()('app_state').where({ key: STATUS_KEY }).del();
+    await getDb()('platform_alerts').del();
+    const agora = new Date(Math.floor(Date.now() / 1000) * 1000);
+    const startedAt = new Date(agora.getTime() - 60_000).toISOString();
+    await writeStatus({
+      lastAttemptDay: saoPauloClock(agora).day,
+      lastRun: { status: 'running', trigger: 'schedule', source: 'panel', startedAt }
+    });
+
+    // Vivo em outra instância (a vez renovada): nada muda.
+    const vivo = { holder: 'outra-instancia:envio' };
+    assert.equal(await acquireLease('external-backup', { ttlMs: 60_000, ...vivo }), true);
+    try {
+      assert.equal((await ExternalBackupService.schedulerPass({ now: agora, force: true })).skipped, 'nothing_due');
+      assert.equal((await readStatus()).lastRun.status, 'running');
+    } finally {
+      await releaseLease('external-backup', vivo);
+    }
+
+    // A vez dele venceu (ou foi solta sem gravar nada): falha, alerta, e o
+    // backup do dia sai de novo na mesma passada.
+    const r = await ExternalBackupService.schedulerPass({ now: agora, force: true });
+    assert.equal(r.started, 'backup', JSON.stringify(r));
+    await esperar();
+    assert.equal((await alertasDeBackup()).length, 1);
+    const status = await readStatus();
+    assert.equal(status.lastRun.status, 'ok');
+    assert.equal(status.lastAttemptDay, saoPauloClock(agora).day);
+  });
 });
 
 describe('a vez durante um envio longo', () => {
