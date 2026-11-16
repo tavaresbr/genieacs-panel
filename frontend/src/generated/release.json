@@ -1,16 +1,76 @@
 {
-  "version": "1.44.0",
-  "build": 1678,
-  "sourceCommit": "abc7812d76fc",
-  "releasedAt": "2026-11-15",
-  "basedOnTag": "v1.43.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/bdbe5113f1a9...abc7812d76fc",
+  "version": "1.45.0",
+  "build": 1693,
+  "sourceCommit": "4001f006bac2",
+  "releasedAt": "2026-11-16",
+  "basedOnTag": "v1.44.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/a51b633661bd...4001f006bac2",
   "changes": [
     {
-      "shortHash": "6f92216c",
+      "shortHash": "b67e95a9",
       "date": "2026-11-15",
-      "title": "Painel Uso da IA (chamadas e tokens por tarefa)",
+      "title": "Senha repetida trava a conta, instalação fechada no SaaS e mais",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "6792aa81",
+      "date": "2026-11-15",
+      "title": "Split SGP, WhatsApp and Chatbot integration pages into tabs",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "87362c28",
+      "date": "2026-11-15",
+      "title": "Convite morre com a autoridade de quem o cunhou; servidor WhatsApp da caixa só pelo admin da plataforma",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "57c18f49",
+      "date": "2026-11-15",
+      "title": "Token de verificação da Meta da caixa só para o admin da plataforma",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "5def020f",
+      "date": "2026-11-15",
+      "title": "Aceite de convite não revela contas e ativar 2FA pede a senha",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "8c1c6d4a",
+      "date": "2026-11-15",
+      "title": "Código de instalação de teste sem cara de segredo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "86a06b09",
+      "date": "2026-11-15",
+      "title": "Cliente urgente e irritado entra no alerta de espera na metade do tempo",
       "category": "New"
+    },
+    {
+      "shortHash": "348bde88",
+      "date": "2026-11-15",
+      "title": "O erro do envio da redefinição vai ao log só pelo código",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "2593de3c",
+      "date": "2026-11-15",
+      "title": "A rota escolhe entre conta nova e conta existente",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "5c313f97",
+      "date": "2026-11-16",
+      "title": "Aviso de link sem endereço do painel sem o propósito do bilhete",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "07ae627a",
+      "date": "2026-11-16",
+      "title": "As recusas do aceite em funções próprias",
+      "category": "Changed"
     }
   ]
 }

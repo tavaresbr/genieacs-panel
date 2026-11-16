@@ -7,6 +7,33 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.45.0] - 2026-11-16
+
+### New
+
+- Cliente urgente e irritado entra no alerta de espera na metade do tempo (`86a06b09`)
+
+### Fixed
+
+- Senha repetida trava a conta, instalação fechada no SaaS e mais (`b67e95a9`)
+- Convite morre com a autoridade de quem o cunhou; servidor WhatsApp da caixa só pelo admin da plataforma (`87362c28`)
+- Token de verificação da Meta da caixa só para o admin da plataforma (`57c18f49`)
+- Aceite de convite não revela contas e ativar 2FA pede a senha (`5def020f`)
+- O erro do envio da redefinição vai ao log só pelo código (`348bde88`)
+- A rota escolhe entre conta nova e conta existente (`2593de3c`)
+- Aviso de link sem endereço do painel sem o propósito do bilhete (`5c313f97`)
+
+### Changed
+
+- As recusas do aceite em funções próprias (`07ae627a`)
+
+### Maintenance
+
+- Split SGP, WhatsApp and Chatbot integration pages into tabs (`6792aa81`)
+- Código de instalação de teste sem cara de segredo (`8c1c6d4a`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/a51b633661bd...4001f006bac2)
+
 ## [1.44.0] - 2026-11-15
 
 ### New
