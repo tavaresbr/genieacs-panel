@@ -440,6 +440,31 @@ describe('a mass outage is one message, not forty', () => {
     assert.ok(!messages[1].body.includes('ODP-1'), messages[1].body);
     assert.match(messages[1].body, /ODP Centro restabelecido/);
   });
+
+  it('uma ONT trocada, a antiga parada no GenieACS com o mesmo login, não derruba o cliente', async () => {
+    await setRules({
+      ont_offline: { enabled: true, threshold: 30, cooldownMinutes: 60 },
+      mass_outage: { enabled: true, threshold: 5, cooldownMinutes: 60 },
+      rx_power_low: { enabled: false },
+      temperature_high: { enabled: false }
+    });
+
+    identities = Array.from({ length: 6 }, (unused, index) => ({
+      _id: `dev-${index + 1}`,
+      pppoe: `cliente${index + 1}`
+    }));
+    // Clientes 3 e 4 trocaram de ONT: a antiga ficou no ACS, offline, com o
+    // mesmo login. Pela regra do mapa (vale quem informou por último) só 1 e 2
+    // estão caídos — 2 de 5, não é rompimento.
+    identities.push({ _id: 'old-3', pppoe: 'cliente3' }, { _id: 'old-4', pppoe: 'cliente4' });
+    fleet = identities.map((item, index) => device(item._id, {
+      _lastInform: index < 2 || item._id.startsWith('old-') ? informedMinutesAgo(45) : informedMinutesAgo(1)
+    }));
+
+    await scan({ now: now() });
+    const rows = await alertRows();
+    assert.ok(!rows.some((row) => row.rule === 'mass_outage'), JSON.stringify(rows));
+  });
 });
 
 describe('a scan that cannot say anything says why', () => {

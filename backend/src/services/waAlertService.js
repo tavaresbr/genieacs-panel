@@ -1024,11 +1024,26 @@ class WaAlertService {
       nodeByPppoe.set(String(node.pppoe).trim().toLowerCase(), node);
     }
 
+    // Troca de ONT deixa o aparelho antigo no GenieACS com o mesmo login, e
+    // ele fica offline para sempre. Como no mapa (`mapStatusService.status`),
+    // o cliente é julgado pelo equipamento que informou por último: se esse
+    // está online, o cliente está online, por mais que o antigo siga caído.
+    const offlineSet = new Set(offline);
+    const latestByPppoe = new Map();
+    for (const [deviceId, pppoe] of pppoeByDevice) {
+      const lastInform = informs.get(deviceId);
+      if (lastInform === undefined) continue;
+      const current = latestByPppoe.get(pppoe);
+      if (!current || lastInform > current.lastInform) latestByPppoe.set(pppoe, { deviceId, lastInform });
+    }
+
     // Cliente no mapa → os equipamentos dele que estão offline.
     const offlineClients = new Map();
     const devicesByClient = new Map();
     for (const deviceId of offline) {
       const pppoe = pppoeByDevice.get(deviceId);
+      const latest = pppoe ? latestByPppoe.get(pppoe) : null;
+      if (latest && !offlineSet.has(latest.deviceId)) continue;
       const ontNode = pppoe ? nodeByPppoe.get(pppoe) : null;
       // Embaixo de um nó em manutenção: não conta para a queda de ninguém.
       if (!ontNode || skipClients?.has(ontNode.node_id)) continue;
