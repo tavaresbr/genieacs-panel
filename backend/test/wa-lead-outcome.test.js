@@ -8,6 +8,7 @@ const { default: WaConversation } = await import('../src/models/WaConversation.j
 const { default: WaConversationService } = await import('../src/services/waConversationService.js');
 const { default: WaSalesPlanService } = await import('../src/services/waSalesPlanService.js');
 const { default: WaSalesReportService } = await import('../src/services/waSalesReportService.js');
+const { default: WaAiService } = await import('../src/services/waAiService.js');
 
 let account;
 let plano;
@@ -87,6 +88,36 @@ describe('o resultado da venda ao encerrar', () => {
     await assert.rejects(encerrar(c.id, { outcome: 'won' }), { code: 'lead_not_a_sale' });
     await encerrar(c.id, undefined);
     assert.ok((await lido(c.id)).closed_at, 'encerra normalmente sem resultado');
+  });
+});
+
+describe('um segundo interesse na mesma conversa', () => {
+  const registrar = async (id) => {
+    const conversation = await lido(id);
+    return asTenant(() => WaAiService.registrarInteresse({ conversation, dados: { nome: 'Cliente' } }));
+  };
+
+  it('depois de um lead com resultado, começa um lead novo (conta e é aprendido de novo)', async () => {
+    const c = await conversa();
+    await encerrar(c.id, { outcome: 'won', planId: plano.id });
+    const antigo = new Date(Date.now() - 3 * 24 * 3600_000);
+    await getDb()('wa_conversations').where({ id: c.id }).update({ lead_at: antigo, lead_learned_at: new Date() });
+    assert.equal((await registrar(c.id)).intent, 'lead');
+    const linha = await lido(c.id);
+    assert.ok(new Date(linha.lead_at) > antigo, 'lead_at é o do novo interesse');
+    assert.equal(linha.lead_outcome, null);
+    assert.equal(linha.lead_lost_reason, null);
+    assert.equal(linha.lead_plan_id, null);
+    assert.equal(linha.lead_learned_at, null);
+  });
+
+  it('um lead ainda em aberto fica como está', async () => {
+    const c = await conversa();
+    const antigo = new Date(Date.now() - 3 * 24 * 3600_000);
+    antigo.setMilliseconds(0);
+    await getDb()('wa_conversations').where({ id: c.id }).update({ lead_at: antigo });
+    await registrar(c.id);
+    assert.equal(new Date((await lido(c.id)).lead_at).getTime(), antigo.getTime());
   });
 });
 

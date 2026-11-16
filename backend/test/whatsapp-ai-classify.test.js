@@ -155,6 +155,20 @@ describe('WaAiService.classificar', () => {
     }
   });
 
+  it('sem o add-on de IA não chama a IA', async () => {
+    const { default: AddonService } = await import('../src/services/addonService.js');
+    const original = AddonService.allows;
+    AddonService.allows = async (chave) => chave !== 'ai';
+    try {
+      const c = await conversa();
+      assert.equal(await classificar(c), null);
+      assert.equal(pedidos.length, 0);
+      assert.equal((await linha(c)).ai_classified_at, null);
+    } finally {
+      AddonService.allows = original;
+    }
+  });
+
   it('a opção começa desligada e só aceita verdadeiro', async () => {
     await salvar({ classify: 'sim' });
     assert.equal((await asTenant(() => WaBotConfigService.getConfig())).ai.classify, false);

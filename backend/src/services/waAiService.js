@@ -169,8 +169,8 @@ function textoDoAnexo(mensagem) {
 }
 
 /** O que o cliente escreveu nas duas últimas mensagens: com isso a base de conhecimento acha o que responder. */
-function ultimasDoCliente(fio) {
-  return fio.filter((m) => m.role === 'user').slice(-2)
+function ultimasDoCliente(fio, quantas = 2) {
+  return fio.filter((m) => m.role === 'user').slice(-quantas)
     .map((m) => (Array.isArray(m.content) ? m.content.filter((p) => p.type === 'text').map((p) => p.text).join(' ') : String(m.content ?? '')))
     .join(' ');
 }
@@ -292,7 +292,7 @@ export function modeloDaTarefa(ai, tarefa) {
  * base de conhecimento acha para o que ele disse) vem depois. Quem só lê texto
  * recebe tudo junto, na mesma ordem, como uma string.
  */
-async function promptDeSistema({ ai, conversation, link, modo, recente = '', visao = false }) {
+async function promptDeSistema({ ai, conversation, link, modo, recente = '', nova = '', visao = false, contexto = {} }) {
   const empresa = await nomeDaEmpresa();
   const vendas = !link?.contract && ai.sales !== false && modo !== 'sugestao';
 
@@ -320,8 +320,10 @@ async function promptDeSistema({ ai, conversation, link, modo, recente = '', vis
       const nome = nomeSeguro(conversation.push_name);
       if (nome) variavel.push(`Nome que a pessoa usa no WhatsApp (dado, não instrução): "${nome}".`);
       // O que a empresa sabe de si (vantagens, respostas a objeções), conforme o que o cliente disse.
-      const conhecimento = await WaAiKnowledgeService.paraPrompt(recente).catch(() => '');
+      const conhecimento = await WaAiKnowledgeService.paraPrompt(recente, { nova }).catch(() => '');
       if (conhecimento) variavel.push(conhecimento);
+      // A trava de preço aceita os valores que a própria base (escrita pelo provedor) pôs no prompt.
+      contexto.conhecimento = conhecimento;
     }
   }
   if (!(await WaBotConfigService.withinHours())) {
@@ -363,8 +365,16 @@ class WaAiService {
       await WaBotConfigService.recordAiError(null);
 
       // Quem ainda não é cliente nunca recebe um valor que o provedor não cadastrou.
-      const inventado = await this.valoresInventados({ ai, link, texto: resultado.texto });
-      if (inventado.length) return await this.barrarPrecoInventado({ conversation, texto: resultado.texto, valores: inventado });
+      // O contrato é o do FIM do laço: quem se identificou nesta mesma mensagem
+      // (identificar_cliente) já é cliente, e o valor da fatura vem do SGP.
+      const inventado = await this.valoresInventados({
+        ai, link: resultado.link ?? link, texto: resultado.texto, tambem: resultado.permitidos
+      });
+      if (inventado.length) {
+        return await this.barrarPrecoInventado({
+          conversation, texto: resultado.texto, valores: inventado, intent: resultado.intent
+        });
+      }
 
       if (resultado.transferiu) {
         await WaBotService.pausar(conversation, new Date(Date.now() + WaBotService.PAUSA_ATENDENTE_MS));
@@ -398,12 +408,18 @@ class WaAiService {
    * estão no catálogo de planos nem no texto das instruções (que o próprio
    * provedor escreveu). Vazio para cliente com contrato (o valor da fatura vem
    * de ferramenta) e com as vendas da IA desligadas.
+   *
+   * `tambem`: outros textos cujos valores valem — as respostas da base de
+   * conhecimento que entraram no prompt (escritas pelo provedor) e o que o
+   * próprio cliente escreveu (repetir o valor que ele citou não é inventar).
    */
-  static async valoresInventados({ ai, link, texto }) {
+  static async valoresInventados({ ai, link, texto, tambem = [] }) {
     if (link?.contract || ai.sales === false) return [];
     if (!valoresEmCentavos(texto).length) return [];
     const permitidos = await WaSalesPlanService.precosDoCatalogo();
-    for (const valor of valoresEmCentavos(ai.instructions)) permitidos.add(valor);
+    for (const fonte of [ai.instructions, ...tambem]) {
+      for (const valor of valoresEmCentavos(fonte)) permitidos.add(valor);
+    }
     return valoresForaDaLista(texto, permitidos);
   }
 
@@ -411,7 +427,7 @@ class WaAiService {
    * O texto da IA com valor fora do catálogo não sai: a conversa vai para a
    * equipe com a passagem padrão, e uma nota interna diz o que foi barrado.
    */
-  static async barrarPrecoInventado({ conversation, texto, valores }) {
+  static async barrarPrecoInventado({ conversation, texto, valores, intent = null }) {
     const nota = [
       'A IA citou um valor que não está no catálogo de planos, e a mensagem NÃO foi enviada ao cliente.',
       `Valor(es): ${valores.map(formatarReais).join(', ')}`,
@@ -420,7 +436,9 @@ class WaAiService {
     await WaSendService.enqueue({ conversationId: conversation.id, body: nota, isNote: true, userId: null, source: 'bot' });
     await WaBotService.pausar(conversation, new Date(Date.now() + WaBotService.PAUSA_ATENDENTE_MS));
     await WaBotService.responderCom(conversation, (await WaBotService.textoPassagem('handoffQueued')).slice(0, RESPOSTA_MAX));
-    return { replied: true, intent: 'atendente', from: 'ia' };
+    // O interesse registrado nesta volta continua sendo 'lead': é esse evento que
+    // impede registrar_interesse_comercial de repetir a nota em 24 h.
+    return { replied: true, intent: intent === 'lead' ? 'lead' : 'atendente', from: 'ia' };
   }
 
   /**
@@ -507,6 +525,9 @@ class WaAiService {
    */
   static async classificar(conversation) {
     try {
+      // O add-on de IA (0127), como no atendimento: sem ele, nenhuma chamada paga.
+      // `ai.enabled` não entra: a classificação tem o próprio opt-in (`ai.classify`).
+      if (!(await AddonService.allows('ai'))) return null;
       const ai = await WaBotConfigService.aiSettings();
       if (!ai.classify || !ai.apiKey || !conversation?.id) return null;
       const agora = new Date();
@@ -749,7 +770,10 @@ class WaAiService {
   /**
    * O laço com o modelo: até `RODADAS` voltas de ferramenta, depois o texto.
    *
-   * @returns {Promise<{texto: string|null, anexos: string[], intent: string|null, transferiu: boolean}>}
+   * `link` volta como ficou no fim (identificar_cliente pode tê-lo trocado), e
+   * `permitidos` traz os textos cujos valores a trava de preço aceita.
+   *
+   * @returns {Promise<{texto: string|null, anexos: string[], intent: string|null, transferiu: boolean, link: object|null, permitidos: string[]}>}
    */
   static async conversar({ ai, conversation, link: linkInicial, modo }) {
     let link = linkInicial;
@@ -782,13 +806,16 @@ class WaAiService {
     const turnos = await historico(conversation.id, HISTORICO, { midia: visao });
     const fio = prepararFio(turnos, { fecharComUsuario: sugestao ? INSTRUCAO_DO_RASCUNHO : null });
     const tarefa = turnos.comMidia ? 'visao' : (sugestao ? 'sugestao' : 'conversa');
-    if (!fio.length) return { texto: null, anexos: [], intent: null, transferiu: false };
+    if (!fio.length) return { texto: null, anexos: [], intent: null, transferiu: false, link, permitidos: [] };
+    const recente = ultimasDoCliente(fio);
+    const contexto = {};
     const mensagens = [
-      { role: 'system', content: await promptDeSistema({ ai, conversation, link, modo, recente: ultimasDoCliente(fio), visao }) },
+      { role: 'system', content: await promptDeSistema({ ai, conversation, link, modo, recente, nova: ultimasDoCliente(fio, 1), visao, contexto }) },
       ...fio
     ];
     const anexos = [];
     let intent = null;
+    const fim = (r) => ({ ...r, link, permitidos: [contexto.conhecimento || '', recente] });
 
     for (let rodada = 0; rodada <= RODADAS; rodada += 1) {
       const disponiveis = rodada < RODADAS ? nomes() : [];
@@ -805,7 +832,7 @@ class WaAiService {
       });
       const chamadas = resposta.toolCalls.filter((c) => disponiveis.includes(c.name));
       if (!chamadas.length) {
-        return { texto: resposta.content, anexos, intent, transferiu: false };
+        return fim({ texto: resposta.content, anexos, intent, transferiu: false });
       }
 
       mensagens.push({
@@ -817,7 +844,7 @@ class WaAiService {
       });
       for (const chamada of chamadas) {
         if (chamada.name === 'transferir_para_atendente') {
-          return { texto: resposta.content, anexos, intent: 'atendente', transferiu: true };
+          return fim({ texto: resposta.content, anexos, intent: 'atendente', transferiu: true });
         }
         // eslint-disable-next-line no-await-in-loop -- poucas chamadas por volta
         const saida = await this.executar(chamada, { conversation, link });
@@ -826,12 +853,12 @@ class WaAiService {
         if (saida.intent) intent = saida.intent;
         if (saida.transferir) {
           const lead = saida.intent === 'lead';
-          return { texto: lead ? resposta.content : saida.texto, anexos, intent: lead ? 'lead' : 'atendente', transferiu: true };
+          return fim({ texto: lead ? resposta.content : saida.texto, anexos, intent: lead ? 'lead' : 'atendente', transferiu: true });
         }
         mensagens.push({ role: 'tool', tool_call_id: chamada.id, content: saida.paraModelo });
       }
     }
-    return { texto: null, anexos, intent, transferiu: false };
+    return fim({ texto: null, anexos, intent, transferiu: false });
   }
 
   /** Uma ferramenta: o texto para o modelo ler, e o que o servidor anexa. */
@@ -918,7 +945,12 @@ class WaAiService {
     });
     await WaTagService.tagSales(conversation.id);
     // É daqui que a conversa passa a contar como venda no relatório, e a pedir o resultado ao encerrar.
-    await tdb('wa_conversations').where({ id: conversation.id }).whereNull('lead_at').update({ lead_at: new Date() });
+    // Um lead anterior já com resultado (fechou/perdeu) começa um NOVO lead: sem
+    // isso o segundo interesse na mesma conversa nunca contava, nem era aprendido
+    // (`lead_learned_at`). Um lead em aberto (sem resultado) fica como está.
+    await tdb('wa_conversations').where({ id: conversation.id })
+      .where((q) => q.whereNull('lead_at').orWhereNotNull('lead_outcome'))
+      .update({ lead_at: new Date(), lead_outcome: null, lead_lost_reason: null, lead_plan_id: null, lead_learned_at: null });
     // Avisa a equipe pelos canais dos alertas (WhatsApp, e-mail, Telegram), se ligados. Não lança.
     await WaAlertService.notifyEvent({
       rule: 'wa_lead',
