@@ -256,7 +256,8 @@ export class S3Client {
       parar();
       throw new S3Error(`Could not reach the S3 endpoint (${error.cause?.code || error.name || 'network error'})`, { code: 'unreachable' });
     }
-    if (resposta.body && typeof resposta.body.pipeThrough === 'function') {
+    // 204/205/304 não podem ter corpo num `new Response` (ele lança).
+    if (resposta.body && typeof resposta.body.pipeThrough === 'function' && ![204, 205, 304].includes(resposta.status)) {
       rearmar();
       const medido = resposta.body.pipeThrough(new TransformStream({
         transform(pedaco, ctrl) { rearmar(); ctrl.enqueue(pedaco); },
