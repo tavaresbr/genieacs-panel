@@ -273,6 +273,17 @@ describe('GET /api/devices without VirtualParameters', () => {
     assert.equal(device.pppoe, 'scripted-3');
     assert.equal(device.rxpower, '-19.87');
   });
+
+  it('o portal do assinante lê o sinal pelo mesmo caminho do painel', async () => {
+    const { default: DeviceService } = await import('../src/services/deviceService.js');
+    genieAcs.fleet = [bareOnt(4)];
+    const overview = await asTenant(() => DeviceService.getCustomerPortalOverview(bareOnt(4)._id));
+
+    assert.equal(overview.optical.rxPower, -21.53);
+    assert.ok(genieAcs.projections.at(-1).includes(
+      'InternetGatewayDevice.WANDevice.1.X_ALU-COM_GponInterfaceConfig.RXPower'
+    ));
+  });
 });
 
 /** A Nokia with its optics' temperature and its VLAN under `X_ALU-COM_…` names. */

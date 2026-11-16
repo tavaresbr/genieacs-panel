@@ -2010,6 +2010,12 @@ class DeviceService {
     if (!deviceId) throw new Error('Device ID is required');
 
     const virtualParams = await this.getVirtualParameters();
+    // O sinal e a temperatura saem pela mesma leitura da página do operador e
+    // da lista (`resolveRxPower`/`resolveTemperature`): sem os caminhos de
+    // fabricante na projeção, a ONT sem VirtualParameter configurado mostrava
+    // "sem leitura" ao assinante enquanto o painel mostrava o valor.
+    const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
+    const learnedTemperaturePaths = await this.readTemperaturePaths();
     const projection = [
       '_id',
       '_deviceId._ProductClass',
@@ -2021,6 +2027,10 @@ class DeviceService {
       virtualParams.vpRxPower,
       virtualParams.vpTemperature,
       virtualParams.vpActiveDevices,
+      ...RX_POWER_FALLBACK_PATHS,
+      ...learnedRxPaths,
+      ...TEMPERATURE_FALLBACK_PATHS,
+      ...learnedTemperaturePaths,
       '_lastInform',
       '_lastBoot',
       '_registered'
@@ -2080,8 +2090,8 @@ class DeviceService {
         uptimeSeconds: getValue('InternetGatewayDevice.DeviceInfo.UpTime')
       },
       optical: {
-        rxPower: getValue(virtualParams.vpRxPower),
-        temperature: getValue(virtualParams.vpTemperature)
+        rxPower: this.resolveRxPower(item, virtualParams, learnedRxPaths).value,
+        temperature: this.resolveTemperature(item, virtualParams, learnedTemperaturePaths).value
       },
       connectedDevices: getValue(virtualParams.vpActiveDevices),
       wifi,
