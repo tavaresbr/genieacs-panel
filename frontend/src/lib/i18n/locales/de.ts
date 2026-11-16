@@ -6470,6 +6470,7 @@ const de: Dictionary = {
   "integrations.backup.hourHint": "Gilt, wenn das Panel das Backup erstellt.",
   "integrations.backup.keepDaily": "Aufbewahrte tägliche Kopien",
   "integrations.backup.keepWeekly": "Aufbewahrte wöchentliche Kopien",
+  "integrations.backup.retentionRange": "Ganze Zahl von {min} bis {max}.",
   "integrations.backup.retentionHint": "Behält die neueste Kopie jedes der letzten Tage und davor eine pro Woche. Die neueste Kopie wird nie gelöscht.",
   "integrations.backup.includeMedia": "WhatsApp-Anhänge einschließen",
   "integrations.backup.test": "Verbindung testen",

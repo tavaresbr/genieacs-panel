@@ -4,7 +4,7 @@ import {
 } from '@/lib/backup-keys'
 import { PLATFORM_ALERT_EVENTS, type ExternalBackupSettings } from '@/lib/api'
 import { ALERT_EVENT_LABELS } from '@/lib/platform-alerts'
-import { backupPatch, formatBytes } from '@/components/platform/external-backup-card'
+import { backupPatch, formatBytes, retentionValue } from '@/components/platform/external-backup-card'
 // O lado que decifra é o do servidor/CLI: a prova de que o par gerado aqui
 // abre o que o backend cifra é usar o código dele. Por caminho calculado, como
 // em `audit-actions.test.ts`, para o TypeScript não tipar um módulo do backend.
@@ -49,12 +49,23 @@ describe('o cartão', () => {
   }
   const form = {
     endpoint: '', region: 'us-east-1', bucket: 'b', prefix: 'p/', forcePathStyle: false, accessKeyId: '', secretAccessKey: '',
-    enabled: true, runner: 'panel' as const, hour: 3, keepDaily: 7, keepWeekly: 4, includeMedia: true
+    enabled: true, runner: 'panel' as const, hour: 3, keepDaily: '7', keepWeekly: '4', includeMedia: true
   }
 
   it('manda só o que mudou; a access key e a secret só quando digitadas', () => {
     expect(backupPatch(info, form)).toEqual({})
     expect(backupPatch(info, { ...form, hour: 5, secretAccessKey: ' s3cr3t ' })).toEqual({ hour: 5, secretAccessKey: 's3cr3t' })
+  })
+
+  it('a retenção apagada não vira 0: fica fora do patch e é inválida', () => {
+    expect(retentionValue('keepDaily', '')).toBeNull()
+    expect(retentionValue('keepDaily', '0')).toBeNull()
+    expect(retentionValue('keepDaily', '1.5')).toBeNull()
+    expect(retentionValue('keepDaily', '366')).toBeNull()
+    expect(retentionValue('keepWeekly', '0')).toBe(0)
+    expect(retentionValue('keepWeekly', ' 520 ')).toBe(520)
+    expect(backupPatch(info, { ...form, keepWeekly: '' })).toEqual({})
+    expect(backupPatch(info, { ...form, keepDaily: '10' })).toEqual({ keepDaily: 10 })
   })
 
   it('formata tamanhos', () => {

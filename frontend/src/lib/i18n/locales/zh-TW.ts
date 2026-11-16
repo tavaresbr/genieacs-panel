@@ -6467,6 +6467,7 @@ const zhTW: Dictionary = {
   "integrations.backup.hourHint": "由面板執行備份時使用。",
   "integrations.backup.keepDaily": "保留的每日副本",
   "integrations.backup.keepWeekly": "保留的每週副本",
+  "integrations.backup.retentionRange": "{min} 到 {max} 之間的整數。",
   "integrations.backup.retentionHint": "保留最近每一天的最新副本，再往前每週保留一份。最新的副本永遠不會被刪除。",
   "integrations.backup.includeMedia": "包含 WhatsApp 附件",
   "integrations.backup.test": "測試連線",

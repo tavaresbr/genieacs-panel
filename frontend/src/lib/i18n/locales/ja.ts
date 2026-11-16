@@ -6466,6 +6466,7 @@ const ja: Dictionary = {
   "integrations.backup.hourHint": "パネルがバックアップを取る場合に使われます。",
   "integrations.backup.keepDaily": "保持する日次コピー数",
   "integrations.backup.keepWeekly": "保持する週次コピー数",
+  "integrations.backup.retentionRange": "{min}〜{max} の整数。",
   "integrations.backup.retentionHint": "直近の各日について最新のコピーを残し、それ以前は週に 1 つ残します。最新のコピーは削除されません。",
   "integrations.backup.includeMedia": "WhatsApp の添付ファイルを含める",
   "integrations.backup.test": "接続をテスト",

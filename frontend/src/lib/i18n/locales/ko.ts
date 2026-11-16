@@ -6473,6 +6473,7 @@ const ko: Dictionary = {
   "integrations.backup.hourHint": "패널이 백업할 때 사용됩니다.",
   "integrations.backup.keepDaily": "보관할 일별 사본",
   "integrations.backup.keepWeekly": "보관할 주별 사본",
+  "integrations.backup.retentionRange": "{min}에서 {max} 사이의 정수.",
   "integrations.backup.retentionHint": "최근 각 날짜의 최신 사본을 남기고, 그 이전은 주마다 하나씩 남깁니다. 가장 최신 사본은 삭제되지 않습니다.",
   "integrations.backup.includeMedia": "WhatsApp 첨부 파일 포함",
   "integrations.backup.test": "연결 테스트",

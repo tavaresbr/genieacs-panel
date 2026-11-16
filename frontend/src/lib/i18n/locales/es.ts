@@ -6466,6 +6466,7 @@ const es: Dictionary = {
   "integrations.backup.hourHint": "Se usa cuando la copia la hace el panel.",
   "integrations.backup.keepDaily": "Copias diarias conservadas",
   "integrations.backup.keepWeekly": "Copias semanales conservadas",
+  "integrations.backup.retentionRange": "Número entero de {min} a {max}.",
   "integrations.backup.retentionHint": "Conserva la copia más reciente de cada uno de los últimos días y, antes de ellos, una por semana. La copia más reciente nunca se borra.",
   "integrations.backup.includeMedia": "Incluir los adjuntos de WhatsApp",
   "integrations.backup.test": "Probar conexión",

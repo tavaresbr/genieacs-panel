@@ -6474,6 +6474,7 @@ const hi: Dictionary = {
   "integrations.backup.hourHint": "जब बैकअप पैनल लेता है तब लागू।",
   "integrations.backup.keepDaily": "रखी जाने वाली दैनिक कॉपी",
   "integrations.backup.keepWeekly": "रखी जाने वाली साप्ताहिक कॉपी",
+  "integrations.backup.retentionRange": "{min} से {max} तक की पूर्ण संख्या।",
   "integrations.backup.retentionHint": "हाल के हर दिन की सबसे नई कॉपी रखता है, और उनसे पहले हर हफ़्ते एक। सबसे नई कॉपी कभी नहीं हटती।",
   "integrations.backup.includeMedia": "WhatsApp अटैचमेंट शामिल करें",
   "integrations.backup.test": "कनेक्शन जाँचें",

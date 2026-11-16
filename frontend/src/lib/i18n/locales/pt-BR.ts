@@ -6466,6 +6466,7 @@ const ptBR: Dictionary = {
   "integrations.backup.hourHint": "Vale quando quem tira o backup é o painel.",
   "integrations.backup.keepDaily": "Cópias diárias mantidas",
   "integrations.backup.keepWeekly": "Cópias semanais mantidas",
+  "integrations.backup.retentionRange": "Número inteiro de {min} a {max}.",
   "integrations.backup.retentionHint": "Mantém a cópia mais nova de cada um dos dias mais recentes e, antes deles, uma por semana. A cópia mais nova nunca é apagada.",
   "integrations.backup.includeMedia": "Incluir os anexos do WhatsApp",
   "integrations.backup.test": "Testar conexão",

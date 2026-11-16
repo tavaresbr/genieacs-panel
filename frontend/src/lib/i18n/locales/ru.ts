@@ -6474,6 +6474,7 @@ const ru: Dictionary = {
   "integrations.backup.hourHint": "Используется, когда бэкап делает панель.",
   "integrations.backup.keepDaily": "Хранить ежедневных копий",
   "integrations.backup.keepWeekly": "Хранить еженедельных копий",
+  "integrations.backup.retentionRange": "Целое число от {min} до {max}.",
   "integrations.backup.retentionHint": "Хранит самую новую копию каждого из последних дней, а до них — по одной в неделю. Самая новая копия никогда не удаляется.",
   "integrations.backup.includeMedia": "Включать вложения WhatsApp",
   "integrations.backup.test": "Проверить подключение",

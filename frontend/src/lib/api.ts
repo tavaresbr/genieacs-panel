@@ -8642,7 +8642,7 @@ export interface ExternalBackupRun {
   source?: 'panel' | 'host'
   startedAt?: string
   finishedAt?: string
-  durationMs?: number
+  durationMs?: number | null
   key?: string
   bytes?: number
   sha256?: string

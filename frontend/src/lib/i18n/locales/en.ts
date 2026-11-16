@@ -6468,6 +6468,7 @@ const en = {
   "integrations.backup.hourHint": "Used when the panel takes the backup.",
   "integrations.backup.keepDaily": "Daily copies kept",
   "integrations.backup.keepWeekly": "Weekly copies kept",
+  "integrations.backup.retentionRange": "Whole number from {min} to {max}.",
   "integrations.backup.retentionHint": "Keeps the newest copy of each of the most recent days, then one per week before them. The newest copy is never deleted.",
   "integrations.backup.includeMedia": "Include WhatsApp attachments",
   "integrations.backup.test": "Test connection",

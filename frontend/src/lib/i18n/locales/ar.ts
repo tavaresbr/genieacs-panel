@@ -6475,6 +6475,7 @@ const ar: Dictionary = {
   "integrations.backup.hourHint": "يُستخدم عندما تأخذ اللوحة النسخة.",
   "integrations.backup.keepDaily": "النسخ اليومية المحفوظة",
   "integrations.backup.keepWeekly": "النسخ الأسبوعية المحفوظة",
+  "integrations.backup.retentionRange": "عدد صحيح من {min} إلى {max}.",
   "integrations.backup.retentionHint": "يحتفظ بأحدث نسخة لكل يوم من الأيام الأخيرة، ثم بنسخة واحدة لكل أسبوع قبلها. لا تُحذف أحدث نسخة أبدًا.",
   "integrations.backup.includeMedia": "تضمين مرفقات WhatsApp",
   "integrations.backup.test": "اختبار الاتصال",
