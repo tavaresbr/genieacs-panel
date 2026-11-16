@@ -944,7 +944,9 @@ class WaAlertService {
     const t = translatorFor(DEFAULT_LOCALE);
     const esperando = await WaResponseTimeService.waitingNow({
       now: new Date(now),
-      minMinutes: Math.max(1, Number(rule.threshold) || 15)
+      minMinutes: Math.max(1, Number(rule.threshold) || 15),
+      // Urgente e irritado (marca da IA, opt-in): avisa na metade do tempo.
+      urgentMinMinutes: Math.max(1, Math.floor((Number(rule.threshold) || 15) / 2))
     });
     for (const item of esperando) {
       const subject = String(item.conversationId);

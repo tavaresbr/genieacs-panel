@@ -205,14 +205,15 @@ class WaResponseTimeService {
   /**
    * Quem está esperando gente agora, há pelo menos `minMinutes`: conversas
    * abertas com mensagem do cliente nos últimos 7 dias, a espera mais antiga
-   * primeiro.
+   * primeiro. Quem a IA marcou como urgente e irritado conta a partir de
+   * `urgentMinMinutes` (por padrão, o mesmo limite).
    */
-  static async waitingNow({ now = new Date(), minMinutes = 0 } = {}) {
+  static async waitingNow({ now = new Date(), minMinutes = 0, urgentMinMinutes = minMinutes } = {}) {
     const desde = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const candidatas = await tdb('wa_conversations')
       .whereNull('closed_at')
       .where('last_inbound_at', '>=', desde)
-      .select('id', 'push_name', 'wa_phone_e164', 'contract', 'assigned_user_id');
+      .select('id', 'push_name', 'wa_phone_e164', 'contract', 'assigned_user_id', 'ai_urgency', 'ai_mood');
     const porId = new Map(candidatas.map((c) => [Number(c.id), c]));
     const itens = [];
     const ids = [...porId.keys()];
@@ -223,14 +224,17 @@ class WaResponseTimeService {
         const inicio = esperaAberta(eventos);
         if (inicio === null) continue;
         const minutos = Math.floor((now.getTime() - inicio) / 60_000);
-        if (minutos < minMinutes) continue;
         const c = porId.get(id);
+        // Quem a IA marcou como urgente e irritado entra na lista (e no alerta) mais cedo.
+        const urgente = c?.ai_urgency === 'alta' && c?.ai_mood === 'irritado';
+        if (minutos < (urgente ? Math.min(urgentMinMinutes, minMinutes) : minMinutes)) continue;
         itens.push({
           conversationId: id,
           since: new Date(inicio).toISOString(),
           minutes: minutos,
           assignedUserId: c?.assigned_user_id ? Number(c.assigned_user_id) : null,
-          contact: c?.push_name || (c?.wa_phone_e164 ? `+${c.wa_phone_e164}` : null) || c?.contract || null
+          contact: c?.push_name || (c?.wa_phone_e164 ? `+${c.wa_phone_e164}` : null) || c?.contract || null,
+          urgent: urgente
         });
       }
     }
