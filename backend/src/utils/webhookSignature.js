@@ -43,13 +43,25 @@ function parseTimestamp(value) {
   return Number.isNaN(parsed) ? null : Math.trunc(parsed / 1000);
 }
 
-function digestsFor(rawBody, secret, timestamp) {
+function digestsFor(rawBody, secret, timestamp, { timestampedOnly = false } = {}) {
   // Two conventions are accepted: the body alone, and Stripe's
   // `<timestamp>.<body>`. Which one this provider's SGP uses is unknown, and
-  // both require the shared secret, so accepting either costs nothing.
-  const payloads = [rawBody];
-  if (timestamp) payloads.push(Buffer.concat([Buffer.from(`${timestamp}.`), rawBody]));
-  return payloads.map((payload) => crypto.createHmac('sha256', secret).update(payload).digest());
+  // both require the shared secret, so accepting either costs nothing — MAS só
+  // enquanto o carimbo não é exigido.
+  //
+  // Com `requireTimestamp`, a assinatura só sobre o corpo deixa de valer. Ela
+  // não cobre o carimbo, então uma entrega capturada podia ser reenviada a
+  // qualquer momento com um `X-SGP-Timestamp` novo no cabeçalho: o carimbo
+  // passava na janela de tolerância e a assinatura antiga continuava batendo.
+  // A exigência existia no papel e não protegia de repetição nenhuma. Só a
+  // forma que amarra o carimbo à assinatura fecha isso. O carimbo entra como
+  // veio no cabeçalho (o texto cru, não o número já convertido), que é o que
+  // o remetente assinou.
+  const timestamped = timestamp ? Buffer.concat([Buffer.from(`${timestamp}.`), rawBody]) : null;
+  const payloads = timestampedOnly ? [timestamped] : [rawBody, timestamped];
+  return payloads
+    .filter(Boolean)
+    .map((payload) => crypto.createHmac('sha256', secret).update(payload).digest());
 }
 
 function candidateBuffers(signature) {
@@ -70,7 +82,8 @@ function candidateBuffers(signature) {
  * Header name, digest encoding and signed payload are all accepted in several
  * shapes because SGP's exact convention is not documented for integrators.
  * Everything accepted still requires the secret; nothing here weakens the
- * check. The reason string is for the panel's own event log — the response
+ * check. With `requireTimestamp`, only `<timestamp>.<body>` is accepted — ver
+ * `digestsFor`: sem isso o carimbo não protegia de repetição. The reason string is for the panel's own event log — the response
  * itself never says which part failed.
  */
 export function verifyWebhookSignature({
@@ -95,7 +108,7 @@ export function verifyWebhookSignature({
   const provided = candidateBuffers(signature);
   if (provided.length === 0) return { ok: false, reason: 'invalid_signature' };
 
-  const expected = digestsFor(rawBody, secret, timestampHeader);
+  const expected = digestsFor(rawBody, secret, timestampHeader, { timestampedOnly: requireTimestamp });
   for (const candidate of provided) {
     for (const digest of expected) {
       if (timingSafeCompare(candidate, digest)) return { ok: true, reason: null };

@@ -264,11 +264,19 @@ panel accepts several shapes, all of which still require the secret:
 - header `X-SGP-Signature`, `X-Signature`, `X-Hub-Signature-256` or
   `X-Webhook-Signature`, with or without a `sha256=` prefix;
 - the digest in hex or base64;
-- the signed payload being either the body alone or `<timestamp>.<body>`.
+- the signed payload being either the body alone or `<timestamp>.<body>` —
+  the latter only while *Require a signed timestamp* is off (see below).
 
 *Require a signed timestamp* is **on by default for a new integration** (one
 with no SGP configuration saved yet): a delivery without a fresh timestamp is
-refused, which closes the replay of a captured delivery. Integrations saved
+refused, and the signature must then cover `<timestamp>.<body>` — the exact
+text of the timestamp header (`X-SGP-Timestamp`, `X-Timestamp` or
+`X-Webhook-Timestamp`), a dot, then the raw body. A signature over the body
+alone is **refused** in this mode even with a fresh timestamp header: it does not
+bind the timestamp, so a captured delivery could otherwise be replayed with a
+new header. Together these close the replay of a captured delivery. If this SGP
+install signs only the body, deliveries answer `401` with
+`invalid_signature` in the log; turn the option off. Integrations saved
 before this default keep the setting they had (off unless someone turned it
 on), so nothing that already receives events stops. If this SGP install does
 not send a timestamp header, deliveries answer `401` and the panel's log shows
@@ -285,6 +293,16 @@ BODY='{"evento":"pagamento_confirmado","contrato":"4321"}'
 SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | awk '{print $2}')
 curl -X POST -H 'Content-Type: application/json' \
   -H "X-SGP-Signature: sha256=$SIG" -d "$BODY" \
+  https://panel.example.com/api/sgp/events/webhook
+```
+
+With *Require a signed timestamp* on, sign the timestamp together with the body:
+
+```bash
+TS=$(date +%s)
+SIG=$(printf '%s.%s' "$TS" "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | awk '{print $2}')
+curl -X POST -H 'Content-Type: application/json' \
+  -H "X-SGP-Timestamp: $TS" -H "X-SGP-Signature: sha256=$SIG" -d "$BODY" \
   https://panel.example.com/api/sgp/events/webhook
 ```
 
@@ -402,6 +420,6 @@ messages.
 | Invoices missing while the contract loads | The provider's SGP install restricts the `titulos` endpoint for this token |
 | Custom integration paths | Endpoint paths are stored per install and can be adjusted through `PUT /api/sgp/config` (`endpoints.customer`, `endpoints.invoices`, `endpoints.unlock`) |
 | Every webhook delivery returns 404 | Event delivery is off, or no secret has been generated |
-| Every webhook delivery returns 401 | Wrong secret, or *Require a signed timestamp* is on and SGP does not send one |
+| Every webhook delivery returns 401 | Wrong secret, or *Require a signed timestamp* is on and SGP does not send one, or signs only the body instead of `<timestamp>.<body>` |
 | Webhook returns 403 with "Origin is not allowed" | A proxy in front of the panel is adding an `Origin` header. Server-to-server calls send none; add that origin to `CORS_ORIGINS` |
 | Events arrive but nothing changes | The event's contract has no CPE linked to it yet |

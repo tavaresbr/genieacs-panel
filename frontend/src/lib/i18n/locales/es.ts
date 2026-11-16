@@ -2201,7 +2201,7 @@ const es: Dictionary = {
   'settings.sgp.events.webhookEnable': 'Aceptar eventos del SGP',
   'settings.sgp.events.webhookEnableHint': 'Mientras esté apagado, la dirección responde como si no existiera.',
   'settings.sgp.events.requireTimestamp': 'Exigir marca de tiempo firmada',
-  'settings.sgp.events.requireTimestampHint': 'Actívalo solo tras confirmar que el SGP la envía; de lo contrario se rechaza cada entrega.',
+  'settings.sgp.events.requireTimestampHint': 'Actívalo solo tras confirmar que el SGP envía la marca de tiempo en el encabezado y firma <timestamp>.<cuerpo>; entonces se rechaza la firma solo del cuerpo y toda entrega sin marca.',
   'settings.sgp.events.reconcileEnable': 'Reconciliar contratos periódicamente',
   'settings.sgp.events.reconcileEnableHint': 'Funciona aunque el SGP no envíe nada, y recupera una entrega que se perdió.',
   'settings.sgp.events.reconcileInterval': 'Intervalo (minutos)',

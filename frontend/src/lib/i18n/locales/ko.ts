@@ -2204,7 +2204,7 @@ const ko: Dictionary = {
   'settings.sgp.events.webhookEnable': 'SGP 이벤트 수신',
   'settings.sgp.events.webhookEnableHint': '꺼져 있는 동안에는 엔드포인트가 존재하지 않는 것처럼 응답합니다.',
   'settings.sgp.events.requireTimestamp': '서명된 타임스탬프 요구',
-  'settings.sgp.events.requireTimestampHint': 'SGP가 타임스탬프를 보내는 것이 확인된 뒤에만 켜십시오. 그렇지 않으면 모든 전달이 거부됩니다.',
+  'settings.sgp.events.requireTimestampHint': 'SGP가 타임스탬프를 헤더로 보내고 <timestamp>.<본문>에 서명하는 것이 확인된 뒤에만 켜십시오. 켜면 본문만 서명한 전달은 거부되며, 타임스탬프가 없는 전달도 모두 거부됩니다.',
   'settings.sgp.events.reconcileEnable': '계약을 주기적으로 대사',
   'settings.sgp.events.reconcileEnableHint': 'SGP가 아무것도 보내지 않을 때도 동작하며, 누락된 전달을 잡아냅니다.',
   'settings.sgp.events.reconcileInterval': '주기 (분)',

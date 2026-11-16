@@ -2177,7 +2177,7 @@ const ar: Dictionary = {
   'settings.sgp.events.webhookEnable': 'قبول الأحداث من SGP',
   'settings.sgp.events.webhookEnableHint': 'أثناء تعطيل هذا الخيار، تستجيب نقطة النهاية كأنها غير موجودة.',
   'settings.sgp.events.requireTimestamp': 'اشتراط طابع زمني موقّع',
-  'settings.sgp.events.requireTimestampHint': 'فعّل هذا فقط بعد التأكّد من أن SGP يرسله؛ وإلّا ستُرفض كل الرسائل.',
+  'settings.sgp.events.requireTimestampHint': 'فعّل هذا فقط بعد التأكّد من أن SGP يرسل الطابع الزمني في الترويسة ويوقّع <timestamp>.<body>؛ عندها يُرفض التوقيع على المحتوى وحده، وتُرفض كل رسالة بلا طابع زمني.',
   'settings.sgp.events.reconcileEnable': 'مطابقة العقود دوريًا',
   'settings.sgp.events.reconcileEnableHint': 'تعمل حتى عندما لا يرسل SGP شيئًا، وتلتقط أي رسالة ضاعت.',
   'settings.sgp.events.reconcileInterval': 'الفترة (بالدقائق)',

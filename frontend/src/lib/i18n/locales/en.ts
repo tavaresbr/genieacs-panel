@@ -2203,7 +2203,7 @@ const en = {
   'settings.sgp.events.webhookEnable': 'Accept events from SGP',
   'settings.sgp.events.webhookEnableHint': 'While this is off the endpoint answers as if it did not exist.',
   'settings.sgp.events.requireTimestamp': 'Require a signed timestamp',
-  'settings.sgp.events.requireTimestampHint': 'Only turn this on once SGP is confirmed to send one; otherwise every delivery is refused.',
+  'settings.sgp.events.requireTimestampHint': 'Only turn this on once SGP is confirmed to send a timestamp header and sign <timestamp>.<body> with it; a signature over the body alone is then refused, and so is every delivery without one.',
   'settings.sgp.events.reconcileEnable': 'Reconcile contracts periodically',
   'settings.sgp.events.reconcileEnableHint': 'Works even when SGP sends nothing, and catches a delivery that went missing.',
   'settings.sgp.events.reconcileInterval': 'Interval (minutes)',

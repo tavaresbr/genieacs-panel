@@ -2201,7 +2201,7 @@ const zhCN: Dictionary = {
   'settings.sgp.events.webhookEnable': '接收来自 SGP 的事件',
   'settings.sgp.events.webhookEnableHint': '关闭时，该接口会表现为不存在。',
   'settings.sgp.events.requireTimestamp': '要求带签名的时间戳',
-  'settings.sgp.events.requireTimestampHint': '请在确认 SGP 确实会发送时间戳后再启用，否则所有推送都会被拒绝。',
+  'settings.sgp.events.requireTimestampHint': '请在确认 SGP 会在请求头中发送时间戳并对 <timestamp>.<正文> 签名后再启用；启用后仅对正文的签名会被拒绝，没有时间戳的推送也会被拒绝。',
   'settings.sgp.events.reconcileEnable': '定期核对合同',
   'settings.sgp.events.reconcileEnableHint': '即使 SGP 不推送任何内容也能工作，并可补回丢失的推送。',
   'settings.sgp.events.reconcileInterval': '间隔（分钟）',

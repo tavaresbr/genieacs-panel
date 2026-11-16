@@ -2200,7 +2200,7 @@ const ja: Dictionary = {
   'settings.sgp.events.webhookEnable': 'SGP からのイベントを受け付ける',
   'settings.sgp.events.webhookEnableHint': 'これが無効の間、エンドポイントは存在しないかのように応答します。',
   'settings.sgp.events.requireTimestamp': '署名付きタイムスタンプを必須にする',
-  'settings.sgp.events.requireTimestampHint': 'SGP が送信していることを確認してから有効にしてください。そうでないとすべての配信が拒否されます。',
+  'settings.sgp.events.requireTimestampHint': 'SGP がタイムスタンプをヘッダーで送信し、<timestamp>.<本文> に署名していることを確認してから有効にしてください。有効にすると本文だけへの署名は拒否され、タイムスタンプのない配信もすべて拒否されます。',
   'settings.sgp.events.reconcileEnable': '契約を定期的に突合する',
   'settings.sgp.events.reconcileEnableHint': 'SGP が何も送信しない場合でも機能し、届かなかった配信を補完します。',
   'settings.sgp.events.reconcileInterval': '間隔 (分)',

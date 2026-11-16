@@ -2206,7 +2206,7 @@ const it: Dictionary = {
   'settings.sgp.events.webhookEnable': 'Accetta eventi da SGP',
   'settings.sgp.events.webhookEnableHint': "Finché è disattivato, l'endpoint risponde come se non esistesse.",
   'settings.sgp.events.requireTimestamp': 'Richiedi una marca temporale firmata',
-  'settings.sgp.events.requireTimestampHint': 'Attivalo solo dopo aver verificato che SGP ne invii una; altrimenti ogni consegna viene rifiutata.',
+  'settings.sgp.events.requireTimestampHint': 'Attivalo solo dopo aver verificato che SGP invii il timestamp nell\'intestazione e firmi <timestamp>.<corpo>; da quel momento la firma del solo corpo viene rifiutata, così come ogni consegna senza timestamp.',
   'settings.sgp.events.reconcileEnable': 'Riconcilia i contratti periodicamente',
   'settings.sgp.events.reconcileEnableHint': 'Funziona anche quando SGP non invia nulla, e recupera una consegna andata persa.',
   'settings.sgp.events.reconcileInterval': 'Intervallo (minuti)',

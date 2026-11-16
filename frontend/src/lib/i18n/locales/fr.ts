@@ -2201,7 +2201,7 @@ const fr: Dictionary = {
   'settings.sgp.events.webhookEnable': 'Accepter les événements de SGP',
   'settings.sgp.events.webhookEnableHint': 'Tant que cette option est désactivée, le point de terminaison répond comme s’il n’existait pas.',
   'settings.sgp.events.requireTimestamp': 'Exiger un horodatage signé',
-  'settings.sgp.events.requireTimestampHint': 'N’activez cette option qu’une fois confirmé que SGP en envoie un ; sinon, chaque livraison est refusée.',
+  'settings.sgp.events.requireTimestampHint': 'N’activez cette option qu’une fois confirmé que SGP envoie l’horodatage en en-tête et signe <timestamp>.<corps> ; la signature du seul corps est alors refusée, tout comme chaque livraison sans horodatage.',
   'settings.sgp.events.reconcileEnable': 'Rapprocher les contrats périodiquement',
   'settings.sgp.events.reconcileEnableHint': 'Fonctionne même si SGP n’envoie rien et rattrape une livraison perdue.',
   'settings.sgp.events.reconcileInterval': 'Intervalle (minutes)',

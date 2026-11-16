@@ -3680,7 +3680,7 @@ const de: Dictionary = {
   'settings.sgp.events.webhookEnable': 'Ereignisse von SGP annehmen',
   'settings.sgp.events.webhookEnableHint': 'Solange dies aus ist, antwortet der Endpunkt, als gäbe es ihn nicht.',
   'settings.sgp.events.requireTimestamp': 'Signierten Zeitstempel verlangen',
-  'settings.sgp.events.requireTimestampHint': 'Schalte dies erst ein, wenn bestätigt ist, dass SGP einen sendet; sonst wird jede Zustellung abgelehnt.',
+  'settings.sgp.events.requireTimestampHint': 'Schalte dies erst ein, wenn bestätigt ist, dass SGP einen Zeitstempel-Header sendet und <timestamp>.<body> signiert; eine Signatur nur über den Body wird dann abgelehnt, ebenso jede Zustellung ohne Zeitstempel.',
   'settings.sgp.events.reconcileEnable': 'Verträge periodisch abgleichen',
   'settings.sgp.events.reconcileEnableHint': 'Funktioniert auch, wenn SGP nichts sendet, und fängt eine verlorene Zustellung auf.',
   'settings.sgp.events.reconcileInterval': 'Intervall (Minuten)',

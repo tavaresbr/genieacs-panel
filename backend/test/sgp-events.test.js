@@ -254,6 +254,14 @@ describe('webhook delivery', () => {
     assert.equal(status, 401);
 
     const fresh = String(Math.trunc(Date.now() / 1000));
+    // A repetição que a exigência existe para barrar: a assinatura capturada
+    // cobre só o corpo, e quem reenvia põe um carimbo novo no cabeçalho.
+    const replay = await postWebhook(body, {
+      'X-SGP-Signature': sign(body),
+      'X-SGP-Timestamp': fresh
+    });
+    assert.equal(replay.status, 401, 'com o carimbo exigido, a assinatura só do corpo não pode valer');
+
     const ok = await postWebhook(body, {
       'X-SGP-Signature': sign(`${fresh}.${body}`),
       'X-SGP-Timestamp': fresh

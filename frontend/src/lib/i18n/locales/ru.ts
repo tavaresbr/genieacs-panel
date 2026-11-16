@@ -2206,7 +2206,7 @@ const ru: Dictionary = {
   'settings.sgp.events.webhookEnable': 'Принимать события из SGP',
   'settings.sgp.events.webhookEnableHint': 'Пока параметр выключен, конечная точка отвечает так, будто её не существует.',
   'settings.sgp.events.requireTimestamp': 'Требовать подписанную метку времени',
-  'settings.sgp.events.requireTimestampHint': 'Включайте только после того, как убедитесь, что SGP её отправляет; иначе все сообщения будут отклонены.',
+  'settings.sgp.events.requireTimestampHint': 'Включайте только после того, как убедитесь, что SGP отправляет метку времени в заголовке и подписывает <timestamp>.<тело>; подпись только тела тогда отклоняется, как и любое сообщение без метки.',
   'settings.sgp.events.reconcileEnable': 'Периодически сверять договоры',
   'settings.sgp.events.reconcileEnableHint': 'Работает, даже когда SGP ничего не отправляет, и выявляет потерянные сообщения.',
   'settings.sgp.events.reconcileInterval': 'Интервал (минуты)',

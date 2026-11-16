@@ -2177,7 +2177,7 @@ const hi: Dictionary = {
   'settings.sgp.events.webhookEnableHint': 'यह बंद रहने पर एंडपॉइंट ऐसे उत्तर देता है मानो वह मौजूद ही न हो।',
   'settings.sgp.events.requireTimestamp': 'हस्ताक्षरित समय-चिह्न अनिवार्य करें',
 
-  'settings.sgp.events.requireTimestampHint': 'यह तभी चालू करें जब पुष्टि हो जाए कि SGP इसे भेजता है; अन्यथा हर संदेश अस्वीकार हो जाएगा।',
+  'settings.sgp.events.requireTimestampHint': 'यह तभी चालू करें जब पुष्टि हो जाए कि SGP हेडर में टाइमस्टैम्प भेजता है और <timestamp>.<body> पर हस्ताक्षर करता है; तब केवल body पर हस्ताक्षर अस्वीकार होगा, और बिना टाइमस्टैम्प का हर संदेश भी।',
   'settings.sgp.events.reconcileEnable': 'अनुबंधों का समय-समय पर मिलान करें',
   'settings.sgp.events.reconcileEnableHint': 'यह तब भी काम करता है जब SGP कुछ न भेजे, और खो गए संदेश को पकड़ लेता है।',
   'settings.sgp.events.reconcileInterval': 'अंतराल (मिनट)',

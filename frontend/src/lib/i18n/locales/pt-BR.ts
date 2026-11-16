@@ -2201,7 +2201,7 @@ const ptBR: Dictionary = {
   'settings.sgp.events.webhookEnable': 'Aceitar eventos do SGP',
   'settings.sgp.events.webhookEnableHint': 'Enquanto estiver desligado, o endereço responde como se não existisse.',
   'settings.sgp.events.requireTimestamp': 'Exigir carimbo de tempo assinado',
-  'settings.sgp.events.requireTimestampHint': 'Só ligue depois de confirmar que o SGP envia um; senão toda entrega é recusada.',
+  'settings.sgp.events.requireTimestampHint': 'Só ligue depois de confirmar que o SGP envia o carimbo no cabeçalho e assina <timestamp>.<corpo>; com isto ligado, a assinatura só do corpo é recusada, e toda entrega sem carimbo também.',
   'settings.sgp.events.reconcileEnable': 'Reconciliar contratos periodicamente',
   'settings.sgp.events.reconcileEnableHint': 'Funciona mesmo que o SGP não envie nada, e recupera uma entrega que se perdeu.',
   'settings.sgp.events.reconcileInterval': 'Intervalo (minutos)',
