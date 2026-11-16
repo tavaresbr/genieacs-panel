@@ -9,6 +9,7 @@ import { WaError } from './whatsappConfigService.js';
 import { tdb, tinsert, tinsertReturningId } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { conditionKey } from './alertConditionKey.js';
 
 const t = (chave, vars) => translate(DEFAULT_LOCALE, chave, vars);
 
@@ -84,7 +85,7 @@ class OutageIncidentService {
     }
 
     for (const [nodeId, row] of abertoPorNo) {
-      if (ativos.has(nodeId) || unknown?.has(`mass_outage:${nodeId}`)) continue;
+      if (ativos.has(nodeId) || unknown?.has(conditionKey('mass_outage', nodeId))) continue;
       await this.resolver(row.id);
     }
   }

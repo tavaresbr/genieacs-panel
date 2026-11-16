@@ -27,6 +27,7 @@ import AddonService from './addonService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TELEGRAM_CHAT_PATTERN, TELEGRAM_TOKEN_PATTERN, sendTelegramMessage } from './telegramClient.js';
 import { detectOutages, mapsLink } from './outageDetector.js';
+import { conditionKey } from './alertConditionKey.js';
 import PushService from './pushService.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
@@ -221,10 +222,6 @@ function clamp(value, min, max, fallback) {
   return Math.min(Math.max(number, min), max);
 }
 
-// The separator is escaped, not typed. A literal NUL in the source makes git
-// treat this file as BINARY: it then refuses to merge it and silently keeps
-// one side, which is how a merge quietly drops the other side's changes.
-const conditionKey = (rule, subject) => `${rule}\u0000${subject}`;
 
 /**
  * Technical alerts: telling the provider's own team, over WhatsApp, when the
