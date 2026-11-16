@@ -85,6 +85,12 @@ class AsaasInvoiceService {
     const credential = this.credentialFor(config);
     try {
       const live = await getCharge(invoice.id, credential);
+      // Removida no Asaas (o webhook PAYMENT_DELETED se perdeu): a leitura
+      // ainda responde, com o status de antes — que pode ser "em aberto".
+      if (live.deleted) {
+        await AsaasCharge.markDeleted(invoice.id);
+        return null;
+      }
       if (live.status && !OPEN_STATUSES.includes(live.status)) {
         await AsaasCharge.applyStatus(invoice.id, { status: live.status, paymentDate: live.paidOn, dueDate: live.dueDate });
         return null;

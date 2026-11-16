@@ -137,8 +137,8 @@ class AsaasImportService {
     try {
       if (config.importCustomers) await this.importCustomers(credential, startedAt, summary);
       if (config.importCharges) {
-        const seen = await this.importCharges(credential, startedAt, summary);
-        await this.reconcile(credential, seen, summary);
+        const { seen, contested } = await this.importCharges(credential, startedAt, summary);
+        await this.reconcile(credential, seen, summary, contested);
       }
     } catch (error) {
       // O que já foi gravado fica gravado — e é dito: uma passada que morre na
@@ -173,9 +173,22 @@ class AsaasImportService {
     summary.reason = 'ceiling';
   }
 
-  /** Devolve os ids do gateway vistos nesta passada: é contra eles que `reconcile` confere o que sumiu. */
+  /**
+   * Devolve os ids do gateway vistos nesta passada (`seen`): é contra eles que
+   * `reconcile` confere o que sumiu. E as linhas da página que NÃO foram
+   * gravadas (`contested`): a página diz "em aberto" de uma cobrança que o
+   * painel já tem como fechada.
+   *
+   * Isso acontece quando o webhook chega durante a passada — a página foi lida
+   * antes do pagamento, a entrega depois — e gravar a página por cima rebaixaria
+   * o status mais novo para o velho, deixando o bot cobrar quem já pagou. Mas
+   * também pode ser a cobrança reaberta de verdade (restaurada, baixa desfeita)
+   * com o webhook perdido. A página sozinha não distingue os dois casos; quem
+   * decide é a leitura uma a uma em `reconcile`.
+   */
   static async importCharges(credential, startedAt, summary) {
     const seen = new Set();
+    const contested = [];
     // O CPF/CNPJ de cada cliente, lido do banco uma vez por cliente e guardado.
     const documents = new Map();
     const documentOf = async (customerId) => {
@@ -197,9 +210,15 @@ class AsaasImportService {
         for (const row of rows) {
           const document = await documentOf(row.customerId);
           if (!document) summary.charges.withoutCustomer += 1;
-          const outcome = await AsaasCharge.upsertFromAsaas(row, { document, seenAt: startedAt });
           seen.add(row.id);
           summary.charges.total += 1;
+          const existing = await AsaasCharge.getByAsaasId(row.id);
+          const fechada = existing && (existing.deleted || !OPEN_STATUSES.includes(existing.status));
+          if (fechada && OPEN_STATUSES.includes(row.status) && !row.deleted) {
+            contested.push({ row, document });
+            continue;
+          }
+          const outcome = await AsaasCharge.upsertFromAsaas(row, { document, seenAt: startedAt });
           summary.charges[outcome] += 1;
         }
         if (!hasMore || rows.length === 0) break;
@@ -209,7 +228,7 @@ class AsaasImportService {
         }
       }
     }
-    return seen;
+    return { seen, contested };
   }
 
   /**
@@ -221,7 +240,28 @@ class AsaasImportService {
    * segundos e arredonda, então duas passadas no mesmo segundo se confundiam —
    * a que acabou de ser vista parecia velha e a velha parecia recém-vista.
    */
-  static async reconcile(credential, seen, summary) {
+  static async reconcile(credential, seen, summary, contested = []) {
+    // As contestadas (ver `importCharges`) não dependem da passada estar
+    // completa: cada uma foi vista, e a dúvida é só qual status vale.
+    for (const { row, document } of contested.slice(0, RECONCILE_LIMIT)) {
+      await sleep(this.PAGE_PACE_MS);
+      try {
+        const current = await getCharge(row.id, credential);
+        if (current.deleted) {
+          await AsaasCharge.markDeleted(row.id);
+        } else if (OPEN_STATUSES.includes(current.status)) {
+          // Reaberta de verdade: a página estava certa, e a linha volta inteira.
+          await AsaasCharge.upsertFromAsaas({ ...row, status: current.status }, { document, seenAt: new Date() });
+        } else {
+          await AsaasCharge.applyStatus(row.id, { status: current.status, paymentDate: current.paidOn, dueDate: current.dueDate });
+        }
+        summary.charges.reconciled += 1;
+      } catch (error) {
+        if (error instanceof AsaasError && error.code === 'unauthorized') throw error;
+        // Na dúvida fica o que o painel já tinha (fechada): a próxima passada tenta de novo.
+      }
+    }
+
     if (summary.partial) return;
     const stale = (await AsaasCharge.listOpen())
       .filter((charge) => !seen.has(charge.asaas_id))
@@ -230,6 +270,13 @@ class AsaasImportService {
       await sleep(this.PAGE_PACE_MS);
       try {
         const current = await getCharge(charge.asaas_id, credential);
+        // Removida no Asaas: a leitura responde 200 com `deleted: true` (e o
+        // status de antes), não 404 — e aplicar esse status a deixaria aberta.
+        if (current.deleted) {
+          await AsaasCharge.markDeleted(charge.asaas_id);
+          summary.charges.gone += 1;
+          continue;
+        }
         await AsaasCharge.applyStatus(charge.asaas_id, {
           status: current.status,
           paymentDate: current.paidOn,

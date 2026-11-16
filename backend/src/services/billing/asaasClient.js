@@ -477,7 +477,7 @@ export async function receiveInCash(chargeId, { paymentDate, value }, credencial
  * leitura a baixa ficaria respondendo 502 para sempre, empurrando quem opera
  * para o pagamento avulso, que o webhook reentregue depois creditaria de novo.
  *
- * @returns {Promise<{ id: string, status: string|null, valueCents: number|null }>}
+ * @returns {Promise<{ id: string, status: string|null, deleted: boolean, valueCents: number|null }>}
  */
 export async function getCharge(chargeId, credencial = null) {
   const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { method: 'GET', credencial });
@@ -485,6 +485,11 @@ export async function getCharge(chargeId, credencial = null) {
   return {
     id: String(resposta?.id ?? chargeId),
     status: resposta?.status ? String(resposta.status) : null,
+    // A cobrança removida NÃO some da leitura: o Asaas responde 200 com
+    // `deleted: true` (e o status de antes, muitas vezes ainda PENDING) — é
+    // assim que ela pode ser restaurada. Só o 404 não basta para dizer "foi
+    // apagada"; quem lê confere este campo antes do status.
+    deleted: resposta?.deleted === true,
     // Arredondado sobre o produto, pelo motivo de `paraCentavos` no provider.
     valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null,
     // O dia do pagamento, quando já foi pago — o desconto por antecipação é
