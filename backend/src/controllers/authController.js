@@ -309,6 +309,39 @@ async function responderEmailJaCadastrado({ req, res, slug, name, email, passwor
   }));
 }
 
+/**
+ * Uma resposta do cadastro já decidida fora do fluxo principal. As conferências
+ * do login (nome com `@`, nome tomado, e-mail tomado) lançam isto com a
+ * resposta pronta, e `signup` só responde: o fluxo que cria o provedor fica
+ * sem `if` sobre o que o cliente digitou guardando a criação.
+ */
+class RespostaDoCadastro extends Error {
+  constructor(responder) {
+    super('signup answered early');
+    this.responder = responder;
+  }
+}
+
+/** Nome com `@`: recusa de formato, igual para todo mundo (ver `signup`). */
+function recusarNomeComArroba(username) {
+  if (!String(username).includes('@')) return;
+  throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t('auth.signupUsernameAt'))));
+}
+
+/**
+ * O login contra o espaço de nomes inteiro: nome tomado é 409 (a pessoa tem
+ * que trocar), e-mail tomado responde como cadastro feito e avisa o dono.
+ * O nome vem antes, para que um 409 nunca dependa do e-mail.
+ */
+async function recusarLoginTomado({ username, email, slug, name, password }) {
+  if (await User.loginConflict({ username })) {
+    throw new RespostaDoCadastro((req, res) => res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken'))));
+  }
+  if (await User.loginConflict({ email })) {
+    throw new RespostaDoCadastro((req, res) => responderEmailJaCadastrado({ req, res, slug, name, email, password }));
+  }
+}
+
 class AuthController {
   /**
    * `POST /api/auth/signup` — um ISP se cadastra sozinho. Só na edição SaaS,
@@ -357,9 +390,7 @@ class AuthController {
       // tomado diria que aquele endereço tem conta — a mesma pergunta que a
       // resposta do e-mail tomado deixou de responder. Sem `@`, o nome nunca
       // casa com um endereço, e a recusa é de formato, igual para todo mundo.
-      if (username.includes('@')) {
-        return res.status(400).json(createErrorResponse(req.t('auth.signupUsernameAt')));
-      }
+      recusarNomeComArroba(username);
       // A regra da senha nova (10+, fora das comuns, diferente do login); ver
       // `utils/passwordPolicy.js`. O tamanho mantém a frase de antes.
       const senhaRuim = newPasswordProblem(password, { username, email }, { lengthKey: 'auth.signupInvalid' });
@@ -407,12 +438,7 @@ class AuthController {
       if (await Tenant.findBySlug(slug)) {
         return res.status(409).json(createErrorResponse(req.t('auth.signupSlugTaken')));
       }
-      if (await User.loginConflict({ username })) {
-        return res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken')));
-      }
-      if (await User.loginConflict({ email })) {
-        return responderEmailJaCadastrado({ req, res, slug, name, email, password });
-      }
+      await recusarLoginTomado({ username, email, slug, name, password });
 
       let tenantId;
       let userId;
@@ -469,14 +495,9 @@ class AuthController {
         if (await Tenant.findBySlug(slug)) {
           return res.status(409).json(createErrorResponse(req.t('auth.signupSlugTaken')));
         }
-        if (await User.loginConflict({ username })) {
-          return res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken')));
-        }
-        // O e-mail que outro cadastro tomou no meio do caminho: a mesma
-        // resposta de quando já estava tomado, pelo mesmo motivo.
-        if (await User.loginConflict({ email })) {
-          return responderEmailJaCadastrado({ req, res, slug, name, email, password });
-        }
+        // O nome ou o e-mail que outro cadastro tomou no meio do caminho: a
+        // mesma resposta de quando já estava tomado, pelo mesmo motivo.
+        await recusarLoginTomado({ username, email, slug, name, password });
         throw error;
       }
 
@@ -565,6 +586,7 @@ class AuthController {
         emailed: provado
       }));
     } catch (error) {
+      if (error instanceof RespostaDoCadastro) return await error.responder(req, res);
       console.error('Signup error:', error);
       return res.status(500).json(createErrorResponse(req.t('auth.signupFailed'), error.message));
     }
