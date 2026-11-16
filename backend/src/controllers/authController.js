@@ -69,8 +69,10 @@ async function enviarBilhete({ req, purpose, userId, tenantId, email, rota, assu
     // vira oráculo —, nenhuma mensagem sai, e não há onde ler o porquê. Num
     // deploy de host único o endereço do painel não se deduz de subdomínio
     // nenhum, e `PUBLIC_BASE_URL` é a única fonte que resta.
+    // Sem o propósito no texto: o CodeQL lê o nome dele (redefinição de senha)
+    // como dado sensível. O provedor basta para achar a configuração faltando.
     console.warn(
-      `Cannot send ${purpose} ticket: no panel URL for tenant ${tenantId}. ` +
+      `Cannot send auth ticket: no panel URL for tenant ${tenantId}. ` +
       'Set PUBLIC_BASE_URL (deployments without TENANT_BASE_DOMAIN) or TENANT_BASE_DOMAIN.'
     );
     return false;
