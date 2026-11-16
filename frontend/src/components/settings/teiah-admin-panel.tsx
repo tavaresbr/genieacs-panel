@@ -68,10 +68,14 @@ export function TeiahAdminPanel() {
     })
   }, [])
 
-  const load = useCallback(async () => {
+  /* `keepForm`: depois de uma reconsulta só o gasto e a lista mudam — reaplicar
+     tudo jogaria fora o limite e os preços que o admin estava editando. */
+  const load = useCallback(async ({ keepForm = false }: { keepForm?: boolean } = {}) => {
     const [current, list] = await Promise.all([teiahAPI.getGuards(), teiahAPI.worsened()])
-    if (current.success && current.data) apply(current.data)
-    else setError(current.message || t('settings.teiah.admin.loadFailed'))
+    if (current.success && current.data) {
+      if (keepForm) setUsage(current.data.usage)
+      else apply(current.data)
+    } else setError(current.message || t('settings.teiah.admin.loadFailed'))
     if (list.success && list.data) setWorsened(list.data.items)
   }, [apply, t])
 
@@ -96,6 +100,9 @@ export function TeiahAdminPanel() {
         return
       }
       apply(res.data)
+      // A prévia foi calculada com o limite e os preços antigos (custo e aviso
+      // de "passa do limite"): descartada, o admin pede outra.
+      setPreview(null)
       toast.success(t('settings.teiah.admin.saved'))
     } finally {
       setSaving(false)
@@ -135,7 +142,7 @@ export function TeiahAdminPanel() {
       }
       setResult(res.data)
       setPreview(null)
-      await load()
+      await load({ keepForm: true })
     } finally {
       setRunning(false)
     }
