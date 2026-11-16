@@ -37,6 +37,12 @@ function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
+/** O instante da leitura em ms: o banco devolve Date, texto ou número conforme o dialeto. */
+function syncedAtKey(value) {
+  const ms = value ? new Date(value).getTime() : Number.NaN;
+  return Number.isFinite(ms) ? String(ms) : '';
+}
+
 class SgpEventService {
   /**
    * Stores an inbound webhook. The dedupe key prefers an id from the payload
@@ -254,9 +260,12 @@ class SgpEventService {
         const { created, event } = await this.store({
           source: 'reconcile',
           // A transition seen twice produces the same key, so a repeated pass
-          // never duplicates the event.
+          // never duplicates the event. A leitura anterior (`last_synced_at`
+          // do `before`) entra na chave: sem ela, bloqueado → desbloqueado →
+          // bloqueado de novo dava a mesma chave do primeiro bloqueio e o
+          // segundo era engolido pelo `insertIfNew`.
           dedupeKey: `reconcile:${after.contract}:${transition}:${sha256(
-            `${SgpService.linkState(after)}|${after.status_label ?? ''}|${after.plan ?? ''}`
+            `${SgpService.linkState(after)}|${after.status_label ?? ''}|${after.plan ?? ''}|${syncedAtKey(before.last_synced_at)}`
           ).slice(0, 24)}`,
           type: transition,
           rawType: after.status_label ?? after.status ?? null,

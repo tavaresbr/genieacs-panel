@@ -354,6 +354,19 @@ describe('reconciliation', () => {
     assert.equal(events.length, 1);
   });
 
+  it('bloqueado, desbloqueado e bloqueado de novo: o segundo bloqueio também vira evento', async () => {
+    contractState.blocked = false;
+    contractState.statusDisplay = 'Ativo';
+    await call(`${panelUrl}/api/sgp/reconcile`, { method: 'POST', headers: authHeaders(token) });
+    assert.equal((await getDb()('sgp_events').where({ source: 'reconcile', type: 'unblocked' })).length, 1);
+
+    contractState.blocked = true;
+    contractState.statusDisplay = 'Bloqueado';
+    await call(`${panelUrl}/api/sgp/reconcile`, { method: 'POST', headers: authHeaders(token) });
+    const events = await getDb()('sgp_events').where({ source: 'reconcile', type: 'blocked' });
+    assert.equal(events.length, 2);
+  });
+
   it('requires an administrator', async () => {
     const { status } = await call(`${panelUrl}/api/sgp/reconcile`, { method: 'POST' });
     assert.equal(status, 401);
