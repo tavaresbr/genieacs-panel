@@ -1251,6 +1251,9 @@ export default function DeviceDetailPage() {
         toast.warning(summonDeferredMessage(res.data, t, formatDateTime, res.message || t('devices.summon.success')))
       } else if (res.success) {
         toast.success(res.message || t('devices.summon.success'))
+        // O aparelho acabou de informar: relê para a tela mostrar o que ele
+        // mandou agora, e não os valores de antes do clique.
+        void fetchDeviceDetails(true)
       } else {
         toast.error(res.message || t('devices.summon.failed'))
       }
