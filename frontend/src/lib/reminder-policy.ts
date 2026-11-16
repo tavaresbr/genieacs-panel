@@ -1,4 +1,5 @@
 import type { ReminderChannel, ReminderPolicy, ReminderStep, ReminderStepKind } from '@/lib/api'
+import { todayIn } from '@/lib/wa-billing-status'
 
 /**
  * A régua de cobrança (0121) do lado da tela: as mesmas regras de
@@ -94,7 +95,7 @@ export function newStep(steps: ReminderStep[], now: number = Date.now()): Remind
 }
 
 /** Ordenados pelo dia, como o servidor grava (estável). */
-export function sortSteps(steps: ReminderStep[]): ReminderStep[] {
+export function sortSteps<T extends ReminderStep>(steps: T[]): T[] {
   return steps.map((s, i) => [s, i] as const)
     .sort((a, b) => a[0].offsetDays - b[0].offsetDays || a[1] - b[1])
     .map(([s]) => s)
@@ -123,7 +124,9 @@ export function sampleValues(offsetDays: number, now: Date = new Date()): Record
   return {
     empresa: 'Provedor Exemplo',
     valor: 'R$ 199,90',
-    vencimento: prazo.toISOString().slice(0, 10),
+    // O dia no calendário de São Paulo, não o UTC: depois das 21h o UTC já
+    // virou o dia e a prévia mostraria o vencimento um dia depois.
+    vencimento: todayIn(prazo),
     link: 'https://painel.exemplo.com/fatura',
     plano: 'Pro'
   }
