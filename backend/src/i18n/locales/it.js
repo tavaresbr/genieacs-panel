@@ -59,6 +59,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Nuovi codici di recupero generati; i vecchi non valgono più',
   'auth.mfaEnrollmentRequired': 'Questo provider richiede l\'accesso in due passaggi. Attivalo per continuare',
   'auth.mfaRequiredByProvider': 'Un provider per cui lavori richiede l\'accesso in due passaggi; non può essere disattivato',
+  'auth.platformMfaEnrollmentRequired': 'La piattaforma richiede l\'accesso in due passaggi ai suoi amministratori. Attivalo per continuare',
+  'auth.mfaRequiredByPlatform': 'La piattaforma richiede l\'accesso in due passaggi ai suoi amministratori; non può essere disattivato',
   'auth.passwordUpdated': 'Password aggiornata correttamente',
 
   // Limite di richieste
@@ -283,6 +285,7 @@ export default {
   'vendor.listFailed': 'Non è stato possibile ottenere i produttori',
   'vendor.idRequired': 'L’ID del produttore è obbligatorio',
   'vendor.notFound': 'Produttore non trovato',
+  'vendor.platformAdminOnly': 'Solo un amministratore della piattaforma può modificare il catalogo predefinito ereditato da tutti i provider',
   'vendor.retrieved': 'Produttore ottenuto correttamente',
   'vendor.getFailed': 'Non è stato possibile ottenere il produttore',
   'vendor.fieldsRequired': 'Il nome, manufacturer_patterns e product_patterns sono obbligatori',
@@ -1140,6 +1143,9 @@ export default {
   'auth.signupInvalid': 'Nome del provider, utente (3–64) e password (10–128) sono obbligatori',
   'auth.signupSlugTaken': 'Questo sottodominio è già in uso',
   'auth.signupUsernameTaken': 'Questo nome utente è già in uso',
+  'auth.signupUsernameAt': 'Il nome utente non può contenere @ — l\'e-mail va nel suo campo',
+  'auth.signupExistingMailSubject': 'Tentativo di registrazione con la tua e-mail su {product}',
+  'auth.signupExistingMailBody': 'Qualcuno ha provato a creare un account su {product} con questo indirizzo e-mail, che ha già un account.\n\nSe sei stato tu, accedi dall\'indirizzo del pannello del tuo provider oppure usa "Password dimenticata" nella schermata di accesso per reimpostarla.\n\nSe non sei stato tu, ignora questo messaggio: non è stato creato nessun nuovo account e il tuo non è cambiato.',
   'auth.signupPhoneInvalid': 'Inserisci un numero WhatsApp con prefisso',
   'auth.signupWelcomeWhatsapp': 'Benvenuto in {product}, {provider}! 🎉\n\nIl tuo pannello è pronto: {link}\nUtente: {username}\n\nLa tua prova è iniziata. Rispondi a questo messaggio se ti serve aiuto con la configurazione.',
   'auth.signupTeamSubject': 'Nuovo provider registrato: {provider}',

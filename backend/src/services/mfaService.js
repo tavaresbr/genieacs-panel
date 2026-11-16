@@ -6,6 +6,8 @@ import { generateTotpSecret, totpUri, verifyTotp } from '../utils/totp.js';
 import { TranslatableError } from '../i18n/index.js';
 import TenantUser from '../models/TenantUser.js';
 import { mfaRequired } from '../models/Tenant.js';
+import PlatformAdmin from '../models/PlatformAdmin.js';
+import { platformRequiresMfa } from '../config/platformMfa.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 
 /**
@@ -238,6 +240,13 @@ class MfaService {
     const vinculos = await TenantUser.listForUserWithTenant(userId);
     if (vinculos.some((vinculo) => mfaRequired(vinculo))) {
       throw recusa('auth.mfaRequiredByProvider', 'mfa_required_by_provider', 409);
+    }
+    // A mesma regra para a plataforma que exige o 2FA de quem a opera
+    // (`PLATFORM_REQUIRE_MFA`). Vale de qualquer sessão da pessoa, inclusive a
+    // do painel de um provedor: o segundo fator é da conta, e desligá-lo lá
+    // deixaria o console, na próxima entrada, só com a senha até a ativação.
+    if (platformRequiresMfa() && await PlatformAdmin.has(userId)) {
+      throw recusa('auth.mfaRequiredByPlatform', 'mfa_required_by_platform', 409);
     }
     await this.confirmIdentity(user, password, code);
     await getDb().transaction(async (trx) => {

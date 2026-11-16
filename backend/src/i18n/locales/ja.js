@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': '新しい復旧コードを生成しました。古いコードは使えません',
   'auth.mfaEnrollmentRequired': 'このプロバイダーでは2段階ログインが必須です。続行するには有効にしてください',
   'auth.mfaRequiredByProvider': '所属するプロバイダーが2段階ログインを必須にしているため、無効にできません',
+  'auth.platformMfaEnrollmentRequired': 'プラットフォームは管理者に2段階ログインを必須にしています。続行するには有効にしてください',
+  'auth.mfaRequiredByPlatform': 'プラットフォームは管理者に2段階ログインを必須にしているため、無効にできません',
   'auth.passwordUpdated': 'パスワードを更新しました',
 
   // レート制限
@@ -284,6 +286,7 @@ export default {
   'vendor.listFailed': 'ベンダーを取得できませんでした',
   'vendor.idRequired': 'ベンダー ID が必要です',
   'vendor.notFound': 'ベンダーが見つかりません',
+  'vendor.platformAdminOnly': 'すべてのプロバイダーが引き継ぐ既定のカタログを変更できるのはプラットフォーム管理者だけです',
   'vendor.retrieved': 'ベンダーを取得しました',
   'vendor.getFailed': 'ベンダーを取得できませんでした',
   'vendor.fieldsRequired': 'name、manufacturer_patterns、product_patterns が必要です',
@@ -1142,6 +1145,9 @@ export default {
   'auth.signupInvalid': 'プロバイダー名、ユーザー名（3〜64文字）、パスワード（10〜128文字）が必要です',
   'auth.signupSlugTaken': 'このサブドメインは既に使用されています',
   'auth.signupUsernameTaken': 'このユーザー名は既に使用されています',
+  'auth.signupUsernameAt': 'ユーザー名に @ は使えません — メールアドレスは専用の欄に入力してください',
+  'auth.signupExistingMailSubject': '{product} であなたのメールアドレスによる登録が試みられました',
+  'auth.signupExistingMailBody': '誰かがこのメールアドレスで {product} のアカウントを作成しようとしましたが、このアドレスにはすでにアカウントがあります。\n\nご本人の場合は、ご利用のプロバイダーのパネルのアドレスからログインするか、ログイン画面の「パスワードをお忘れですか」からパスワードを再設定してください。\n\n心当たりがない場合は、このメッセージを無視してください。新しいアカウントは作成されておらず、お使いのアカウントも変更されていません。',
   'auth.signupPhoneInvalid': '市外局番付きの WhatsApp 番号を入力してください',
   'auth.signupWelcomeWhatsapp': '{product} へようこそ、{provider} さん！🎉\n\nパネルの準備ができました: {link}\nユーザー: {username}\n\nトライアルが始まりました。設定でお困りの際はこのメッセージに返信してください。',
   'auth.signupTeamSubject': '新しいプロバイダーが登録されました: {provider}',

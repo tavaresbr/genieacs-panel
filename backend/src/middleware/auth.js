@@ -10,6 +10,7 @@ import { roleHas } from '../config/permissions.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
 import { hostMatchesTenant, usesTenantSubdomains } from './tenantResolver.js';
 import { canHoldSession } from '../config/login.js';
+import { platformRequiresMfa } from '../config/platformMfa.js';
 import RefreshToken from '../models/RefreshToken.js';
 
 // Quinze minutos (era uma hora): o token de acesso passou a morar só na
@@ -436,7 +437,9 @@ function mfaEnrollmentRefusal(req, session) {
   return {
     success: false,
     code: 'mfa_enrollment_required',
-    message: req.t('auth.mfaEnrollmentRequired')
+    // O mesmo `code` nas duas exigências — a tela reage igual —, mas a frase
+    // diz quem exige: no console não há provedor para culpar.
+    message: req.t(session.platform ? 'auth.platformMfaEnrollmentRequired' : 'auth.mfaEnrollmentRequired')
   };
 }
 
@@ -468,7 +471,15 @@ async function hydrateConsole(user, decoded) {
     tenantId: null,
     platform: true,
     tokenVersion: Number(user.token_version || 0),
-    sessionId: typeof decoded?.sid === 'string' ? decoded.sid : null
+    sessionId: typeof decoded?.sid === 'string' ? decoded.sid : null,
+    // A plataforma exige o 2FA de quem a opera (`PLATFORM_REQUIRE_MFA`) e esta
+    // pessoa ainda não ativou. Mesma ativação obrigatória do provedor com
+    // `require_mfa`, e lida do mesmo jeito: a cada requisição, da linha da
+    // pessoa, e não do token — quem ativa sai dela na chamada seguinte, e quem
+    // teve o 2FA zerado volta para ela na chamada seguinte também. A
+    // personificação não passa por aqui: ela é aberta DO console, que esta
+    // exigência já guarda.
+    mfaEnrollmentRequired: platformRequiresMfa() && !user.totp_enabled_at
   };
 }
 

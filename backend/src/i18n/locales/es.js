@@ -59,6 +59,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Se generaron nuevos códigos de recuperación; los anteriores ya no sirven',
   'auth.mfaEnrollmentRequired': 'Este proveedor exige el inicio de sesión en dos pasos. Actívelo para continuar',
   'auth.mfaRequiredByProvider': 'Un proveedor en el que trabaja exige el inicio de sesión en dos pasos; no se puede desactivar',
+  'auth.platformMfaEnrollmentRequired': 'La plataforma exige el inicio de sesión en dos pasos a sus administradores. Actívelo para continuar',
+  'auth.mfaRequiredByPlatform': 'La plataforma exige el inicio de sesión en dos pasos a sus administradores; no se puede desactivar',
   'auth.passwordUpdated': 'Contraseña actualizada correctamente',
 
   // Límite de solicitudes
@@ -282,6 +284,7 @@ export default {
   'vendor.listFailed': 'No se pudieron obtener los fabricantes',
   'vendor.idRequired': 'El ID del fabricante es obligatorio',
   'vendor.notFound': 'Fabricante no encontrado',
+  'vendor.platformAdminOnly': 'Solo un administrador de la plataforma puede cambiar el catálogo predeterminado que heredan todos los proveedores',
   'vendor.retrieved': 'Fabricante obtenido correctamente',
   'vendor.getFailed': 'No se pudo obtener el fabricante',
   'vendor.fieldsRequired': 'El nombre, manufacturer_patterns y product_patterns son obligatorios',
@@ -1139,6 +1142,9 @@ export default {
   'auth.signupInvalid': 'Se requieren nombre del proveedor, usuario (3–64) y contraseña (10–128)',
   'auth.signupSlugTaken': 'Este subdominio ya está en uso',
   'auth.signupUsernameTaken': 'Este nombre de usuario ya está en uso',
+  'auth.signupUsernameAt': 'El nombre de usuario no puede contener @ — el correo va en su propio campo',
+  'auth.signupExistingMailSubject': 'Intento de registro con su correo en {product}',
+  'auth.signupExistingMailBody': 'Alguien intentó crear una cuenta en {product} con esta dirección de correo, que ya tiene una cuenta.\n\nSi fue usted, inicie sesión en la dirección del panel de su proveedor o use "Olvidé mi contraseña" en la pantalla de inicio de sesión para restablecerla.\n\nSi no fue usted, ignore este mensaje: no se creó ninguna cuenta nueva y la suya no cambió.',
   'auth.signupPhoneInvalid': 'Introduce un WhatsApp con código de área',
   'auth.signupWelcomeWhatsapp': '¡Bienvenido a {product}, {provider}! 🎉\n\nTu panel está listo: {link}\nUsuario: {username}\n\nTu periodo de prueba ya comenzó. Responde a este mensaje si necesitas ayuda con la configuración.',
   'auth.signupTeamSubject': 'Nuevo proveedor registrado: {provider}',

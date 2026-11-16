@@ -7,6 +7,7 @@ import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../conf
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
 import { developmentFallbackAllowed } from '../config/runtimeEnv.js';
+import { platformRequiresMfa } from '../config/platformMfa.js';
 import { CONSOLE_AUDIENCE, PANEL_AUDIENCE, decodeOwnSessionToken, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
 import RefreshToken, { describeUserAgent } from '../models/RefreshToken.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from '../middleware/sessionCookie.js';
@@ -219,6 +220,9 @@ async function respostaDoConsole(req, res, user) {
         tenantId: null,
         platform: true,
         isPlatformAdmin: true,
+        // A plataforma exige o 2FA e esta pessoa ainda não ativou: a tela vai
+        // direto para a ativação, como no login do provedor que o exige.
+        mfaEnrollmentRequired: !mfaEnabled(user) && platformRequiresMfa(),
         createdAt: user.created_at,
         updatedAt: user.updated_at
       },
@@ -249,6 +253,164 @@ function setupClosedWithoutToken() {
   return IS_SAAS && !process.env.SETUP_TOKEN && !developmentFallbackAllowed();
 }
 
+/**
+ * O cadastro público quando o E-MAIL já tem conta: responde como um cadastro
+ * que deu certo, e avisa o dono do endereço.
+ *
+ * Antes era um 409 "nome de usuário em uso", e isso fazia da rota um oráculo
+ * público: qualquer um, sem sessão, descobria se um e-mail tinha conta no
+ * painel trocando só o subdomínio e o nome a cada tentativa. Agora a resposta
+ * tem o mesmo status e a mesma forma do 201 de verdade — o subdomínio e o nome
+ * que a pessoa digitou, o endereço que o painel teria, e `emailed` com o mesmo
+ * significado ("saiu uma mensagem para este endereço") —, sem criar provedor,
+ * pessoa, vínculo nem sessão.
+ *
+ * Quem é dono do endereço recebe o aviso, e é ele quem fecha o ciclo: a
+ * pessoa legítima que esqueceu que já tinha conta fica sabendo pela caixa de
+ * entrada que deve entrar ou redefinir a senha. O texto não diz de qual
+ * provedor é a conta nem traz link — vai para um endereço que ainda não provou
+ * nada, e um link ali seria o formato exato de um phishing.
+ *
+ * O `bcrypt.hash` é desperdício de propósito: o caminho de verdade paga um, e
+ * sem ele a diferença de tempo seria a pista mais barata.
+ *
+ * O que isto NÃO fecha, e por quê: o cadastro real cria na hora coisas que
+ * se veem de fora — o subdomínio passa a existir, e o login com a senha que
+ * se acabou de escolher funciona —, e o falso não. Quem insistir consegue
+ * distinguir os dois com um segundo pedido. Só que, para cada e-mail LIVRE que
+ * testar, terá criado um provedor de verdade (auditado, avisado à equipe) e
+ * mandado ao dono do endereço um link de verificação; e para cada e-mail
+ * TOMADO, o dono recebe o aviso. Deixa de ser uma consulta muda e barata,
+ * limitada ainda pelo `authLimiter` da rota. A transação e o seed também
+ * deixam o caminho real mais lento — o mesmo preço para medir.
+ *
+ * Melhor esforço como o bilhete: um SMTP fora do ar vira `emailed: false`,
+ * exatamente o que o cadastro real responderia no mesmo deploy, e nunca 500.
+ */
+async function responderEmailJaCadastrado({ req, res, slug, name, email, password }) {
+  await bcrypt.hash(password, BCRYPT_ROUNDS);
+  const panelUrl = panelUrlFor({ slug });
+  let emailed = false;
+  if (panelUrl && mailTransport().name !== 'none') {
+    emailed = await mailTransport().send({
+      to: email,
+      subject: req.t('auth.signupExistingMailSubject', { product: PRODUCT_NAME }),
+      text: req.t('auth.signupExistingMailBody', { product: PRODUCT_NAME })
+    }).catch(() => false);
+  }
+  // Nada do pedido no log (nem o endereço, nem o subdomínio digitado): o log
+  // não pode virar a lista que a resposta deixou de ser, nem receber linha
+  // forjada.
+  console.info('Signup: the e-mail already has an account; answered as created and notified it.');
+  return res.status(201).json(createResponse(req.t('auth.signupCreated'), {
+    tenant: { slug, name },
+    panelUrl,
+    emailed: Boolean(emailed)
+  }));
+}
+
+/**
+ * Uma resposta do cadastro já decidida fora do fluxo principal. As conferências
+ * do login (nome com `@`, nome tomado, e-mail tomado) lançam isto com a
+ * resposta pronta, e `signup` só responde: o fluxo que cria o provedor fica
+ * sem `if` sobre o que o cliente digitou guardando a criação.
+ */
+class RespostaDoCadastro extends Error {
+  constructor(responder) {
+    super('signup answered early');
+    this.responder = responder;
+  }
+}
+
+/** Nome com `@`: recusa de formato, igual para todo mundo (ver `signup`). */
+function recusarNomeComArroba(username) {
+  if (!String(username).includes('@')) return;
+  throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t('auth.signupUsernameAt'))));
+}
+
+/**
+ * O login contra o espaço de nomes inteiro: nome tomado é 409 (a pessoa tem
+ * que trocar), e-mail tomado responde como cadastro feito e avisa o dono.
+ * O nome vem antes, para que um 409 nunca dependa do e-mail.
+ */
+async function recusarLoginTomado({ username, email, slug, name, password }) {
+  if (await User.loginConflict({ username })) {
+    throw new RespostaDoCadastro((req, res) => res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken'))));
+  }
+  if (await User.loginConflict({ email })) {
+    throw new RespostaDoCadastro((req, res) => responderEmailJaCadastrado({ req, res, slug, name, email, password }));
+  }
+}
+
+/**
+ * O formulário do cadastro público, conferido inteiro antes de o banco ser
+ * consultado. Lança `RespostaDoCadastro` com o 400 pronto; devolve o que
+ * `signup` usa. Fora do fluxo principal pelo mesmo motivo de
+ * `recusarLoginTomado`: nenhuma conferência do que o cliente digitou fica
+ * guardando a criação do provedor.
+ */
+async function lerCorpoDoCadastro(req) {
+    const body = req.body ?? {};
+    const slug = String(body.slug ?? '');
+    const name = String(body.providerName ?? '').trim();
+    const username = String(body.username ?? '').trim();
+    const password = String(body.password ?? '');
+    // Conta nova nasce com e-mail, como toda conta desde o login por e-mail —
+    // e a do dono de um provedor mais ainda: é a que vai cadastrar as outras.
+    const email = User.normalizeEmail(body.email);
+
+    const problem = slugProblem(slug);
+    if (problem) throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(problem)));
+    if (name.length < 1 || name.length > SIGNUP_NAME_MAX) {
+      throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t('auth.signupInvalid'))));
+    }
+    const nomeRuim = usernameLengthProblem(username, 'auth.signupInvalid');
+    if (nomeRuim) {
+      throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t(nomeRuim))));
+    }
+    // Nome e e-mail vivem no mesmo espaço de nomes (`User.loginConflict`).
+    // Um nome com `@` podia ser o e-mail de outra pessoa, e o 409 do nome
+    // tomado diria que aquele endereço tem conta — a mesma pergunta que a
+    // resposta do e-mail tomado deixou de responder. Sem `@`, o nome nunca
+    // casa com um endereço, e a recusa é de formato, igual para todo mundo.
+    recusarNomeComArroba(username);
+    // A regra da senha nova (10+, fora das comuns, diferente do login); ver
+    // `utils/passwordPolicy.js`. O tamanho mantém a frase de antes.
+    const senhaRuim = newPasswordProblem(password, { username, email }, { lengthKey: 'auth.signupInvalid' });
+    if (senhaRuim) {
+      throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code)));
+    }
+    if (!email || !isValidEmail(email)) {
+      throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t('auth.emailInvalid'))));
+    }
+    // O que a página pública acrescenta, tudo opcional: o plano escolhido na
+    // vitrine, o CNPJ (que já vira o cadastro fiscal) e o WhatsApp do dono.
+    //
+    // Plano que não está à venda é ignorado, e não recusado: o link com
+    // `?plano=` pode ser de ontem, e o provedor ainda ganha o teste padrão.
+    const chosenPlan = body.planCode ? await Plan.findPublicByCode(body.planCode) : null;
+    const taxId = body.taxId ? normalizeTaxId(body.taxId) : '';
+    if (taxId && !isValidCnpj(taxId)) {
+      throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t('tenant.billingTaxIdInvalid'))));
+    }
+    const phone = body.phone ? normalizarTelefoneBr(body.phone) : '';
+    if (body.phone && !phone) {
+      throw new RespostaDoCadastro((req, res) => res.status(400).json(createErrorResponse(req.t('auth.signupPhoneInvalid'))));
+    }
+    const fiscal = {};
+    if (taxId) fiscal.billing_tax_id = taxId;
+    if (phone) fiscal.billing_phone = phone;
+    if (taxId) {
+      const legalName = String(body.legalName ?? '').trim().slice(0, 160);
+      if (legalName) fiscal.billing_legal_name = legalName;
+      const cidade = String(body.city ?? '').trim().slice(0, 80);
+      if (cidade) fiscal.billing_city = cidade;
+      const uf = String(body.state ?? '').trim().toUpperCase();
+      if (/^[A-Z]{2}$/.test(uf)) fiscal.billing_state = uf;
+    }
+    return { body, slug, name, username, password, email, chosenPlan, fiscal, taxId, phone };
+}
+
 class AuthController {
   /**
    * `POST /api/auth/signup` — um ISP se cadastra sozinho. Só na edição SaaS,
@@ -274,68 +436,21 @@ class AuthController {
       if (!usesTenantSubdomains() && !req.platformHost) {
         return res.status(404).json(createErrorResponse(req.t('common.routeNotFound')));
       }
-      const body = req.body ?? {};
-      const slug = String(body.slug ?? '');
-      const name = String(body.providerName ?? '').trim();
-      const username = String(body.username ?? '').trim();
-      const password = String(body.password ?? '');
-      // Conta nova nasce com e-mail, como toda conta desde o login por e-mail —
-      // e a do dono de um provedor mais ainda: é a que vai cadastrar as outras.
-      const email = User.normalizeEmail(body.email);
-
-      const problem = slugProblem(slug);
-      if (problem) return res.status(400).json(createErrorResponse(problem));
-      if (name.length < 1 || name.length > SIGNUP_NAME_MAX) {
-        return res.status(400).json(createErrorResponse(req.t('auth.signupInvalid')));
-      }
-      const nomeRuim = usernameLengthProblem(username, 'auth.signupInvalid');
-      if (nomeRuim) {
-        return res.status(400).json(createErrorResponse(req.t(nomeRuim)));
-      }
-      // A regra da senha nova (10+, fora das comuns, diferente do login); ver
-      // `utils/passwordPolicy.js`. O tamanho mantém a frase de antes.
-      const senhaRuim = newPasswordProblem(password, { username, email }, { lengthKey: 'auth.signupInvalid' });
-      if (senhaRuim) {
-        return res.status(400).json(createErrorResponse(req.t(senhaRuim.key), null, senhaRuim.code));
-      }
-      if (!email || !isValidEmail(email)) {
-        return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
-      }
-      // O que a página pública acrescenta, tudo opcional: o plano escolhido na
-      // vitrine, o CNPJ (que já vira o cadastro fiscal) e o WhatsApp do dono.
+      const { body, slug, name, username, password, email, chosenPlan, fiscal, taxId, phone } = await lerCorpoDoCadastro(req);
+      // Subdomínio e nome tomados respondem 409 com palavras diferentes,
+      // porque as correções são diferentes — e porque os dois são visíveis de
+      // qualquer jeito: o subdomínio é um endereço público, e o nome a pessoa
+      // tem que trocar para seguir. O nome é conferido contra o espaço de
+      // nomes inteiro, pelo motivo escrito em `User.findByLogin`; sem `@` (ver
+      // acima), só casa com outro nome, nunca com um e-mail.
       //
-      // Plano que não está à venda é ignorado, e não recusado: o link com
-      // `?plano=` pode ser de ontem, e o provedor ainda ganha o teste padrão.
-      const chosenPlan = body.planCode ? await Plan.findPublicByCode(body.planCode) : null;
-      const taxId = body.taxId ? normalizeTaxId(body.taxId) : '';
-      if (taxId && !isValidCnpj(taxId)) {
-        return res.status(400).json(createErrorResponse(req.t('tenant.billingTaxIdInvalid')));
-      }
-      const phone = body.phone ? normalizarTelefoneBr(body.phone) : '';
-      if (body.phone && !phone) {
-        return res.status(400).json(createErrorResponse(req.t('auth.signupPhoneInvalid')));
-      }
-      const fiscal = {};
-      if (taxId) fiscal.billing_tax_id = taxId;
-      if (phone) fiscal.billing_phone = phone;
-      if (taxId) {
-        const legalName = String(body.legalName ?? '').trim().slice(0, 160);
-        if (legalName) fiscal.billing_legal_name = legalName;
-        const cidade = String(body.city ?? '').trim().slice(0, 80);
-        if (cidade) fiscal.billing_city = cidade;
-        const uf = String(body.state ?? '').trim().toUpperCase();
-        if (/^[A-Z]{2}$/.test(uf)) fiscal.billing_state = uf;
-      }
-      // As duas colisões respondem 409 com palavras diferentes, porque as duas
-      // correções são diferentes: outro subdomínio, ou outro login. O login é
-      // conferido contra o espaço de nomes inteiro — nome e e-mail vivem no
-      // mesmo — pelo motivo escrito em `User.findByLogin`.
+      // O e-mail tomado é o que não pode aparecer: responde como cadastro
+      // feito, sem criar nada, e avisa o dono do endereço. A ordem importa —
+      // o nome vem antes, para que um 409 nunca dependa do e-mail.
       if (await Tenant.findBySlug(slug)) {
         return res.status(409).json(createErrorResponse(req.t('auth.signupSlugTaken')));
       }
-      if (await User.loginConflict({ username, email })) {
-        return res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken')));
-      }
+      await recusarLoginTomado({ username, email, slug, name, password });
 
       let tenantId;
       let userId;
@@ -392,9 +507,9 @@ class AuthController {
         if (await Tenant.findBySlug(slug)) {
           return res.status(409).json(createErrorResponse(req.t('auth.signupSlugTaken')));
         }
-        if (await User.loginConflict({ username, email })) {
-          return res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken')));
-        }
+        // O nome ou o e-mail que outro cadastro tomou no meio do caminho: a
+        // mesma resposta de quando já estava tomado, pelo mesmo motivo.
+        await recusarLoginTomado({ username, email, slug, name, password });
         throw error;
       }
 
@@ -483,6 +598,7 @@ class AuthController {
         emailed: provado
       }));
     } catch (error) {
+      if (error instanceof RespostaDoCadastro) return await error.responder(req, res);
       console.error('Signup error:', error);
       return res.status(500).json(createErrorResponse(req.t('auth.signupFailed'), error.message));
     }

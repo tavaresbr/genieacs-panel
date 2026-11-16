@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'New recovery codes generated; the old ones no longer work',
   'auth.mfaEnrollmentRequired': 'This provider requires two-step login. Turn it on to continue',
   'auth.mfaRequiredByProvider': 'A provider you work for requires two-step login; it cannot be turned off',
+  'auth.platformMfaEnrollmentRequired': 'The platform requires two-step login for its administrators. Turn it on to continue',
+  'auth.mfaRequiredByPlatform': 'The platform requires two-step login for its administrators; it cannot be turned off',
   'auth.passwordUpdated': 'Password updated successfully',
 
   // Rate limiting
@@ -285,6 +287,7 @@ export default {
   'vendor.listFailed': 'Failed to get the vendors',
   'vendor.idRequired': 'The vendor ID is required',
   'vendor.notFound': 'Vendor not found',
+  'vendor.platformAdminOnly': 'Only a platform administrator can change the default catalogue that every provider inherits',
   'vendor.retrieved': 'Vendor retrieved successfully',
   'vendor.getFailed': 'Failed to get the vendor',
   'vendor.fieldsRequired': 'The name, manufacturer_patterns, and product_patterns are required',
@@ -1142,6 +1145,9 @@ export default {
   'auth.signupInvalid': 'Provider name, username (3–64) and password (10–128) are required',
   'auth.signupSlugTaken': 'This subdomain is already taken',
   'auth.signupUsernameTaken': 'This username is already taken',
+  'auth.signupUsernameAt': 'The username cannot contain @ — the email goes in its own field',
+  'auth.signupExistingMailSubject': 'Sign-up attempt with your email at {product}',
+  'auth.signupExistingMailBody': 'Someone tried to create an account at {product} with this email address, which already has an account.\n\nIf it was you, sign in at your provider\'s panel address or use "Forgot password" on the sign-in screen to reset your password.\n\nIf it was not you, ignore this message: no new account was created and yours has not changed.',
   'auth.signupPhoneInvalid': 'Enter a WhatsApp number with area code',
   'auth.signupWelcomeWhatsapp': 'Welcome to {product}, {provider}! 🎉\n\nYour panel is ready: {link}\nUser: {username}\n\nYour trial has started. Reply to this message if you need help setting it up.',
   'auth.signupTeamSubject': 'New provider signed up: {provider}',

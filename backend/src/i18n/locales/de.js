@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Neue Wiederherstellungscodes erzeugt; die alten gelten nicht mehr',
   'auth.mfaEnrollmentRequired': 'Dieser Anbieter verlangt die Anmeldung in zwei Schritten. Aktivieren Sie sie, um fortzufahren',
   'auth.mfaRequiredByProvider': 'Ein Anbieter, für den Sie arbeiten, verlangt die Anmeldung in zwei Schritten; sie kann nicht ausgeschaltet werden',
+  'auth.platformMfaEnrollmentRequired': 'Die Plattform verlangt von ihren Administratoren die Anmeldung in zwei Schritten. Aktivieren Sie sie, um fortzufahren',
+  'auth.mfaRequiredByPlatform': 'Die Plattform verlangt von ihren Administratoren die Anmeldung in zwei Schritten; sie kann nicht ausgeschaltet werden',
   'auth.passwordUpdated': 'Passwort erfolgreich aktualisiert',
 
   // Ratenbegrenzung
@@ -285,6 +287,7 @@ export default {
   'vendor.listFailed': 'Die Hersteller konnten nicht abgerufen werden',
   'vendor.idRequired': 'Die Hersteller-ID ist erforderlich',
   'vendor.notFound': 'Hersteller nicht gefunden',
+  'vendor.platformAdminOnly': 'Nur ein Plattformadministrator kann den Standardkatalog ändern, den alle Anbieter übernehmen',
   'vendor.retrieved': 'Hersteller erfolgreich abgerufen',
   'vendor.getFailed': 'Der Hersteller konnte nicht abgerufen werden',
   'vendor.fieldsRequired': 'Die Felder name, manufacturer_patterns und product_patterns sind erforderlich',
@@ -1143,6 +1146,9 @@ export default {
   'auth.signupInvalid': 'Anbietername, Benutzername (3–64) und Passwort (10–128) sind erforderlich',
   'auth.signupSlugTaken': 'Diese Subdomain ist bereits vergeben',
   'auth.signupUsernameTaken': 'Dieser Benutzername ist bereits vergeben',
+  'auth.signupUsernameAt': 'Der Benutzername darf kein @ enthalten — die E-Mail gehört in ihr eigenes Feld',
+  'auth.signupExistingMailSubject': 'Registrierungsversuch mit Ihrer E-Mail bei {product}',
+  'auth.signupExistingMailBody': 'Jemand hat versucht, bei {product} ein Konto mit dieser E-Mail-Adresse anzulegen, zu der bereits ein Konto existiert.\n\nWaren Sie das, melden Sie sich unter der Panel-Adresse Ihres Anbieters an oder nutzen Sie "Passwort vergessen" auf der Anmeldeseite, um das Passwort zurückzusetzen.\n\nWaren Sie es nicht, ignorieren Sie diese Nachricht: Es wurde kein neues Konto erstellt und Ihres ist unverändert.',
   'auth.signupPhoneInvalid': 'Gib eine WhatsApp-Nummer mit Vorwahl ein',
   'auth.signupWelcomeWhatsapp': 'Willkommen bei {product}, {provider}! 🎉\n\nDein Panel ist bereit: {link}\nBenutzer: {username}\n\nDeine Testphase hat begonnen. Antworte auf diese Nachricht, wenn du Hilfe bei der Einrichtung brauchst.',
   'auth.signupTeamSubject': 'Neuer Anbieter registriert: {provider}',

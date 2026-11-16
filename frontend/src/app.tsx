@@ -286,6 +286,10 @@ function ConsoleShell() {
   const { isAuthenticated, loading, user } = useAuth()
   if (loading) return <AuthFallback />
   if (!isAuthenticated || !user?.platform) return <Navigate to="/login" replace />
+  // A plataforma exige o 2FA de quem a opera (`PLATFORM_REQUIRE_MFA`) e esta
+  // pessoa não ativou: o servidor recusa toda rota do console até lá, então a
+  // casca inteira dá lugar à ativação — a mesma do provedor que exige o 2FA.
+  if (mustEnroll(user)) return <MfaEnrollmentScreen />
 
   return (
     <div className="min-h-screen">

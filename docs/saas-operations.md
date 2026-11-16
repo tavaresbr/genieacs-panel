@@ -41,6 +41,8 @@ Todas estão em `deploy/saas.env.example`, com comentário. As que não podem fa
 - `METRICS_TOKEN` (opcional, ≥ 32 caracteres): quem coleta `/api/platform/metrics`.
 - `SMTP_URL` e `MAIL_FROM` (opcionais): por onde sai o convite de equipe. Sem as duas não
   há envio, e o link continua saindo na tela — ver §8.
+- `PLATFORM_REQUIRE_MFA` (opcional): o login em duas etapas de quem opera o console.
+  Vazio vale **ligado** em produção; `false` desliga. Ver "O 2FA do console", abaixo.
 
 ### DNS e proxy
 
@@ -208,6 +210,28 @@ node backend/scripts/grant-platform-admin.js quem-opera
 
 Nesse caso a conta continua sendo membro do ISP dela, o que é legítimo: a mesma pessoa
 opera a plataforma e trabalha no provedor. A diferença entre os dois modos é essa.
+
+### O 2FA do console
+
+Em produção o console **exige o login em duas etapas** de quem o opera
+(`PLATFORM_REQUIRE_MFA`, ligado quando vazio). O console cria e suspende provedores, mexe
+em cobrança e abre personificação em qualquer cliente: só a senha não basta para isso.
+
+Ligar não tranca ninguém do lado de fora. Quem entra no console sem o 2FA — a primeira
+conta, recém-criada pelo script acima, ou um deploy que já estava no ar antes da chave —
+entra normalmente e cai direto na **tela de ativação**: até ativar, a sessão só alcança a
+própria conta (`/api/auth/…`: ativar, ver quem é, sair); toda rota do console responde
+`403 mfa_enrollment_required`. Ativou, o console abre na hora, sem novo login. Enquanto a
+chave estiver ligada, quem está no cadastro da plataforma não desliga o próprio 2FA
+(`409 mfa_required_by_platform`).
+
+Não muda: a sessão do painel de um provedor da mesma pessoa (ali vale a exigência do
+provedor, se ele tiver uma) e a personificação, que só se abre de dentro do console. Quem
+perdeu o celular e os códigos é destravado pelo servidor (`skygenpanel reset-mfa <usuário>`
+ou `node backend/scripts/reset-mfa.js <usuário>`), e na entrada seguinte ativa de novo.
+
+`PLATFORM_REQUIRE_MFA=false` desliga — o console volta a honrar o 2FA só de quem o
+ligou. Fora de produção (testes, desenvolvimento) o padrão é desligado.
 
 ### As três sessões
 

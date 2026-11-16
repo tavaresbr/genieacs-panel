@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': '已產生新的復原代碼；舊代碼不再有效',
   'auth.mfaEnrollmentRequired': '此服務商要求兩步驟登入。請啟用後繼續',
   'auth.mfaRequiredByProvider': '您所在的服務商要求兩步驟登入，無法關閉',
+  'auth.platformMfaEnrollmentRequired': '平台要求其管理員使用兩步驟登入。請啟用後繼續',
+  'auth.mfaRequiredByPlatform': '平台要求其管理員使用兩步驟登入，無法關閉',
   'auth.passwordUpdated': '密碼已更新',
 
   // 速率限制
@@ -284,6 +286,7 @@ export default {
   'vendor.listFailed': '無法取得廠商清單',
   'vendor.idRequired': '需要提供廠商 ID',
   'vendor.notFound': '找不到該廠商',
+  'vendor.platformAdminOnly': '只有平台管理員可以修改所有服務商繼承的預設目錄',
   'vendor.retrieved': '已取得廠商資訊',
   'vendor.getFailed': '無法取得廠商資訊',
   'vendor.fieldsRequired': '需要提供 name、manufacturer_patterns 與 product_patterns',
@@ -1142,6 +1145,9 @@ export default {
   'auth.signupInvalid': '需要業者名稱、使用者名稱（3–64）和密碼（10–128）',
   'auth.signupSlugTaken': '此子網域已被使用',
   'auth.signupUsernameTaken': '此使用者名稱已被使用',
+  'auth.signupUsernameAt': '使用者名稱不能包含 @ —— 電子郵件請填寫在專屬欄位',
+  'auth.signupExistingMailSubject': '有人嘗試以您的電子郵件在 {product} 註冊',
+  'auth.signupExistingMailBody': '有人嘗試使用此電子郵件地址在 {product} 建立帳戶，而此地址已經有帳戶。\n\n如果是您本人，請在您業者的面板網址登入，或在登入畫面使用「忘記密碼」重設密碼。\n\n如果不是您，請忽略此郵件：沒有建立任何新帳戶，您的帳戶也沒有變動。',
   'auth.signupPhoneInvalid': '請輸入含區碼的 WhatsApp 號碼',
   'auth.signupWelcomeWhatsapp': '歡迎使用 {product}，{provider}！🎉\n\n您的面板已就緒：{link}\n使用者：{username}\n\n試用期已開始。如需設定協助，請回覆此訊息。',
   'auth.signupTeamSubject': '新服務商註冊：{provider}',

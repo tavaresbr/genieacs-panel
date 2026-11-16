@@ -178,6 +178,71 @@ describe('o cadastro manda a prova do endereço', () => {
   });
 });
 
+/**
+ * O e-mail que já tem conta. A rota é pública, e um 409 "em uso" fazia dela um
+ * oráculo de "este endereço tem conta no painel". Agora a resposta é a de um
+ * cadastro feito — mesmo status, mesma forma, mesmo `emailed` —, nada nasce, e
+ * quem recebe a notícia é o dono do endereço.
+ */
+describe('o cadastro com um e-mail que já tem conta', () => {
+  const comEmailDoOwner = () => ({ ...cadastro(), email: 'owner@exemplo.test' });
+
+  it('responde como um cadastro feito, sem criar nada nem cunhar bilhete', async () => {
+    const corpo = comEmailDoOwner();
+    const real = await casa('/api/auth/signup', { method: 'POST', body: cadastro() });
+    const res = await casa('/api/auth/signup', { method: 'POST', body: corpo });
+    assert.equal(res.status, real.status, JSON.stringify(res.body));
+    assert.equal(res.body.message, real.body.message);
+    assert.deepEqual(Object.keys(res.body.data).sort(), Object.keys(real.body.data).sort());
+    assert.deepEqual(res.body.data.tenant, { slug: corpo.slug, name: corpo.providerName });
+    assert.equal(res.body.data.panelUrl, `https://${corpo.slug}.painel.test`);
+    assert.equal(res.body.data.emailed, true);
+
+    const db = getDb();
+    assert.equal(await db('tenants').where({ slug: corpo.slug }).first(), undefined);
+    assert.equal(await db('users').where({ username: corpo.username }).first(), undefined);
+    const dono = await db('users').where({ email: 'owner@exemplo.test' }).first();
+    assert.equal(await db('auth_tickets').where({ user_id: dono.id }).first(), undefined,
+      'o aviso não carrega credencial nenhuma');
+  });
+
+  it('e avisa o dono do endereço, sem link', async () => {
+    await casa('/api/auth/signup', { method: 'POST', body: comEmailDoOwner() });
+    assert.equal(recebidas.length, 1);
+    const mensagem = decodificarQuotedPrintable(recebidas[0]);
+    assert.match(mensagem, /^To: .*owner@exemplo\.test/m);
+    assert.match(mensagem, /Esqueci minha senha/);
+    assert.doesNotMatch(mensagem, /https?:\/\/[^\s]*painel\.test/, 'o aviso não manda ninguém a link nenhum');
+  });
+
+  it('e sem transporte de e-mail diz que não mandou — como o cadastro real', async () => {
+    const antes = process.env.SMTP_URL;
+    delete process.env.SMTP_URL;
+    resetMailTransport();
+    try {
+      const res = await casa('/api/auth/signup', { method: 'POST', body: comEmailDoOwner() });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.data.emailed, false);
+    } finally {
+      process.env.SMTP_URL = antes;
+      resetMailTransport();
+    }
+  });
+
+  it('o nome tomado segue 409, com a mesma frase exista o e-mail ou não', async () => {
+    const livre = await casa('/api/auth/signup', {
+      method: 'POST', body: { ...cadastro(), username: 'owner' }
+    });
+    const tomado = await casa('/api/auth/signup', {
+      method: 'POST', body: { ...cadastro(), username: 'owner', email: 'owner@exemplo.test' }
+    });
+    assert.equal(livre.status, 409);
+    assert.equal(tomado.status, 409);
+    assert.equal(livre.body.message, tomado.body.message);
+    assert.equal(recebidas.length, 0, 'o 409 do nome não manda aviso a ninguém');
+  });
+});
+
 describe('a poda dos bilhetes, que o cadastro público torna obrigatória', () => {
   it('apaga o bilhete vencido e guarda o que ainda vale', async () => {
     const db = getDb();

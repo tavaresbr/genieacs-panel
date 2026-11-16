@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Nouveaux codes de récupération générés ; les anciens ne sont plus valables',
   'auth.mfaEnrollmentRequired': 'Ce fournisseur exige la connexion en deux étapes. Activez-la pour continuer',
   'auth.mfaRequiredByProvider': 'Un fournisseur pour lequel vous travaillez exige la connexion en deux étapes ; elle ne peut pas être désactivée',
+  'auth.platformMfaEnrollmentRequired': 'La plateforme exige la connexion en deux étapes pour ses administrateurs. Activez-la pour continuer',
+  'auth.mfaRequiredByPlatform': 'La plateforme exige la connexion en deux étapes pour ses administrateurs ; elle ne peut pas être désactivée',
   'auth.passwordUpdated': 'Mot de passe mis à jour',
 
   // Limitation de débit
@@ -285,6 +287,7 @@ export default {
   'vendor.listFailed': 'Impossible d’obtenir les fabricants',
   'vendor.idRequired': 'L’ID du fabricant est requis',
   'vendor.notFound': 'Fabricant introuvable',
+  'vendor.platformAdminOnly': 'Seul un administrateur de la plateforme peut modifier le catalogue par défaut dont héritent tous les fournisseurs',
   'vendor.retrieved': 'Fabricant récupéré',
   'vendor.getFailed': 'Impossible d’obtenir le fabricant',
   'vendor.fieldsRequired': 'Les champs name, manufacturer_patterns et product_patterns sont requis',
@@ -1138,6 +1141,9 @@ export default {
   'auth.signupInvalid': 'Le nom du fournisseur, l\'identifiant (3–64) et le mot de passe (10–128) sont requis',
   'auth.signupSlugTaken': 'Ce sous-domaine est déjà pris',
   'auth.signupUsernameTaken': 'Cet identifiant est déjà pris',
+  'auth.signupUsernameAt': 'Le nom d\'utilisateur ne peut pas contenir @ — l\'e-mail a son propre champ',
+  'auth.signupExistingMailSubject': 'Tentative d\'inscription avec votre e-mail sur {product}',
+  'auth.signupExistingMailBody': 'Quelqu\'un a essayé de créer un compte sur {product} avec cette adresse e-mail, qui a déjà un compte.\n\nSi c\'était vous, connectez-vous à l\'adresse du panneau de votre fournisseur ou utilisez « Mot de passe oublié » sur l\'écran de connexion pour le réinitialiser.\n\nSi ce n\'était pas vous, ignorez ce message : aucun nouveau compte n\'a été créé et le vôtre n\'a pas changé.',
   'auth.signupPhoneInvalid': 'Saisissez un numéro WhatsApp avec indicatif',
   'auth.signupWelcomeWhatsapp': 'Bienvenue sur {product}, {provider} ! 🎉\n\nVotre panneau est prêt : {link}\nUtilisateur : {username}\n\nVotre essai a commencé. Répondez à ce message si vous avez besoin d’aide pour la configuration.',
   'auth.signupTeamSubject': 'Nouveau fournisseur inscrit : {provider}',

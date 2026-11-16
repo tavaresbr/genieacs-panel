@@ -62,6 +62,8 @@ export default {
   'auth.mfaRecoveryRegenerated': '새 복구 코드를 만들었습니다. 이전 코드는 더 이상 사용할 수 없습니다',
   'auth.mfaEnrollmentRequired': '이 공급자는 2단계 로그인을 요구합니다. 계속하려면 켜 주세요',
   'auth.mfaRequiredByProvider': '소속 공급자가 2단계 로그인을 요구하므로 끌 수 없습니다',
+  'auth.platformMfaEnrollmentRequired': '플랫폼은 관리자에게 2단계 로그인을 요구합니다. 계속하려면 켜 주세요',
+  'auth.mfaRequiredByPlatform': '플랫폼은 관리자에게 2단계 로그인을 요구하므로 끌 수 없습니다',
   'auth.passwordUpdated': '비밀번호를 변경했습니다',
 
   // 요청 제한
@@ -286,6 +288,7 @@ export default {
   'vendor.listFailed': '제조사 목록을 조회하지 못했습니다',
   'vendor.idRequired': '제조사 ID가 필요합니다',
   'vendor.notFound': '제조사를 찾을 수 없습니다',
+  'vendor.platformAdminOnly': '모든 공급자가 물려받는 기본 카탈로그는 플랫폼 관리자만 변경할 수 있습니다',
   'vendor.retrieved': '제조사 정보를 조회했습니다',
   'vendor.getFailed': '제조사 정보를 조회하지 못했습니다',
   'vendor.fieldsRequired': 'name, manufacturer_patterns, product_patterns이 필요합니다',
@@ -1145,6 +1148,9 @@ export default {
   'auth.signupInvalid': '사업자 이름, 사용자 이름(3~64자), 비밀번호(10~128자)가 필요합니다',
   'auth.signupSlugTaken': '이 하위 도메인은 이미 사용 중입니다',
   'auth.signupUsernameTaken': '이 사용자 이름은 이미 사용 중입니다',
+  'auth.signupUsernameAt': '사용자 이름에는 @를 쓸 수 없습니다 — 이메일은 별도 칸에 입력하세요',
+  'auth.signupExistingMailSubject': '{product}에서 귀하의 이메일로 가입이 시도되었습니다',
+  'auth.signupExistingMailBody': '누군가 이미 계정이 있는 이 이메일 주소로 {product}에 계정을 만들려고 했습니다.\n\n본인이라면 사용 중인 사업자의 패널 주소에서 로그인하거나, 로그인 화면의 "비밀번호를 잊으셨나요"로 비밀번호를 재설정하세요.\n\n본인이 아니라면 이 메시지를 무시하세요. 새 계정은 만들어지지 않았고 귀하의 계정도 바뀌지 않았습니다.',
   'auth.signupPhoneInvalid': '지역 번호를 포함한 WhatsApp 번호를 입력하세요',
   'auth.signupWelcomeWhatsapp': '{product}에 오신 것을 환영합니다, {provider}! 🎉\n\n패널이 준비되었습니다: {link}\n사용자: {username}\n\n체험 기간이 시작되었습니다. 설정에 도움이 필요하면 이 메시지에 답장하세요.',
   'auth.signupTeamSubject': '새 공급자 가입: {provider}',

@@ -60,6 +60,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'नए रिकवरी कोड बनाए गए; पुराने अब मान्य नहीं हैं',
   'auth.mfaEnrollmentRequired': 'यह प्रदाता दो-चरणीय लॉगिन अनिवार्य करता है। जारी रखने के लिए इसे चालू करें',
   'auth.mfaRequiredByProvider': 'आप जिस प्रदाता के लिए काम करते हैं वह दो-चरणीय लॉगिन अनिवार्य करता है; इसे बंद नहीं किया जा सकता',
+  'auth.platformMfaEnrollmentRequired': 'प्लेटफ़ॉर्म अपने व्यवस्थापकों के लिए दो-चरणीय लॉगिन अनिवार्य करता है। जारी रखने के लिए इसे चालू करें',
+  'auth.mfaRequiredByPlatform': 'प्लेटफ़ॉर्म अपने व्यवस्थापकों के लिए दो-चरणीय लॉगिन अनिवार्य करता है; इसे बंद नहीं किया जा सकता',
   'auth.passwordUpdated': 'पासवर्ड अपडेट हो गया',
 
   // दर सीमा
@@ -283,6 +285,7 @@ export default {
   'vendor.listFailed': 'विक्रेता सूची प्राप्त नहीं हो सकी',
   'vendor.idRequired': 'विक्रेता आईडी आवश्यक है',
   'vendor.notFound': 'विक्रेता नहीं मिला',
+  'vendor.platformAdminOnly': 'केवल प्लेटफ़ॉर्म व्यवस्थापक ही वह डिफ़ॉल्ट कैटलॉग बदल सकता है जो हर प्रदाता को मिलता है',
   'vendor.retrieved': 'विक्रेता की जानकारी प्राप्त हुई',
   'vendor.getFailed': 'विक्रेता की जानकारी प्राप्त नहीं हो सकी',
   'vendor.fieldsRequired': 'name, manufacturer_patterns और product_patterns आवश्यक हैं',
@@ -1067,6 +1070,9 @@ export default {
   'auth.signupInvalid': 'प्रदाता का नाम, उपयोगकर्ता नाम (3–64) और पासवर्ड (10–128) आवश्यक हैं',
   'auth.signupSlugTaken': 'यह सबडोमेन पहले से लिया जा चुका है',
   'auth.signupUsernameTaken': 'यह उपयोगकर्ता नाम पहले से लिया जा चुका है',
+  'auth.signupUsernameAt': 'उपयोगकर्ता नाम में @ नहीं हो सकता — ईमेल उसके अपने फ़ील्ड में डालें',
+  'auth.signupExistingMailSubject': '{product} पर आपके ईमेल से साइन-अप का प्रयास',
+  'auth.signupExistingMailBody': 'किसी ने इस ईमेल पते से {product} पर खाता बनाने की कोशिश की, जबकि इस पते का खाता पहले से है।\n\nअगर यह आप थे, तो अपने प्रदाता के पैनल पते पर साइन इन करें या पासवर्ड रीसेट करने के लिए साइन-इन स्क्रीन पर "पासवर्ड भूल गए" का उपयोग करें।\n\nअगर यह आप नहीं थे, तो इस संदेश को अनदेखा करें: कोई नया खाता नहीं बना और आपका खाता नहीं बदला।',
   'auth.signupPhoneInvalid': 'एरिया कोड के साथ WhatsApp नंबर दर्ज करें',
   'auth.signupWelcomeWhatsapp': '{product} में आपका स्वागत है, {provider}! 🎉\n\nआपका पैनल तैयार है: {link}\nउपयोगकर्ता: {username}\n\nआपका ट्रायल शुरू हो गया है। सेटअप में मदद चाहिए तो इस संदेश का जवाब दें।',
   'auth.signupTeamSubject': 'नया प्रदाता पंजीकृत: {provider}',

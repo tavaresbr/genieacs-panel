@@ -86,7 +86,8 @@ A regra vale no cadastro (signup), na instalação (setup), na criação e ediç
 **Detalhe de SEC-04 (repetição no webhook do SGP):**
 - `webhookRequireTimestamp` passa a valer `true` quando não há configuração gravada, ou seja, numa integração nova;
 - configuração gravada sem o campo (anterior à exigência) é lida como `false`;
-- configuração gravada com o campo explícito é respeitada.
+- configuração gravada com o campo explícito é respeitada;
+- com a exigência ligada, só vale a assinatura sobre `<timestamp>.<corpo>`; a assinatura só do corpo, que antes passava com qualquer carimbo novo no cabeçalho, é recusada (`invalid_signature`).
 
 Ver a seção 4.2.
 
@@ -124,9 +125,9 @@ Caminho para remover depois:
 
 Integrações já configuradas **não mudam**: quem já recebe eventos continua recebendo. Para ligar a proteção numa delas:
 
-1. Confirme que o SGP manda o cabeçalho de carimbo de tempo (`X-SGP-Timestamp` ou equivalente) e que assina `<timestamp>.<corpo>` ou só o corpo. Os formatos aceitos estão em `docs/sgp-integration.md`.
+1. Confirme que o SGP manda o cabeçalho de carimbo de tempo (`X-SGP-Timestamp` ou equivalente) e que assina `<timestamp>.<corpo>`. Com a exigência ligada, a assinatura **só do corpo é recusada**, mesmo com carimbo novo: ela não cobre o carimbo, e uma entrega capturada poderia ser reenviada com outro cabeçalho. Os formatos aceitos estão em `docs/sgp-integration.md`.
 2. Em **Configurações → Integração SGP → Eventos e reconciliação**, ligue **Exigir carimbo de tempo assinado**. A tolerância padrão é de 300 s e é configurável entre 30 e 3600.
-3. Faça uma entrega de teste. Se voltar 401, o log do painel mostra `Rejected an SGP webhook delivery: missing_timestamp` (ou `stale_timestamp`). Se o SGP não envia o carimbo, desligue de novo.
+3. Faça uma entrega de teste. Se voltar 401, o log do painel mostra `Rejected an SGP webhook delivery: missing_timestamp` (ou `stale_timestamp`, ou `invalid_signature` quando o SGP assina só o corpo). Se o SGP não envia o carimbo ou não o assina, desligue de novo.
 
 Pela API, o mesmo resultado sai de `PUT /api/sgp/config` com `{ "webhookRequireTimestamp": true }`.
 

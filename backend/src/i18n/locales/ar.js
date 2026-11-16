@@ -60,6 +60,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'تم إنشاء رموز استرداد جديدة؛ الرموز القديمة لم تعد صالحة',
   'auth.mfaEnrollmentRequired': 'يشترط هذا المزود تسجيل الدخول بخطوتين. فعّله للمتابعة',
   'auth.mfaRequiredByProvider': 'مزود تعمل لديه يشترط تسجيل الدخول بخطوتين؛ لا يمكن إيقافه',
+  'auth.platformMfaEnrollmentRequired': 'تشترط المنصة تسجيل الدخول بخطوتين لمسؤوليها. فعّله للمتابعة',
+  'auth.mfaRequiredByPlatform': 'تشترط المنصة تسجيل الدخول بخطوتين لمسؤوليها؛ لا يمكن إيقافه',
   'auth.passwordUpdated': 'تم تحديث كلمة المرور',
 
   // حدود المعدّل
@@ -283,6 +285,7 @@ export default {
   'vendor.listFailed': 'تعذّر جلب قائمة المصنّعين',
   'vendor.idRequired': 'معرّف المصنّع مطلوب',
   'vendor.notFound': 'المصنّع غير موجود',
+  'vendor.platformAdminOnly': 'لا يستطيع تعديل الكتالوج الافتراضي الذي يرثه كل مزود إلا مسؤول المنصة',
   'vendor.retrieved': 'تم جلب بيانات المصنّع',
   'vendor.getFailed': 'تعذّر جلب بيانات المصنّع',
   'vendor.fieldsRequired': 'الحقول name وmanufacturer_patterns وproduct_patterns مطلوبة',
@@ -1059,6 +1062,9 @@ export default {
   'auth.signupInvalid': 'اسم المزوّد واسم المستخدم (3–64) وكلمة المرور (10–128) مطلوبة',
   'auth.signupSlugTaken': 'هذا النطاق الفرعي مستخدم بالفعل',
   'auth.signupUsernameTaken': 'اسم المستخدم هذا مستخدم بالفعل',
+  'auth.signupUsernameAt': 'لا يمكن أن يحتوي اسم المستخدم على @ — يوضع البريد الإلكتروني في حقله الخاص',
+  'auth.signupExistingMailSubject': 'محاولة تسجيل ببريدك الإلكتروني في {product}',
+  'auth.signupExistingMailBody': 'حاول شخص ما إنشاء حساب في {product} بعنوان البريد الإلكتروني هذا، وهو مرتبط بحساب موجود بالفعل.\n\nإن كنت أنت، فسجّل الدخول من عنوان لوحة مزوّدك أو استخدم "نسيت كلمة المرور" في شاشة تسجيل الدخول لإعادة تعيينها.\n\nإن لم تكن أنت، فتجاهل هذه الرسالة: لم يُنشأ أي حساب جديد ولم يتغيّر حسابك.',
   'auth.signupPhoneInvalid': 'أدخل رقم واتساب مع رمز المنطقة',
   'auth.signupWelcomeWhatsapp': 'مرحبًا بك في {product}، {provider}! 🎉\n\nلوحتك جاهزة: {link}\nالمستخدم: {username}\n\nبدأت الفترة التجريبية. رُدّ على هذه الرسالة إذا احتجت مساعدة في الإعداد.',
   'auth.signupTeamSubject': 'تسجيل مزوّد جديد: {provider}',

@@ -59,6 +59,8 @@ export default {
   'auth.mfaRecoveryRegenerated': 'Novos códigos de recuperação gerados; os antigos deixaram de valer',
   'auth.mfaEnrollmentRequired': 'Este provedor exige o login em duas etapas. Ative-o para continuar',
   'auth.mfaRequiredByProvider': 'Um provedor em que você trabalha exige o login em duas etapas; ele não pode ser desligado',
+  'auth.platformMfaEnrollmentRequired': 'A plataforma exige o login em duas etapas de quem a administra. Ative-o para continuar',
+  'auth.mfaRequiredByPlatform': 'A plataforma exige o login em duas etapas de quem a administra; ele não pode ser desligado',
   'auth.passwordUpdated': 'Senha atualizada com sucesso',
 
   // Limite de requisições
@@ -282,6 +284,7 @@ export default {
   'vendor.listFailed': 'Não foi possível obter os fabricantes',
   'vendor.idRequired': 'O ID do fabricante é obrigatório',
   'vendor.notFound': 'Fabricante não encontrado',
+  'vendor.platformAdminOnly': 'Só um administrador da plataforma altera o catálogo padrão que todo provedor herda',
   'vendor.retrieved': 'Fabricante obtido com sucesso',
   'vendor.getFailed': 'Não foi possível obter o fabricante',
   'vendor.fieldsRequired': 'O nome, manufacturer_patterns e product_patterns são obrigatórios',
@@ -1141,6 +1144,9 @@ export default {
   'auth.signupInvalid': 'Nome do provedor, usuário (3–64) e senha (10–128) são obrigatórios',
   'auth.signupSlugTaken': 'Este subdomínio já está em uso',
   'auth.signupUsernameTaken': 'Este nome de usuário já está em uso',
+  'auth.signupUsernameAt': 'O nome de usuário não pode conter @ — o e-mail vai no campo próprio',
+  'auth.signupExistingMailSubject': 'Tentativa de cadastro com o seu e-mail no {product}',
+  'auth.signupExistingMailBody': 'Alguém tentou criar uma conta no {product} com este endereço de e-mail, que já tem uma conta.\n\nSe foi você, entre pelo endereço do painel do seu provedor ou use "Esqueci minha senha" na tela de login para redefinir a senha.\n\nSe não foi você, ignore esta mensagem: nenhuma conta nova foi criada e a sua não mudou.',
   'auth.signupPhoneInvalid': 'Informe um WhatsApp com DDD',
   'auth.signupWelcomeWhatsapp': 'Bem-vindo ao {product}, {provider}! 🎉\n\nSeu painel está pronto: {link}\nUsuário: {username}\n\nSeu período de teste já começou. Responda esta mensagem se precisar de ajuda na configuração.',
   'auth.signupTeamSubject': 'Novo provedor cadastrado: {provider}',
