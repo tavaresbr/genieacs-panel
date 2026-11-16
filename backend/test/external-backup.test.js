@@ -487,6 +487,43 @@ describe('o host', () => {
     await getDb()('platform_alerts').del();
     assert.equal((await PlatformAlertService.checkBackupFailure({ now: agora, dir: destino })).enqueued, 0);
   });
+
+  it('espera a vez que o painel tem (a verificação semanal), e desiste com other_instance depois do prazo', async () => {
+    const { acquireLease, releaseLease } = await import('../src/services/schedulerLease.js');
+    const stamp = '2026-11-03T031700Z';
+    const dir = path.join(base, 'host', stamp);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'panel.sqlite'), 'x');
+    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ client: 'better-sqlite3', schemaMigration: '0001' }));
+    const outra = { holder: 'painel:verificacao' };
+    assert.equal(await acquireLease('external-backup', { ttlMs: 60_000, ...outra }), true);
+    try {
+      // Nunca soltada: tenta até o prazo e devolve o `skipped` (o script sai 1).
+      const esperas = [];
+      const desistiu = await ExternalBackupService.performHost({
+        sourceDir: dir, waitMs: 100, pollMs: 30, sleep: async (ms) => { esperas.push(ms); }
+      });
+      assert.equal(desistiu.status, 'skipped');
+      assert.equal(desistiu.reason, 'other_instance');
+      assert.ok(esperas.length >= 1, 'desistiu sem esperar a vez');
+
+      // Soltada durante a espera: o envio sai.
+      let tentativas = 0;
+      const enviou = await ExternalBackupService.performHost({
+        sourceDir: dir,
+        waitMs: 60_000,
+        pollMs: 1000,
+        sleep: async () => {
+          tentativas += 1;
+          await releaseLease('external-backup', outra);
+        }
+      });
+      assert.equal(enviou.status, 'ok', JSON.stringify(enviou));
+      assert.equal(tentativas, 1);
+    } finally {
+      await releaseLease('external-backup', outra).catch(() => {});
+    }
+  });
 });
 
 describe('a CLI do restore (o que se roda no dia, com a chave privada)', () => {

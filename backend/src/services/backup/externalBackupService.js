@@ -242,6 +242,30 @@ class ExternalBackupService {
     }
   }
 
+  /**
+   * O envio do host (`backup-external.js upload`): `perform`, mas esperando a
+   * vez quando outra instância a tem. A vez `external-backup` é a mesma da
+   * verificação semanal do painel — sem esperar, o backup do dia era pulado
+   * em silêncio (o script saía 0) toda vez que as duas coincidiam. Espera até
+   * `waitMs`, tentando a cada `pollMs`; ainda sem a vez, devolve o `skipped`
+   * com `waitedMs`, e quem chama sai com erro (o `OnFailure=` do systemd).
+   */
+  static async performHost({
+    sourceDir, waitMs = 30 * 60_000, pollMs = 30_000,
+    sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); })
+  } = {}) {
+    const inicio = Date.now();
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- uma tentativa por vez, esperando a vez
+      const resultado = await this.perform({ trigger: 'host', sourceDir });
+      if (resultado.status !== 'skipped' || resultado.reason !== 'other_instance') return resultado;
+      const passou = Date.now() - inicio;
+      if (passou + pollMs > waitMs) return { ...resultado, waitedMs: passou };
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(pollMs);
+    }
+  }
+
   /** O corpo de `perform`, já com a vez (e a renovação dela) nas mãos. */
   static async performLeased({ trigger, sourceDir, now, inicio, config, source }) {
     const { day } = saoPauloClock(now);
