@@ -113,6 +113,9 @@ export default function Signup() {
     if (form.providerName.trim().length < 1) return setError(t('signup.error.name'))
     if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(form.slug) || form.slug.length < 3) return setError(t('signup.error.slug'))
     if (form.username.trim().length < 3) return setError(t('setup.error.usernameTooShort'))
+    // A mesma regra do servidor: nome e e-mail dividem um espaço de nomes, e
+    // um nome com @ poderia casar com o e-mail de outra conta.
+    if (form.username.includes('@')) return setError(t('signup.error.usernameAt'))
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setError(t('setup.error.emailInvalid'))
     if (form.password.length < PASSWORD_MIN_LENGTH) return setError(t('setup.error.passwordTooShort'))
     if (form.password !== form.confirm) return setError(t('setup.error.passwordMismatch'))

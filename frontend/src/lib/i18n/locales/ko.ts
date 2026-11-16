@@ -3878,6 +3878,7 @@ const ko: Dictionary = {
   'signup.backToLogin': '이미 패널이 있나요? 로그인',
   'signup.error.name': '사업자 이름을 입력하세요.',
   'signup.error.slug': '주소는 3자 이상이어야 하며 소문자, 숫자, 하이픈만 사용할 수 있습니다.',
+  'signup.error.usernameAt': '사용자 이름에는 @를 쓸 수 없습니다 — 이메일은 별도 칸에 입력하세요.',
   'signup.error.failed': '패널을 만들 수 없습니다. 다시 시도하세요.',
   'onboarding.kicker': '{total}단계 중 {step}단계',
   'onboarding.skip': '지금은 건너뛰기',

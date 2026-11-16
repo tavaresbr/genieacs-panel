@@ -3879,6 +3879,7 @@ const ru: Dictionary = {
   'signup.backToLogin': 'Уже есть панель? Войти',
   'signup.error.name': 'Укажите название провайдера.',
   'signup.error.slug': 'Адрес должен содержать не менее 3 символов: строчные буквы, цифры и дефисы.',
+  'signup.error.usernameAt': 'Имя пользователя не может содержать @ — адрес почты указывается в отдельном поле.',
   'signup.error.failed': 'Не удалось создать панель. Попробуйте ещё раз.',
   'onboarding.kicker': 'Шаг {step} из {total}',
   'onboarding.skip': 'Пропустить пока',

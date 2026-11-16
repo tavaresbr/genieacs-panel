@@ -3837,6 +3837,7 @@ const ar: Dictionary = {
   'signup.backToLogin': 'لديك لوحة بالفعل؟ سجّل الدخول',
   'signup.error.name': 'أدخل اسم المزوّد.',
   'signup.error.slug': 'يحتاج العنوان إلى 3 أحرف على الأقل: أحرف لاتينية صغيرة وأرقام وشرطات.',
+  'signup.error.usernameAt': 'لا يمكن أن يحتوي اسم المستخدم على @ — يوضع البريد الإلكتروني في حقله الخاص.',
   'signup.error.failed': 'تعذّر إنشاء اللوحة. حاول مرة أخرى.',
   'onboarding.kicker': 'الخطوة {step} من {total}',
   'onboarding.skip': 'تخطٍّ الآن',

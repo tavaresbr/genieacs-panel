@@ -3871,6 +3871,7 @@ const fr: Dictionary = {
   'signup.backToLogin': 'Vous avez déjà un panneau ? Se connecter',
   'signup.error.name': 'Indiquez le nom du fournisseur.',
   'signup.error.slug': 'L\'adresse doit comporter au moins 3 caractères : lettres minuscules, chiffres et tirets.',
+  'signup.error.usernameAt': 'Le nom d\'utilisateur ne peut pas contenir @ — l\'e-mail a son propre champ.',
   'signup.error.failed': 'Le panneau n\'a pas pu être créé. Réessayez.',
   'onboarding.kicker': 'Étape {step} sur {total}',
   'onboarding.skip': 'Passer pour l\'instant',

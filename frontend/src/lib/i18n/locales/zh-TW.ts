@@ -3872,6 +3872,7 @@ const zhTW: Dictionary = {
   'signup.backToLogin': '已有面板？登入',
   'signup.error.name': '請輸入業者名稱。',
   'signup.error.slug': '網址至少需要 3 個字元：小寫字母、數字和連字號。',
+  'signup.error.usernameAt': '使用者名稱不能包含 @ —— 電子郵件請填寫在專屬欄位。',
   'signup.error.failed': '無法建立面板，請再試一次。',
   'onboarding.kicker': '第 {step} 步，共 {total} 步',
   'onboarding.skip': '暫時略過',

@@ -3871,6 +3871,7 @@ const zhCN: Dictionary = {
   'signup.backToLogin': '已有面板？登录',
   'signup.error.name': '请输入运营商名称。',
   'signup.error.slug': '地址至少需要 3 个字符：小写字母、数字和连字符。',
+  'signup.error.usernameAt': '用户名不能包含 @ —— 电子邮件请填写在专门的字段中。',
   'signup.error.failed': '无法创建面板，请重试。',
   'onboarding.kicker': '第 {step} 步，共 {total} 步',
   'onboarding.skip': '暂时跳过',

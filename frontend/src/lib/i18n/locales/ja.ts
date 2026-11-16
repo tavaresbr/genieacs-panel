@@ -3871,6 +3871,7 @@ const ja: Dictionary = {
   'signup.backToLogin': 'すでにパネルをお持ちですか？サインイン',
   'signup.error.name': 'プロバイダー名を入力してください。',
   'signup.error.slug': 'アドレスは3文字以上で、小文字・数字・ハイフンのみ使えます。',
+  'signup.error.usernameAt': 'ユーザー名に @ は使えません — メールアドレスは専用の欄に入力してください。',
   'signup.error.failed': 'パネルを作成できませんでした。もう一度お試しください。',
   'onboarding.kicker': 'ステップ {step} / {total}',
   'onboarding.skip': '今はスキップ',

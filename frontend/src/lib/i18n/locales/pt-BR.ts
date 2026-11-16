@@ -3871,6 +3871,7 @@ const ptBR: Dictionary = {
   'signup.backToLogin': 'Já tem um painel? Entrar',
   'signup.error.name': 'Informe o nome do provedor.',
   'signup.error.slug': 'O endereço precisa de pelo menos 3 caracteres: letras minúsculas, dígitos e hífens.',
+  'signup.error.usernameAt': 'O nome de usuário não pode conter @ — o e-mail vai no campo próprio.',
   'signup.error.failed': 'Não foi possível criar o painel. Tente de novo.',
   'onboarding.kicker': 'Passo {step} de {total}',
   'onboarding.skip': 'Pular por enquanto',

@@ -3836,6 +3836,7 @@ const hi: Dictionary = {
   'signup.backToLogin': 'पहले से पैनल है? साइन इन करें',
   'signup.error.name': 'प्रदाता का नाम दर्ज करें।',
   'signup.error.slug': 'पते में कम से कम 3 अक्षर चाहिए: छोटे अक्षर, अंक और हाइफ़न।',
+  'signup.error.usernameAt': 'उपयोगकर्ता नाम में @ नहीं हो सकता — ईमेल उसके अपने फ़ील्ड में डालें।',
   'signup.error.failed': 'पैनल नहीं बनाया जा सका। फिर से प्रयास करें।',
   'onboarding.kicker': 'चरण {step} / {total}',
   'onboarding.skip': 'अभी छोड़ें',

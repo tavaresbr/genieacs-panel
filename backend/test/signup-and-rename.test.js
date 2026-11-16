@@ -124,12 +124,30 @@ describe('signing up', () => {
       method: 'POST', body: { ...good, slug: 'email-ruim', username: 'email-ruim', email: 'nao-e-um-endereco' }
     });
     assert.equal(badEmail.status, 400);
-    // The address of an existing account is a taken login: the namespace is one.
+    // O endereço de uma conta que já existe continua tomado — nada nasce com
+    // ele —, mas a resposta não pode DIZER isso: seria um oráculo público de
+    // "este e-mail tem conta". Responde como um cadastro feito, na mesma forma.
     const taken = await home('/api/auth/signup', {
       method: 'POST', body: { ...good, slug: 'email-tomado', username: 'outro-nome', email: 'owner@exemplo.test' }
     });
-    assert.equal(taken.status, 409);
+    assert.equal(taken.status, 201, JSON.stringify(taken.body));
+    assert.deepEqual(Object.keys(taken.body.data).sort(), ['emailed', 'panelUrl', 'tenant']);
+    assert.deepEqual(taken.body.data.tenant, { slug: 'email-tomado', name: 'ISP Nova' });
+    assert.equal(taken.body.data.panelUrl, 'https://email-tomado.painel.test');
+    assert.equal(taken.body.data.token, undefined);
     assert.equal(await getDb()('tenants').where({ slug: 'email-tomado' }).first(), undefined);
+    assert.equal(await getDb()('users').where({ username: 'outro-nome' }).first(), undefined);
+    // Nome com @ é recusado pelo formato: senão o nome tomado diria, no lugar
+    // do e-mail, que aquele endereço tem conta.
+    const arroba = await home('/api/auth/signup', {
+      method: 'POST', body: { ...good, slug: 'arroba', username: 'owner@exemplo.test', email: 'arroba@exemplo.test' }
+    });
+    assert.equal(arroba.status, 400);
+    const arrobaLivre = await home('/api/auth/signup', {
+      method: 'POST', body: { ...good, slug: 'arroba', username: 'ninguem@exemplo.test', email: 'arroba@exemplo.test' }
+    });
+    assert.equal(arrobaLivre.status, 400);
+    assert.equal(arroba.body.message, arrobaLivre.body.message, 'a recusa não pode depender de o endereço existir');
   });
 
   it('and she can sign in at her own address, and nowhere else', async () => {

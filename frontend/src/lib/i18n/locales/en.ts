@@ -3873,6 +3873,7 @@ const en = {
   'signup.backToLogin': 'Already have a panel? Sign in',
   'signup.error.name': 'Enter the provider name.',
   'signup.error.slug': 'The address needs at least 3 characters: lower-case letters, digits and hyphens.',
+  'signup.error.usernameAt': 'The username cannot contain @ — the email goes in its own field.',
   'signup.error.failed': 'The panel could not be created. Try again.',
   'onboarding.kicker': 'Step {step} of {total}',
   'onboarding.skip': 'Skip for now',
