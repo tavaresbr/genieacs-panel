@@ -7,6 +7,26 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.46.0] - 2026-11-16
+
+### New
+
+- 2FA obrigatório para quem opera a plataforma (`bf8d779f`)
+
+### Fixed
+
+- Com o carimbo exigido, só vale a assinatura sobre <timestamp>.<corpo> (`329a243c`)
+- O cadastro público não diz mais se um e-mail tem conta (`f600946d`)
+- Só o cadastro da plataforma escreve no catálogo padrão da caixa (`72e89ff5`)
+- O log do cadastro com e-mail tomado não leva nada do pedido (`ccfecf3d`)
+
+### Changed
+
+- As recusas do login em funções próprias (`1c54e49f`)
+- O formulário conferido numa função própria (`4bb852ff`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/4ae64d6f87b8...c61e69e96213)
+
 ## [1.45.1] - 2026-11-16
 
 ### Fixed

@@ -1,172 +1,52 @@
 {
-  "version": "1.45.1",
-  "build": 1723,
-  "sourceCommit": "2a0311eaff14",
+  "version": "1.46.0",
+  "build": 1732,
+  "sourceCommit": "c61e69e96213",
   "releasedAt": "2026-11-16",
-  "basedOnTag": "v1.45.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/12c194a7c02f...2a0311eaff14",
+  "basedOnTag": "v1.45.1",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/4ae64d6f87b8...c61e69e96213",
   "changes": [
     {
-      "shortHash": "babee8a7",
+      "shortHash": "329a243c",
       "date": "2026-11-16",
-      "title": "Sessões, NPS/convite, corridas de resposta e formatação",
+      "title": "Com o carimbo exigido, só vale a assinatura sobre <timestamp>.<corpo>",
       "category": "Fixed"
     },
     {
-      "shortHash": "2cbab88e",
+      "shortHash": "f600946d",
       "date": "2026-11-16",
-      "title": "Cobrança removida não fica em aberto, e evento/página atrasados não desfazem o fechamento",
+      "title": "O cadastro público não diz mais se um e-mail tem conta",
       "category": "Fixed"
     },
     {
-      "shortHash": "67c48c30",
+      "shortHash": "72e89ff5",
       "date": "2026-11-16",
-      "title": "Trava de preço, segundo lead, add-on na classificação e copiloto na conversa certa",
+      "title": "Só o cadastro da plataforma escreve no catálogo padrão da caixa",
       "category": "Fixed"
     },
     {
-      "shortHash": "ef88ce74",
+      "shortHash": "bf8d779f",
       "date": "2026-11-16",
-      "title": "A trava de preço não libera o valor que o cliente chutou",
+      "title": "2FA obrigatório para quem opera a plataforma",
+      "category": "New"
+    },
+    {
+      "shortHash": "ccfecf3d",
+      "date": "2026-11-16",
+      "title": "O log do cadastro com e-mail tomado não leva nada do pedido",
       "category": "Fixed"
     },
     {
-      "shortHash": "8d26af03",
+      "shortHash": "1c54e49f",
       "date": "2026-11-16",
-      "title": "Prazo do S3 por inatividade, não pela transferência inteira",
-      "category": "Fixed"
+      "title": "As recusas do login em funções próprias",
+      "category": "Changed"
     },
     {
-      "shortHash": "0ab20ca8",
+      "shortHash": "4bb852ff",
       "date": "2026-11-16",
-      "title": "Dias do lembrete contados no calendário de São Paulo",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "5707ad8d",
-      "date": "2026-11-16",
-      "title": "Falha do provisionamento não derruba o resto da passada",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "53638e2c",
-      "date": "2026-11-16",
-      "title": "O upload do host espera a vez em vez de pular em silêncio",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "3f1a83e4",
-      "date": "2026-11-16",
-      "title": "Execução tomada com UPDATE condicional",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "cb92e3f6",
-      "date": "2026-11-16",
-      "title": "Backup interrompido no meio vira falha e o dia é tentado de novo",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "45f052d4",
-      "date": "2026-11-16",
-      "title": "Não embrulhar resposta 204/205/304 do S3 num Response com corpo",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "fdfedd48",
-      "date": "2026-11-16",
-      "title": "Incidente de queda em manutenção não fecha com \"normalizado\"",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "fc317ab9",
-      "date": "2026-11-16",
-      "title": "Queda em massa julga o cliente pelo último equipamento a informar",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "1eee6825",
-      "date": "2026-11-16",
-      "title": "RX do TR-181 (OpticalSignalLevel) em milésimos de dBm",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "84f4b28c",
-      "date": "2026-11-16",
-      "title": "Página da URL preservada e releitura após Solicitar Inform",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "e9ffc8c1",
-      "date": "2026-11-16",
-      "title": "Solicitar Inform não empilha leituras na fila de ONT inalcançável",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "d5bef87f",
-      "date": "2026-11-16",
-      "title": "Reimportar a planilha depois do Excel não corrompe CPF e WhatsApp",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "3b895e7e",
-      "date": "2026-11-16",
-      "title": "Curingas do LIKE escapados em vez de removidos",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "04e3f281",
-      "date": "2026-11-16",
-      "title": "Reconciliação não engole o segundo bloqueio do mesmo contrato",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "407897b2",
-      "date": "2026-11-16",
-      "title": "Sinal e temperatura do assinante pela mesma leitura do painel",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "020a66d3",
-      "date": "2026-11-16",
-      "title": "Auto-indicação e duplicata comparam com e sem o nono dígito",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "4bab8c3f",
-      "date": "2026-11-16",
-      "title": "Fila da ONT descontando a própria tarefa mesmo sem id na resposta",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "45437b38",
-      "date": "2026-11-16",
-      "title": "Leituras ganham teto de 30 s para a lista de conversas não parar de atualizar",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "15b72cb2",
-      "date": "2026-11-16",
-      "title": "Falha do provisionamento no log sem quebra de linha",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "91aaf272",
-      "date": "2026-11-16",
-      "title": "O log da falha do provisionamento leva só o tipo do erro",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "6a36bddb",
-      "date": "2026-11-16",
-      "title": "O log da falha do provisionamento não leva nada do erro",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "b73a5e83",
-      "date": "2026-11-16",
-      "title": "Chave da reconciliação pelo último evento do contrato, não por horário",
-      "category": "Fixed"
+      "title": "O formulário conferido numa função própria",
+      "category": "Changed"
     }
   ]
 }
