@@ -334,6 +334,25 @@ async function gzipText(text: string): Promise<Blob | null> {
   }
 }
 
+/** Quanto uma leitura (GET) espera antes de desistir. */
+export const GET_TIMEOUT_MS = 30_000
+
+/**
+ * O sinal que dá um teto de tempo às leituras. Sem ele, um pedido que a rede
+ * deixa pendurado (Wi-Fi que cai, aparelho que dorme, proxy que trava) nunca
+ * termina, e quem espera por ele — a lista de conversas, que só pede de novo
+ * depois que o pedido anterior acaba — para de atualizar até recarregar a
+ * página. Escritas ficam como estão: um envio ou um upload lento não pode ser
+ * cortado no meio. Quem já passou um `signal` próprio manda nele.
+ */
+export function readTimeoutSignal(method: string | undefined, given?: AbortSignal | null): AbortSignal | undefined {
+  if (given) return given
+  if ((method ?? 'GET').toUpperCase() !== 'GET') return undefined
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+    ? AbortSignal.timeout(GET_TIMEOUT_MS)
+    : undefined
+}
+
 class ApiClient {
   private baseURL: string
   /** O token de acesso: só aqui, na memória desta aba (0129). */
@@ -441,9 +460,11 @@ class ApiClient {
     }
 
     try {
+      const signal = readTimeoutSignal(options.method, options.signal)
       const response = await fetch(url, {
         ...options,
         headers,
+        ...(signal ? { signal } : {}),
       })
 
       const contentType = response.headers.get('content-type') || ''
