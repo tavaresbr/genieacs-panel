@@ -389,6 +389,40 @@ describe('o agendador', () => {
     assert.equal((await ExternalBackupService.schedulerPass({ now: agora, force: true })).skipped, 'nothing_due');
     await configurar();
   });
+
+  it('o backup que morreu no meio vira falha (com alerta) quando a vez dele vence, e o dia é tentado de novo', async () => {
+    const { acquireLease, releaseLease } = await import('../src/services/schedulerLease.js');
+    const { writeStatus } = await import('../src/services/backup/externalBackupSettings.js');
+    const { saoPauloClock } = await import('../src/services/platformAlertService.js');
+    await getDb()('app_state').where({ key: STATUS_KEY }).del();
+    await getDb()('platform_alerts').del();
+    const agora = new Date(Math.floor(Date.now() / 1000) * 1000);
+    const startedAt = new Date(agora.getTime() - 60_000).toISOString();
+    await writeStatus({
+      lastAttemptDay: saoPauloClock(agora).day,
+      lastRun: { status: 'running', trigger: 'schedule', source: 'panel', startedAt }
+    });
+
+    // Vivo em outra instância (a vez renovada): nada muda.
+    const vivo = { holder: 'outra-instancia:envio' };
+    assert.equal(await acquireLease('external-backup', { ttlMs: 60_000, ...vivo }), true);
+    try {
+      assert.equal((await ExternalBackupService.schedulerPass({ now: agora, force: true })).skipped, 'nothing_due');
+      assert.equal((await readStatus()).lastRun.status, 'running');
+    } finally {
+      await releaseLease('external-backup', vivo);
+    }
+
+    // A vez dele venceu (ou foi solta sem gravar nada): falha, alerta, e o
+    // backup do dia sai de novo na mesma passada.
+    const r = await ExternalBackupService.schedulerPass({ now: agora, force: true });
+    assert.equal(r.started, 'backup', JSON.stringify(r));
+    await esperar();
+    assert.equal((await alertasDeBackup()).length, 1);
+    const status = await readStatus();
+    assert.equal(status.lastRun.status, 'ok');
+    assert.equal(status.lastAttemptDay, saoPauloClock(agora).day);
+  });
 });
 
 describe('a vez durante um envio longo', () => {
@@ -486,6 +520,43 @@ describe('o host', () => {
     fs.utimesSync(path.join(dir, 'manifest.json'), new Date(agora.getTime() + 60_000), new Date(agora.getTime() + 60_000));
     await getDb()('platform_alerts').del();
     assert.equal((await PlatformAlertService.checkBackupFailure({ now: agora, dir: destino })).enqueued, 0);
+  });
+
+  it('espera a vez que o painel tem (a verificação semanal), e desiste com other_instance depois do prazo', async () => {
+    const { acquireLease, releaseLease } = await import('../src/services/schedulerLease.js');
+    const stamp = '2026-11-03T031700Z';
+    const dir = path.join(base, 'host', stamp);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'panel.sqlite'), 'x');
+    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ client: 'better-sqlite3', schemaMigration: '0001' }));
+    const outra = { holder: 'painel:verificacao' };
+    assert.equal(await acquireLease('external-backup', { ttlMs: 60_000, ...outra }), true);
+    try {
+      // Nunca soltada: tenta até o prazo e devolve o `skipped` (o script sai 1).
+      const esperas = [];
+      const desistiu = await ExternalBackupService.performHost({
+        sourceDir: dir, waitMs: 100, pollMs: 30, sleep: async (ms) => { esperas.push(ms); }
+      });
+      assert.equal(desistiu.status, 'skipped');
+      assert.equal(desistiu.reason, 'other_instance');
+      assert.ok(esperas.length >= 1, 'desistiu sem esperar a vez');
+
+      // Soltada durante a espera: o envio sai.
+      let tentativas = 0;
+      const enviou = await ExternalBackupService.performHost({
+        sourceDir: dir,
+        waitMs: 60_000,
+        pollMs: 1000,
+        sleep: async () => {
+          tentativas += 1;
+          await releaseLease('external-backup', outra);
+        }
+      });
+      assert.equal(enviou.status, 'ok', JSON.stringify(enviou));
+      assert.equal(tentativas, 1);
+    } finally {
+      await releaseLease('external-backup', outra).catch(() => {});
+    }
   });
 });
 

@@ -9,6 +9,7 @@ import { WaError } from './whatsappConfigService.js';
 import { tdb, tinsert, tinsertReturningId } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { conditionKey } from './alertConditionKey.js';
 
 const t = (chave, vars) => translate(DEFAULT_LOCALE, chave, vars);
 
@@ -84,7 +85,7 @@ class OutageIncidentService {
     }
 
     for (const [nodeId, row] of abertoPorNo) {
-      if (ativos.has(nodeId) || unknown?.has(`mass_outage:${nodeId}`)) continue;
+      if (ativos.has(nodeId) || unknown?.has(conditionKey('mass_outage', nodeId))) continue;
       await this.resolver(row.id);
     }
   }
@@ -271,17 +272,18 @@ class OutageIncidentService {
     else if (status === 'resolved') query.whereNot({ status: 'open' }).where('resolved_at', '>=', desde);
     else query.where((q) => q.where({ status: 'open' }).orWhere('resolved_at', '>=', desde));
 
-    // Como a busca da caixa de entrada: os curingas do LIKE saem do termo,
-    // e um termo que só tinha curingas não acha nada.
+    // Como a busca da caixa de entrada: os curingas do LIKE são escapados
+    // (`WaConversation.likeTerm`), e um termo sem texto não acha nada.
     if (String(search ?? '').trim()) {
-      const termo = WaConversation.likeTerm(search).slice(0, 100);
+      // Corta antes de escapar: cortar depois podia separar o `!` do curinga.
+      const termo = WaConversation.likeTerm(String(search).trim().slice(0, 100));
       query.where((q) => {
         if (!termo) {
           q.whereRaw('1 = 0');
           return;
         }
-        q.whereRaw("lower(coalesce(node_name, '')) like ?", [`%${termo}%`])
-          .orWhereRaw('lower(node_id) like ?', [`%${termo}%`]);
+        q.whereRaw(`lower(coalesce(node_name, '')) like ? ${WaConversation.LIKE_ESCAPE}`, [`%${termo}%`])
+          .orWhereRaw(`lower(node_id) like ? ${WaConversation.LIKE_ESCAPE}`, [`%${termo}%`]);
       });
     }
     if (notified === 'pending') query.whereNull('notice_sent_at');

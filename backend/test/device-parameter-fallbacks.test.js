@@ -213,12 +213,18 @@ describe('an optical reading found by its own name', () => {
     assert.equal(findRxPowerReading(item, readValue), null);
   });
 
-  it('reads the TR-181 optical interface', () => {
-    const item = { Device: { Optical: { Interface: { 1: { OpticalSignalLevel: param(-2417) } } } } };
+  it('reads the TR-181 optical interface, in thousandths of a dBm', () => {
+    // TR-181 define OpticalSignalLevel em 0,001 dBm: -24170 é -24,17 dBm.
+    const item = { Device: { Optical: { Interface: { 1: { OpticalSignalLevel: param(-24170) } } } } };
     assert.deepEqual(findRxPowerReading(item, readValue), {
       value: -24.17,
       path: 'Device.Optical.Interface.1.OpticalSignalLevel'
     });
+  });
+
+  it('still reads a firmware that publishes the TR-181 level in hundredths', () => {
+    const item = { Device: { Optical: { Interface: { 1: { OpticalSignalLevel: param(-2417) } } } } };
+    assert.equal(findRxPowerReading(item, readValue).value, -24.17);
   });
 
   it('does not walk an unbounded document looking for one number', () => {
@@ -266,6 +272,17 @@ describe('GET /api/devices without VirtualParameters', () => {
 
     assert.equal(device.pppoe, 'scripted-3');
     assert.equal(device.rxpower, '-19.87');
+  });
+
+  it('o portal do assinante lê o sinal pelo mesmo caminho do painel', async () => {
+    const { default: DeviceService } = await import('../src/services/deviceService.js');
+    genieAcs.fleet = [bareOnt(4)];
+    const overview = await asTenant(() => DeviceService.getCustomerPortalOverview(bareOnt(4)._id));
+
+    assert.equal(overview.optical.rxPower, -21.53);
+    assert.ok(genieAcs.projections.at(-1).includes(
+      'InternetGatewayDevice.WANDevice.1.X_ALU-COM_GponInterfaceConfig.RXPower'
+    ));
   });
 });
 

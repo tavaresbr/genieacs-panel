@@ -114,12 +114,17 @@ class WaAiKnowledgeService {
    * O texto da base para o prompt, dado o que o cliente escreveu. Conta o uso
    * dos itens que entraram por gatilho; nunca lança (a conversa não pode
    * depender do contador).
+   *
+   * `nova`: só a mensagem mais recente do cliente. O prompt olha as duas
+   * últimas, mas o uso só conta o item que ESTA mensagem disparou: senão a
+   * mesma mensagem contava de novo na resposta seguinte.
    */
-  static async paraPrompt(conversa) {
+  static async paraPrompt(conversa, { nova = conversa } = {}) {
     const linhas = await tdb('wa_ai_knowledge').where({ active: true });
     const { texto, usados } = escolherConhecimento(linhas, conversa);
-    if (usados.length) {
-      tdb('wa_ai_knowledge').whereIn('id', usados.map((i) => i.id)).increment('uses', 1).catch(() => {});
+    const daNova = new Set(escolherConhecimento(usados, nova).usados.map((i) => i.id));
+    if (daNova.size) {
+      tdb('wa_ai_knowledge').whereIn('id', [...daNova]).increment('uses', 1).catch(() => {});
     }
     return texto;
   }

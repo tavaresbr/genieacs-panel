@@ -73,7 +73,8 @@ export const RX_POWER_FALLBACK_PATHS = Object.freeze([
   // ship the object as "InterafceConfig" and GenieACS stores what it is told.
   'InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig.RXPower',
   'InternetGatewayDevice.WANDevice.1.WANPONInterfaceConfig.RXPower',
-  // TR-181, in units of 0.1 dBm
+  // TR-181, em unidades de 0,001 dBm (-24170 = -24,17 dBm) — ver a escala 1000
+  // em RX_POWER_SCALES.
   'Device.Optical.Interface.1.OpticalSignalLevel'
 ]);
 
@@ -125,8 +126,12 @@ const RX_POWER_MAX_DBM = -0.01;
  * the one the firmware meant. It is unambiguous in practice because the
  * alternatives are an order of magnitude apart — -2500 is -25 dBm at a
  * hundredth and an impossible -250 dBm at a tenth.
+ *
+ * O milésimo é o do TR-181 (`OpticalSignalLevel`): -24170 é -24,17 dBm. Vem
+ * por último porque de -4000 a -40000 o centésimo já cai fora da janela
+ * (-40 a -400 dBm), então não rouba leitura de quem publica em centésimos.
  */
-const RX_POWER_SCALES = Object.freeze([1, 10, 100]);
+const RX_POWER_SCALES = Object.freeze([1, 10, 100, 1000]);
 
 /**
  * Reads a number out of whatever the ONT reported — a number, a numeric

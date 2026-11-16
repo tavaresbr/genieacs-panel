@@ -98,11 +98,11 @@ export function AsaasPanel() {
         ...(clearKey ? { apiKey: '' } : form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {})
       })
       if (!res.success || !res.data) {
-        toast.error(res.message || t('settings.asaas.save'))
+        toast.error(res.message || t('settings.asaas.saveFailed'))
         return
       }
       applyConfig(res.data)
-      toast.success(clearKey ? t('settings.asaas.keyRemoved') : (res.message || t('settings.asaas.saveFailed')))
+      toast.success(clearKey ? t('settings.asaas.keyRemoved') : (res.message || t('settings.asaas.save')))
     } finally {
       setSaving(false)
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  affiliateCodeFromQuery, bpToPercent, parseMonths, passwordTokenFromHash, payoutActions, percentToBp
+  affiliateCodeFromQuery, bpToPercent, formatBpPercent, parseMonths, passwordTokenFromHash, payoutActions, percentToBp
 } from '@/lib/affiliates'
 import en from '@/lib/i18n/locales/en'
 
@@ -21,6 +21,16 @@ describe('o programa de afiliados na tela (0126)', () => {
     expect(percentToBp('')).toBeNull()
     expect(percentToBp('101')).toBeUndefined()
     expect(percentToBp('abc')).toBeUndefined()
+  })
+
+  it('mostra a porcentagem no idioma da tela, e o campo continua com o ponto', () => {
+    expect(formatBpPercent(1250, 'pt-BR')).toBe('12,5')
+    expect(formatBpPercent(1250, 'en-US')).toBe('12.5')
+    expect(formatBpPercent(1000, 'pt-BR')).toBe('10')
+    expect(formatBpPercent(1234, 'pt-BR')).toBe('12,34')
+    expect(formatBpPercent(null, 'pt-BR')).toBe('')
+    // O que vai ao campo é relido pelo `percentToBp` sem perda.
+    expect(percentToBp(formatBpPercent(1250, 'pt-BR'))).toBe(1250)
   })
 
   it('aceita meses de 1 a 120', () => {

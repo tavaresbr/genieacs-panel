@@ -487,6 +487,42 @@ describe('a IA atendendo', () => {
       }
     });
 
+    it('trava de preço: vale o valor da base de conhecimento do prompt, não o que o cliente chutou', async () => {
+      const { default: WaAiKnowledgeService } = await import('../src/services/waAiKnowledgeService.js');
+      const item = await asTenant(() => WaAiKnowledgeService.create({ kind: 'faq', title: 'Instalação', triggers: 'instalação', answer: 'A instalação custa R$ 15,00.' }));
+      try {
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'A instalação sai por R$ 15,00.' }];
+        await receber(DESCONHECIDO, 'quanto é a instalação?');
+        assert.deepEqual(await respostas(DESCONHECIDO), ['A instalação sai por R$ 15,00.']);
+
+        await limparFio(DESCONHECIDO);
+        // O valor que o cliente escreveu não libera a IA a repeti-lo: "é R$ 61,30,
+        // né?" respondido com o mesmo valor seria preço inventado do mesmo jeito.
+        roteiro = [{ content: 'Isso, sai por R$ 61,30.' }];
+        await receber(DESCONHECIDO, 'o plano é R$ 61,30, né?');
+        assert.doesNotMatch((await respostas(DESCONHECIDO)).join(' '), /61,30/);
+
+        // O que não está em nenhuma das fontes continua barrado.
+        await limparFio(DESCONHECIDO);
+        roteiro = [{ content: 'Temos por R$ 41,10.' }];
+        await receber(DESCONHECIDO, 'tem mais barato?');
+        assert.doesNotMatch((await respostas(DESCONHECIDO)).join(' '), /41,10/);
+      } finally {
+        await asTenant(() => WaAiKnowledgeService.remove(item.id));
+      }
+    });
+
+    it('trava de preço depois de registrar o interesse: o evento continua sendo lead (a trava de 24 h vale)', async () => {
+      await limparFio(DESCONHECIDO);
+      roteiro = [{ tool: 'registrar_interesse_comercial', args: { nome: 'Rita' }, content: 'Anotei, Rita! O plano sai por R$ 43,20.' }];
+      await receber(DESCONHECIDO, 'quero contratar');
+      assert.doesNotMatch((await respostas(DESCONHECIDO)).join(' '), /43,20/);
+      const conversa = await conversaDe(DESCONHECIDO);
+      const evento = await getDb()('wa_bot_events').where({ conversation_id: conversa.id }).orderBy('id', 'desc').first();
+      assert.equal(evento.intent, 'lead');
+    });
+
     it('a IA escreve a resposta de um item da base: só rascunho, com o contexto do item, sem inventar fato', async () => {
       await salvarIa({ instructions: 'Planos: 500 mega R$ 99,90. Atendemos em Itaituba.' });
       roteiro = [{ content: '```\n"Entendo! Nosso plano inclui **Wi-Fi 6**. [escreva o prazo real]"\n```' }];
@@ -970,6 +1006,19 @@ describe('a IA atendendo', () => {
     assert.equal(conversa.contract, '9100');
     assert.ok(pedidosIa[0].payload.tools.some((t) => t.function.name === 'identificar_cliente'));
     assert.deepEqual(await respostas(DESCONHECIDO), ['Pronto, encontrei seu cadastro.']);
+  });
+
+  it('identificou e pediu a fatura na mesma mensagem: o valor da fatura não é barrado', async () => {
+    await limparFio(DESCONHECIDO);
+    roteiro = [
+      { tool: 'identificar_cliente', args: { documento: DOC } },
+      { tool: 'consultar_fatura' },
+      { content: 'Sua fatura é de R$ 119,90, os dados estão logo abaixo.' }
+    ];
+    await receber(DESCONHECIDO, `meu cpf é ${DOC}, quero a fatura`);
+    const saidas = await respostas(DESCONHECIDO);
+    assert.match(saidas[0] ?? '', /^Sua fatura é de R\$ 119,90/, JSON.stringify(saidas));
+    assert.ok(saidas.includes(PIX));
   });
 
   it('pedido de senha: a resposta fixa, sem chamar a IA', async () => {

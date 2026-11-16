@@ -1176,7 +1176,11 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
                     onLinked={linked}
                     onBack={closeThread}
                     onSummarize={canSuggest && aiCopilot ? async () => {
-                      const res = await whatsappAPI.summarizeConversation(conversation.id)
+                      // O id do clique: a resposta que chega depois de trocar de
+                      // conversa é da anterior, e não pode aparecer nesta.
+                      const id = conversation.id
+                      const res = await whatsappAPI.summarizeConversation(id)
+                      if (selectedIdRef.current !== id) return null
                       if (res.success && res.data) return res.data.text
                       toast.error(res.message || whatsappErrorMessage(t, res.code))
                       return null
@@ -1197,13 +1201,19 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
                     metaTemplates={metaTemplates.filter((m) => m.accountId === conversation.accountId)}
                     onSendTemplate={sendTemplate}
                     onSuggest={canSuggest && aiSuggest ? async () => {
-                      const res = await whatsappAPI.suggestReply(conversation.id)
+                      // Como no resumo: o rascunho de A não pode cair na caixa de B
+                      // (o composer não sabe de conversa, e seria enviado ao cliente errado).
+                      const id = conversation.id
+                      const res = await whatsappAPI.suggestReply(id)
+                      if (selectedIdRef.current !== id) return null
                       if (res.success && res.data) return res.data.text
                       toast.error(res.message || whatsappErrorMessage(t, res.code))
                       return null
                     } : undefined}
                     onRewrite={canSuggest && aiCopilot ? async (text, mode) => {
-                      const res = await whatsappAPI.rewriteReply(conversation.id, text, mode)
+                      const id = conversation.id
+                      const res = await whatsappAPI.rewriteReply(id, text, mode)
+                      if (selectedIdRef.current !== id) return null
                       if (res.success && res.data) return res.data.text
                       toast.error(res.message || whatsappErrorMessage(t, res.code))
                       return null

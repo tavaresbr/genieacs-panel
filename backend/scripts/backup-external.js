@@ -7,7 +7,7 @@ import path from 'node:path';
  * `deploy/skygenpanel-backup` chama depois do `run`, e o que se usa no dia do
  * restore.
  *
- *   node scripts/backup-external.js upload [diretório] [--if-configured]
+ *   node scripts/backup-external.js upload [diretório] [--if-configured] [--wait-seconds N] [--poll-seconds N]
  *   node scripts/backup-external.js notify-failure [--reason "texto"]
  *   node scripts/backup-external.js verify
  *   node scripts/backup-external.js list [--all]
@@ -134,9 +134,22 @@ async function main() {
     }
     const dir = posicionais[0] || maisNovo(process.env.SKYGP_BACKUP_DIR || '/var/backups/skygenpanel');
     if (!dir) throw new Error('No finished backup to upload (run `skygenpanel-backup run` first)');
-    const resultado = await Service.perform({ trigger: 'host', sourceDir: caminho(dir) });
+    // A vez ocupada pelo painel (a verificação semanal, ou outra instância)
+    // não é motivo para pular o backup do dia: espera por ela, e só desiste —
+    // com erro, para o `OnFailure=` avisar — depois de `--wait-seconds`
+    // (padrão 30 min, ou `SKYGP_EXTERNAL_BACKUP_WAIT_SECONDS`).
+    const segundos = (valor, padrao) => (typeof valor === 'string' && valor.trim() !== '' && Number(valor) >= 0 ? Number(valor) : padrao);
+    const espera = segundos(opcoes['wait-seconds'] ?? process.env.SKYGP_EXTERNAL_BACKUP_WAIT_SECONDS, 1800);
+    const intervalo = segundos(opcoes['poll-seconds'] ?? process.env.SKYGP_EXTERNAL_BACKUP_POLL_SECONDS, 30);
+    const resultado = await Service.performHost({ sourceDir: caminho(dir), waitMs: espera * 1000, pollMs: intervalo * 1000 });
     saida(resultado);
-    if (resultado.status === 'failed' || (resultado.status === 'skipped' && resultado.reason === 'not_configured')) process.exitCode = 1;
+    if (resultado.status === 'failed'
+      || (resultado.status === 'skipped' && ['not_configured', 'other_instance'].includes(resultado.reason))) {
+      if (resultado.reason === 'other_instance') {
+        process.stderr.write(`backup-external: another instance held the external-backup lease for ${Math.round(espera)} s; nothing was uploaded\n`);
+      }
+      process.exitCode = 1;
+    }
     return undefined;
   }
   if (verbo === 'notify-failure') {

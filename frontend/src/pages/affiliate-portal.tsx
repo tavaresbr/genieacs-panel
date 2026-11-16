@@ -6,7 +6,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import {
-  COMMISSION_STATUS_KEYS, PAYOUT_STATUS_KEYS, affiliateBadgeClass, bpToPercent, passwordTokenFromHash
+  COMMISSION_STATUS_KEYS, PAYOUT_STATUS_KEYS, affiliateBadgeClass, formatBpPercent, passwordTokenFromHash
 } from '@/lib/affiliates'
 import { displayDate } from '@/lib/date-format'
 import { formatMoney } from '@/lib/money'
@@ -23,7 +23,7 @@ const brl = (cents: number) => formatMoney(cents, 'BRL')
  * nome mascarado, o extrato e os lotes.
  */
 export default function AffiliatePortalPage() {
-  const { t } = useTranslation()
+  const { t, intlLocale } = useTranslation()
   const id = useId()
   const [token] = useState(() => passwordTokenFromHash(typeof window === 'undefined' ? '' : window.location.hash))
   const [estado, setEstado] = useState<'carregando' | 'senha' | 'login' | 'painel'>(token ? 'senha' : 'carregando')
@@ -169,7 +169,7 @@ export default function AffiliatePortalPage() {
             <section className="modern-card p-5">
               <p className="wrap-break-word font-semibold">{dados.profile.name}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {t('affiliatePortal.terms', { rate: bpToPercent(dados.profile.rateBp), months: dados.profile.months })}
+                {t('affiliatePortal.terms', { rate: formatBpPercent(dados.profile.rateBp, intlLocale), months: dados.profile.months })}
               </p>
               <h2 className="mt-4 text-sm font-semibold">{t('affiliatePortal.yourLink')}</h2>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">

@@ -180,6 +180,9 @@ export default function DevicesPage() {
         toast.warning(summonDeferredMessage(res.data, t, formatDateTime, res.message || t('devices.summon.success')));
       } else if (res.success) {
         toast.success(res.message || t('devices.summon.success'));
+        // O aparelho acabou de informar: relê a lista para a linha mostrar o
+        // último contato e o sinal novos, em vez dos de antes do clique.
+        setRefreshNonce((value) => value + 1)
       } else {
         toast.error(res.message || t('devices.summon.failed'));
       }
@@ -192,13 +195,16 @@ export default function DevicesPage() {
 
   // Typing must not fire a request per keystroke: the search term the API sees
   // only catches up once the operator pauses, and any change restarts paging.
+  // Só quando o termo mudou de fato: no carregamento os dois já vêm iguais da
+  // URL, e voltar à página 1 ali jogava fora a página restaurada do endereço.
   useEffect(() => {
+    if (searchInput === searchTerm) return
     const handle = window.setTimeout(() => {
       setSearchTerm(searchInput)
       setPage(1)
     }, SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(handle)
-  }, [searchInput])
+  }, [searchInput, searchTerm])
 
   // The vendor catalogue only feeds brand resolution, so it is fetched once
   // instead of travelling with every page of devices.

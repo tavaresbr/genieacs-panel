@@ -153,6 +153,33 @@ describe('o que a entrega faz', () => {
     assert.equal(desconhecida.body.handled, false);
   });
 
+  it('um evento atrasado depois do PAYMENT_DELETED não ressuscita a cobrança; só o RESTORED', async () => {
+    await entregar(evento('PAYMENT_CREATED', pay()), tokenAlfa);
+    await entregar(evento('PAYMENT_DELETED', pay()), tokenAlfa);
+    for (const atrasado of ['PAYMENT_UPDATED', 'PAYMENT_OVERDUE']) {
+      const res = await entregar(evento(atrasado, pay({ status: atrasado === 'PAYMENT_OVERDUE' ? 'OVERDUE' : 'PENDING' })), tokenAlfa);
+      assert.equal(res.status, 200);
+      assert.equal(res.body.handled, false, atrasado);
+    }
+    let row = await linha(alfa);
+    assert.ok(row.deleted === true || Number(row.deleted) === 1);
+    assert.equal((await dentro(alfa, () => AsaasCharge.listOpenByDocument(DOC))).length, 0);
+
+    await entregar(evento('PAYMENT_RESTORED', pay({ status: 'PENDING' })), tokenAlfa);
+    row = await linha(alfa);
+    assert.ok(row.deleted === false || Number(row.deleted) === 0);
+    assert.equal((await dentro(alfa, () => AsaasCharge.listOpenByDocument(DOC))).length, 1);
+  });
+
+  it('estorno depois do recebido vale; um CONFIRMED atrasado depois do estorno não', async () => {
+    await entregar(evento('PAYMENT_RECEIVED', pay({ status: 'RECEIVED' })), tokenAlfa);
+    await entregar(evento('PAYMENT_REFUNDED', pay({ status: 'REFUNDED' })), tokenAlfa);
+    assert.equal((await linha(alfa)).status, 'REFUNDED');
+    const res = await entregar(evento('PAYMENT_CONFIRMED', pay({ status: 'CONFIRMED' })), tokenAlfa);
+    assert.equal(res.body.handled, false);
+    assert.equal((await linha(alfa)).status, 'REFUNDED');
+  });
+
   it('a mesma entrega duas vezes é inócua', async () => {
     const corpo = evento('PAYMENT_RECEIVED', pay({ status: 'RECEIVED' }));
     await entregar(corpo, tokenAlfa);

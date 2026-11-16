@@ -16,6 +16,8 @@ const { default: WaAlertService } = await import('../src/services/waAlertService
 const { default: WaBotService } = await import('../src/services/waBotService.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
+const { default: OutageIncidentService } = await import('../src/services/outageIncidentService.js');
+const { conditionKey } = await import('../src/services/alertConditionKey.js');
 
 const scan = () => asTenant(() => WaAlertService.scan({ now: Date.now() }));
 
@@ -229,6 +231,25 @@ describe('o incidente de queda em massa', () => {
       .where({ direction: 'out' })
       .whereIn('conversation_id', getDb()('wa_conversations').select('id').where({ account_id: supportAccountId }));
     assert.equal(paraClientes.length, 0);
+  });
+
+  it('caixa que entra em manutenção (condição desconhecida) mantém o incidente aberto, sem "normalizado"', async () => {
+    queda();
+    await scan();
+    const [aberto] = await listar();
+    assert.equal(aberto.status, 'open');
+    // A chave tem de ser a mesma que a varredura monta; com outro formato o
+    // incidente em manutenção era lido como resolvido.
+    await asTenant(() => OutageIncidentService.syncFromScan({
+      firing: new Map(),
+      unknown: new Set([conditionKey('mass_outage', 'ODP-1')])
+    }));
+    const [depois] = await listar();
+    assert.equal(depois.status, 'open');
+
+    await asTenant(() => OutageIncidentService.syncFromScan({ firing: new Map(), unknown: new Set() }));
+    const [fechado] = await listar();
+    assert.equal(fechado.status, 'resolved');
   });
 
   it('um id que não existe responde 404', async () => {

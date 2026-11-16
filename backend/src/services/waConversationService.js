@@ -459,8 +459,8 @@ class WaConversationService {
   static async contractsMatchingClientName(term) {
     const like = `%${WaConversation.likeTerm(term)}%`;
     if (like === '%%') return [];
-    const links = await tdb('sgp_links').whereRaw('lower(client_name) like ?', [like]).select('contract');
-    const contacts = await tdb('sgp_contacts').whereRaw('lower(client_name) like ?', [like]).select('contract');
+    const links = await tdb('sgp_links').whereRaw(`lower(client_name) like ? ${WaConversation.LIKE_ESCAPE}`, [like]).select('contract');
+    const contacts = await tdb('sgp_contacts').whereRaw(`lower(client_name) like ? ${WaConversation.LIKE_ESCAPE}`, [like]).select('contract');
     return [...new Set([...links, ...contacts].map((row) => row.contract).filter(Boolean))];
   }
 
@@ -470,7 +470,7 @@ class WaConversationService {
     if (like === '%%') return [];
     const rows = await tdb('sgp_contacts')
       .whereNull('contract')
-      .whereRaw('lower(client_name) like ?', [like])
+      .whereRaw(`lower(client_name) like ? ${WaConversation.LIKE_ESCAPE}`, [like])
       .select('id');
     return rows.map((row) => row.id);
   }

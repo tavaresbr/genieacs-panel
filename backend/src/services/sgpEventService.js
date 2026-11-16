@@ -37,6 +37,8 @@ function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
+/** O instante da leitura em ms: o banco devolve Date, texto ou número conforme o dialeto. */
+
 class SgpEventService {
   /**
    * Stores an inbound webhook. The dedupe key prefers an id from the payload
@@ -251,12 +253,18 @@ class SgpEventService {
         const transition = this.detectTransition(before, after);
         if (!transition) continue;
         summary.changed += 1;
+        // A transition seen twice produces the same key, so a repeated pass
+        // never duplicates the event. O último evento do contrato entra na
+        // chave: sem ele, bloqueado → desbloqueado → bloqueado de novo dava a
+        // mesma chave do primeiro bloqueio e o segundo era engolido pelo
+        // `insertIfNew`. (Um horário não serve: no MySQL ele guarda segundos,
+        // e duas leituras no mesmo segundo davam a mesma chave.) Duas passadas
+        // simultâneas leem o mesmo último evento e continuam deduplicadas.
+        const anterior = await SgpEvent.lastIdForContract(after.contract);
         const { created, event } = await this.store({
           source: 'reconcile',
-          // A transition seen twice produces the same key, so a repeated pass
-          // never duplicates the event.
           dedupeKey: `reconcile:${after.contract}:${transition}:${sha256(
-            `${SgpService.linkState(after)}|${after.status_label ?? ''}|${after.plan ?? ''}`
+            `${SgpService.linkState(after)}|${after.status_label ?? ''}|${after.plan ?? ''}|${anterior}`
           ).slice(0, 24)}`,
           type: transition,
           rawType: after.status_label ?? after.status ?? null,

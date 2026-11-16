@@ -36,6 +36,7 @@ export default function Invite() {
 
   const [token] = useState(() => window.location.hash.slice(1))
   const [preview, setPreview] = useState<InvitePreview | null>(null)
+  const [falhaPrevia, setFalhaPrevia] = useState(false)
   const [loading, setLoading] = useState(true)
   const [modo, setModo] = useState<InviteMode>('new')
   const [form, setForm] = useState({ username: '', email: '', password: '' })
@@ -52,6 +53,10 @@ export default function Invite() {
     void invitesAPI.preview(token).then((res) => {
       if (cancelled) return
       setPreview(res.success && res.data ? res.data : null)
+      // O `apiClient` não lança: rede fora e 5xx também chegam como recusa.
+      // Só o 404 (`not_found`) diz que o convite não serve; o resto é falha
+      // passageira, e dizer "não vale mais" mandaria pedir outro link à toa.
+      setFalhaPrevia(!res.success && res.code !== 'not_found')
       setLoading(false)
     })
     return () => { cancelled = true }
@@ -105,6 +110,12 @@ export default function Invite() {
         <div className="auth-panel">
           {loading ? (
             <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+          ) : !preview && falhaPrevia ? (
+            <>
+              <p className="page-kicker">{t('invite.kicker')}</p>
+              <h1 className="text-2xl font-bold text-foreground">{t('invite.loadFailedTitle')}</h1>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground" role="alert">{t('invite.loadFailedText')}</p>
+            </>
           ) : !preview ? (
             <>
               {/* Vencido, revogado, já usado e inexistente respondem todos a

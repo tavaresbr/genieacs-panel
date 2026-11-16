@@ -14,7 +14,7 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
 import { portalBaseDomain } from '../middleware/tenantResolver.js';
 import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
-import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
 const BASE_URL_KEY = 'referralBaseUrl';
 const TOKEN_VERSION = 'v1';
@@ -135,14 +135,18 @@ class CustomerReferralService {
     const neighborhood = String(input.neighborhood ?? '').trim().slice(0, 120) || null;
 
     // Quem indica a si mesmo não ganha nada, e o cadastro seria só ruído.
+    // Comparado pelas grafias com e sem o nono dígito: o cadastro guarda uma,
+    // o cliente digita a outra, e o número é o mesmo.
+    const variants = variantesTelefoneBr(phone);
     const links = await SgpLink.getByContracts([contract]);
     const own = whatsappPhoneOf(links[0] ?? null, row).phone;
-    if (own && normalizarTelefoneBr(own) === phone) {
+    if (own && variantesTelefoneBr(own).some((spelling) => variants.includes(spelling))) {
       throw invalid('whatsapp.referral.selfReferral', 'self_referral');
     }
 
-    // O mesmo indicado de novo (a pessoa tocou duas vezes) não duplica.
-    const again = await CustomerReferral.findDuplicate(contract, phone);
+    // O mesmo indicado de novo (a pessoa tocou duas vezes, ou digitou sem o 9
+    // na segunda) não duplica.
+    const again = await CustomerReferral.findDuplicate(contract, variants);
     if (again) return { referral: publicRow(again), created: false };
 
     const referral = await CustomerReferral.create({

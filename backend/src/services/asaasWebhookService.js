@@ -128,6 +128,17 @@ class AsaasWebhookService {
       if (jaFechada && OPEN_STATUSES.includes(charge.status) && !reabre) {
         return { handled: false, reason: 'stale_event' };
       }
+      // Removida é fechada também, e mais: qualquer evento atrasado (um UPDATED
+      // ou OVERDUE que saiu antes do DELETED) gravaria `deleted: false` e a
+      // ressuscitaria na régua. Só o PAYMENT_RESTORED a traz de volta.
+      if (existing?.deleted && event !== 'PAYMENT_RESTORED') {
+        return { handled: false, reason: 'stale_event' };
+      }
+      // Estornada é o fim: um CONFIRMED/RECEIVED atrasado não a "despaga".
+      // Estornar depois de recebida continua valendo — a regra é só a de saída.
+      if (existing?.status === 'REFUNDED' && charge.status !== 'REFUNDED') {
+        return { handled: false, reason: 'stale_event' };
+      }
 
       // O CPF/CNPJ vem do cliente que a importação já trouxe; cliente ainda
       // desconhecido fica sem documento até a próxima importação completa.

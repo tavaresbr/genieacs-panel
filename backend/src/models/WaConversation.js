@@ -80,14 +80,18 @@ class WaConversation {
   }
 
   /**
-   * `%` and `_` are LIKE's own wildcards, and the three engines the panel
-   * supports spell the escape clause differently enough that getting it right
-   * everywhere costs more than it buys: a phone, a name and a contract never
-   * contain either, so a term carrying them is stripped rather than escaped.
+   * `%` e `_` são os curingas do LIKE. Antes eram tirados do termo, e quem
+   * buscava `joao_silva` (um login PPPoE comum) procurava `joaosilva` e não
+   * achava. Agora são escapados com `!` — o mesmo escape de
+   * `BillingCharge.bySupersededGatewayId`, que os três bancos aceitam igual;
+   * a barra invertida não serve porque o MySQL a interpreta dentro do
+   * literal `'\'`. Todo `like ?` que recebe este termo leva `LIKE_ESCAPE`.
    */
   static likeTerm(term) {
-    return String(term ?? '').trim().toLowerCase().replace(/[%_]/g, '');
+    return String(term ?? '').trim().toLowerCase().replace(/[!%_]/g, (c) => `!${c}`);
   }
+
+  static LIKE_ESCAPE = "escape '!'";
 
   /**
    * The inbox page.
@@ -131,17 +135,17 @@ class WaConversation {
       const like = `%${term}%`;
       const digits = term.replace(/\D/g, '');
       query.where((match) => {
-        // The operator typed something, but stripping LIKE's wildcards left no
-        // searchable text behind. Falling through to "no filter" would hand
-        // back the whole inbox under a search term, and every row of it would
-        // read as a match.
+        // The operator typed something, but only blanks: no searchable text
+        // left behind. Falling through to "no filter" would hand back the
+        // whole inbox under a search term, and every row of it would read as
+        // a match.
         if (!term) {
           match.whereRaw('1 = 0');
           return;
         }
         match
-          .whereRaw('lower(push_name) like ?', [like])
-          .orWhereRaw('lower(contract) like ?', [like]);
+          .whereRaw(`lower(push_name) like ? ${this.LIKE_ESCAPE}`, [like])
+          .orWhereRaw(`lower(contract) like ? ${this.LIKE_ESCAPE}`, [like]);
         // Stored as digits only, so what the operator typed has to be reduced
         // the same way: "(93) 98111-0001" and 5593981110001 are one number
         // written twice, and only one of the two spellings is in the column.

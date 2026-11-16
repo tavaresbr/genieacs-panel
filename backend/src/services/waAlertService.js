@@ -27,6 +27,7 @@ import AddonService from './addonService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TELEGRAM_CHAT_PATTERN, TELEGRAM_TOKEN_PATTERN, sendTelegramMessage } from './telegramClient.js';
 import { detectOutages, mapsLink } from './outageDetector.js';
+import { conditionKey } from './alertConditionKey.js';
 import PushService from './pushService.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
@@ -221,10 +222,6 @@ function clamp(value, min, max, fallback) {
   return Math.min(Math.max(number, min), max);
 }
 
-// The separator is escaped, not typed. A literal NUL in the source makes git
-// treat this file as BINARY: it then refuses to merge it and silently keeps
-// one side, which is how a merge quietly drops the other side's changes.
-const conditionKey = (rule, subject) => `${rule}\u0000${subject}`;
 
 /**
  * Technical alerts: telling the provider's own team, over WhatsApp, when the
@@ -1027,11 +1024,26 @@ class WaAlertService {
       nodeByPppoe.set(String(node.pppoe).trim().toLowerCase(), node);
     }
 
+    // Troca de ONT deixa o aparelho antigo no GenieACS com o mesmo login, e
+    // ele fica offline para sempre. Como no mapa (`mapStatusService.status`),
+    // o cliente é julgado pelo equipamento que informou por último: se esse
+    // está online, o cliente está online, por mais que o antigo siga caído.
+    const offlineSet = new Set(offline);
+    const latestByPppoe = new Map();
+    for (const [deviceId, pppoe] of pppoeByDevice) {
+      const lastInform = informs.get(deviceId);
+      if (lastInform === undefined) continue;
+      const current = latestByPppoe.get(pppoe);
+      if (!current || lastInform > current.lastInform) latestByPppoe.set(pppoe, { deviceId, lastInform });
+    }
+
     // Cliente no mapa → os equipamentos dele que estão offline.
     const offlineClients = new Map();
     const devicesByClient = new Map();
     for (const deviceId of offline) {
       const pppoe = pppoeByDevice.get(deviceId);
+      const latest = pppoe ? latestByPppoe.get(pppoe) : null;
+      if (latest && !offlineSet.has(latest.deviceId)) continue;
       const ontNode = pppoe ? nodeByPppoe.get(pppoe) : null;
       // Embaixo de um nó em manutenção: não conta para a queda de ninguém.
       if (!ontNode || skipClients?.has(ontNode.node_id)) continue;

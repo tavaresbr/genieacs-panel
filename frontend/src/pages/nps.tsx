@@ -14,8 +14,10 @@ const COMMENT_MAX = 1000
  *
  * Sem sessão, como a confirmação de e-mail: costuma ser aberta no celular, e o
  * token do link é a credencial. Ele vem no FRAGMENTO (`/nps#token`) e é tirado
- * da barra assim que lido — o fragmento não vai ao servidor nem ao `Referer`,
- * e fora da barra também não fica no histórico. As chamadas o levam no corpo.
+ * da barra assim que o servidor responde por ele (falha passageira o mantém,
+ * para o recarregar tentar de novo) — o fragmento não vai ao servidor nem ao
+ * `Referer`, e fora da barra também não fica no histórico. As chamadas o
+ * levam no corpo.
  *
  * Quem já respondeu vê a nota e pode mudá-la por sete dias desde a primeira
  * resposta; depois disso a página só mostra o que foi respondido.
@@ -37,10 +39,13 @@ export default function NpsPage() {
   useEffect(() => {
     if (lido.current) return
     lido.current = true
-    if (window.location.hash) window.history.replaceState(null, '', window.location.pathname)
-    if (!token) { setEstado('erro'); setErro(t('nps.notFound')); return }
+    const tirarDaBarra = () => {
+      if (window.location.hash) window.history.replaceState(null, '', window.location.pathname)
+    }
+    if (!token) { tirarDaBarra(); setEstado('erro'); setErro(t('nps.notFound')); return }
     void npsAPI.lookup(token).then((res) => {
       if (res.success && res.data) {
+        tirarDaBarra()
         setView(res.data)
         setScore(res.data.score)
         setComment(res.data.comment ?? '')
@@ -48,10 +53,19 @@ export default function NpsPage() {
         return
       }
       setEstado('erro')
-      setErro(t(res.code === 'expired' ? 'nps.expired' : 'nps.notFound'))
+      // O `apiClient` não lança: rede fora e 5xx também chegam aqui, sem
+      // código. Só o 404/410 do servidor dizem que o link não serve; o resto
+      // é falha passageira, e aí o token fica na barra para o recarregar
+      // tentar de novo — tirá-lo antes deixava a pessoa sem a pesquisa.
+      if (res.code === 'expired' || res.code === 'not_found') {
+        tirarDaBarra()
+        setErro(t(res.code === 'expired' ? 'nps.expired' : 'nps.notFound'))
+      } else {
+        setErro(t('nps.loadFailed'))
+      }
     }).catch(() => {
       setEstado('erro')
-      setErro(t('nps.failed'))
+      setErro(t('nps.loadFailed'))
     })
   }, [t, token])
 

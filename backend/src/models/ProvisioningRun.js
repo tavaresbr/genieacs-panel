@@ -45,6 +45,21 @@ class ProvisioningRun {
     return this.getById(id);
   }
 
+  /**
+   * Takes a run for execution: `running` only if it is still in `fromStatus`.
+   *
+   * The scheduler runs on every instance, and two of them can read the same
+   * row from `getDue` in the same minute. A plain update let both mark it
+   * `running` and both write to the CPE; the conditional UPDATE lets exactly
+   * one of them see a changed row. True when this caller won.
+   */
+  static async claim(id, fromStatus, patch = {}) {
+    const changed = await tdb('provisioning_runs')
+      .where({ id, status: fromStatus })
+      .update({ ...patch, status: 'running', updated_at: new Date() });
+    return Number(changed) === 1;
+  }
+
   static async getById(id) {
     return parseRow(await tdb('provisioning_runs').where({ id }).first());
   }

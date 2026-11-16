@@ -180,10 +180,12 @@ class InviteController {
   static async preview(req, res) {
     try {
       const invite = await InviteController.usableInvite(req);
-      if (!invite) return res.status(404).json(createErrorResponse(req.t('invite.notFound')));
+      // `not_found` é o mesmo nos cinco casos (não vira oráculo): serve só
+      // para a tela separar "link ruim" de rede fora ou 5xx, que não têm código.
+      if (!invite) return res.status(404).json(createErrorResponse(req.t('invite.notFound'), null, 'not_found'));
 
       const tenant = await Tenant.findPublicById(invite.tenant_id);
-      if (!tenant) return res.status(404).json(createErrorResponse(req.t('invite.notFound')));
+      if (!tenant) return res.status(404).json(createErrorResponse(req.t('invite.notFound'), null, 'not_found'));
 
       return res.json(createResponse(req.t('invite.previewed'), {
         tenant: { name: tenant.name, slug: tenant.slug },

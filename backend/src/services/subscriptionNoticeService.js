@@ -630,7 +630,12 @@ class SubscriptionNoticeService {
       nomePlano = daFatura?.name ?? nomePlano;
     }
 
-    const dias = Math.max(0, Math.ceil(Math.abs(pendente.deadline.getTime() - now.getTime()) / 86_400_000));
+    // Dias de CALENDÁRIO (São Paulo) entre hoje e o prazo — a mesma régua da
+    // data que a mensagem mostra. Arredondar as horas para cima fazia o
+    // `after` (e o manual, e o do teste), mandado segundos depois de prazo +
+    // três dias, dizer "há 4 dia(s)".
+    const diaDe = (instante) => Date.parse(`${ChargeIssuingService.isoDate(instante)}T00:00:00Z`);
+    const dias = Math.abs(Math.round((diaDe(pendente.deadline) - diaDe(now)) / 86_400_000));
     const vars = {
       provider: tenant.name || PRODUCT_NAME,
       // A data é a do vencimento da fatura passada por quem chama (a

@@ -59,6 +59,8 @@ function subirGateway() {
     }
     const um = url.pathname.match(/^\/payments\/([^/]+)$/);
     if (um) {
+      // `detail` modela as duas respostas de "sumiu": sem entrada, 404; com
+      // `deleted: true`, o 200 que o Asaas dá à cobrança removida (restaurável).
       const corpo = detail[um[1]];
       return corpo ? responder(200, corpo) : responder(404, { errors: [{ code: 'not_found' }] });
     }
@@ -186,6 +188,47 @@ describe('a importação de cobranças', () => {
 
     const abertas = await dentro(() => AsaasCharge.listOpenByDocument('11144477735'));
     assert.deepEqual(abertas.map((c) => c.asaas_id), ['pay_3'], 'a paga não pode continuar cobrável');
+  });
+
+  it('removida no Asaas responde 200 com deleted: true (status ainda PENDING): vira removida, não aberta', async () => {
+    await dentro(() => AsaasImportService.syncAll());
+    pending = [cobranca('pay_1', 'cus_1', 'PENDING'), cobranca('pay_3', 'cus_1', 'PENDING')];
+    detail = { pay_2: { id: 'pay_2', status: 'PENDING', deleted: true, dueDate: '2026-11-10' } };
+
+    const resumo = await dentro(() => AsaasImportService.syncAll());
+    assert.equal(resumo.charges.gone, 1);
+    assert.equal(resumo.charges.reconciled, 0);
+    const pay2 = await getDb()('asaas_charges').where({ asaas_id: 'pay_2' }).first();
+    assert.ok(pay2.deleted === true || Number(pay2.deleted) === 1);
+    assert.equal(await dentro(() => AsaasCharge.countOpen()), 3);
+  });
+
+  it('a página velha não rebaixa a cobrança que o webhook já fechou: a leitura uma a uma decide', async () => {
+    await dentro(() => AsaasImportService.syncAll());
+    // O webhook do pagamento chegou; a página (lida antes) ainda traz pay_1 em aberto.
+    await getDb()('asaas_charges').where({ asaas_id: 'pay_1' }).update({ status: 'RECEIVED', payment_date: '2026-11-02' });
+    detail = { pay_1: { id: 'pay_1', status: 'RECEIVED', paymentDate: '2026-11-02', dueDate: '2026-11-10' } };
+
+    const resumo = await dentro(() => AsaasImportService.syncAll());
+    assert.equal(resumo.charges.reconciled, 1);
+    assert.ok(seen.includes('GET /payments/pay_1'), 'a dúvida é tirada no gateway');
+    const pay1 = await getDb()('asaas_charges').where({ asaas_id: 'pay_1' }).first();
+    assert.equal(pay1.status, 'RECEIVED');
+    assert.equal(pay1.payment_date, '2026-11-02');
+  });
+
+  it('a página reabre a fechada quando o gateway confirma (baixa desfeita com o webhook perdido)', async () => {
+    await dentro(() => AsaasImportService.syncAll());
+    await getDb()('asaas_charges').where({ asaas_id: 'pay_1' }).update({ status: 'RECEIVED_IN_CASH' });
+    await getDb()('asaas_charges').where({ asaas_id: 'pay_3' }).update({ deleted: true });
+    detail = {
+      pay_1: { id: 'pay_1', status: 'PENDING', dueDate: '2026-11-10' },
+      pay_3: { id: 'pay_3', status: 'PENDING', deleted: false, dueDate: '2026-11-10' }
+    };
+
+    await dentro(() => AsaasImportService.syncAll());
+    const abertas = await dentro(() => AsaasCharge.listOpenByDocument('11144477735'));
+    assert.deepEqual(abertas.map((c) => c.asaas_id).sort(), ['pay_1', 'pay_3']);
   });
 
   it('sem importar clientes, a cobrança entra sem documento e a passada diz quantas', async () => {

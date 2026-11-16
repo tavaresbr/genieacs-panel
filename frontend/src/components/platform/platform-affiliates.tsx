@@ -19,6 +19,7 @@ import {
   PIX_KEY_TYPES,
   affiliateBadgeClass,
   bpToPercent,
+  formatBpPercent,
   parseMonths,
   payoutActions,
   percentToBp,
@@ -65,7 +66,7 @@ async function copiar(texto: string) {
  * agendador monta, que alguém daqui revisa e aprova, e só então manda o Pix.
  */
 export function PlatformAffiliates() {
-  const { t } = useTranslation()
+  const { t, intlLocale } = useTranslation()
   const toast = useToast()
   const formId = useId()
   const [affiliates, setAffiliates] = useState<AffiliateView[]>([])
@@ -337,7 +338,7 @@ export function PlatformAffiliates() {
               </select>
             </div>
             {campo('pixKey', t('affiliates.pixKey'), { maxLength: 140 })}
-            {campo('rate', t('affiliates.rate'), { inputMode: 'decimal', hint: t('affiliates.rateHint', { rate: bpToPercent(defaults?.rateBp) }), maxLength: 6 })}
+            {campo('rate', t('affiliates.rate'), { inputMode: 'decimal', hint: t('affiliates.rateHint', { rate: formatBpPercent(defaults?.rateBp, intlLocale) }), maxLength: 6 })}
             {campo('months', t('affiliates.months'), { inputMode: 'numeric', hint: t('affiliates.monthsHint', { months: defaults?.months ?? '' }), maxLength: 3 })}
             {campo('code', t('affiliates.code'), { hint: t('affiliates.codeHint'), maxLength: 15 })}
             {campo('notes', t('affiliates.notes'), { maxLength: 500 })}
@@ -380,7 +381,7 @@ export function PlatformAffiliates() {
               <p className="mt-2 text-sm">
                 <span className="font-mono">{a.code}</span>
                 {' · '}
-                {t('affiliates.terms', { rate: bpToPercent(a.effectiveRateBp), months: a.effectiveMonths ?? '' })}
+                {t('affiliates.terms', { rate: formatBpPercent(a.effectiveRateBp, intlLocale), months: a.effectiveMonths ?? '' })}
                 {' · '}
                 {t('affiliates.referred', { count: a.referredCount })}
               </p>
@@ -462,7 +463,7 @@ export function PlatformAffiliates() {
                                   <tr key={c.id}>
                                     <td>{displayDate(c.accruedAt) ?? '—'}</td>
                                     <td className="wrap-break-word">{c.kind === 'clawback' ? t('affiliates.kind.clawback') : c.providerName}</td>
-                                    <td>{brl(c.baseCents ?? 0)} × {bpToPercent(c.rateBp)}%</td>
+                                    <td>{brl(c.baseCents ?? 0)} × {formatBpPercent(c.rateBp, intlLocale)}%</td>
                                     <td className="font-semibold">{brl(c.amountCents)}</td>
                                     <td><span className={affiliateBadgeClass(c.status)}>{t(COMMISSION_STATUS_KEYS[c.status])}</span></td>
                                   </tr>

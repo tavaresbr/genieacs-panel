@@ -73,6 +73,12 @@ class SgpEvent {
     return (await tdb('sgp_events').where({ dedupe_key: dedupeKey }).first()) || null;
   }
 
+  /** O id do evento mais recente deste contrato (0 sem nenhum). */
+  static async lastIdForContract(contract) {
+    const row = await tdb('sgp_events').where({ contract }).max({ id: 'id' }).first();
+    return Number(row?.id || 0);
+  }
+
   static async list({ status = null, type = null, contract = null, limit = 25 } = {}) {
     const query = tdb('sgp_events').orderBy('id', 'desc');
     if (status) query.where({ status });

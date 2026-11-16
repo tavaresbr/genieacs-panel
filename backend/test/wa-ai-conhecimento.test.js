@@ -99,6 +99,25 @@ describe('a base do provedor', () => {
     assert.doesNotMatch(texto, /Descreva aqui/);
   });
 
+  it('o uso conta só o item que a mensagem mais nova disparou', async () => {
+    const criado = await asTenant(() => WaAiKnowledgeService.create({ kind: 'objecao', title: 'Demora', triggers: 'demora', answer: 'Instalamos em até 48 h.' }));
+    const usos = async () => (await asTenant(() => WaAiKnowledgeService.list())).find((i) => i.id === criado.id).uses;
+    const esperar = async (n) => {
+      for (let i = 0; i < 40 && (await usos()) !== n; i += 1) await new Promise((r) => setTimeout(r, 25)); // eslint-disable-line no-await-in-loop -- o contador sobe sem esperar
+      return usos();
+    };
+    try {
+      assert.match(await asTenant(() => WaAiKnowledgeService.paraPrompt('a instalação demora?', { nova: 'a instalação demora?' })), /48 h/);
+      assert.equal(await esperar(1), 1);
+      // A mensagem anterior ainda põe o item no prompt, mas a nova não o disparou: não conta de novo.
+      assert.match(await asTenant(() => WaAiKnowledgeService.paraPrompt('a instalação demora? ok, obrigado', { nova: 'ok, obrigado' })), /48 h/);
+      await new Promise((r) => setTimeout(r, 100));
+      assert.equal(await usos(), 1);
+    } finally {
+      await asTenant(() => WaAiKnowledgeService.remove(criado.id));
+    }
+  });
+
   it('cria, valida e apaga', async () => {
     const criado = await asTenant(() => WaAiKnowledgeService.create({ kind: 'vantagem', title: '  Instalação   rápida ', answer: 'Instalamos em até 48 h.' }));
     assert.equal(criado.title, 'Instalação rápida');

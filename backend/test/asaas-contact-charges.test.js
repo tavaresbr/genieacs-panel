@@ -329,6 +329,27 @@ describe('dar baixa manual (dinheiro em mãos ou Pix fora do Asaas)', () => {
     assert.equal(recebimentos().length, 0);
   });
 
+  it('removida no Asaas (200 com deleted: true, status ainda PENDING): 409, sem receiveInCash, e a cópia vira removida', async () => {
+    // É assim que o Asaas responde a cobrança apagada — o 404 é só a que nunca existiu.
+    Object.assign(remotas.find((r) => r.id === 'pay_aberta'), { status: 'PENDING', deleted: true });
+    // Direto no serviço: a rota tem limitador por usuário, e o arquivo já gasta a cota dele.
+    await assert.rejects(
+      dentro(() => AsaasProviderCustomerService.settleCharge(contatoKey, 'pay_aberta')),
+      (error) => error.code === 'charge_closed' && error.status === 409
+    );
+    assert.equal(recebimentos().length, 0);
+    const row = await dentro(() => AsaasCharge.getByAsaasId('pay_aberta'));
+    assert.ok(row.deleted === true || Number(row.deleted) === 1);
+  });
+
+  it('o bot não entrega fatura removida no Asaas (200 com deleted: true): null, e ela sai das abertas', async () => {
+    Object.assign(remotas.find((r) => r.id === 'pay_futura'), { deleted: true });
+    const [fatura] = (await dentro(() => AsaasInvoiceService.openByDocument(DOC))).filter((f) => f.id === 'pay_futura');
+    assert.equal(await dentro(() => AsaasInvoiceService.completeForBot(fatura)), null);
+    const abertas = await dentro(() => AsaasCharge.listOpenByDocument(DOC));
+    assert.ok(!abertas.some((c) => c.asaas_id === 'pay_futura'));
+  });
+
   it('cobrança cancelada no Asaas não é título a quitar: 409', async () => {
     remotas.find((r) => r.id === 'pay_aberta').status = 'DELETED';
     const res = await baixa('pay_aberta');

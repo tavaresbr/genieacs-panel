@@ -348,9 +348,46 @@ describe('provisioning poller', () => {
     assert.equal(genie.state.tasks.length, 0);
   });
 
+  it('an unreachable GenieACS does not stop the rest of the pass, and the clock still moves', async () => {
+    const { default: SchedulerService } = await import('../src/services/schedulerService.js');
+    const { getConfig, processDue } = ProvisioningService;
+    const avisos = console.warn;
+    ProvisioningService.getConfig = async () => ({ ...(await getConfig.call(ProvisioningService)), enabled: true, intervalSeconds: 300 });
+    ProvisioningService.processDue = async () => { throw new Error('connect ECONNREFUSED'); };
+    console.warn = () => {};
+    try {
+      await asTenant(() => SchedulerService.writeState({ lastProvisioningAt: null }));
+      const summary = await asTenant(() => SchedulerService.runJobs());
+      assert.deepEqual(summary.provisioning, { error: 'connect ECONNREFUSED' });
+      const state = await asTenant(() => SchedulerService.readState());
+      assert.ok(state.lastProvisioningAt, 'the failed pass must still record its clock');
+    } finally {
+      ProvisioningService.getConfig = getConfig;
+      ProvisioningService.processDue = processDue;
+      console.warn = avisos;
+      await asTenant(() => SchedulerService.writeState({ lastProvisioningAt: null }));
+    }
+  });
+
   it('leaves an already provisioned device alone', async () => {
     const candidates = await asTenant(() => ProvisioningService.findCandidates({ limit: 10 }));
     assert.ok(!candidates.includes(DEVICE_ID), 'a successful run settles the device');
+  });
+
+  it('two instances that read the same due run execute it once', async () => {
+    const run = await asTenant(() => ProvisioningRun.create({
+      device_id: 'stub-device-claim', trigger: 'poller', status: 'pending', attempt_count: 0
+    }));
+    assert.equal(await asTenant(() => ProvisioningRun.claim(run.id, 'pending')), true);
+    assert.equal(await asTenant(() => ProvisioningRun.claim(run.id, 'pending')), false, 'the second claim must lose');
+
+    // The other instance still holds the stale `pending` copy from `getDue`:
+    // it must leave the run alone, without a single call to GenieACS.
+    genie.state.tasks.length = 0;
+    const seen = await asTenant(() => ProvisioningService.executeRun(run));
+    assert.equal(seen.status, 'running');
+    assert.equal(genie.state.tasks.length, 0);
+    await getDb()('provisioning_runs').where({ id: run.id }).del();
   });
 
   it('fails a run that was interrupted mid-flight', async () => {

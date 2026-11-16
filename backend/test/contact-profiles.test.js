@@ -372,6 +372,32 @@ describe('a planilha', () => {
     assert.match(csv, /'=HYPERLINK/);
   });
 
+  it('a planilha que passou pelo Excel não corrompe CPF nem WhatsApp', async () => {
+    const whatsappAntes = (await ficha('373')).body.data.whatsappPhone;
+    const csv = [
+      'Contrato;Nome;CPF/CNPJ;WhatsApp',
+      // O Excel virou o WhatsApp de 13 dígitos em notação científica: ignora.
+      '373;;;5,59399E+12',
+      // CPF com o zero da frente cortado: volta com o zero.
+      '374;;1234567890;',
+      // Verificador errado: não grava, vira erro da linha.
+      '373;;52998224726;',
+      // WhatsApp que não é um número brasileiro completo.
+      '373;;;12345678',
+      // A mesma linha nova duas vezes: um cadastro só.
+      ';Cliente Repetido da Planilha;;',
+      ';Cliente Repetido da Planilha;;'
+    ].join('\n');
+    const res = await importar(csv, 'apply');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.data.errors.map((error) => error.line), [4, 5], JSON.stringify(res.body.data.errors));
+    assert.equal(res.body.data.created, 1);
+    assert.equal(res.body.data.updated, 1);
+    const perfil = (await ficha('374')).body.data;
+    assert.equal(perfil.fields.document.value, '01234567890');
+    assert.equal((await ficha('373')).body.data.whatsappPhone, whatsappAntes);
+  });
+
   it('recusa uma planilha sem as colunas do exportar', async () => {
     const res = await importar('Fruta;Cor\nbanana;amarela', 'preview');
     assert.equal(res.status, 400);

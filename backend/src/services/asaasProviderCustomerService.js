@@ -275,6 +275,13 @@ class AsaasProviderCustomerService {
     const credential = this.credentialFor(config);
     try {
       const live = await getCharge(row.asaas_id, credential);
+      // Removida no Asaas com o webhook perdido: o status lido pode ainda ser
+      // PENDING, e baixar seria receber por um título que não existe mais. A
+      // cópia passa a removida e a resposta é a mesma da cancelada.
+      if (live.deleted) {
+        await AsaasCharge.markDeleted(row.asaas_id);
+        throw new AsaasProviderError('asaas.error.chargeClosed', { code: 'charge_closed', status: 409 });
+      }
       let status = live.status;
       let paidOn = live.paidOn;
       if (OPEN_STATUSES.includes(live.status)) {

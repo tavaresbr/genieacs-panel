@@ -4,6 +4,7 @@ import ContactProfileService, { ContactProfileError, checkField, shownValue } fr
 import WaContactService from './waContactService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { toCsvWith } from '../utils/csv.js';
+import { isValidCnpj, isValidCpf } from '../utils/taxId.js';
 
 /** The largest spreadsheet the import reads: well over the biggest base this panel serves. */
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
@@ -138,6 +139,35 @@ function comparable(field, value) {
 
 const splitList = (value) => String(value ?? '').split(/[,;\n]+/).map((item) => item.trim()).filter(Boolean);
 
+/**
+ * Identificadores que o Excel transforma em número ao reabrir o CSV. Um
+ * WhatsApp de 13 dígitos volta como `5,59399E+12` — os dígitos do fim já se
+ * perderam, não há o que recuperar — e um CPF perde o zero da frente.
+ */
+const NUMERIC_ID_FIELDS = ['document', 'whatsappPhone', 'phones', 'zip'];
+const SCIENTIFIC = /^-?\d+(?:[.,]\d+)?E[+-]?\d+$/i;
+
+/**
+ * As células de uma linha, antes de servirem de chave ou de edição. Notação
+ * científica é tratada como célula vazia (fica o que já está gravado, em vez
+ * de gravar um número truncado); o zero que o Excel tirou do CPF (10 dígitos)
+ * e do CNPJ (13) volta.
+ */
+function repairExcelCells(cells) {
+  const repaired = { ...cells };
+  for (const field of NUMERIC_ID_FIELDS) {
+    if (SCIENTIFIC.test(String(repaired[field] ?? '').trim())) delete repaired[field];
+  }
+  if (repaired.document) {
+    const digits = String(repaired.document).replace(/\D/g, '');
+    if (digits.length === 10 || digits.length === 13) repaired.document = `0${digits}`;
+  }
+  return repaired;
+}
+
+/** CPF ou CNPJ com os verificadores certos. */
+const validDocument = (digits) => isValidCpf(digits) || isValidCnpj(digits);
+
 // ── The service ───────────────────────────────────────────────────────────
 
 /**
@@ -225,6 +255,7 @@ class ContactSheetService {
     }
 
     const plan = { total: lines.length, updates: [], creates: [], unchanged: 0, errors: [] };
+    const newRows = new Set();
     for (let index = 0; index < lines.length; index += 1) {
       const line = index + 2; // the header is line 1, as the spreadsheet numbers it
       const cells = {};
@@ -234,8 +265,17 @@ class ContactSheetService {
       try {
         // eslint-disable-next-line no-await-in-loop -- one row at a time: each looks up its own record
         const step = await this.planRow(cells);
-        if (step.kind === 'create') plan.creates.push({ line, ...step });
-        else if (step.changed.length > 0) plan.updates.push({ line, ...step });
+        if (step.kind === 'create') {
+          // A mesma linha nova repetida na planilha (copiar e colar, duas
+          // abas juntadas) é um cliente só, não dois cadastros iguais.
+          const signature = comparable('create', step.patch);
+          if (newRows.has(signature)) {
+            plan.unchanged += 1;
+          } else {
+            newRows.add(signature);
+            plan.creates.push({ line, ...step });
+          }
+        } else if (step.changed.length > 0) plan.updates.push({ line, ...step });
         else plan.unchanged += 1;
       } catch (error) {
         if (!(error instanceof ContactProfileError)) throw error;
@@ -246,13 +286,25 @@ class ContactSheetService {
   }
 
   /** What one row would do: update which fields of which record, or create one. */
-  static async planRow(cells) {
+  static async planRow(rawCells) {
+    // Antes de procurar o registro: o CPF sem o zero da frente não acharia
+    // ninguém e a linha viraria um cliente novo, duplicado.
+    const cells = repairExcelCells(rawCells);
     const row = await this.findRow(cells);
     const patch = this.patchFrom(cells);
+    // Documento com verificador errado não grava. Só vira erro quando mudaria
+    // algo: o que o SGP mandou torto e a planilha só devolveu não é culpa dela.
+    const badDocument = patch.document && !validDocument(patch.document);
+    // WhatsApp, só brasileiro completo (55 + DDD + 8 ou 9 dígitos): um número
+    // que o Excel cortou ainda "normaliza" para 8 a 15 dígitos e mandaria a
+    // conversa do cliente para outra pessoa. Mesma regra: erro só se mudaria.
+    const badPhone = patch.whatsappPhone && !/^55\d{10,11}$/.test(patch.whatsappPhone);
 
     if (!row) {
       if (cells.key || cells.contract) throw sheetError('contacts.import.rowNotFound');
       if (!patch.name) throw sheetError('contacts.import.rowNoName');
+      if (badDocument) throw sheetError('contacts.error.invalidField', { field: 'document' });
+      if (badPhone) throw sheetError('contacts.error.invalidField', { field: 'whatsappPhone' });
       return { kind: 'create', name: patch.name, patch, changed: Object.keys(patch) };
     }
 
@@ -263,6 +315,8 @@ class ContactSheetService {
       if (field === 'whatsappPhone') return patch.whatsappPhone !== profile.whatsappPhone;
       return comparable(field, patch[field]) !== comparable(field, profile.fields[field]?.value);
     });
+    if (badDocument && changed.includes('document')) throw sheetError('contacts.error.invalidField', { field: 'document' });
+    if (badPhone && changed.includes('whatsappPhone')) throw sheetError('contacts.error.invalidField', { field: 'whatsappPhone' });
     return {
       kind: 'update',
       key,

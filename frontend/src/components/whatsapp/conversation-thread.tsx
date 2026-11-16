@@ -104,6 +104,8 @@ export function ConversationThread({
   const headerRef = useRef<HTMLElement>(null)
   const [headerWidth, setHeaderWidth] = useState(0)
   const stick = useRef(true)
+  // A conversa aberta agora: o resumo pedido em outra não pode abrir nesta.
+  const conversationIdRef = useRef(conversation.id)
 
   const address = conversationAddress(conversation)
   const toast = useToast()
@@ -140,6 +142,7 @@ export function ConversationThread({
   // operator came here for.
   useEffect(() => {
     const box = scrollRef.current
+    conversationIdRef.current = conversation.id
     setLinkerOpen(false)
     setSummary(undefined)
     if (!box) return
@@ -361,7 +364,10 @@ export function ConversationThread({
                     return
                   }
                   setSummary(null)
-                  void onSummarize().then((text) => setSummary(text ?? undefined))
+                  const id = conversation.id
+                  void onSummarize().then((text) => {
+                    if (conversationIdRef.current === id) setSummary(text ?? undefined)
+                  })
                 }}
               >
                 <Icon name="sparkles" size={16} className={summary === null ? 'animate-pulse' : ''} />

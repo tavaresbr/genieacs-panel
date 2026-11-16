@@ -2,6 +2,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -167,6 +168,71 @@ describe('contra um S3 de mentira', () => {
     assert.ok(fake.requests.filter((q) => q.query['continuation-token']).length >= 2);
     const errado = new S3Client({ ...credenciais, secretAccessKey: 'outro', endpoint: fake.url, forcePathStyle: true });
     await assert.rejects(errado.listObjects(''), (e) => e instanceof S3Error && /SignatureDoesNotMatch/.test(e.message));
+  });
+});
+
+describe('o prazo é de inatividade, não da transferência inteira', () => {
+  // Um servidor cru: manda o objeto em pedaços com `intervalo` entre eles, ou
+  // para no meio (`trava`), ou demora a responder (`atrasaCabecalho`).
+  const credenciais = { bucket: 'b', accessKeyId: 'AK', secretAccessKey: 'SK', region: 'us-east-1' };
+  let servidor;
+  let url;
+  let base;
+  let modo = {};
+
+  before(async () => {
+    base = fs.mkdtempSync(path.join(os.tmpdir(), 'skygp-s3-prazo-'));
+    servidor = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', async () => {
+        const espera = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+        if (modo.atrasaCabecalho) await espera(modo.atrasaCabecalho);
+        res.writeHead(200, { 'content-type': 'application/octet-stream' });
+        if (req.method !== 'GET') { res.end(); return; }
+        for (let i = 0; i < modo.pedacos; i += 1) {
+          if (res.destroyed) return;
+          res.write(Buffer.alloc(1000, i));
+          if (modo.trava && i === 1) return; // nunca termina
+          // eslint-disable-next-line no-await-in-loop
+          await espera(modo.intervalo);
+        }
+        res.end();
+      });
+    });
+    await new Promise((resolve) => { servidor.listen(0, '127.0.0.1', resolve); });
+    url = `http://127.0.0.1:${servidor.address().port}`;
+  });
+
+  after(async () => {
+    servidor.closeAllConnections();
+    await new Promise((resolve) => { servidor.close(resolve); });
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
+  const cliente = () => new S3Client({ ...credenciais, endpoint: url, forcePathStyle: true, timeoutMs: 200 });
+
+  it('um download lento que nunca para passa do prazo total e termina', async () => {
+    modo = { pedacos: 8, intervalo: 80 }; // ~640 ms no total, 80 ms entre pedaços
+    const inicio = Date.now();
+    const r = await cliente().getObjectToFile('lento.bin', path.join(base, 'lento.bin'));
+    assert.ok(Date.now() - inicio > 400, 'o teste não exercitou um download mais longo que o prazo');
+    assert.equal(r.bytes, 8000);
+  });
+
+  it('um download que trava no meio é abortado', async () => {
+    modo = { pedacos: 8, intervalo: 10, trava: true };
+    await assert.rejects(
+      cliente().getObjectToFile('trava.bin', path.join(base, 'trava.bin')),
+      (e) => e.name === 'TimeoutError'
+    );
+  });
+
+  it('o servidor que não responde é abortado; o PUT com corpo segue funcionando', async () => {
+    modo = { atrasaCabecalho: 600 };
+    await assert.rejects(cliente().putObject('x', { body: Buffer.alloc(10) }), (e) => e instanceof S3Error && e.code === 'unreachable');
+    modo = {};
+    const r = await cliente().putObject('x', { body: Buffer.alloc(200_000, 7) });
+    assert.equal(r.multipart, false);
   });
 });
 
