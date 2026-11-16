@@ -114,6 +114,20 @@ describe('buscar o contrato', () => {
     assert.deepEqual(await asTenant(() => SgpContact.search('   ')), []);
   });
 
+  it('o "_" de um login é texto: acha joao_silva e não joaoxsilva', async () => {
+    const tenantId = (await getDb()('tenants').first()).id;
+    await getDb()('sgp_contacts').insert([
+      { tenant_id: tenantId, contract: '9101', client_name: 'Joao Um', login: 'joao_silva', state: 'active' },
+      { tenant_id: tenantId, contract: '9102', client_name: 'Joao Dois', login: 'joaoxsilva', state: 'active' }
+    ]);
+    try {
+      const find = async (q) => (await asTenant(() => SgpContact.search(q))).map((row) => row.contract);
+      assert.deepEqual(await find('joao_silva'), ['9101']);
+    } finally {
+      await getDb()('sgp_contacts').whereIn('contract', ['9101', '9102']).del();
+    }
+  });
+
   it('sugere o contrato cujo login é o da ONT, e avisa de quem já tem ONT', async () => {
     SgpService.reportedPppoeLogin = async () => ({ login: 'ta100.310.1', state: 'found' });
     await asTenant(() => SgpLink.upsert({

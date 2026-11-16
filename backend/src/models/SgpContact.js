@@ -1,4 +1,5 @@
 import { tdb, tinsert, withDeadlockRetry } from '../config/database.js';
+import WaConversation from './WaConversation.js';
 
 /**
  * An SGP client the panel knows — see `sgpContactsTable` in
@@ -65,14 +66,15 @@ class SgpContact {
    * Contracts the operator may be looking for, by what they remember of one:
    * the number, part of the name, the CPF/CNPJ or the PPPoE login.
    *
-   * LIKE's own wildcards are stripped from the term, so what is typed is
-   * matched as text; a term left empty by that matches nothing rather than the
-   * whole table. The document is stored as digits, so it is searched as digits.
+   * LIKE's own wildcards are escaped (`WaConversation.likeTerm`), so what is
+   * typed is matched as text — `joao_silva` finds the login `joao_silva`; an
+   * empty term matches nothing rather than the whole table. The document is
+   * stored as digits, so it is searched as digits.
    */
   static async search(q, { limit = 15 } = {}) {
-    const term = String(q ?? '').toLowerCase().replace(/[%_\\]/g, '').trim().slice(0, 64);
+    const term = String(q ?? '').toLowerCase().trim().slice(0, 64);
     if (!term) return [];
-    const like = `%${term}%`;
+    const like = `%${WaConversation.likeTerm(term)}%`;
     const digits = term.replace(/\D/g, '');
     const max = Math.min(Math.max(Number.parseInt(limit, 10) || 15, 1), 50);
     return tdb('sgp_contacts')
@@ -80,8 +82,8 @@ class SgpContact {
       .where((match) => {
         match
           .where('contract', term)
-          .orWhereRaw('lower(client_name) like ?', [like])
-          .orWhereRaw('lower(login) like ?', [like]);
+          .orWhereRaw(`lower(client_name) like ? ${WaConversation.LIKE_ESCAPE}`, [like])
+          .orWhereRaw(`lower(login) like ? ${WaConversation.LIKE_ESCAPE}`, [like]);
         if (digits.length >= 3) match.orWhere('document', 'like', `%${digits}%`);
       })
       .select('contract', 'client_name', 'document', 'plan', 'state', 'status_label', 'login')

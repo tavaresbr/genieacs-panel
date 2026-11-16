@@ -300,15 +300,15 @@ class WaContactService {
       const like = `%${term}%`;
       const digits = term.replace(/\D/g, '');
       query.where((match) => {
-        // Same rule as the inbox: a term that stripping LIKE's wildcards
-        // emptied must match nothing, not everything.
+        // Same rule as the inbox: a term with no text left must match
+        // nothing, not everything.
         if (!term) {
           match.whereRaw('1 = 0');
           return;
         }
         match
-          .whereRaw('lower(client_name) like ?', [like])
-          .orWhereRaw('lower(contract) like ?', [like]);
+          .whereRaw(`lower(client_name) like ? ${WaConversation.LIKE_ESCAPE}`, [like])
+          .orWhereRaw(`lower(contract) like ? ${WaConversation.LIKE_ESCAPE}`, [like]);
         if (digits) {
           match
             .orWhere('document', 'like', `%${digits}%`)
