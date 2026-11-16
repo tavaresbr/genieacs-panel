@@ -459,7 +459,14 @@ class SchedulerService {
       provisioningConfig.enabled
       && this.due(state.lastProvisioningAt, provisioningConfig.intervalSeconds * 1000)
     ) {
-      summary.provisioning = await ProvisioningService.processDue({});
+      // Com o `.catch` dos outros: com o GenieACS fora do ar a busca de
+      // candidatos lança, e sem ele o resto da passada deste provedor (Asaas,
+      // SGP, reconciliação, contatos, TeiaH, régua) não rodava em tick nenhum.
+      // O relógio anda mesmo na falha, para não martelar o ACS a cada minuto.
+      summary.provisioning = await ProvisioningService.processDue({}).catch((error) => {
+        console.warn(`Provisioning pass failed: ${error.message}`);
+        return { error: error.message };
+      });
       await this.writeState({ lastProvisioningAt: new Date().toISOString() });
     }
 

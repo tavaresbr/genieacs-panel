@@ -348,6 +348,27 @@ describe('provisioning poller', () => {
     assert.equal(genie.state.tasks.length, 0);
   });
 
+  it('an unreachable GenieACS does not stop the rest of the pass, and the clock still moves', async () => {
+    const { default: SchedulerService } = await import('../src/services/schedulerService.js');
+    const { getConfig, processDue } = ProvisioningService;
+    const avisos = console.warn;
+    ProvisioningService.getConfig = async () => ({ ...(await getConfig.call(ProvisioningService)), enabled: true, intervalSeconds: 300 });
+    ProvisioningService.processDue = async () => { throw new Error('connect ECONNREFUSED'); };
+    console.warn = () => {};
+    try {
+      await asTenant(() => SchedulerService.writeState({ lastProvisioningAt: null }));
+      const summary = await asTenant(() => SchedulerService.runJobs());
+      assert.deepEqual(summary.provisioning, { error: 'connect ECONNREFUSED' });
+      const state = await asTenant(() => SchedulerService.readState());
+      assert.ok(state.lastProvisioningAt, 'the failed pass must still record its clock');
+    } finally {
+      ProvisioningService.getConfig = getConfig;
+      ProvisioningService.processDue = processDue;
+      console.warn = avisos;
+      await asTenant(() => SchedulerService.writeState({ lastProvisioningAt: null }));
+    }
+  });
+
   it('leaves an already provisioned device alone', async () => {
     const candidates = await asTenant(() => ProvisioningService.findCandidates({ limit: 10 }));
     assert.ok(!candidates.includes(DEVICE_ID), 'a successful run settles the device');
