@@ -204,6 +204,17 @@ describe('a gravação', () => {
     assert.equal(res.body.data.apiKeySource, 'db');
   });
 
+  it('trocar a chave do .env sem escolher ambiente mantém produção', async () => {
+    process.env.ASAAS_API_KEY = ENV_KEY;
+    const antes = await platform('/integrations/asaas');
+    assert.equal(antes.body.data.environment, 'production');
+
+    const res = await platform('/integrations/asaas', { method: 'PUT', body: { apiKey: DB_KEY } });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.apiKeySource, 'db');
+    assert.equal(res.body.data.environment, 'production', 'a troca da chave não pode cair no sandbox');
+  });
+
   it('ausente mantém; vazio apaga e devolve a palavra ao ambiente', async () => {
     process.env.ASAAS_API_KEY = ENV_KEY;
     await platform('/integrations/asaas', { method: 'PUT', body: { apiKey: DB_KEY, environment: 'sandbox' } });

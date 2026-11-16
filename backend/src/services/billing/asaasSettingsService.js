@@ -411,6 +411,12 @@ async function lerGuardado() {
   return value;
 }
 
+/** O ambiente guardado, ou o padrão pela origem da chave — ver `resolver`. */
+function ambientePadrao(stored, apiKeySource) {
+  if (ENVIRONMENTS.includes(stored?.environment)) return stored.environment;
+  return apiKeySource === 'env' ? 'production' : 'sandbox';
+}
+
 /**
  * Os valores que valem agora, com a origem de cada um.
  *
@@ -434,10 +440,7 @@ async function resolver() {
   const webhookToken = tokenDb ?? tokenEnv;
   const webhookTokenSource = tokenDb ? 'db' : tokenEnv ? 'env' : null;
 
-  let environment;
-  if (ENVIRONMENTS.includes(stored?.environment)) environment = stored.environment;
-  else if (apiKeySource === 'env') environment = 'production';
-  else environment = 'sandbox';
+  const environment = ambientePadrao(stored, apiKeySource);
 
   return {
     platformId,
@@ -571,6 +574,14 @@ export async function save(patch = {}) {
   if (nfse !== undefined) proximo.nfse = nfse;
   if (charges !== undefined) proximo.charges = charges;
   if (environment !== undefined) proximo.environment = environment;
+  else if (apiKey !== undefined && !proximo.environment) {
+    // Sem ambiente guardado, o padrão depende da ORIGEM da chave: chave do
+    // `.env` é produção, do banco é sandbox. Trocar a chave sem escolher o
+    // ambiente mudaria a origem e, calada, jogaria a cobrança para o sandbox —
+    // então fixamos o ambiente que valia antes da troca.
+    const origemAntes = abrir(anterior.apiKey) ? 'db' : envValue('ASAAS_API_KEY') ? 'env' : null;
+    proximo.environment = ambientePadrao(anterior, origemAntes);
+  }
   if (apiKey !== undefined) proximo.apiKey = apiKey ? selar(apiKey) : null;
   if (webhookToken !== undefined) proximo.webhookToken = webhookToken ? selar(webhookToken) : null;
   proximo.updatedAt = new Date().toISOString();
