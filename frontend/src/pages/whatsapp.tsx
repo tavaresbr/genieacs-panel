@@ -934,6 +934,14 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     let lastFrame = ''
     let lastCard: number | null = null
     const debug = new URLSearchParams(window.location.search).get('wadebug') === '1'
+    // Com `?wadebug=1`: as últimas ocorrências do teclado, para um print mostrar
+    // a sequência que levou ao problema e não só o instante.
+    const started = Date.now()
+    const history: string[] = []
+    let cause = 'init'
+    const note = (what: string) => {
+      cause = what
+    }
     const update = () => {
       const next = keyboardFrame({ innerHeight: window.innerHeight, vvTop: vv.offsetTop, vvHeight: vv.height })
       const key = next ? `${next.top}:${next.height}` : ''
@@ -957,24 +965,38 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
         setCardHeight(height)
       }
       if (debug) {
-        setDebugInfo(
-          `inner ${Math.round(window.innerHeight)} vv ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)} `
+        const now = `inner ${Math.round(window.innerHeight)} vv ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)} `
           + `scrollY ${Math.round(window.scrollY)} kb ${next ? `${next.top}+${next.height}` : '-'} card ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'} h ${height ?? '-'}`
-        )
+        const line = `${((Date.now() - started) / 1000).toFixed(1)}s ${cause} vv ${Math.round(vv.height)}/${Math.round(vv.offsetTop)} y${Math.round(window.scrollY)} kb ${next ? `${next.top}+${next.height}` : '-'} c ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'}`
+        if (history[history.length - 1]?.slice(history[history.length - 1].indexOf(' ') + 1) !== line.slice(line.indexOf(' ') + 1)) {
+          history.push(line)
+          if (history.length > 7) history.shift()
+        }
+        setDebugInfo([now, ...history.slice().reverse()].join('\n'))
       }
     }
     update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
+    const onResize = () => { note('resize'); update() }
+    const onScroll = () => { note('scroll'); update() }
+    const onFocusIn = () => { note('focus'); update() }
+    const onFocusOut = () => { note('blur'); update() }
+    vv.addEventListener('resize', onResize)
+    vv.addEventListener('scroll', onScroll)
+    if (debug) {
+      document.addEventListener('focusin', onFocusIn)
+      document.addEventListener('focusout', onFocusOut)
+    }
     // Um aviso que aparece ou some acima do cartão empurra o topo dele.
-    const observer = new ResizeObserver(update)
+    const observer = new ResizeObserver(() => { note('layout'); update() })
     observer.observe(body)
     // A barra de atalhos aparecer ou sumir muda onde o cartão termina.
-    const unsubscribeBar = subscribeMobileBar(() => window.requestAnimationFrame(update))
+    const unsubscribeBar = subscribeMobileBar(() => window.requestAnimationFrame(() => { note('bar'); update() }))
     return () => {
       unsubscribeBar()
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
+      vv.removeEventListener('resize', onResize)
+      vv.removeEventListener('scroll', onScroll)
+      document.removeEventListener('focusin', onFocusIn)
+      document.removeEventListener('focusout', onFocusOut)
       observer.disconnect()
       root.style.overflow = before.rootOverflow
       body.style.overflow = before.bodyOverflow
@@ -985,7 +1007,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   return (
     <section className="space-y-5 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       {debugInfo && (
-        <div className="pointer-events-none fixed inset-x-1 top-1 z-2000 rounded bg-black/85 px-2 py-1 font-mono text-[0.62rem] leading-4 text-green-300" aria-hidden="true">
+        <div className="pointer-events-none fixed inset-x-1 top-1 z-2000 whitespace-pre-wrap rounded bg-black/85 px-2 py-1 font-mono text-[0.55rem] leading-3 text-green-300" aria-hidden="true">
           {debugInfo}
         </div>
       )}

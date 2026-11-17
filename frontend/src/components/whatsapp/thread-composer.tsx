@@ -483,6 +483,15 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
         }`}
         placeholder={t('whatsapp.inbox.placeholder')}
         aria-label={t('whatsapp.inbox.placeholder')}
+        // Não é campo de senha, cartão nem endereço: sem isto o iOS 26 (e o
+        // Chrome do iPhone) desenha, acima do teclado, a barra de preenchimento
+        // automático (chave, cartão, pino), que não entra na conta da área
+        // visível e deixa um vazio entre a caixa de escrever e o teclado.
+        name="wa-message"
+        autoComplete="off"
+        data-form-type="other"
+        data-lpignore="true"
+        data-1p-ignore="true"
         value={body}
         onChange={(event) => setBody(event.target.value)}
         onPaste={paste}
