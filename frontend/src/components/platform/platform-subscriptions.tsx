@@ -33,6 +33,7 @@ import {
   centsToInput,
   chargeActions,
   chargeBadgeClass,
+  chargeGrossCents,
   computeChargeAmount,
   dayInputValue,
   dayKeySaoPaulo,
@@ -46,6 +47,7 @@ import {
   isChargeLate,
   openTotalsByCurrency,
   parseExtendDays,
+  refundPeriodDays,
   refundPreview,
   summaryStatusCards,
   todayIso,
@@ -115,11 +117,15 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
   // aberto das linhas vêm em mais de uma moeda, somar tudo seria inventar um
   // valor, e a tela mostra uma linha por moeda. Com uma moeda só (o caso de
   // sempre), vale o número do servidor, na moeda dessas cobranças.
-  const totaisPorMoeda = useMemo(() => openTotalsByCurrency(rows), [rows])
+  const totaisPorMoeda = useMemo(() => openTotalsByCurrency(rows, summary?.openTotals), [rows, summary])
   const variasMoedas = totaisPorMoeda.length > 1
   const moedaTotal = totaisPorMoeda[0]?.currency || plans[0]?.currency || 'BRL'
 
-  const vazio = loading
+  // "Carregando…" só na primeira carga. No recarregar (o botão, ou depois de
+  // qualquer ação), as linhas ficam e só o ícone gira: trocar a lista pela
+  // linha de "Carregando…" desmontava o painel aberto (`SubscriptionDetail`),
+  // que perdia o estado e buscava tudo de novo ao remontar.
+  const vazio = loading && rows.length === 0
     ? t('common.loading')
     : error !== null
       ? error || t('platform.subs.loadFailed')
@@ -543,11 +549,18 @@ type DialogState =
  */
 function useRefusal() {
   const { t } = useTranslation()
-  return (res: { code?: string; message?: string }) => {
+  return (res: { code?: string; message?: string; detail?: string }) => {
     if (res.code === 'not_open') return t('platform.subs.err.notOpen')
     if (res.code === 'not_paid') return t('platform.subs.err.notPaid')
     if (res.code === 'busy') return t('platform.subs.err.busy')
-    if (res.code === 'gateway_failed') return t('platform.subs.err.gatewayFailed')
+    if (res.code === 'no_subscription') return t('platform.subs.err.noSubscription')
+    // O texto do gateway vai junto, como no estorno: quem opera a conta de lá
+    // resolve o chamado por ele.
+    if (res.code === 'gateway_failed') {
+      return res.detail
+        ? t('platform.subs.err.gatewayFailedDetail', { detail: res.detail })
+        : t('platform.subs.err.gatewayFailed')
+    }
     return res.message || t('platform.saveFailed')
   }
 }
@@ -602,8 +615,9 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
   }
 
   const stored = sub?.storedStatus ?? null
-  // Os dias que um pagamento compra, para a prévia do estorno: os do plano
-  // atual, ou os 30 que o backend assume quando o plano não diz.
+  // Os dias que um pagamento mensal compra, para a prévia do estorno: os do
+  // plano atual, ou os 30 que o backend assume quando o plano não diz. O
+  // anual e as avulsas são decididos por cobrança (`refundPeriodDays`).
   const periodDays = plans.find((plan) => plan.id === sub?.planId)?.periodDays ?? 30
 
   return (
@@ -633,7 +647,8 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
         <div className="rounded-md border border-border bg-card p-3">
           <h4 className="mb-2 text-sm font-semibold text-foreground">{t('common.status')}</h4>
           <div className="flex flex-wrap gap-2">
-            {stored !== 'suspended' && stored !== 'canceled' && (
+            {/* Sem assinatura não há status a mudar (o servidor responde 404). */}
+            {sub && stored !== 'suspended' && stored !== 'canceled' && (
               <button type="button" className="modern-button-secondary" onClick={() => setDialog({ kind: 'status', status: 'suspended' })}>
                 <Icon name="lock" size={16} />
                 {t('platform.subs.suspend')}
@@ -645,7 +660,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
                 {t('platform.subs.reactivate')}
               </button>
             )}
-            {stored !== 'canceled' && (
+            {sub && stored !== 'canceled' && (
               <button type="button" className="modern-button-secondary text-destructive" onClick={() => setDialog({ kind: 'status', status: 'canceled' })}>
                 <Icon name="x" size={16} />
                 {t('platform.subs.cancelSubscription')}
@@ -754,7 +769,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
           tenantId={tenantId}
           charge={dialog.charge}
           renewsAt={sub?.renewsAt ?? null}
-          periodDays={periodDays}
+          periodDays={refundPeriodDays(dialog.charge, sub?.billingCycle, periodDays)}
           onClose={fechar}
           onDone={recarregar}
         />
@@ -1191,6 +1206,12 @@ function SettleDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
         await onDone()
       } else {
         toast.error(recusa(res))
+        // "A lista foi recarregada" (`err.notOpen`): a cobrança mudou por
+        // fora, e o diálogo dela não tem mais o que fazer — fecha e recarrega.
+        if (res.code === 'not_open') {
+          onClose()
+          await onDone()
+        }
       }
     } finally {
       setBusy(false)
@@ -1307,6 +1328,12 @@ function DueDateDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps 
         await onDone()
       } else {
         toast.error(recusa(res))
+        // "A lista foi recarregada" (`err.notOpen`): a cobrança mudou por
+        // fora, e o diálogo dela não tem mais o que fazer — fecha e recarrega.
+        if (res.code === 'not_open') {
+          onClose()
+          await onDone()
+        }
       }
     } finally {
       setBusy(false)
@@ -1343,7 +1370,13 @@ function AmountDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
   const [mode, setMode] = useState<AmountMode>('discountAmount')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const resultado = input.trim() === '' ? null : computeChargeAmount(charge.amountCents, mode, input)
+  // O crédito reservado nela (0106): `amountCents` já vem abatido dele. O
+  // valor digitado é o FINAL — o servidor devolve o crédito ao saldo, para a
+  // próxima fatura —, então o desconto se faz sobre o preço ANTES do crédito.
+  // Descontar do valor abatido e ainda devolver o crédito o daria duas vezes.
+  const credito = Math.max(0, charge.creditCents ?? 0)
+  const bruto = chargeGrossCents(charge)
+  const resultado = input.trim() === '' ? null : computeChargeAmount(bruto, mode, input)
   const novo = resultado?.ok ? resultado.amountCents : null
   const valido = novo !== null && novo !== charge.amountCents
 
@@ -1358,6 +1391,12 @@ function AmountDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
         await onDone()
       } else {
         toast.error(recusa(res))
+        // "A lista foi recarregada" (`err.notOpen`): a cobrança mudou por
+        // fora, e o diálogo dela não tem mais o que fazer — fecha e recarrega.
+        if (res.code === 'not_open') {
+          onClose()
+          await onDone()
+        }
       }
     } finally {
       setBusy(false)
@@ -1387,6 +1426,22 @@ function AmountDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
       <p className="text-muted-foreground">
         {t('platform.subs.currentAmount', { amount: formatMoney(charge.amountCents, charge.currency) })}
       </p>
+      {credito > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+          <p className="text-foreground">
+            {t('platform.subs.amountCredit', {
+              credit: formatMoney(credito, charge.currency),
+              gross: formatMoney(bruto, charge.currency)
+            })}
+          </p>
+          <p className="field-hint">
+            {t('platform.subs.amountCreditHint', {
+              credit: formatMoney(credito, charge.currency),
+              gross: formatMoney(bruto, charge.currency)
+            })}
+          </p>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('platform.subs.changeAmount')}>
         {(['value', 'discountAmount', 'discountPercent'] as const).map((m) => (
           <button
@@ -1445,6 +1500,12 @@ function CancelChargeDialog({ tenantId, charge, onClose, onDone }: ActionDialogP
         await onDone()
       } else {
         toast.error(recusa(res))
+        // "A lista foi recarregada" (`err.notOpen`): a cobrança mudou por
+        // fora, e o diálogo dela não tem mais o que fazer — fecha e recarrega.
+        if (res.code === 'not_open') {
+          onClose()
+          await onDone()
+        }
       }
     } finally {
       setBusy(false)

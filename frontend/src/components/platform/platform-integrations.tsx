@@ -157,6 +157,10 @@ function AsaasCard() {
   if (environment !== info.environment) corpo.environment = environment
   if (clearApiKey) corpo.apiKey = ''
   else if (apiKey.trim()) corpo.apiKey = apiKey.trim()
+  /* Trocar a chave muda a origem dela (env → banco), e sem ambiente gravado o
+     padrão do servidor segue a origem: manda o ambiente junto para que a troca
+     nunca mude, de carona, para onde a cobrança vai. */
+  if (corpo.apiKey !== undefined) corpo.environment = environment
   const mudou = Object.keys(corpo).length > 0
 
   const salvar = async () => {

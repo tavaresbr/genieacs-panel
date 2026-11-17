@@ -153,7 +153,12 @@ export function PlatformReminderPolicy() {
   const salvar = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!perfil) return
-    const ordenada: ReminderPolicy = { steps: sortSteps(rascunho.steps) }
+    /* Ordena os próprios cartões antes de validar: o índice do erro (local ou
+       do servidor) é o da lista ordenada, e o "Passo N" da tela tem de ser o
+       mesmo — senão o erro aponta para o passo errado. */
+    const ordenados = sortSteps(passos)
+    setPassos(ordenados)
+    const ordenada: ReminderPolicy = semChave(ordenados)
     const local: { code: ReminderStepError; index: number | null } | null = validateReminderPolicy(ordenada)
     if (local) {
       toast.error(mensagemDeErro(local.code, local.index, t('platform.reminders.saveFailed')))

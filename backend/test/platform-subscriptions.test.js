@@ -292,7 +292,7 @@ describe('a lista de todos', () => {
     assert.equal(linhaBeta.openCharge.id, daBeta, 'a mais recente em aberto, e não a velha');
     assert.equal(linhaBeta.openCharge.gatewayChargeId, 'pay_beta_atual');
     assert.deepEqual(Object.keys(linhaBeta.openCharge).sort(), [
-      'amountCents', 'amountOverriddenAt', 'attempts', 'billingType', 'createdAt', 'creditCents', 'currency', 'dueDate', 'gatewayChargeId', 'id', 'invoice', 'invoiceUrl', 'kind', 'lastError', 'periodEnd', 'pricing', 'proration', 'provider', 'status', 'superseded', 'updatedAt'
+      'amountCents', 'amountOverriddenAt', 'attempts', 'billingCycle', 'billingType', 'createdAt', 'creditCents', 'currency', 'dueDate', 'gatewayChargeId', 'id', 'invoice', 'invoiceUrl', 'kind', 'lastError', 'periodEnd', 'pricing', 'proration', 'provider', 'status', 'superseded', 'updatedAt'
     ]);
 
     // Sem vazamento cruzado: a cobrança de cada linha é a do dono dela.
@@ -309,6 +309,7 @@ describe('a lista de todos', () => {
     assert.equal(summary.byStatus.trial, 1);
     assert.equal(summary.byStatus.none, 0);
     assert.equal(summary.openTotalCents, 5000 + 10000 + 7000, 'todas as em aberto, a velha inclusive');
+    assert.deepEqual(summary.openTotals, [{ currency: 'BRL', cents: 5000 + 10000 + 7000 }], 'por moeda, também a velha');
     assert.equal(summary.overdueCount, 1);
     assert.ok(velha);
   });

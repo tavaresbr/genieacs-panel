@@ -2367,6 +2367,8 @@ export interface ChargeConsoleView {
   amountCents: number
   /** O crédito abatido nela (0106). Opcional: servidores antigos não mandam. */
   creditCents?: number
+  /** O ciclo que ela paga (0104); nulo nas de antes (mensais). Opcional: servidores antigos não mandam. */
+  billingCycle?: BillingCycle | null
   currency: string
   status: TenantChargeView['status']
   dueDate: string | null
@@ -2483,6 +2485,8 @@ export type SubscriptionConsoleStatus = SubscriptionStatus | 'none'
 export interface SubscriptionConsoleSummary {
   byStatus: Record<SubscriptionConsoleStatus, number>
   openTotalCents: number
+  /** O total em aberto separado por moeda, de TODAS as em aberto. Opcional: servidores antigos não mandam. */
+  openTotals?: { currency: string; cents: number }[]
   overdueCount: number
   /** Quantos estão isentos de cobrança. Opcional: servidores antigos não mandam. */
   exempt?: number
@@ -2920,7 +2924,7 @@ export const platformAPI = {
     ),
 
   updateCharge: (tenantId: number, chargeId: number, payload: { dueDate?: string; amountCents?: number }) =>
-    apiClient.requestWithBody<{ charge: ChargeConsoleView }>(
+    apiClient.requestWithBody<{ charge: ChargeConsoleView; creditReleasedCents?: number }>(
       'PATCH', `/platform/tenants/${tenantId}/charges/${chargeId}`, payload
     ),
 
@@ -8638,7 +8642,7 @@ export interface ExternalBackupRun {
   source?: 'panel' | 'host'
   startedAt?: string
   finishedAt?: string
-  durationMs?: number
+  durationMs?: number | null
   key?: string
   bytes?: number
   sha256?: string

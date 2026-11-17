@@ -410,8 +410,14 @@ class PlatformSubscriptionsController {
       const dia = hoje(now);
       let openTotalCents = 0;
       let overdueCount = 0;
+      // O mesmo total, separado por moeda: somar centavos de moedas diferentes
+      // dá um número que não existe, e a tela só tinha a cobrança mais recente
+      // de cada linha para refazer a conta — deixava de fora a velha esquecida.
+      const porMoeda = new Map();
       for (const row of abertas) {
         openTotalCents += Number(row.amount_cents) || 0;
+        const moeda = String(row.currency || 'BRL').toUpperCase();
+        porMoeda.set(moeda, (porMoeda.get(moeda) ?? 0) + (Number(row.amount_cents) || 0));
         const vencimento = isoDateOf(row.due_date);
         if (row.status === 'overdue' || (vencimento && vencimento < dia)) overdueCount += 1;
       }
@@ -429,7 +435,13 @@ class PlatformSubscriptionsController {
 
       return res.json(createResponse('Subscriptions retrieved', {
         rows: visiveis,
-        summary: { byStatus, exempt, openTotalCents, overdueCount }
+        summary: {
+          byStatus,
+          exempt,
+          openTotalCents,
+          openTotals: [...porMoeda.entries()].map(([currency, cents]) => ({ currency, cents })),
+          overdueCount
+        }
       }));
     } catch (error) {
       console.error('List subscriptions error:', error);
@@ -888,15 +900,22 @@ class PlatformSubscriptionsController {
             await BillingCharge.update(cobranca.id, patch);
             // O valor digitado pelo console é o final (0106): o crédito que
             // estava reservado nela volta ao saldo do provedor, para a
-            // próxima fatura.
-            if (mudaValor) await TenantCredit.releaseForCharge(cobranca.id);
+            // próxima fatura. Não se mantém a reserva numa cobrança de valor
+            // à mão — a emissão, a troca de plano e a indicação contam com
+            // "valor à mão não tem crédito". É a tela que tem de mostrar o
+            // crédito e fazer o desconto sobre o preço ANTES dele
+            // (`amountCents + creditCents`): descontar do valor já abatido e
+            // ainda devolver o crédito daria o crédito duas vezes. O quanto
+            // voltou vai na resposta e na trilha.
+            const creditoDevolvido = mudaValor ? await TenantCredit.releaseForCharge(cobranca.id) : 0;
             const charge = await BillingCharge.findById(cobranca.id);
             return {
               cobranca,
               antes,
               depois: { amountCents: Number(charge.amount_cents), dueDate: isoDateOf(charge.due_date) },
               charge,
-              gateway: Boolean(gateway)
+              gateway: Boolean(gateway),
+              creditoDevolvido
             };
           } finally {
             await BillingCharge.release(cobranca.id);
@@ -915,12 +934,14 @@ class PlatformSubscriptionsController {
             periodEnd: BillingCharge.periodEndOf(resultado.cobranca),
             before: resultado.antes,
             after: resultado.depois,
-            atGateway: resultado.gateway
+            atGateway: resultado.gateway,
+            ...(resultado.creditoDevolvido > 0 ? { creditReleasedCents: resultado.creditoDevolvido } : {})
           }
         });
       }
       return res.json(createResponse(resultado.nada ? 'Nothing changed' : 'Charge updated', {
-        charge: BillingCharge.presentForConsole(resultado.charge)
+        charge: BillingCharge.presentForConsole(resultado.charge),
+        creditReleasedCents: resultado.creditoDevolvido ?? 0
       }));
     } catch (error) {
       console.error('Update charge error:', error);

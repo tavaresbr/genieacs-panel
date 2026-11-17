@@ -788,6 +788,11 @@ class PlatformBillingController {
       }
 
       const before = await Subscription.forTenant(tenant.id);
+      // Mudar o status de quem não tem assinatura não tem o que mudar: 404
+      // com código, que a tela traduz — e não o 500 do `setStatus` lançando.
+      if (status !== undefined && !before) {
+        return res.status(404).json(createErrorResponse('Subscription not found', null, 'no_subscription'));
+      }
       const actorUserId = req.user?.userId ?? null;
       let resultado = null;
       let statusFeito = false;

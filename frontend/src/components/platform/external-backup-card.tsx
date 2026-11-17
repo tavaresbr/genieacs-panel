@@ -40,8 +40,10 @@ type Form = {
   enabled: boolean
   runner: ExternalBackupSettings['runner']
   hour: number
-  keepDaily: number
-  keepWeekly: number
+  /* Texto, não número: com Number('') um campo apagado virava 0 e ia ao
+     servidor como se fosse um valor escolhido. Vira número só ao salvar. */
+  keepDaily: string
+  keepWeekly: string
   includeMedia: boolean
 }
 
@@ -57,19 +59,36 @@ function formOf(info: ExternalBackupSettings): Form {
     enabled: info.enabled,
     runner: info.runner,
     hour: info.hour,
-    keepDaily: info.keepDaily,
-    keepWeekly: info.keepWeekly,
+    keepDaily: String(info.keepDaily),
+    keepWeekly: String(info.keepWeekly),
     includeMedia: info.includeMedia
   }
+}
+
+/** Os mesmos limites do servidor para a retenção. */
+export const RETENTION_LIMITS = { keepDaily: [1, 365], keepWeekly: [0, 520] } as const
+
+/** O número da retenção, ou null se o texto não é um inteiro dentro da faixa. */
+export function retentionValue(campo: keyof typeof RETENTION_LIMITS, texto: string): number | null {
+  const aparado = texto.trim()
+  if (!/^\d+$/.test(aparado)) return null
+  const n = Number(aparado)
+  const [min, max] = RETENTION_LIMITS[campo]
+  return n >= min && n <= max ? n : null
 }
 
 /** Só o que mudou: a access key e a secret só vão quando digitadas. */
 export function backupPatch(info: ExternalBackupSettings, form: Form): ExternalBackupUpdate {
   const patch: ExternalBackupUpdate = {}
-  const comparar = ['endpoint', 'region', 'bucket', 'prefix', 'forcePathStyle', 'enabled', 'runner', 'hour', 'keepDaily', 'keepWeekly', 'includeMedia'] as const
+  const comparar = ['endpoint', 'region', 'bucket', 'prefix', 'forcePathStyle', 'enabled', 'runner', 'hour', 'includeMedia'] as const
   for (const campo of comparar) {
     const atual = campo === 'region' ? (info.region || 'us-east-1') : info[campo]
     if (form[campo] !== atual) (patch as Record<string, unknown>)[campo] = form[campo]
+  }
+  // Retenção inválida não entra no patch; quem a mostra (e trava o salvar) é o cartão.
+  for (const campo of ['keepDaily', 'keepWeekly'] as const) {
+    const n = retentionValue(campo, form[campo])
+    if (n !== null && n !== info[campo]) patch[campo] = n
   }
   if (form.accessKeyId.trim()) patch.accessKeyId = form.accessKeyId.trim()
   if (form.secretAccessKey.trim()) patch.secretAccessKey = form.secretAccessKey.trim()
@@ -128,7 +147,8 @@ function LinhaEnvio({ titulo, run }: { titulo: TranslationKey; run: ExternalBack
             <div>{t('integrations.backup.when', { when: formatRelativeTime((run.finishedAt || run.startedAt) as string) })}</div>
           )}
           {run.bytes !== undefined && <div>{t('integrations.backup.size', { size: formatBytes(run.bytes) })}</div>}
-          {run.durationMs !== undefined && (
+          {/* Um envio interrompido grava null (sem início legível): não é "0s". */}
+          {run.durationMs != null && (
             <div>{t('integrations.backup.duration', { seconds: String(Math.round(run.durationMs / 100) / 10) })}</div>
           )}
           {run.source && <div>{t(run.source === 'host' ? 'integrations.backup.byHost' : 'integrations.backup.byPanel')}</div>}
@@ -215,10 +235,13 @@ export function ExternalBackupCard() {
 
   const patch = backupPatch(info, form)
   const mudou = Object.keys(patch).length > 0
+  const dailyInvalido = retentionValue('keepDaily', form.keepDaily) === null
+  const weeklyInvalido = retentionValue('keepWeekly', form.keepWeekly) === null
+  const retencaoInvalida = dailyInvalido || weeklyInvalido
   const set = <K extends keyof Form>(campo: K, valor: Form[K]) => setForm((f) => (f ? { ...f, [campo]: valor } : f))
 
   const salvar = async () => {
-    if (!mudou || saving) return
+    if (!mudou || saving || retencaoInvalida) return
     setSaving(true)
     try {
       const res = await externalBackupAPI.save(patch)
@@ -395,12 +418,22 @@ export function ExternalBackupCard() {
             <div>
               <label htmlFor="bkp-daily" className="field-label">{t('integrations.backup.keepDaily')}</label>
               <input id="bkp-daily" type="number" min={1} max={365} className="modern-input w-full" value={form.keepDaily}
-                onChange={(e) => set('keepDaily', Number(e.target.value))} />
+                aria-invalid={dailyInvalido} onChange={(e) => set('keepDaily', e.target.value)} />
+              {dailyInvalido && (
+                <p className="field-hint text-destructive">
+                  {t('integrations.backup.retentionRange', { min: RETENTION_LIMITS.keepDaily[0], max: RETENTION_LIMITS.keepDaily[1] })}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="bkp-weekly" className="field-label">{t('integrations.backup.keepWeekly')}</label>
               <input id="bkp-weekly" type="number" min={0} max={520} className="modern-input w-full" value={form.keepWeekly}
-                onChange={(e) => set('keepWeekly', Number(e.target.value))} />
+                aria-invalid={weeklyInvalido} onChange={(e) => set('keepWeekly', e.target.value)} />
+              {weeklyInvalido && (
+                <p className="field-hint text-destructive">
+                  {t('integrations.backup.retentionRange', { min: RETENTION_LIMITS.keepWeekly[0], max: RETENTION_LIMITS.keepWeekly[1] })}
+                </p>
+              )}
             </div>
             <p className="field-hint md:col-span-2">{t('integrations.backup.retentionHint')}</p>
             <label className="flex items-center gap-2 text-sm md:col-span-2">
@@ -409,7 +442,7 @@ export function ExternalBackupCard() {
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button type="button" className="modern-button" disabled={!mudou || saving} onClick={() => void salvar()}>
+            <button type="button" className="modern-button" disabled={!mudou || saving || retencaoInvalida} onClick={() => void salvar()}>
               {saving ? t('common.saving') : t('common.save')}
             </button>
             <button type="button" className="modern-button-secondary" disabled={busy !== null || mudou || !info.secretAccessKeyConfigured}

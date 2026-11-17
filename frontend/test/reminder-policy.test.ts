@@ -55,6 +55,13 @@ describe('a pré-visualização', () => {
     expect(sampleValues(3, agora).vencimento).toBe('2026-10-07')
   })
 
+  it('o vencimento de exemplo é o dia de São Paulo, não o UTC, depois das 21h', () => {
+    // 22h de 10/03 em São Paulo já é 11/03 em UTC.
+    const agora = new Date('2026-03-11T01:00:00Z')
+    expect(sampleValues(0, agora).vencimento).toBe('2026-03-10')
+    expect(sampleValues(-3, agora).vencimento).toBe('2026-03-13')
+  })
+
   it('a variável entra na posição do cursor', () => {
     expect(insertVariable('Olá !', 'empresa', 4)).toEqual({ text: 'Olá {empresa}!', caret: 13 })
     expect(insertVariable('Fim', 'link', null)).toEqual({ text: 'Fim{link}', caret: 9 })
