@@ -48,7 +48,7 @@ import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
 import { CloseSurveyDialog } from '@/components/whatsapp/close-survey-dialog'
 import { setMobileBarHidden, setMobileBarUnread, subscribeMobileBar } from '@/lib/mobile-bar'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
-import { cardHeightAboveKeyboard, cardOutOfView, visibleHeightWithKeyboard } from '@/lib/wa-keyboard'
+import { cardHeightAboveKeyboard, keyboardFrame } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation, useNavigate } from 'react-router'
@@ -904,14 +904,16 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     return () => setMobileBarUnread(0)
   }, [unreadTotal])
   // Teclado do iPhone: o Safari não encolhe a página, só a `visualViewport`
-  // (`lib/wa-keyboard.ts`). Com o teclado aberto o cartão passa a caber na
-  // parte visível, com a caixa de escrever logo acima dele. Só no celular.
+  // (`lib/wa-keyboard.ts`), e ao focar a caixa de escrever ele DESLOCA a área
+  // visível. Medir o cartão no meio dessa rolagem dava um cartão errado (vazio
+  // até o teclado, ou a tela escura). Com o teclado aberto o cartão vira uma
+  // camada `fixed` colada à área visível (`keyboardFrame`): termina sempre no
+  // teclado, não importa quanto o Safari desloque. Só no celular.
   const [keyboardHeight, setKeyboardHeight] = useState<number | null>(null)
-  // A altura do cartão, medida de onde ele está de fato até o fim da área
-  // visível (`cardHeightAboveKeyboard`): o Safari rola a página ao focar a
-  // caixa, e a conta fixa deixava um vazio entre o cartão e o teclado. Sem
-  // teclado a mesma medida faz o cartão fechar a tela, qualquer que seja o
-  // número de faixas de aviso acima dele.
+  const [frame, setFrame] = useState<{ top: number; height: number } | null>(null)
+  // Sem teclado, a altura do cartão é medida de onde ele está até o fim da
+  // tela (`cardHeightAboveKeyboard`), qualquer que seja o número de faixas de
+  // aviso acima dele.
   const [cardHeight, setCardHeight] = useState<number | null>(null)
   const cardRef = useRef<HTMLElement>(null)
   // `?wadebug=1` mostra as medidas do teclado numa faixa no topo, para quem testa no aparelho.
@@ -920,59 +922,44 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     const vv = window.visualViewport
     if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
     // No celular só o cartão rola por dentro; a barra, as abas e os avisos
-    // ficam parados. A página volta a rolar ao sair desta aba.
-    //
-    // Menos com o teclado aberto: o Safari, ao focar a caixa de escrever, desloca
-    // a área visível para mostrá-la, e com a página travada (`overflow: hidden`)
-    // não há como trazê-la de volta — a tela ficava vazia, só o teclado. Com o
-    // teclado aberto a página destrava, volta ao topo, e o cartão (medido logo
-    // abaixo) termina acima do teclado, de modo que nada precisa rolar.
+    // ficam parados. A página fica travada SEMPRE, teclado aberto ou não: o
+    // cartão do teclado é `fixed` e acompanha a área visível, então não há o
+    // que rolar — e uma página destravada era o que o Safari rolava.
     const root = document.documentElement
     const body = document.body
     const before = { rootOverflow: root.style.overflow, bodyOverflow: body.style.overflow, bodyOverscroll: body.style.overscrollBehavior }
-    const lock = (on: boolean) => {
-      root.style.overflow = on ? 'hidden' : before.rootOverflow
-      body.style.overflow = on ? 'hidden' : before.bodyOverflow
-      body.style.overscrollBehavior = on ? 'none' : before.bodyOverscroll
-    }
-    lock(true)
-    let last: number | null = null
+    root.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    body.style.overscrollBehavior = 'none'
+    let lastFrame = ''
     let lastCard: number | null = null
-    let lastRescue = 0
     const debug = new URLSearchParams(window.location.search).get('wadebug') === '1'
     const update = () => {
-      const next = visibleHeightWithKeyboard({ innerHeight: window.innerHeight, vvHeight: vv.height })
-      if (next !== last) {
-        last = next
-        setKeyboardHeight(next)
-        lock(next === null)
+      const next = keyboardFrame({ innerHeight: window.innerHeight, vvTop: vv.offsetTop, vvHeight: vv.height })
+      const key = next ? `${next.top}:${next.height}` : ''
+      if (key !== lastFrame) {
+        lastFrame = key
+        setFrame(next)
+        setKeyboardHeight(next ? next.height : null)
       }
-      // A barra fixa e as abas ficam no topo da área visível; com o teclado
-      // aberto, também quando só a área visível (e não a página) se deslocou.
-      if (window.scrollY !== 0 || (next !== null && vv.offsetTop > 0)) window.scrollTo(0, 0)
+      // Sem teclado a página volta ao topo (a barra fixa e as abas ficam lá).
+      if (!next && window.scrollY !== 0) window.scrollTo(0, 0)
       const card = cardRef.current
       const rect = card?.getBoundingClientRect() ?? null
       // A barra de atalhos, quando aparece, fica entre o cartão e o fim da tela.
       const barHeight = document.querySelector<HTMLElement>('[data-mobile-tab-bar]')?.offsetHeight ?? 0
-      const height = rect
+      // Com o teclado aberto o cartão é o quadro; medir só sem ele.
+      const height = !next && rect
         ? cardHeightAboveKeyboard({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: rect.top }, { margin: 8 + barHeight })
         : null
       if (height !== lastCard) {
         lastCard = height
         setCardHeight(height)
       }
-      // A rede de segurança da tela escura: com o teclado aberto e o cartão fora
-      // da área visível, traz o cartão de volta. No máximo a cada meio segundo,
-      // para não brigar com o Safari se ele insistir em deslocar.
-      if (card && rect && next !== null && Date.now() - lastRescue > 500
-        && cardOutOfView({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: rect.top, cardBottom: rect.bottom })) {
-        lastRescue = Date.now()
-        card.scrollIntoView({ block: 'nearest' })
-      }
       if (debug) {
         setDebugInfo(
           `inner ${Math.round(window.innerHeight)} vv ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)} `
-          + `scrollY ${Math.round(window.scrollY)} kb ${next ?? '-'} card ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'} h ${height ?? '-'}`
+          + `scrollY ${Math.round(window.scrollY)} kb ${next ? `${next.top}+${next.height}` : '-'} card ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'} h ${height ?? '-'}`
         )
       }
     }
@@ -989,7 +976,9 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
       observer.disconnect()
-      lock(false)
+      root.style.overflow = before.rootOverflow
+      body.style.overflow = before.bodyOverflow
+      body.style.overscrollBehavior = before.bodyOverscroll
     }
   }, [])
 
@@ -1043,7 +1032,11 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
             }`}
             // Sem a área segura (o teclado cobre o indicador de home) e sem o
             // `min-h`, que impediria o cartão de encolher.
-            style={cardHeight !== null ? { height: `${cardHeight}px`, minHeight: 0 } : keyboardHeight !== null ? { height: `calc(${keyboardHeight}px - 9rem)`, minHeight: 0 } : undefined}
+            style={frame !== null
+              // Teclado aberto: a camada `fixed` que ocupa a área visível. A
+              // área segura de cima só importa no app instalado (tela cheia).
+              ? { position: 'fixed', top: frame.top, left: 0, right: 0, height: frame.height, minHeight: 0, zIndex: 1300, borderRadius: 0, paddingTop: 'env(safe-area-inset-top)' }
+              : cardHeight !== null ? { height: `${cardHeight}px`, minHeight: 0 } : undefined}
           >
             <div className={`${showSgpPanel && conversation ? 'hidden 2xl:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">

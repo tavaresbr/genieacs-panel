@@ -57,3 +57,24 @@ export function cardOutOfView(
   const visible = Math.min(cardBottom, vvTop + vvHeight) - Math.max(cardTop, vvTop)
   return visible < min
 }
+
+/**
+ * O quadro que o cartão ocupa com o teclado aberto: exatamente a área visível.
+ *
+ * Medir "onde o cartão está" durante a rolagem do Safari (`cardHeightAboveKeyboard`)
+ * dá resultado errado justo quando ele desloca a área visível para mostrar a
+ * caixa de escrever: o cartão fica mais alto que o visível, ou deixa um vazio
+ * até o teclado, ou a tela fica escura. A `visualViewport` já diz o que se vê:
+ * `top` é o quanto a área visível está deslocada, `height` é a altura dela. Um
+ * cartão `position: fixed` com esses dois valores termina sempre no teclado,
+ * não importa o que o Safari rolar.
+ *
+ * `null` sem teclado (a mesma regra de `visibleHeightWithKeyboard`).
+ */
+export function keyboardFrame(
+  { innerHeight, vvTop, vvHeight }: { innerHeight: number; vvTop: number; vvHeight: number }
+): { top: number; height: number } | null {
+  const height = visibleHeightWithKeyboard({ innerHeight, vvHeight })
+  if (height === null || !Number.isFinite(vvTop)) return null
+  return { top: Math.max(0, Math.round(vvTop)), height }
+}
