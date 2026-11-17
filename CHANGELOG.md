@@ -7,6 +7,19 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.47.1] - 2026-11-17
+
+### Fixed
+
+- Aba Assinaturas — crédito no desconto, prévia do estorno, recarga sem desmontar o painel (`a1dffd0b`)
+- Trocar a chave do Asaas não muda o ambiente de carona (`ba789f43`)
+- Conexão ilegível pode ser substituída inteira (`e9904d8c`)
+- Passo do erro e vencimento da prévia batem com a tela (`596f80fd`)
+- Retenção apagada não vira 0 e envio interrompido sem "0s" (`d56d9f41`)
+- Reconsulta não apaga a edição e salvar descarta a prévia velha (`1d1d573a`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/d5f9d21c4e58...3ef13c029f0c)
+
 ## [1.47.0] - 2026-11-16
 
 ### New

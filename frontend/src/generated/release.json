@@ -1,16 +1,46 @@
 {
-  "version": "1.47.0",
-  "build": 1735,
-  "sourceCommit": "1c59a6420800",
-  "releasedAt": "2026-11-16",
-  "basedOnTag": "v1.46.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/779ea42eb9f4...1c59a6420800",
+  "version": "1.47.1",
+  "build": 1743,
+  "sourceCommit": "3ef13c029f0c",
+  "releasedAt": "2026-11-17",
+  "basedOnTag": "v1.47.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/d5f9d21c4e58...3ef13c029f0c",
   "changes": [
     {
-      "shortHash": "352b9821",
+      "shortHash": "a1dffd0b",
       "date": "2026-11-16",
-      "title": "Escolher o número do provedor ao clicar em Conversar",
-      "category": "New"
+      "title": "Aba Assinaturas — crédito no desconto, prévia do estorno, recarga sem desmontar o painel",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "ba789f43",
+      "date": "2026-11-16",
+      "title": "Trocar a chave do Asaas não muda o ambiente de carona",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "e9904d8c",
+      "date": "2026-11-16",
+      "title": "Conexão ilegível pode ser substituída inteira",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "596f80fd",
+      "date": "2026-11-16",
+      "title": "Passo do erro e vencimento da prévia batem com a tela",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "d56d9f41",
+      "date": "2026-11-16",
+      "title": "Retenção apagada não vira 0 e envio interrompido sem \"0s\"",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "1d1d573a",
+      "date": "2026-11-16",
+      "title": "Reconsulta não apaga a edição e salvar descarta a prévia velha",
+      "category": "Fixed"
     }
   ]
 }
