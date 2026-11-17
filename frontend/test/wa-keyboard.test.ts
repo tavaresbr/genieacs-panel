@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cardHeightAboveKeyboard, cardOutOfView, visibleHeightWithKeyboard } from '../src/lib/wa-keyboard'
+import { cardHeightAboveKeyboard, cardOutOfView, keyboardFrame, visibleHeightWithKeyboard } from '../src/lib/wa-keyboard'
 
 describe('visibleHeightWithKeyboard', () => {
   it('com o teclado aberto no iPhone, devolve a altura visível', () => {
@@ -75,5 +75,37 @@ describe('cardOutOfView', () => {
   it('medida estranha não mexe na página', () => {
     expect(cardOutOfView({ vvTop: Number.NaN, vvHeight: 500, cardTop: 0, cardBottom: 10 })).toBe(false)
     expect(cardOutOfView({ vvTop: 0, vvHeight: 0, cardTop: 0, cardBottom: 10 })).toBe(false)
+  })
+})
+
+describe('keyboardFrame', () => {
+  it('com o teclado aberto, o quadro é exatamente a área visível', () => {
+    expect(keyboardFrame({ innerHeight: 812, vvTop: 0, vvHeight: 460 })).toEqual({ top: 0, height: 460 })
+  })
+
+  it('quando o Safari desloca a área visível, o quadro vai junto (e termina no teclado)', () => {
+    const frame = keyboardFrame({ innerHeight: 812, vvTop: 120, vvHeight: 460 })
+    expect(frame).toEqual({ top: 120, height: 460 })
+    // fim do quadro = fim da área visível, logo acima do teclado
+    expect(frame!.top + frame!.height).toBe(120 + 460)
+  })
+
+  it('sem teclado, não há quadro (nada muda)', () => {
+    expect(keyboardFrame({ innerHeight: 812, vvTop: 0, vvHeight: 812 })).toBeNull()
+    expect(keyboardFrame({ innerHeight: 812, vvTop: 0, vvHeight: 760 })).toBeNull()
+  })
+
+  it('no Android a página já encolhe junto: sem quadro', () => {
+    expect(keyboardFrame({ innerHeight: 460, vvTop: 0, vvHeight: 460 })).toBeNull()
+  })
+
+  it('arredonda e nunca devolve topo negativo', () => {
+    expect(keyboardFrame({ innerHeight: 812, vvTop: 59.6, vvHeight: 459.6 })).toEqual({ top: 60, height: 460 })
+    expect(keyboardFrame({ innerHeight: 812, vvTop: -3, vvHeight: 460 })).toEqual({ top: 0, height: 460 })
+  })
+
+  it('valores inválidos não quebram a conta', () => {
+    expect(keyboardFrame({ innerHeight: 812, vvTop: Number.NaN, vvHeight: 460 })).toBeNull()
+    expect(keyboardFrame({ innerHeight: 0, vvTop: 0, vvHeight: 0 })).toBeNull()
   })
 })
