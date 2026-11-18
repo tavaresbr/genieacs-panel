@@ -207,6 +207,7 @@ after(async () => {
 });
 
 beforeEach(() => {
+  WaAiService.reiniciarPausa();
   roteiro = [];
   pedidosIa = [];
   iaFora = false;
@@ -345,6 +346,21 @@ describe('o motivo da recusa', () => {
     assert.equal(res.body.code, 'ai_no_balance');
     recusa = { status: 429, body: { error: { code: '1302', message: 'High concurrency' } } };
     assert.equal((await api('/bot-config/ai-test', { method: 'POST', body: {} })).body.code, 'ai_rate_limited');
+  });
+
+  it('chave recusada: a IA fica quieta por um tempo e não bate na API a cada mensagem', async () => {
+    await limparFio(ASSINANTE);
+    recusa = { status: 401, body: { error: { code: '1000', message: 'Authentication failed' } } };
+    await receber(ASSINANTE, 'oi');
+    assert.equal(pedidosIa.length, 1);
+    pedidosIa = [];
+    recusa = null;
+    await receber(ASSINANTE, 'alguém aí?');
+    assert.equal(pedidosIa.length, 0, 'pausada: nenhuma chamada à API');
+    WaAiService.reiniciarPausa();
+    roteiro = [{ content: 'Oi!' }];
+    await receber(ASSINANTE, 'oi de novo');
+    assert.equal(pedidosIa.length, 1, 'passada a pausa, a IA volta');
   });
 
   it('a falha no atendimento fica com o motivo para a tela', async () => {

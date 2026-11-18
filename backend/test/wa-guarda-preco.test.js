@@ -30,3 +30,12 @@ describe('os valores em reais de um texto', () => {
     assert.equal(formatarReais(4990), 'R$ 49,90');
   });
 });
+
+describe('valor mensal sem "R$"', () => {
+  it('59,90/mês e 59,90 por mês contam como preço; data e percentual não', async () => {
+    const { valoresEmCentavos } = await import('../src/utils/wa/guardaDePreco.js');
+    assert.deepEqual(valoresEmCentavos('só 59,90/mês'), [5990]);
+    assert.deepEqual(valoresEmCentavos('59,90 por mês'), [5990]);
+    assert.deepEqual(valoresEmCentavos('dia 18.11, 99,9% de estabilidade e 2,4 GHz'), []);
+  });
+});

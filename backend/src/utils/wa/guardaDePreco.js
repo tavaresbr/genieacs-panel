@@ -9,6 +9,9 @@ const COM_CIFRAO = /R\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:[,.](\d{1,2}))?/gi;
 // "99 reais", "89,90 reais"
 const COM_REAIS = /(\d{1,3}(?:\.\d{3})+|\d+)(?:[,.](\d{1,2}))?\s*reais\b/gi;
 
+// "59,90/mês", "59,90 por mês", "só 59,90 ao mês": o valor sem "R$" mas com a cobrança mensal
+const COM_MES = /(\d{1,3}(?:\.\d{3})+|\d+)[,.](\d{2})\s*(?:\/\s*m[eê]s|por\s+m[eê]s|ao\s+m[eê]s|mensais?)/gi;
+
 const emCentavos = (inteiro, fracao) => {
   const reais = Number(String(inteiro).replace(/\./g, ''));
   const centavos = fracao ? Number(String(fracao).padEnd(2, '0')) : 0;
@@ -19,7 +22,7 @@ const emCentavos = (inteiro, fracao) => {
 export function valoresEmCentavos(texto) {
   const achados = new Set();
   const fonte = String(texto ?? '');
-  for (const regex of [COM_CIFRAO, COM_REAIS]) {
+  for (const regex of [COM_CIFRAO, COM_REAIS, COM_MES]) {
     for (const m of fonte.matchAll(regex)) {
       const valor = emCentavos(m[1], m[2]);
       if (valor > 0) achados.add(valor);

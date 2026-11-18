@@ -31,7 +31,13 @@ export function lerGatilhos(texto) {
 }
 
 /** O item combina com a conversa se algum gatilho aparece nela. */
-export const combina = (item, conversaNormalizada) => lerGatilhos(item.triggers).some((g) => conversaNormalizada.includes(g));
+export const combina = (item, conversaNormalizada) => lerGatilhos(item.triggers).some((g) => aparece(g, conversaNormalizada));
+
+/** O gatilho como palavra inteira: "cai" não casa com "caixa". */
+function aparece(gatilho, texto) {
+  const escapado = gatilho.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![a-z0-9])${escapado}(?![a-z0-9])`).test(texto);
+}
 
 const linha = (item) => `- ${ROTULO[item.kind] ?? 'Item'} — ${item.title}: ${item.answer}`;
 
