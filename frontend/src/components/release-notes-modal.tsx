@@ -6,6 +6,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { orderReleaseChanges } from '@/lib/release-notes'
 import release from '@/generated/release.json'
+import { lockBody } from '@/lib/body-lock'
 
 const CATEGORY_STYLE: Record<string, { icon: string; className: string }> = {
   Breaking: { icon: 'warning', className: 'modern-badge-error' },
@@ -31,15 +32,14 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
 
   useEffect(() => {
     if (!open) return
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const release = lockBody()
     closeButtonRef.current?.focus()
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => {
-      document.body.style.overflow = previousOverflow
+      release()
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [onClose, open])

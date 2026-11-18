@@ -48,7 +48,8 @@ import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
 import { CloseSurveyDialog } from '@/components/whatsapp/close-survey-dialog'
 import { setMobileBarHidden, setMobileBarUnread, subscribeMobileBar } from '@/lib/mobile-bar'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
-import { cardHeightAboveKeyboard, keyboardFrame, nextBaseInner } from '@/lib/wa-keyboard'
+import { cardHeightAboveKeyboard, cardOutOfView, keyboardFrame, nextBaseInner } from '@/lib/wa-keyboard'
+import { lockRoot, pulseLock } from '@/lib/body-lock'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation, useNavigate } from 'react-router'
@@ -918,19 +919,27 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   const cardRef = useRef<HTMLElement>(null)
   // `?wadebug=1` mostra as medidas do teclado numa faixa no topo, para quem testa no aparelho.
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
+  // O celular pode virar tablet/desktop (e o contrário) girando o aparelho ou
+  // redimensionando a janela: o efeito do teclado liga e desliga com isso.
+  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1023px)')
+    const onChange = () => setPhone(query.matches)
+    query.addEventListener('change', onChange)
+    onChange()
+    return () => query.removeEventListener('change', onChange)
+  }, [])
   useEffect(() => {
     const vv = window.visualViewport
-    if (!vv || !window.matchMedia('(max-width: 1023px)').matches) return
+    if (!vv || !phone) return
     // No celular só o cartão rola por dentro; a barra, as abas e os avisos
     // ficam parados. A página fica travada SEMPRE, teclado aberto ou não: o
     // cartão do teclado é `fixed` e acompanha a área visível, então não há o
-    // que rolar — e uma página destravada era o que o Safari rolava.
-    const root = document.documentElement
-    const body = document.body
-    const before = { rootOverflow: root.style.overflow, bodyOverflow: body.style.overflow, bodyOverscroll: body.style.overscrollBehavior }
-    root.style.overflow = 'hidden'
-    body.style.overflow = 'hidden'
-    body.style.overscrollBehavior = 'none'
+    // que rolar — e uma página destravada era o que o Safari rolava. A trava é
+    // compartilhada (`lib/body-lock.ts`) com a gaveta e os modais.
+    const releaseLock = lockRoot()
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1)
+    let disposed = false
     let lastFrame = ''
     let lastCard: number | null = null
     const debug = new URLSearchParams(window.location.search).get('wadebug') === '1'
@@ -942,9 +951,10 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     const history: string[] = []
     const DEBUG_KEY = 'wa-kb-debug'
     let previous = ''
-    if (debug) {
-      try { previous = localStorage.getItem(DEBUG_KEY) ?? '' } catch { /* sem armazenamento */ }
-    }
+    try {
+      if (debug) previous = localStorage.getItem(DEBUG_KEY) ?? ''
+      else localStorage.removeItem(DEBUG_KEY)
+    } catch { /* sem armazenamento */ }
     let cause = 'init'
     const note = (what: string) => {
       cause = what
@@ -956,39 +966,45 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     let baseWidth = window.innerWidth
     let misses = 0
     let forceStatic = false
+    let grace = 0
     const fieldFocused = () => {
       const el = document.activeElement
       return !!el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || (el as HTMLElement).isContentEditable)
     }
     const update = () => {
+      if (disposed) return
       const nb = nextBaseInner({ base: baseInner, baseWidth, innerHeight: window.innerHeight, innerWidth: window.innerWidth, fieldFocused: fieldFocused() })
       baseInner = nb.base
       baseWidth = nb.baseWidth
-      let next = forceStatic ? null : keyboardFrame({ innerHeight: baseInner, vvTop: vv.offsetTop, vvHeight: vv.height })
+      let next = forceStatic ? null : keyboardFrame({ innerHeight: baseInner, vvTop: vv.offsetTop, vvHeight: vv.height, scale: vv.scale })
       if (!next) forceStatic = forceStatic && fieldFocused()
       const key = next ? `${next.top}:${next.height}` : ''
       if (key !== lastFrame) {
         lastFrame = key
+        misses = 0 // o quadro mudou: a medição do cartão ainda é do quadro anterior
         setFrame(next)
         setKeyboardHeight(next ? next.height : null)
       }
-      // Sem teclado a página volta ao topo (a barra fixa e as abas ficam lá).
-      // Com `html/body` em `overflow:hidden` o `scrollY` fica 0 mesmo quando o iOS
-      // deixa a janela de layout deslocada depois de fechar o teclado (cabeçalho
-      // cortado, vazio embaixo): por isso o reset é sempre, não só se `scrollY ≠ 0`.
-      if (!next) {
-        window.scrollTo(0, 0)
-        const scroller = document.scrollingElement
-        if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0
-        // Janela ainda deslocada: solta a trava por um quadro, rola ao topo e trava de novo.
-        if (Math.abs(vv.offsetTop) > 1 && !fieldFocused()) {
-          root.style.overflow = before.rootOverflow
-          body.style.overflow = before.bodyOverflow
-          window.requestAnimationFrame(() => {
-            window.scrollTo(0, 0)
-            root.style.overflow = 'hidden'
-            body.style.overflow = 'hidden'
-          })
+      // Sem teclado a página volta ao topo (a barra fixa e as abas ficam lá). No
+      // iOS, com `html/body` em `overflow:hidden` o `scrollY` fica 0 mesmo quando
+      // ele deixa a janela de layout deslocada depois de fechar o teclado
+      // (cabeçalho cortado, vazio embaixo): por isso o reset é sempre. Não vale
+      // com a rede de segurança ativa (desfaria o `scrollIntoView`) nem com zoom.
+      if (!next && !forceStatic && vv.scale <= 1.05) {
+        if (ios) {
+          window.scrollTo(0, 0)
+          const scroller = document.scrollingElement
+          if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0
+          // Janela ainda deslocada: solta a trava por um quadro, rola ao topo e trava de novo.
+          if (Math.abs(vv.offsetTop) > 1 && !fieldFocused()) {
+            pulseLock((cb) => window.requestAnimationFrame(() => {
+              if (disposed) return
+              window.scrollTo(0, 0)
+              cb()
+            }))
+          }
+        } else if (window.scrollY !== 0) {
+          window.scrollTo(0, 0)
         }
       }
       const card = cardRef.current
@@ -996,17 +1012,19 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       // Rede de segurança: com o teclado aberto o cartão tem de cruzar a área
       // visível. Se não cruza duas vezes seguidas, abandona a camada `fixed`
       // (o layout em fluxo) e traz o cartão à vista, em vez de deixar a tela vazia.
-      if (next && rect) {
-        const visible = Math.min(rect.bottom, vv.offsetTop + vv.height) - Math.max(rect.top, vv.offsetTop)
-        misses = visible < 40 ? misses + 1 : 0
+      if (grace > 0) {
+        grace -= 1
+      } else if (next && rect) {
+        misses = cardOutOfView({ vvTop: vv.offsetTop, vvHeight: vv.height, cardTop: rect.top, cardBottom: rect.bottom }) ? misses + 1 : 0
         if (misses >= 2) {
           forceStatic = true
           misses = 0
+          grace = 3
           next = null
           lastFrame = ''
           setFrame(null)
           setKeyboardHeight(null)
-          window.requestAnimationFrame(() => card?.scrollIntoView({ block: 'nearest' }))
+          window.requestAnimationFrame(() => { if (!disposed) card?.scrollIntoView({ block: 'nearest' }) })
         }
       } else {
         misses = 0
@@ -1036,6 +1054,13 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
         setDebugInfo([now, ...shown].join('\n') + prev)
       }
     }
+    // O iOS dispara `resize` e `scroll` quase juntos: um só `update` por quadro.
+    let queued = 0
+    const schedule = (what: string) => {
+      note(what)
+      if (queued) return
+      queued = window.requestAnimationFrame(() => { queued = 0; update() })
+    }
     update()
     // A animação do teclado dura ~300 ms e o iOS nem sempre avisa o fim:
     // reavalia depois de focar/desfocar.
@@ -1046,8 +1071,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
         timers.push(window.setTimeout(() => { note(`${what}+${ms}`); update() }, ms))
       }
     }
-    const onResize = () => { note('resize'); update() }
-    const onScroll = () => { note('scroll'); update() }
+    const onResize = () => schedule('resize')
+    const onScroll = () => schedule('scroll')
     const onFocusIn = () => { note('focus'); update(); later('focus') }
     const onFocusOut = () => { note('blur'); update(); later('blur') }
     vv.addEventListener('resize', onResize)
@@ -1055,11 +1080,13 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     document.addEventListener('focusin', onFocusIn)
     document.addEventListener('focusout', onFocusOut)
     // Um aviso que aparece ou some acima do cartão empurra o topo dele.
-    const observer = new ResizeObserver(() => { note('layout'); update() })
-    observer.observe(body)
+    const observer = new ResizeObserver(() => schedule('layout'))
+    observer.observe(document.body)
     // A barra de atalhos aparecer ou sumir muda onde o cartão termina.
-    const unsubscribeBar = subscribeMobileBar(() => window.requestAnimationFrame(() => { note('bar'); update() }))
+    const unsubscribeBar = subscribeMobileBar(() => schedule('bar'))
     return () => {
+      disposed = true
+      if (queued) window.cancelAnimationFrame(queued)
       unsubscribeBar()
       timers.forEach((id) => window.clearTimeout(id))
       vv.removeEventListener('resize', onResize)
@@ -1067,11 +1094,12 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       document.removeEventListener('focusin', onFocusIn)
       document.removeEventListener('focusout', onFocusOut)
       observer.disconnect()
-      root.style.overflow = before.rootOverflow
-      body.style.overflow = before.bodyOverflow
-      body.style.overscrollBehavior = before.bodyOverscroll
+      releaseLock()
+      setFrame(null)
+      setKeyboardHeight(null)
+      setCardHeight(null)
     }
-  }, [])
+  }, [phone])
 
   return (
     <section className="space-y-5 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">

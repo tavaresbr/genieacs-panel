@@ -122,3 +122,12 @@ describe('nextBaseInner', () => {
     expect(nextBaseInner({ base: 800, baseWidth: 400, innerHeight: 390, innerWidth: 850, fieldFocused: true })).toEqual({ base: 390, baseWidth: 850 })
   })
 })
+
+describe('keyboardFrame com zoom', () => {
+  it('zoom de pinça não é teclado', () => {
+    expect(keyboardFrame({ innerHeight: 800, vvTop: 0, vvHeight: 400, scale: 2 })).toBeNull()
+  })
+  it('sem zoom continua detectando', () => {
+    expect(keyboardFrame({ innerHeight: 800, vvTop: 0, vvHeight: 400, scale: 1 })).toEqual({ top: 0, height: 400 })
+  })
+})

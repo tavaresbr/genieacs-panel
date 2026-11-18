@@ -7,6 +7,7 @@ import { formatMoney } from '@/lib/money'
 import { displayDate, displayDateTime } from '@/lib/date-format'
 import { safeInvoiceUrl } from '@/lib/invoice'
 import { copyToClipboard } from '@/lib/utils'
+import { lockBody } from '@/lib/body-lock'
 
 /**
  * A "segunda via" de uma cobrança em aberto: a página do gateway, a linha
@@ -54,15 +55,14 @@ export function ChargePaymentModal({ chargeId, onClose }: { chargeId: number | n
 
   useEffect(() => {
     if (!open) return
-    const overflowAntes = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const soltar = lockBody()
     fechar.current?.focus()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = overflowAntes
+      soltar()
       window.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])
