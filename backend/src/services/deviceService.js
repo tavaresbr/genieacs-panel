@@ -151,9 +151,11 @@ class DeviceService {
   static FAULT_OWNERS_TTL_MS = 60_000;
 
   /**
-   * A frota do ACS inteiro que a marcação automática lê. A passada é a cada
-   * 15 min, e cada provedor do mesmo ACS lia a mesma frota inteira na mesma
-   * volta: dentro desta janela, os provedores seguintes usam a mesma leitura.
+   * A leitura fora do escopo que a marcação automática faz. A passada é a
+   * cada 15 min; dentro desta janela, quem fizer a MESMA busca no mesmo ACS
+   * usa a mesma leitura. A busca leva a tag do provedor (`_tags $nin`), então
+   * na prática é o mesmo provedor repetindo a passada — o console e o
+   * agendador logo um depois do outro.
    */
   static FLEET_IDENTITY_TTL_MS = 120_000;
 
@@ -1153,7 +1155,25 @@ class DeviceService {
    * provedor: quem chama roda dentro de `withoutDeviceScope`, porque o que se
    * procura são justamente os equipamentos que ainda não têm tag.
    */
-  static async listFleetIdentity({ fresh = false } = {}) {
+  /**
+   * Os caminhos de onde `resolvePppoeUsername` pode tirar o login numa
+   * leitura de identidade: o VirtualParameter, o catálogo e os aprendidos.
+   */
+  static async pppoeLoginPaths() {
+    const virtualParams = await this.getVirtualParameters();
+    return [...new Set([
+      virtualParams.vpPppoeUsername,
+      ...PPPOE_FALLBACK_PATHS,
+      ...await this.readPppoePaths()
+    ].filter(Boolean))];
+  }
+
+  /**
+   * `query`: a busca da NBI (objeto), ou nenhuma para a frota inteira.
+   * `fallbackQuery`: a busca mais larga a usar quando `query` não cabe na URL
+   * (`NBI_URL_BUDGET`) — quem chama filtra de novo do lado de cá.
+   */
+  static async listFleetIdentity({ fresh = false, query = null, fallbackQuery = null } = {}) {
     const virtualParams = await this.getVirtualParameters();
     // Só o que a marcação lê: serial, login e tags. A projeção da listagem
     // (RX, temperatura, SSIDs, …) era a frota do ACS INTEIRO — de todos os
@@ -1163,9 +1183,7 @@ class DeviceService {
     const projection = [...new Set([
       '_id',
       '_deviceId._SerialNumber',
-      virtualParams.vpPppoeUsername,
-      ...PPPOE_FALLBACK_PATHS,
-      ...await this.readPppoePaths(),
+      ...await this.pppoeLoginPaths(),
       '_tags'
     ].filter(Boolean))];
     // Fora do escopo a frota é a do ACS, não a do provedor: os provedores que
@@ -1176,7 +1194,17 @@ class DeviceService {
     const shareKey = connector.mode === 'direct' && deviceScopeSuspended()
       ? `acs:${await connector.rootUrl()}`
       : null;
-    const rows = await this.fetchFleet({ projection: projection.join(',') }, {
+    let busca = query;
+    if (busca && fallbackQuery
+      && (await connector.urlFor(this.devicePath(''), {
+        query: JSON.stringify(busca), projection: projection.join(',')
+      })).toString().length > NBI_URL_BUDGET) {
+      busca = fallbackQuery;
+    }
+    const rows = await this.fetchFleet({
+      ...(busca ? { query: JSON.stringify(busca) } : {}),
+      projection: projection.join(',')
+    }, {
       ttlMs: this.FLEET_IDENTITY_TTL_MS, fresh, shareKey
     });
     return rows.map((item) => {

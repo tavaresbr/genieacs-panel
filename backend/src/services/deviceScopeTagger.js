@@ -3,6 +3,8 @@ import { currentTenantId } from '../config/tenantContext.js';
 import Setting from '../models/Setting.js';
 import DeviceService from './deviceService.js';
 import DirectConnector, { DEVICE_SCOPE_KEY, withoutDeviceScope } from './genieacs/direct.js';
+import { connectorFor } from './genieacs/connector.js';
+import { NBI_URL_BUDGET } from './genieacs/fleetReads.js';
 
 /** Onde ficam os prefixos PPPoE da marcação automática, em texto separado por vírgula. */
 export const AUTO_PREFIXES_KEY = 'deviceScopeAutoPrefixes';
@@ -26,6 +28,38 @@ export function parsePrefixes(raw) {
 /** Um prefixo é começo do outro — os dois reivindicariam as mesmas ONTs. */
 export function prefixesOverlap(a, b) {
   return a.startsWith(b) || b.startsWith(a);
+}
+
+const escapeRegex = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * O "casa com os prefixos ou com os seriais" como busca da NBI, ou `null`
+ * quando não há o que casar.
+ *
+ * É um SUPERCONJUNTO do que `run` casa do lado de cá: qualquer caminho de
+ * login (`loginPaths`) que comece com um prefixo, sem diferenciar maiúsculas
+ * — e `run` confere de novo, pelo login que `resolvePppoeUsername` escolhe.
+ * Assim a busca só tira do caminho quem com certeza não casa.
+ */
+export function matchQuery({ prefixes = [], serials = new Set(), loginPaths = [] } = {}) {
+  const ou = [];
+  if (prefixes.length > 0) {
+    const expressao = `^\\s*(?:${prefixes.map(escapeRegex).join('|')})`;
+    for (const caminho of loginPaths) {
+      ou.push({ [`${caminho}._value`]: { $regex: expressao, $options: 'i' } });
+    }
+  }
+  if (serials.size > 0) {
+    const expressao = `^\\s*(?:${[...serials].map(escapeRegex).join('|')})\\s*$`;
+    ou.push({ '_deviceId._SerialNumber': { $regex: expressao, $options: 'i' } });
+  }
+  return ou.length > 0 ? { $or: ou } : null;
+}
+
+/** `{ $and: [a, b] }` sem os vazios. */
+function juntar(...partes) {
+  const cheias = partes.filter(Boolean);
+  return cheias.length > 1 ? { $and: cheias } : (cheias[0] ?? null);
 }
 
 /**
@@ -56,31 +90,49 @@ class DeviceScopeTagger {
    * `{ prefixes: string[], serials: Set<string>, apply: boolean }` →
    * `{ tag, matched, alreadyTagged, toTag, tagged, conflicts, conflictCount }`,
    * ou `{ error }` quando o provedor não tem tag.
-   */
-  /**
-   * `fresh: false` aceita a leitura do ACS que outro provedor do mesmo
-   * endereço acabou de fazer (`DeviceService.FLEET_IDENTITY_TTL_MS`) — é o que
-   * a passada automática usa. A ferramenta do console lê na hora (o padrão).
+   *
+   * O ACS devolve só quem casa e ainda NÃO tem a tag do provedor
+   * (`_tags $nin [tag]`): numa frota já marcada, quase nada. Por isso
+   * `alreadyTagged` sai de outra pergunta — uma contagem (`total` da NBI, ou
+   * só os `_id`) de quem casa e já tem a tag — e `matched` é a soma
+   * `alreadyTagged + toTag + conflictCount`. A contagem casa pela busca, que
+   * olha todo caminho de login, e não pelo login escolhido do lado de cá:
+   * um aparelho com dois logins diferentes pode contar onde a lista não o
+   * poria. É um número para o console, e nada é marcado por ele.
+   *
+   * `fresh: false` aceita a leitura que a mesma busca fez há pouco
+   * (`DeviceService.FLEET_IDENTITY_TTL_MS`) — é o que a passada automática
+   * usa. A ferramenta do console lê na hora (o padrão).
    */
   static async run({ prefixes = [], serials = new Set(), apply = false, fresh = true } = {}) {
     const tag = String((await Setting.getByKey(DEVICE_SCOPE_KEY)) ?? '').trim();
     if (!tag) return { error: 'Set the provider device tag first' };
     const prefixos = prefixes.map((p) => String(p).toLowerCase()).filter(Boolean);
+    if (prefixos.length === 0 && serials.size === 0) {
+      return { tag, matched: 0, alreadyTagged: 0, toTag: 0, tagged: 0, conflicts: [], conflictCount: 0 };
+    }
     const tagsDeProvedor = await DirectConnector.allScopeTags();
+    const casa = (d) => {
+      const login = String(d.pppoe || '').toLowerCase();
+      return (login && prefixos.some((p) => login.startsWith(p)))
+        || (serials.size > 0 && serials.has(String(d.serial || '').toUpperCase()));
+    };
 
     return withoutDeviceScope(async () => {
-      const frota = await DeviceService.listFleetIdentity({ fresh });
-      const casam = frota.filter((d) => {
-        const login = String(d.pppoe || '').toLowerCase();
-        return (login && prefixos.some((p) => login.startsWith(p)))
-          || (serials.size > 0 && serials.has(String(d.serial || '').toUpperCase()));
+      const filtro = matchQuery({ prefixes: prefixos, serials, loginPaths: await DeviceService.pppoeLoginPaths() });
+      const semATag = { _tags: { $nin: [tag] } };
+      // Uma lista de seriais grande demais para a URL vai só com o `$nin`, e
+      // o casamento fica todo do lado de cá.
+      const frota = await DeviceService.listFleetIdentity({
+        fresh, query: juntar(semATag, filtro), fallbackQuery: semATag
       });
-      const jaMarcados = [];
       const conflitos = [];
       const marcar = [];
-      for (const d of casam) {
-        if (d.tags.includes(tag)) jaMarcados.push(d);
-        else if (d.tags.some((t) => tagsDeProvedor.has(t))) conflitos.push(d);
+      for (const d of frota) {
+        if (!casa(d)) continue;
+        // Marcado depois da leitura (a guardada): entra na contagem abaixo.
+        if (d.tags.includes(tag)) continue;
+        if (d.tags.some((t) => tagsDeProvedor.has(t))) conflitos.push(d);
         else marcar.push(d);
       }
       let marcados = 0;
@@ -88,17 +140,17 @@ class DeviceScopeTagger {
         for (const d of marcar) {
           // eslint-disable-next-line no-await-in-loop -- um por vez: o ACS é compartilhado
           await DeviceService.mutateDeviceTag(d._id, tag, 'POST');
-          // Na lista de tags da própria leitura (que pode ser a guardada, a
-          // mesma que o próximo provedor do ACS vai ler): para ele, este
-          // equipamento já tem dono e é conflito, nunca uma segunda tag.
+          // Na lista de tags da própria leitura (que pode ser a guardada):
+          // quem a ler de novo dentro do prazo vê o equipamento já marcado.
           if (!d.tags.includes(tag)) d.tags.push(tag);
           marcados += 1;
         }
       }
+      const jaMarcados = await this.countAlreadyTagged(tag, filtro, casa);
       return {
         tag,
-        matched: casam.length,
-        alreadyTagged: jaMarcados.length,
+        matched: jaMarcados + marcar.length + conflitos.length,
+        alreadyTagged: jaMarcados,
         toTag: marcar.length,
         tagged: marcados,
         conflicts: conflitos.slice(0, 50).map((d) => ({
@@ -107,6 +159,24 @@ class DeviceScopeTagger {
         conflictCount: conflitos.length
       };
     });
+  }
+
+  /**
+   * Quantos equipamentos que casam já têm a tag. Uma contagem da NBI (o
+   * header `total`, como a paginação da lista) quando a busca cabe na URL;
+   * senão, os já marcados só com serial, login e tags, casados do lado de cá.
+   * Roda dentro do `withoutDeviceScope` de `run`.
+   */
+  static async countAlreadyTagged(tag, filtro, casa) {
+    const comATag = juntar({ _tags: tag }, filtro);
+    const consulta = JSON.stringify(comATag);
+    const connector = await connectorFor();
+    const url = await connector.urlFor(DeviceService.devicePath(''), { query: consulta, projection: '_id', limit: 1 });
+    if (filtro && url.toString().length <= NBI_URL_BUDGET) {
+      return DeviceService.countDevicesFromGenieAcs(consulta);
+    }
+    const marcados = await DeviceService.listFleetIdentity({ fresh: true, query: { _tags: tag } });
+    return marcados.filter(casa).length;
   }
 
   /**

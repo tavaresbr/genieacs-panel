@@ -42,6 +42,10 @@ const api = (path, options = {}) => call(`${panelUrl}/api${path}`, {
   headers: { ...authHeaders(token), ...(options.headers || {}) }
 });
 
+/** As leituras de lista da marcação (com `$nin`), sem as contagens. */
+const listasDaMarcacao = (requests) => requests.filter((r) => r.method === 'GET' && /^\/devices\/?$/.test(r.path)
+  && (new URLSearchParams(r.search).get('query') || '').includes('$nin'));
+
 const frota = () => [
   buildDevice({ id: 'ONT-ALFA-1', tags: ['alfa'], pppoeUsername: 'alfa1@isp' }),
   buildDevice({ id: 'ONT-ALFA-2', tags: ['alfa', 'contrato_10'], pppoeUsername: 'alfa2@isp' }),
@@ -80,6 +84,7 @@ after(async () => {
 
 beforeEach(async () => {
   genie.state.devices = frota();
+  genie.state.applyTags = false;
   genie.state.tasks.length = 0;
   genie.state.tags.length = 0;
   genie.state.deleted.length = 0;
@@ -276,6 +281,65 @@ describe('o console da plataforma', () => {
     assert.equal(body.data.conflictCount, 1);
     assert.deepEqual(genie.state.tags, []);
   });
+
+  it('as contas do console: o ACS filtra quem já tem a tag, e a soma continua certa', async () => {
+    genie.state.devices.push(
+      buildDevice({ id: 'ONT-ALFA-3', tags: [], pppoeUsername: 'ALFA3@isp' }),
+      buildDevice({ id: 'ONT-ALFA-9', tags: ['beta'], pppoeUsername: 'alfa9@isp' }),
+      buildDevice({ id: 'ONT-ALFA-X', tags: ['alfa', 'beta'], pppoeUsername: 'alfa10@isp' })
+    );
+    const antes = genie.state.requests.length;
+    const { status, body } = await api(`/platform/tenants/${alfa}/genieacs/tag-devices`, {
+      method: 'POST', body: { pppoePrefix: 'alfa' }
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.alreadyTagged, 3, 'ALFA-1, ALFA-2 e a ALFA-X, que também tem a da beta');
+    assert.equal(body.data.toTag, 1);
+    assert.equal(body.data.conflictCount, 1);
+    assert.deepEqual(body.data.conflicts.map((c) => c.id), ['ONT-ALFA-9']);
+    assert.equal(body.data.matched, 5);
+    assert.equal(body.data.tagged, 0);
+
+    const pedidos = genie.state.requests.slice(antes).filter((r) => r.method === 'GET' && /^\/devices\/?$/.test(r.path));
+    const lista = listasDaMarcacao(pedidos);
+    assert.equal(lista.length, 1);
+    const busca = JSON.parse(new URLSearchParams(lista[0].search).get('query'));
+    assert.deepEqual(busca.$and[0], { _tags: { $nin: ['alfa'] } });
+    assert.ok(busca.$and[1].$or.some((parte) => Object.keys(parte)[0].endsWith('._value')));
+    // A contagem pede só os `_id` dos que casam e já têm a tag.
+    const contagens = pedidos.filter((r) => new URLSearchParams(r.search).get('projection') === '_id');
+    assert.ok(contagens.length >= 1);
+    assert.deepEqual(JSON.parse(new URLSearchParams(contagens[0].search).get('query')).$and[0], { _tags: 'alfa' });
+  });
+
+  it('por serial; lista grande demais para a URL vai só com o $nin, com as mesmas contas', async () => {
+    const comSerial = (id, serial, tags) => {
+      const device = buildDevice({ id, tags, pppoeUsername: `${id}@isp` });
+      device._deviceId._SerialNumber = serial;
+      return device;
+    };
+    genie.state.devices = [
+      comSerial('S-1', 'zteg00000001', []),
+      comSerial('S-2', 'ZTEG00000002', ['alfa']),
+      comSerial('S-3', 'ZTEG00000003', ['beta']),
+      comSerial('S-4', 'ZTEG00000004', [])
+    ];
+    const alvo = ['ZTEG00000001', 'ZTEG00000002', 'ZTEG00000003'];
+    const pequena = await runInTenant(alfa, () => DeviceScopeTagger.run({ serials: new Set(alvo) }));
+    const muitos = [...alvo, ...Array.from({ length: 1500 }, (unused, i) => `FHTT${String(i).padStart(8, '0')}`)];
+    const antes = genie.state.requests.length;
+    const grande = await runInTenant(alfa, () => DeviceScopeTagger.run({ serials: new Set(muitos) }));
+    for (const r of [pequena, grande]) {
+      assert.equal(r.toTag, 1, 'S-1, com o serial em minúsculas no ACS');
+      assert.equal(r.alreadyTagged, 1);
+      assert.equal(r.conflictCount, 1);
+      assert.equal(r.matched, 3);
+    }
+    const pedidos = genie.state.requests.slice(antes).filter((r) => r.method === 'GET' && /^\/devices\/?$/.test(r.path));
+    assert.ok(pedidos.every((r) => r.search.length < 8192), 'nenhuma URL passa do limite');
+    const lista = listasDaMarcacao(pedidos);
+    assert.deepEqual(JSON.parse(new URLSearchParams(lista[0].search).get('query')), { _tags: { $nin: ['alfa'] } });
+  });
 });
 
 describe('a marcação automática pelo prefixo do PPPoE', () => {
@@ -307,27 +371,46 @@ describe('a marcação automática pelo prefixo do PPPoE', () => {
     assert.deepEqual(genie.state.tags, []);
   });
 
-  it('lê só serial, login e tags, e os provedores do mesmo ACS dividem a leitura', async () => {
+  it('lê só serial, login e tags; o ACS devolve só quem não tem a tag ($nin)', async () => {
+    // A tag posta fica no documento, como num GenieACS de verdade: é o que a
+    // leitura seguinte da beta vê.
+    genie.state.applyTags = true;
     await runInTenant(alfa, () => Setting.upsert('deviceScopeAutoPrefixes', 'ta100'));
     await runInTenant(beta, () => Setting.upsert('deviceScopeAutoPrefixes', 'ta100-novo'));
     const antes = genie.state.requests.length;
 
     const primeira = await runInTenant(alfa, () => DeviceScopeTagger.runAuto());
     assert.equal(primeira.tagged, 1);
-    // O mesmo ACS, a mesma projeção: a beta usa a leitura que a alfa fez —
-    // e vê a ONT que a alfa acabou de marcar como DELA, nunca a marca de novo.
+    // Cada provedor pergunta pela SUA tag; a beta vê a ONT que a alfa acabou
+    // de marcar como dela, e nunca a marca de novo.
     const segunda = await runInTenant(beta, () => DeviceScopeTagger.runAuto());
     assert.equal(segunda.tagged, 0);
     assert.equal(segunda.conflictCount, 1, 'a ONT que a alfa acabou de marcar é conflito para a beta');
     assert.deepEqual(genie.state.tags, [{ deviceId: 'ONT-SEMDONO', tag: 'alfa', method: 'POST' }]);
 
-    const leituras = genie.state.requests.slice(antes)
-      .filter((r) => r.method === 'GET' && /^\/devices\/?$/.test(r.path));
-    assert.equal(leituras.length, 1, 'uma leitura do ACS para os dois provedores');
+    const leituras = listasDaMarcacao(genie.state.requests.slice(antes));
+    assert.equal(leituras.length, 2, 'uma leitura por provedor, cada uma com a sua tag');
+    const [daAlfa, daBeta] = leituras.map((r) => JSON.parse(new URLSearchParams(r.search).get('query')));
+    assert.ok(JSON.stringify(daAlfa).includes('{"_tags":{"$nin":["alfa"]}}'), JSON.stringify(daAlfa));
+    assert.ok(JSON.stringify(daBeta).includes('{"_tags":{"$nin":["beta"]}}'), JSON.stringify(daBeta));
+    assert.ok(JSON.stringify(daAlfa).includes('$regex'), 'o prefixo também vai na busca');
     const projecao = new URLSearchParams(leituras[0].search).get('projection').split(',');
     assert.ok(projecao.includes('_tags') && projecao.includes('_deviceId._SerialNumber'));
     assert.ok(!projecao.some((caminho) => /WLANConfiguration|Optical|Temperature/.test(caminho)),
       `nada da listagem que a marcação não lê: ${projecao.join(',')}`);
+  });
+
+  it('a mesma busca dentro de 2 min usa a leitura guardada, e as contas continuam certas', async () => {
+    genie.state.applyTags = true;
+    const primeira = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['ta100'], apply: true, fresh: false }));
+    assert.equal(primeira.tagged, 1);
+    const antes = genie.state.requests.length;
+    const segunda = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['ta100'], apply: true, fresh: false }));
+    assert.equal(listasDaMarcacao(genie.state.requests.slice(antes)).length, 0, 'sem nova leitura da lista');
+    assert.equal(segunda.tagged, 0);
+    assert.equal(segunda.toTag, 0);
+    assert.equal(segunda.alreadyTagged, 1, 'a contagem é ao vivo');
+    assert.equal(segunda.matched, 1);
   });
 
   it('sem prefixo, ou sem tag, não faz nada', async () => {
