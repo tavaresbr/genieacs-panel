@@ -168,6 +168,180 @@ function repairExcelCells(cells) {
 /** CPF ou CNPJ com os verificadores certos. */
 const validDocument = (digits) => isValidCpf(digits) || isValidCnpj(digits);
 
+// ── O que a prévia lê, em lote ────────────────────────────────────────────
+
+const LOOKUP_CHUNK = 500;
+
+/** `whereIn` em lotes (o teto de variáveis do SQLite), na ordem de `id`. */
+async function rowsWhereIn(table, column, values) {
+  const unique = [...new Set(values)];
+  const rows = [];
+  for (let i = 0; i < unique.length; i += LOOKUP_CHUNK) {
+    // eslint-disable-next-line no-await-in-loop -- poucos lotes
+    rows.push(...await tdb(table).whereIn(column, unique.slice(i, i + LOOKUP_CHUNK)));
+  }
+  return rows.sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+/** A primeira linha (menor `id`) de cada valor da coluna. */
+function firstBy(rows, column) {
+  const map = new Map();
+  for (const row of rows) {
+    const key = row[column] === null || row[column] === undefined ? null : String(row[column]);
+    if (key !== null && !map.has(key)) map.set(key, row);
+  }
+  return map;
+}
+
+const CONTACT_KEY = /^c:(\d+)$/;
+
+/**
+ * As fichas que uma planilha toca, lidas de uma vez.
+ *
+ * `planRow` fazia, POR LINHA, as leituras de `ContactProfileService.rowFor`,
+ * `clientFor` e `get` — de cinco a oito consultas, e a planilha aceita até
+ * `IMPORT_MAX_ROWS` linhas. Aqui as mesmas perguntas viram poucas consultas
+ * `whereIn` antes do laço, e cada método responde exatamente o que a consulta
+ * avulsa responderia: o mesmo critério de busca e, onde ela pedia
+ * `orderBy('id').first()`, a linha de menor `id`. A prévia não escreve nada,
+ * então ler antes do laço vê o mesmo banco que ler dentro dele.
+ *
+ * Duas notas de fidelidade:
+ *  - `tdb('sgp_links').where({ contract }).first()`, o vínculo do WhatsApp em
+ *    `present`, não tinha `orderBy`; aqui é o de menor `id`, que é o que o
+ *    índice `(tenant_id, contract)` da 0141 devolve primeiro.
+ *  - Uma chave ou contrato da planilha que não casa exatamente cai na consulta
+ *    avulsa de antes: a igualdade do MySQL ignora caixa e espaço à direita, um
+ *    `Map` não. É a linha de erro ("não achei"), rara, e continua igual.
+ */
+export class SheetLookup {
+  static async load(sheetCells) {
+    const lookup = new SheetLookup();
+    lookup.loaded = new WeakSet();
+    const ids = [];
+    const contracts = [];
+    const documents = [];
+    for (const cells of sheetCells) {
+      const key = cells.key ? String(cells.key).trim() : null;
+      const named = key || (cells.contract ? String(cells.contract).trim() : null);
+      if (named) {
+        const byId = named.match(CONTACT_KEY);
+        if (byId) ids.push(Number.parseInt(byId[1], 10));
+        else contracts.push(named);
+        continue;
+      }
+      const digits = String(cells.document ?? '').replace(/\D/g, '');
+      if (digits) documents.push(digits);
+    }
+
+    lookup.contactById = new Map((await rowsWhereIn('sgp_contacts', 'id', ids.filter((id) => id > 0)))
+      .map((row) => [Number(row.id), row]));
+    lookup.contactByContract = firstBy(await rowsWhereIn('sgp_contacts', 'contract', contracts), 'contract');
+    lookup.linkByContract = firstBy(await rowsWhereIn('sgp_links', 'contract', contracts), 'contract');
+
+    // O caminho do CPF/CNPJ de `findRow`: a ficha pelo documento, e dela a
+    // linha de contato; ou a linha de contato pelo documento.
+    const docClients = (await rowsWhereIn('sgp_clients', 'document', documents)).map((c) => SgpClient.parse(c));
+    lookup.docClientByDocument = firstBy(docClients, 'document');
+    const docClientIds = [...lookup.docClientByDocument.values()].map((client) => String(client.sgp_client_id));
+    const byRef = await rowsWhereIn('sgp_contacts', 'client_ref', docClientIds);
+    const byOwnId = (await rowsWhereIn('sgp_contacts', 'sgp_client_id', docClientIds)).filter((row) => row.contract === null);
+    lookup.clientRowsByClient = new Map();
+    for (const row of [...byRef, ...byOwnId].sort((a, b) => Number(a.id) - Number(b.id))) {
+      for (const owner of [row.client_ref, row.contract === null ? row.sgp_client_id : null]) {
+        if (owner === null || owner === undefined) continue;
+        const k = String(owner);
+        if (!lookup.clientRowsByClient.has(k)) lookup.clientRowsByClient.set(k, row);
+      }
+    }
+    lookup.contactByDocument = firstBy(await rowsWhereIn('sgp_contacts', 'document', documents), 'document');
+    for (const map of [lookup.contactById, lookup.contactByContract, lookup.clientRowsByClient, lookup.contactByDocument]) {
+      for (const row of map.values()) lookup.remember(row);
+    }
+
+    // O que `clientFor` e o vínculo do WhatsApp de `present` leem, para as
+    // linhas achadas acima. A linha substituta que `rowFor` monta da ONT
+    // entra pelo documento dela.
+    const found = [
+      ...lookup.contactById.values(), ...lookup.contactByContract.values(),
+      ...lookup.clientRowsByClient.values(), ...lookup.contactByDocument.values(),
+      ...[...lookup.linkByContract.values()].map((link) => ContactProfileService.standInFromLink(link))
+    ];
+    const clientKeys = found.map((row) => row.client_ref || (!row.contract ? row.sgp_client_id : null)).filter(Boolean).map(String);
+    lookup.clientBySgpId = firstBy((await rowsWhereIn('sgp_clients', 'sgp_client_id', clientKeys)).map((c) => SgpClient.parse(c)), 'sgp_client_id');
+    const rowDocuments = found.map((row) => String(row.document ?? '').replace(/\D/g, '')).filter(Boolean);
+    lookup.clientByDocument = firstBy((await rowsWhereIn('sgp_clients', 'document', rowDocuments)).map((c) => SgpClient.parse(c)), 'document');
+    const rowContracts = found.filter((row) => !row.fromLink && row.contract).map((row) => String(row.contract));
+    for (const [contract, link] of firstBy(await rowsWhereIn('sgp_links', 'contract', rowContracts), 'contract')) {
+      if (!lookup.linkByContract.has(contract)) lookup.linkByContract.set(contract, link);
+    }
+    return lookup;
+  }
+
+  /** `ContactProfileService.rowFor`, das linhas já lidas. */
+  async rowFor(key) {
+    const raw = String(key ?? '').trim();
+    if (!raw) return null;
+    const byId = raw.match(CONTACT_KEY);
+    // Por id não há o que a igualdade do banco acharia e o `Map` não.
+    if (byId) return this.contactById.get(Number.parseInt(byId[1], 10)) ?? null;
+    const contact = this.contactByContract.get(raw);
+    if (contact) return contact;
+    const link = this.linkByContract.get(raw);
+    if (link) return this.remember(ContactProfileService.standInFromLink(link));
+    return ContactProfileService.rowFor(raw);
+  }
+
+  /** O caminho do documento de `findRow`. */
+  rowForDocument(digits) {
+    const client = this.docClientByDocument.get(digits);
+    if (client) {
+      const row = this.clientRowsByClient.get(String(client.sgp_client_id));
+      if (row) return row;
+    }
+    return this.contactByDocument.get(digits) ?? null;
+  }
+
+  /** `ContactProfileService.clientFor`. */
+  clientFor(row) {
+    if (!row) return null;
+    const clientKey = row.client_ref || (!row.contract ? row.sgp_client_id : null);
+    if (clientKey) {
+      const client = this.clientBySgpId.get(String(clientKey));
+      if (client) return client;
+    }
+    const digits = String(row.document ?? '').replace(/\D/g, '');
+    return digits ? this.clientByDocument.get(digits) ?? null : null;
+  }
+
+  /**
+   * A parte de `ContactProfileService.get` que a comparação lê: os campos, as
+   * notas e o WhatsApp — pelos mesmos `fieldsOf` e `whatsappOf`.
+   */
+  async profileFor(row) {
+    let client = this.clientFor(row);
+    let link = row.fromLink || !row.contract ? null : this.linkByContract.get(String(row.contract)) ?? null;
+    // Linha que veio da consulta avulsa (o `rowFor` de reserva acima): as
+    // leituras dela também são avulsas.
+    if (!this.loaded.has(row)) {
+      client = await ContactProfileService.clientFor(row);
+      link = row.fromLink || !row.contract ? null : await tdb('sgp_links').where({ contract: String(row.contract) }).first();
+    }
+    const whatsapp = ContactProfileService.whatsappOf(row, link);
+    return {
+      fields: ContactProfileService.fieldsOf(row, client),
+      notes: client?.notes ?? null,
+      whatsappPhone: whatsapp.phone
+    };
+  }
+
+  /** Marca uma linha como lida aqui — as leituras dela estão no lote. */
+  remember(row) {
+    if (row) this.loaded.add(row);
+    return row;
+  }
+}
+
 // ── The service ───────────────────────────────────────────────────────────
 
 /**
@@ -256,15 +430,23 @@ class ContactSheetService {
 
     const plan = { total: lines.length, updates: [], creates: [], unchanged: 0, errors: [] };
     const newRows = new Set();
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = index + 2; // the header is line 1, as the spreadsheet numbers it
+    const sheet = lines.map((cellsOfLine) => {
       const cells = {};
       columns.forEach((column, position) => {
-        if (column) cells[column.field] = unescapeCell(lines[index][position]);
+        if (column) cells[column.field] = unescapeCell(cellsOfLine[position]);
       });
+      return cells;
+    });
+    // As fichas que a planilha toca, numa dúzia de consultas e não cinco a
+    // oito por linha — ver `SheetLookup`. Com as células já consertadas, que é
+    // o que `planRow` procura.
+    const lookup = await SheetLookup.load(sheet.map((cells) => repairExcelCells(cells)));
+    for (let index = 0; index < sheet.length; index += 1) {
+      const line = index + 2; // the header is line 1, as the spreadsheet numbers it
+      const cells = sheet[index];
       try {
-        // eslint-disable-next-line no-await-in-loop -- one row at a time: each looks up its own record
-        const step = await this.planRow(cells);
+        // eslint-disable-next-line no-await-in-loop -- só cai no banco na linha que o lote não achou
+        const step = await this.planRow(cells, lookup);
         if (step.kind === 'create') {
           // A mesma linha nova repetida na planilha (copiar e colar, duas
           // abas juntadas) é um cliente só, não dois cadastros iguais.
@@ -286,11 +468,11 @@ class ContactSheetService {
   }
 
   /** What one row would do: update which fields of which record, or create one. */
-  static async planRow(rawCells) {
+  static async planRow(rawCells, lookup = null) {
     // Antes de procurar o registro: o CPF sem o zero da frente não acharia
     // ninguém e a linha viraria um cliente novo, duplicado.
     const cells = repairExcelCells(rawCells);
-    const row = await this.findRow(cells);
+    const row = await this.findRow(cells, lookup);
     const patch = this.patchFrom(cells);
     // Documento com verificador errado não grava. Só vira erro quando mudaria
     // algo: o que o SGP mandou torto e a planilha só devolveu não é culpa dela.
@@ -309,7 +491,9 @@ class ContactSheetService {
     }
 
     const key = row.contract ? String(row.contract) : `c:${row.id}`;
-    const profile = await ContactProfileService.get(key);
+    // `get(key)` acharia a mesma linha de novo: o contrato é único por
+    // provedor, e sem contrato a chave é o próprio id.
+    const profile = lookup ? await lookup.profileFor(row) : await ContactProfileService.get(key);
     const changed = Object.keys(patch).filter((field) => {
       if (field === 'notes') return (patch.notes ?? null) !== (profile.notes ?? null);
       if (field === 'whatsappPhone') return patch.whatsappPhone !== profile.whatsappPhone;
@@ -327,11 +511,12 @@ class ContactSheetService {
   }
 
   /** The record a row names: by its key, its contract, or — lacking both — its CPF/CNPJ. */
-  static async findRow(cells) {
-    if (cells.key) return ContactProfileService.rowFor(cells.key);
-    if (cells.contract) return ContactProfileService.rowFor(cells.contract);
+  static async findRow(cells, lookup = null) {
+    if (cells.key) return lookup ? lookup.rowFor(cells.key) : ContactProfileService.rowFor(cells.key);
+    if (cells.contract) return lookup ? lookup.rowFor(cells.contract) : ContactProfileService.rowFor(cells.contract);
     const digits = String(cells.document ?? '').replace(/\D/g, '');
     if (!digits) return null;
+    if (lookup) return lookup.rowForDocument(digits);
     const client = await SgpClient.getByDocument(digits);
     if (client) {
       const [row] = await tdb('sgp_contacts')

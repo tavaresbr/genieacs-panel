@@ -187,7 +187,11 @@ class ContactProfileService {
     // A contract with an ONT that no contacts sync stored yet: the link row
     // has what a record needs to start from.
     const links = await SgpLink.getByContract(raw);
-    const link = links[0];
+    return this.standInFromLink(links[0]);
+  }
+
+  /** A linha substituta que `rowFor` monta da primeira ONT do contrato. */
+  static standInFromLink(link) {
     if (!link) return null;
     return {
       id: null,
@@ -224,7 +228,13 @@ class ContactProfileService {
     return this.present(String(key), row, client);
   }
 
-  static async present(key, row, client) {
+  /**
+   * Os campos da ficha como ela os mostra — a edição do operador ou o valor
+   * do SGP —, sem nenhuma leitura. Separado de `present` para a importação da
+   * planilha comparar cada linha com a ficha sem refazer as consultas dela
+   * (`ContactSheetService.plan` carrega tudo em lote): uma regra só, nos dois.
+   */
+  static fieldsOf(row, client) {
     const overrides = client?.overrides ?? {};
     const fields = {};
     for (const field of PROFILE_FIELDS) {
@@ -238,6 +248,19 @@ class ContactProfileService {
         editedAt: edit?.at ?? null
       };
     }
+    return fields;
+  }
+
+  /**
+   * O WhatsApp que a ficha mostra, dado o vínculo da ONT já lido: a linha
+   * substituta montada de `sgp_links` (`fromLink`) é ela mesma o vínculo.
+   */
+  static whatsappOf(row, link) {
+    return whatsappPhoneOf(row.fromLink ? row : link, row.fromLink ? null : row);
+  }
+
+  static async present(key, row, client) {
+    const fields = this.fieldsOf(row, client);
 
     // Every contract of the client when there is a record to gather them by;
     // the one row otherwise.
@@ -248,8 +271,8 @@ class ContactProfileService {
       ? await tdb('sgp_links').whereIn('contract', contractRows.map((entry) => String(entry.contract))).select('contract', 'device_id', 'link_mode', 'login').orderBy('id', 'asc')
       : [];
 
-    const link = row.fromLink ? row : (row.contract ? await tdb('sgp_links').where({ contract: String(row.contract) }).first() : null);
-    const whatsapp = whatsappPhoneOf(link, row.fromLink ? null : row);
+    const link = row.fromLink || !row.contract ? null : await tdb('sgp_links').where({ contract: String(row.contract) }).first();
+    const whatsapp = this.whatsappOf(row, link);
 
     const config = await SgpService.getConfig().catch(() => null);
     const clientId = client?.sgp_client_id ?? null;
