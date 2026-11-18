@@ -1,76 +1,52 @@
 {
-  "version": "1.49.0",
-  "build": 1787,
-  "sourceCommit": "f2d1863fc3bf",
+  "version": "1.50.0",
+  "build": 1798,
+  "sourceCommit": "25f8ba28af7d",
   "releasedAt": "2026-11-18",
-  "basedOnTag": "v1.48.1",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/971f72adfc7b...f2d1863fc3bf",
+  "basedOnTag": "v1.49.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/a27f567177b0...25f8ba28af7d",
   "changes": [
     {
-      "shortHash": "19e26697",
+      "shortHash": "ed71038b",
       "date": "2026-11-18",
-      "title": "Filtro do SGP aplicado no servidor, antes da paginação",
-      "category": "Improved"
+      "title": "PIX e CPF não vão ao provedor de IA; texto da IA mascarado; log seguro; ação feita não se perde",
+      "category": "Fixed"
     },
     {
-      "shortHash": "fec68e53",
+      "shortHash": "c7aac0e6",
       "date": "2026-11-18",
-      "title": "A planilha leva o filtro do SGP, como a lista",
+      "title": "Corrige vulnerabilidades do npm audit",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1de7a6e8",
+      "date": "2026-11-18",
+      "title": "Falha de conexão vira uma linha curta no log e aviso no painel",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "95688c9b",
+      "date": "2026-11-18",
+      "title": "Aviso de GenieACS fora em todas as telas e saúde por provedor no console",
       "category": "New"
     },
     {
-      "shortHash": "10285fa0",
+      "shortHash": "ea07f054",
       "date": "2026-11-18",
-      "title": "Webhook responde antes do bot; processamento em fila por conversa",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "6c07efc9",
-      "date": "2026-11-18",
-      "title": "Bot responde cada mensagem de uma rajada; trava por answers_message_id",
+      "title": "Erro logado pelo ACS fica numa linha só; teste escapa todo &",
       "category": "Fixed"
     },
     {
-      "shortHash": "d2644777",
+      "shortHash": "6405548c",
       "date": "2026-11-18",
-      "title": "Volta travada do bot não segura a fila da conversa para sempre",
+      "title": "Linha inteira higienizada e prewarm cita o id do provedor, não o slug",
       "category": "Fixed"
     },
     {
-      "shortHash": "6d08b097",
+      "shortHash": "1ede271e",
       "date": "2026-11-18",
-      "title": "Prazo da tarefa travada na fila de entrada",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f0c67f22",
-      "date": "2026-11-18",
-      "title": "Uma leitura da frota por provedor com a projeção unida",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "ba78f4fd",
-      "date": "2026-11-18",
-      "title": "ACS filtra quem já tem a tag ($nin)",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "bab7a4dd",
-      "date": "2026-11-18",
-      "title": "Ação do operador lê a frota na hora; auto-tag cai na leitura inteira se o ACS ignorar o $nin",
+      "title": "Higienização na forma que o CodeQL reconhece",
       "category": "Fixed"
-    },
-    {
-      "shortHash": "10165aa1",
-      "date": "2026-11-18",
-      "title": "Conferência zerada também cai na leitura inteira",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "dccad588",
-      "date": "2026-11-18",
-      "title": "Espera da outra conversa por tempo, não por voltas do laço",
-      "category": "Maintenance"
     }
   ]
 }

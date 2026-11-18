@@ -7,6 +7,26 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.50.0] - 2026-11-18
+
+### New
+
+- Aviso de GenieACS fora em todas as telas e saúde por provedor no console (`95688c9b`)
+
+### Fixed
+
+- PIX e CPF não vão ao provedor de IA; texto da IA mascarado; log seguro; ação feita não se perde (`ed71038b`)
+- Falha de conexão vira uma linha curta no log e aviso no painel (`1de7a6e8`)
+- Erro logado pelo ACS fica numa linha só; teste escapa todo & (`ea07f054`)
+- Linha inteira higienizada e prewarm cita o id do provedor, não o slug (`6405548c`)
+- Higienização na forma que o CodeQL reconhece (`1ede271e`)
+
+### Maintenance
+
+- Corrige vulnerabilidades do npm audit (`c7aac0e6`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/a27f567177b0...25f8ba28af7d)
+
 ## [1.49.0] - 2026-11-18
 
 ### New
