@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.50.1] - 2026-11-18
+
+### Fixed
+
+- Trava de rolagem compartilhada e teclado do iPhone mais robusto (`c914bfd0`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/5f994c1addac...2982de2280b9)
+
 ## [1.50.0] - 2026-11-18
 
 ### New

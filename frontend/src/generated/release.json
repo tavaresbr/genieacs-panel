@@ -1,51 +1,15 @@
 {
-  "version": "1.50.0",
-  "build": 1798,
-  "sourceCommit": "25f8ba28af7d",
+  "version": "1.50.1",
+  "build": 1801,
+  "sourceCommit": "2982de2280b9",
   "releasedAt": "2026-11-18",
-  "basedOnTag": "v1.49.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/a27f567177b0...25f8ba28af7d",
+  "basedOnTag": "v1.50.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5f994c1addac...2982de2280b9",
   "changes": [
     {
-      "shortHash": "ed71038b",
+      "shortHash": "c914bfd0",
       "date": "2026-11-18",
-      "title": "PIX e CPF não vão ao provedor de IA; texto da IA mascarado; log seguro; ação feita não se perde",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "c7aac0e6",
-      "date": "2026-11-18",
-      "title": "Corrige vulnerabilidades do npm audit",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "1de7a6e8",
-      "date": "2026-11-18",
-      "title": "Falha de conexão vira uma linha curta no log e aviso no painel",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "95688c9b",
-      "date": "2026-11-18",
-      "title": "Aviso de GenieACS fora em todas as telas e saúde por provedor no console",
-      "category": "New"
-    },
-    {
-      "shortHash": "ea07f054",
-      "date": "2026-11-18",
-      "title": "Erro logado pelo ACS fica numa linha só; teste escapa todo &",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "6405548c",
-      "date": "2026-11-18",
-      "title": "Linha inteira higienizada e prewarm cita o id do provedor, não o slug",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "1ede271e",
-      "date": "2026-11-18",
-      "title": "Higienização na forma que o CodeQL reconhece",
+      "title": "Trava de rolagem compartilhada e teclado do iPhone mais robusto",
       "category": "Fixed"
     }
   ]
