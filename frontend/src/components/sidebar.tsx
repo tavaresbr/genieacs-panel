@@ -17,6 +17,7 @@ const APP_VERSION_LABEL = __APP_COMMIT__ ? `${APP_RELEASE.version} (${__APP_COMM
 import { normalizeRole, ROLE_LABEL_KEYS } from '@/lib/permissions'
 import { visibleMenuScreens } from '@/lib/screens'
 import { wearingPlatformHat } from '@/lib/shell'
+import { lockBody } from '@/lib/body-lock'
 
 
 /**
@@ -61,11 +62,10 @@ export default function Sidebar() {
   useEffect(() => {
     if (!isMobileOpen) return
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setIsMobileOpen(false) }
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const release = lockBody()
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = overflow
+      release()
       window.removeEventListener('keydown', onKey)
     }
   }, [isMobileOpen])

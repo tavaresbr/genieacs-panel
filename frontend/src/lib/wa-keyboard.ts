@@ -72,8 +72,10 @@ export function cardOutOfView(
  * `null` sem teclado (a mesma regra de `visibleHeightWithKeyboard`).
  */
 export function keyboardFrame(
-  { innerHeight, vvTop, vvHeight }: { innerHeight: number; vvTop: number; vvHeight: number }
+  { innerHeight, vvTop, vvHeight, scale = 1 }: { innerHeight: number; vvTop: number; vvHeight: number; scale?: number }
 ): { top: number; height: number } | null {
+  // Zoom de pinça também encolhe a `visualViewport`: não é teclado.
+  if (scale > 1.05) return null
   const height = visibleHeightWithKeyboard({ innerHeight, vvHeight })
   if (height === null || !Number.isFinite(vvTop)) return null
   return { top: Math.max(0, Math.round(vvTop)), height }

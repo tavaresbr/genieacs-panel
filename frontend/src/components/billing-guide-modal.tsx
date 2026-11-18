@@ -4,6 +4,7 @@ import { HelpDocument } from '@/components/help-document'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import { PROVIDER_BILLING_GUIDE } from '@/lib/help-docs'
+import { lockBody } from '@/lib/body-lock'
 
 /**
  * O "Como funciona" da tela de Plano: o guia curto do provedor
@@ -20,15 +21,14 @@ export function BillingGuideModal({ open, onClose }: { open: boolean; onClose: (
 
   useEffect(() => {
     if (!open) return
-    const overflowAntes = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const soltar = lockBody()
     fechar.current?.focus()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = overflowAntes
+      soltar()
       window.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])
