@@ -169,9 +169,12 @@ describe('the WhatsApp webhook answers before the bot', () => {
     // Outra conversa não espera a primeira.
     const outra = await entregaCrua(ALFA_TOKEN, evento(ALFA_INSTANCE, 'FILA-ORD-X', 'outra', '5593955556666@s.whatsapp.net'));
     assert.equal(outra.status, 200);
-    for (let i = 0; i < 50 && !log.includes('end:outra'); i += 1) {
+    // Espera por tempo, não por voltas do laço: no Postgres/MySQL a tarefa da
+    // outra conversa faz leituras de verdade antes de chegar ao bot.
+    const ate = Date.now() + 10_000;
+    while (!log.includes('end:outra') && Date.now() < ate) {
       // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 10));
     }
     assert.ok(log.includes('end:outra'), 'a different conversation is not blocked by a slow one');
     assert.ok(!log.includes('start:segunda'), 'the second message waits for the first');
