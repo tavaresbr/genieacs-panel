@@ -48,17 +48,32 @@ export function ChatNumberMenu({ accounts, onChoose, children }: ChatNumberMenuP
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const first = useRef<HTMLButtonElement>(null)
+  const wrapper = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     if (open) first.current?.focus()
   }, [open])
 
+  // Fecha ao clicar fora. Não por `blur`: Safari e Firefox no macOS não focam o
+  // botão ao clicar, o `blur` chegava antes do clique e o item se perdia.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (event: PointerEvent) => {
+      if (wrapper.current && !wrapper.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [open])
+
   const choose = accounts.length > 1
   return (
     <span
+      ref={wrapper}
       className="relative inline-flex"
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false)
+        // Só o foco que sai do menu por Tab (relatedTarget de fora); o clique fora é o `pointerdown`.
+        const para = event.relatedTarget as Node | null
+        if (para && !event.currentTarget.contains(para)) setOpen(false)
       }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') setOpen(false)
