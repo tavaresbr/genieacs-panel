@@ -498,6 +498,7 @@ export default {
   'sgp.ticketFailed': 'Не удалось создать заявку в SGP',
   'sgp.error.ticketContentRequired': 'Опишите, что происходит, прежде чем создавать заявку',
   'sgp.error.ticketDisabled': 'Создание заявок в SGP отключено. Включите его в настройках.',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': 'связей SGP: {count}',
   'sgp.linksLoadFailed': 'Не удалось получить список связей SGP',
   'sgp.syncDone': 'Синхронизация завершена: привязано {linked} из {total} ONT',

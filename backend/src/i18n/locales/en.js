@@ -498,6 +498,7 @@ export default {
   'sgp.ticketFailed': 'Failed to open the ticket in SGP',
   'sgp.error.ticketContentRequired': 'Describe what is happening before opening the ticket',
   'sgp.error.ticketDisabled': 'Opening tickets in SGP is turned off. Enable it in Settings.',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': '{count} SGP link(s)',
   'sgp.linksLoadFailed': 'Failed to list the SGP links',
   'sgp.syncDone': 'Synchronization finished: {linked} of {total} ONT(s) linked',

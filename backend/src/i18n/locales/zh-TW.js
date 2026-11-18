@@ -497,6 +497,7 @@ export default {
   'sgp.ticketFailed': '在 SGP 中建立工單失敗',
   'sgp.error.ticketContentRequired': '請先說明發生了什麼，再建立工單',
   'sgp.error.ticketDisabled': 'SGP 工單建立已關閉。請在設定中開啟。',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': '{count} 筆 SGP 連結紀錄',
   'sgp.linksLoadFailed': '無法列出 SGP 連結紀錄',
   'sgp.syncDone': '同步完成：{total} 台 ONT 中有 {linked} 台已連結',

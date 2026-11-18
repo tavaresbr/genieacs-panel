@@ -495,6 +495,7 @@ export default {
   'sgp.ticketFailed': 'Falha ao abrir o chamado no SGP',
   'sgp.error.ticketContentRequired': 'Descreva o que está acontecendo antes de abrir o chamado',
   'sgp.error.ticketDisabled': 'A abertura de chamados no SGP está desligada. Ative em Ajustes.',
+  'sgp.error.ticketTypeInvalid': 'Tipo de chamado inválido. Escolha um da lista configurada.',
   'sgp.linksLoaded': '{count} vínculo(s) com o SGP',
   'sgp.linksLoadFailed': 'Falha ao listar os vínculos com o SGP',
   'sgp.syncDone': 'Sincronização concluída: {linked} de {total} ONT(s) vinculados',

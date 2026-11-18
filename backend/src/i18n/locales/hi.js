@@ -496,6 +496,7 @@ export default {
   'sgp.ticketFailed': 'SGP में शिकायत नहीं खोली जा सकी',
   'sgp.error.ticketContentRequired': 'शिकायत खोलने से पहले बताएँ कि क्या हो रहा है',
   'sgp.error.ticketDisabled': 'SGP में शिकायत खोलना बंद है। इसे सेटिंग्स में सक्षम करें।',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': '{count} SGP लिंक',
   'sgp.linksLoadFailed': 'SGP लिंक की सूची नहीं मिल सकी',
   'sgp.syncDone': 'समन्वयन पूरा हुआ: {total} में से {linked} ONT जुड़े',

@@ -498,6 +498,7 @@ export default {
   'sgp.ticketFailed': '在 SGP 中创建工单失败',
   'sgp.error.ticketContentRequired': '请先说明发生了什么，再创建工单',
   'sgp.error.ticketDisabled': 'SGP 工单创建已关闭。请在设置中开启。',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': '{count} 条 SGP 关联记录',
   'sgp.linksLoadFailed': '无法列出 SGP 关联记录',
   'sgp.syncDone': '同步完成：{total} 台 ONT 中有 {linked} 台已关联',

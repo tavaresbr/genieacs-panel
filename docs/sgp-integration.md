@@ -423,3 +423,14 @@ messages.
 | Every webhook delivery returns 401 | Wrong secret, or *Require a signed timestamp* is on and SGP does not send one, or signs only the body instead of `<timestamp>.<body>` |
 | Webhook returns 403 with "Origin is not allowed" | A proxy in front of the panel is adding an `Origin` header. Server-to-server calls send none; add that origin to `CORS_ORIGINS` |
 | Events arrive but nothing changes | The event's contract has no CPE linked to it yet |
+
+### Problem types and the customer notice (WhatsApp panel)
+
+Settings → SGP keeps an optional list of problem types (`ticketTypes`, each a
+name plus the SGP `ocorrenciatipo` id, up to 30). When the list is not empty the
+WhatsApp panel's "Abrir chamado" form shows a selector, and the server accepts
+only an id from that list; without a choice the default `ticketOccurrenceType`
+is used. After the ticket is opened the panel also sends the customer a WhatsApp
+message (`ticketNotifyCustomer`, text in `ticketOpenedMessage`, variables
+`{nome} {primeiro_nome} {contrato} {protocolo} {tipo}`). A failed notice never
+undoes the ticket: the response carries `notified: false` instead.

@@ -452,6 +452,7 @@ export default {
   'sgp.ticketFailed': 'Ticket konnte in SGP nicht eröffnet werden',
   'sgp.error.ticketContentRequired': 'Beschreiben Sie, was passiert, bevor Sie das Ticket eröffnen',
   'sgp.error.ticketDisabled': 'Das Eröffnen von Tickets in SGP ist deaktiviert. Aktivieren Sie es in den Einstellungen.',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': '{count} SGP-Verknüpfung(en)',
   'sgp.linksLoadFailed': 'Die SGP-Verknüpfungen konnten nicht aufgelistet werden',
   'sgp.syncDone': 'Synchronisierung abgeschlossen: {linked} von {total} ONT(s) verknüpft',

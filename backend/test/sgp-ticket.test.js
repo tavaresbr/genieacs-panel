@@ -148,6 +148,46 @@ describe('opening a ticket', () => {
     await configure({ ticketOccurrenceType: 5 });
   });
 
+  it('only accepts a configured problem type once the list exists', async () => {
+    await configure({
+      ticketTypes: [
+        { label: 'Sem conexão', id: 11 },
+        { label: 'Sem conexão duplicada', id: 11 },
+        { label: '', id: 12 },
+        { label: 'Internet lenta', id: 12 }
+      ]
+    });
+    const cfg = await call(`${panelUrl}/api/sgp/config`, { headers: authHeaders(token) });
+    assert.deepEqual(
+      cfg.body.data.ticketTypes,
+      [{ label: 'Sem conexão', id: 11 }, { label: 'Internet lenta', id: 12 }]
+    );
+
+    const ok = await openTicket({ content: 'teste', occurrenceType: 12 });
+    assert.equal(ok.status, 200);
+    assert.equal(lastTicketPayload().ocorrenciatipo, 12);
+
+    const before = requests.length;
+    const bad = await openTicket({ content: 'teste', occurrenceType: 99 });
+    assert.equal(bad.status, 400);
+    assert.equal(requests.length, before, 'nothing should have been sent');
+
+    await configure({ ticketTypes: [] });
+  });
+
+  it('renders the customer notice and drops what is empty', async () => {
+    const { renderTicketOpenedMessage } = await import('../src/services/waSubscriberPanelService.js');
+    const tpl = 'Olá, {primeiro_nome}! Abrimos o chamado {protocolo} ({tipo}) para você.';
+    assert.equal(
+      renderTicketOpenedMessage(tpl, { primeiro_nome: 'Fernanda', protocolo: '#48213', tipo: 'Sem conexão' }),
+      'Olá, Fernanda! Abrimos o chamado #48213 (Sem conexão) para você.'
+    );
+    assert.equal(
+      renderTicketOpenedMessage(tpl, { primeiro_nome: 'Fernanda', protocolo: '', tipo: '' }),
+      'Olá, Fernanda! Abrimos o chamado para você.'
+    );
+  });
+
   it('refuses before calling SGP when there is nothing to say', async () => {
     const { status } = await openTicket({ content: '   ' });
     assert.equal(status, 400);
