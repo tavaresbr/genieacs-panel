@@ -100,9 +100,9 @@ export default function DevicesPage() {
   // Ações em lote: só para quem tem `devices.maintain` — um clique alcança
   // muitos assinantes. Sem a permissão, a lista fica exatamente como era.
   const canBatch = can('devices.maintain')
-  // A planilha: só dono e admin (`devices.export`), com o recorte que o
-  // servidor sabe aplicar. O filtro do ERP é feito aqui na tela e não entra —
-  // a tela diz isso em vez de entregar mais linhas do que mostra.
+  // A planilha: só dono e admin (`devices.export`), com busca, estado e foco.
+  // O filtro do ERP ainda não entra na exportação — a tela diz isso em vez de
+  // entregar mais linhas do que mostra.
   const canExport = can('devices.export')
   const [exporting, setExporting] = useState(false)
   // A sincronização da frota com o SGP, a mesma de Configurações → SGP, à mão
@@ -234,7 +234,10 @@ export default function DevicesPage() {
           pageSize: PAGE_SIZE,
           search: searchTerm,
           status: filterStatus,
-          focus: filterFocus
+          focus: filterFocus,
+          // Sempre, e o servidor decide: sem a integração (ou sem `sgp.read`)
+          // ele ignora o filtro, e a resposta diz `sgpAvailable: false`.
+          sgp: filterSgp
         })
 
         if (cancelled) return
@@ -277,7 +280,7 @@ export default function DevicesPage() {
     fetchDevices()
 
     return () => { cancelled = true }
-  }, [page, searchTerm, filterStatus, filterFocus, refreshNonce, t])
+  }, [page, searchTerm, filterStatus, filterFocus, filterSgp, refreshNonce, t])
 
   const processedDevices = useMemo<ProcessedDevice[]>(() => {
     const now = new Date()
@@ -304,18 +307,6 @@ export default function DevicesPage() {
     return links
   }, [devices])
 
-  // Search, status and the dashboard slice are resolved by the API; only the
-  // contract state, which the devices endpoint knows nothing about, is narrowed
-  // here — and only across the rows of the page that came back (the counter
-  // beside the paging says how many of them are shown).
-  const visibleDevices = useMemo<ProcessedDevice[]>(() => {
-    if (!sgpAvailable || filterSgp === 'all') return processedDevices
-    return processedDevices.filter((device) => {
-      const link = sgpLinks.get(device._id)
-      return filterSgp === 'unlinked' ? !link : link?.state === filterSgp
-    })
-  }, [processedDevices, filterSgp, sgpAvailable, sgpLinks])
-
   const clearFilters = () => {
     setSearchInput('')
     setSearchTerm('')
@@ -336,21 +327,22 @@ export default function DevicesPage() {
     )
   }
 
+  // O filtro do SGP só conta com a integração ligada: sem ela o servidor o
+  // ignora, e a lista que voltou não está filtrada por ele.
+  const sgpFiltering = sgpAvailable && filterSgp !== 'all'
   const hasFilters = Boolean(searchInput)
     || filterStatus !== 'all'
-    || filterSgp !== 'all'
+    || sgpFiltering
     || filterFocus !== 'all'
   const rangeFrom = paging.total === 0 ? 0 : (paging.page - 1) * paging.pageSize + 1
   const rangeTo = (paging.page - 1) * paging.pageSize + processedDevices.length
-  // The contract filter hides rows of the current page, so the server range
-  // alone would not explain what is on screen.
-  const contractFiltered = visibleDevices.length !== processedDevices.length
-  const pageRows: SelectableRow[] = visibleDevices.map((device) => ({ id: device._id, label: device.SerialNumber || device._id }))
+  const pageRows: SelectableRow[] = processedDevices.map((device) => ({ id: device._id, label: device.SerialNumber || device._id }))
   const pageState = pageSelectionState(selected, pageRows)
   const batchFilter: Record<string, string> = {
     ...(searchTerm ? { search: searchTerm } : {}),
     ...(filterStatus !== 'all' ? { status: filterStatus } : {}),
-    ...(filterFocus !== 'all' ? { focus: filterFocus } : {})
+    ...(filterFocus !== 'all' ? { focus: filterFocus } : {}),
+    ...(sgpFiltering ? { sgp: filterSgp } : {})
   }
 
   // "Todos os N do filtro": busca os ids página a página, no maior tamanho que
@@ -360,7 +352,7 @@ export default function DevicesPage() {
     try {
       const next = new Map(selected)
       for (let pagina = 1; next.size < Math.min(paging.total, BATCH_LIMIT); pagina += 1) {
-        const res = await devicesAPI.getDevices({ page: pagina, pageSize: 100, search: searchTerm, status: filterStatus, focus: filterFocus })
+        const res = await devicesAPI.getDevices({ page: pagina, pageSize: 100, search: searchTerm, status: filterStatus, focus: filterFocus, sgp: filterSgp })
         const payload = res.success ? (res.data as DeviceListResponse<Device>) : null
         const linhas = payload?.devices ?? []
         for (const device of linhas) {
@@ -579,7 +571,12 @@ export default function DevicesPage() {
                 <div>
                   <label htmlFor="device-sgp" className="field-label">{t('devices.sgp.filterLabel')}</label>
                   <div className="relative">
-                    <select id="device-sgp" className="modern-input appearance-none pe-10" value={filterSgp} onChange={(event) => setFilterSgp(event.target.value as SgpFilter)}>
+                    <select id="device-sgp" className="modern-input appearance-none pe-10" value={filterSgp} onChange={(event) => {
+                      // Como o status e o foco: o servidor recorta a frota
+                      // inteira, então a página volta para a primeira.
+                      setFilterSgp(event.target.value as SgpFilter)
+                      setPage(1)
+                    }}>
                       <option value="all">{t('devices.sgp.filterAll')}</option>
                       <option value="active">{t('devices.sgp.filterActive')}</option>
                       <option value="blocked">{t('devices.sgp.filterBlocked')}</option>
@@ -593,7 +590,6 @@ export default function DevicesPage() {
               <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground sm:col-span-2 xl:col-span-1 xl:justify-end">
                 <span>
                   {t('devices.pagination.range', { from: rangeFrom, to: rangeTo, total: paging.total })}
-                  {contractFiltered && <> · <strong className="data-value">{visibleDevices.length}</strong> {t('devices.shownLabel')}</>}
                 </span>
                 {hasFilters && (
                   <button type="button" onClick={clearFilters} className="font-semibold text-primary hover:underline">
@@ -603,7 +599,7 @@ export default function DevicesPage() {
               </div>
             </section>
 
-            {visibleDevices.length === 0 ? (
+            {processedDevices.length === 0 ? (
               <section className="modern-card empty-state">
                 <div className="empty-state-icon"><Icon name={hasFilters ? 'search' : 'server'} size={22} /></div>
                 <h2 className="empty-state-title">{hasFilters ? t('devices.empty.filteredTitle') : t('devices.empty.title')}</h2>
@@ -623,7 +619,7 @@ export default function DevicesPage() {
                     selection={selected}
                     filter={batchFilter}
                     filterTotal={paging.total}
-                    canSelectAll={canSelectWholeFilter(paging.total, selected.size, contractFiltered)}
+                    canSelectAll={canSelectWholeFilter(paging.total, selected.size)}
                     selectingAll={selectingAll}
                     onSelectAll={() => void selectWholeFilter()}
                     onClear={() => setSelected(new Map())}
@@ -657,7 +653,7 @@ export default function DevicesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {visibleDevices.map((device) => {
+                        {processedDevices.map((device) => {
                           const signalInfo = getSignalStrengthInfo(device.rxpower)
                           return (
                             <tr key={device._id}>
@@ -723,7 +719,7 @@ export default function DevicesPage() {
                 </section>
 
                 <section className="mobile-card-list space-y-3" aria-label={t('devices.title')} aria-busy={loading}>
-                  {visibleDevices.map((device) => {
+                  {processedDevices.map((device) => {
                     const signalInfo = getSignalStrengthInfo(device.rxpower)
                     return (
                       <article key={device._id} className="mobile-data-card">
@@ -770,7 +766,6 @@ export default function DevicesPage() {
                 <nav className="mt-4 flex flex-wrap items-center justify-between gap-3" aria-label={t('devices.pagination.aria')}>
                   <p className="text-sm text-muted-foreground">
                     {t('devices.pagination.range', { from: rangeFrom, to: rangeTo, total: paging.total })}
-                    {contractFiltered && <> · <strong className="data-value">{visibleDevices.length}</strong> {t('devices.shownLabel')}</>}
                   </p>
                   <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                     <button

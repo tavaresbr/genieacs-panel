@@ -73,6 +73,9 @@ describe('o lote, sem rede', () => {
   it('o recorte guarda só os campos do filtro, curtos, e nada quando não há filtro', () => {
     assert.deepEqual(batchFilterLabel({ status: 'offline', focus: 'all', search: ' vila ', outro: 'x' }), { status: 'offline', search: 'vila' });
     assert.equal(batchFilterLabel({ status: 'all' }), null);
+    // O filtro do SGP é aplicado no servidor e entra no recorte da trilha.
+    assert.deepEqual(batchFilterLabel({ sgp: 'blocked', status: 'all' }), { sgp: 'blocked' });
+    assert.equal(batchFilterLabel({ sgp: 'all' }), null);
     assert.equal(batchFilterLabel('offline'), null);
     assert.equal(batchFilterLabel({ search: 'x'.repeat(100) }).search.length, 64);
   });

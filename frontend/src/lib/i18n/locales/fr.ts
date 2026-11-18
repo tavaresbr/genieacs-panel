@@ -617,7 +617,6 @@ const fr: Dictionary = {
   'devices.sgpSync.aria': 'Synchroniser le contrat de chaque équipement avec le SGP',
   'devices.export.failed': 'Impossible de télécharger le tableur.',
   'devices.export.sgpIgnored': 'Le tableur reprend la recherche, l’état et le focus. Le filtre ERP ne s’applique qu’à cet écran et n’y figure pas.',
-  'devices.shownLabel': 'affichés',
   'devices.refreshAria': 'Actualiser l’inventaire des équipements',
   'devices.loadingAria': 'Chargement de l’inventaire des équipements',
   'devices.error.title': 'L’inventaire des équipements est indisponible',

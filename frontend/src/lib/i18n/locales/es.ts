@@ -617,7 +617,6 @@ const es: Dictionary = {
   'devices.sgpSync.aria': 'Sincronizar los contratos de todos los equipos con el SGP',
   'devices.export.failed': 'No se pudo descargar la planilla.',
   'devices.export.sgpIgnored': 'La planilla usa la búsqueda, el estado y el foco. El filtro del ERP solo aplica en esta pantalla y no se incluye.',
-  'devices.shownLabel': 'mostrados',
   'devices.refreshAria': 'Actualizar inventario de equipos',
   'devices.loadingAria': 'Cargando inventario de equipos',
   'devices.error.title': 'El inventario de equipos no está disponible',

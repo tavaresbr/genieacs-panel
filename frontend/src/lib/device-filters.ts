@@ -112,11 +112,35 @@ export function filtersToQuery(filters: DeviceFilters): URLSearchParams {
 }
 
 /**
- * A query da planilha: o recorte que o SERVIDOR sabe aplicar — busca, estado
- * e foco. A página não entra (a planilha leva todas), e o filtro do ERP também
- * não: ele é feito na tela, sobre a página que chegou, e o servidor não o
- * conhece. Por isso `exportIgnoresSgp` existe — a tela avisa em vez de
- * entregar um arquivo com mais linhas do que a lista mostra.
+ * A query de uma página da lista: o recorte inteiro, aplicado pelo SERVIDOR —
+ * inclusive o filtro do SGP, que corta a frota antes de paginar, para o total
+ * e as páginas serem os do recorte filtrado. Os defaults não vão: a API já os
+ * assume. O servidor ignora `sgp` quando a integração está desligada ou quem
+ * pede não tem `sgp.read`.
+ */
+export function deviceListQuery(params: {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: DeviceStatusFilter
+  focus?: DeviceFocusFilter
+  sgp?: SgpFilter
+}): URLSearchParams {
+  const query = new URLSearchParams()
+  if (params.page !== undefined) query.set('page', String(params.page))
+  if (params.pageSize !== undefined) query.set('pageSize', String(params.pageSize))
+  if (params.search) query.set('search', params.search)
+  if (params.status && params.status !== 'all') query.set('status', params.status)
+  if (params.focus && params.focus !== 'all') query.set('focus', params.focus)
+  if (params.sgp && params.sgp !== 'all') query.set('sgp', params.sgp)
+  return query
+}
+
+/**
+ * A query da planilha: busca, estado e foco. A página não entra (a planilha
+ * leva todas), e o filtro do ERP também não: a exportação ainda não o aplica.
+ * Por isso `exportIgnoresSgp` existe — a tela avisa em vez de entregar um
+ * arquivo com mais linhas do que a lista mostra.
  */
 export function deviceExportQuery(filters: Pick<DeviceFilters, 'search' | 'status' | 'focus'>): URLSearchParams {
   const query = new URLSearchParams()

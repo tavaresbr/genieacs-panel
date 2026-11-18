@@ -55,11 +55,10 @@ export function togglePage(selection: Selection, rows: readonly SelectableRow[])
 /**
  * Se a tela oferece "selecionar todos os N do filtro".
  *
- * Só quando o total cabe no lote, e nunca com o filtro de contrato do SGP
- * ligado: esse filtro é aplicado na tela, página por página, e o total que o
- * servidor devolve não é o que o operador está vendo — marcaria aparelhos que
- * o recorte na tela esconde.
+ * Só quando o total cabe no lote. Todo filtro da lista — o do contrato do SGP
+ * inclusive — é aplicado no servidor antes de paginar, então o total que volta
+ * é exatamente o recorte que o operador está vendo.
  */
-export function canSelectWholeFilter(total: number, selectedSize: number, contractFiltered: boolean): boolean {
-  return !contractFiltered && total > 0 && total <= BATCH_LIMIT && selectedSize < total
+export function canSelectWholeFilter(total: number, selectedSize: number): boolean {
+  return total > 0 && total <= BATCH_LIMIT && selectedSize < total
 }

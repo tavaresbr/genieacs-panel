@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, runInTenant, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
@@ -499,5 +499,166 @@ describe('GET /api/devices pagination', () => {
     } finally {
       genieAcs.sendTotalHeader = true;
     }
+  });
+});
+
+/**
+ * O filtro do contrato do SGP, aplicado no servidor.
+ *
+ * Antes ele era feito na tela, sobre as 25 linhas que já tinham voltado: o
+ * total e as páginas eram os da frota inteira, e "bloqueados" podia mostrar
+ * uma página vazia com "página 1 de 2". Aqui o filtro corta a frota ANTES de
+ * paginar, e o total é o do recorte filtrado.
+ */
+describe('GET /api/devices with the SGP filter', () => {
+  const LINKS = [
+    // Os ativos ficam espalhados pela frota — dois deles longe da primeira
+    // página sem filtro — para que paginar antes de filtrar desse outra resposta.
+    { device_id: 'ONT-029', contract: '9001', state: 'active' },
+    { device_id: 'ONT-020', contract: '9002', state: 'active' },
+    { device_id: 'ONT-005', contract: '9003', state: 'active' },
+    { device_id: 'ONT-010', contract: '9004', state: 'blocked' },
+    // Estado fora do vocabulário e estado vazio são `unknown`, como a coluna lê.
+    { device_id: 'ONT-001', contract: '9005', state: 'suspenso' },
+    { device_id: 'ONT-002', contract: '9006', state: '' }
+  ];
+  const ACTIVE_IDS = ['ONT-029', 'ONT-020', 'ONT-005'];
+  let alfa;
+  let beta;
+
+  const ligarSgp = (enabled) => call(`${panelUrl}/api/sgp/config`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: enabled
+      ? { enabled: true, baseUrl: 'http://127.0.0.1:9', app: 'painel', token: 'sgp-token', linkMode: 'pppoe' }
+      : { enabled: false }
+  });
+
+  before(async () => {
+    DeviceService.forgetDashboards();
+    const db = getDb();
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    await db('tenants').insert({ slug: 'beta-sgp-filter', name: 'Provedor Beta', status: 'active' });
+    beta = (await db('tenants').where({ slug: 'beta-sgp-filter' }).first()).id;
+    await db('sgp_links').insert(LINKS.map((link) => ({ ...link, tenant_id: alfa, link_mode: 'auto' })));
+    // O outro provedor lê o MESMO ACS e tem vínculos nos MESMOS ids, com outro
+    // estado: se a leitura dos vínculos escapasse do provedor, os totais do
+    // primeiro mudariam.
+    await db('sgp_links').insert([
+      { tenant_id: beta, device_id: 'ONT-029', contract: '1', state: 'blocked', link_mode: 'auto' },
+      { tenant_id: beta, device_id: 'ONT-028', contract: '2', state: 'blocked', link_mode: 'auto' },
+      { tenant_id: beta, device_id: 'ONT-027', contract: '3', state: 'cancelled', link_mode: 'auto' }
+    ]);
+    await runInTenant(beta, () => Setting.upsert(
+      'genieAcsUrl',
+      `http://127.0.0.1:${genieAcs.server.address().port}`
+    ));
+    assert.equal((await ligarSgp(true)).status, 200);
+  });
+
+  after(async () => {
+    await ligarSgp(false);
+    await getDb()('sgp_links').whereIn('tenant_id', [alfa, beta]).del();
+    DeviceService.forgetDashboards();
+  });
+
+  it('filters the whole fleet before paging, so total and pages are the filtered ones', async () => {
+    const primeira = await listDevices('?sgp=active&pageSize=2&page=1');
+    assert.equal(primeira.status, 200);
+    assert.equal(primeira.body.data.sgpFilter, 'active');
+    assert.equal(primeira.body.data.total, ACTIVE_IDS.length);
+    assert.equal(primeira.body.data.totalPages, 2);
+    assert.deepEqual(primeira.body.data.devices.map((device) => device._id), ['ONT-029', 'ONT-020']);
+
+    const segunda = await listDevices('?sgp=active&pageSize=2&page=2');
+    assert.equal(segunda.body.data.page, 2);
+    assert.deepEqual(segunda.body.data.devices.map((device) => device._id), ['ONT-005']);
+    for (const device of [...primeira.body.data.devices, ...segunda.body.data.devices]) {
+      assert.equal(device.sgpLink.state, 'active');
+    }
+
+    // Uma página além do fim volta para a última do recorte FILTRADO.
+    const alem = await listDevices('?sgp=active&pageSize=2&page=9');
+    assert.equal(alem.body.data.page, 2);
+  });
+
+  it('counts each state and the unlinked devices', async () => {
+    const totalDe = async (sgp) => (await listDevices(`?sgp=${sgp}&pageSize=100`)).body.data;
+
+    const bloqueados = await totalDe('blocked');
+    assert.deepEqual(bloqueados.devices.map((device) => device._id), ['ONT-010']);
+    assert.equal(bloqueados.total, 1);
+
+    const desconhecidos = await totalDe('unknown');
+    assert.deepEqual(desconhecidos.devices.map((device) => device._id).sort(), ['ONT-001', 'ONT-002']);
+
+    assert.equal((await totalDe('cancelled')).total, 0);
+
+    const semVinculo = await totalDe('unlinked');
+    assert.equal(semVinculo.total, FLEET_SIZE - LINKS.length);
+    assert.ok(semVinculo.devices.every((device) => device.sgpLink === null));
+    assert.ok(!semVinculo.devices.some((device) => LINKS.some((link) => link.device_id === device._id)));
+  });
+
+  it('keeps every filter in its own cache entry, over one fleet read', async () => {
+    DeviceService.forgetDashboards();
+    const fleetReads = () => genieAcs.requests.filter((r) => r.limit === null && r.skip === null && r.projection !== '_id');
+    const antes = fleetReads().length;
+
+    const ativos = await listDevices('?sgp=active');
+    const bloqueados = await listDevices('?sgp=blocked');
+    const semVinculo = await listDevices('?sgp=unlinked');
+    const todos = await listDevices('?search=SN00');
+    const ativosDeNovo = await listDevices('?sgp=active');
+
+    assert.equal(ativos.body.data.total, 3);
+    assert.equal(bloqueados.body.data.total, 1);
+    assert.equal(semVinculo.body.data.total, FLEET_SIZE - LINKS.length);
+    assert.equal(todos.body.data.total, FLEET_SIZE);
+    assert.equal(ativosDeNovo.body.data.total, 3);
+    assert.equal(fleetReads().length - antes, 1, 'os filtros cortam a mesma leitura da frota');
+  });
+
+  it('combines with the status filter and with a search', async () => {
+    // Abaixo do índice 12 está online: dos ativos, só a ONT-005.
+    const online = await listDevices('?sgp=active&status=online');
+    assert.deepEqual(online.body.data.devices.map((device) => device._id), ['ONT-005']);
+
+    // Índice ímpar é ZTE: ONT-029 e ONT-005.
+    const zte = await listDevices('?sgp=active&search=zte');
+    assert.deepEqual(zte.body.data.devices.map((device) => device._id), ['ONT-029', 'ONT-005']);
+    assert.equal(zte.body.data.total, 2);
+  });
+
+  it('ignores an unknown value, like status and focus do', async () => {
+    const { body } = await listDevices('?sgp=banana');
+    assert.equal(body.data.sgpFilter, 'all');
+    assert.equal(body.data.total, FLEET_SIZE);
+  });
+
+  it('is ignored while the integration is off', async () => {
+    assert.equal((await ligarSgp(false)).status, 200);
+    try {
+      const { body } = await listDevices('?sgp=active');
+      assert.equal(body.data.sgpAvailable, false);
+      assert.equal(body.data.sgpFilter, 'all');
+      assert.equal(body.data.total, FLEET_SIZE);
+    } finally {
+      assert.equal((await ligarSgp(true)).status, 200);
+    }
+  });
+
+  it("reads only the provider's own links", async () => {
+    // O primeiro provedor não enxerga os bloqueados do outro nos mesmos ids.
+    const bloqueados = await listDevices('?sgp=blocked&pageSize=100');
+    assert.deepEqual(bloqueados.body.data.devices.map((device) => device._id), ['ONT-010']);
+
+    // E o outro, lendo a mesma frota, vê os dele — a chave do cache leva o
+    // provedor, senão esta leitura devolveria a resposta guardada acima.
+    const doBeta = await runInTenant(beta, () => DeviceService.getDevicesPage({ sgp: 'blocked', pageSize: 100 }));
+    assert.deepEqual(doBeta.devices.map((device) => device._id), ['ONT-029', 'ONT-028']);
+    assert.equal(doBeta.total, 2);
+    const semVinculoBeta = await runInTenant(beta, () => DeviceService.getDevicesPage({ sgp: 'unlinked' }));
+    assert.equal(semVinculoBeta.total, FLEET_SIZE - 3);
   });
 });

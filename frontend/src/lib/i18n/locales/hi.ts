@@ -607,7 +607,6 @@ const hi: Dictionary = {
   'devices.sgpSync.aria': 'सभी उपकरणों के अनुबंध SGP के साथ सिंक करें',
   'devices.export.failed': 'स्प्रेडशीट डाउनलोड नहीं हो सकी।',
   'devices.export.sgpIgnored': 'स्प्रेडशीट में खोज, स्थिति और फ़ोकस शामिल हैं। ERP फ़िल्टर केवल इसी स्क्रीन पर लागू होता है और शामिल नहीं है।',
-  'devices.shownLabel': 'दिखाए गए',
   'devices.refreshAria': 'उपकरण सूची ताज़ा करें',
   'devices.loadingAria': 'उपकरण सूची लोड हो रही है',
   'devices.error.title': 'उपकरण सूची उपलब्ध नहीं है',

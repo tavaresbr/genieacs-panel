@@ -128,6 +128,15 @@ class SgpLink {
     return tdb('sgp_links').whereIn('contract', contracts.map(String)).orderBy('device_id', 'asc');
   }
 
+  /**
+   * O estado do contrato de cada aparelho vinculado do provedor — só as duas
+   * colunas, numa leitura. É o que o filtro do SGP da lista de equipamentos
+   * cruza com a frota inteira antes de paginar.
+   */
+  static async listDeviceStates() {
+    return tdb('sgp_links').select('device_id', 'state');
+  }
+
   static async getAll() {
     return tdb('sgp_links').orderBy('device_id', 'asc');
   }

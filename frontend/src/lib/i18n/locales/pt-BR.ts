@@ -617,7 +617,6 @@ const ptBR: Dictionary = {
   'devices.sgpSync.aria': 'Sincronizar os contratos de todos os equipamentos com o SGP',
   'devices.export.failed': 'Não foi possível baixar a planilha.',
   'devices.export.sgpIgnored': 'A planilha leva a busca, o estado e o foco. O filtro do ERP é só desta tela e não entra nela.',
-  'devices.shownLabel': 'exibidos',
   'devices.refreshAria': 'Atualizar inventário de equipamentos',
   'devices.loadingAria': 'Carregando inventário de equipamentos',
   'devices.error.title': 'O inventário de equipamentos está indisponível',

@@ -618,7 +618,6 @@ const de: Dictionary = {
   'devices.sgpSync.aria': 'Verträge aller Geräte mit SGP synchronisieren',
   'devices.export.failed': 'Die Tabelle konnte nicht heruntergeladen werden.',
   'devices.export.sgpIgnored': 'Die Tabelle übernimmt Suche, Status und Fokus. Der ERP-Filter gilt nur auf diesem Bildschirm und ist nicht enthalten.',
-  'devices.shownLabel': 'angezeigt',
   'devices.refreshAria': 'Geräteinventar aktualisieren',
   'devices.loadingAria': 'Geräteinventar wird geladen',
   'devices.error.title': 'Das Geräteinventar ist nicht verfügbar',

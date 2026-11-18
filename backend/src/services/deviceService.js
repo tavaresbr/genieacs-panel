@@ -513,6 +513,20 @@ class DeviceService {
   static DEVICE_FOCUS_FILTERS = ['new24h', 'weak-signal', 'hot', 'many-clients'];
 
   /**
+   * O filtro do contrato do SGP: o estado do vínculo, ou `unlinked` para o
+   * aparelho sem vínculo nenhum. Lista fechada, como `status` e `focus` — o
+   * que não está aqui vira "todos". Quem decide se o filtro vale (integração
+   * ligada, `sgp.read`) é o controlador; aqui ele só é aplicado.
+   */
+  static DEVICE_SGP_FILTERS = ['active', 'blocked', 'cancelled', 'unknown', 'unlinked'];
+  static SGP_LINK_STATES = ['active', 'blocked', 'cancelled'];
+
+  static normalizeSgpFilter(raw) {
+    const value = String(raw ?? 'all').trim().toLowerCase();
+    return this.DEVICE_SGP_FILTERS.includes(value) ? value : 'all';
+  }
+
+  /**
    * Every listing parameter arrives from the browser, so each one is coerced and
    * clamped here instead of being trusted. `page` is only bounded from below:
    * the real upper bound depends on the total, which is known further down.
@@ -530,7 +544,8 @@ class DeviceService {
         : this.DEVICE_PAGE_SIZE_DEFAULT,
       search: String(query.search ?? '').trim().slice(0, this.DEVICE_SEARCH_MAX_LENGTH),
       status: ['online', 'offline', 'stale'].includes(rawStatus) ? rawStatus : 'all',
-      focus: this.DEVICE_FOCUS_FILTERS.includes(rawFocus) ? rawFocus : 'all'
+      focus: this.DEVICE_FOCUS_FILTERS.includes(rawFocus) ? rawFocus : 'all',
+      sgp: this.normalizeSgpFilter(query.sgp)
     };
   }
 
@@ -927,7 +942,7 @@ class DeviceService {
    * de a contagem bater com o número que mandou o operador para cá.
    */
   static async getDevicesPage(options = {}) {
-    const { page, pageSize, search, status, focus } = this.normalizeDeviceListQuery(options);
+    const { page, pageSize, search, status, focus, sgp } = this.normalizeDeviceListQuery(options);
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = await this.ensureRxPowerPaths();
     const learnedTemperaturePaths = await this.readTemperaturePaths();
@@ -939,7 +954,10 @@ class DeviceService {
     );
     const listQuery = this.buildDeviceListQuery(status, focus);
     const queryParam = listQuery ? JSON.stringify(listQuery) : null;
-    const passagemLocal = Boolean(search) || this.focusNeedsLocalPass(focus);
+    // O filtro do SGP também é do painel (`sgp_links`), não do NBI: entra na
+    // passagem local, e por isso a contagem e as páginas saem do recorte já
+    // filtrado — e não de 25 linhas filtradas na tela depois de paginadas.
+    const passagemLocal = Boolean(search) || this.focusNeedsLocalPass(focus) || sgp !== 'all';
 
     if (!passagemLocal) {
       const total = await this.countDevicesFromGenieAcs(queryParam);
@@ -985,8 +1003,14 @@ class DeviceService {
         .filter((device) => this.deviceMatchesFocus(device, focus));
     }, { ttlMs: this.SEARCH_MATCH_TTL_MS, gate: false });
 
-    const matches = !search ? await recortar() : await this.searchMatches.read(`${recorteKey}|${search}`, async () => {
-      const recorte = await recortar();
+    // A chave do recorte filtrado leva o filtro do SGP e a busca em JSON: a
+    // busca é texto livre, e sem a separação um termo como `active|x` poderia
+    // cair na entrada de outro filtro. O recorte sem nada por cima continua
+    // em `${recorteKey}|`, que JSON nenhum produz.
+    const filtrar = () => this.searchMatches.read(`${recorteKey}|${JSON.stringify({ sgp, search })}`, async () => {
+      let recorte = await recortar();
+      if (sgp !== 'all') recorte = await this.filterBySgpLink(recorte, sgp);
+      if (!search) return recorte;
       // O Customer ID é do painel, não do GenieACS, e por isso a busca é a
       // única que precisa dele — sobre o que o recorte já deixou passar.
       const ids = recorte.map((device) => device._id);
@@ -1005,6 +1029,7 @@ class DeviceService {
         needle
       ));
     }, { ttlMs: this.SEARCH_MATCH_TTL_MS, gate: false });
+    const matches = !search && sgp === 'all' ? await recortar() : await filtrar();
 
     const total = matches.length;
     const totalPages = Math.ceil(total / pageSize);
@@ -1136,6 +1161,24 @@ class DeviceService {
     }
     if (matches.length > max) throw grandeDemais();
     return { devices: matches, filters: { search, status, focus } };
+  }
+
+  /**
+   * O recorte com só os aparelhos cujo vínculo do SGP casa com o filtro.
+   *
+   * UMA leitura da tabela do provedor (`sgp_links` passa por `tdb`), só
+   * `device_id` e `state`, e o cruzamento em memória: a frota já está aqui, e
+   * um `IN` em lotes de 500 sobre ela seria uma ida ao banco por lote. O estado
+   * que não é um dos três conhecidos é `unknown`, como `SgpService.linkState`
+   * lê — a coluna mostra a mesma coisa que o filtro escolhe.
+   */
+  static async filterBySgpLink(devices, sgp) {
+    const states = new Map();
+    for (const row of await SgpLink.listDeviceStates()) {
+      states.set(String(row.device_id), this.SGP_LINK_STATES.includes(row.state) ? row.state : 'unknown');
+    }
+    if (sgp === 'unlinked') return devices.filter((device) => !states.has(String(device._id)));
+    return devices.filter((device) => states.get(String(device._id)) === sgp);
   }
 
   /**
