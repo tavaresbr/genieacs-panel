@@ -839,7 +839,7 @@ Todas obrigatórias; qualquer uma delas responde com silêncio.
 | --- | --- |
 | só `direction === 'in'` | o eco `fromMe` é o provedor digitando no próprio celular; respondê-lo mandaria as palavras dele de volta ao cliente dele |
 | nunca com humano no fio — **30 min** desde a última mensagem com `sent_by` (nota interna conta) | um atendente atropelado por um bot é pior que bot nenhum; 30 min cobre quem foi olhar a OLT e não deixa o chamado de ontem calar o bot hoje |
-| nunca duas vezes pela mesma mensagem | o índice único de `external_id` é a dedupe real (o reenvio nem chega aqui); o cinto é "existe saída com `id` maior que o da entrada" |
+| nunca duas vezes pela mesma mensagem | o índice único de `external_id` é a dedupe real (o reenvio nem chega aqui), e a fila por conversa roda um turno de cada vez; o cinto é "existe resposta do bot com `answers_message_id` igual ao id desta entrada" (0142). Não é "saída mais nova que a entrada": numa rajada ("oi" e logo "2ª via do boleto") a segunda mensagem é gravada antes de o bot responder a primeira, e essa leitura calava o pedido de verdade |
 | nunca em pedido de saída | `pedeSaida()` — responder um "SAIR" com mensagem é responder com o oposto do pedido |
 | teto de **3 respostas automáticas por hora por contato** | um auto-respondedor do outro lado vira laço, e um laço manda milhares de mensagens pelo número do provedor antes de alguém notar |
 | assinante não resolvido → `whatsapp.bot.notRecognised` | número não reconhecido **nunca** recebe dado de contrato |

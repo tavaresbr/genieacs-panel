@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import DeviceService from './deviceService.js';
 import SgpService from './sgpService.js';
 import InvoiceSourceService, { mergeOpenInvoices } from './invoiceSourceService.js';
@@ -108,6 +109,16 @@ const JANELA_TETO_MS = 60 * 60 * 1000;
  * value nothing writes would be no ceiling at all, and it would fail open.
  */
 const ORIGEM_BOT = 'bot';
+
+/**
+ * A mensagem de entrada que o bot está respondendo agora.
+ *
+ * Toda resposta do bot sai por `responderCom`, chamado de uns vinte lugares
+ * (menu, fatura, sinal, IA, Asaas, o bot do dono da plataforma). Passar o id
+ * por todos eles é a forma que se esquece num caminho novo; o escopo aberto
+ * em `responder` chega a todos sem que nenhum precise saber.
+ */
+const respondendoA = new AsyncLocalStorage();
 
 /** `enqueue` refusals that mean "there is nowhere to send", not "something broke". */
 const SEM_ONDE_MANDAR = new Set(['no_account', 'no_destination']);
@@ -609,7 +620,10 @@ class WaBotService {
    */
   static async responder({ conversation, messageId, body, direction } = {}) {
     try {
-      const resultado = await this.rotear({ conversation, messageId, body, direction });
+      const resultado = await respondendoA.run(
+        Number.isInteger(Number(messageId)) && Number(messageId) > 0 ? Number(messageId) : null,
+        () => this.rotear({ conversation, messageId, body, direction })
+      );
       if (resultado?.replied) await this.registrar(conversation, resultado.intent);
       return resultado;
     } catch (error) {
@@ -656,18 +670,26 @@ class WaBotService {
 
     // Never twice for the same inbound message. The unique index on
     // `(tenant_id, external_id)` is the real dedupe — a redelivered event never
-    // reaches this far — and this is the belt: a reply of the BOT'S own, newer
-    // than the inbound row, means this message was already answered.
+    // reaches this far — and the per-conversation queue (`waInboundQueue.js`)
+    // runs one turn at a time. This is the belt: a reply of the BOT'S own that
+    // says it answers THIS row (`answers_message_id`).
     //
-    // Scoped to `source: 'bot'` for the same reason the ceiling below is. A
-    // campaign message landing in the seconds between the inbound row and this
-    // pass is not an answer to anything, and reading it as one would swallow a
-    // real question — the operator's own reply is caught by the human check
-    // below, which is where that belongs.
-    const jaRespondida = Number.isInteger(Number(messageId))
+    // It used to be "any bot reply newer than this row", and that stopped being
+    // true once the webhook began answering before the bot: in a burst ("oi",
+    // then "2ª via do boleto") the second message is stored before the bot has
+    // answered the first, so the reply to "oi" lands with a higher id and the
+    // real request was read as already answered. Asking for the exact row is
+    // the question the belt always meant to ask. Other automatic messages
+    // (campaign, survey, the marketing opt-out) never set the column, so they
+    // are not read as answers either.
+    const jaRespondida = Number.isInteger(Number(messageId)) && Number(messageId) > 0
       ? await tdb('wa_messages')
-        .where({ conversation_id: conversation.id, direction: 'out', source: 'bot' })
-        .where('id', '>', Number(messageId))
+        .where({
+          conversation_id: conversation.id,
+          direction: 'out',
+          source: ORIGEM_BOT,
+          answers_message_id: Number(messageId)
+        })
         .first()
       : null;
     if (jaRespondida) return { replied: false, reason: 'already_answered' };
@@ -1071,7 +1093,8 @@ class WaBotService {
       conversationId: conversation.id,
       body: texto,
       userId: null,
-      source: ORIGEM_BOT
+      source: ORIGEM_BOT,
+      answersMessageId: respondendoA.getStore() ?? null
     });
   }
 }
