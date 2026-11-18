@@ -297,6 +297,11 @@ export function getAcsHealth(tenantId) {
   };
 }
 
+/** Uma linha só: quebra de linha no texto vira ` | `. */
+function umaLinha(texto) {
+  return texto.replace(/[\r\n\u2028\u2029]+/g, ' | ');
+}
+
 /**
  * O log de quem chamou o ACS e recebeu a falha de volta.
  *
@@ -311,8 +316,11 @@ export function logUnlessAcsFailure(label, error, { level = 'error', messageOnly
   const code = acsFailureOf(error);
   if (code) return code;
   const write = level === 'warn' ? console.warn : console.error;
-  if (messageOnly) write(`${label}: ${error?.message ?? error}`);
-  else write(`${label}:`, error);
+  // O texto do erro pode carregar o que veio de fora (o corpo da NBI, um
+  // campo do pedido): quebras de linha viram ` | `, para ninguém forjar uma
+  // linha de log. O stack continua inteiro, só numa linha.
+  const texto = messageOnly ? String(error?.message ?? error) : String(error?.stack ?? error);
+  write(`${label}: ${umaLinha(texto)}`);
   return null;
 }
 

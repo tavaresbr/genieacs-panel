@@ -94,7 +94,7 @@ describe('o que a faixa diz', () => {
   })
 
   it('o administrador ganha o atalho para as configurações; os outros, só o texto', () => {
-    expect(desenhar(ACS_SETTINGS_HREF)).toContain(`href="${ACS_SETTINGS_HREF.replace('&', '&amp;')}"`)
+    expect(desenhar(ACS_SETTINGS_HREF)).toContain(`href="${ACS_SETTINGS_HREF.replace(/&/g, '&amp;')}"`)
     expect(desenhar(null)).not.toContain('href=')
   })
 

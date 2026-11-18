@@ -214,7 +214,12 @@ describe('o log da queda: uma linha a cada 5 min por provedor e código', () => 
       const bug = new TypeError('boom');
       assert.equal(logUnlessAcsFailure('Get dashboard error', bug), null);
       assert.equal(escritas.length, 1);
-      assert.equal(escritas[0][1], bug, 'o erro inteiro, com stack');
+      assert.equal(escritas[0].length, 1, 'uma linha só');
+      assert.match(escritas[0][0], /^Get dashboard error: TypeError: boom \| +at /, 'o stack inteiro, numa linha');
+      // Quebra de linha no texto do erro não forja uma linha nova no log.
+      escritas.length = 0;
+      logUnlessAcsFailure('Get dashboard error', new Error('a\nERROR forjada'), { messageOnly: true });
+      assert.deepEqual(escritas, [['Get dashboard error: a | ERROR forjada']]);
     } finally {
       console.error = original;
     }
