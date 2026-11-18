@@ -252,4 +252,24 @@ describe('the WhatsApp webhook answers before the bot', () => {
     preso.resolve();
     assert.equal(await WaInboundQueue.drain(1000), true);
   });
+
+  it('releases the conversation queue when a task stalls past the deadline', async () => {
+    const preso = adiado();
+    const ordem = [];
+    const avisos = [];
+    const warn = console.warn;
+    console.warn = (...a) => { avisos.push(a.join(' ')); };
+    try {
+      await runInTenant(alfa, async () => {
+        WaInboundQueue.enqueue(alfa, 'stall', async () => { ordem.push('preso'); await preso.promise; }, { stallMs: 30 });
+        WaInboundQueue.enqueue(alfa, 'stall', async () => { ordem.push('seguinte'); });
+      });
+      assert.equal(await WaInboundQueue.drain(2000), true);
+      assert.deepEqual(ordem, ['preso', 'seguinte']);
+      assert.deepEqual(avisos, ['WhatsApp webhook background task stalled; releasing the conversation queue']);
+    } finally {
+      console.warn = warn;
+      preso.resolve();
+    }
+  });
 });

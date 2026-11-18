@@ -44,6 +44,28 @@ import { currentContext, runInTenant } from '../config/tenantContext.js';
  */
 
 const BACKGROUND_FAILURE_LOG = 'WhatsApp webhook background processing failed';
+const STALLED_LOG = 'WhatsApp webhook background task stalled; releasing the conversation queue';
+
+/**
+ * Quanto uma tarefa pode segurar a corrente da sua conversa. Uma volta do bot
+ * que nunca termina (um fetch sem prazo, uma promessa esquecida) não pode
+ * deixar o cliente sem resposta para sempre: vencido o prazo, a corrente anda
+ * e a próxima mensagem é atendida. A tarefa travada segue rodando — não há
+ * como cancelá-la —, só deixa de bloquear as outras.
+ */
+export const TASK_STALL_MS = Math.max(1_000, Number(process.env.WA_INBOUND_TASK_STALL_MS) || 120_000);
+
+function comPrazo(promessa, ms) {
+  let relogio;
+  const prazo = new Promise((resolve) => {
+    relogio = setTimeout(() => {
+      console.warn(STALLED_LOG);
+      resolve();
+    }, ms);
+    relogio.unref?.();
+  });
+  return Promise.race([promessa, prazo]).finally(() => clearTimeout(relogio));
+}
 
 /** chave → promessa da última tarefa da corrente daquela chave. */
 const correntes = new Map();
@@ -63,7 +85,7 @@ function tenantDaChamada() {
  * @param {() => Promise<unknown>} fn o trabalho
  * @returns {Promise<void>} resolve quando ESTA tarefa terminou (com ou sem falha)
  */
-export function enqueue(tenantId, chave, fn) {
+export function enqueue(tenantId, chave, fn, { stallMs = TASK_STALL_MS } = {}) {
   const id = Number(tenantId);
   if (!Number.isInteger(id) || id <= 0) {
     throw new TypeError('waInboundQueue.enqueue needs a provider id');
@@ -80,10 +102,12 @@ export function enqueue(tenantId, chave, fn) {
   const k = `${id}:${String(chave)}`;
   const anterior = correntes.get(k) ?? Promise.resolve();
   const tarefa = anterior
-    .then(() => runInTenant(id, fn))
-    .catch(() => {
-      console.error(BACKGROUND_FAILURE_LOG);
-    });
+    .then(() => comPrazo(
+      Promise.resolve().then(() => runInTenant(id, fn)).catch(() => {
+        console.error(BACKGROUND_FAILURE_LOG);
+      }),
+      stallMs
+    ));
   correntes.set(k, tarefa);
   pendentes.add(tarefa);
   tarefa.finally(() => {
