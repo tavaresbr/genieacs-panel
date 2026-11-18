@@ -125,7 +125,7 @@ class MaintenanceService {
    * aparelhos pelo PPPoE. O ACS é a fonte principal; o vínculo do SGP (que
    * tem o login) cobre um ACS fora do ar e é de onde vem o telefone.
    */
-  static async aparelhosDoNo(nodeId, { nodes = null } = {}) {
+  static async aparelhosDoNo(nodeId, { nodes = null, fresh = false } = {}) {
     const todos = nodes ?? await MappingNode.getAll();
     const edges = await MappingEdge.getAll();
     const logins = new Set(clientsBeneath(nodeId, todos, edges)
@@ -134,7 +134,7 @@ class MaintenanceService {
     if (logins.size === 0) return [];
     const ids = new Set();
     try {
-      for (const item of await DeviceService.getCustomerIdentityDevices()) {
+      for (const item of await DeviceService.getCustomerIdentityDevices({ fresh })) {
         const login = String(item?.pppoe ?? '').trim().toLowerCase();
         if (item?._id && logins.has(login)) ids.add(String(item._id));
       }
@@ -184,7 +184,7 @@ class MaintenanceService {
   /** Quantos serão atingidos, para o formulário mostrar antes de agendar. */
   static async preview(nodeId, { startsAt = null, endsAt = null } = {}) {
     const { node, nodes } = await this.no(nodeId);
-    const ids = await this.aparelhosDoNo(node.node_id, { nodes });
+    const ids = await this.aparelhosDoNo(node.node_id, { nodes, fresh: true });
     const links = ids.length ? await SgpLink.getByDeviceIds(ids) : [];
     const telefones = new Set(links
       .map((l) => normalizarTelefoneBr(l.phone_manual) || normalizarTelefoneBr(l.phone_e164))
@@ -229,7 +229,7 @@ class MaintenanceService {
       created_at: agora,
       updated_at: agora
     });
-    await this.acrescentar(id, await this.aparelhosDoNo(node.node_id, { nodes }));
+    await this.acrescentar(id, await this.aparelhosDoNo(node.node_id, { nodes, fresh: true }));
     await this.auditar(req, userId, AuditLog.ACTIONS.MAINTENANCE_SCHEDULED, id, {
       node: node.name || node.node_id,
       startsAt: inicio.toISOString(),
@@ -306,7 +306,8 @@ class MaintenanceService {
     }
     if (!(await contaDeEnvio())) throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 409 });
     try {
-      await this.acrescentar(id, await this.aparelhosDoNo(janela.node_id));
+      // O "avisar agora" do operador lê a frota na hora; o automático aceita a foto.
+      await this.acrescentar(id, await this.aparelhosDoNo(janela.node_id, { fresh: !automatico }));
     } catch (error) {
       // O mapa mudou (nó apagado): avisa quem já estava na lista.
       console.warn(`maintenance ${id} refresh:`, error?.message || error);

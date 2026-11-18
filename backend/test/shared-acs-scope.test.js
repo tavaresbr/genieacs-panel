@@ -85,6 +85,9 @@ after(async () => {
 beforeEach(async () => {
   genie.state.devices = frota();
   genie.state.applyTags = false;
+  genie.state.unsupported = [];
+  genie.state.unsupportedReply = 'empty';
+  DeviceScopeTagger.fullReadAcs.clear();
   genie.state.tasks.length = 0;
   genie.state.tags.length = 0;
   genie.state.deleted.length = 0;
@@ -312,6 +315,63 @@ describe('o console da plataforma', () => {
     assert.deepEqual(JSON.parse(new URLSearchParams(contagens[0].search).get('query')).$and[0], { _tags: 'alfa' });
   });
 
+  const frotaDoConsole = () => {
+    genie.state.devices.push(
+      buildDevice({ id: 'ONT-ALFA-3', tags: [], pppoeUsername: 'ALFA3@isp' }),
+      buildDevice({ id: 'ONT-ALFA-9', tags: ['beta'], pppoeUsername: 'alfa9@isp' })
+    );
+  };
+
+  it('ACS que responde nada ao $nin: cai na leitura inteira, marca certo e lembra do ACS', async (t) => {
+    genie.state.applyTags = true;
+    genie.state.unsupported = ['$nin'];
+    genie.state.unsupportedReply = 'empty';
+    frotaDoConsole();
+    const avisos = t.mock.method(console, 'warn', () => {});
+
+    const r = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['alfa'], apply: true }));
+    assert.equal(r.tagged, 1);
+    assert.deepEqual(genie.state.tags, [{ deviceId: 'ONT-ALFA-3', tag: 'alfa', method: 'POST' }]);
+    assert.equal(r.alreadyTagged, 2);
+    assert.equal(r.toTag, 1);
+    assert.equal(r.conflictCount, 1);
+    assert.deepEqual(r.conflicts.map((c) => c.id), ['ONT-ALFA-9']);
+    assert.equal(r.matched, 4);
+    const linhas = avisos.mock.calls.map((call) => call.arguments.join(' ')).filter((linha) => /auto-tag/.test(linha));
+    assert.deepEqual(linhas, ['Device scope auto-tag: the ACS did not honour the narrowed query; using the full fleet read']);
+
+    // A próxima passada no mesmo ACS vai direto pela leitura inteira.
+    const antes = genie.state.requests.length;
+    const depois = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['alfa'] }));
+    assert.equal(listasDaMarcacao(genie.state.requests.slice(antes)).length, 0, 'nem tenta o $nin de novo');
+    assert.equal(depois.alreadyTagged, 3);
+    assert.equal(depois.toTag, 0);
+    assert.equal(depois.matched, 4);
+  });
+
+  it('ACS que recusa $nin/$or com 400: cai na leitura inteira com as mesmas contas', async (t) => {
+    genie.state.unsupported = ['$nin', '$or'];
+    genie.state.unsupportedReply = 400;
+    frotaDoConsole();
+    t.mock.method(console, 'warn', () => {});
+    t.mock.method(console, 'error', () => {});
+    const r = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['alfa'] }));
+    assert.equal(r.alreadyTagged, 2);
+    assert.equal(r.toTag, 1);
+    assert.equal(r.conflictCount, 1);
+    assert.equal(r.matched, 4);
+    assert.equal(r.tagged, 0);
+    assert.equal(DeviceScopeTagger.fullReadAcs.size, 1);
+  });
+
+  it('busca estreita vazia de verdade (todos já marcados) não cai na leitura inteira', async () => {
+    const r = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['alfa'] }));
+    assert.equal(r.alreadyTagged, 2);
+    assert.equal(r.toTag, 0);
+    assert.equal(r.matched, 2);
+    assert.equal(DeviceScopeTagger.fullReadAcs.size, 0);
+  });
+
   it('por serial; lista grande demais para a URL vai só com o $nin, com as mesmas contas', async () => {
     const comSerial = (id, serial, tags) => {
       const device = buildDevice({ id, tags, pppoeUsername: `${id}@isp` });
@@ -404,6 +464,10 @@ describe('a marcação automática pelo prefixo do PPPoE', () => {
     genie.state.applyTags = true;
     const primeira = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['ta100'], apply: true, fresh: false }));
     assert.equal(primeira.tagged, 1);
+    // Contado ANTES de marcar: o que esta passada marcou está em `toTag`, não nos dois.
+    assert.equal(primeira.toTag, 1);
+    assert.equal(primeira.alreadyTagged, 0);
+    assert.equal(primeira.matched, 1);
     const antes = genie.state.requests.length;
     const segunda = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['ta100'], apply: true, fresh: false }));
     assert.equal(listasDaMarcacao(genie.state.requests.slice(antes)).length, 0, 'sem nova leitura da lista');

@@ -2090,13 +2090,19 @@ class DeviceService {
     return { projection, virtualParams };
   }
 
-  static async getCustomerIdentityDevices() {
+  /**
+   * `fresh`: quem o operador acabou de pedir (sincronizar IDs, sincronizar o
+   * SGP, a visão geral, a manutenção) vai ao ACS; os laços de fundo aceitam
+   * a foto da frota (`FLEET_SNAPSHOT_TTL_MS`).
+   */
+  static async getCustomerIdentityDevices({ fresh = false } = {}) {
     const { projection, virtualParams } = await this.identityProjection();
     // A frota inteira numa resposta: com milhares de ONTs, os 15 s padrão do
     // conector não bastam e a sincronização de IDs morria com "aborted".
     const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS customer identity response',
-      timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
+      timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS,
+      fresh
     });
     return data.map((item) => ({
       _id: item._id || null,

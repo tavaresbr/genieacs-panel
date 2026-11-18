@@ -29,7 +29,8 @@ const startedAt = new Map();
 const TIMED_OUT = Symbol('timed-out');
 
 async function syncOnce() {
-  const devices = await DeviceService.getCustomerIdentityDevices();
+  // O botão do operador: a frota de agora, não a foto de alguns segundos.
+  const devices = await DeviceService.getCustomerIdentityDevices({ fresh: true });
   const deviceIds = devices.map((device) => String(device?._id || '')).filter(Boolean);
   const identityHashes = devices
     .filter((device) => device?._id && device?.softwareId && device?.pppoe)

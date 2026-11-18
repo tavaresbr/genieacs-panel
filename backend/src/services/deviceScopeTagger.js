@@ -56,6 +56,15 @@ export function matchQuery({ prefixes = [], serials = new Set(), loginPaths = []
   return ou.length > 0 ? { $or: ou } : null;
 }
 
+/**
+ * A NBI recusou a busca (4xx que não é de credencial): a forma da busca, e
+ * não o ACS, é o problema. O erro é o de `DeviceService.genieAcsError`.
+ */
+function refusedQuery(error) {
+  const status = Number(/responded with status: (\d{3})/.exec(String(error?.message ?? ''))?.[1]);
+  return status >= 400 && status < 500 && status !== 401 && status !== 403;
+}
+
 /** `{ $and: [a, b] }` sem os vazios. */
 function juntar(...partes) {
   const cheias = partes.filter(Boolean);
@@ -100,6 +109,10 @@ class DeviceScopeTagger {
    * um aparelho com dois logins diferentes pode contar onde a lista não o
    * poria. É um número para o console, e nada é marcado por ele.
    *
+   * Um ACS que não honra a busca estreita (responde nada, ou 4xx) faz esta
+   * passada cair na leitura inteira de antes, e o ACS fica lembrado por
+   * `FULL_READ_MS` — ver `readNarrowed`.
+   *
    * `fresh: false` aceita a leitura que a mesma busca fez há pouco
    * (`DeviceService.FLEET_IDENTITY_TTL_MS`) — é o que a passada automática
    * usa. A ferramenta do console lê na hora (o padrão).
@@ -119,19 +132,32 @@ class DeviceScopeTagger {
     };
 
     return withoutDeviceScope(async () => {
+      const connector = await connectorFor();
+      const acs = `${connector.mode}|${await connector.rootUrl()}`;
       const filtro = matchQuery({ prefixes: prefixos, serials, loginPaths: await DeviceService.pppoeLoginPaths() });
-      const semATag = { _tags: { $nin: [tag] } };
-      // Uma lista de seriais grande demais para a URL vai só com o `$nin`, e
-      // o casamento fica todo do lado de cá.
-      const frota = await DeviceService.listFleetIdentity({
-        fresh, query: juntar(semATag, filtro), fallbackQuery: semATag
-      });
+
+      let leitura = null;
+      if (!this.usesFullRead(acs)) {
+        leitura = await this.readNarrowed({ tag, filtro, casa, fresh });
+        if (!leitura) {
+          this.fullReadAcs.set(acs, Date.now() + this.FULL_READ_MS);
+          console.warn('Device scope auto-tag: the ACS did not honour the narrowed query; using the full fleet read');
+        }
+      }
+      // O caminho antigo: a frota inteira fora do escopo, separada aqui.
+      if (!leitura) leitura = await this.readFull({ tag, fresh });
+
       const conflitos = [];
       const marcar = [];
-      for (const d of frota) {
+      let jaMarcados = leitura.alreadyTagged;
+      for (const d of leitura.frota) {
         if (!casa(d)) continue;
-        // Marcado depois da leitura (a guardada): entra na contagem abaixo.
-        if (d.tags.includes(tag)) continue;
+        if (d.tags.includes(tag)) {
+          // Na leitura estreita, quem tem a tag já está na contagem (marcado
+          // depois da leitura guardada); na inteira, é contado aqui.
+          if (leitura.countHere) jaMarcados += 1;
+          continue;
+        }
         if (d.tags.some((t) => tagsDeProvedor.has(t))) conflitos.push(d);
         else marcar.push(d);
       }
@@ -146,7 +172,6 @@ class DeviceScopeTagger {
           marcados += 1;
         }
       }
-      const jaMarcados = await this.countAlreadyTagged(tag, filtro, casa);
       return {
         tag,
         matched: jaMarcados + marcar.length + conflitos.length,
@@ -159,6 +184,73 @@ class DeviceScopeTagger {
         conflictCount: conflitos.length
       };
     });
+  }
+
+  /**
+   * Os ACS que não entenderam a busca estreita, e até quando usam a leitura
+   * inteira direto: `<modo>|<raiz>` → validade. Em memória; 6 h, e então a
+   * busca estreita é tentada de novo (o ACS pode ter sido atualizado).
+   */
+  static fullReadAcs = new Map();
+  static FULL_READ_MS = 6 * 60 * 60_000;
+
+  static usesFullRead(acs) {
+    const ate = this.fullReadAcs.get(acs);
+    if (ate && ate > Date.now()) return true;
+    if (ate) this.fullReadAcs.delete(acs);
+    return false;
+  }
+
+  /**
+   * A leitura estreita: o ACS devolve só quem casa e não tem a tag, e os já
+   * marcados vêm de uma contagem à parte, feita ANTES de marcar (quem é
+   * marcado nesta passada conta em `toTag`, não em `alreadyTagged`).
+   *
+   * `null` quando o ACS não honrou a busca — ver `narrowedIgnored` — ou a
+   * recusou com 4xx: quem chama cai na leitura inteira.
+   */
+  static async readNarrowed({ tag, filtro, casa, fresh }) {
+    const semATag = { _tags: { $nin: [tag] } };
+    try {
+      // Uma lista de seriais grande demais para a URL vai só com o `$nin`, e
+      // o casamento fica todo do lado de cá.
+      const frota = await DeviceService.listFleetIdentity({
+        fresh, query: juntar(semATag, filtro), fallbackQuery: semATag
+      });
+      const alreadyTagged = await this.countAlreadyTagged(tag, filtro, casa);
+      if (frota.length === 0 && await this.narrowedIgnored(tag, filtro, alreadyTagged)) return null;
+      return { frota, alreadyTagged, countHere: false };
+    } catch (error) {
+      if (refusedQuery(error)) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * A busca estreita voltou vazia: o ACS a entendeu, ou a ignorou? Um ACS que
+   * não conhece `$nin` pode responder nada a uma busca que não entende —
+   * e a marcação pararia calada. A conferência é barata (o `total` da NBI):
+   * quantos casam SEM o `$nin`. Mais do que os já marcados quer dizer que
+   * havia quem devolver.
+   */
+  static async narrowedIgnored(tag, filtro, alreadyTagged) {
+    const consulta = filtro ? JSON.stringify(filtro) : null;
+    const connector = await connectorFor();
+    const url = consulta
+      ? await connector.urlFor(DeviceService.devicePath(''), { query: consulta, projection: '_id', limit: 1 })
+      : null;
+    if (url && url.toString().length <= NBI_URL_BUDGET) {
+      return (await DeviceService.countDevicesFromGenieAcs(consulta)) > alreadyTagged;
+    }
+    // A busca foi só o `$nin` (a lista de seriais não cabia): a frota inteira
+    // contra os que têm a tag.
+    const total = await DeviceService.countDevicesFromGenieAcs(null);
+    return total > await DeviceService.countDevicesFromGenieAcs(JSON.stringify({ _tags: tag }));
+  }
+
+  /** A leitura de antes: a frota inteira fora do escopo, contada aqui. */
+  static async readFull({ fresh }) {
+    return { frota: await DeviceService.listFleetIdentity({ fresh }), alreadyTagged: 0, countHere: true };
   }
 
   /**

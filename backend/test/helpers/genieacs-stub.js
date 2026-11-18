@@ -101,7 +101,7 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
   // é como um teste faz a ONT "responder" — mudar o documento que o ACS guarda.
   // Tarefa aceita com 202 fica em `GET /tasks`, que é a fila do ACS.
   // `files` é a coleção de arquivos do ACS (firmware), como o NBI a devolve.
-  const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, taskStatusFor: null, respond, requests: [], onTask: null, applyTags: false };
+  const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, taskStatusFor: null, respond, requests: [], onTask: null, applyTags: false, unsupported: [], unsupportedReply: 'empty' };
 
   const server = http.createServer((req, res) => {
     // O corpo em bytes: um firmware enviado (`PUT /files/<nome>`) não é texto,
@@ -240,6 +240,13 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
       if (url.pathname === '/devices' || url.pathname === '/devices/') {
         const query = url.searchParams.get('query');
         if (!query) return send(200, state.devices);
+        // Um GenieACS que não entende certos operadores: `unsupported` lista
+        // quais (`['$nin']`), e `unsupportedReply` diz o que ele faz com a
+        // busca que os usa — `'empty'` (responde nada, calado) ou um status.
+        if ((state.unsupported || []).some((operador) => query.includes(`"${operador}"`))) {
+          if (state.unsupportedReply === 'empty') return send(200, []);
+          return send(Number(state.unsupportedReply) || 400, { message: 'bad query' });
+        }
         let filter = {};
         try {
           filter = JSON.parse(query);

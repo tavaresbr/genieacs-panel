@@ -364,6 +364,40 @@ describe('a foto da frota: uma leitura por provedor com a projeção unida', () 
     });
   });
 
+  it('o que o operador pede (sincronizar IDs, visão geral do SGP) vai ao ACS, mesmo com a foto nova', async (t) => {
+    const { default: CustomerIdSyncJob } = await import('../src/services/customerIdSyncJob.js');
+    t.mock.method(CustomerIdSyncJob, 'remember', async () => {});
+    await runInTenant(alfa, async () => {
+      await DeviceService.getDashboardDevices();
+      assert.equal(leiturasDaFrota(genie).length, 1);
+      // O laço de fundo aceita a foto…
+      await DeviceService.getCustomerIdentityDevices();
+      assert.equal(leiturasDaFrota(genie).length, 1);
+      // …o botão "sincronizar IDs de cliente" não.
+      const resumo = await CustomerIdSyncJob.run(`fresh-${alfa}`);
+      assert.equal(resumo.total, 2);
+      assert.equal(leiturasDaFrota(genie).length, 2);
+    });
+
+    // As telas e botões do SGP e da manutenção pedem `fresh`.
+    const pedidos = [];
+    t.mock.method(DeviceService, 'getCustomerIdentityDevices', async (options) => {
+      pedidos.push(options?.fresh === true);
+      return [];
+    });
+    t.mock.method(SgpService, 'getConfig', async () => ({ linkMode: 'pppoe' }));
+    t.mock.method(SgpService, 'requireReady', (config) => config);
+    await runInTenant(alfa, () => SgpService.getFleetOverview());
+    assert.deepEqual(pedidos, [true], 'a visão geral');
+    pedidos.length = 0;
+    t.mock.method(SgpService, 'relinkStale', async (options) => {
+      pedidos.push(options?.fresh === true);
+      return { relinked: 0, stranded: new Set() };
+    });
+    await runInTenant(alfa, () => SgpService.syncFleet());
+    assert.deepEqual(pedidos, [true, false], 'sincronizar o SGP: uma leitura na hora, e a segunda usa ela');
+  });
+
   it('leitores ao mesmo tempo esperam a mesma leitura em voo', async () => {
     await runInTenant(alfa, () => Promise.all([
       DeviceService.getDashboardDevices(),
