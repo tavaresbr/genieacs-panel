@@ -364,6 +364,21 @@ describe('o console da plataforma', () => {
     assert.equal(DeviceScopeTagger.fullReadAcs.size, 1);
   });
 
+  it('ACS que responde nada ao $or (calado, sem 4xx): a conferência zerada também cai na leitura inteira', async (t) => {
+    genie.state.applyTags = true;
+    genie.state.unsupported = ['$or'];
+    genie.state.unsupportedReply = 'empty';
+    frotaDoConsole();
+    t.mock.method(console, 'warn', () => {});
+    const r = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['alfa'], apply: true }));
+    assert.equal(r.tagged, 1);
+    assert.deepEqual(genie.state.tags, [{ deviceId: 'ONT-ALFA-3', tag: 'alfa', method: 'POST' }]);
+    assert.equal(r.alreadyTagged, 2);
+    assert.equal(r.conflictCount, 1);
+    assert.equal(r.matched, 4);
+    assert.equal(DeviceScopeTagger.fullReadAcs.size, 1);
+  });
+
   it('busca estreita vazia de verdade (todos já marcados) não cai na leitura inteira', async () => {
     const r = await runInTenant(alfa, () => DeviceScopeTagger.run({ prefixes: ['alfa'] }));
     assert.equal(r.alreadyTagged, 2);

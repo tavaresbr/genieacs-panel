@@ -240,7 +240,14 @@ class DeviceScopeTagger {
       ? await connector.urlFor(DeviceService.devicePath(''), { query: consulta, projection: '_id', limit: 1 })
       : null;
     if (url && url.toString().length <= NBI_URL_BUDGET) {
-      return (await DeviceService.countDevicesFromGenieAcs(consulta)) > alreadyTagged;
+      const casam = await DeviceService.countDevicesFromGenieAcs(consulta);
+      // Zero em tudo — nada a marcar, nada marcado, nada casa — é ou um
+      // provedor cujos prefixos não casam com ninguém, ou um ACS que responde
+      // nada a um `$or` que não entende (a própria conferência usa o `$or`).
+      // Não dá para distinguir barato; a leitura inteira decide, e é o mesmo
+      // custo de antes desta otimização.
+      if (casam === 0 && alreadyTagged === 0) return true;
+      return casam > alreadyTagged;
     }
     // A busca foi só o `$nin` (a lista de seriais não cabia): a frota inteira
     // contra os que têm a tag.
