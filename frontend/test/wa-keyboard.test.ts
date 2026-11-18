@@ -109,3 +109,16 @@ describe('keyboardFrame', () => {
     expect(keyboardFrame({ innerHeight: 0, vvTop: 0, vvHeight: 0 })).toBeNull()
   })
 })
+
+import { nextBaseInner } from '../src/lib/wa-keyboard'
+describe('nextBaseInner', () => {
+  it('segue a janela sem campo em foco', () => {
+    expect(nextBaseInner({ base: 800, baseWidth: 400, innerHeight: 700, innerWidth: 400, fieldFocused: false })).toEqual({ base: 700, baseWidth: 400 })
+  })
+  it('com campo em foco guarda a maior altura (janela encolhida pelo teclado)', () => {
+    expect(nextBaseInner({ base: 800, baseWidth: 400, innerHeight: 430, innerWidth: 400, fieldFocused: true })).toEqual({ base: 800, baseWidth: 400 })
+  })
+  it('recomeça ao girar o aparelho', () => {
+    expect(nextBaseInner({ base: 800, baseWidth: 400, innerHeight: 390, innerWidth: 850, fieldFocused: true })).toEqual({ base: 390, baseWidth: 850 })
+  })
+})

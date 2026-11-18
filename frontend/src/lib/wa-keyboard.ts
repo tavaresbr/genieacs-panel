@@ -78,3 +78,18 @@ export function keyboardFrame(
   if (height === null || !Number.isFinite(vvTop)) return null
   return { top: Math.max(0, Math.round(vvTop)), height }
 }
+
+/**
+ * A altura "de repouso" da janela, para medir o teclado contra ela.
+ *
+ * No Chrome do iPhone a janela (`innerHeight`) às vezes encolhe junto com a
+ * `visualViewport`; comparar as duas dava ~0 com o teclado aberto. Sem campo em
+ * foco a base é a altura atual; com campo em foco ela só cresce. Troca de
+ * largura (girar o aparelho) recomeça a base.
+ */
+export function nextBaseInner(
+  { base, baseWidth, innerHeight, innerWidth, fieldFocused }: { base: number; baseWidth: number; innerHeight: number; innerWidth: number; fieldFocused: boolean }
+): { base: number; baseWidth: number } {
+  if (innerWidth !== baseWidth || !fieldFocused || !(base > 0)) return { base: innerHeight, baseWidth: innerWidth }
+  return { base: Math.max(base, innerHeight), baseWidth }
+}
