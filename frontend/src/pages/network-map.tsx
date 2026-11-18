@@ -18,6 +18,7 @@ import {
 } from '@/lib/kml-import'
 import { buildKml, kmlFileName } from '@/lib/kml-export'
 import { LIVE_COLORS, LIVE_REFRESH_MS, LIVE_STATES, liveLabelKey, type LiveItem, type LiveOutage, type LiveStatus } from '@/lib/map-status'
+import { useVisibleInterval } from '@/lib/visible-interval'
 import { Link, useSearchParams } from 'react-router'
 import { BoxOccupancyView } from '@/components/map/box-occupancy-view'
 import { OutageHistoryView } from '@/components/map/outage-history-view'
@@ -575,6 +576,10 @@ export default function NetworkMap() {
   const tileLayerRef = useRef<any>(null)
   const leafletRef = useRef<any>(null)
   const hasCenteredAssetsRef = useRef(false)
+  // Marcador de cada ponto pelo id, com o HTML e a dica que ele mostra agora,
+  // para a leitura ao vivo só retocar o que mudou em vez de refazer o mapa.
+  const nodeMarkersRef = useRef(new Map<string, { marker: any; node: MapNode; html: string; tooltip: string }>())
+  const clientsPerBoxRef = useRef(new Map<string, Set<string>>())
 
   const normalizeNodes = (data: unknown): MapNode[] =>
     (Array.isArray(data) ? data : []).map((raw: any) => ({
@@ -683,11 +688,14 @@ export default function NetworkMap() {
       setLiveError(t('map.live.failed'))
     }
   }, [pppoeKey, t])
-  useEffect(() => {
-    void loadLive()
-    const timer = window.setInterval(() => void loadLive(), LIVE_REFRESH_MS)
-    return () => window.clearInterval(timer)
-  }, [loadLive])
+  useEffect(() => { void loadLive() }, [loadLive])
+  // A leitura ao vivo pergunta ao ACS por cada login do mapa: com a aba
+  // escondida ninguém está olhando, então o relógio para e lê uma vez ao voltar.
+  useVisibleInterval(() => void loadLive(), LIVE_REFRESH_MS)
+  // A reconstrução do mapa lê o estado ao vivo por aqui, para não depender
+  // dele e não rodar a cada minuto; quem retoca as cores é `applyLiveStatus`.
+  const liveRef = useRef({ liveByNode, outageByBox })
+  useEffect(() => { liveRef.current = { liveByNode, outageByBox } }, [liveByNode, outageByBox])
 
   const liveText = useCallback((item: LiveItem) => [
     t(liveLabelKey(item.state)),
@@ -708,7 +716,28 @@ export default function NetworkMap() {
     setSelectedNode(node)
   }
 
-  const updateMapObjects = useCallback(() => {
+  // Ícone e dica de um ponto a partir do estado ao vivo. Separado da
+  // reconstrução para que a leitura de cada minuto só troque o que mudou.
+  const nodeAppearance = useCallback((node: MapNode, state: LiveItem | undefined, outage: LiveOutage | undefined) => {
+    const iconColor = isDarkMode ? '#f4f3ed' : '#173f35'
+    // O estado ao vivo é uma bolinha no canto e a borda na mesma cor.
+    const border = state ? LIVE_COLORS[state.state] : (isDarkMode ? '#53615a' : '#bdc9c2')
+    const dot = state ? `<span style="position:absolute;top:-4px;right:-4px;width:11px;height:11px;border-radius:50%;background:${LIVE_COLORS[state.state]};border:2px solid ${isDarkMode ? '#17211c' : '#fff'}"></span>` : ''
+    // Caixa com provável rompimento: borda vermelha grossa e halo, para ser
+    // a primeira coisa que o olho encontra no mapa.
+    const halo = outage ? `0 0 0 5px ${LIVE_COLORS.offline}55,0 2px 6px rgba(0,0,0,.2)` : '0 2px 6px rgba(0,0,0,.2)'
+    const html = `<div style="position:relative;width:28px;height:28px;padding:3px;border-radius:8px;background:${isDarkMode ? '#17211c' : '#fff'};border:${outage ? 3 : state ? 2 : 1}px solid ${outage ? LIVE_COLORS.offline : border};box-shadow:${halo}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${getNodeSvg(node.type)}</svg>${dot}</div>`
+    const capacity = BOX_TYPES.has(node.type) ? capacityOf(node) : null
+    const portsText = capacity !== null ? `<br>${escapeHtml(t('map.box.tooltip', { used: clientsPerBoxRef.current.get(node.node_id)?.size ?? 0, capacity }))}` : ''
+    const outageText = outage ? `<br><strong style="color:${LIVE_COLORS.offline}">${escapeHtml(outageLine(outage))}</strong>` : ''
+    const tooltip = `<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}${state ? `<br>${escapeHtml(liveText(state))}` : ''}${portsText}${outageText}`
+    return { html, tooltip }
+  }, [isDarkMode, liveText, nodeTypeLabel, outageLine, t])
+
+  // Reconstrói pontos e cabos. Roda só quando o conjunto muda (carga, edição,
+  // tema, idioma): com milhares de ONTs, refazer tudo a cada leitura ao vivo
+  // eram dezenas de milhares de nós do DOM recriados por minuto.
+  const rebuildMapObjects = useCallback(() => {
     const L = leafletRef.current
     const map = mapRef.current
     if (!L || !map) return
@@ -716,6 +745,7 @@ export default function NetworkMap() {
     cablesLayerRef.current ||= L.layerGroup().addTo(map)
     markersLayerRef.current.clearLayers()
     cablesLayerRef.current.clearLayers()
+    nodeMarkersRef.current = new Map()
 
     const byId = new Map(nodes.map((node) => [node.node_id, node]))
     edges.forEach((edge) => {
@@ -754,26 +784,17 @@ export default function NetworkMap() {
       link(a, b)
       link(b, a)
     })
+    clientsPerBoxRef.current = clientsPerBox
 
+    const { liveByNode: liveNow, outageByBox: outagesNow } = liveRef.current
     nodes.forEach((node) => {
-      const iconColor = isDarkMode ? '#f4f3ed' : '#173f35'
-      const state = liveByNode.get(node.node_id)
-      const outage = outageByBox.get(node.node_id)
-      // O estado ao vivo é uma bolinha no canto e a borda na mesma cor.
-      const border = state ? LIVE_COLORS[state.state] : (isDarkMode ? '#53615a' : '#bdc9c2')
-      const dot = state ? `<span style="position:absolute;top:-4px;right:-4px;width:11px;height:11px;border-radius:50%;background:${LIVE_COLORS[state.state]};border:2px solid ${isDarkMode ? '#17211c' : '#fff'}"></span>` : ''
-      // Caixa com provável rompimento: borda vermelha grossa e halo, para ser
-      // a primeira coisa que o olho encontra no mapa.
-      const halo = outage ? `0 0 0 5px ${LIVE_COLORS.offline}55,0 2px 6px rgba(0,0,0,.2)` : '0 2px 6px rgba(0,0,0,.2)'
-      const html = `<div style="position:relative;width:28px;height:28px;padding:3px;border-radius:8px;background:${isDarkMode ? '#17211c' : '#fff'};border:${outage ? 3 : state ? 2 : 1}px solid ${outage ? LIVE_COLORS.offline : border};box-shadow:${halo}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${getNodeSvg(node.type)}</svg>${dot}</div>`
+      const { html, tooltip } = nodeAppearance(node, liveNow.get(node.node_id), outagesNow.get(node.node_id))
       const marker = L.marker([node.latitude, node.longitude], {
         icon: L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 14] })
       }).addTo(markersLayerRef.current)
-      const capacity = BOX_TYPES.has(node.type) ? capacityOf(node) : null
-      const portsText = capacity !== null ? `<br>${escapeHtml(t('map.box.tooltip', { used: clientsPerBox.get(node.node_id)?.size ?? 0, capacity }))}` : ''
-      const outageText = outage ? `<br><strong style="color:${LIVE_COLORS.offline}">${escapeHtml(outageLine(outage))}</strong>` : ''
-      marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}${state ? `<br>${escapeHtml(liveText(state))}` : ''}${portsText}${outageText}`)
+      marker.bindTooltip(tooltip)
       marker.on('click', () => { setSelectedNode(node); setSelectedEdge(null) })
+      nodeMarkersRef.current.set(node.node_id, { marker, node, html, tooltip })
     })
     // A sede por cima de tudo: é o ponto de referência de quem olha a rede.
     if (headquarters) {
@@ -797,7 +818,26 @@ export default function NetworkMap() {
       )
       hasCenteredAssetsRef.current = true
     }
-  }, [edges, headquarters, isDarkMode, liveByNode, liveText, maxZoom, minZoom, nodeTypeLabel, nodes, outageByBox, outageLine, t, tenantName])
+  }, [edges, headquarters, maxZoom, minZoom, nodeAppearance, nodes, t, tenantName])
+
+  // A leitura ao vivo só troca ícone e dica dos pontos cujo estado mudou; os
+  // cabos não dependem dela. Comparar o HTML poupa até o `setIcon` dos que
+  // continuam iguais, que são quase todos de um minuto para o outro.
+  const applyLiveStatus = useCallback(() => {
+    const L = leafletRef.current
+    if (!L) return
+    nodeMarkersRef.current.forEach((entry) => {
+      const { html, tooltip } = nodeAppearance(entry.node, liveByNode.get(entry.node.node_id), outageByBox.get(entry.node.node_id))
+      if (html !== entry.html) {
+        entry.marker.setIcon(L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 14] }))
+        entry.html = html
+      }
+      if (tooltip !== entry.tooltip) {
+        entry.marker.setTooltipContent(tooltip)
+        entry.tooltip = tooltip
+      }
+    })
+  }, [liveByNode, nodeAppearance, outageByBox])
 
   useEffect(() => {
     if (mapView !== 'map') return
@@ -818,13 +858,14 @@ export default function NetworkMap() {
       mapRef.current.setMinZoom(minZoom)
       mapRef.current.setMaxZoom(maxZoom)
       if (!nodes.length) mapRef.current.setView(mapCenter, defaultZoom)
-      updateMapObjects()
+      rebuildMapObjects()
       window.setTimeout(() => mapRef.current?.invalidateSize(), 80)
     })()
     return () => { cancelled = true }
-  }, [defaultZoom, mapCenter, mapView, maxZoom, minZoom, nodes.length, updateMapObjects, updateTileLayer])
+  }, [defaultZoom, mapCenter, mapView, maxZoom, minZoom, nodes.length, rebuildMapObjects, updateTileLayer])
   useEffect(() => { if (mapRef.current) updateTileLayer() }, [updateTileLayer])
-  useEffect(() => { if (mapRef.current) updateMapObjects() }, [updateMapObjects])
+  useEffect(() => { if (mapRef.current) rebuildMapObjects() }, [rebuildMapObjects])
+  useEffect(() => { if (mapRef.current) applyLiveStatus() }, [applyLiveStatus])
 
   const openNewNode = (at?: { lat: number; lng: number }) => {
     const center = at ?? mapRef.current?.getCenter()?.wrap()
