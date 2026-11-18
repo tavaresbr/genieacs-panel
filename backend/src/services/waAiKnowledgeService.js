@@ -96,7 +96,9 @@ class WaAiKnowledgeService {
       throw new WaError('whatsapp.aiKnowledge.exampleUnedited', { code: 'ai_knowledge_example_unedited', status: 409 });
     }
     const respostaFinal = dados.answer ?? atual.answer;
-    if (dados.active === true && ESPACO_A_PREENCHER.test(respostaFinal)) {
+    // Vale também ao editar a resposta de um item que já está ativo.
+    const ficaAtivo = dados.active ?? Boolean(atual.active);
+    if (ficaAtivo && ESPACO_A_PREENCHER.test(respostaFinal)) {
       throw new WaError('whatsapp.aiKnowledge.placeholder', { code: 'ai_knowledge_placeholder', status: 409 });
     }
     // Editar um exemplo o torna do operador: só então ele pode valer.

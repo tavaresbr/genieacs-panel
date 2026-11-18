@@ -132,3 +132,13 @@ describe('a base do provedor', () => {
     await assert.rejects(asTenant(() => WaAiKnowledgeService.update(criado.id, { title: 'x' })), { code: 'ai_knowledge_not_found' });
   });
 });
+
+describe('gatilho como palavra inteira', () => {
+  it('"cai" não casa com "caixa", mas casa com "cai"', async () => {
+    const { combina } = await import('../src/utils/wa/conhecimento.js');
+    const item = { triggers: 'cai, preço alto' };
+    assert.equal(combina(item, 'abri a caixa de entrada'), false);
+    assert.equal(combina(item, 'a internet cai toda hora'), true);
+    assert.equal(combina(item, 'o preco alto me assusta'), true);
+  });
+});

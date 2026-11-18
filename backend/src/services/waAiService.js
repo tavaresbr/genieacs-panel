@@ -345,6 +345,14 @@ async function promptDeSistema({ ai, conversation, link, modo, recente = '', nov
   return partes;
 }
 
+/** Uma conversa por vez: duas mensagens seguidas esperam a vez em vez de gerar duas respostas e dois alertas. */
+const filaDaConversa = new Map();
+/** Depois de chave recusada ou saldo zerado, a IA fica quieta alguns minutos em vez de bater na API a cada mensagem. */
+const IA_PAUSADA_MS = 2 * 60_000;
+const iaPausadaAte = new Map();
+/** Prazo total das voltas com ferramentas: o webhook não fica preso além disso. */
+const PRAZO_TOTAL_MS = 40_000;
+
 class WaAiService {
   /**
    * Responde a mensagem do cliente com a IA, ou `null` para o bot de menu
@@ -353,6 +361,23 @@ class WaAiService {
    * @returns {Promise<{replied: true, intent: string, from?: string}|null>}
    */
   static async atender({ conversation, texto }) {
+    const chave = `${conversation?.tenant_id ?? ''}:${conversation?.id}`;
+    const anterior = filaDaConversa.get(chave) ?? Promise.resolve();
+    const minha = anterior.catch(() => {}).then(() => this.atenderAgora({ conversation, texto }));
+    filaDaConversa.set(chave, minha);
+    try {
+      return await minha;
+    } finally {
+      if (filaDaConversa.get(chave) === minha) filaDaConversa.delete(chave);
+    }
+  }
+
+  /** Só para teste: tira a pausa depois de recusa de chave/saldo. */
+  static reiniciarPausa() {
+    iaPausadaAte.clear();
+  }
+
+  static async atenderAgora({ conversation, texto }) {
     // O add-on de IA (0127), quando o catálogo o exige: sem ele a mensagem
     // segue pelo menu, como com a IA desligada.
     if (!(await AddonService.allows('ai'))) return null;
@@ -363,11 +388,21 @@ class WaAiService {
       return null;
     }
     if (!ai.enabled || !ai.apiKey || !String(texto ?? '').trim()) return null;
+    // Chave recusada ou saldo zerado há pouco: uma chave nova (ou a espera) volta a usar a IA.
+    const chavePausa = `${conversation?.tenant_id ?? ''}:${ai.apiKey}`;
+    if ((iaPausadaAte.get(chavePausa) ?? 0) > Date.now()) return null;
 
     try {
       const conversa = (await tdb('wa_conversations').where({ id: conversation.id }).first()) || conversation;
       const link = await this.linkDe(conversa);
-      const resultado = await this.conversar({ ai, conversation: conversa, link, modo: 'atendimento' });
+      let resultado;
+      try {
+        resultado = await this.conversar({ ai, conversation: conversa, link, modo: 'atendimento' });
+      } catch (error) {
+        // Foto ou PDF que a API recusa derrubaria a IA da conversa por 24 h: tenta de novo só com texto.
+        if (error?.code !== 'ai_bad_response' || ai.vision !== true) throw error;
+        resultado = await this.conversar({ ai: { ...ai, vision: false }, conversation: conversa, link, modo: 'atendimento' });
+      }
       await WaBotConfigService.recordAiError(null);
 
       // Quem ainda não é cliente nunca recebe um valor que o provedor não cadastrou.
@@ -408,6 +443,7 @@ class WaAiService {
     } catch (error) {
       const code = error?.code && String(error.code).startsWith('ai_') ? error.code : 'ai_failed';
       console.warn(`[wa] IA: conversa ${conversation.id}: ${code}${code === 'ai_failed' ? ` (${JSON.stringify(logSafe(error?.message, 200))})` : ''}`);
+      if (code === 'ai_unauthorized' || code === 'ai_no_balance') iaPausadaAte.set(`${conversation?.tenant_id ?? ''}:${ai.apiKey}`, Date.now() + IA_PAUSADA_MS);
       await WaBotConfigService.recordAiError(code, error?.details, { automatico: true });
       return null;
     }
@@ -836,7 +872,12 @@ class WaAiService {
     // é exatamente o preço inventado que a trava existe para segurar.
     const fim = (r) => ({ ...r, link, permitidos: [contexto.conhecimento || ''] });
 
+    const prazo = Date.now() + PRAZO_TOTAL_MS;
     for (let rodada = 0; rodada <= RODADAS; rodada += 1) {
+      if (rodada > 0 && Date.now() > prazo) {
+        if (efeitos.length) return fim({ texto: efeitos.join('\n\n'), anexos, intent, transferiu: false });
+        throw new WaError('whatsapp.ai.error.timeout', { code: 'ai_timeout', status: 504 });
+      }
       const disponiveis = rodada < RODADAS ? nomes() : [];
       let resposta;
       try {

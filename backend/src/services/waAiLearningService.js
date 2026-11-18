@@ -101,7 +101,9 @@ class WaAiLearningService {
         ? 'A venda FECHOU.'
         : `A venda se PERDEU por ${MOTIVOS[conversa.lead_lost_reason] ?? 'motivo não informado'}.`;
 
-      const resposta = await WaAiClient.chat({
+      let resposta;
+      try {
+        resposta = await WaAiClient.chat({
         provider: ai.provider,
         baseUrl: ai.baseUrl,
         apiKey: ai.apiKey,
@@ -113,6 +115,11 @@ class WaAiLearningService {
           { role: 'user', content: `${desfecho}\n\nTítulos já cadastrados: ${titulos.join('; ') || '(nenhum)'}\n\nConversa:\n${fala.join('\n')}` }
         ]
       });
+      } catch (error) {
+        // A chamada paga falhou: a venda volta à fila para a próxima tentativa.
+        await tdb('wa_conversations').where({ id: conversationId }).update({ lead_learned_at: null });
+        throw error;
+      }
 
       const vistos = new Set(titulos.map(normalizar));
       let gravadas = 0;
