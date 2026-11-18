@@ -641,6 +641,41 @@ o plantão, porque chegam como chamado: o CPF que o SGP do ISP guarda não sai d
 exclusão feita sem o serviço ter sido cancelado se desfaz na próxima `syncFleet` — a ONT
 continua informando e a conta renasce com um ID do Cliente novo.
 
+### Índices das consultas quentes (migração `0141_hot_path_indexes`)
+
+A 0141 cria nove índices compostos, todos começando por `tenant_id`, para a lista de
+conversas, a espera do cliente, a saúde do WhatsApp, a resolução do assinante pelo
+telefone/contrato e o filtro da auditoria. Ela roda no boot como as outras, e:
+
+- **Postgres**: em tabela com 10 mil linhas ou mais, o índice é construído com
+  `CREATE INDEX CONCURRENTLY` — não trava INSERT/UPDATE, mas demora mais (em
+  `wa_messages` de milhões de linhas, minutos) e o boot espera por ele. Se o caminho online
+  falhar, a migração derruba o índice inválido e cai no `CREATE INDEX` comum, que **trava as
+  escritas da tabela** enquanto roda.
+- **MySQL (InnoDB)**: `ADD INDEX` já é online por padrão.
+- **SQLite**: índice comum; não há escritor concorrente que importe.
+
+Para não depender do boot num Postgres grande, rode antes do upgrade (fora de transação —
+`psql` sem `BEGIN`; com `?schema=` no `DATABASE_URL`, faça `SET search_path` para ele antes).
+A migração encontra os índices válidos pelo nome e não refaz nada:
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS wa_messages_direction_idx     ON wa_messages (tenant_id, conversation_id, direction, id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS wa_messages_tenant_status_idx ON wa_messages (tenant_id, delivery_status, created_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS wa_conversations_recent_idx   ON wa_conversations (tenant_id, last_message_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS wa_conversations_inbound_idx  ON wa_conversations (tenant_id, closed_at, last_inbound_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS wa_conversations_contract_idx ON wa_conversations (tenant_id, contract);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS sgp_links_contract_idx        ON sgp_links (tenant_id, contract);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS sgp_links_phone_idx           ON sgp_links (tenant_id, phone_e164);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS sgp_links_phone_manual_idx    ON sgp_links (tenant_id, phone_manual);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS audit_log_action_id_idx       ON audit_log (tenant_id, action, id);
+```
+
+Um `CONCURRENTLY` interrompido deixa o índice marcado como inválido; confira com
+`SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;`, derrube com
+`DROP INDEX CONCURRENTLY <nome>;` e rode de novo (a migração também faz isso sozinha). Os
+índices antigos de coluna única continuam lá; nada é derrubado.
+
 ## 5. Desfazer: suspender, apagar
 
 Ambos no console (`/platform`), ambos gravados em `platform_audit`, que é compartilhada e

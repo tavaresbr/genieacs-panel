@@ -4031,6 +4031,100 @@ async function missingColumns(db, table, columns) {
 }
 
 /**
+ * Os índices da 0141, um por consulta quente que hoje varre o provedor inteiro.
+ *
+ * Todos começam por `tenant_id` porque toda consulta escopada carrega o
+ * provedor (`tdb` acrescenta o filtro): um índice que não começa por ele é um
+ * que o planejador tem de ignorar ou filtrar depois. Os antigos, de coluna
+ * única, ficam onde estão — alguma leitura sem escopo (a plataforma, um
+ * relatório) ainda pode preferi-los, e derrubar índice em tabela viva é
+ * decisão que não se toma de carona.
+ *
+ * Nomes explícitos e curtos: o nome que o knex inventaria para
+ * `(tenant_id, conversation_id, direction, id)` passa dos 64 caracteres do
+ * MySQL, e lá o `CREATE INDEX` falharia — calado, no padrão "tenta e engole".
+ */
+const HOT_PATH_INDEXES = [
+  // `resolveSubscriber`, `bindUnlinked` e `SgpLink.getByContract(s)`: contrato
+  // e telefone são as três chaves por onde uma mensagem acha o assinante.
+  ['sgp_links', ['tenant_id', 'contract'], 'sgp_links_contract_idx'],
+  ['sgp_links', ['tenant_id', 'phone_e164'], 'sgp_links_phone_idx'],
+  ['sgp_links', ['tenant_id', 'phone_manual'], 'sgp_links_phone_manual_idx'],
+  // A lista de conversas ordena por `last_message_at`; `waitingNow` e a saúde
+  // filtram abertas (`closed_at` nulo) com entrada recente; a ligação por
+  // contrato procura a conversa pelo contrato.
+  ['wa_conversations', ['tenant_id', 'last_message_at'], 'wa_conversations_recent_idx'],
+  ['wa_conversations', ['tenant_id', 'closed_at', 'last_inbound_at'], 'wa_conversations_inbound_idx'],
+  ['wa_conversations', ['tenant_id', 'contract'], 'wa_conversations_contract_idx'],
+  // `awaitingSince`: o maior `id` por conversa e direção. E a saúde do outbox
+  // conta por status e janela de `created_at` — o `(delivery_status,
+  // created_at)` antigo não começa pelo provedor.
+  ['wa_messages', ['tenant_id', 'conversation_id', 'direction', 'id'], 'wa_messages_direction_idx'],
+  ['wa_messages', ['tenant_id', 'delivery_status', 'created_at'], 'wa_messages_tenant_status_idx'],
+  // O filtro por ação da auditoria pagina por `id` decrescente.
+  ['audit_log', ['tenant_id', 'action', 'id'], 'audit_log_action_id_idx']
+];
+
+/**
+ * Abaixo disso a tabela é pequena o bastante para um `CREATE INDEX` comum ser
+ * instantâneo — install novo, banco de teste. Acima, no Postgres, o índice é
+ * construído `CONCURRENTLY`.
+ */
+const ONLINE_INDEX_MIN_ROWS = 10_000;
+
+/**
+ * Cria um índice sem travar as escritas da tabela, onde o banco deixa.
+ *
+ * No Postgres um `CREATE INDEX` comum segura um lock que bloqueia INSERT e
+ * UPDATE até terminar — em `wa_messages` de produção, milhões de linhas, isso
+ * é o WhatsApp parado durante o boot. `CONCURRENTLY` não bloqueia, mas não
+ * pode rodar dentro de transação; o runner (`schema.js`) não abre uma, e o
+ * knex manda um `raw` sem parâmetros como consulta simples, em autocommit.
+ *
+ * Um `CONCURRENTLY` que falha no meio deixa para trás um índice INVÁLIDO com o
+ * nome certo, e o `IF NOT EXISTS` da tentativa seguinte o tomaria por pronto.
+ * Por isso o inválido é derrubado antes. E se o caminho online falhar por
+ * qualquer motivo (um deadlock com outro `CONCURRENTLY`, um Postgres antigo),
+ * cai no índice comum: lento e travando, mas correto — melhor que um boot que
+ * não sobe.
+ *
+ * No MySQL (InnoDB) o `ADD INDEX` já é online por padrão; no SQLite não há
+ * escritor concorrente que importe. Os dois vão pelo builder de sempre.
+ */
+async function createIndexOnline(db, table, columns, name) {
+  const client = String(db.client.config.client);
+  if (client !== 'pg') {
+    if (await hasIndex(db, table, name)) return;
+    await db.schema.alterTable(table, (t) => t.index(columns, name));
+    return;
+  }
+
+  const found = await db.raw(
+    `select i.indisvalid as valid from pg_index i
+      where i.indexrelid = to_regclass(format('%I.%I', current_schema(), ?::text))`,
+    [name]
+  );
+  const existing = found.rows?.[0];
+  if (existing?.valid) return;
+  if (existing) await db.raw('drop index concurrently if exists ??', [name]);
+
+  const [{ n } = {}] = (await db.raw(
+    `select count(*)::int as n from (select 1 from ?? limit ${ONLINE_INDEX_MIN_ROWS}) s`, [table]
+  )).rows ?? [];
+  const cols = columns.map(() => '??').join(', ');
+  if (Number(n) >= ONLINE_INDEX_MIN_ROWS) {
+    try {
+      await db.raw(`create index concurrently if not exists ?? on ?? (${cols})`, [name, table, ...columns]);
+      return;
+    } catch (error) {
+      console.warn(`CREATE INDEX CONCURRENTLY ${name} failed (${error.message}); building it with a plain CREATE INDEX`);
+      await db.raw('drop index if exists ??', [name]).catch(() => {});
+    }
+  }
+  await db.raw(`create index if not exists ?? on ?? (${cols})`, [name, table, ...columns]);
+}
+
+/**
  * The columns the health read filters and orders by, and the ones an install
  * older than that read has no index for.
  */
@@ -7894,6 +7988,31 @@ export const migrations = [
       await db.schema.alterTable('wa_conversations', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /**
+     * Os índices das consultas quentes — ver `HOT_PATH_INDEXES` para o que cada
+     * um serve e `createIndexOnline` para como o Postgres os constrói sem
+     * travar escrita.
+     *
+     * Sem `isApplied`, como a 0016: `up` é idempotente (cada índice é
+     * conferido pelo nome antes), então rodar numa base que já os tem custa só
+     * as consultas de catálogo.
+     *
+     * Num Postgres grande o operador pode preferir construí-los antes do
+     * upgrade, fora do boot — os comandos estão em `docs/saas-operations.md`
+     * ("Índices das consultas quentes"). Esta etapa então só confirma que
+     * estão lá e válidos.
+     */
+    id: '0141_hot_path_indexes',
+    async up(db) {
+      for (const [table, columns, name] of HOT_PATH_INDEXES) {
+        // eslint-disable-next-line no-await-in-loop -- DDL, um índice por vez
+        if (!(await db.schema.hasTable(table))) continue;
+        // eslint-disable-next-line no-await-in-loop -- idem
+        await createIndexOnline(db, table, columns, name);
+      }
     }
   }
 ];
