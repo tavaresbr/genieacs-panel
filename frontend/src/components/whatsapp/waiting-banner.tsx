@@ -5,6 +5,7 @@ import { whatsappAPI, type WaitingReport } from '@/lib/api'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { Icon } from '@/components/ui/icon'
+import { useVisibleInterval } from '@/lib/visible-interval'
 
 const POLL_MS = 60_000
 
@@ -29,11 +30,10 @@ export function useWaiting() {
     }
   }, [])
 
-  useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => void load(), POLL_MS)
-    return () => window.clearInterval(timer)
-  }, [load])
+  useEffect(() => { void load() }, [load])
+  // Com a aba escondida o relógio para de vez (antes ele batia e só pulava a
+  // leitura); ao voltar lê na hora, em vez de mostrar a fila de até 1 min atrás.
+  useVisibleInterval(() => void load(), POLL_MS)
 
   return report
 }

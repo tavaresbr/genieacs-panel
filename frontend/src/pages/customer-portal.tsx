@@ -11,6 +11,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { getActiveLocale, isCustomerSessionCode, translate } from '@/lib/i18n'
 import { billingFailure } from '@/lib/portal-billing'
 import { setActiveDateFormat } from '@/lib/date-format'
+import { useVisibleInterval } from '@/lib/visible-interval'
 
 type PortalOverview = {
   customerId: string
@@ -315,11 +316,10 @@ export default function CustomerPortal() {
     return () => { cancelled = true }
   }, [loadOverview, loadBilling, loadProvider])
 
-  useEffect(() => {
-    if (!authenticated) return
-    const timer = window.setInterval(() => void loadOverview(), 60_000)
-    return () => window.clearInterval(timer)
-  }, [authenticated, loadOverview])
+  // A visão geral consulta o ACS do equipamento do cliente: o portal esquecido
+  // numa aba de fundo não deve repetir isso a cada minuto. Ao voltar à aba,
+  // lê na hora para o cliente não ver um estado antigo.
+  useVisibleInterval(() => void loadOverview(), 60_000, authenticated)
 
   useEffect(() => {
     if (authenticated) return
