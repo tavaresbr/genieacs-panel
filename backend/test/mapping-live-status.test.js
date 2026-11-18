@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 const { asTenant, authHeaders, call, startTestServers, stopTestServers } = await import('./helpers/harness.js');
 const { buildDevice, startGenieAcsStub } = await import('./helpers/genieacs-stub.js');
 const { default: Setting } = await import('../src/models/Setting.js');
+const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: MapStatusService, classifyNode } = await import('../src/services/mapStatusService.js');
 const { default: OutageWatcher } = await import('../src/services/outageWatcher.js');
 
@@ -45,6 +46,7 @@ after(async () => {
 afterEach(() => {
   genie.state.respond = null;
   MapStatusService.clearCache();
+  DeviceService.fleetSnapshots.forget();
 });
 
 const status = () => call(`${panelUrl}/api/mapping-data/status`, { headers: authHeaders(token) });
@@ -132,6 +134,7 @@ describe('GET /api/mapping-data/status', () => {
       if (device._id === 'ONT-RB1' || device._id === 'ONT-RB2') device._lastInform = new Date().toISOString();
     }
     MapStatusService.clearCache();
+    DeviceService.fleetSnapshots.forget();
     await OutageWatcher.tick();
     res = await historico();
     const fechado = res.body.data.events.find((event) => event.node_id === 'cto-rua-b');
@@ -143,6 +146,7 @@ describe('GET /api/mapping-data/status', () => {
   it('lista os equipamentos com PPPoE que ainda não estão no mapa', async () => {
     genie.state.devices.push(buildDevice({ id: 'ONT-NOVO', pppoeUsername: 'novo@vila' }));
     MapStatusService.clearCache();
+    DeviceService.fleetSnapshots.forget();
     const res = await call(`${panelUrl}/api/mapping-data/unmapped`, { headers: authHeaders(token) });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     const logins = res.body.data.items.map((item) => item.pppoe);

@@ -71,6 +71,8 @@ describe('o destino que sai no fio', () => {
 
   for (const [nome, ler] of leituras) {
     it(`a leitura de ${nome} pede /devices, sem barra a mais`, async () => {
+      // Sem a foto da frota da leitura anterior: cada caso fala com o ACS.
+      DeviceService.forgetDashboards();
       pedidos = [];
       await ler();
       assert.ok(pedidos.length >= 1, 'a leitura precisa ter falado com o ACS');
@@ -85,6 +87,7 @@ describe('o destino que sai no fio', () => {
   it('e a projeção continua indo junto, como parâmetro de busca', async () => {
     // O par que dá sentido aos quatro acima: sem ele, um conector que jogasse a
     // busca fora passaria em todos.
+    DeviceService.forgetDashboards();
     pedidos = [];
     await asTenant(() => DeviceService.getTelemetryFleet());
     const busca = new URL(pedidos[0], base).searchParams.get('projection');

@@ -45,8 +45,10 @@ import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { connectorFor } from './genieacs/connector.js';
-import { UNASSIGNED_SCOPE_TAG, deviceScopeSuspended } from './genieacs/direct.js';
-import { FLEET_READ_TIMEOUT_MS, createFleetReads, forgetFleetReads } from './genieacs/fleetReads.js';
+import { UNASSIGNED_SCOPE_TAG, deviceScopeSuspended, mergeScopeQuery } from './genieacs/direct.js';
+import {
+  FLEET_READ_TIMEOUT_MS, NBI_URL_BUDGET, createFleetReads, createFleetSnapshots, forgetFleetReads
+} from './genieacs/fleetReads.js';
 
 /** A página da coleção `files`, e quantas no máximo (10 000 arquivos). */
 const FIRMWARE_PAGE_SIZE = 500;
@@ -129,6 +131,8 @@ class DeviceService {
    * vez de pedir outra. Menor que a cadência do painel, para que a atualização
    * seguinte do próprio painel sempre vá ao ACS — o número não fica mais velho
    * do que já ficava. `GENIEACS_FLEET_READ_TTL_MS=0` desliga (fica só em voo).
+   * É também o prazo da foto da frota (`FLEET_SNAPSHOT_TTL_MS`), que serve o
+   * painel, os alertas, a telemetria, a identidade e o mapa.
    */
   static DASHBOARD_FLEET_TTL_MS = (() => {
     const raw = Number.parseInt(String(process.env.GENIEACS_FLEET_READ_TTL_MS ?? ''), 10);
@@ -182,6 +186,102 @@ class DeviceService {
       if (!Array.isArray(data)) throw new Error(label);
       return data;
     }, { ttlMs, fresh });
+  }
+
+  /**
+   * A foto da frota por provedor e escopo — ver `createFleetSnapshots`. O
+   * painel, a varredura de alertas, a telemetria do histórico, a identidade
+   * (sincronização de IDs, quedas, SGP) e o mapa leem a frota inteira com
+   * projeções diferentes; com a foto, dentro de `FLEET_SNAPSHOT_TTL_MS` é UMA
+   * leitura do ACS com a projeção de todos.
+   */
+  static fleetSnapshots = createFleetSnapshots();
+
+  /**
+   * Quanto a foto vale. O mesmo prazo do painel
+   * (`GENIEACS_FLEET_READ_TTL_MS`): é o painel que acorda a cada minuto, e os
+   * outros leitores periódicos aceitam a frota de alguns segundos atrás.
+   * Zero deixa só a leitura em voo compartilhada.
+   */
+  static get FLEET_SNAPSHOT_TTL_MS() {
+    return this.DASHBOARD_FLEET_TTL_MS;
+  }
+
+  /**
+   * Os leitores conhecidos da foto, e a projeção de cada um.
+   *
+   * É o que faz a PRIMEIRA leitura já trazer o que os outros vão pedir: quem
+   * vai ao ACS pede a união de todos, e quem chegar depois dentro do prazo é
+   * servido pela mesma foto. Um leitor fora daqui ainda funciona — o campo que
+   * a foto não tem faz uma leitura nova, que passa a ser a foto.
+   */
+  static fleetSnapshotConsumers = new Map([
+    ['dashboard', () => DeviceService.dashboardProjection().then((r) => r.projection)],
+    ['telemetry', () => DeviceService.telemetryProjection().then((r) => r.projection)],
+    ['identity', () => DeviceService.identityProjection().then((r) => r.projection)],
+    ['map', () => DeviceService.mapProjection().then((r) => r.projection)]
+  ]);
+
+  /** A projeção unida dos leitores conhecidos. Um que falhe fica de fora. */
+  static async fleetSnapshotUnion() {
+    const parts = await Promise.all([...this.fleetSnapshotConsumers.values()].map(
+      (projection) => Promise.resolve().then(projection).catch(() => [])
+    ));
+    return [...new Set(parts.flat().filter(Boolean))];
+  }
+
+  /**
+   * O tamanho da URL de uma leitura da frota com esta projeção — a busca do
+   * escopo incluída, como `applyScope` a monta.
+   */
+  static async fleetReadUrlLength(connector, scopeTag, projection) {
+    const query = { projection: projection.join(',') };
+    if (scopeTag) query.query = mergeScopeQuery(undefined, scopeTag);
+    return (await connector.urlFor(this.devicePath(''), query)).toString().length;
+  }
+
+  /**
+   * A frota inteira com (pelo menos) `fields`, pela foto do provedor.
+   *
+   * Só para a leitura da COLEÇÃO INTEIRA, sem busca: com filtro (um aparelho,
+   * a busca da lista, a marcação automática) a resposta é outra e vai por
+   * `fetchFleet`.
+   *
+   * A chave leva o provedor, o modo e a raiz do ACS e o escopo — a tag, ou
+   * `all` dentro de `withoutDeviceScope`. Uma leitura sem escopo nunca recebe
+   * a foto com escopo, nem o contrário; um provedor nunca recebe a de outro, e
+   * o mesmo provedor com outro endereço não recebe a do endereço antigo.
+   *
+   * Se a projeção unida não couber na URL (`NBI_URL_BUDGET`), cada um lê só o
+   * que pediu, como antes da foto.
+   */
+  static async readFleetSnapshot(fields, {
+    label = 'Invalid API response', fresh = false, timeoutMs = null
+  } = {}) {
+    const connector = await connectorFor();
+    const scopeTag = deviceScopeSuspended() ? null : ((await connector.scopeTag()) ?? null);
+    const escopo = deviceScopeSuspended() ? 'all' : `tag:${scopeTag ?? ''}`;
+    const key = `${currentTenantId()}|${connector.mode}|${await connector.rootUrl()}|${escopo}`;
+    const ttlMs = this.FLEET_SNAPSHOT_TTL_MS;
+    return this.fleetSnapshots.read(key, fields, {
+      ttlMs,
+      fresh,
+      union: async (wanted) => {
+        const union = await this.fleetSnapshotUnion();
+        const all = [...new Set([...wanted, ...union])];
+        return (await this.fleetReadUrlLength(connector, scopeTag, all)) > NBI_URL_BUDGET ? null : union;
+      },
+      separate: (wanted) => this.fetchFleet({ projection: wanted.join(',') }, {
+        label, ttlMs, fresh, timeoutMs
+      }),
+      load: async (projection) => {
+        const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') }, 'GET', null, {
+          timeoutMs: timeoutMs ?? this.FLEET_READ_TIMEOUT_MS
+        });
+        if (!Array.isArray(data)) throw new Error(label);
+        return data;
+      }
+    });
   }
 
   static dashboardCacheTtlMs = 60_000;
@@ -1233,7 +1333,7 @@ class DeviceService {
    * onde ninguém abriu a lista de equipamentos ainda conta `Unknown` — até a
    * primeira listagem, e não para sempre, que era o estado anterior.
    */
-  static async getDashboardDevices({ fresh = false } = {}) {
+  static async dashboardProjection() {
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
     const learnedTemperaturePaths = await this.readTemperaturePaths();
@@ -1259,9 +1359,15 @@ class DeviceService {
       '_lastInform',
       '_registered'
     ].filter(Boolean))];
-    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+    return { projection, virtualParams, learnedRxPaths, learnedTemperaturePaths };
+  }
+
+  static async getDashboardDevices({ fresh = false } = {}) {
+    const {
+      projection, virtualParams, learnedRxPaths, learnedTemperaturePaths
+    } = await this.dashboardProjection();
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS dashboard response',
-      ttlMs: this.DASHBOARD_FLEET_TTL_MS,
       fresh
     });
     return data.map((item) => this.processDeviceData(
@@ -1279,7 +1385,7 @@ class DeviceService {
    * axis: GenieACS only refreshes a parameter when the device informs, so the
    * inform is when the reading was actually taken.
    */
-  static async getTelemetryFleet() {
+  static async telemetryProjection() {
     const virtualParams = await this.getVirtualParameters();
     const projection = [
       '_id',
@@ -1290,7 +1396,12 @@ class DeviceService {
       ...TEMPERATURE_FALLBACK_PATHS,
       'InternetGatewayDevice.DeviceInfo.UpTime'
     ].filter(Boolean);
-    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+    return { projection, virtualParams };
+  }
+
+  static async getTelemetryFleet() {
+    const { projection, virtualParams } = await this.telemetryProjection();
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS telemetry response'
     });
     return data.map((item) => ({
@@ -1935,7 +2046,7 @@ class DeviceService {
     };
   }
 
-  static async getCustomerIdentityDevices() {
+  static async identityProjection() {
     const virtualParams = await this.getVirtualParameters();
     const projection = [
       '_id',
@@ -1948,9 +2059,14 @@ class DeviceService {
       ...PPPOE_FALLBACK_PATHS,
       ...await this.readPppoePaths()
     ].filter(Boolean);
+    return { projection, virtualParams };
+  }
+
+  static async getCustomerIdentityDevices() {
+    const { projection, virtualParams } = await this.identityProjection();
     // A frota inteira numa resposta: com milhares de ONTs, os 15 s padrão do
     // conector não bastam e a sincronização de IDs morria com "aborted".
-    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS customer identity response',
       timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
     });
@@ -1973,7 +2089,7 @@ class DeviceService {
    * Uma consulta só, com projeção, como a telemetria; o prazo é o mesmo da
    * sincronização de IDs, porque é a frota inteira numa resposta.
    */
-  static async getMapStatusFleet() {
+  static async mapProjection() {
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
     const projection = [
@@ -1986,7 +2102,12 @@ class DeviceService {
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths
     ].filter(Boolean);
-    const data = await this.fetchFleet({ projection: [...new Set(projection)].join(',') }, {
+    return { projection: [...new Set(projection)], virtualParams, learnedRxPaths };
+  }
+
+  static async getMapStatusFleet() {
+    const { projection, virtualParams, learnedRxPaths } = await this.mapProjection();
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS map status response',
       timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
     });

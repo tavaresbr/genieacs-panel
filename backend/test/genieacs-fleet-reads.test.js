@@ -10,7 +10,12 @@ import assert from 'node:assert/strict';
  * exatamente a mesma resposta de antes.
  */
 const { getDb, runInTenant, startTestServers, stopTestServers } = await import('./helpers/harness.js');
-const { createFleetReads, forgetFleetReads } = await import('../src/services/genieacs/fleetReads.js');
+const {
+  NBI_URL_BUDGET, createFleetReads, createFleetSnapshots, forgetFleetReads
+} = await import('../src/services/genieacs/fleetReads.js');
+const { DEVICE_SCOPE_KEY, forgetSharedAcs, withoutDeviceScope } = await import('../src/services/genieacs/direct.js');
+const { default: Setting } = await import('../src/models/Setting.js');
+const { default: WaAlertService } = await import('../src/services/waAlertService.js');
 const {
   FLEET_READ_LIMIT, fleetReadsForTenant, resetAcsConcurrency
 } = await import('../src/services/genieacs/concurrency.js');
@@ -260,5 +265,216 @@ describe('as voltas de fundo não se sobrepõem', () => {
     await runInTenant(alfa, () => MapStatusService.fleet());
     assert.equal(reads, 1, 'e o resultado vale o prazo do cache');
     MapStatusService.clearCache();
+  });
+});
+
+describe('a foto da frota: uma leitura por provedor com a projeção unida', () => {
+  let genie;
+  let outro;
+
+  const leiturasDaFrota = (stub) => stub.state.requests.filter(
+    (req) => req.method === 'GET' && (req.path === '/devices' || req.path === '/devices/')
+  );
+  const projecaoDe = (req) => new URLSearchParams(req.search).get('projection').split(',');
+
+  let egressoReal;
+
+  before(async () => {
+    // Com seis provedores na tabela a instalação é "compartilhada" e o egresso
+    // recusa a porta aleatória do ACS falso; o assunto aqui é a foto, não o
+    // egresso (a mesma troca de `shared-acs-scope.test.js`).
+    const { default: GenieAcsEgress } = await import('../src/services/genieacsEgress.js');
+    egressoReal = GenieAcsEgress.fetch;
+    GenieAcsEgress.fetch = (url, options) => fetch(url, options);
+    const { buildDevice, startGenieAcsStub } = await import('./helpers/genieacs-stub.js');
+    genie = await startGenieAcsStub({
+      devices: [
+        buildDevice({ id: 'ONT-A1', pppoeUsername: 'ana@alfa', tags: ['alfa'] }),
+        buildDevice({ id: 'ONT-B1', pppoeUsername: 'bia@beta', tags: ['beta'] })
+      ]
+    });
+    outro = await startGenieAcsStub({ devices: [buildDevice({ id: 'ONT-X1', pppoeUsername: 'xis@outro' })] });
+    await runInTenant(alfa, () => Setting.upsert('genieAcsUrl', genie.url));
+    await runInTenant(extras[0], () => Setting.upsert('genieAcsUrl', outro.url));
+  });
+
+  after(async () => {
+    const { default: GenieAcsEgress } = await import('../src/services/genieacsEgress.js');
+    GenieAcsEgress.fetch = egressoReal;
+    await runInTenant(alfa, () => Setting.upsert(DEVICE_SCOPE_KEY, ''));
+    await getDb()('settings').whereIn('tenant_id', extras).del();
+    await genie.close();
+    await outro.close();
+  });
+
+  afterEach(() => {
+    genie.state.requests.length = 0;
+    outro.state.requests.length = 0;
+    MapStatusService.clearCache();
+    forgetSharedAcs();
+  });
+
+  it('painel + alertas + mapa (e telemetria e identidade) dentro do prazo: 1 leitura do ACS', async (t) => {
+    // A varredura de alertas até a leitura da frota: o que vem antes dela
+    // (canais, contas do WhatsApp) e o que vem depois (avisar) não é o assunto.
+    t.mock.method(WaAlertService, 'getSettings', async () => ({ enabled: true, rules: {} }));
+    t.mock.method(WaAlertService, 'readyChannels', async () => ({ whatsapp: true }));
+    t.mock.method(WaAlertService, 'evaluateAccounts', async () => ({ firing: [], unknown: [] }));
+    t.mock.method(WaAlertService, 'evaluateWaiting', async () => ({ firing: [], unknown: [] }));
+    t.mock.method(WaAlertService, 'avisarFilaTravada', async () => {});
+    t.mock.method(WaAlertService, 'reconcile', async () => {});
+    let avaliados = null;
+    t.mock.method(WaAlertService, 'evaluate', async (devices) => { avaliados = devices; return { firing: [], unknown: [] }; });
+
+    await runInTenant(alfa, async () => {
+      const painel = await DeviceService.getDashboardDevices();
+      const resumo = await WaAlertService.runScan();
+      const mapa = await MapStatusService.fleet();
+      const telemetria = await DeviceService.getTelemetryFleet();
+      const identidade = await DeviceService.getCustomerIdentityDevices();
+
+      assert.equal(leiturasDaFrota(genie).length, 1, 'uma leitura da frota para os cinco leitores');
+      assert.equal(resumo.error ?? null, null);
+      assert.equal(avaliados?.length, 2, 'a varredura recebeu a frota');
+      assert.equal(painel.length, 2);
+      // Cada leitor continua lendo o que é seu na linha compartilhada.
+      assert.deepEqual(mapa.map((d) => d.pppoe).sort(), ['ana@alfa', 'bia@beta']);
+      assert.equal(telemetria.find((d) => d.deviceId === 'ONT-A1').uptime, 86_400);
+      assert.equal(identidade.find((d) => d._id === 'ONT-A1').softwareId, 'V1.0.0');
+
+      // A primeira leitura já pediu o que os outros quatro precisavam.
+      const campos = projecaoDe(leiturasDaFrota(genie)[0]);
+      for (const campo of [
+        '_registered', 'InternetGatewayDevice.DeviceInfo.UpTime',
+        'InternetGatewayDevice.DeviceInfo.SoftwareVersion', '_lastInform'
+      ]) {
+        assert.ok(campos.includes(campo), `a projeção unida traz ${campo}`);
+      }
+    });
+  });
+
+  it('o "atualizar" do painel (fresh) vai ao ACS e renova a foto para os outros', async () => {
+    await runInTenant(alfa, async () => {
+      await DeviceService.getDashboardDevices();
+      await DeviceService.getDashboardDevices({ fresh: true });
+      assert.equal(leiturasDaFrota(genie).length, 2);
+      await DeviceService.getMapStatusFleet();
+      await DeviceService.getTelemetryFleet();
+      assert.equal(leiturasDaFrota(genie).length, 2, 'a foto nova serve os seguintes');
+    });
+  });
+
+  it('leitores ao mesmo tempo esperam a mesma leitura em voo', async () => {
+    await runInTenant(alfa, () => Promise.all([
+      DeviceService.getDashboardDevices(),
+      DeviceService.getMapStatusFleet(),
+      DeviceService.getTelemetryFleet(),
+      DeviceService.getCustomerIdentityDevices()
+    ]));
+    assert.equal(leiturasDaFrota(genie).length, 1);
+  });
+
+  it('nunca de um provedor para outro, nem para outro endereço do mesmo provedor', async () => {
+    await runInTenant(alfa, () => DeviceService.getDashboardDevices());
+    const doOutro = await runInTenant(extras[0], () => DeviceService.getMapStatusFleet());
+    assert.deepEqual(doOutro.map((d) => d.deviceId), ['ONT-X1']);
+    assert.equal(leiturasDaFrota(outro).length, 1);
+
+    // O mesmo provedor passa a apontar para outro ACS (sem o console
+    // esquecer nada): a foto do endereço antigo não serve.
+    await runInTenant(alfa, () => Setting.upsert('genieAcsUrl', outro.url));
+    try {
+      const depois = await runInTenant(alfa, () => DeviceService.getMapStatusFleet());
+      assert.deepEqual(depois.map((d) => d.deviceId), ['ONT-X1']);
+      assert.equal(leiturasDaFrota(outro).length, 2);
+    } finally {
+      await runInTenant(alfa, () => Setting.upsert('genieAcsUrl', genie.url));
+    }
+  });
+
+  it('a leitura sem escopo (marcação automática) e a com escopo nunca dividem foto', async () => {
+    await runInTenant(alfa, () => Setting.upsert(DEVICE_SCOPE_KEY, 'alfa'));
+    forgetSharedAcs();
+    try {
+      const comEscopo = await runInTenant(alfa, () => DeviceService.getTelemetryFleet());
+      assert.deepEqual(comEscopo.map((d) => d.deviceId), ['ONT-A1']);
+      const semEscopo = await runInTenant(alfa, () => withoutDeviceScope(() => DeviceService.getTelemetryFleet()));
+      assert.deepEqual(semEscopo.map((d) => d.deviceId).sort(), ['ONT-A1', 'ONT-B1']);
+      const deNovo = await runInTenant(alfa, () => DeviceService.getMapStatusFleet());
+      assert.deepEqual(deNovo.map((d) => d.deviceId), ['ONT-A1'], 'a com escopo continua só com a dela');
+      const leituras = leiturasDaFrota(genie);
+      assert.equal(leituras.length, 2);
+      assert.ok(new URLSearchParams(leituras[0].search).get('query').includes('alfa'));
+      assert.equal(new URLSearchParams(leituras[1].search).get('query'), null);
+    } finally {
+      await runInTenant(alfa, () => Setting.upsert(DEVICE_SCOPE_KEY, ''));
+    }
+  });
+
+  it('projeção unida grande demais para a URL: cada um lê o seu, sem foto unida', async (t) => {
+    const enorme = Array.from({ length: 200 }, (unused, i) => `InternetGatewayDevice.X_VENDOR.Muito.Comprido.Campo.${i}.Valor`);
+    t.mock.method(DeviceService, 'fleetSnapshotUnion', async () => enorme);
+    await runInTenant(alfa, async () => {
+      await DeviceService.getDashboardDevices();
+      await DeviceService.getMapStatusFleet();
+    });
+    const leituras = leiturasDaFrota(genie);
+    assert.equal(leituras.length, 2, 'duas leituras separadas');
+    for (const req of leituras) {
+      assert.ok(req.search.length < NBI_URL_BUDGET, 'cada uma cabe na URL');
+      assert.ok(!projecaoDe(req).includes(enorme[0]));
+    }
+    assert.equal(DeviceService.fleetSnapshots.size, 0);
+  });
+});
+
+describe('a família de fotos', () => {
+  it('em voo: quem pede um subconjunto espera; quem pede campo a mais lê de novo', async () => {
+    const fotos = createFleetSnapshots();
+    const projecoes = [];
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const load = async (projection) => { projecoes.push(projection); await held; return [{ _id: 'x' }]; };
+    const pending = runInTenant(alfa, () => Promise.all([
+      fotos.read('k', ['a', 'b'], { load, union: async () => ['c'] }),
+      fotos.read('k', ['c'], { load }),
+      fotos.read('k', ['a'], { load, fresh: true }),
+      fotos.read('k', ['z'], { load })
+    ]));
+    await tick();
+    release();
+    await pending;
+    assert.equal(projecoes.length, 2);
+    assert.deepEqual(projecoes[0], ['a', 'b', 'c']);
+    assert.deepEqual(projecoes[1], ['z']);
+  });
+
+  it('a foto sai da memória quando vence; falha não vira foto', async () => {
+    const fotos = createFleetSnapshots();
+    let calls = 0;
+    const load = async () => { calls += 1; return [calls]; };
+    await runInTenant(alfa, async () => {
+      await fotos.read('k', ['a'], { load, ttlMs: 20 });
+      assert.equal(fotos.size, 1);
+      assert.deepEqual(await fotos.read('k', ['a'], { load, ttlMs: 20 }), [1]);
+      await new Promise((resolve) => { setTimeout(resolve, 40); });
+      assert.equal(fotos.size, 0, 'vencida, sai sem esperar a próxima leitura');
+      await assert.rejects(fotos.read('f', ['a'], { load: async () => { throw new Error('acs fora'); }, ttlMs: 1000 }));
+      assert.equal(fotos.size, 0);
+    });
+  });
+
+  it('esquecer no meio da leitura: o que ela trouxer não vira foto', async () => {
+    const fotos = createFleetSnapshots();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const pending = runInTenant(alfa, () => fotos.read('k', ['a'], {
+      load: async () => { await held; return []; }, ttlMs: 60_000
+    }));
+    await tick();
+    forgetFleetReads();
+    release();
+    await pending;
+    assert.equal(fotos.size, 0);
   });
 });

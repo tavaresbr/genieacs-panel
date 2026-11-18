@@ -48,6 +48,8 @@ after(async () => {
 
 afterEach(async () => {
   await CustomerIdSyncJob.idle();
+  // A foto da frota é de 30 s: o caso seguinte muda o ACS e tem de lê-lo.
+  DeviceService.forgetDashboards();
   genie.state.respond = null;
   DeviceService.CUSTOMER_IDENTITY_TIMEOUT_MS = 60_000;
   CustomerIdSyncJob.BUDGET_MS = 20_000;
