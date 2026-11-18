@@ -160,8 +160,78 @@ describe('a planilha', () => {
     await planilha('?search=vila&status=all');
     const [linha] = await trilha();
     const detalhe = JSON.parse(linha.detail);
-    assert.deepEqual(detalhe, { count: 1, status: 'all', focus: 'all', search: true });
+    assert.deepEqual(detalhe, { count: 1, status: 'all', focus: 'all', sgp: 'all', search: true });
     assert.ok(!linha.detail.includes('vila'), 'o texto buscado foi para a trilha');
+  });
+});
+
+/**
+ * O filtro do contrato do SGP, o mesmo da lista: a planilha leva as linhas que
+ * a tela mostra com ele ligado — e o ignora, como a lista, com a integração
+ * desligada.
+ */
+describe('a planilha com o filtro do SGP', () => {
+  const ligarSgp = (enabled) => call(`${panelUrl}/api/sgp/config`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: enabled
+      ? { enabled: true, baseUrl: 'http://127.0.0.1:9', app: 'painel', token: 'sgp-token', linkMode: 'pppoe' }
+      : { enabled: false }
+  });
+  let beta;
+
+  before(async () => {
+    const db = getDb();
+    const alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    await db('tenants').insert({ slug: 'beta-export-sgp', name: 'Provedor Beta', status: 'active' });
+    beta = (await db('tenants').where({ slug: 'beta-export-sgp' }).first()).id;
+    await db('sgp_links').insert([
+      { tenant_id: alfa, device_id: 'ONT-B', contract: '10', state: 'blocked', link_mode: 'auto' },
+      { tenant_id: alfa, device_id: 'ONT-C', contract: '11', state: 'active', link_mode: 'auto' },
+      // O outro provedor, nos mesmos ids: não pode mudar a planilha deste.
+      { tenant_id: beta, device_id: 'ONT-A', contract: '20', state: 'blocked', link_mode: 'auto' }
+    ]);
+    assert.equal((await ligarSgp(true)).status, 200);
+  });
+
+  after(async () => {
+    await ligarSgp(false);
+    await getDb()('sgp_links').whereIn('contract', ['10', '11', '20']).del();
+  });
+
+  const series = async (query) => {
+    const { linhas, cabecalho } = await planilha(query);
+    return linhas.map((l) => l[cabecalho.indexOf('Série')]).sort();
+  };
+
+  it('leva só os aparelhos do estado pedido, e os sem vínculo', async () => {
+    assert.deepEqual(await series('?sgp=blocked'), ['ZTEGBBBB0002']);
+    assert.deepEqual(await series('?sgp=active'), ['ZTEGCCCC0003']);
+    assert.deepEqual(await series('?sgp=unlinked'), ['ZTEGAAAA0001']);
+    assert.deepEqual(await series('?sgp=cancelled'), []);
+  });
+
+  it('o teto vale sobre o recorte filtrado, não sobre a frota', async () => {
+    DeviceService.DEVICE_EXPORT_MAX = 2;
+    assert.deepEqual(await series('?sgp=blocked'), ['ZTEGBBBB0002']);
+    assert.equal((await baixar('?sgp=unlinked&status=all')).status, 200);
+  });
+
+  it('a trilha diz o filtro do SGP que valeu', async () => {
+    await getDb()('audit_log').where({ action: AuditLog.ACTIONS.DEVICES_EXPORTED }).del();
+    await planilha('?sgp=blocked');
+    const [linha] = await trilha();
+    assert.equal(JSON.parse(linha.detail).sgp, 'blocked');
+  });
+
+  it('valor desconhecido e integração desligada: o filtro é ignorado', async () => {
+    assert.equal((await series('?sgp=banana')).length, 3);
+    assert.equal((await ligarSgp(false)).status, 200);
+    try {
+      assert.equal((await series('?sgp=blocked')).length, 3);
+    } finally {
+      assert.equal((await ligarSgp(true)).status, 200);
+    }
   });
 });
 

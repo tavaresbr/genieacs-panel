@@ -616,7 +616,6 @@ const zhCN: Dictionary = {
   'devices.sgpSync.failed': '无法与 SGP 同步',
   'devices.sgpSync.aria': '将所有设备的合同与 SGP 同步',
   'devices.export.failed': '无法下载表格。',
-  'devices.export.sgpIgnored': '表格包含搜索、状态和焦点筛选。ERP 筛选仅作用于此页面，不包含在表格中。',
   'devices.refreshAria': '刷新设备清单',
   'devices.loadingAria': '正在加载设备清单',
   'devices.error.title': '设备清单不可用',

@@ -148,13 +148,14 @@ class DeviceController {
   /**
    * `GET /api/devices/export` — o recorte da lista numa planilha.
    *
-   * Os filtros são os da lista (`status`, `focus`, `search`), lidos pela mesma
-   * normalização; a trilha guarda quantas linhas saíram e o recorte, e diz só
+   * Os filtros são os da lista (`status`, `focus`, `search` e `sgp`, este com
+   * a mesma condição da lista: `sgp.read` e integração pronta), lidos pela
+   * mesma normalização; a trilha guarda quantas linhas saíram e o recorte, e diz só
    * SE houve busca — o texto buscado pode ser o nome de um assinante.
    */
   static async exportDevices(req, res) {
     try {
-      const { csv, count, filters } = await exportDevicesCsv(req.query);
+      const { csv, count, filters } = await exportDevicesCsv({ ...req.query, sgp: await sgpFilterFor(req) });
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.DEVICES_EXPORTED,
         subjectType: 'devices',
@@ -163,6 +164,7 @@ class DeviceController {
           count,
           status: filters.status,
           focus: filters.focus,
+          sgp: filters.sgp,
           search: Boolean(filters.search)
         }
       });

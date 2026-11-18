@@ -606,7 +606,6 @@ const ar: Dictionary = {
   'devices.sgpSync.failed': 'تعذّرت المزامنة مع SGP',
   'devices.sgpSync.aria': 'مزامنة عقود جميع الأجهزة مع SGP',
   'devices.export.failed': 'تعذّر تنزيل جدول البيانات.',
-  'devices.export.sgpIgnored': 'يتضمن جدول البيانات البحث والحالة والتركيز. مرشّح ERP يسري على هذه الشاشة فقط ولا يُضمَّن.',
   'devices.refreshAria': 'تحديث سجل الأجهزة',
   'devices.loadingAria': 'جارٍ تحميل سجل الأجهزة',
   'devices.error.title': 'سجل الأجهزة غير متاح',

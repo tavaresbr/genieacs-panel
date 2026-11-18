@@ -617,7 +617,6 @@ const ru: Dictionary = {
   'devices.sgpSync.failed': 'Не удалось синхронизировать с SGP',
   'devices.sgpSync.aria': 'Синхронизировать договоры всех устройств с SGP',
   'devices.export.failed': 'Не удалось скачать таблицу.',
-  'devices.export.sgpIgnored': 'Таблица учитывает поиск, состояние и фокус. Фильтр ERP действует только на этом экране и в неё не входит.',
   'devices.refreshAria': 'Обновить реестр устройств',
   'devices.loadingAria': 'Загрузка реестра устройств',
   'devices.error.title': 'Реестр устройств недоступен',

@@ -617,7 +617,6 @@ const it: Dictionary = {
   'devices.sgpSync.failed': 'Impossibile sincronizzare con SGP',
   'devices.sgpSync.aria': 'Sincronizza i contratti di tutti gli apparati con SGP',
   'devices.export.failed': 'Impossibile scaricare il foglio.',
-  'devices.export.sgpIgnored': 'Il foglio usa la ricerca, lo stato e il focus. Il filtro ERP vale solo in questa schermata e non è incluso.',
   'devices.refreshAria': 'Aggiorna l’inventario degli apparati',
   'devices.loadingAria': 'Caricamento dell’inventario degli apparati',
   'devices.error.title': 'L’inventario degli apparati non è disponibile',

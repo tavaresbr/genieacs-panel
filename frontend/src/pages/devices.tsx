@@ -12,7 +12,6 @@ import {
 } from '@/lib/api'
 import {
   deviceExportQuery,
-  exportIgnoresSgp,
   filtersFromQuery,
   filtersToQuery,
   type DeviceFocusFilter,
@@ -100,9 +99,8 @@ export default function DevicesPage() {
   // Ações em lote: só para quem tem `devices.maintain` — um clique alcança
   // muitos assinantes. Sem a permissão, a lista fica exatamente como era.
   const canBatch = can('devices.maintain')
-  // A planilha: só dono e admin (`devices.export`), com busca, estado e foco.
-  // O filtro do ERP ainda não entra na exportação — a tela diz isso em vez de
-  // entregar mais linhas do que mostra.
+  // A planilha: só dono e admin (`devices.export`), com o mesmo recorte da
+  // lista — o filtro do SGP inclusive, aplicado no servidor.
   const canExport = can('devices.export')
   const [exporting, setExporting] = useState(false)
   // A sincronização da frota com o SGP, a mesma de Configurações → SGP, à mão
@@ -407,7 +405,7 @@ export default function DevicesPage() {
   const exportSheet = async () => {
     setExporting(true)
     try {
-      const res = await devicesAPI.exportSheet(deviceExportQuery({ search: searchTerm, status: filterStatus, focus: filterFocus }))
+      const res = await devicesAPI.exportSheet(deviceExportQuery({ search: searchTerm, status: filterStatus, focus: filterFocus, sgp: filterSgp }))
       if (!res.success || !res.blob) {
         toast.error(res.message || t('devices.export.failed'))
         return
@@ -420,7 +418,6 @@ export default function DevicesPage() {
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
-      if (exportIgnoresSgp({ sgp: filterSgp })) toast.info(t('devices.export.sgpIgnored'))
     } finally {
       setExporting(false)
     }
@@ -483,7 +480,6 @@ export default function DevicesPage() {
                 className="modern-button-secondary whitespace-nowrap px-3 sm:px-4"
                 disabled={exporting}
                 onClick={() => void exportSheet()}
-                title={exportIgnoresSgp({ sgp: filterSgp }) ? t('devices.export.sgpIgnored') : undefined}
               >
                 <Icon name="external" size={16} />
                 {t('devices.export.button')}

@@ -1117,7 +1117,7 @@ class DeviceService {
    * recorte grande demais é recusado sem trazer a frota.
    */
   static async getDevicesForExport(options = {}) {
-    const { search, status, focus } = this.normalizeDeviceListQuery(options);
+    const { search, status, focus, sgp } = this.normalizeDeviceListQuery(options);
     const max = this.DEVICE_EXPORT_MAX;
     const grandeDemais = () => new TranslatableError('device.exportTooLarge', { max: String(max) }, {
       status: 413,
@@ -1135,7 +1135,9 @@ class DeviceService {
     const listQuery = this.buildDeviceListQuery(status, focus);
     const queryParam = listQuery ? JSON.stringify(listQuery) : null;
 
-    if (!search && !this.focusNeedsLocalPass(focus)) {
+    // Com o filtro do SGP a contagem do NBI não é a do recorte (ela não sabe
+    // dos vínculos): o teto vale sobre o que o filtro deixar, mais abaixo.
+    if (!search && !this.focusNeedsLocalPass(focus) && sgp === 'all') {
       if ((await this.countDevicesFromGenieAcs(queryParam)) > max) throw grandeDemais();
     }
 
@@ -1146,6 +1148,8 @@ class DeviceService {
       ))
       .reverse()
       .filter((device) => this.deviceMatchesFocus(device, focus));
+    // O mesmo corte da lista, pela mesma leitura de `sgp_links` do provedor.
+    if (sgp !== 'all') matches = await this.filterBySgpLink(matches, sgp);
     const customerIds = await this.lookupCustomerIds(matches.map((device) => device._id));
     matches = matches.map((device) => ({ ...device, customerId: customerIds.get(String(device._id)) || null }));
     if (search) {
@@ -1160,7 +1164,7 @@ class DeviceService {
       }, needle));
     }
     if (matches.length > max) throw grandeDemais();
-    return { devices: matches, filters: { search, status, focus } };
+    return { devices: matches, filters: { search, status, focus, sgp } };
   }
 
   /**

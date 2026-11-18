@@ -618,7 +618,6 @@ const en = {
   'devices.sgpSync.failed': 'Could not sync with SGP',
   'devices.sgpSync.aria': 'Sync every device\'s contract with SGP',
   'devices.export.failed': 'Could not download the spreadsheet.',
-  'devices.export.sgpIgnored': 'The spreadsheet uses the search, status and focus. The ERP filter only applies on this screen and is not included.',
   'devices.refreshAria': 'Refresh device inventory',
   'devices.loadingAria': 'Loading device inventory',
   'devices.error.title': 'Device inventory is unavailable',

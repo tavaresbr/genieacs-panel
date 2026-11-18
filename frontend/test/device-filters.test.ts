@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest'
 import {
   deviceExportQuery,
   deviceListQuery,
-  exportIgnoresSgp,
   filtersFromQuery,
   filtersToQuery,
   focusFromQuery,
@@ -146,15 +145,10 @@ describe('a tela lê por aqui', () => {
 })
 
 describe('a query da planilha', () => {
-  it('leva busca, estado e foco, e nunca a página nem o filtro do ERP', () => {
-    const query = deviceExportQuery({ search: ' vila ', status: 'offline', focus: 'weak-signal' })
-    expect(query.toString()).toBe('search=vila&status=offline&focus=weak-signal')
-    expect(deviceExportQuery({ search: '', status: 'all', focus: 'all' }).toString()).toBe('')
-  })
-
-  it('avisa quando o filtro do ERP está ligado, porque ele não entra', () => {
-    expect(exportIgnoresSgp({ sgp: 'all' })).toBe(false)
-    expect(exportIgnoresSgp({ sgp: 'blocked' })).toBe(true)
+  it('leva busca, estado, foco e o filtro do SGP, e nunca a página', () => {
+    const query = deviceExportQuery({ search: ' vila ', status: 'offline', focus: 'weak-signal', sgp: 'blocked' })
+    expect(query.toString()).toBe('search=vila&status=offline&focus=weak-signal&sgp=blocked')
+    expect(deviceExportQuery({ search: '', status: 'all', focus: 'all', sgp: 'all' }).toString()).toBe('')
   })
 })
 

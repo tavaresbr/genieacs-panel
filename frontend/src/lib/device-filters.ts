@@ -137,20 +137,16 @@ export function deviceListQuery(params: {
 }
 
 /**
- * A query da planilha: busca, estado e foco. A página não entra (a planilha
- * leva todas), e o filtro do ERP também não: a exportação ainda não o aplica.
- * Por isso `exportIgnoresSgp` existe — a tela avisa em vez de entregar um
- * arquivo com mais linhas do que a lista mostra.
+ * A query da planilha: o mesmo recorte da lista — busca, estado, foco e o
+ * filtro do SGP, que o servidor aplica como na lista (e ignora nas mesmas
+ * condições). Só a página não entra: a planilha leva todas.
  */
-export function deviceExportQuery(filters: Pick<DeviceFilters, 'search' | 'status' | 'focus'>): URLSearchParams {
+export function deviceExportQuery(filters: Pick<DeviceFilters, 'search' | 'status' | 'focus' | 'sgp'>): URLSearchParams {
   const query = new URLSearchParams()
   const search = filters.search.trim()
   if (search) query.set('search', search)
   if (filters.status !== 'all') query.set('status', filters.status)
   if (filters.focus !== 'all') query.set('focus', filters.focus)
+  if (filters.sgp !== 'all') query.set('sgp', filters.sgp)
   return query
-}
-
-export function exportIgnoresSgp(filters: Pick<DeviceFilters, 'sgp'>): boolean {
-  return filters.sgp !== 'all'
 }
