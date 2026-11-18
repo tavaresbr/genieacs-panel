@@ -1,7 +1,8 @@
 import { IS_SAAS } from '../config/edition.js';
 import { recordAcsRequest } from '../utils/metrics.js';
 import { blockedAddressReason } from '../utils/net/blockedRanges.js';
-import { PinnedTransport } from '../utils/net/pinnedFetch.js';
+import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js';
+import { GENIEACS_DNS_FAILED, classifyAcsFailure } from './genieacs/acsHealth.js';
 
 // Re-exported because this module has always been where the panel asks "is this
 // address off limits". The table itself now lives in `utils/net/blockedRanges.js`
@@ -244,7 +245,12 @@ export class GenieAcsEgress {
     // address" — a sentence about DNS for something that was about the clock.
     signal?.throwIfAborted();
     if (addresses.length === 0) {
-      throw new Error(`GenieACS host ${hostname} did not resolve to any address`);
+      // Com código, para que quem conta a saúde do ACS (`acsHealth.js`) não
+      // precise ler a frase: "não resolveu" é `dns`, e é só isso que sai dali.
+      const error = new Error(`GenieACS host ${hostname} did not resolve to any address`);
+      error.code = GENIEACS_DNS_FAILED;
+      error.acsFailure = 'dns';
+      throw error;
     }
 
     return { parsed, hostname, port, addresses };
@@ -265,7 +271,7 @@ export class GenieAcsEgress {
       // Counted per provider, by what stopped it: a refusal is ours and a
       // resolution failure is the network's, and the two are different pages.
       recordAcsRequest({ outcome: error?.code === EGRESS_REFUSED ? 'refused' : 'error' });
-      throw error;
+      throw tagTransportFailure(error);
     }
     const { parsed, hostname, port, addresses } = target;
 
@@ -286,9 +292,26 @@ export class GenieAcsEgress {
       return response;
     } catch (error) {
       recordAcsRequest({ outcome: 'error' });
-      throw error;
+      throw tagTransportFailure(error, { transport: true });
     }
   }
+}
+
+/**
+ * Põe em `acsFailure` o código de `acsHealth.js` (`dns`, `refused`,
+ * `timeout`, …) no erro que sai daqui, para que nenhum chamador precise
+ * reconhecer frase de erro. O que sai do socket e não tem código conhecido é
+ * `unknown` — exceto o corpo grande demais, que é o ACS respondendo, não o ACS
+ * fora.
+ */
+function tagTransportFailure(error, { transport = false } = {}) {
+  if (!error || typeof error !== 'object' || error.acsFailure) return error;
+  let code = classifyAcsFailure(error);
+  if (!code && transport && error.code !== RESPONSE_TOO_LARGE) code = 'unknown';
+  if (code) {
+    try { error.acsFailure = code; } catch { /* objeto congelado: a classificação refaz o caminho */ }
+  }
+  return error;
 }
 
 export default GenieAcsEgress;

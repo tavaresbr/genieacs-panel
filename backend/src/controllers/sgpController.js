@@ -3,6 +3,7 @@ import SgpLink from '../models/SgpLink.js';
 import SgpContactSyncService from '../services/sgpContactSyncService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
+import { ACS_UNREACHABLE_STATUS, acsUnreachableBody, acsFailureOf } from '../services/genieacs/acsHealth.js';
 
 function handleError(req, res, error, fallbackKey) {
   if (error instanceof SgpError) {
@@ -12,6 +13,12 @@ function handleError(req, res, error, fallbackKey) {
       ...createErrorResponse(translateError(req.t, error), error.details || error.code),
       code: error.code
     });
+  }
+  // A visão geral do SGP lê o GenieACS também: o ACS fora vira a frase do
+  // motivo, sem stack — o conector já deixou a linha curta (`acsHealth.js`).
+  const falhaDoAcs = acsFailureOf(error);
+  if (falhaDoAcs) {
+    return res.status(ACS_UNREACHABLE_STATUS).json(acsUnreachableBody(req.t, falhaDoAcs));
   }
   console.error(`${fallbackKey}:`, error);
   return res.status(500).json(createErrorResponse(req.t(fallbackKey), error.message));

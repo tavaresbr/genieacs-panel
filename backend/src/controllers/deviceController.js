@@ -16,6 +16,7 @@ import { translateError } from '../i18n/index.js';
 import { exportDevicesCsv } from '../services/deviceExport.js';
 import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBatchIds } from '../services/deviceBatch.js';
 import { acsAgentOfflineBody, isAgentOffline } from '../services/genieacs/agent.js';
+import { ACS_UNREACHABLE_STATUS, acsUnreachableBody, acsFailureOf, getAcsHealth } from '../services/genieacs/acsHealth.js';
 import FirmwareStore, { readUploadHeaders } from '../services/firmwareStore.js';
 import SgpService from '../services/sgpService.js';
 import { roleHas } from '../config/permissions.js';
@@ -67,10 +68,20 @@ async function sgpFilterFor(req) {
  * agente está fora do ar desde…" em vez de um 502 que parece defeito do ACS.
  * Todo `catch` deste controlador passa por aqui, então nenhuma rota de
  * equipamento precisa lembrar disso uma a uma.
+ *
+ * E o ACS que não responde (DNS, porta fechada, prazo, certificado, 401/403,
+ * 5xx): 502 `acs_unreachable` com o sub-código em `reason` e a frase dele
+ * traduzida, em vez do 500/502 genérico com a mensagem crua. Sem log aqui: o
+ * conector já escreveu a linha curta e espaçada (`acsHealth.js`), e o stack
+ * trace por leitura era justamente o que enchia o journal.
  */
 function respostaDeEscopo(req, res, error) {
   if (isAgentOffline(error)) {
     return res.status(503).json(acsAgentOfflineBody(error, translateError(req.t, error)));
+  }
+  const falhaDoAcs = acsFailureOf(error);
+  if (falhaDoAcs) {
+    return res.status(ACS_UNREACHABLE_STATUS).json(acsUnreachableBody(req.t, falhaDoAcs));
   }
   const chave = error?.translationKey;
   if (chave !== 'device.notFound' && chave !== 'device.scopeTagProtected') return null;
@@ -346,6 +357,23 @@ class DeviceController {
       return res.status(500).json(
         createErrorResponse(req.t('device.swaps.failed'), error.message)
       );
+    }
+  }
+
+  /**
+   * `GET /api/devices/acs-health` — o GenieACS deste provedor está respondendo?
+   *
+   * Lido da memória (`acsHealth.js`), que o conector atualiza a cada pedido à
+   * NBI: não pergunta nada ao ACS, então pode ser consultado de minuto em
+   * minuto pela casca do painel. Só o provedor em escopo — o id vem da sessão,
+   * nunca do pedido — e só o código fixo da falha, nunca host ou mensagem.
+   */
+  static async getAcsHealth(req, res) {
+    try {
+      return res.json(createResponse(null, getAcsHealth(currentTenantId())));
+    } catch (error) {
+      console.error('Get ACS health error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
     }
   }
 

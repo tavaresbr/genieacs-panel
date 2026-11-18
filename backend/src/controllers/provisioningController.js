@@ -6,12 +6,19 @@ import { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { acsAgentOfflineBody, isAgentOffline } from '../services/genieacs/agent.js';
+import { ACS_UNREACHABLE_STATUS, acsUnreachableBody, acsFailureOf } from '../services/genieacs/acsHealth.js';
 
 function handleError(req, res, error, fallbackKey) {
   // O agente do GenieACS desconectado (modo `agent`) sai no formato comum das
   // rotas que falam com o ACS, e não como `provisioning_error`.
   if (isAgentOffline(error)) {
     return res.status(503).json(acsAgentOfflineBody(error, translateError(req.t, error)));
+  }
+  // O ACS fora (DNS, recusa, prazo, …): a frase do motivo, sem stack — o
+  // conector já deixou a linha curta no log (`acsHealth.js`).
+  const falhaDoAcs = acsFailureOf(error);
+  if (falhaDoAcs) {
+    return res.status(ACS_UNREACHABLE_STATUS).json(acsUnreachableBody(req.t, falhaDoAcs));
   }
   const status = error?.status ?? (error instanceof SgpError ? error.status : null);
   if (status) {

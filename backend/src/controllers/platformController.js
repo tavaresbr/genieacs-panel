@@ -27,6 +27,7 @@ import { slugProblem } from '../utils/slug.js';
 import OnboardingService from '../services/onboardingService.js';
 import { tenantMediaRoot } from '../services/waMediaService.js';
 import { effectiveConfig as externalBackupConfig } from '../services/backup/externalBackupSettings.js';
+import { getAcsHealth } from '../services/genieacs/acsHealth.js';
 
 /** O backup externo está pronto para rodar? Nunca lança: falha de leitura é "não". */
 async function externalBackupConfigured() {
@@ -431,11 +432,16 @@ class PlatformController {
       const subscriptions = await subscriptionsByTenant();
       const caixa = await Tenant.platform();
       return res.json(createResponse('Tenants retrieved successfully', {
-        tenants: tenants.map((tenant) => present(
-          tenant,
-          counts.get(Number(tenant.id)) || 0,
-          subscriptions.get(Number(tenant.id)) || null
-        )),
+        tenants: tenants.map((tenant) => ({
+          ...present(
+            tenant,
+            counts.get(Number(tenant.id)) || 0,
+            subscriptions.get(Number(tenant.id)) || null
+          ),
+          // O GenieACS de cada um, da memória do processo (`acsHealth.js`):
+          // a lista mostra "fora (DNS) desde 09:46" sem consultar ACS nenhum.
+          acsHealth: getAcsHealth(tenant.id)
+        })),
         // Três campos e nada mais: o console precisa do nome para escrever na
         // tela e do slug para montar o endereço onde há domínio-base. Plano,
         // cadastro fiscal e gateway não vêm porque não há o que fazer com eles

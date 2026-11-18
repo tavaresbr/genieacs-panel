@@ -15,6 +15,7 @@ import { afterModeChange, agentStatus, issueAgentToken } from '../services/genie
 import { TAG_PREFIX } from '../services/deviceTagService.js';
 import FirmwareStore, { readOriginalName } from '../services/firmwareStore.js';
 import { isAgentOffline } from '../services/genieacs/agent.js';
+import { getAcsHealth } from '../services/genieacs/acsHealth.js';
 import { translateError } from '../i18n/index.js';
 import DeviceScopeTagger, {
   AUTO_PREFIXES_KEY, AUTO_PREFIXES_MAX, AUTO_PREFIX_MAX_LENGTH, parsePrefixes, prefixesOverlap
@@ -174,7 +175,9 @@ async function snapshot(tenant) {
     agent: await agentStatus(),
     suggestion: suggestGenieAcsUrl(tenant)
   }));
-  return { ...base, sharedAcs: await sharedAcs(tenant, base.url) };
+  // A saúde vem da memória do processo (`acsHealth.js`), a mesma que o painel
+  // do provedor lê: o console vê "fora (DNS) desde 09:46" sem SSH.
+  return { ...base, sharedAcs: await sharedAcs(tenant, base.url), health: getAcsHealth(tenant.id) };
 }
 
 class PlatformGenieAcsController {

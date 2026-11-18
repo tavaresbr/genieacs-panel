@@ -24,6 +24,7 @@ import { applyRowLevelSecurity, assertRoleEnforcesRls, rlsEnabled } from './conf
 import { SCOPED_TABLES } from './config/tenantScope.js';
 import { buildKnexConfig } from './config/dbConfig.js';
 import { agentHub, attachAgentHub } from './services/genieacs/agentHub.js';
+import { logUnlessAcsFailure } from './services/genieacs/acsHealth.js';
 
 // Every `console.*` line written inside a request or a per-provider job
 // carries `[tenant=N]` from here on. Done at boot and not at import, so the
@@ -97,7 +98,8 @@ export const startServer = async () => {
         if (isDormant(await lastPanelActivityAt())) return null;
         return DeviceService.getDashboardData(false);
       }).catch((error) => {
-        console.warn(`Dashboard prewarm skipped: ${error.message}`);
+        // O ACS fora já foi logado, uma vez e curto, pelo conector.
+        logUnlessAcsFailure('Dashboard prewarm skipped', error, { level: 'warn', messageOnly: true });
       });
       // The Customer ID sweep qualifies too, now that `device_profiles` is per
       // provider — it was the last table under here that was not, `sgp_links`
@@ -115,11 +117,14 @@ export const startServer = async () => {
       }, {
         // Named per provider: one ISP with an unreachable GenieACS must be
         // legible as that, not as the sweep having skipped the deployment.
+        //
+        // Quando o motivo é o GenieACS fora, a linha curta do conector já diz
+        // isso por provedor (`[tenant=N] GenieACS unreachable (dns)`).
         onError: (error, tenant) => {
-          console.warn(`Customer ID prewarm skipped for provider ${tenant.slug}: ${error.message}`);
+          logUnlessAcsFailure(`Customer ID prewarm skipped for provider ${tenant.slug}`, error, { level: 'warn', messageOnly: true });
         }
       }).catch((error) => {
-        console.warn(`Customer ID prewarm skipped: ${error.message}`);
+        logUnlessAcsFailure('Customer ID prewarm skipped', error, { level: 'warn', messageOnly: true });
       });
       // Accounts created before portal passwords existed authenticated with a
       // slice of their own Customer ID. Give them real credentials in the
