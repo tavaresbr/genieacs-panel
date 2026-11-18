@@ -1,4 +1,5 @@
 import { getDb, insertReturningId } from '../config/database.js';
+import { invalidateDeliveryCandidates } from '../config/deliveryCandidatesCache.js';
 
 /**
  * The provider rows themselves — read both from the control plane and, for the
@@ -378,6 +379,9 @@ class Tenant {
           ? db.raw('COALESCE(suspended_at, ?)', [agora])
           : null
       });
+    // Só provedor ativo recebe webhook: suspenso sai da lista já, e não em
+    // trinta segundos.
+    invalidateDeliveryCandidates();
     return changed > 0;
   }
 

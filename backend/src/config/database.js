@@ -2,6 +2,7 @@ import knexFactory from 'knex';
 import { buildKnexConfig, isSqlite } from './dbConfig.js';
 import { installSqlSentinel } from './sqlSentinel.js';
 import { installRls } from './rls.js';
+import { tagDirectoryBuilder, watchContactDirectoryWrites } from './contactDirectoryCache.js';
 import { currentTenantId, TenantScopeError } from './tenantContext.js';
 import { isScoped } from './tenantScope.js';
 
@@ -20,7 +21,12 @@ export function getDb() {
     // continua vendo exatamente o mesmo SQL que veria sem RLS — do contrário
     // toda leitura escopada passaria a chegar nela dentro de uma transação e a
     // guarda mudaria de comportamento por causa de uma opção de deploy.
-    db = installRls(installSqlSentinel(knexFactory(config)), { client: config.client });
+    // O vigia das escritas no diretório de contatos fica no knex de dentro,
+    // junto da sentinela: é ali que passa todo SQL, com ou sem RLS por fora.
+    db = installRls(
+      installSqlSentinel(watchContactDirectoryWrites(knexFactory(config))),
+      { client: config.client }
+    );
   }
   return db;
 }
@@ -95,7 +101,10 @@ export function tdb(table, trx = null) {
   const knex = trx || getDb();
   if (!isScoped(table)) return knex(table);
 
-  const query = knex(table).where(`${table}.${TENANT_COLUMN}`, currentTenantId());
+  const tenantId = currentTenantId();
+  // A anotação é para o vigia do diretório de contatos (`contactDirectoryCache.js`):
+  // quando a escrita volta, ele já está fora deste escopo.
+  const query = tagDirectoryBuilder(knex(table).where(`${table}.${TENANT_COLUMN}`, tenantId), table, tenantId);
 
   // knex ignores `where` on an insert, so `tdb('x').insert(...)` would write an
   // unscoped row and look perfectly reasonable doing it. Closing that door here
@@ -155,7 +164,8 @@ function withTenant(table, row) {
  */
 export function tinsert(table, row, trx = null) {
   const knex = trx || getDb();
-  return knex(table).insert(withTenant(table, row));
+  const builder = knex(table).insert(withTenant(table, row));
+  return isScoped(table) ? tagDirectoryBuilder(builder, table, currentTenantId()) : builder;
 }
 
 /**

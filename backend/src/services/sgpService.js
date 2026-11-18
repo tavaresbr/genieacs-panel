@@ -11,6 +11,7 @@ import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js
 import { deploymentIsShared } from './genieacsEgress.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { sgpDeliveryCandidates } from '../config/deliveryCandidatesCache.js';
 import { SGP_EVENT_RETENTION } from '../config/retention.js';
 
 const CONFIG_KEY = 'sgp_integration_config';
@@ -1036,6 +1037,9 @@ class SgpService {
    */
   static invalidateConfigCache() {
     this.configCache.invalidate();
+    // A lista de quem pode assinar uma entrega leva o segredo e a política de
+    // horário deste provedor: salvar a configuração a deixa velha.
+    sgpDeliveryCandidates.clear();
   }
 
   static normalizeBaseUrl(value) {

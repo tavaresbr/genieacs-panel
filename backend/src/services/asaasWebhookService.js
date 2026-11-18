@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { asaasDeliveryCandidates } from '../config/deliveryCandidatesCache.js';
 import AsaasProviderService from './asaasProviderService.js';
 import AsaasCustomer from '../models/AsaasCustomer.js';
 import AsaasCharge, { OPEN_STATUSES } from '../models/AsaasCharge.js';
@@ -66,6 +67,12 @@ class AsaasWebhookService {
 
   /** Os provedores ativos com a entrega ligada e um token. */
   static async deliveryCandidates() {
+    // Uma vez a cada ~30 s por processo — ver `deliveryCandidatesCache.js`.
+    // `authenticate` continua conferindo contra todos, em tempo constante.
+    return asaasDeliveryCandidates.remember(() => this.loadDeliveryCandidates());
+  }
+
+  static async loadDeliveryCandidates() {
     const tenants = await getDb()('tenants').where({ status: 'active' }).orderBy('id', 'asc');
     const candidates = [];
     for (const tenant of tenants) {
