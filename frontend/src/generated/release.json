@@ -1,15 +1,15 @@
 {
-  "version": "1.50.1",
-  "build": 1801,
-  "sourceCommit": "2982de2280b9",
+  "version": "1.50.2",
+  "build": 1804,
+  "sourceCommit": "0e7fef156654",
   "releasedAt": "2026-11-18",
-  "basedOnTag": "v1.50.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/5f994c1addac...2982de2280b9",
+  "basedOnTag": "v1.50.1",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/b0d40da0f358...0e7fef156654",
   "changes": [
     {
-      "shortHash": "c914bfd0",
+      "shortHash": "e58b95a8",
       "date": "2026-11-18",
-      "title": "Trava de rolagem compartilhada e teclado do iPhone mais robusto",
+      "title": "Fila por conversa, prazo total, pausa após chave/saldo, retry sem mídia, trava de preço mensal e base de conhecimento",
       "category": "Fixed"
     }
   ]
