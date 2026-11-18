@@ -48,7 +48,7 @@ import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
 import { CloseSurveyDialog } from '@/components/whatsapp/close-survey-dialog'
 import { setMobileBarHidden, setMobileBarUnread, subscribeMobileBar } from '@/lib/mobile-bar'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
-import { cardHeightAboveKeyboard, keyboardFrame } from '@/lib/wa-keyboard'
+import { cardHeightAboveKeyboard, keyboardFrame, nextBaseInner } from '@/lib/wa-keyboard'
 import { useAuth } from '@/contexts/auth-context'
 import { sessionOwner } from '@/lib/session-owner'
 import { useLocation, useNavigate } from 'react-router'
@@ -935,15 +935,37 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     let lastCard: number | null = null
     const debug = new URLSearchParams(window.location.search).get('wadebug') === '1'
     // Com `?wadebug=1`: as últimas ocorrências do teclado, para um print mostrar
-    // a sequência que levou ao problema e não só o instante.
+    // a sequência que levou ao problema e não só o instante. As linhas também
+    // vão para o `localStorage`: na tela escura a faixa (que é `fixed`, como o
+    // cartão) some, e depois de recarregar a página ela mostra a "sessão anterior".
     const started = Date.now()
     const history: string[] = []
+    const DEBUG_KEY = 'wa-kb-debug'
+    let previous = ''
+    if (debug) {
+      try { previous = localStorage.getItem(DEBUG_KEY) ?? '' } catch { /* sem armazenamento */ }
+    }
     let cause = 'init'
     const note = (what: string) => {
       cause = what
     }
+    // A maior altura de janela vista com nenhum campo em foco: no Chrome do
+    // iPhone a janela às vezes encolhe junto com o teclado, e `innerHeight -
+    // vvHeight` fica perto de zero mesmo com o teclado aberto.
+    let baseInner = window.innerHeight
+    let baseWidth = window.innerWidth
+    let misses = 0
+    let forceStatic = false
+    const fieldFocused = () => {
+      const el = document.activeElement
+      return !!el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || (el as HTMLElement).isContentEditable)
+    }
     const update = () => {
-      const next = keyboardFrame({ innerHeight: window.innerHeight, vvTop: vv.offsetTop, vvHeight: vv.height })
+      const nb = nextBaseInner({ base: baseInner, baseWidth, innerHeight: window.innerHeight, innerWidth: window.innerWidth, fieldFocused: fieldFocused() })
+      baseInner = nb.base
+      baseWidth = nb.baseWidth
+      let next = forceStatic ? null : keyboardFrame({ innerHeight: baseInner, vvTop: vv.offsetTop, vvHeight: vv.height })
+      if (!next) forceStatic = forceStatic && fieldFocused()
       const key = next ? `${next.top}:${next.height}` : ''
       if (key !== lastFrame) {
         lastFrame = key
@@ -954,6 +976,24 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       if (!next && window.scrollY !== 0) window.scrollTo(0, 0)
       const card = cardRef.current
       const rect = card?.getBoundingClientRect() ?? null
+      // Rede de segurança: com o teclado aberto o cartão tem de cruzar a área
+      // visível. Se não cruza duas vezes seguidas, abandona a camada `fixed`
+      // (o layout em fluxo) e traz o cartão à vista, em vez de deixar a tela vazia.
+      if (next && rect) {
+        const visible = Math.min(rect.bottom, vv.offsetTop + vv.height) - Math.max(rect.top, vv.offsetTop)
+        misses = visible < 40 ? misses + 1 : 0
+        if (misses >= 2) {
+          forceStatic = true
+          misses = 0
+          next = null
+          lastFrame = ''
+          setFrame(null)
+          setKeyboardHeight(null)
+          window.requestAnimationFrame(() => card?.scrollIntoView({ block: 'nearest' }))
+        }
+      } else {
+        misses = 0
+      }
       // A barra de atalhos, quando aparece, fica entre o cartão e o fim da tela.
       const barHeight = document.querySelector<HTMLElement>('[data-mobile-tab-bar]')?.offsetHeight ?? 0
       // Com o teclado aberto o cartão é o quadro; medir só sem ele.
@@ -965,27 +1005,38 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
         setCardHeight(height)
       }
       if (debug) {
-        const now = `inner ${Math.round(window.innerHeight)} vv ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)} `
-          + `scrollY ${Math.round(window.scrollY)} kb ${next ? `${next.top}+${next.height}` : '-'} card ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'} h ${height ?? '-'}`
-        const line = `${((Date.now() - started) / 1000).toFixed(1)}s ${cause} vv ${Math.round(vv.height)}/${Math.round(vv.offsetTop)} y${Math.round(window.scrollY)} kb ${next ? `${next.top}+${next.height}` : '-'} c ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'}`
+        const box = document.querySelector('textarea')?.getBoundingClientRect()
+        const now = `inner ${Math.round(window.innerHeight)}/${Math.round(window.outerHeight)} base ${Math.round(baseInner)} vv ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)} `
+          + `scrollY ${Math.round(window.scrollY)} kb ${next ? `${next.top}+${next.height}` : '-'} card ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'} h ${height ?? '-'}${forceStatic ? ' STATIC' : ''}`
+        const line = `${((Date.now() - started) / 1000).toFixed(1)}s ${cause} in ${Math.round(window.innerHeight)} vv ${Math.round(vv.height)}/${Math.round(vv.offsetTop)} y${Math.round(window.scrollY)} kb ${next ? `${next.top}+${next.height}` : '-'} c ${rect ? `${Math.round(rect.top)}..${Math.round(rect.bottom)}` : '-'} t ${box ? `${Math.round(box.top)}..${Math.round(box.bottom)}` : '-'} f ${document.activeElement?.tagName?.toLowerCase() ?? '-'}${forceStatic ? ' STATIC' : ''}`
         if (history[history.length - 1]?.slice(history[history.length - 1].indexOf(' ') + 1) !== line.slice(line.indexOf(' ') + 1)) {
           history.push(line)
-          if (history.length > 7) history.shift()
+          if (history.length > 40) history.shift()
+          try { localStorage.setItem(DEBUG_KEY, history.join('\n')) } catch { /* sem armazenamento */ }
         }
-        setDebugInfo([now, ...history.slice().reverse()].join('\n'))
+        const shown = history.slice(-6).reverse()
+        const prev = previous ? `\nsessão anterior:\n${previous.split('\n').slice(-8).join('\n')}` : ''
+        setDebugInfo([now, ...shown].join('\n') + prev)
       }
     }
     update()
+    // A animação do teclado dura ~300 ms e o iOS nem sempre avisa o fim:
+    // reavalia depois de focar/desfocar.
+    const timers: number[] = []
+    const later = (what: string) => {
+      timers.splice(0).forEach((id) => window.clearTimeout(id))
+      for (const ms of [100, 250, 500, 1000]) {
+        timers.push(window.setTimeout(() => { note(`${what}+${ms}`); update() }, ms))
+      }
+    }
     const onResize = () => { note('resize'); update() }
     const onScroll = () => { note('scroll'); update() }
-    const onFocusIn = () => { note('focus'); update() }
-    const onFocusOut = () => { note('blur'); update() }
+    const onFocusIn = () => { note('focus'); update(); later('focus') }
+    const onFocusOut = () => { note('blur'); update(); later('blur') }
     vv.addEventListener('resize', onResize)
     vv.addEventListener('scroll', onScroll)
-    if (debug) {
-      document.addEventListener('focusin', onFocusIn)
-      document.addEventListener('focusout', onFocusOut)
-    }
+    document.addEventListener('focusin', onFocusIn)
+    document.addEventListener('focusout', onFocusOut)
     // Um aviso que aparece ou some acima do cartão empurra o topo dele.
     const observer = new ResizeObserver(() => { note('layout'); update() })
     observer.observe(body)
@@ -993,6 +1044,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     const unsubscribeBar = subscribeMobileBar(() => window.requestAnimationFrame(() => { note('bar'); update() }))
     return () => {
       unsubscribeBar()
+      timers.forEach((id) => window.clearTimeout(id))
       vv.removeEventListener('resize', onResize)
       vv.removeEventListener('scroll', onScroll)
       document.removeEventListener('focusin', onFocusIn)
