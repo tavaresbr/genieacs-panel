@@ -2586,12 +2586,22 @@ class SgpService {
     ]);
     const suggested = reported?.login ? await SgpContact.getByLogin(reported.login) : [];
     const contracts = [...new Set([...results, ...suggested].map((row) => String(row.contract)))];
-    const links = contracts.length
-      ? await Promise.all(contracts.map((contract) => SgpLink.getByContract(contract)))
-      : [];
-    const owners = new Map(contracts.map((contract, index) => [
+    // Uma consulta para todos os contratos, e não uma por resultado: a busca
+    // devolve até 15 e a sugestão por login soma mais. `getByContracts` ordena
+    // por `device_id`; a lista de cada contrato volta à ordem por `id` que
+    // `getByContract` dava, para o "já tem ONT" sair igual. Contrato vazio
+    // não tinha vínculo nenhum por lá e continua sem.
+    const wanted = contracts.filter(Boolean);
+    const rows = wanted.length ? await SgpLink.getByContracts(wanted) : [];
+    const byContract = new Map();
+    for (const link of [...rows].sort((a, b) => Number(a.id) - Number(b.id))) {
+      const key = String(link.contract);
+      if (!byContract.has(key)) byContract.set(key, []);
+      byContract.get(key).push(link);
+    }
+    const owners = new Map(contracts.map((contract) => [
       contract,
-      links[index].map((link) => link.device_id).filter((id) => id !== deviceId)
+      (byContract.get(contract) || []).map((link) => link.device_id).filter((id) => id !== deviceId)
     ]));
     const shape = (row) => ({
       contract: String(row.contract),
