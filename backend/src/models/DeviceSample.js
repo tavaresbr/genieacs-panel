@@ -26,14 +26,42 @@ class DeviceSample {
    * device per restart without anyone noticing. The
    * `(tenant_id, device_id, inform_at)` index serves this without touching the
    * table on any of the three engines.
+   *
+   * `sinceMs` corta a leitura à janela recente. Sem ele, o agrupamento varre o
+   * índice INTEIRO a cada coleta — dias de amostras de toda a frota — para
+   * achar o máximo de cada aparelho; o Postgres e o SQLite não pulam de grupo
+   * em grupo como o MySQL. Um aparelho FORA do mapa devolvido então quer dizer
+   * só "nada desde `sinceMs`", não "nada nunca": quem chama e precisa da
+   * diferença pergunta por ele em `newestInformFor`.
    */
-  static async newestInformByDevice() {
-    const rows = await tdb('device_samples')
+  static async newestInformByDevice({ sinceMs = null } = {}) {
+    const query = tdb('device_samples')
       .select('device_id')
       .max({ newest: 'inform_at' })
       .groupBy('device_id');
+    if (Number.isFinite(sinceMs)) query.where('inform_at', '>=', new Date(sinceMs));
     const newest = new Map();
-    for (const row of rows) newest.set(row.device_id, timestampMs(row.newest));
+    for (const row of await query) newest.set(row.device_id, timestampMs(row.newest));
+    return newest;
+  }
+
+  /**
+   * O mesmo máximo, só para os aparelhos pedidos — o complemento da janela de
+   * `newestInformByDevice`. Em lotes, pelo teto de variáveis do SQLite; cada
+   * lote é uma busca no índice `(tenant_id, device_id, inform_at)`.
+   */
+  static async newestInformFor(deviceIds) {
+    const ids = [...new Set(deviceIds)];
+    const newest = new Map();
+    for (let i = 0; i < ids.length; i += 500) {
+      // eslint-disable-next-line no-await-in-loop -- lotes para não estourar o IN
+      const rows = await tdb('device_samples')
+        .whereIn('device_id', ids.slice(i, i + 500))
+        .select('device_id')
+        .max({ newest: 'inform_at' })
+        .groupBy('device_id');
+      for (const row of rows) newest.set(row.device_id, timestampMs(row.newest));
+    }
     return newest;
   }
 

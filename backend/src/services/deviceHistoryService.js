@@ -218,7 +218,23 @@ class DeviceHistoryService {
       const fleet = await DeviceService.getTelemetryFleet();
       if (!Array.isArray(fleet) || fleet.length === 0) return summary;
 
-      const newest = await DeviceSample.newestInformByDevice();
+      // A última amostra de cada aparelho, lida só no último dia: quem informa
+      // está quase sempre ali, e o agrupamento sobre a tabela inteira era a
+      // consulta mais cara da coleta. O que fica de fora é quem está calado há
+      // mais de um dia — e para esse a ausência no mapa não prova nada: a ONT
+      // offline há três dias ainda mostra no GenieACS o mesmo `lastInform` que
+      // já foi gravado. Esses (só os que têm `lastInform` anterior à janela)
+      // são perguntados um a um, num lote, para a comparação abaixo continuar
+      // exatamente a de antes.
+      const since = now - DAY_MS;
+      const newest = await DeviceSample.newestInformByDevice({ sinceMs: since });
+      const fora = fleet
+        .filter((device) => device.deviceId && !newest.has(device.deviceId))
+        .filter((device) => Math.floor(timestampMs(device.lastInform) / 1000) * 1000 < since)
+        .map((device) => device.deviceId);
+      if (fora.length) {
+        for (const [id, at] of await DeviceSample.newestInformFor(fora)) newest.set(id, at);
+      }
       const rows = [];
       for (const device of fleet) {
         if (!device.deviceId) {

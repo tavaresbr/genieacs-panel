@@ -130,6 +130,29 @@ describe('sample collection', () => {
     assert.equal((await getDb()('device_samples')).length, 1);
   });
 
+  it('compara com a amostra antiga quem está calado há mais de um dia', async () => {
+    // A leitura do "último por aparelho" olha só o último dia; quem ficou fora
+    // dela é perguntado à parte. Um inform de dois dias atrás, mais novo que o
+    // de três dias gravado, ainda é amostra nova — e o de três dias de novo não.
+    const velho = Date.now() - 3 * DAY;
+    fleet = [reading('ont-dark', { informAt: velho }), reading('ont-live', { informAt: Date.now() - 60_000 })];
+    await collect({});
+
+    fleet = [
+      reading('ont-dark', { informAt: velho + DAY }),
+      reading('ont-live', { informAt: Date.now() - 60_000 }),
+      reading('ont-new', { informAt: velho })
+    ];
+    const summary = await collect({});
+    assert.equal(summary.stored, 2, JSON.stringify(summary));
+    assert.equal(summary.unchanged, 1);
+
+    fleet = [reading('ont-dark', { informAt: velho + DAY }), reading('ont-new', { informAt: velho })];
+    const again = await collect({});
+    assert.equal(again.stored, 0);
+    assert.equal(again.unchanged, 2);
+  });
+
   it('skips a device whose clock puts its inform in the future', async () => {
     fleet = [reading('ont-future', { informAt: Date.now() + 5 * DAY })];
     const summary = await collect({});
@@ -173,6 +196,41 @@ describe('hourly rollup', () => {
     await rollup({});
 
     assert.equal((await getDb()('device_sample_hours')).length, 1);
+  });
+
+  it('a segunda passada SUBSTITUI o balde, sem somar ao que havia', async () => {
+    const hourStart = Math.floor((Date.now() - 3 * HOUR) / HOUR) * HOUR;
+    fleet = [reading('ont-a', { informAt: hourStart, rxPower: -20, uptime: 100 })];
+    await collect({});
+    await rollup({});
+
+    fleet = [reading('ont-a', { informAt: hourStart + 600_000, rxPower: -24, uptime: 700 })];
+    await collect({});
+    await rollup({});
+
+    const rows = await getDb()('device_sample_hours');
+    assert.equal(rows.length, 1);
+    assert.equal(Number(rows[0].sample_count), 2);
+    assert.equal(Number(rows[0].rx_min), -24);
+    assert.equal(Number(rows[0].rx_max), -20);
+    assert.equal(Number(rows[0].rx_avg), -22);
+    assert.equal(Number(rows[0].uptime_last), 700);
+  });
+
+  it('grava em lotes mais baldes do que cabem num lote, e regrava os mesmos', async () => {
+    const { default: DeviceSampleHour } = await import('../src/models/DeviceSampleHour.js');
+    const bucketAt = new Date(Math.floor((Date.now() - 5 * HOUR) / HOUR) * HOUR);
+    const baldes = (rx) => Array.from({ length: 450 }, (_, i) => ({
+      device_id: `ont-${i}`, bucket_at: bucketAt, sample_count: 1,
+      rx_min: rx, rx_avg: rx, rx_max: rx, temp_min: null, temp_avg: null, temp_max: null, uptime_last: i
+    }));
+    assert.equal(await asTenant(() => DeviceSampleHour.upsertMany(baldes(-20))), 450);
+    // O mesmo balde repetido no lote: vale o último, como valia no laço antigo.
+    const repetidos = [...baldes(-25), { ...baldes(-26)[7] }];
+    await asTenant(() => DeviceSampleHour.upsertMany(repetidos));
+    const rows = await getDb()('device_sample_hours');
+    assert.equal(rows.length, 450);
+    assert.ok(rows.every((row) => Number(row.rx_avg) === (row.device_id === 'ont-7' ? -26 : -25)));
   });
 
   it('leaves the hour still in progress alone', async () => {
