@@ -1,6 +1,7 @@
 import WaBotConfigService from './waBotConfigService.js';
 import WaAssignmentService from './waAssignmentService.js';
 import { tdb } from '../config/database.js';
+import { TenantCache } from '../config/tenantCache.js';
 
 /** Os períodos que a tela oferece. Qualquer outro valor vira 7. */
 export const RESPONSE_TIME_PERIODS = Object.freeze([7, 30, 90]);
@@ -12,6 +13,17 @@ const PEDIDOS_DE_ATENDENTE = new Set(['atendente', 'handoff', 'tooManyAttempts']
 const CORTES_S = Object.freeze([5 * 60, 15 * 60, 60 * 60]);
 
 const LOTE = 500;
+
+/**
+ * A lista "esperando agora" do painel, por provedor e por limite.
+ *
+ * `GET /waiting` é sondado por toda aba aberta de todo atendente, e a resposta
+ * não depende de quem pergunta — só do provedor e do limite da regra. Sem
+ * cache, dez atendentes são dez varreduras da linha do tempo a cada volta.
+ * Trinta segundos de atraso numa contagem de minutos de espera é o preço.
+ */
+const ESPERANDO_TTL_MS = 30_000;
+const esperandoCache = new TenantCache(ESPERANDO_TTL_MS);
 
 const ms = (valor) => (valor instanceof Date ? valor.getTime() : new Date(valor).getTime());
 
@@ -209,6 +221,39 @@ class WaResponseTimeService {
    * `urgentMinMinutes` (por padrão, o mesmo limite).
    */
   static async waitingNow({ now = new Date(), minMinutes = 0, urgentMinMinutes = minMinutes } = {}) {
+    return this.computeWaitingNow({ now, minMinutes, urgentMinMinutes });
+  }
+
+  /**
+   * `waitingNow` com memória de ~30 s por provedor, chaveada pelos dois
+   * limites. Só para quem pergunta "agora" e tolera a defasagem — a rota da
+   * tela. O alerta (`waAlertService`) passa o próprio `now` e chama
+   * `waitingNow` direto: ele decide disparo e não pode ler o passado.
+   *
+   * A promessa fica no cache, e não o resultado, para que as abas que chegam
+   * juntas esperem a mesma consulta em vez de abrir uma cada. Se ela falhar,
+   * sai do cache e a próxima tenta de novo.
+   */
+  static async waitingNowCached({ minMinutes = 0, urgentMinMinutes = minMinutes } = {}) {
+    const chave = `${minMinutes}:${urgentMinMinutes}`;
+    let porLimite = esperandoCache.get();
+    if (!porLimite) porLimite = esperandoCache.set(new Map());
+    const guardado = porLimite.get(chave);
+    if (guardado) return guardado;
+    const promessa = this.computeWaitingNow({ now: new Date(), minMinutes, urgentMinMinutes });
+    porLimite.set(chave, promessa);
+    promessa.catch(() => {
+      if (porLimite.get(chave) === promessa) porLimite.delete(chave);
+    });
+    return promessa;
+  }
+
+  /** Para os testes: esquece a memória de todos os provedores. */
+  static resetWaitingCache() {
+    esperandoCache.clear();
+  }
+
+  static async computeWaitingNow({ now, minMinutes, urgentMinMinutes }) {
     const desde = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const candidatas = await tdb('wa_conversations')
       .whereNull('closed_at')

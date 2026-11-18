@@ -218,7 +218,7 @@ class WhatsAppMessageController {
       const settings = await WaAlertService.getSettings();
       const threshold = Math.max(1, Number(settings.rules?.wa_waiting?.threshold) || 15);
       const withinHours = await WaBotConfigService.withinHours(new Date());
-      const items = withinHours ? await WaResponseTimeService.waitingNow({ minMinutes: threshold, urgentMinMinutes: Math.max(1, Math.floor(threshold / 2)) }) : [];
+      const items = withinHours ? await WaResponseTimeService.waitingNowCached({ minMinutes: threshold, urgentMinMinutes: Math.max(1, Math.floor(threshold / 2)) }) : [];
       return res.json(createResponse(req.t('whatsapp.configLoaded'), { thresholdMinutes: threshold, withinHours, items }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.configLoadFailed');
