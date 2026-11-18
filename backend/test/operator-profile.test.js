@@ -199,6 +199,15 @@ describe('operator avatar', () => {
     assert.equal(body.data.users.find((u) => u.id === adminId).profile.avatar, png);
   });
 
+  it('hands the signed-in person their own photo for the side menu', async () => {
+    const res = await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(adminToken) });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.avatar, png);
+    // Quem não enviou foto recebe null — e não a foto de outra pessoa.
+    const owner = await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(ownerToken) });
+    assert.equal(owner.body.data.avatar, null);
+  });
+
   it('trusts the bytes and not the declared type', async () => {
     // Declarado JPEG, mas os bytes são PNG: vale o que os bytes provam.
     const res = await avatar(adminId, ownerToken, `data:image/jpeg;base64,${PNG_1X1}`);
@@ -249,6 +258,8 @@ describe('operator avatar', () => {
     const res = await call(`${panelUrl}/api/users/${adminId}/avatar`, { method: 'DELETE', headers: authHeaders(ownerToken) });
     assert.equal(res.status, 200);
     assert.equal(res.body.data.profile.avatar, null);
+    const me = await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(adminToken) });
+    assert.equal(me.body.data.avatar, null);
     const row = await getDb()('operator_profiles').where({ user_id: adminId }).first();
     assert.equal(row.avatar_data, null);
     const rows = await getDb()('audit_log')

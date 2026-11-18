@@ -108,6 +108,12 @@ class OperatorProfile {
     return new Map(rows.map((row) => [Number(row.user_id), row]));
   }
 
+  /** Só a foto (data URL ou null): o menu lateral a lê a cada carregamento, sem o resto do cadastro. */
+  static async avatar(userId) {
+    const row = await tdb('operator_profiles').where({ user_id: userId }).first('avatar_mime', 'avatar_data');
+    return avatarDataUrl(row);
+  }
+
   /** O cadastro completo, com o CPF decifrado — só para a tela de edição. */
   static async get(userId) {
     const row = await tdb('operator_profiles').where({ user_id: userId }).first();

@@ -36,6 +36,11 @@ export interface User {
    * Opcional pelo mesmo motivo de `email`: nem toda resposta traz o campo.
    */
   emailVerified?: boolean
+  /**
+   * A foto da pessoa neste provedor, como data URL (`data:image/jpeg;base64,…`),
+   * ou `null` quando não enviou. O menu lateral a mostra no lugar da inicial.
+   */
+  avatar?: string | null
   /** Se o login em duas etapas está ligado — só isso; o segredo nunca vem. */
   mfaEnabled?: boolean
   /**

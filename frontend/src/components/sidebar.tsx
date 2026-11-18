@@ -357,9 +357,16 @@ function SidebarContent({
           data-testid="sidebar-account-link"
           className={`mb-2 flex items-center rounded-md transition-colors hover:bg-white/8 ${isCollapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#d97706] text-sm font-bold text-[#1f251f]">
-            {initial}
-          </div>
+          {user?.avatar ? (
+            <img
+              src={user.avatar} alt="" width={36} height={36}
+              className="size-9 shrink-0 rounded-md object-cover" data-testid="sidebar-avatar-img"
+            />
+          ) : (
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#d97706] text-sm font-bold text-[#1f251f]">
+              {initial}
+            </div>
+          )}
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-white">{displayName}</div>

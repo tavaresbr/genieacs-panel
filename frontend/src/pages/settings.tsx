@@ -3372,7 +3372,11 @@ export default function Settings() {
                   operator={editingOperator}
                   isSelf={currentUser?.id === editingOperator.id}
                   onClose={() => setEditingOperator(null)}
-                  onSaved={() => { void fetchOperators() }}
+                  onSaved={() => {
+                    void fetchOperators()
+                    // A foto da própria pessoa também aparece no menu lateral.
+                    if (currentUser?.id === editingOperator.id) void refreshUser()
+                  }}
                 />
               )}
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
