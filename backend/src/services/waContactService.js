@@ -650,9 +650,16 @@ class WaContactService {
       // new thread opens on the current one.
       // Com um número escolhido não há atalho: a conversa é a DAQUELE número,
       // achada (ou criada) mais abaixo.
-      const reusable = !chosen && contact.conversationId
+      let reusable = !chosen && contact.conversationId
         ? await WaConversation.getById(contact.conversationId)
         : null;
+      // A conversa de um número que não está mais conectado (ou que saiu do
+      // provedor) não serve: o atendente escreveria e nada sairia. Abre-se a do
+      // número padrão.
+      if (reusable) {
+        const owner = await WhatsAppAccount.getById(reusable.account_id);
+        if (!owner || owner.status !== 'connected') reusable = null;
+      }
       const onNumber = reusable
         && variantesTelefoneBr(subscriber.phone).includes(reusable.wa_phone_e164);
       if (reusable && (onNumber || !normalizarTelefoneBr(subscriber.phone))) {
@@ -679,11 +686,9 @@ class WaContactService {
     }
 
     const externalThreadId = `${number}@s.whatsapp.net`;
-    // Só com número escolhido: a conversa daquele número já existia?
-    const prior = chosen
-      ? (await WaConversation.getByThread(account.id, externalThreadId))
-        || (await WaConversation.getByPhoneSpelling(account.id, externalThreadId))
-      : null;
+    // A conversa daquele número já existia? (`created` só é verdadeiro se foi criada agora.)
+    const prior = (await WaConversation.getByThread(account.id, externalThreadId))
+      || (await WaConversation.getByPhoneSpelling(account.id, externalThreadId));
 
     const conversation = await WaConversation.ensure({
       accountId: account.id,

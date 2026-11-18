@@ -849,7 +849,7 @@ export default function DeviceDetailPage() {
   const [sgpTicketEnabled, setSgpTicketEnabled] = useState(false)
   const [sgpUrl, setSgpUrl] = useState<string | null>(null)
   const [openingWhatsApp, setOpeningWhatsApp] = useState(false)
-  const whatsappNumbers = useConnectedAccounts(can('whatsapp.send'))
+  const whatsappNumbers = useConnectedAccounts(can('whatsapp.send') && can('whatsapp.read'))
   const [ticketOpen, setTicketOpen] = useState(false)
   const [ticketText, setTicketText] = useState('')
   const [ticketSending, setTicketSending] = useState(false)
