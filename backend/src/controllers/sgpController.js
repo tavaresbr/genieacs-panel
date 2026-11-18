@@ -58,6 +58,9 @@ class SgpController {
         eventTypeMap: body.eventTypeMap,
         ticketEnabled: body.ticketEnabled,
         ticketOccurrenceType: body.ticketOccurrenceType,
+        ticketTypes: body.ticketTypes,
+        ticketNotifyCustomer: body.ticketNotifyCustomer,
+        ticketOpenedMessage: body.ticketOpenedMessage,
         // The "Contacts for WhatsApp" section saves through this same route.
         contactsSyncEnabled: body.contactsSyncEnabled,
         contactsSyncIntervalHours: body.contactsSyncIntervalHours,

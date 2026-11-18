@@ -499,6 +499,7 @@ export default {
   'sgp.ticketFailed': 'SGP 접수에 실패했습니다',
   'sgp.error.ticketContentRequired': '접수하기 전에 상황을 설명해 주세요',
   'sgp.error.ticketDisabled': 'SGP 접수 기능이 꺼져 있습니다. 설정에서 켜세요.',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': 'SGP 연결 {count}건',
   'sgp.linksLoadFailed': 'SGP 연결 목록을 조회하지 못했습니다',
   'sgp.syncDone': '동기화를 완료했습니다: ONT {total}대 중 {linked}대 연결됨',

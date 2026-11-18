@@ -106,6 +106,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const [templateId, setTemplateId] = useState('')
   const [ticketOpen, setTicketOpen] = useState(false)
   const [ticketText, setTicketText] = useState('')
+  const [ticketType, setTicketType] = useState('')
   // The answer to an older request must not overwrite a newer one: switching
   // threads while SGP is slow is exactly when the two cross.
   const requestRef = useRef(0)
@@ -153,6 +154,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
     setSearchedDocument(null)
     setTicketOpen(false)
     setTicketText('')
+    setTicketType('')
     void load()
   }, [conversationId, load])
 
@@ -377,16 +379,28 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
     if (!contract || !ticketText.trim()) return
     setBusy('ticket')
     try {
-      const res = await whatsappAPI.subscriberTicket(conversationId, { contract, content: ticketText.trim() })
+      const res = await whatsappAPI.subscriberTicket(conversationId, {
+        contract,
+        content: ticketText.trim(),
+        ...(ticketType ? { occurrenceType: Number(ticketType) } : {})
+      })
       if (!res.success || !res.data) {
         toast.error(res.message || t('detail.sgp.ticketFailed'))
         return
       }
-      toast.success(res.data.ticket
-        ? t('detail.sgp.ticketOpenedWithNumber', { number: res.data.ticket })
-        : res.message || t('detail.sgp.ticketOpened'))
+      if (res.data.notified === false) {
+        toast.warning(t('detail.sgp.ticketOpenedNotNotified'))
+      } else if (res.data.notified && res.data.ticket) {
+        toast.success(t('detail.sgp.ticketOpenedNotified', { number: res.data.ticket }))
+      } else {
+        toast.success(res.data.ticket
+          ? t('detail.sgp.ticketOpenedWithNumber', { number: res.data.ticket })
+          : res.message || t('detail.sgp.ticketOpened'))
+      }
       setTicketOpen(false)
       setTicketText('')
+      setTicketType('')
+    setTicketType('')
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -800,6 +814,24 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                       </button>
                     ) : (
                       <div>
+                        {(panel.ticketTypes?.length ?? 0) > 0 && (
+                          <div className="mb-2">
+                            <label className="metric-label" htmlFor={`wa-ticket-type-${conversationId}`}>
+                              {t('detail.sgp.ticketType')}
+                            </label>
+                            <select
+                              id={`wa-ticket-type-${conversationId}`}
+                              className="modern-input mt-1 w-full"
+                              value={ticketType}
+                              onChange={(event) => setTicketType(event.target.value)}
+                            >
+                              <option value="">{t('detail.sgp.ticketTypeDefault')}</option>
+                              {panel.ticketTypes?.map((entry) => (
+                                <option key={entry.id} value={entry.id}>{entry.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <label className="metric-label" htmlFor={`wa-ticket-${conversationId}`}>
                           {t('detail.sgp.ticketLabel')}
                         </label>

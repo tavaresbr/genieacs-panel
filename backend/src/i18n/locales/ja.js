@@ -497,6 +497,7 @@ export default {
   'sgp.ticketFailed': 'SGP への問い合わせの登録に失敗しました',
   'sgp.error.ticketContentRequired': '問い合わせを登録する前に状況を記入してください',
   'sgp.error.ticketDisabled': 'SGP への問い合わせ登録は無効です。設定で有効にしてください。',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': 'SGP の紐づけ {count} 件',
   'sgp.linksLoadFailed': 'SGP の紐づけを一覧できませんでした',
   'sgp.syncDone': '同期が完了しました: {total} 台中 {linked} 台の ONT を紐づけました',

@@ -175,14 +175,20 @@ class WhatsAppSubscriberController {
       const result = await WaSubscriberPanelService.ticket(req.params?.id, {
         contract: body.contract,
         content: body.content,
-        note: body.note
-      });
+        note: body.note,
+        occurrenceType: body.occurrenceType
+      }, { userId: req.user?.userId ?? null });
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.WHATSAPP_TICKET_OPENED,
         subjectType: 'wa_conversation',
         subjectId: req.params?.id,
         // Só o contrato e se foi nota; o texto do chamado é do cliente.
-        detail: { contract: String(body.contract ?? '') || null, note: Boolean(body.note) }
+        detail: {
+          contract: String(body.contract ?? '') || null,
+          note: Boolean(body.note),
+          occurrenceType: Number(body.occurrenceType) || null,
+          notified: result.notified === true
+        }
       });
       return res.json(createResponse(result.message || req.t('sgp.ticketOpened'), result));
     } catch (error) {

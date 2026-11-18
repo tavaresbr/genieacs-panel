@@ -496,6 +496,7 @@ export default {
   'sgp.ticketFailed': 'Impossibile aprire il ticket in SGP',
   'sgp.error.ticketContentRequired': 'Descrivi che cosa sta succedendo prima di aprire il ticket',
   'sgp.error.ticketDisabled': "L'apertura di ticket in SGP è disattivata. Attivala nelle Impostazioni.",
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': '{count} collegamento/i SGP',
   'sgp.linksLoadFailed': 'Non è stato possibile elencare i collegamenti SGP',
   'sgp.syncDone': 'Sincronizzazione terminata: {linked} di {total} ONT collegate',

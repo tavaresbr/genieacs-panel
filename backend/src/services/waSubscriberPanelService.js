@@ -377,6 +377,8 @@ class WaSubscriberPanelService {
       // com "Retomar" no topo das faturas.
       dunningPause,
       ticketEnabled: config.ticketEnabled === true,
+      ticketTypes: config.ticketTypes ?? [],
+      ticketDefaultType: config.ticketOccurrenceType,
       teiahReady
     };
   }
@@ -566,10 +568,55 @@ class WaSubscriberPanelService {
     return this.build(conversation.id, { contract: clean });
   }
 
-  static async ticket(conversationId, { contract, content, note }) {
-    const { contract: clean } = await this.actionContract(conversationId, contract);
-    return SgpService.openTicket({ contract: clean, content, note });
+  static async ticket(
+    conversationId,
+    { contract, content, note, occurrenceType = null },
+    { userId = null } = {}
+  ) {
+    const { conversation, contract: clean } = await this.actionContract(conversationId, contract);
+    const result = await SgpService.openTicket({
+      contract: clean, content, note, occurrenceType
+    });
+
+    // O chamado já está aberto no SGP: avisar o cliente é um extra, e uma
+    // falha aqui não pode virar "falha ao abrir o chamado".
+    let notified = false;
+    try {
+      const config = await SgpService.getConfig();
+      if (config.ticketNotifyCustomer !== false && conversation.wa_phone_e164) {
+        const [link] = await SgpLink.getByContract(clean);
+        const name = link?.client_name || conversation.push_name || '';
+        const body = renderTicketOpenedMessage(config.ticketOpenedMessage, {
+          nome: name,
+          primeiro_nome: String(name).trim().split(/\s+/)[0] || '',
+          contrato: clean,
+          protocolo: result.ticket ? `#${result.ticket}` : '',
+          tipo: result.typeLabel || ''
+        });
+        if (body) {
+          await WaSendService.enqueue({ conversationId, body, userId, source: 'operator' });
+          notified = true;
+        }
+      }
+    } catch (error) {
+      console.error('Aviso de chamado aberto não enviado:', error?.message || error);
+    }
+    return { ...result, notified };
   }
+}
+
+/**
+ * O texto do aviso de chamado aberto, com `{variavel}` trocada pelo valor.
+ * Variável vazia some junto com os parênteses/espaços que a cercavam, para
+ * não sobrar "chamado  ()" quando o SGP não devolveu protocolo ou o tipo.
+ */
+export function renderTicketOpenedMessage(template, vars) {
+  return String(template ?? '')
+    .replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''))
+    .replace(/\(\s*\)/g, '')
+    .replace(/[ \t]+([,.!?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
 export default WaSubscriberPanelService;

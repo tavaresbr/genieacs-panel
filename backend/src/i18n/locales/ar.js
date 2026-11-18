@@ -497,6 +497,7 @@ export default {
   'sgp.ticketFailed': 'تعذّر فتح البلاغ في SGP',
   'sgp.error.ticketContentRequired': 'اشرح ما الذي يحدث قبل فتح البلاغ',
   'sgp.error.ticketDisabled': 'فتح البلاغات في SGP معطّل. فعّله من الإعدادات.',
+  'sgp.error.ticketTypeInvalid': 'Invalid ticket type. Pick one from the configured list.',
   'sgp.linksLoaded': '{count} ارتباطًا بـ SGP',
   'sgp.linksLoadFailed': 'تعذّر جلب قائمة ارتباطات SGP',
   'sgp.syncDone': 'اكتملت المزامنة: رُبط {linked} من أصل {total} جهازًا',

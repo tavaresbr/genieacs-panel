@@ -118,6 +118,12 @@ function paramName(value, fallback) {
  */
 export const DEFAULT_TICKET_OCCURRENCE_TYPE = 5;
 
+/** Aviso que o cliente recebe quando o painel abre um chamado por ele. */
+export const DEFAULT_TICKET_OPENED_MESSAGE =
+  'Olá, {primeiro_nome}! Abrimos o chamado {protocolo} ({tipo}) para você. '
+  + 'Nossa equipe vai analisar e retornar em breve.';
+export const MAX_TICKET_TYPES = 30;
+
 /**
  * The unlock path the panel used to default to, and which SGP never served.
  *
@@ -800,6 +806,21 @@ function clampNumber(value, min, max, fallback) {
  * `pagamento_confirmado` are one entry, and an unknown target type is dropped
  * rather than silently routing an event to a handler that does not exist.
  */
+function normalizeTicketTypes(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const types = [];
+  for (const entry of value) {
+    const label = String(entry?.label ?? '').trim().slice(0, 60);
+    const id = Math.trunc(Number(entry?.id));
+    if (!label || !Number.isFinite(id) || id < 1 || id > 999999 || seen.has(id)) continue;
+    seen.add(id);
+    types.push({ label, id });
+    if (types.length >= MAX_TICKET_TYPES) break;
+  }
+  return types;
+}
+
 function normalizeEventTypeMap(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const map = {};
@@ -845,6 +866,9 @@ const DEFAULT_CONFIG = Object.freeze({
   invoiceLimit: 6,
   ticketEnabled: false,
   ticketOccurrenceType: DEFAULT_TICKET_OCCURRENCE_TYPE,
+  ticketTypes: [],
+  ticketNotifyCustomer: true,
+  ticketOpenedMessage: DEFAULT_TICKET_OPENED_MESSAGE,
   endpoints: DEFAULT_ENDPOINTS,
   webhookEnabled: false,
   // Ligado nas integrações NOVAS (sem configuração gravada): a entrega precisa
@@ -1168,6 +1192,10 @@ class SgpService {
       ticketOccurrenceType: clampNumber(
         stored.ticketOccurrenceType, 1, 999999, DEFAULT_TICKET_OCCURRENCE_TYPE
       ),
+      ticketTypes: normalizeTicketTypes(stored.ticketTypes),
+      ticketNotifyCustomer: stored.ticketNotifyCustomer !== false,
+      ticketOpenedMessage: String(stored.ticketOpenedMessage ?? '').trim().slice(0, 1000)
+        || DEFAULT_TICKET_OPENED_MESSAGE,
       ...this.readContactsSync(stored),
       ...this.readSettle(stored),
       ...this.readPreRegistration(stored),
@@ -1370,6 +1398,15 @@ class SgpService {
       ticketOccurrenceType: patch.ticketOccurrenceType === undefined
         ? current.ticketOccurrenceType
         : clampNumber(patch.ticketOccurrenceType, 1, 999999, DEFAULT_TICKET_OCCURRENCE_TYPE),
+      ticketTypes: patch.ticketTypes === undefined
+        ? current.ticketTypes
+        : normalizeTicketTypes(patch.ticketTypes),
+      ticketNotifyCustomer: patch.ticketNotifyCustomer === undefined
+        ? current.ticketNotifyCustomer
+        : patch.ticketNotifyCustomer !== false,
+      ticketOpenedMessage: patch.ticketOpenedMessage === undefined
+        ? current.ticketOpenedMessage
+        : (String(patch.ticketOpenedMessage ?? '').trim().slice(0, 1000) || DEFAULT_TICKET_OPENED_MESSAGE),
       endpoints: {
         customer: this.normalizeEndpoint(
           patch.endpoints?.customer ?? current.endpoints.customer, DEFAULT_ENDPOINTS.customer
@@ -1893,6 +1930,16 @@ class SgpService {
       });
     }
 
+    // Com a lista de tipos configurada, só um id dela é aceito: o navegador
+    // não escolhe uma ocorrência que o operador não cadastrou.
+    let chosenType = null;
+    if (Number(occurrenceType) > 0) {
+      chosenType = (config.ticketTypes ?? []).find((entry) => entry.id === Number(occurrenceType)) ?? null;
+      if (!chosenType && (config.ticketTypes ?? []).length > 0) {
+        throw new SgpError('sgp.error.ticketTypeInvalid', { code: 'invalid_ticket_type', status: 400 });
+      }
+    }
+
     const payload = {
       contrato: cleanContract,
       // Trimmed rather than rejected: a technician's note running long is not a
@@ -1914,7 +1961,8 @@ class SgpService {
       // Null rather than a hardcoded sentence when the ERP says nothing: the
       // panel speaks eleven languages and the service has no request to
       // translate against, so the caller supplies the wording.
-      message: asText(pick(data, ['msg', 'mensagem', 'message']))
+      message: asText(pick(data, ['msg', 'mensagem', 'message'])),
+      typeLabel: chosenType?.label ?? null
     };
   }
 

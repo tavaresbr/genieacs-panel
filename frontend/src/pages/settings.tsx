@@ -298,6 +298,9 @@ export default function Settings() {
     invoiceLimit: 6,
     ticketEnabled: false,
     ticketOccurrenceType: 5,
+    ticketTypes: [] as SgpConfig['ticketTypes'],
+    ticketNotifyCustomer: true,
+    ticketOpenedMessage: '',
     settleReceivingPoint: 0,
     settlePaymentMethods: '',
     settleFees: 0,
@@ -459,6 +462,9 @@ export default function Settings() {
           invoiceLimit: config.invoiceLimit,
           ticketEnabled: config.ticketEnabled,
           ticketOccurrenceType: config.ticketOccurrenceType,
+          ticketTypes: config.ticketTypes ?? [],
+          ticketNotifyCustomer: config.ticketNotifyCustomer !== false,
+          ticketOpenedMessage: config.ticketOpenedMessage ?? '',
           settleReceivingPoint: config.settleReceivingPoint ?? 0,
           settlePaymentMethods: (config.settlePaymentMethods ?? []).join(', '),
           settleFees: config.settleFees ?? 0,
@@ -563,6 +569,9 @@ export default function Settings() {
         invoiceLimit: sgpForm.invoiceLimit,
         ticketEnabled: sgpForm.ticketEnabled,
         ticketOccurrenceType: sgpForm.ticketOccurrenceType,
+        ticketTypes: sgpForm.ticketTypes.filter((entry) => entry.label.trim() && entry.id > 0),
+        ticketNotifyCustomer: sgpForm.ticketNotifyCustomer,
+        ticketOpenedMessage: sgpForm.ticketOpenedMessage,
         settleReceivingPoint: sgpForm.settleReceivingPoint,
         settlePaymentMethods: sgpForm.settlePaymentMethods.split(',').map((entry) => entry.trim()).filter(Boolean),
         settleFees: sgpForm.settleFees,
@@ -2535,6 +2544,89 @@ export default function Settings() {
                             <p className="mt-1 text-sm leading-6 text-muted-foreground">
                               {t('settings.sgp.ticketOccurrenceTypeHint')}
                             </p>
+
+                            <div className="mt-4">
+                              <span className="field-label">{t('settings.sgp.ticketTypes')}</span>
+                              <p className="mb-2 text-sm leading-6 text-muted-foreground">{t('settings.sgp.ticketTypesHint')}</p>
+                              <div className="grid gap-2">
+                                {sgpForm.ticketTypes.map((entry, index) => (
+                                  <div key={index} className="flex gap-2">
+                                    <input
+                                      className="modern-input min-w-0 flex-1"
+                                      maxLength={60}
+                                      placeholder={t('settings.sgp.ticketTypeLabel')}
+                                      aria-label={t('settings.sgp.ticketTypeLabel')}
+                                      value={entry.label}
+                                      onChange={(event) => setSgpForm((current) => ({
+                                        ...current,
+                                        ticketTypes: current.ticketTypes.map((item, i) => (i === index ? { ...item, label: event.target.value } : item))
+                                      }))}
+                                    />
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      className="modern-input w-28"
+                                      placeholder={t('settings.sgp.ticketTypeId')}
+                                      aria-label={t('settings.sgp.ticketTypeId')}
+                                      value={entry.id || ''}
+                                      onChange={(event) => setSgpForm((current) => ({
+                                        ...current,
+                                        ticketTypes: current.ticketTypes.map((item, i) => (i === index ? { ...item, id: Math.max(Number(event.target.value) || 0, 0) } : item))
+                                      }))}
+                                    />
+                                    <button
+                                      type="button"
+                                      className="modern-button-secondary"
+                                      aria-label={t('settings.sgp.ticketTypeRemove')}
+                                      onClick={() => setSgpForm((current) => ({
+                                        ...current,
+                                        ticketTypes: current.ticketTypes.filter((_, i) => i !== index)
+                                      }))}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              {sgpForm.ticketTypes.length < 30 && (
+                                <button
+                                  type="button"
+                                  className="modern-button-secondary mt-2"
+                                  onClick={() => setSgpForm((current) => ({
+                                    ...current,
+                                    ticketTypes: [...current.ticketTypes, { label: '', id: 0 }]
+                                  }))}
+                                >
+                                  {t('settings.sgp.ticketTypeAdd')}
+                                </button>
+                              )}
+                            </div>
+
+                            <label className="mt-4 flex cursor-pointer items-start gap-3">
+                              <input
+                                type="checkbox"
+                                className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                                checked={sgpForm.ticketNotifyCustomer}
+                                onChange={(event) => setSgpForm((current) => ({ ...current, ticketNotifyCustomer: event.target.checked }))}
+                              />
+                              <span>
+                                <span className="block font-semibold">{t('settings.sgp.ticketNotify')}</span>
+                                <span className="mt-1 block text-sm leading-6 text-muted-foreground">{t('settings.sgp.ticketNotifyHint')}</span>
+                              </span>
+                            </label>
+                            {sgpForm.ticketNotifyCustomer && (
+                              <div className="mt-3">
+                                <label htmlFor="sgp-ticket-message" className="field-label">{t('settings.sgp.ticketMessage')}</label>
+                                <textarea
+                                  id="sgp-ticket-message"
+                                  className="modern-input min-h-20 w-full"
+                                  maxLength={1000}
+                                  value={sgpForm.ticketOpenedMessage}
+                                  onChange={(event) => setSgpForm((current) => ({ ...current, ticketOpenedMessage: event.target.value }))}
+                                />
+                                <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.ticketMessageHint')}</p>
+                              </div>
+                            )}
                           </div>
                         )}
 

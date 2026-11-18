@@ -3871,6 +3871,10 @@ export interface SgpConfig {
   ticketEnabled: boolean
   /** The install's own Tipo de Ocorrência id; SGP documents 5 as the default. */
   ticketOccurrenceType: number
+  /** Problem types the attendant picks from when opening a ticket. */
+  ticketTypes: SgpTicketType[]
+  ticketNotifyCustomer: boolean
+  ticketOpenedMessage: string
   /** The receiving point (cash desk) id settlements go to; 0 = not set. */
   settleReceivingPoint: number
   settlePaymentMethods: string[]
@@ -3937,8 +3941,16 @@ export interface SgpContactsTestResult {
   sample: { contract: string | null; name: string | null; hasPhone: boolean }[]
 }
 
+export interface SgpTicketType {
+  label: string
+  id: number
+}
+
 export interface SgpTicket {
   contract: string
+  /** Whether the customer got the WhatsApp notice (WhatsApp panel only). */
+  notified?: boolean
+  typeLabel?: string | null
   /** Null when the install answers in a shape we do not recognise. */
   ticket: string | null
   message: string | null
@@ -6293,6 +6305,8 @@ export type WaSubscriberPanel =
       /** A régua parada para este contrato (comprovante recebido); null sem pausa. */
       dunningPause: WaDunningPause | null
       ticketEnabled: boolean
+      ticketTypes?: SgpTicketType[]
+      ticketDefaultType?: number
     }
 
 export interface WaDunningPause {
@@ -7293,7 +7307,7 @@ export const whatsappAPI = {
   subscriberSavePhone: (conversationId: number, contract: string) =>
     apiClient.post<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber/phone`, { contract }),
 
-  subscriberTicket: (conversationId: number, payload: { contract: string; content: string; note?: string }) =>
+  subscriberTicket: (conversationId: number, payload: { contract: string; content: string; note?: string; occurrenceType?: number }) =>
     apiClient.post<SgpTicket>(`/whatsapp/conversations/${conversationId}/subscriber/ticket`, payload),
 
   requeueMessage: (id: number) =>
