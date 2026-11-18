@@ -141,6 +141,14 @@ describe('POST /conversations/:id/ai-rewrite', () => {
     assert.equal(pedidos.length, 0);
   });
 
+  it('recusa texto com CPF, PIX ou linha digitável sem chamar a IA', async () => {
+    const c = await conversa([['in', 'oi']]);
+    const res = await api(`/conversations/${c.id}/ai-rewrite`, { method: 'POST', body: { text: 'seu cpf 123.456.789-09 ok', mode: 'educado' } });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'ai_rewrite_sensitive');
+    assert.equal(pedidos.length, 0);
+  });
+
   it('resposta vazia da IA é 502', async () => {
     const c = await conversa([['in', 'oi']]);
     resposta = '   ';

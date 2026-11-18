@@ -224,10 +224,15 @@ function juntarConteudos(a, b, separador) {
   return [...lista(a), { type: 'text', text: separador.trim() ? separador : '\n' }, ...lista(b)];
 }
 
+/** O primeiro trecho da fatura sem links nem códigos: é o que o modelo pode ler. */
+function resumoDaFatura(trecho) {
+  return mascararSensivel(String(trecho ?? '')).replace(/https?:\/\/\S+/gi, '[link]').slice(0, 300);
+}
+
 const INSTRUCAO_DO_RASCUNHO = 'Escreva agora o próximo texto que a equipe deve enviar ao cliente, com base na conversa acima. Devolva só o texto da mensagem.';
 
 /** O fio como o modelo lê: cliente é `user`, bot e atendente são `assistant`. Notas internas ficam de fora. */
-async function historico(conversationId, limite = HISTORICO, { midia = false } = {}) {
+async function historico(conversationId, limite = HISTORICO, { midia = false, documento = false } = {}) {
   const linhas = await tdb('wa_messages')
     .where({ conversation_id: conversationId, is_note: false })
     .where((consulta) => consulta.whereNotNull('body').orWhereNotNull('attachment_path'))
@@ -237,10 +242,11 @@ async function historico(conversationId, limite = HISTORICO, { midia = false } =
   const ordem = linhas.reverse();
   // As últimas mídias do cliente (com `ai.vision`): bytes lidos do disco, só do que a API do Claude aceita.
   const vistas = midia ? escolherMidias(ordem) : new Set();
-  // A última fala do cliente vai inteira: o documento que ele acabou de digitar
-  // é o que `identificar_cliente` precisa ler. As anteriores saem mascaradas.
+  // A última fala do cliente vai inteira só quando `identificar_cliente` está
+  // disponível (`documento`): o CPF que ele acabou de digitar é o que a ferramenta
+  // precisa ler. Nos demais casos, e nas falas anteriores, sai mascarada.
   let ultimaDoCliente = -1;
-  ordem.forEach((m, i) => { if (m.direction === 'in') ultimaDoCliente = i; });
+  if (documento) ordem.forEach((m, i) => { if (m.direction === 'in') ultimaDoCliente = i; });
   let viu = false;
   const turnos = [];
   for (const [i, m] of ordem.entries()) {
@@ -367,6 +373,10 @@ class WaAiService {
       // Quem ainda não é cliente nunca recebe um valor que o provedor não cadastrou.
       // O contrato é o do FIM do laço: quem se identificou nesta mesma mensagem
       // (identificar_cliente) já é cliente, e o valor da fatura vem do SGP.
+      // Nenhum código de pagamento sai da boca do modelo (um dígito trocado num PIX
+      // é dinheiro que não chega): o que ele escrever é mascarado; os códigos
+      // certos vão como anexo.
+      resultado.texto = resultado.texto ? mascararSensivel(resultado.texto) : resultado.texto;
       const inventado = await this.valoresInventados({
         ai, link: resultado.link ?? link, texto: resultado.texto, tambem: resultado.permitidos
       });
@@ -397,7 +407,7 @@ class WaAiService {
       return { replied: true, intent: resultado.intent || 'ia', from: 'ia' };
     } catch (error) {
       const code = error?.code && String(error.code).startsWith('ai_') ? error.code : 'ai_failed';
-      console.warn(`[wa] IA: conversa ${conversation.id}: ${code}${code === 'ai_failed' ? ` (${error?.message})` : ''}`);
+      console.warn(`[wa] IA: conversa ${conversation.id}: ${code}${code === 'ai_failed' ? ` (${JSON.stringify(logSafe(error?.message, 200))})` : ''}`);
       await WaBotConfigService.recordAiError(code, error?.details, { automatico: true });
       return null;
     }
@@ -502,6 +512,9 @@ class WaAiService {
     if (!modoDeReescrita(mode)) throw new WaError('whatsapp.ai.error.rewriteMode', { code: 'ai_rewrite_mode', status: 400 });
     const atual = String(text ?? '').trim().slice(0, REESCRITA_ENTRADA_MAX);
     if (!atual) throw new WaError('whatsapp.ai.error.rewriteEmpty', { code: 'ai_rewrite_empty', status: 400 });
+    // CPF, PIX e linha digitável não vão ao provedor, e um dígito trocado na volta
+    // seria dinheiro que não chega: o atendente tira o código e tenta de novo.
+    if (mascararSensivel(atual) !== atual) throw new WaError('whatsapp.ai.error.rewriteSensitive', { code: 'ai_rewrite_sensitive', status: 400 });
     const ai = await WaBotConfigService.aiSettings();
     if (!ai.apiKey) throw new WaError('whatsapp.ai.error.keyRequired', { code: 'ai_key_required', status: 409 });
     return this.copiloto({
@@ -762,7 +775,7 @@ class WaAiService {
         return { contract: link.contract, device_id: link.device_id ?? null };
       }
     } catch (error) {
-      console.warn(`[wa] IA: identificação da conversa ${conversation.id}: ${error?.message}`);
+      console.warn(`[wa] IA: identificação da conversa ${conversation.id}: ${JSON.stringify(logSafe(error?.message, 200))}`);
     }
     return null;
   }
@@ -803,7 +816,7 @@ class WaAiService {
     // Sem mensagem do cliente para responder, não há o que a IA dizer: o bot de
     // menu segue, ou, no rascunho, a instrução final dá a vez a ela.
     const visao = ai.vision === true && aiProviderOrDefault(ai.provider) === AI_PROVIDER_ANTHROPIC;
-    const turnos = await historico(conversation.id, HISTORICO, { midia: visao });
+    const turnos = await historico(conversation.id, HISTORICO, { midia: visao, documento: nomes().includes('identificar_cliente') });
     const fio = prepararFio(turnos, { fecharComUsuario: sugestao ? INSTRUCAO_DO_RASCUNHO : null });
     const tarefa = turnos.comMidia ? 'visao' : (sugestao ? 'sugestao' : 'conversa');
     if (!fio.length) return { texto: null, anexos: [], intent: null, transferiu: false, link, permitidos: [] };
@@ -814,6 +827,9 @@ class WaAiService {
       ...fio
     ];
     const anexos = [];
+    // O que uma ferramenta com efeito (liberação) já fez: se o modelo falhar depois,
+    // o cliente ainda recebe o resultado em vez de cair no menu sem saber.
+    const efeitos = [];
     let intent = null;
     // Só o que o PROVEDOR escreveu (a base que entrou no prompt). O valor que
     // o cliente digitou fica de fora: "é R$ 10, né?" respondido com "sim, R$ 10"
@@ -822,17 +838,24 @@ class WaAiService {
 
     for (let rodada = 0; rodada <= RODADAS; rodada += 1) {
       const disponiveis = rodada < RODADAS ? nomes() : [];
-      // eslint-disable-next-line no-await-in-loop -- cada volta depende da anterior
-      const resposta = await WaAiClient.chat({
-        provider: ai.provider,
-        baseUrl: ai.baseUrl,
-        apiKey: ai.apiKey,
-        workspaceId: ai.workspaceId,
-        model: modeloDaTarefa(ai, tarefa),
-        messages: mensagens,
-        tools: disponiveis.map(ferramenta),
-        task: tarefa
-      });
+      let resposta;
+      try {
+        // eslint-disable-next-line no-await-in-loop -- cada volta depende da anterior
+        resposta = await WaAiClient.chat({
+          provider: ai.provider,
+          baseUrl: ai.baseUrl,
+          apiKey: ai.apiKey,
+          workspaceId: ai.workspaceId,
+          model: modeloDaTarefa(ai, tarefa),
+          messages: mensagens,
+          tools: disponiveis.map(ferramenta),
+          task: tarefa
+        });
+      } catch (error) {
+        if (!efeitos.length) throw error;
+        console.warn(`[wa] IA: conversa ${conversation.id}: falha depois de uma ação já feita: ${JSON.stringify(logSafe(error?.code || error?.message, 200))}`);
+        return fim({ texto: efeitos.join('\n\n'), anexos, intent, transferiu: false });
+      }
       const chamadas = resposta.toolCalls.filter((c) => disponiveis.includes(c.name));
       if (!chamadas.length) {
         return fim({ texto: resposta.content, anexos, intent, transferiu: false });
@@ -854,6 +877,7 @@ class WaAiService {
         if (saida.link) link = saida.link;
         if (saida.anexo) anexos.push(...[saida.anexo].flat());
         if (saida.intent) intent = saida.intent;
+        if (saida.efeito) efeitos.push(saida.efeito);
         if (saida.transferir) {
           const lead = saida.intent === 'lead';
           return fim({ texto: lead ? resposta.content : saida.texto, anexos, intent: lead ? 'lead' : 'atendente', transferiu: true });
@@ -873,7 +897,9 @@ class WaAiService {
           const semFatura = partes[0] === await WaBotConfigService.message('noOpenInvoice');
           if (semFatura) return { paraModelo: `Sem fatura em aberto. Diga ao cliente: ${partes[0]}`, intent: 'noOpenInvoice' };
           return {
-            paraModelo: `Fatura encontrada. Os dados abaixo serão enviados logo depois da sua resposta, em mensagens separadas, exatamente assim (não repita os códigos):\n${partes.join('\n\n')}`,
+            // O modelo lê só o resumo (valor e vencimento): PIX, linha digitável e
+            // link são anexados pelo servidor e não passam pelo provedor de IA.
+            paraModelo: `Fatura encontrada. O valor, o vencimento e os códigos de pagamento (PIX, linha digitável, link) serão enviados logo depois da sua resposta, em mensagens separadas. Não os escreva nem repita; só diga que estão logo abaixo. Resumo: ${resumoDaFatura(partes[0])}`,
             anexo: partes,
             intent: 'fatura'
           };
@@ -906,7 +932,7 @@ class WaAiService {
           return { paraModelo: 'Ferramenta indisponível.' };
       }
     } catch (error) {
-      console.warn(`[wa] IA: ferramenta ${chamada.name}: ${error?.code || error?.message}`);
+      console.warn(`[wa] IA: ferramenta ${chamada.name}: ${JSON.stringify(logSafe(error?.code || error?.message, 200))}`);
       return { paraModelo: 'O sistema não respondeu agora. Peça desculpas e ofereça transferir para um atendente.' };
     }
   }
@@ -1001,7 +1027,7 @@ class WaAiService {
       return { paraModelo: 'O cliente não confirmou. Não libere; ofereça outra ajuda ou transferir para um atendente.' };
     }
     const texto = await WaBotService.textoLiberacao(link, conversation);
-    return { paraModelo: `Resultado do pedido de liberação (repasse ao cliente): ${texto}`, intent: 'liberar' };
+    return { paraModelo: `Resultado do pedido de liberação (repasse ao cliente): ${texto}`, intent: 'liberar', efeito: texto };
   }
 
   /**

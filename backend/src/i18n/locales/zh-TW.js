@@ -756,6 +756,7 @@ export default {
   'whatsapp.ai.error.draftGoal': '請描述訊息的用途，或輸入要改進的文字',
   'whatsapp.ai.error.emptyConversation': 'There are no messages to summarize in this conversation',
   'whatsapp.ai.error.rewriteEmpty': 'Write the text you want to rewrite',
+  'whatsapp.ai.error.rewriteSensitive': 'The text has an ID number, PIX or payment code. Remove it before rewriting with AI',
   'whatsapp.ai.error.rewriteMode': 'Invalid rewrite mode',
   'whatsapp.templates.deleteFailed': '無法刪除範本',
   'whatsapp.templates.notFound': '找不到該範本',
