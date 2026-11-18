@@ -758,6 +758,7 @@ export default {
   'whatsapp.ai.error.draftGoal': 'Опишите, что должно делать сообщение, или напишите текст для улучшения',
   'whatsapp.ai.error.emptyConversation': 'There are no messages to summarize in this conversation',
   'whatsapp.ai.error.rewriteEmpty': 'Write the text you want to rewrite',
+  'whatsapp.ai.error.rewriteSensitive': 'The text has an ID number, PIX or payment code. Remove it before rewriting with AI',
   'whatsapp.ai.error.rewriteMode': 'Invalid rewrite mode',
   'whatsapp.templates.deleteFailed': 'Не удалось удалить шаблон',
   'whatsapp.templates.notFound': 'Шаблон не найден',

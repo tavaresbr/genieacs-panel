@@ -755,6 +755,7 @@ export default {
   'whatsapp.ai.error.draftGoal': '메시지의 목적을 적거나 개선할 본문을 입력하세요',
   'whatsapp.ai.error.emptyConversation': 'There are no messages to summarize in this conversation',
   'whatsapp.ai.error.rewriteEmpty': 'Write the text you want to rewrite',
+  'whatsapp.ai.error.rewriteSensitive': 'The text has an ID number, PIX or payment code. Remove it before rewriting with AI',
   'whatsapp.ai.error.rewriteMode': 'Invalid rewrite mode',
   'whatsapp.templates.deleteFailed': '템플릿을 삭제하지 못했습니다',
   'whatsapp.templates.notFound': '템플릿을 찾을 수 없습니다',

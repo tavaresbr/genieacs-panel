@@ -971,6 +971,17 @@ describe('a IA atendendo', () => {
     assert.ok(saidas.includes(PIX), 'o PIX sai sozinho, exatamente como o SGP mandou');
     // A segunda volta levou o resultado da ferramenta.
     assert.equal(pedidosIa[1].payload.messages.at(-1).role, 'tool');
+    // O provedor de IA não lê o código de pagamento: só o resumo da fatura.
+    assert.equal(JSON.stringify(pedidosIa).includes(PIX), false, 'o PIX não vai ao provedor de IA');
+  });
+
+  it('a IA escreve um PIX por conta própria: o código é mascarado antes de sair', async () => {
+    await limparFio(ASSINANTE);
+    roteiro = [{ content: `Pague por aqui: ${PIX}` }];
+    await receber(ASSINANTE, 'qual o pix?');
+    const saidas = await respostas(ASSINANTE);
+    assert.equal(saidas.join(' ').includes(PIX), false);
+    assert.match(saidas.join(' '), /PIX omitido/);
   });
 
   it('a conexão: o sinal da ONT, e nunca a senha do Wi-Fi', async () => {

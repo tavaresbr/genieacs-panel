@@ -754,6 +754,7 @@ export default {
   'whatsapp.ai.error.draftGoal': 'Describe qué debe hacer el mensaje o escribe un texto para mejorar',
   'whatsapp.ai.error.emptyConversation': 'No hay mensajes que resumir en esta conversación',
   'whatsapp.ai.error.rewriteEmpty': 'Escribe el texto que quieres reescribir',
+  'whatsapp.ai.error.rewriteSensitive': 'El texto tiene CPF, PIX o línea de pago. Quítalos antes de reescribir con la IA',
   'whatsapp.ai.error.rewriteMode': 'Modo de reescritura no válido',
   'whatsapp.templates.deleteFailed': 'No se pudo eliminar la plantilla',
   'whatsapp.templates.notFound': 'Plantilla no encontrada',
