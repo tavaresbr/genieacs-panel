@@ -1,100 +1,16 @@
 {
-  "version": "1.48.0",
-  "build": 1771,
-  "sourceCommit": "0fc1b976a433",
+  "version": "1.48.1",
+  "build": 1774,
+  "sourceCommit": "e9dd9a6d4b90",
   "releasedAt": "2026-11-18",
-  "basedOnTag": "v1.47.4",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/1874285ca84b...0fc1b976a433",
+  "basedOnTag": "v1.48.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/ef2836743e75...e9dd9a6d4b90",
   "changes": [
     {
-      "shortHash": "c6d3a357",
+      "shortHash": "fa09e267",
       "date": "2026-11-18",
-      "title": "Foto do usuário logado no menu lateral",
-      "category": "New"
-    },
-    {
-      "shortHash": "94018893",
-      "date": "2026-11-18",
-      "title": "Leitura ao vivo só retoca os pontos e para com a aba escondida",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "6fb279c9",
-      "date": "2026-11-18",
-      "title": "Leituras periódicas param com a aba escondida",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "41802377",
-      "date": "2026-11-18",
-      "title": "Contrato do SGP vem com a página, sem baixar /sgp/links inteiro",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "846b081f",
-      "date": "2026-11-18",
-      "title": "Dicionário inglês também sob demanda, fora do chunk de entrada",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "eba5c9ce",
-      "date": "2026-11-18",
-      "title": "React, DOM e roteador num chunk próprio",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "50894587",
-      "date": "2026-11-18",
-      "title": "Leituras de frota compartilhadas, agendador com vagas por provedor",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "7f54c0bc",
-      "date": "2026-11-18",
-      "title": "Índices compostos das consultas quentes (0141)",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "725fceff",
-      "date": "2026-11-18",
-      "title": "Estatísticas do planejador com PRAGMA optimize",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "973d8066",
-      "date": "2026-11-18",
-      "title": "Lista \"esperando agora\" memorizada por provedor (~30 s)",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "ee66b703",
-      "date": "2026-11-18",
-      "title": "Coleta lê só o último dia e o rollup grava em lote",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "e7d372e0",
-      "date": "2026-11-18",
-      "title": "Lista de contatos e candidatos de webhook memorizados",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "b02dde6e",
-      "date": "2026-11-18",
-      "title": "Vínculos e aparelhos afetados em lote",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "0cbdc304",
-      "date": "2026-11-18",
-      "title": "Prévia da planilha lê as fichas em lote",
-      "category": "Improved"
-    },
-    {
-      "shortHash": "7c480f72",
-      "date": "2026-11-18",
-      "title": "Tipo de problema ao abrir chamado e aviso ao cliente",
-      "category": "New"
+      "title": "IPhone — volta ao topo ao fechar o teclado mesmo com a página travada",
+      "category": "Fixed"
     }
   ]
 }
