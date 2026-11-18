@@ -387,6 +387,48 @@ deploy compartilhado é uma linha que ninguém consegue transformar em ação.
 - `path` nunca traz a query string, então um token colado na URL não vai para o log.
 - `/api/health` só aparece quando falha.
 
+### GenieACS de um provedor fora do ar
+
+Quando o GenieACS de um provedor não responde, o log não ganha um stack trace por
+leitura: ganha **uma linha a cada 5 minutos** por provedor e motivo, e uma quando volta.
+
+```
+[tenant=2] GenieACS unreachable (dns); further failures suppressed for 5 min
+[tenant=2] GenieACS reachable again
+```
+
+O que vem entre parênteses é sempre um destes códigos — nunca o host nem a mensagem do
+erro, que vêm da URL que o provedor configurou:
+
+| Código | O que quer dizer | Por onde começar |
+|---|---|---|
+| `dns` | o nome do endereço não resolve (`ENOTFOUND`, `EAI_AGAIN`) | o DNS do domínio do ACS, ou a URL digitada errada |
+| `refused` | o servidor recusou a conexão (`ECONNREFUSED`) | o GenieACS parado, ou a porta da NBI (7557) fechada |
+| `timeout` | ninguém respondeu dentro do prazo (15 s) | firewall descartando, link do provedor caído |
+| `tls` | o certificado HTTPS foi recusado | certificado vencido, autoassinado ou de outro nome |
+| `unauthorized` | a NBI respondeu 401/403 | a credencial do GenieACS no console |
+| `http_error` | a NBI respondeu 5xx | o próprio GenieACS (logs dele, MongoDB) |
+| `blocked` | a guarda de egresso recusou o endereço | URL apontando para rede interna, ou porta fora da lista (`GENIEACS_ALLOWED_PORTS`) |
+| `unknown` | outra falha de transporte (`ECONNRESET`, rede inalcançável…) | a rede entre o painel e o ACS |
+
+O resto continua com stack: um erro que **não** é falha do ACS é bug do painel, e aí o
+stack é o que resolve.
+
+Onde ver sem SSH:
+
+- **No console**: a lista de provedores mostra "GenieACS fora (DNS) desde 09:46" ao lado
+  do estado de quem está fora, e a tela do GenieACS do provedor mostra o motivo, desde
+  quando e quantas falhas seguidas. É o que o painel daquele provedor viu nos pedidos de
+  verdade ao ACS, guardado na memória do processo — um restart zera, e volta no primeiro
+  pedido.
+- **No painel do provedor**: depois de um minuto fora, uma faixa vermelha em todas as telas
+  explica o motivo ("O GenieACS não está acessível: o endereço configurado não existe no
+  DNS…"); o administrador ganha o atalho para as configurações. A faixa some sozinha quando
+  o ACS volta. As rotas de equipamento respondem `502` com `code: "acs_unreachable"` e o
+  motivo em `reason`, em vez do 500 genérico.
+- `GET /api/devices/acs-health` (qualquer sessão do provedor) devolve o mesmo estado:
+  `{ status, code, since, lastCheckedAt, consecutiveFailures, downForMs }`.
+
 ## 3. Ver: métricas
 
 `GET /api/platform/metrics`, formato de exposição do Prometheus, **`tenant_id` em toda
