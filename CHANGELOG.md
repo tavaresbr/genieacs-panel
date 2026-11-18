@@ -7,6 +7,33 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.49.0] - 2026-11-18
+
+### New
+
+- A planilha leva o filtro do SGP, como a lista (`fec68e53`)
+
+### Improved
+
+- Filtro do SGP aplicado no servidor, antes da paginação (`19e26697`)
+- Webhook responde antes do bot; processamento em fila por conversa (`10285fa0`)
+- Uma leitura da frota por provedor com a projeção unida (`f0c67f22`)
+- ACS filtra quem já tem a tag ($nin) (`ba78f4fd`)
+
+### Fixed
+
+- Bot responde cada mensagem de uma rajada; trava por answers_message_id (`6c07efc9`)
+- Volta travada do bot não segura a fila da conversa para sempre (`d2644777`)
+- Ação do operador lê a frota na hora; auto-tag cai na leitura inteira se o ACS ignorar o $nin (`bab7a4dd`)
+- Conferência zerada também cai na leitura inteira (`10165aa1`)
+
+### Maintenance
+
+- Prazo da tarefa travada na fila de entrada (`6d08b097`)
+- Espera da outra conversa por tempo, não por voltas do laço (`dccad588`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/971f72adfc7b...f2d1863fc3bf)
+
 ## [1.48.1] - 2026-11-18
 
 ### Fixed

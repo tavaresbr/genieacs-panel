@@ -1,16 +1,76 @@
 {
-  "version": "1.48.1",
-  "build": 1774,
-  "sourceCommit": "e9dd9a6d4b90",
+  "version": "1.49.0",
+  "build": 1787,
+  "sourceCommit": "f2d1863fc3bf",
   "releasedAt": "2026-11-18",
-  "basedOnTag": "v1.48.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/ef2836743e75...e9dd9a6d4b90",
+  "basedOnTag": "v1.48.1",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/971f72adfc7b...f2d1863fc3bf",
   "changes": [
     {
-      "shortHash": "fa09e267",
+      "shortHash": "19e26697",
       "date": "2026-11-18",
-      "title": "IPhone — volta ao topo ao fechar o teclado mesmo com a página travada",
+      "title": "Filtro do SGP aplicado no servidor, antes da paginação",
+      "category": "Improved"
+    },
+    {
+      "shortHash": "fec68e53",
+      "date": "2026-11-18",
+      "title": "A planilha leva o filtro do SGP, como a lista",
+      "category": "New"
+    },
+    {
+      "shortHash": "10285fa0",
+      "date": "2026-11-18",
+      "title": "Webhook responde antes do bot; processamento em fila por conversa",
+      "category": "Improved"
+    },
+    {
+      "shortHash": "6c07efc9",
+      "date": "2026-11-18",
+      "title": "Bot responde cada mensagem de uma rajada; trava por answers_message_id",
       "category": "Fixed"
+    },
+    {
+      "shortHash": "d2644777",
+      "date": "2026-11-18",
+      "title": "Volta travada do bot não segura a fila da conversa para sempre",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "6d08b097",
+      "date": "2026-11-18",
+      "title": "Prazo da tarefa travada na fila de entrada",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f0c67f22",
+      "date": "2026-11-18",
+      "title": "Uma leitura da frota por provedor com a projeção unida",
+      "category": "Improved"
+    },
+    {
+      "shortHash": "ba78f4fd",
+      "date": "2026-11-18",
+      "title": "ACS filtra quem já tem a tag ($nin)",
+      "category": "Improved"
+    },
+    {
+      "shortHash": "bab7a4dd",
+      "date": "2026-11-18",
+      "title": "Ação do operador lê a frota na hora; auto-tag cai na leitura inteira se o ACS ignorar o $nin",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "10165aa1",
+      "date": "2026-11-18",
+      "title": "Conferência zerada também cai na leitura inteira",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "dccad588",
+      "date": "2026-11-18",
+      "title": "Espera da outra conversa por tempo, não por voltas do laço",
+      "category": "Maintenance"
     }
   ]
 }
