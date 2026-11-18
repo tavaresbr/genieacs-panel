@@ -1,5 +1,5 @@
 import AppState from '../models/AppState.js';
-import { tdb } from '../config/database.js';
+import { getDb, isSqlite, tdb } from '../config/database.js';
 import DeviceService from './deviceService.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
@@ -681,6 +681,16 @@ class SchedulerService {
         console.warn(`Retention pass failed for provider ${tenant.slug}: ${error.message}`);
       }
     });
+    // SQLite: as estatísticas do planejador envelhecem com o banco, e uma
+    // conexão do pool pode viver semanas sem reabrir (o `optimize` de
+    // `afterCreate` só roda na abertura). Uma vez por dia, depois da poda —
+    // que é justamente o que mais muda as tabelas —, `PRAGMA optimize` refaz
+    // só o que precisa. Postgres e MySQL têm autovacuum/analyze próprios.
+    if (isSqlite()) {
+      await getDb().raw('PRAGMA optimize').catch((error) => {
+        console.warn(`Could not optimize SQLite statistics: ${error.message}`);
+      });
+    }
   }
 }
 

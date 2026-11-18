@@ -4106,7 +4106,13 @@ async function createIndexOnline(db, table, columns, name) {
   );
   const existing = found.rows?.[0];
   if (existing?.valid) return;
-  if (existing) await db.raw('drop index concurrently if exists ??', [name]);
+  // `db.client.raw`, e não `db.raw`, para os comandos CONCURRENTLY: com
+  // `RLS_ENABLED=true` o `db` é o envoltório de `rls.js`, que põe toda consulta
+  // numa transação para marcar o provedor — e ali o CONCURRENTLY é recusado.
+  // DDL não lê linha nenhuma, então não precisa da marca. A contagem abaixo
+  // fica no `db`, porque ela LÊ linhas e, sem a marca, o RLS devolveria zero.
+  const direto = (sql, bindings) => db.client.raw(sql, bindings);
+  if (existing) await direto('drop index concurrently if exists ??', [name]);
 
   const [{ n } = {}] = (await db.raw(
     `select count(*)::int as n from (select 1 from ?? limit ${ONLINE_INDEX_MIN_ROWS}) s`, [table]
@@ -4114,7 +4120,7 @@ async function createIndexOnline(db, table, columns, name) {
   const cols = columns.map(() => '??').join(', ');
   if (Number(n) >= ONLINE_INDEX_MIN_ROWS) {
     try {
-      await db.raw(`create index concurrently if not exists ?? on ?? (${cols})`, [name, table, ...columns]);
+      await direto(`create index concurrently if not exists ?? on ?? (${cols})`, [name, table, ...columns]);
       return;
     } catch (error) {
       console.warn(`CREATE INDEX CONCURRENTLY ${name} failed (${error.message}); building it with a plain CREATE INDEX`);

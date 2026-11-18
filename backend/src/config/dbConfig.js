@@ -183,6 +183,20 @@ export function buildKnexConfig(config = readDbConfig()) {
         conn.pragma('journal_mode = WAL');
         conn.pragma('busy_timeout = 5000');
         conn.pragma('foreign_keys = ON');
+        // As estatísticas do planejador. Sem `sqlite_stat1` o SQLite escolhe
+        // índice por heurística, e com vários índices compostos começando por
+        // `tenant_id` ele pode pegar o pior. `0x10002` é o que a documentação
+        // recomenda na abertura de conexão de vida longa: analisa só as
+        // tabelas que nunca foram analisadas ou mudaram muito, com o limite de
+        // amostragem que o próprio `optimize` impõe — barato num banco já
+        // analisado. O `PRAGMA optimize` diário fica na poda do agendador.
+        // Em try: estatística é otimização, e uma conexão que não abre por
+        // causa dela é um painel fora do ar por nada.
+        try {
+          conn.pragma('optimize = 0x10002');
+        } catch {
+          // segue sem estatística nova
+        }
         done(null, conn);
       }
     }
