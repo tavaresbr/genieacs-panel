@@ -7,6 +7,34 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.48.0] - 2026-11-18
+
+### New
+
+- Foto do usuário logado no menu lateral (`c6d3a357`)
+- Tipo de problema ao abrir chamado e aviso ao cliente (`7c480f72`)
+
+### Improved
+
+- Leitura ao vivo só retoca os pontos e para com a aba escondida (`94018893`)
+- Leituras periódicas param com a aba escondida (`6fb279c9`)
+- Contrato do SGP vem com a página, sem baixar /sgp/links inteiro (`41802377`)
+- Dicionário inglês também sob demanda, fora do chunk de entrada (`846b081f`)
+- Leituras de frota compartilhadas, agendador com vagas por provedor (`50894587`)
+- Índices compostos das consultas quentes (0141) (`7f54c0bc`)
+- Estatísticas do planejador com PRAGMA optimize (`725fceff`)
+- Lista "esperando agora" memorizada por provedor (~30 s) (`973d8066`)
+- Coleta lê só o último dia e o rollup grava em lote (`ee66b703`)
+- Lista de contatos e candidatos de webhook memorizados (`e7d372e0`)
+- Vínculos e aparelhos afetados em lote (`b02dde6e`)
+- Prévia da planilha lê as fichas em lote (`0cbdc304`)
+
+### Maintenance
+
+- React, DOM e roteador num chunk próprio (`eba5c9ce`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/1874285ca84b...0fc1b976a433)
+
 ## [1.47.4] - 2026-11-18
 
 ### Fixed
