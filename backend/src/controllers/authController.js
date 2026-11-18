@@ -28,6 +28,7 @@ import MfaService, { mfaEnabled } from '../services/mfaService.js';
 import AccountLockout from '../models/AccountLockout.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import Plan from '../models/Plan.js';
+import OperatorProfile from '../models/OperatorProfile.js';
 import PlatformNotifyService from '../services/platformNotifyService.js';
 import PlatformAlertService from '../services/platformAlertService.js';
 import { normalizeTaxId, isValidCnpj } from '../utils/taxId.js';
@@ -1264,6 +1265,14 @@ class AuthController {
             ? null
             : await Tenant.findPublicById(req.user.tenantId)
               .then((row) => (row ? { slug: row.slug ?? null, name: row.name } : null)),
+          // A foto da pessoa NESTE provedor (o menu lateral a mostra no lugar da
+          // inicial). Lida na caixa do provedor da SESSÃO, e não na do host: num
+          // host único o escopo da rota é o do primeiro provedor. Nula no
+          // console, na personificação e para quem não enviou foto — e uma falha
+          // aqui nunca derruba o carregamento da tela por causa de um enfeite.
+          avatar: req.user.platform || req.user.impersonation || !req.user.tenantId
+            ? null
+            : await runInTenant(req.user.tenantId, () => OperatorProfile.avatar(userId)).catch(() => null),
           // Presente só na sessão do console, e é o que diz à tela que esta
           // sessão não tem provedor — em vez de ela deduzir isso de um
           // `tenantId` nulo, que é a dedução que um dia alguém faz errado.

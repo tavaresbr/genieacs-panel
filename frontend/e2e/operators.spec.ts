@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { PROVIDER, loginViaForm, shot } from './support/demo'
+import path from 'node:path'
+import { PROVIDER, SCREENSHOTS_DIR, loginViaForm, shot } from './support/demo'
 
 /**
  * "Editar" um operador (Configurações → Acesso da conta → Operadores): o
@@ -76,6 +77,9 @@ test.describe('o cadastro do operador', () => {
     await page.goto('/settings?tab=security')
 
     // Sem foto, a lista mostra as iniciais.
+    const rodape = page.getByTestId('sidebar-account-link')
+    await expect(page.getByTestId('sidebar-avatar-img')).toBeHidden()
+    await rodape.screenshot({ path: path.join(SCREENSHOTS_DIR, 'sidebar-avatar-01-initial.png') })
     await expect(page.getByTestId('operator-avatar-initials').filter({ visible: true }).first()).toBeVisible()
 
     await page.getByRole('button', { name: /^Editar cadastro de / }).first().click()
@@ -92,6 +96,9 @@ test.describe('o cadastro do operador', () => {
     await dialogo.getByTestId('operator-avatar-file').setInputFiles({ name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('oi') })
     await expect(dialogo.getByTestId('operator-avatar-img')).toBeVisible()
 
+    // O menu lateral troca a inicial pela foto na hora, sem recarregar a página.
+    await expect(page.getByTestId('sidebar-avatar-img')).toBeVisible()
+    await rodape.screenshot({ path: path.join(SCREENSHOTS_DIR, 'sidebar-avatar-02-photo.png') })
     await dialogo.getByRole('button', { name: 'Cancelar' }).click()
     // A lista já mostra a foto (a gravação foi na hora).
     await expect(page.getByTestId('operator-avatar-img').filter({ visible: true }).first()).toBeVisible()
@@ -101,5 +108,7 @@ test.describe('o cadastro do operador', () => {
     await page.getByRole('button', { name: /^Editar cadastro de / }).first().click()
     await page.getByTestId('operator-edit').getByRole('button', { name: 'Remover foto' }).click()
     await expect(page.getByTestId('operator-edit').getByTestId('operator-avatar-initials')).toBeVisible()
+    // E o menu volta à inicial.
+    await expect(page.getByTestId('sidebar-avatar-img')).toBeHidden()
   })
 })
