@@ -17,13 +17,27 @@ import {
  * nothing.
  */
 describe('translating', () => {
-  it('reads the bundled English dictionary', () => {
+  /**
+   * English is lazy like every other locale, so it is not in the entry chunk.
+   * Before anything loads a key reads as itself — never empty — and
+   * `LanguageProvider` holds the first render until a dictionary is in memory,
+   * so no screen paints this state. Must run first: loading is per module.
+   */
+  it('reads keys as themselves before any dictionary has loaded', () => {
+    expect(isDictionaryLoaded('en')).toBe(false)
+    expect(translate('en', 'common.na')).toBe('common.na')
+  })
+
+  it('reads the English dictionary once loaded', async () => {
+    await loadDictionary('en')
+    expect(isDictionaryLoaded('en')).toBe(true)
     expect(translate('en', 'common.na')).toBe(en['common.na'])
   })
 
   /**
-   * A locale whose chunk has not arrived reads as English rather than blank.
-   * This is the normal state for the first paint in every locale but English.
+   * A locale whose chunk has not arrived reads as English rather than blank,
+   * once English is in memory (it is fetched as the fallback when a locale's
+   * chunk fails, and when the first paint has waited too long).
    */
   it('falls back to English while a dictionary is still on the way', () => {
     expect(isDictionaryLoaded('ja')).toBe(false)
@@ -58,7 +72,7 @@ describe('translating', () => {
     expect(translate('es', 'common.na')).toBe(first)
   })
 
-  it('resolves rather than throwing for a locale with no loader', async () => {
+  it('resolves rather than throwing for a dictionary already in memory', async () => {
     await expect(loadDictionary('en')).resolves.toBeUndefined()
   })
 })
