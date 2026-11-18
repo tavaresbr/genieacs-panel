@@ -2653,11 +2653,16 @@ class SgpService {
       const key = String(link.contract);
       perContract.set(key, (perContract.get(key) || 0) + 1);
     }
-    return links.map((link) => ({
+    return links.map((link) => this.listedLink(link, perContract.get(String(link.contract)) || 1));
+  }
+
+  /** Uma linha de `listLinks`, a mesma forma que a lista de equipamentos recebe. */
+  static listedLink(link, deviceCount) {
+    return {
       deviceId: link.device_id,
       contract: link.contract,
       login: link.login || null,
-      deviceCount: perContract.get(String(link.contract)) || 1,
+      deviceCount,
       clientName: link.client_name,
       plan: link.plan,
       status: link.status,
@@ -2667,7 +2672,26 @@ class SgpService {
       lastSyncedAt: link.last_synced_at
         ? new Date(link.last_synced_at).toISOString()
         : null
-    }));
+    };
+  }
+
+  /**
+   * Os vínculos só dos aparelhos pedidos — o que a página da lista de
+   * equipamentos mostra. A tela baixava `listLinks` inteiro (dezenas de
+   * milhares de linhas numa rede grande) para decorar 50 linhas; aqui são duas
+   * leituras com `IN`. `null` quando a integração está desligada, que é o que
+   * faz a tela esconder a coluna.
+   */
+  static async linksForDevices(deviceIds) {
+    if (!this.isReady(await this.getConfig())) return null;
+    const ids = [...new Set(deviceIds.map((id) => String(id ?? '')).filter(Boolean))];
+    const links = await SgpLink.getByDeviceIds(ids);
+    const perContract = await SgpLink.countByContracts([...new Set(links.map((link) => String(link.contract)))]);
+    const found = new Map();
+    for (const link of links) {
+      found.set(String(link.device_id), this.listedLink(link, perContract.get(String(link.contract)) || 1));
+    }
+    return found;
   }
 
   // Refreshes one account during a fleet sync. A manual link is never

@@ -305,6 +305,46 @@ describe('GET /api/devices pagination', () => {
     }
   });
 
+  /**
+   * A coluna de contratos vem com a página: a tela baixava `/sgp/links`
+   * inteiro (a tabela do provedor toda) para decorar 25 linhas. Sem a
+   * integração ligada a resposta diz que não há SGP e não carrega o campo.
+   */
+  it('carries the SGP link of each returned row, only while the integration is on', async () => {
+    const tenant = getDb().raw('(select id from tenants order by id limit 1)');
+    await asTenant(() => getDb()('sgp_links').insert([
+      { tenant_id: tenant, device_id: 'ONT-029', contract: '777', client_name: 'Assinante Um', state: 'blocked', link_mode: 'auto' },
+      { tenant_id: tenant, device_id: 'ONT-000', contract: '777', client_name: 'Assinante Um', state: 'blocked', link_mode: 'auto' }
+    ]));
+    try {
+      const off = await listDevices('?pageSize=5');
+      assert.equal(off.body.data.sgpAvailable, false);
+      assert.ok(!('sgpLink' in off.body.data.devices[0]));
+
+      const saved = await call(`${panelUrl}/api/sgp/config`, {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: { enabled: true, baseUrl: 'http://127.0.0.1:9', app: 'painel', token: 'sgp-token', linkMode: 'pppoe' }
+      });
+      assert.equal(saved.status, 200);
+
+      const { body } = await listDevices('?pageSize=5');
+      assert.equal(body.data.sgpAvailable, true);
+      const [first, second] = body.data.devices;
+      // A primeira linha é a ONT-029 (mais nova primeiro) e tem contrato; o
+      // contrato é dividido com a ONT-000, que está fora desta página — a
+      // contagem tem que olhar o provedor, não só a página.
+      assert.equal(first._id, 'ONT-029');
+      assert.equal(first.sgpLink.contract, '777');
+      assert.equal(first.sgpLink.state, 'blocked');
+      assert.equal(first.sgpLink.deviceCount, 2);
+      assert.equal(second.sgpLink, null);
+    } finally {
+      await call(`${panelUrl}/api/sgp/config`, { method: 'PUT', headers: authHeaders(token), body: { enabled: false } });
+      await asTenant(() => getDb()('sgp_links').whereIn('device_id', ['ONT-029', 'ONT-000']).del());
+    }
+  });
+
   it('combines a search with the pushed-down status filter', async () => {
     const { body } = await listDevices('?search=zte&status=online');
     // Odd indices are ZTE, and indices below 12 are online: 1, 3, 5, 7, 9, 11.

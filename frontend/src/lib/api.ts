@@ -3447,6 +3447,11 @@ export interface DeviceListParams {
 
 export interface DeviceListResponse<T> {
   devices: T[]
+  /**
+   * Verdadeiro quando cada linha traz `sgpLink` (o contrato do SGP, ou `null`):
+   * integração ligada e quem pede tem `sgp.read`.
+   */
+  sgpAvailable?: boolean
   page: number
   pageSize: number
   total: number

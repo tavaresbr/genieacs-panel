@@ -105,6 +105,23 @@ class SgpLink {
     return Number(row?.total ?? 0);
   }
 
+  /**
+   * Quantas ONTs do provedor estão em cada contrato, só para os contratos
+   * pedidos — a lista de equipamentos marca o contrato dividido sem ler a
+   * tabela inteira.
+   */
+  static async countByContracts(contracts) {
+    const found = new Map();
+    if (!Array.isArray(contracts) || contracts.length === 0) return found;
+    const rows = await tdb('sgp_links')
+      .whereIn('contract', contracts.map(String))
+      .groupBy('contract')
+      .select('contract')
+      .count({ total: '*' });
+    for (const row of rows) found.set(String(row.contract), Number(row.total) || 0);
+    return found;
+  }
+
   /** The links of several contracts at once — one `IN`, for the billing cadence. */
   static async getByContracts(contracts) {
     if (!Array.isArray(contracts) || contracts.length === 0) return [];
