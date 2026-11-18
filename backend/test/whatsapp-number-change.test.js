@@ -111,4 +111,28 @@ describe('troca de número no cadastro', () => {
     const again = await asTenant(() => waContacts.openConversation('N-7'));
     assert.equal(again.conversation.id, conversation.id, 'da próxima vez abre a nova');
   });
+
+  it('"Abrir conversa" não reaproveita a conversa de um número desconectado', async () => {
+    await asTenant(() => SgpContact.upsertFromSgp({ contract: 'N-8', client_name: 'Cliente', phone_e164: '5593977776666' }));
+    const parado = await asTenant(() => WhatsAppAccount.create({
+      name: 'painel-parado', purpose: 'billing', flavor: 'v2', base_url: 'https://evo2.provedor.test', status: 'disconnected', is_default: false,
+      ...WhatsAppConfigService.encryptInstanceToken('t-par'), ...WhatsAppConfigService.encryptWebhookToken('w-par')
+    }));
+    const c = await asTenant(() => WaConversation.ensure({
+      accountId: parado.id, externalThreadId: '5593977776666@s.whatsapp.net', waPhone: '5593977776666', waLid: null, pushName: 'Cliente'
+    }));
+    await getDb()('wa_conversations').where({ id: c.id }).update({ contract: 'N-8' });
+    const waContacts = (await import('../src/services/waContactService.js')).default;
+    const { conversation, created } = await asTenant(() => waContacts.openConversation('N-8'));
+    const linha = await getDb()('wa_conversations').where({ id: conversation.id }).first();
+    assert.equal(linha.account_id, accountId, 'abre no número conectado');
+    assert.notEqual(conversation.id, c.id);
+    assert.equal(created, true);
+  });
+
+  it('duas criações ao mesmo tempo da mesma conversa devolvem a mesma, sem erro', async () => {
+    const dados = { accountId, externalThreadId: '5593966665555@s.whatsapp.net', waPhone: '5593966665555', waLid: null, pushName: 'Cliente' };
+    const [a, b] = await asTenant(() => Promise.all([WaConversation.ensure(dados), WaConversation.ensure(dados)]));
+    assert.equal(a.id, b.id);
+  });
 });

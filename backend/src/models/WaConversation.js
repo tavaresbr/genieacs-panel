@@ -1,4 +1,4 @@
-import { tdb, tinsertReturningId } from '../config/database.js';
+import { tdb, tinsertReturningId, isUniqueViolation } from '../config/database.js';
 import { variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
 const PHONE_DOMAIN = '@s.whatsapp.net';
@@ -60,15 +60,26 @@ class WaConversation {
       await tdb('wa_conversations').where({ id: existing.id }).update({ ...patch, updated_at: now });
       return this.getById(existing.id);
     }
-    const id = await tinsertReturningId('wa_conversations', {
-      account_id: accountId,
-      external_thread_id: externalThreadId,
-      wa_phone_e164: waPhone || null,
-      wa_lid: waLid || null,
-      push_name: pushName || null,
-      created_at: now,
-      updated_at: now
-    });
+    let id;
+    try {
+      id = await tinsertReturningId('wa_conversations', {
+        account_id: accountId,
+        external_thread_id: externalThreadId,
+        wa_phone_e164: waPhone || null,
+        wa_lid: waLid || null,
+        push_name: pushName || null,
+        created_at: now,
+        updated_at: now
+      });
+    } catch (error) {
+      // Dois cliques, ou um clique e uma mensagem de entrada ao mesmo tempo: a
+      // outra chamada criou a conversa primeiro. Vale a que ficou.
+      if (!isUniqueViolation(error)) throw error;
+      const winner = (await this.getByThread(accountId, externalThreadId))
+        || (await this.getByPhoneSpelling(accountId, externalThreadId));
+      if (!winner) throw error;
+      return winner;
+    }
     return this.getById(id);
   }
 

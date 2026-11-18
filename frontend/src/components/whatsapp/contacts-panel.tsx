@@ -217,7 +217,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '', persistKe
 
   const canSend = can('whatsapp.send')
 
-  const numbers = useConnectedAccounts(canSend)
+  const numbers = useConnectedAccounts(canSend && can('whatsapp.read'))
   const canOpenProfile = can('contacts.read')
   const canCreate = can('contacts.edit')
   const [creating, setCreating] = useState(false)

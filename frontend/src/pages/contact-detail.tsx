@@ -181,7 +181,7 @@ export default function ContactDetailPage() {
 
   // The thread with this client in the panel's inbox: the one that exists, or
   // a new empty one. Opening sends nothing; the operator writes in the inbox.
-  const numbers = useConnectedAccounts(can('whatsapp.send'))
+  const numbers = useConnectedAccounts(can('whatsapp.send') && can('whatsapp.read'))
   const openConversation = async (phone?: string, accountId?: number) => {
     if (!profile) return
     setOpening(true)
