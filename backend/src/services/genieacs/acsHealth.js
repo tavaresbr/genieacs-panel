@@ -297,9 +297,13 @@ export function getAcsHealth(tenantId) {
   };
 }
 
-/** Uma linha só: quebra de linha no texto vira ` | `. */
+/**
+ * Uma linha só: as quebras de linha somem (as linhas do stack já começam com
+ * espaços, e continuam legíveis). A última troca é a forma que o CodeQL
+ * reconhece como higienização de log.
+ */
 function umaLinha(texto) {
-  return String(texto).replace(/\r/g, '').replace(/\n/g, ' | ').replace(/[\u2028\u2029]/g, ' | ');
+  return String(texto).replace(/[\u2028\u2029]/g, ' ').replace(/\n|\r/g, '');
 }
 
 /**
@@ -317,8 +321,8 @@ export function logUnlessAcsFailure(label, error, { level = 'error', messageOnly
   if (code) return code;
   const write = level === 'warn' ? console.warn : console.error;
   // O texto do erro pode carregar o que veio de fora (o corpo da NBI, um
-  // campo do pedido): quebras de linha viram ` | `, para ninguém forjar uma
-  // linha de log. O stack continua inteiro, só numa linha.
+  // campo do pedido): sem quebras de linha, ninguém forja uma linha de log.
+  // O stack continua inteiro, só numa linha.
   const texto = messageOnly ? String(error?.message ?? error) : String(error?.stack ?? error);
   write(umaLinha(`${label}: ${texto}`));
   return null;
