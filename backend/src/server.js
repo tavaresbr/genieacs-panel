@@ -121,7 +121,7 @@ export const startServer = async () => {
         // Quando o motivo é o GenieACS fora, a linha curta do conector já diz
         // isso por provedor (`[tenant=N] GenieACS unreachable (dns)`).
         onError: (error, tenant) => {
-          logUnlessAcsFailure(`Customer ID prewarm skipped for provider ${tenant.slug}`, error, { level: 'warn', messageOnly: true });
+          logUnlessAcsFailure(`Customer ID prewarm skipped for provider ${Number(tenant.id)}`, error, { level: 'warn', messageOnly: true });
         }
       }).catch((error) => {
         logUnlessAcsFailure('Customer ID prewarm skipped', error, { level: 'warn', messageOnly: true });

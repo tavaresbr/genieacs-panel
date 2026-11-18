@@ -299,7 +299,7 @@ export function getAcsHealth(tenantId) {
 
 /** Uma linha só: quebra de linha no texto vira ` | `. */
 function umaLinha(texto) {
-  return texto.replace(/[\r\n\u2028\u2029]+/g, ' | ');
+  return String(texto).replace(/\r/g, '').replace(/\n/g, ' | ').replace(/[\u2028\u2029]/g, ' | ');
 }
 
 /**
@@ -320,7 +320,7 @@ export function logUnlessAcsFailure(label, error, { level = 'error', messageOnly
   // campo do pedido): quebras de linha viram ` | `, para ninguém forjar uma
   // linha de log. O stack continua inteiro, só numa linha.
   const texto = messageOnly ? String(error?.message ?? error) : String(error?.stack ?? error);
-  write(`${label}: ${umaLinha(texto)}`);
+  write(umaLinha(`${label}: ${texto}`));
   return null;
 }
 
