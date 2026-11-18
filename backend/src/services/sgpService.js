@@ -2877,12 +2877,18 @@ class SgpService {
    * there is none, which means the ONT is unplugged or its replacement never
    * reached this GenieACS.
    */
-  static findSuccessor(device, link, devices, links) {
+  static findSuccessor(device, link, devices, links, index = null) {
     const deviceId = String(device?._id || '');
     const login = normalizeLogin(link?.login) || normalizeLogin(device?.pppoe);
     const since = device?._lastInform ? new Date(device._lastInform).getTime() : Number.NEGATIVE_INFINITY;
     let best = null;
-    for (const other of devices) {
+    // Com o índice (`successorIndex`), só os candidatos do mesmo login ou do
+    // mesmo contrato, na ordem da frota — o laço abaixo decide igual, porque
+    // qualquer outro aparelho cairia no `continue` do `matchedBy`. Sem ele, a
+    // frota inteira, como sempre: chamado para cada ONT parada, isso era
+    // quadrático na frota.
+    const candidates = index ? index.candidates(login, link?.contract) : devices;
+    for (const other of candidates) {
       const otherId = String(other?._id || '');
       if (!otherId || otherId === deviceId || !other._lastInform) continue;
       const informedAt = new Date(other._lastInform).getTime();
@@ -2900,6 +2906,43 @@ class SgpService {
     if (!best) return null;
     const { informedAt, ...successor } = best;
     return successor;
+  }
+
+  /**
+   * Os aparelhos da frota agrupados por login PPPoE (normalizado) e pelo
+   * contrato do vínculo, para `findSuccessor` olhar só os candidatos.
+   *
+   * `candidates` devolve a união dos dois grupos NA ORDEM DA FROTA, sem
+   * repetir: é a ordem que decide o empate (o primeiro com o inform mais novo
+   * vence), e com ela a resposta é a mesma do laço sobre a frota inteira. O
+   * contrato é conferido de novo em `findSuccessor` contra o `links` do
+   * momento, então um vínculo que saiu do mapa depois do índice montado
+   * (`relinkStale` o tira ao mover) deixa de casar, como antes.
+   */
+  static successorIndex(devices, links) {
+    const byLogin = new Map();
+    const byContract = new Map();
+    const push = (map, key, position) => {
+      if (!key) return;
+      const list = map.get(key);
+      if (list) list.push(position);
+      else map.set(key, [position]);
+    };
+    devices.forEach((other, position) => {
+      push(byLogin, normalizeLogin(other?.pppoe), position);
+      const otherId = String(other?._id || '');
+      if (otherId) push(byContract, links.get(otherId)?.contract || null, position);
+    });
+    return {
+      candidates(login, contract) {
+        const fromLogin = (login && byLogin.get(login)) || [];
+        const fromContract = (contract && byContract.get(contract)) || [];
+        if (fromContract.length === 0) return fromLogin.map((position) => devices[position]);
+        if (fromLogin.length === 0) return fromContract.map((position) => devices[position]);
+        const positions = [...new Set([...fromLogin, ...fromContract])].sort((a, b) => a - b);
+        return positions.map((position) => devices[position]);
+      }
+    };
   }
 
   /**
@@ -2927,12 +2970,13 @@ class SgpService {
       : Number.POSITIVE_INFINITY);
     let relinked = 0;
     const stranded = new Set();
+    const index = this.successorIndex(devices, links);
     for (const device of devices) {
       const deviceId = String(device._id || '');
       const link = links.get(deviceId);
       if (link?.link_mode === 'manual') continue;
       if (ageOf(device) < DeviceService.STALE_AFTER_MS) continue;
-      const successor = this.findSuccessor(device, link, devices, links);
+      const successor = this.findSuccessor(device, link, devices, links, index);
       if (!successor || successor.matchedBy !== 'pppoe') continue;
       if (!(ageOf({ _lastInform: successor.lastInform }) < ONLINE_WINDOW_MS)) continue;
       stranded.add(deviceId);
@@ -2984,6 +3028,7 @@ class SgpService {
     const loginMismatch = [];
     const unlinked = [];
     let linked = 0;
+    const successorIndex = this.successorIndex(devices, links);
 
     for (const device of devices) {
       const deviceId = String(device._id || '');
@@ -3033,7 +3078,7 @@ class SgpService {
         if (!(age < DeviceService.STALE_AFTER_MS)) {
           staleActive.push({
             ...entry,
-            successor: this.findSuccessor(device, link, devices, links)
+            successor: this.findSuccessor(device, link, devices, links, successorIndex)
           });
         }
       }

@@ -41,6 +41,55 @@ export async function forSoleTenant(reason, fn) {
   return runInTenant(tenants[0].id, fn);
 }
 
+function positiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * Quantos provedores os laços de fundo (agendador, alertas, histórico, mapa)
+ * visitam ao mesmo tempo. `TENANT_JOB_CONCURRENCY=1` volta ao laço em série.
+ *
+ * Em série, um provedor cujo ACS ou SGP demora atrasava a passada de TODOS os
+ * outros — a emissão da cobrança, o lembrete e a suspensão do provedor número
+ * trinta esperavam a frota do provedor número um. Quatro é o bastante para que
+ * um provedor lento ocupe uma vaga só, e pouco o bastante para não somar a
+ * memória de muitas frotas ao mesmo tempo (as leituras de frota têm a sua
+ * própria vaga, `withFleetReadSlot`, por provedor).
+ */
+export const TENANT_JOB_CONCURRENCY = positiveInt(process.env.TENANT_JOB_CONCURRENCY, 4);
+
+/**
+ * `job(tenant)` para cada linha de `tenants`, até `concurrency` ao mesmo tempo,
+ * cada um no SEU escopo. O escopo é do `AsyncLocalStorage` de `runInTenant`,
+ * aberto por chamada: dois provedores em paralelo nunca veem o escopo um do
+ * outro. A ordem do resultado é a das linhas, como no laço em série; quem falha
+ * fica de fora do resultado, como sempre ficou.
+ */
+async function visitTenants(tenants, job, onError, concurrency, label) {
+  const results = new Array(tenants.length);
+  const ok = new Array(tenants.length).fill(false);
+  let next = 0;
+  const worker = async () => {
+    while (next < tenants.length) {
+      const index = next;
+      next += 1;
+      const tenant = tenants[index];
+      try {
+        // eslint-disable-next-line no-await-in-loop -- cada vaga visita um provedor por vez
+        results[index] = await runInTenant(tenant.id, () => job(tenant));
+        ok[index] = true;
+      } catch (error) {
+        if (onError) onError(error, tenant);
+        else console.warn(`${label} ${tenant.slug}: ${error.message}`);
+      }
+    }
+  };
+  const vagas = Math.max(1, Math.min(Number(concurrency) || 1, tenants.length));
+  await Promise.all(Array.from({ length: vagas }, () => worker()));
+  return results.filter((unused, index) => ok[index]);
+}
+
 /**
  * Runs background work once per active provider, each inside its own scope.
  *
@@ -56,22 +105,18 @@ export async function forSoleTenant(reason, fn) {
  * `only` restringe a visita a esses ids, e o filtro de ativo continua valendo
  * sobre eles: quem chama sabe quem tem trabalho, e esta função continua sendo
  * quem sabe quem está trabalhando. Lista vazia é "ninguém", sem ir ao banco.
+ *
+ * `concurrency` (padrão 1, em série) deixa até tantos provedores rodarem ao
+ * mesmo tempo. Só para quem não depende da ordem entre provedores e cujo
+ * estado é todo do provedor em escopo — o agendador, os alertas, o histórico,
+ * o mapa. Os outros chamadores continuam em série, como sempre.
  */
-export async function forEachTenant(job, { onError, only = null } = {}) {
+export async function forEachTenant(job, { onError, only = null, concurrency = 1 } = {}) {
   if (only && only.length === 0) return [];
   const query = getDb()('tenants').where({ status: 'active' }).orderBy('id', 'asc');
   if (only) query.whereIn('id', only);
   const tenants = await query;
-  const results = [];
-  for (const tenant of tenants) {
-    try {
-      results.push(await runInTenant(tenant.id, () => job(tenant)));
-    } catch (error) {
-      if (onError) onError(error, tenant);
-      else console.warn(`Background job failed for provider ${tenant.slug}: ${error.message}`);
-    }
-  }
-  return results;
+  return visitTenants(tenants, job, onError, concurrency, 'Background job failed for provider');
 }
 
 /**
@@ -101,16 +146,7 @@ export async function forEachTenant(job, { onError, only = null } = {}) {
  * vinda de fora —, mas deixou de ser literal, e quem mexer naquele caminho
  * precisa saber disto.
  */
-export async function forEveryTenant(job, { onError } = {}) {
+export async function forEveryTenant(job, { onError, concurrency = 1 } = {}) {
   const tenants = await getDb()('tenants').orderBy('id', 'asc');
-  const results = [];
-  for (const tenant of tenants) {
-    try {
-      results.push(await runInTenant(tenant.id, () => job(tenant)));
-    } catch (error) {
-      if (onError) onError(error, tenant);
-      else console.warn(`Retention pass failed for provider ${tenant.slug}: ${error.message}`);
-    }
-  }
-  return results;
+  return visitTenants(tenants, job, onError, concurrency, 'Retention pass failed for provider');
 }

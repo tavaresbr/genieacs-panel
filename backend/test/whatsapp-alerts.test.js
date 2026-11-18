@@ -380,6 +380,27 @@ describe('a mass outage is one message, not forty', () => {
     assert.equal(messages.length, 1, 'forty messages at 3 a.m. is how alerting gets muted');
   });
 
+  it('com o login na frota do painel, não lê a frota uma segunda vez', async (t) => {
+    await setRules({
+      ont_offline: { enabled: true, threshold: 30, cooldownMinutes: 60 },
+      mass_outage: { enabled: true, threshold: 5, cooldownMinutes: 60 },
+      rx_power_low: { enabled: false },
+      temperature_high: { enabled: false }
+    });
+    // A leitura do painel agora traz `pppoe`; a de identidade não pode ser
+    // chamada — e, se fosse, não saberia de ninguém.
+    const identidade = t.mock.method(DeviceService, 'getCustomerIdentityDevices', async () => []);
+    fleet = Array.from({ length: 6 }, (unused, index) => device(`dev-${index + 1}`, {
+      pppoe: `cliente${index + 1}`,
+      _lastInform: index < 5 ? informedMinutesAgo(45) : informedMinutesAgo(1)
+    }));
+
+    const summary = await scan({ now: now() });
+    assert.equal(summary.fired, 1);
+    assert.deepEqual((await alertRows()).map((row) => [row.rule, row.subject]), [['mass_outage', 'ODP-1']]);
+    assert.equal(identidade.mock.callCount(), 0);
+  });
+
   it('leaves an ONT on an unaffected node to its own alert', async () => {
     await setRules({
       ont_offline: { enabled: true, threshold: 30, cooldownMinutes: 60 },

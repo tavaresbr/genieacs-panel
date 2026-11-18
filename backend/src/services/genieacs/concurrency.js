@@ -22,6 +22,20 @@ function positiveInt(value, fallback) {
  */
 export const GLOBAL_LIMIT = positiveInt(process.env.GENIEACS_MAX_CONCURRENCY, 32);
 export const TENANT_LIMIT = positiveInt(process.env.GENIEACS_MAX_CONCURRENCY_PER_TENANT, 6);
+/**
+ * Quantas leituras da COLEÇÃO INTEIRA um provedor pode ter no ar ao mesmo tempo.
+ *
+ * As seis vagas de cima são dimensionadas para pedidos de um aparelho, que
+ * custam pouco. Uma leitura da frota de 20k ONTs custa megabytes de JSON
+ * parseado, e seis delas ao mesmo tempo — painel, alertas, telemetria, mapa e
+ * marcação automática acordando juntos — são seis cópias da frota no heap. Duas
+ * bastam para que uma leitura lenta não segure a outra, e o resto espera na
+ * fila em vez de multiplicar a memória.
+ */
+export const FLEET_READ_LIMIT = Math.min(
+  positiveInt(process.env.GENIEACS_MAX_FLEET_READS_PER_TENANT, 2),
+  TENANT_LIMIT
+);
 
 /** A counting semaphore whose waiters are served in arrival order. */
 class Semaphore {
@@ -55,14 +69,41 @@ class Semaphore {
 
 const globalGate = new Semaphore(GLOBAL_LIMIT);
 const tenantGates = new Map();
+const fleetGates = new Map();
 
-function gateFor(tenantId) {
-  let gate = tenantGates.get(tenantId);
+function gateFor(tenantId, gates = tenantGates, limit = TENANT_LIMIT) {
+  let gate = gates.get(tenantId);
   if (!gate) {
-    gate = new Semaphore(TENANT_LIMIT);
-    tenantGates.set(tenantId, gate);
+    gate = new Semaphore(limit);
+    gates.set(tenantId, gate);
   }
   return gate;
+}
+
+/**
+ * Roda `fn` segurando uma das vagas de leitura de frota do provedor.
+ *
+ * É tomada ANTES das vagas de `withAcsSlot` (que a requisição pega lá dentro),
+ * e só por quem lê a coleção inteira — a ordem é sempre frota → provedor →
+ * global, e nenhum caminho toma a de frota depois das outras, então não há
+ * ciclo entre os semáforos. A espera aqui não conta no prazo da requisição,
+ * pelo mesmo motivo que a das outras vagas não conta.
+ */
+export async function withFleetReadSlot(fn) {
+  const tenantId = currentTenantId();
+  const gate = gateFor(tenantId, fleetGates, FLEET_READ_LIMIT);
+  await gate.acquire();
+  try {
+    return await fn();
+  } finally {
+    gate.release();
+    if (gate.idle && fleetGates.get(tenantId) === gate) fleetGates.delete(tenantId);
+  }
+}
+
+/** For tests: how many whole-fleet reads this provider is holding right now. */
+export function fleetReadsForTenant() {
+  return fleetGates.get(currentTenantId())?.inFlight ?? 0;
 }
 
 /**
@@ -103,6 +144,7 @@ export function inFlightForTenant() {
 /** For tests, between cases. */
 export function resetAcsConcurrency() {
   tenantGates.clear();
+  fleetGates.clear();
   globalGate.inFlight = 0;
   globalGate.waiting = [];
 }

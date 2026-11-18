@@ -11,7 +11,7 @@ import OutageIncidentService from './outageIncidentService.js';
 import MaintenanceService from './maintenanceService.js';
 import WaBotConfigService from './waBotConfigService.js';
 import WaResponseTimeService from './waResponseTimeService.js';
-import { forEachTenant } from '../config/tenantJobs.js';
+import { TENANT_JOB_CONCURRENCY, forEachTenant } from '../config/tenantJobs.js';
 import DeviceService from './deviceService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
@@ -572,7 +572,11 @@ class WaAlertService {
     // from, which follows `settings.genieAcsUrl`. So the loop divides the work
     // rather than repeating it, which is what `forSoleTenant` was holding it
     // back from.
-    const summaries = await forEachTenant(() => this.tickForTenant());
+    //
+    // Lado a lado, até `TENANT_JOB_CONCURRENCY`: tudo o que a passada toca é
+    // do provedor em escopo (as travas de varredura e de resumo são por
+    // provedor), e em série o ACS lento de um atrasava o alerta de todos.
+    const summaries = await forEachTenant(() => this.tickForTenant(), { concurrency: TENANT_JOB_CONCURRENCY });
     return summaries.reduce(
       (total, one) => ({
         fired: (total.fired || 0) + (one.fired || 0),
@@ -863,6 +867,7 @@ class WaAlertService {
 
     if (rules.mass_outage.enabled) {
       await this.applyMassOutage({
+        devices,
         offline: emManutencao.size ? offline.filter((id) => !emManutencao.has(id)) : offline,
         rules,
         firing,
@@ -999,7 +1004,9 @@ class WaAlertService {
    * the wrong end of the network. A cut further upstream simply produces one
    * message per affected ODP, which is still a handful instead of hundreds.
    */
-  static async applyMassOutage({ offline, rules, firing, unknown, informs = new Map(), now = Date.now(), skipClients = null }) {
+  static async applyMassOutage({
+    devices = null, offline, rules, firing, unknown, informs = new Map(), now = Date.now(), skipClients = null
+  }) {
     // Nenhuma caixa cai com menos de 2: abaixo disso, nem se lê a topologia
     // nem se faz a segunda leitura da frota numa rede saudável.
     if (offline.length < 2) return;
@@ -1008,10 +1015,15 @@ class WaAlertService {
     const ontNodes = nodes.filter((node) => node.type === 'ont' && node.pppoe);
     if (ontNodes.length === 0) return;
 
-    // The dashboard projection has no PPPoE username — the only link between a
-    // GenieACS device and a node on the map — so it is read here, from the
-    // panel's own reader, and only for a fleet that already looks broken.
-    const identities = await DeviceService.getCustomerIdentityDevices();
+    // O login PPPoE é o único elo entre um equipamento do GenieACS e um ponto
+    // do mapa. A leitura do painel agora o traz (`getDashboardDevices` projeta
+    // os mesmos caminhos e resolve pelo mesmo `resolvePppoeUsername` que a de
+    // identidade), e a varredura usa a frota que já tem na mão em vez de ler a
+    // frota inteira uma segunda vez. Só quando a frota recebida não traz o
+    // campo — um leitor que não o projeta — a leitura de identidade continua.
+    const temLogin = Array.isArray(devices) && devices.length > 0
+      && devices.every((device) => device && Object.hasOwn(device, 'pppoe'));
+    const identities = temLogin ? devices : await DeviceService.getCustomerIdentityDevices();
     const pppoeByDevice = new Map();
     for (const item of identities) {
       const id = String(item?._id ?? '').trim();

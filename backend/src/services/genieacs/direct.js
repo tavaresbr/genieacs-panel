@@ -6,6 +6,7 @@ import { TranslatableError } from '../../i18n/index.js';
 import GenieAcsEgress from '../genieacsEgress.js';
 import GenieAcsAuthService from '../genieacsAuthService.js';
 import { withAcsSlot } from './concurrency.js';
+import { forgetFleetReads } from './fleetReads.js';
 import { sameAcsAsAny } from './acsIdentity.js';
 import { firmwareOwner, validFirmwareName } from '../firmwareFiles.js';
 
@@ -69,6 +70,11 @@ export function withoutDeviceScope(fn) {
   return semEscopo.run(true, fn);
 }
 
+/** Estamos dentro de `withoutDeviceScope`? Para a chave das leituras de frota guardadas. */
+export function deviceScopeSuspended() {
+  return semEscopo.getStore() === true;
+}
+
 /**
  * A tag que nenhuma ONT carrega: o escopo de um provedor SEM tag num GenieACS
  * que outro provedor também usa. Sem ela, esse provedor via a frota de todos;
@@ -80,9 +86,31 @@ export const UNASSIGNED_SCOPE_TAG = '__sem_tag_de_provedor__';
 const compartilhado = new Map();
 const COMPARTILHADO_TTL_MS = 30_000;
 
+/**
+ * A posse já conferida de cada equipamento: `<provedor>|<tag>|<id>` → validade.
+ *
+ * Toda ação num equipamento (`devices/<id>/...`, tarefa, falha) custava uma ida
+ * a mais à NBI só para perguntar "é seu?" — e a tela de detalhe faz várias
+ * dessas por aparelho, uma atrás da outra. A resposta positiva vale 60 s.
+ *
+ * Só a positiva: "não é seu" nunca é guardado, para um equipamento que acabou
+ * de ganhar a tag (a marcação automática, a ferramenta do console) responder na
+ * hora. E a chave leva a tag: a plataforma trocar a tag do provedor muda a
+ * chave, e `forgetSharedAcs` — que o console chama ao mudar endereço, modo ou
+ * tag — esquece tudo. O que sobra de janela é o equipamento cuja tag alguém
+ * tira à mão, direto no GenieACS: até 60 s em que o antigo dono ainda age nele,
+ * e só se ele mesmo tiver agido nesse equipamento no último minuto.
+ */
+const posseConferida = new Map();
+const POSSE_TTL_MS = 60_000;
+const POSSE_MAX = 10_000;
+
 /** Esquece o que se sabe sobre ACS compartilhado — o console chama ao mudar endereço ou tag. */
 export function forgetSharedAcs() {
   compartilhado.clear();
+  posseConferida.clear();
+  // As leituras de frota guardadas são do endereço e da tag de antes.
+  forgetFleetReads();
 }
 
 const naoEncontrado = () => new TranslatableError('device.notFound', null, { status: 404, code: 'device_not_found' });
@@ -351,6 +379,9 @@ class DirectConnector {
   static async assertOwned(tag, deviceId) {
     const id = String(deviceId ?? '');
     if (!id) throw naoEncontrado();
+    const chave = `${currentTenantId()}|${tag}|${id}`;
+    const agora = Date.now();
+    if ((posseConferida.get(chave) ?? 0) > agora) return;
     const response = await this.request(this.collectionPath('devices'), {
       unscoped: true,
       query: { query: JSON.stringify({ _id: id, _tags: tag }), projection: '_id' }
@@ -359,6 +390,11 @@ class DirectConnector {
     const text = await response.text();
     const rows = text ? JSON.parse(text) : [];
     if (!Array.isArray(rows) || rows.length === 0) throw naoEncontrado();
+    if (posseConferida.size >= POSSE_MAX) {
+      for (const [k, validade] of posseConferida) if (validade <= agora) posseConferida.delete(k);
+      if (posseConferida.size >= POSSE_MAX) posseConferida.clear();
+    }
+    posseConferida.set(chave, Date.now() + POSSE_TTL_MS);
   }
 
   /**

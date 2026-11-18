@@ -44,10 +44,22 @@ class MapStatusService {
   static async fleet() {
     const key = currentTenantId() ?? 'default';
     const hit = cache.get(key);
+    if (hit?.promise) return hit.promise;
     if (hit && hit.expiresAt > Date.now()) return hit.devices;
-    const devices = await DeviceService.getMapStatusFleet();
-    cache.set(key, { devices, expiresAt: Date.now() + this.CACHE_MS });
-    return devices;
+    // Cache vencido com várias telas do mapa abertas (e o vigia de rompimento
+    // no mesmo minuto): todas caíam aqui juntas e cada uma pedia a frota
+    // inteira. Agora a primeira lê, e as outras esperam a mesma leitura.
+    const work = DeviceService.getMapStatusFleet();
+    const slot = { promise: work, devices: null, expiresAt: 0 };
+    cache.set(key, slot);
+    try {
+      const devices = await work;
+      if (cache.get(key) === slot) cache.set(key, { devices, expiresAt: Date.now() + this.CACHE_MS });
+      return devices;
+    } catch (error) {
+      if (cache.get(key) === slot) cache.delete(key);
+      throw error;
+    }
   }
 
   /** O limite da regra de queda em massa, para o mapa usar o mesmo do alerta. */

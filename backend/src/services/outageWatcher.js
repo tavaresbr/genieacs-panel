@@ -1,5 +1,5 @@
 import MappingNode from '../models/MappingNode.js';
-import { forEachTenant } from '../config/tenantJobs.js';
+import { TENANT_JOB_CONCURRENCY, forEachTenant } from '../config/tenantJobs.js';
 import MapStatusService from './mapStatusService.js';
 
 /**
@@ -15,6 +15,12 @@ const TICK_MS = 5 * 60 * 1000;
 
 class OutageWatcher {
   static timer = null;
+
+  /**
+   * A volta em andamento: a leitura da frota de um ACS lento pode passar dos
+   * cinco minutos do relógio, e a volta seguinte não deve começar por cima.
+   */
+  static tickPromise = null;
 
   static start() {
     if (this.timer) return this.timer;
@@ -33,15 +39,24 @@ class OutageWatcher {
   }
 
   static async tick() {
-    await forEachTenant(async () => {
+    if (this.tickPromise) return this.tickPromise;
+    // Lado a lado, até `TENANT_JOB_CONCURRENCY`: o estado é todo do provedor
+    // em escopo (mapa, histórico, cache do mapa), e em série o ACS lento de
+    // um atrasava o histórico de todos.
+    const work = forEachTenant(async () => {
       const mapped = (await MappingNode.getAll()).some((node) => node.type === 'ont' && String(node.pppoe ?? '').trim());
       if (!mapped) return null;
       return MapStatusService.status();
     }, {
+      concurrency: TENANT_JOB_CONCURRENCY,
       onError: (error, tenant) => {
         console.warn(`Outage watcher skipped provider ${tenant.slug}: ${error.message}`);
       }
+    }).then(() => undefined).finally(() => {
+      if (this.tickPromise === work) this.tickPromise = null;
     });
+    this.tickPromise = work;
+    return work;
   }
 }
 
