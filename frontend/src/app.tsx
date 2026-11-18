@@ -9,6 +9,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 import { SubscriptionNotice } from '@/components/subscription-notice'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
+import { AcsHealthBanner } from '@/components/acs-health-banner'
 import { WhatsAppDisconnectedBanner } from '@/components/whatsapp/disconnected-banner'
 import { WhatsAppMessageNotifier } from '@/components/whatsapp/message-notifier'
 import { PwaUpdatePrompt } from '@/components/pwa-update-prompt'
@@ -179,6 +180,10 @@ function ProtectedShell() {
           {/* Número de WhatsApp caído: em toda tela, porque o atendente só
               descobriria quando tentasse responder. */}
           <WhatsAppDisconnectedBanner />
+          {/* O GenieACS do provedor fora há mais de um minuto: em toda tela,
+              com o motivo, porque sem ele nada de equipamento carrega e o
+              operador só via "falha ao carregar". */}
+          <AcsHealthBanner />
           {/* Mensagem nova de cliente: som e notificação do sistema, mesmo
               com o painel em outra aba. Não desenha nada. */}
           <WhatsAppMessageNotifier />

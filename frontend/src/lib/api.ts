@@ -1514,6 +1514,36 @@ export interface Tenant {
    * vez de inventar uma data — `updated_at` daria um número plausível e errado.
    */
   suspendedAt: string | null
+  /**
+   * O GenieACS deste provedor está respondendo? Da memória do servidor, que o
+   * conector atualiza a cada pedido à NBI. Opcional porque um servidor
+   * anterior a ela não manda.
+   */
+  acsHealth?: AcsHealth
+}
+
+/**
+ * Por que o GenieACS não responde, num conjunto fechado: o servidor nunca
+ * manda host nem mensagem do erro, só um destes códigos.
+ */
+export type AcsFailureCode =
+  | 'dns' | 'refused' | 'timeout' | 'tls' | 'unauthorized' | 'http_error' | 'blocked' | 'unknown'
+
+/**
+ * A saúde do GenieACS de um provedor (`GET /devices/acs-health`, e no console
+ * em `TenantGenieAcs.health` e `Tenant.acsHealth`).
+ *
+ * `lastCheckedAt` nulo: o servidor ainda não falou com este ACS desde que
+ * subiu. `downForMs` é medido no relógio do servidor, que é quem decide se a
+ * queda já passou do minuto de tolerância.
+ */
+export interface AcsHealth {
+  status: 'ok' | 'down'
+  code: AcsFailureCode | null
+  since: string | null
+  lastCheckedAt: string | null
+  consecutiveFailures: number
+  downForMs: number
 }
 
 /**
@@ -1624,6 +1654,8 @@ export interface TenantGenieAcs {
     providers: { id: number; name: string; deviceTag: string; autoTagPrefixes: string[] }[]
     missingTag: boolean
   }
+  /** O ACS deste provedor está respondendo, e desde quando não. Opcional: servidor antigo não manda. */
+  health?: AcsHealth
 }
 
 /** O que a marcação em lote achou (e, com `apply`, marcou) na frota do ACS. */
@@ -3558,6 +3590,12 @@ export const devicesAPI = {
 
   getFaults: (limit = 50) =>
     apiClient.get(`/devices/faults?limit=${encodeURIComponent(limit)}`),
+
+  /**
+   * O GenieACS deste provedor está respondendo? Lido da memória do servidor —
+   * não pergunta nada ao ACS —, para o aviso da casca do painel.
+   */
+  getAcsHealth: () => apiClient.get<AcsHealth>('/devices/acs-health'),
 
   clearFault: (faultId: string) =>
     apiClient.delete(`/devices/faults/${encodeURIComponent(faultId)}`),

@@ -8,6 +8,7 @@ import GenieAcsAuthService from '../genieacsAuthService.js';
 import { withAcsSlot } from './concurrency.js';
 import { forgetFleetReads } from './fleetReads.js';
 import { sameAcsAsAny } from './acsIdentity.js';
+import { noteAcsError, noteAcsResponse } from './acsHealth.js';
 import { firmwareOwner, validFirmwareName } from '../firmwareFiles.js';
 
 /**
@@ -261,27 +262,41 @@ class DirectConnector {
     // e o túnel vão pelo egresso, o agente (`agent.js`) desce pelo WebSocket
     // que o programa do provedor abriu. Escopo, raiz, vaga e prazo continuam
     // aqui, uma vez, para todos.
-    return withAcsSlot(async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const extras = { ...headers };
-        let payload = null;
-        if (rawBody !== null && rawBody !== undefined) {
-          if (!Buffer.isBuffer(rawBody)) throw new TypeError('rawBody must be a Buffer');
-          extras['Content-Type'] = contentType;
-          payload = rawBody;
-        } else if (body !== null && body !== undefined) {
-          extras['Content-Type'] = 'application/json';
-          payload = typeof body === 'string' ? body : JSON.stringify(body);
+    //
+    // E é aqui que a saúde do ACS do provedor é contada (`acsHealth.js`):
+    // toda resposta e toda falha de transporte, de todos os modos, passam por
+    // este ponto — e o log curto e espaçado da queda sai de lá, uma vez, em
+    // vez de um stack trace por leitura em cada chamador.
+    const tenantId = currentTenantId();
+    const chaveDoAcs = url.origin;
+    try {
+      const response = await withAcsSlot(async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const extras = { ...headers };
+          let payload = null;
+          if (rawBody !== null && rawBody !== undefined) {
+            if (!Buffer.isBuffer(rawBody)) throw new TypeError('rawBody must be a Buffer');
+            extras['Content-Type'] = contentType;
+            payload = rawBody;
+          } else if (body !== null && body !== undefined) {
+            extras['Content-Type'] = 'application/json';
+            payload = typeof body === 'string' ? body : JSON.stringify(body);
+          }
+          return await this.send(url, {
+            method, headers: extras, body: payload, signal: controller.signal, timeoutMs
+          });
+        } finally {
+          clearTimeout(timeoutId);
         }
-        return await this.send(url, {
-          method, headers: extras, body: payload, signal: controller.signal, timeoutMs
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    });
+      });
+      noteAcsResponse(tenantId, chaveDoAcs, response?.status);
+      return response;
+    } catch (error) {
+      noteAcsError(tenantId, chaveDoAcs, error);
+      throw error;
+    }
   }
 
   /**

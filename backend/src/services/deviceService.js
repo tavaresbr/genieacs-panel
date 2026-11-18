@@ -46,6 +46,7 @@ import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { connectorFor } from './genieacs/connector.js';
 import { UNASSIGNED_SCOPE_TAG, deviceScopeSuspended, mergeScopeQuery } from './genieacs/direct.js';
+import { classifyAcsFailure, logUnlessAcsFailure } from './genieacs/acsHealth.js';
 import {
   FLEET_READ_TIMEOUT_MS, NBI_URL_BUDGET, createFleetReads, createFleetSnapshots, forgetFleetReads
 } from './genieacs/fleetReads.js';
@@ -502,15 +503,21 @@ class DeviceService {
     const body = knownBody === undefined
       ? await response.text().catch(() => '')
       : knownBody;
-    if (body) {
+    // O 401/403 e o 5xx já viraram a linha curta da saúde do ACS
+    // (`acsHealth.js`), contada pelo conector; o corpo deles, a cada leitura,
+    // era a mesma queda repetida no journal. O resto continua logado.
+    const daSaude = classifyAcsFailure({ acsHttpStatus: response.status }) !== null;
+    if (body && !daSaude) {
       console.error(`${label} failed with status ${response.status}: ${String(body).slice(0, 200)}`);
     }
-    if (response.status >= 300 && response.status < 400) {
-      return new Error(
+    const error = response.status >= 300 && response.status < 400
+      ? new Error(
         `${label} answered with a redirect (status: ${response.status}); the configured GenieACS URL must serve the request itself`
-      );
-    }
-    return new Error(`${label} responded with status: ${response.status}`);
+      )
+      : new Error(`${label} responded with status: ${response.status}`);
+    // O status vai no erro, para que a classificação não dependa da frase.
+    error.acsHttpStatus = response.status;
+    return error;
   }
 
   static async fetchGenieAcsCollection(collection, query = {}, method = 'GET', body = null, timeoutMs = 15_000) {
@@ -567,8 +574,9 @@ class DeviceService {
     } catch (error) {
       // O log fica; o `catch` existe por ele. Sem o log, este bloco seria um
       // relançamento puro — e o prazo, que era o outro motivo de ele existir,
-      // agora é fechado pelo conector.
-      console.error('Error fetching from GenieACS:', error);
+      // agora é fechado pelo conector. A falha do ACS (DNS, recusa, prazo, …)
+      // não sai aqui: o conector já a logou numa linha, espaçada.
+      logUnlessAcsFailure('Error fetching from GenieACS', error);
       throw error;
     }
   }
@@ -982,7 +990,7 @@ class DeviceService {
         found.length === 0 && state?.eagerUntil ? { eagerUntil: state.eagerUntil } : {}
       );
     } catch (error) {
-      console.warn(`Unable to probe for the optical RX paths: ${error.message}`);
+      logUnlessAcsFailure('Unable to probe for the optical RX paths', error, { level: 'warn', messageOnly: true });
     }
     return found;
   }
@@ -3804,7 +3812,7 @@ class DeviceService {
       const work = this.refreshDashboardData({ fresh: force });
       cache.promise = work;
       work.catch((error) => {
-        console.error('Dashboard background refresh failed:', error.message);
+        logUnlessAcsFailure('Dashboard background refresh failed', error, { messageOnly: true });
       }).finally(() => {
         if (cache.promise === work) cache.promise = null;
       });

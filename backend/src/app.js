@@ -28,6 +28,7 @@ import { requireAddon, WHATSAPP_ADDON_EXEMPT_PATHS } from './middleware/addonGat
 import { log, requestLogger } from './utils/logger.js';
 import { httpMetrics } from './utils/metrics.js';
 import { acsAgentOfflineBody, isAgentOffline } from './services/genieacs/agent.js';
+import { ACS_UNREACHABLE_STATUS, acsUnreachableBody, acsFailureOf } from './services/genieacs/acsHealth.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
@@ -608,9 +609,17 @@ function serveFrontend(target, htmlFile) {
 // `next` is unused but required: Express only treats a four-argument function
 // as an error handler.
 export function errorHandler(err, req, res, next) {
-  log.error('unhandled_error', { req: req.id ?? null, method: req.method, path: String(req.originalUrl || req.url || '').split('?')[0], err });
+  // A falha do GenieACS do provedor já tem a sua linha curta e espaçada
+  // (`acsHealth.js`); o stack dela aqui, por requisição, é o que não pode.
+  const falhaDoAcs = acsFailureOf(err);
+  if (!falhaDoAcs) {
+    log.error('unhandled_error', { req: req.id ?? null, method: req.method, path: String(req.originalUrl || req.url || '').split('?')[0], err });
+  }
   // A failure raised before the locale middleware ran leaves `req.t` unset.
   const t = req.t || ((key) => translate(DEFAULT_LOCALE, key));
+  if (falhaDoAcs) {
+    return res.status(ACS_UNREACHABLE_STATUS).json(acsUnreachableBody(t, falhaDoAcs));
+  }
   if (err?.type === 'entity.parse.failed') {
     return res.status(400).json({
       success: false,

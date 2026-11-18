@@ -26,6 +26,12 @@ export function sessionOwner(user: Pick<User, 'id' | 'tenant'> | null | undefine
 export const WA_DOWN_DISMISSED_KEY = 'wa-down-dismissed'
 
 /**
+ * A queda do GenieACS que a pessoa fechou nesta aba (`acs-health-banner`).
+ * Pelo mesmo motivo da de cima: é da sessão, e outra sessão não a herda.
+ */
+export const ACS_DOWN_DISMISSED_KEY = 'acs-down-dismissed'
+
+/**
  * Apaga tudo o que a aba guarda em nome da sessão atual.
  *
  * Chamada toda vez que a sessão muda de dono — sair, entrar em outro provedor,
@@ -35,6 +41,7 @@ export function clearSessionScopedStorage() {
   clearDashboardSnapshot()
   try {
     sessionStorage.removeItem(WA_DOWN_DISMISSED_KEY)
+    sessionStorage.removeItem(ACS_DOWN_DISMISSED_KEY)
     sessionStorage.removeItem(CONTACTS_FILTERS_KEY)
   } catch {
     // Storage can be disabled by browser privacy settings.

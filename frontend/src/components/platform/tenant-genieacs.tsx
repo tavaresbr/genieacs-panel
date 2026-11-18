@@ -19,6 +19,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/virtual-parameters'
 import { modeOptions } from '@/lib/genieacs-agent'
 import { GenieAcsAgentPanel } from '@/components/genieacs-agent-panel'
+import { AcsHealthStatus } from '@/components/platform/acs-health-status'
 import { firmwareErrorKind, formatFileSize, reassignSizeMatches, scopedFirmwareName } from '@/lib/firmware'
 
 interface Props {
@@ -281,6 +282,15 @@ export function TenantGenieAcs({ tenant }: Props) {
         <h3 className="font-semibold text-foreground">{t('platform.genieacs.title')}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{t('platform.genieacs.description')}</p>
       </div>
+
+      {/* O que o painel deste provedor viu nos pedidos de verdade ao ACS dele:
+          "fora (DNS) desde 09:46", o que antes só o journal dizia. */}
+      {data.health && (
+        <div>
+          <p className="mb-1 text-sm font-medium">{t('acsHealth.title')}</p>
+          <AcsHealthStatus health={data.health} />
+        </div>
+      )}
 
       <div>
         <label htmlFor={`tenant-${tenant.id}-acs-ownership`} className="block text-sm font-medium mb-1">

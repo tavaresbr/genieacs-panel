@@ -23,6 +23,7 @@ import { PlatformOverviewTab, type OverviewTarget } from '@/components/platform/
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantGenieAcs } from '@/components/platform/tenant-genieacs'
+import { AcsHealthStatus } from '@/components/platform/acs-health-status'
 import { TenantMembers } from '@/components/platform/tenant-members'
 import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { OnboardingBadge, OnboardingStuckFilter, useOnboardingSummaries } from '@/components/platform/tenant-onboarding'
@@ -343,6 +344,13 @@ export default function PlatformPage() {
                 when: formatRelativeTime(tenant.suspendedAt)
               })
               : t('platform.suspendedHowLongUnknown')}
+          </span>
+        )}
+        {/* O GenieACS do provedor fora: "fora (DNS) desde 09:46", sem SSH.
+            Só a queda aparece aqui; o "respondendo" mora na tela do ACS. */}
+        {tenant.acsHealth?.status === 'down' && (
+          <span className="mt-1 block">
+            <AcsHealthStatus health={tenant.acsHealth} compact />
           </span>
         )}
       </>

@@ -8,6 +8,10 @@ const router = express.Router();
 router.get('/', authenticateToken, requirePermission('devices.list'), DeviceController.getDevices);
 router.get('/dashboard', authenticateToken, requirePermission('devices.list'), DeviceController.getDashboard);
 router.get('/faults', authenticateToken, requirePermission('devices.list'), DeviceController.getFaults);
+// A saúde do GenieACS do provedor, para o aviso da casca do painel. Só sessão:
+// todo operador do provedor vê o aviso, mesmo quem não lista equipamentos —
+// é estado do provedor e não dado de cliente, e só sai o código da falha.
+router.get('/acs-health', authenticateToken, DeviceController.getAcsHealth);
 // O recorte da lista numa planilha. Capacidade própria, só do dono e do admin:
 // levar a base toda de uma vez não é o mesmo que ver página por página. Acima
 // de `/:deviceId`, para `export` não ser lido como id de aparelho.

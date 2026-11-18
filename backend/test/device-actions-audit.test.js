@@ -140,8 +140,11 @@ describe('a trilha do que se faz na ONT', () => {
     // o ACS recusou mandaria o técnico procurar outra causa para a queda.
     genie.state.respond = ({ send }) => send(500, { message: 'down' });
     const antes = (await linhas(AuditLog.ACTIONS.DEVICE_REBOOTED)).length;
-    const { status } = await post('/api/devices/reboot', { deviceId: DEVICE_ID });
-    assert.equal(status, 500);
+    const { status, body } = await post('/api/devices/reboot', { deviceId: DEVICE_ID });
+    // O 5xx da NBI é o ACS falhando, não o painel: 502 `acs_unreachable`.
+    assert.equal(status, 502);
+    assert.equal(body.code, 'acs_unreachable');
+    assert.equal(body.reason, 'http_error');
     assert.equal((await linhas(AuditLog.ACTIONS.DEVICE_REBOOTED)).length, antes);
   });
 
