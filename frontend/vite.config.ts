@@ -57,6 +57,17 @@ export default defineConfig({
         panel: fileURLToPath(new URL('./index.html', import.meta.url)),
         portal: fileURLToPath(new URL('./portal.html', import.meta.url)),
       },
+      output: {
+        // React, o DOM e o roteador num chunk só deles: mudam a cada poucos
+        // meses, enquanto o código do painel muda a cada versão. Separados,
+        // o navegador (e o service worker) reaproveita esse pedaço entre
+        // atualizações em vez de baixá-lo de novo junto com o resto.
+        codeSplitting: {
+          groups: [
+            { name: 'react-vendor', test: /[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/ },
+          ],
+        },
+      },
     },
   },
 })

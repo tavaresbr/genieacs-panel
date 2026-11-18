@@ -290,7 +290,18 @@ class OutageIncidentService {
     else if (notified === 'sent') query.whereNotNull('notice_sent_at');
 
     const rows = await query.orderBy('started_at', 'desc').limit(LIST_LIMIT);
-    return Promise.all(rows.map((row) => this.present(row)));
+    // Os aparelhos de todos os incidentes da página numa leitura só (em lotes,
+    // pelo teto de variáveis do SQLite), e não uma por incidente: a lista
+    // desenha até `LIST_LIMIT` de uma vez.
+    const porIncidente = new Map(rows.map((row) => [Number(row.id), []]));
+    const ids = [...porIncidente.keys()];
+    for (let i = 0; i < ids.length; i += 500) {
+      // eslint-disable-next-line no-await-in-loop -- poucos lotes
+      const afetados = await tdb('outage_incident_devices').whereIn('incident_id', ids.slice(i, i + 500))
+        .select('incident_id', 'phone_e164', 'notified_at');
+      for (const d of afetados) porIncidente.get(Number(d.incident_id))?.push(d);
+    }
+    return Promise.all(rows.map((row) => this.present(row, porIncidente.get(Number(row.id)))));
   }
 
   static async get(incidentId) {
@@ -309,8 +320,9 @@ class OutageIncidentService {
     };
   }
 
-  static async present(row) {
-    const afetados = await tdb('outage_incident_devices').where({ incident_id: row.id })
+  /** `afetados`, quando quem chama já os leu em lote; senão, lidos aqui. */
+  static async present(row, afetados = null) {
+    afetados ??= await tdb('outage_incident_devices').where({ incident_id: row.id })
       .select('phone_e164', 'notified_at');
     return {
       id: row.id,

@@ -214,6 +214,33 @@ describe('a delivery finding its own provider', () => {
     }
   });
 
+  it('builds the candidate list once, and forgets it on a save or a suspension', async () => {
+    const { default: SgpEventController } = await import('../src/controllers/sgpEventController.js');
+    const { default: Tenant } = await import('../src/models/Tenant.js');
+    const original = SgpEventController.loadDeliveryCandidates;
+    let builds = 0;
+    SgpEventController.loadDeliveryCandidates = function counted(...args) {
+      builds += 1;
+      return original.apply(this, args);
+    };
+    try {
+      // A save first, so the count starts from an empty memory.
+      await runInTenant(beta, () => SgpService.saveConfig({ webhookSecret: SECRET_BETA }));
+      const send = (id, secret) => postWebhook(JSON.stringify({ id, evento: 'bloqueado', contrato: BETA_ONLY_CONTRACT }), secret);
+      assert.equal((await send('evt-cache-1', SECRET_BETA)).status, 202);
+      assert.equal((await send('evt-cache-2', SECRET_BETA)).status, 202);
+      assert.equal(builds, 1, 'the second delivery reuses the list');
+
+      // A suspended provider stops being a candidate at once.
+      await Tenant.setStatus(beta, 'suspended');
+      assert.equal((await send('evt-cache-3', SECRET_BETA)).status, 401);
+      assert.equal(builds, 2);
+    } finally {
+      SgpEventController.loadDeliveryCandidates = original;
+      await Tenant.setStatus(beta, 'active');
+    }
+  });
+
   it('answers 404 while no provider has delivery switched on', async () => {
     await runInTenant(alfa, () => SgpService.saveConfig({ webhookEnabled: false }));
     await runInTenant(beta, () => SgpService.saveConfig({ webhookEnabled: false }));

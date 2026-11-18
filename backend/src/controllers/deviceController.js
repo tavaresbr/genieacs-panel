@@ -17,6 +17,25 @@ import { exportDevicesCsv } from '../services/deviceExport.js';
 import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBatchIds } from '../services/deviceBatch.js';
 import { acsAgentOfflineBody, isAgentOffline } from '../services/genieacs/agent.js';
 import FirmwareStore, { readUploadHeaders } from '../services/firmwareStore.js';
+import SgpService from '../services/sgpService.js';
+import { roleHas } from '../config/permissions.js';
+
+/**
+ * O contrato do SGP de cada linha da página, para a coluna da lista. Vai junto
+ * com a página em vez de a tela baixar `/sgp/links` inteiro a cada visita.
+ * Só para quem tem `sgp.read` — a mesma exigência daquela rota —, e `null`
+ * (coluna escondida) com a integração desligada ou se a leitura falhar: a
+ * lista de equipamentos não pode cair por causa do SGP.
+ */
+async function sgpLinksForPage(req, devices) {
+  if (!roleHas(req.user?.role, 'sgp.read')) return null;
+  try {
+    return await SgpService.linksForDevices(devices.map((device) => device._id));
+  } catch (error) {
+    console.error('Device list SGP links error:', error);
+    return null;
+  }
+}
 
 /**
  * A recusa do escopo do provedor (ACS compartilhado) como resposta própria.
@@ -353,9 +372,13 @@ class DeviceController {
       // Customer accounts are written on demand, so decoration is deliberately
       // limited to the page being returned instead of the whole fleet.
       const decoratedDevices = await CustomerService.decorateDevices(devices);
+      const sgp = await sgpLinksForPage(req, decoratedDevices);
       return res.json(
         createResponse(req.t('device.listRetrieved'), {
-          devices: decoratedDevices,
+          devices: sgp
+            ? decoratedDevices.map((device) => ({ ...device, sgpLink: sgp.get(String(device._id)) || null }))
+            : decoratedDevices,
+          sgpAvailable: Boolean(sgp),
           page,
           pageSize,
           total,

@@ -45,7 +45,8 @@ import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { connectorFor } from './genieacs/connector.js';
-import { UNASSIGNED_SCOPE_TAG } from './genieacs/direct.js';
+import { UNASSIGNED_SCOPE_TAG, deviceScopeSuspended } from './genieacs/direct.js';
+import { FLEET_READ_TIMEOUT_MS, createFleetReads, forgetFleetReads } from './genieacs/fleetReads.js';
 
 /** A página da coleção `files`, e quantas no máximo (10 000 arquivos). */
 const FIRMWARE_PAGE_SIZE = 500;
@@ -102,6 +103,85 @@ class DeviceService {
   /** Every provider's. For a reset between tests. */
   static forgetDashboards() {
     this.dashboardCaches.clear();
+    forgetFleetReads();
+  }
+
+  /**
+   * As leituras da coleção inteira, compartilhadas por chave — ver
+   * `createFleetReads`. A chave leva o provedor (ou o ACS, fora do escopo).
+   */
+  static fleetReads = createFleetReads({ maxEntries: 64 });
+
+  /**
+   * O que a busca e os recortes locais da lista já filtraram, por provedor e
+   * filtro. Separado de `fleetReads` porque guarda outra coisa (o resultado
+   * processado, não as linhas do NBI) e tem outro limite.
+   */
+  static searchMatches = createFleetReads({ maxEntries: 32 });
+
+  /** O prazo de toda leitura da coleção inteira — ver `FLEET_READ_TIMEOUT_MS`. */
+  static FLEET_READ_TIMEOUT_MS = FLEET_READ_TIMEOUT_MS;
+
+  /**
+   * Por quanto tempo a leitura do painel serve a quem pedir a mesma frota logo
+   * depois. O painel é atualizado a cada minuto, e a varredura de alertas lê a
+   * mesma projeção: dentro desta janela ela usa a frota que acabou de chegar em
+   * vez de pedir outra. Menor que a cadência do painel, para que a atualização
+   * seguinte do próprio painel sempre vá ao ACS — o número não fica mais velho
+   * do que já ficava. `GENIEACS_FLEET_READ_TTL_MS=0` desliga (fica só em voo).
+   */
+  static DASHBOARD_FLEET_TTL_MS = (() => {
+    const raw = Number.parseInt(String(process.env.GENIEACS_FLEET_READ_TTL_MS ?? ''), 10);
+    return Number.isFinite(raw) && raw >= 0 ? Math.min(raw, 55_000) : 30_000;
+  })();
+
+  /**
+   * A busca e os recortes de RX/temperatura/clientes leem a frota inteira e
+   * filtram aqui. Sem guardar, cada tecla (com o atraso do campo) e cada troca
+   * de página era uma frota inteira pedida de novo ao ACS. 30 s: o operador
+   * pagina e refina sem nova leitura, e o que ele vê nunca passa disso.
+   */
+  static SEARCH_MATCH_TTL_MS = 30_000;
+
+  /** Os ids do provedor que filtram as falhas num ACS compartilhado. */
+  static FAULT_OWNERS_TTL_MS = 60_000;
+
+  /**
+   * A frota do ACS inteiro que a marcação automática lê. A passada é a cada
+   * 15 min, e cada provedor do mesmo ACS lia a mesma frota inteira na mesma
+   * volta: dentro desta janela, os provedores seguintes usam a mesma leitura.
+   */
+  static FLEET_IDENTITY_TTL_MS = 120_000;
+
+  /**
+   * Uma leitura da coleção inteira de dispositivos: prazo de frota, uma das
+   * poucas vagas de frota do provedor (`withFleetReadSlot`), e quem pedir a
+   * mesma coisa enquanto ela está no ar espera a mesma resposta.
+   *
+   * A chave é o provedor (com ou sem o escopo de equipamentos) e a busca
+   * inteira, projeção e filtro. `shareKey` troca o provedor por outra coisa —
+   * o ACS, para a leitura fora do escopo que é a mesma para todos os
+   * provedores dele.
+   *
+   * As linhas devolvidas podem ser as mesmas que outro chamador recebeu: quem
+   * lê não as altera (`processDeviceData` só lê).
+   */
+  static async fetchFleet(query, {
+    label = 'Invalid API response', ttlMs = 0, fresh = false, shareKey = null, timeoutMs = null
+  } = {}) {
+    // A tag de escopo entra na chave: é ela que decide QUAIS equipamentos a
+    // resposta traz, e uma tag trocada (ou o ACS que passou a ser
+    // compartilhado) não pode receber a frota guardada da tag de antes.
+    const escopo = deviceScopeSuspended() ? 'all' : `tag:${(await (await connectorFor()).scopeTag()) ?? ''}`;
+    const dono = shareKey ?? `${currentTenantId()}|${escopo}`;
+    const key = `${dono}|${JSON.stringify(query)}`;
+    return this.fleetReads.read(key, async () => {
+      const data = await this.fetchFromGenieAcs('', query, 'GET', null, {
+        timeoutMs: timeoutMs ?? this.FLEET_READ_TIMEOUT_MS
+      });
+      if (!Array.isArray(data)) throw new Error(label);
+      return data;
+    }, { ttlMs, fresh });
   }
 
   static dashboardCacheTtlMs = 60_000;
@@ -790,7 +870,15 @@ class DeviceService {
     return found;
   }
 
-  static async fetchDeviceListPage(queryParam, projection, { skip, limit } = {}) {
+  static async fetchDeviceListPage(queryParam, projection, { skip, limit, fleet = false } = {}) {
+    if (fleet) {
+      // A lista sem página (busca, recorte local, planilha): é a frota inteira,
+      // e vai pelo caminho de frota — prazo, vaga e leitura em voo.
+      return this.fetchFleet({
+        ...(queryParam ? { query: queryParam } : {}),
+        projection: projection.join(',')
+      });
+    }
     const data = await this.fetchFromGenieAcs('', {
       ...(queryParam ? { query: queryParam } : {}),
       projection: projection.join(','),
@@ -879,24 +967,35 @@ class DeviceService {
       };
     }
 
-    const rows = await this.fetchDeviceListPage(queryParam, projection);
-    let matches = rows
-      .map((item) => this.processDeviceData(
-        item, virtualParams, learnedRxPaths, learnedTemperaturePaths
-      ))
-      .reverse()
-      .filter((device) => this.deviceMatchesFocus(device, focus));
+    // O recorte (status + foco) guardado por provedor e filtro, e a busca por
+    // cima dele também: a frota inteira é lida uma vez, e as teclas seguintes
+    // e as trocas de página filtram o que já está em memória — ver
+    // `SEARCH_MATCH_TTL_MS`. A chave leva a projeção porque um caminho de RX
+    // aprendido no meio muda o que cada linha mostra.
+    const recorteKey = [
+      currentTenantId(), queryParam ?? '', projection.join(','), JSON.stringify(focus ?? null)
+    ].join('|');
+    const recortar = () => this.searchMatches.read(`${recorteKey}|`, async () => {
+      const rows = await this.fetchDeviceListPage(queryParam, projection, { fleet: true });
+      return rows
+        .map((item) => this.processDeviceData(
+          item, virtualParams, learnedRxPaths, learnedTemperaturePaths
+        ))
+        .reverse()
+        .filter((device) => this.deviceMatchesFocus(device, focus));
+    }, { ttlMs: this.SEARCH_MATCH_TTL_MS, gate: false });
 
-    if (search) {
+    const matches = !search ? await recortar() : await this.searchMatches.read(`${recorteKey}|${search}`, async () => {
+      const recorte = await recortar();
       // O Customer ID é do painel, não do GenieACS, e por isso a busca é a
       // única que precisa dele — sobre o que o recorte já deixou passar.
-      const ids = matches.map((device) => device._id);
+      const ids = recorte.map((device) => device._id);
       const [customerIds, sgpLinks] = await Promise.all([
         this.lookupCustomerIds(ids),
         this.lookupSgpLinks(ids)
       ]);
       const needle = search.toLowerCase();
-      matches = matches.filter((device) => this.deviceMatchesSearch(
+      return recorte.filter((device) => this.deviceMatchesSearch(
         {
           ...device,
           customerId: customerIds.get(String(device._id)) || null,
@@ -905,14 +1004,16 @@ class DeviceService {
         },
         needle
       ));
-    }
+    }, { ttlMs: this.SEARCH_MATCH_TTL_MS, gate: false });
 
     const total = matches.length;
     const totalPages = Math.ceil(total / pageSize);
     const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1;
     const offset = (currentPage - 1) * pageSize;
     return {
-      devices: matches.slice(offset, offset + pageSize),
+      // Cópias: quem recebe a página a decora (`CustomerService.decorateDevices`),
+      // e o que está guardado tem de continuar sendo o que o ACS respondeu.
+      devices: matches.slice(offset, offset + pageSize).map((device) => ({ ...device })),
       page: currentPage,
       pageSize,
       total,
@@ -927,24 +1028,43 @@ class DeviceService {
    * provedor: quem chama roda dentro de `withoutDeviceScope`, porque o que se
    * procura são justamente os equipamentos que ainda não têm tag.
    */
-  static async listFleetIdentity() {
+  static async listFleetIdentity({ fresh = false } = {}) {
     const virtualParams = await this.getVirtualParameters();
-    const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
-    const learnedTemperaturePaths = await this.readTemperaturePaths();
-    const projection = this.buildDeviceListProjection(
-      virtualParams,
-      learnedRxPaths,
-      await this.readPppoePaths(),
-      learnedTemperaturePaths
-    );
-    const rows = await this.fetchDeviceListPage(null, [...projection, '_tags']);
+    // Só o que a marcação lê: serial, login e tags. A projeção da listagem
+    // (RX, temperatura, SSIDs, …) era a frota do ACS INTEIRO — de todos os
+    // provedores dele — com várias vezes o peso, para jogar quase tudo fora.
+    // O login sai do mesmo `resolvePppoeUsername` e dos mesmos caminhos que a
+    // listagem projeta para ele, então a resposta é a mesma.
+    const projection = [...new Set([
+      '_id',
+      '_deviceId._SerialNumber',
+      virtualParams.vpPppoeUsername,
+      ...PPPOE_FALLBACK_PATHS,
+      ...await this.readPppoePaths(),
+      '_tags'
+    ].filter(Boolean))];
+    // Fora do escopo a frota é a do ACS, não a do provedor: os provedores que
+    // apontam para o mesmo endereço leem a mesma coisa, e por isso a chave é o
+    // endereço. Só no modo direto — no túnel e no agente o endereço é o de
+    // dentro da rede de cada um, e coincidir não quer dizer nada.
+    const connector = await connectorFor();
+    const shareKey = connector.mode === 'direct' && deviceScopeSuspended()
+      ? `acs:${await connector.rootUrl()}`
+      : null;
+    const rows = await this.fetchFleet({ projection: projection.join(',') }, {
+      ttlMs: this.FLEET_IDENTITY_TTL_MS, fresh, shareKey
+    });
     return rows.map((item) => {
-      const device = this.processDeviceData(item, virtualParams, learnedRxPaths, learnedTemperaturePaths);
+      // A MESMA lista de tags da linha guardada, de propósito: quem marca um
+      // equipamento acrescenta a tag nela (`DeviceScopeTagger.run`), e o
+      // próximo provedor do mesmo ACS, lendo a mesma leitura guardada, vê o
+      // equipamento já com dono — e não o marca uma segunda vez.
+      if (!Array.isArray(item._tags)) item._tags = [];
       return {
         _id: String(item._id),
-        serial: String(device.SerialNumber ?? '').trim(),
-        pppoe: String(device.pppoe ?? '').trim(),
-        tags: Array.isArray(item._tags) ? item._tags.map(String) : []
+        serial: String(item._deviceId?._SerialNumber ?? '').trim(),
+        pppoe: String(this.resolvePppoeUsername(item, virtualParams).value ?? '').trim(),
+        tags: item._tags
       };
     });
   }
@@ -994,7 +1114,7 @@ class DeviceService {
       if ((await this.countDevicesFromGenieAcs(queryParam)) > max) throw grandeDemais();
     }
 
-    const rows = await this.fetchDeviceListPage(queryParam, projection);
+    const rows = await this.fetchDeviceListPage(queryParam, projection, { fleet: true });
     let matches = rows
       .map((item) => this.processDeviceData(
         item, virtualParams, learnedRxPaths, learnedTemperaturePaths
@@ -1066,11 +1186,11 @@ class DeviceService {
    * onde ninguém abriu a lista de equipamentos ainda conta `Unknown` — até a
    * primeira listagem, e não para sempre, que era o estado anterior.
    */
-  static async getDashboardDevices() {
+  static async getDashboardDevices({ fresh = false } = {}) {
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
     const learnedTemperaturePaths = await this.readTemperaturePaths();
-    const projection = [
+    const projection = [...new Set([
       '_id',
       '_deviceId._ProductClass',
       '_deviceId._Manufacturer',
@@ -1081,13 +1201,22 @@ class DeviceService {
       ...learnedRxPaths,
       ...TEMPERATURE_FALLBACK_PATHS,
       ...learnedTemperaturePaths,
+      // O login PPPoE, para a varredura de alertas: a queda em massa liga o
+      // equipamento ao ponto do mapa por ele, e sem ele aqui a varredura fazia
+      // uma SEGUNDA leitura da frota inteira (`getCustomerIdentityDevices`) a
+      // cada passada. Meia dúzia de folhas a mais por linha custam menos que
+      // uma frota a mais.
+      virtualParams.vpPppoeUsername,
+      ...PPPOE_FALLBACK_PATHS,
+      ...await this.readPppoePaths(),
       '_lastInform',
       '_registered'
-    ].filter(Boolean);
-    const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') });
-    if (!Array.isArray(data)) {
-      throw new Error('Invalid GenieACS dashboard response');
-    }
+    ].filter(Boolean))];
+    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+      label: 'Invalid GenieACS dashboard response',
+      ttlMs: this.DASHBOARD_FLEET_TTL_MS,
+      fresh
+    });
     return data.map((item) => this.processDeviceData(
       item, virtualParams, learnedRxPaths, learnedTemperaturePaths
     ));
@@ -1114,10 +1243,9 @@ class DeviceService {
       ...TEMPERATURE_FALLBACK_PATHS,
       'InternetGatewayDevice.DeviceInfo.UpTime'
     ].filter(Boolean);
-    const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') });
-    if (!Array.isArray(data)) {
-      throw new Error('Invalid GenieACS telemetry response');
-    }
+    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+      label: 'Invalid GenieACS telemetry response'
+    });
     return data.map((item) => ({
       deviceId: item._id || null,
       lastInform: item._lastInform ?? null,
@@ -1775,12 +1903,10 @@ class DeviceService {
     ].filter(Boolean);
     // A frota inteira numa resposta: com milhares de ONTs, os 15 s padrão do
     // conector não bastam e a sincronização de IDs morria com "aborted".
-    const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') }, 'GET', null, {
+    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+      label: 'Invalid GenieACS customer identity response',
       timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
     });
-    if (!Array.isArray(data)) {
-      throw new Error('Invalid GenieACS customer identity response');
-    }
     return data.map((item) => ({
       _id: item._id || null,
       _lastInform: item._lastInform || null,
@@ -1813,12 +1939,10 @@ class DeviceService {
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths
     ].filter(Boolean);
-    const data = await this.fetchFromGenieAcs('', { projection: [...new Set(projection)].join(',') }, 'GET', null, {
+    const data = await this.fetchFleet({ projection: [...new Set(projection)].join(',') }, {
+      label: 'Invalid GenieACS map status response',
       timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
     });
-    if (!Array.isArray(data)) {
-      throw new Error('Invalid GenieACS map status response');
-    }
     const now = Date.now();
     return data.map((item) => {
       const rx = Number(this.resolveRxPower(item, virtualParams, learnedRxPaths).value);
@@ -3243,8 +3367,17 @@ class DeviceService {
     // devolva uma lista cheia, e a lista de equipamentos vem pelo filtro normal.
     const connector = await connectorFor();
     const tag = await connector.scopeTag();
+    //
+    // A lista de ids é a frota inteira do provedor, e era lida a cada chamada:
+    // guardada 60 s (`FAULT_OWNERS_TTL_MS`), com a tag na chave — trocar a tag
+    // muda a chave, e o console esquece tudo ao trocar (`forgetSharedAcs`).
     const donos = tag
-      ? new Set(((await this.fetchFromGenieAcs('', { projection: '_id' })) || []).map((row) => String(row._id)))
+      ? await this.fleetReads.read(`${currentTenantId()}|faultOwners|${tag}`, async () => {
+        const rows = await this.fetchFromGenieAcs('', { projection: '_id' }, 'GET', null, {
+          timeoutMs: this.FLEET_READ_TIMEOUT_MS
+        });
+        return new Set((rows || []).map((row) => String(row._id)));
+      }, { ttlMs: this.FAULT_OWNERS_TTL_MS })
       : null;
     const data = await this.fetchGenieAcsCollection(
       'faults',
@@ -3430,10 +3563,10 @@ class DeviceService {
    *   depois de uma atualização ociosa disparava, do caminho da requisição,
    *   exatamente a busca que o job acabara de decidir que podia esperar.
    */
-  static async refreshDashboardData({ ttlMs } = {}) {
+  static async refreshDashboardData({ ttlMs, fresh = false } = {}) {
     const cache = this.dashboardCacheFor();
     const scope = await this.dashboardScope();
-    const devices = await this.getDashboardDevices();
+    const devices = await this.getDashboardDevices({ fresh });
     // As falhas do painel anterior só valem se ele era do mesmo escopo.
     const anterior = cache.scope === scope ? cache.data : null;
     const previousFaults = Array.isArray(anterior?.faults) ? anterior.faults : [];
@@ -3464,7 +3597,9 @@ class DeviceService {
 
     const startRefresh = () => {
       if (cache.promise) return cache.promise;
-      const work = this.refreshDashboardData();
+      // O "atualizar" do operador (`force`) vai ao ACS mesmo dentro da janela
+      // em que a leitura do painel é reaproveitada (`DASHBOARD_FLEET_TTL_MS`).
+      const work = this.refreshDashboardData({ fresh: force });
       cache.promise = work;
       work.catch((error) => {
         console.error('Dashboard background refresh failed:', error.message);

@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
+import { useVisibleInterval } from '@/lib/visible-interval'
 
 /** A lista é relida de minuto em minuto: é a cadência do agendador que avisa. */
 const POLL_MS = 60_000
@@ -337,11 +338,9 @@ export function MaintenancePanel({ compact = false }: { compact?: boolean }) {
     }
   }, [])
 
-  useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => void load(), POLL_MS)
-    return () => window.clearInterval(timer)
-  }, [load])
+  useEffect(() => { void load() }, [load])
+  // Mesmo relógio do quadro de quedas: parado com a aba escondida.
+  useVisibleInterval(() => void load(), POLL_MS)
 
   const lista = (items ?? []).filter((item) => !compact
     || item.status === 'active'

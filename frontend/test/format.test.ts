@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { loadDictionary, setActiveLocale } from '@/lib/i18n'
 import {
@@ -7,6 +7,10 @@ import {
   formatRelativeTime
 } from '@/lib/utils'
 import en from '@/lib/i18n/locales/en'
+
+// O inglês também é carregado sob demanda; o painel o tem em memória quando
+// ele é o idioma ou o substituto, e é esse o estado que estes casos descrevem.
+beforeAll(() => loadDictionary('en'))
 
 afterEach(() => {
   setActiveLocale('pt-BR')

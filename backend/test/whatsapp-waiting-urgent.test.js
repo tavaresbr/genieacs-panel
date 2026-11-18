@@ -72,3 +72,20 @@ describe('waitingNow com a marca da IA', () => {
     assert.ok(!ids(await lista()).includes(urgente));
   });
 });
+
+describe('waitingNowCached, a memória da rota da tela', () => {
+  it('serve a mesma lista por ~30 s, por limite, e esquece quando pedem', async () => {
+    WaResponseTimeService.resetWaitingCache();
+    const cached = (opcoes) => asTenant(() => WaResponseTimeService.waitingNowCached(opcoes));
+    const primeira = await cached({ minMinutes: 15, urgentMinMinutes: 7 });
+    const nova = await esperando(40);
+    const segunda = await cached({ minMinutes: 15, urgentMinMinutes: 7 });
+    assert.deepEqual(ids(segunda), ids(primeira), 'dentro da janela a lista é a mesma');
+    // Outro limite é outra chave: calcula na hora e já vê a conversa nova.
+    assert.ok(ids(await cached({ minMinutes: 30, urgentMinMinutes: 15 })).includes(nova));
+    // E o caminho sem cache (o do alerta) nunca lê o passado.
+    assert.ok(ids(await lista()).includes(nova));
+    WaResponseTimeService.resetWaitingCache();
+    assert.ok(ids(await cached({ minMinutes: 15, urgentMinMinutes: 7 })).includes(nova));
+  });
+});

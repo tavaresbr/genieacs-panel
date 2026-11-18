@@ -2,6 +2,8 @@ import AppState from '../models/AppState.js';
 import crypto from 'node:crypto';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { asaasDeliveryCandidates } from '../config/deliveryCandidatesCache.js';
+import { invalidateContactDirectory } from '../config/contactDirectoryCache.js';
 import { ASAAS_WEBHOOK_PATH } from '../config/asaasWebhookPath.js';
 import { BASE_URLS, ENVIRONMENTS } from './billing/asaasSettingsService.js';
 import { AsaasError, testConnection as asaasTestConnection } from './billing/asaasClient.js';
@@ -139,6 +141,11 @@ class AsaasProviderService {
 
   static invalidateConfigCache() {
     this.configCache.invalidate();
+    // O token do webhook e o "entrega ligada" moram aqui — ver
+    // `deliveryCandidatesCache.js`. E ligar ou desligar a integração muda o
+    // "também no Asaas" da lista de contatos.
+    asaasDeliveryCandidates.clear();
+    invalidateContactDirectory();
   }
 
   static async getConfig() {

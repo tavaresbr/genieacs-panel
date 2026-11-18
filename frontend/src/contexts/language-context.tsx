@@ -47,8 +47,8 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 const EMPTY_VALUE = '—'
 
-/** English ships with the bundle, so it can always be rendered right away. */
-const BUNDLED_LOCALE: Locale = 'en'
+/** English stands in while a dictionary is missing; it is lazy too, see `lib/i18n`. */
+const FALLBACK_LOCALE: Locale = 'en'
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   // The locale the visitor asked for, and the one currently being rendered.
@@ -57,7 +57,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [requestedLocale, setRequestedLocale] = useState<Locale>(() => detectLocale())
   const [locale, setRenderedLocale] = useState<Locale>(() => {
     const detected = detectLocale()
-    return isDictionaryLoaded(detected) ? detected : BUNDLED_LOCALE
+    return isDictionaryLoaded(detected) ? detected : FALLBACK_LOCALE
   })
   // Switching language later may briefly fall back to English, which reads as
   // a deliberate response to the click. Doing that on the very first paint
@@ -67,10 +67,21 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   // A dictionary request that never settles must not leave a blank page, so
   // the app is released in English if the chunk has not arrived in time.
+  // English is lazy too now: it is fetched at that point and the app released
+  // once it lands, so the fallback still reads as English rather than as raw
+  // keys. The last timer is for a network that answers nothing at all.
   useEffect(() => {
     if (ready) return undefined
-    const timer = window.setTimeout(() => setReady(true), 3000)
-    return () => window.clearTimeout(timer)
+    let cancelled = false
+    const fallback = window.setTimeout(() => {
+      void loadDictionary(FALLBACK_LOCALE).then(() => { if (!cancelled) setReady(true) })
+    }, 3000)
+    const giveUp = window.setTimeout(() => setReady(true), 15000)
+    return () => {
+      cancelled = true
+      window.clearTimeout(fallback)
+      window.clearTimeout(giveUp)
+    }
   }, [ready])
 
   // Render a locale only once its dictionary is in memory. `loadDictionary`

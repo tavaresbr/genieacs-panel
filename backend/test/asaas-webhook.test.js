@@ -109,6 +109,37 @@ describe('quem pode entregar', () => {
     assert.equal(res.status, 401);
     assert.equal(await linha(alfa), undefined);
   });
+
+  it('a lista de candidatos é montada uma vez e esquecida ao salvar ou suspender', async () => {
+    const { default: AsaasWebhookService } = await import('../src/services/asaasWebhookService.js');
+    const { default: Tenant } = await import('../src/models/Tenant.js');
+    const original = AsaasWebhookService.loadDeliveryCandidates;
+    let montagens = 0;
+    AsaasWebhookService.loadDeliveryCandidates = function contar(...args) {
+      montagens += 1;
+      return original.apply(this, args);
+    };
+    try {
+      // O `beforeEach` salvou a configuração: a primeira entrega monta.
+      assert.equal((await entregar(evento('PAYMENT_CREATED', pay()), tokenAlfa)).status, 200);
+      assert.equal((await entregar(evento('PAYMENT_CREATED', pay({ id: 'pay_b' })), tokenBeta)).status, 200);
+      assert.equal(montagens, 1, 'a segunda entrega reaproveita a lista');
+
+      // Salvar a configuração do Asaas a esquece: o token girado vale na hora.
+      const novo = (await dentro(beta, () => AsaasProviderService.rotateWebhookToken())).token;
+      assert.equal((await entregar(evento('PAYMENT_CREATED', pay({ id: 'pay_c' })), tokenBeta)).status, 401);
+      assert.equal((await entregar(evento('PAYMENT_CREATED', pay({ id: 'pay_c' })), novo)).status, 200);
+      assert.equal(montagens, 2);
+
+      // Suspender sai da lista já, não em trinta segundos.
+      await Tenant.setStatus(beta, 'suspended');
+      assert.equal((await entregar(evento('PAYMENT_CREATED', pay({ id: 'pay_d' })), novo)).status, 401);
+      assert.equal(await linha(beta, 'pay_d'), undefined);
+    } finally {
+      AsaasWebhookService.loadDeliveryCandidates = original;
+      await Tenant.setStatus(beta, 'active');
+    }
+  });
 });
 
 describe('o que a entrega faz', () => {

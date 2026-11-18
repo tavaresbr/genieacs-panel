@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
+import { useVisibleInterval } from '@/lib/visible-interval'
 
 /** De quanto em quanto tempo a lista é relida: a varredura dos alertas roda a cada poucos minutos. */
 const POLL_MS = 60_000
@@ -172,11 +173,10 @@ export function OutagePanel({ onlyOpen = false }: { onlyOpen?: boolean }) {
     if (res.success && res.data) setIncidents(res.data.incidents)
   }, [onlyOpen, days, status, notified, debounced])
 
-  useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => void load(), POLL_MS)
-    return () => window.clearInterval(timer)
-  }, [load])
+  useEffect(() => { void load() }, [load])
+  // O Dashboard e o WhatsApp ficam abertos o dia todo: com a aba escondida
+  // não há quem veja o quadro, então o relógio para e lê ao voltar.
+  useVisibleInterval(() => void load(), POLL_MS)
 
   const lista = (incidents ?? []).filter((i) => !onlyOpen || i.status === 'open')
   if (onlyOpen && lista.length === 0) return null

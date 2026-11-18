@@ -1,4 +1,5 @@
 import AppState from '../models/AppState.js';
+import { currentTenantId } from '../config/tenantContext.js';
 import Setting from '../models/Setting.js';
 import DeviceService from './deviceService.js';
 import DirectConnector, { DEVICE_SCOPE_KEY, withoutDeviceScope } from './genieacs/direct.js';
@@ -40,6 +41,13 @@ export function prefixesOverlap(a, b) {
  * do agendador, para as duas nunca discordarem sobre o que é "de quem".
  */
 class DeviceScopeTagger {
+  /**
+   * A passada automática em andamento, por provedor. O agendador a solta no
+   * fundo (`startAuto`) e não espera: a leitura do ACS inteiro não pode segurar
+   * a cobrança, os lembretes e a suspensão do provedor na mesma volta.
+   */
+  static running = new Map();
+
   static async autoPrefixes() {
     return parsePrefixes(await Setting.getByKey(AUTO_PREFIXES_KEY));
   }
@@ -49,14 +57,19 @@ class DeviceScopeTagger {
    * `{ tag, matched, alreadyTagged, toTag, tagged, conflicts, conflictCount }`,
    * ou `{ error }` quando o provedor não tem tag.
    */
-  static async run({ prefixes = [], serials = new Set(), apply = false } = {}) {
+  /**
+   * `fresh: false` aceita a leitura do ACS que outro provedor do mesmo
+   * endereço acabou de fazer (`DeviceService.FLEET_IDENTITY_TTL_MS`) — é o que
+   * a passada automática usa. A ferramenta do console lê na hora (o padrão).
+   */
+  static async run({ prefixes = [], serials = new Set(), apply = false, fresh = true } = {}) {
     const tag = String((await Setting.getByKey(DEVICE_SCOPE_KEY)) ?? '').trim();
     if (!tag) return { error: 'Set the provider device tag first' };
     const prefixos = prefixes.map((p) => String(p).toLowerCase()).filter(Boolean);
     const tagsDeProvedor = await DirectConnector.allScopeTags();
 
     return withoutDeviceScope(async () => {
-      const frota = await DeviceService.listFleetIdentity();
+      const frota = await DeviceService.listFleetIdentity({ fresh });
       const casam = frota.filter((d) => {
         const login = String(d.pppoe || '').toLowerCase();
         return (login && prefixos.some((p) => login.startsWith(p)))
@@ -75,6 +88,10 @@ class DeviceScopeTagger {
         for (const d of marcar) {
           // eslint-disable-next-line no-await-in-loop -- um por vez: o ACS é compartilhado
           await DeviceService.mutateDeviceTag(d._id, tag, 'POST');
+          // Na lista de tags da própria leitura (que pode ser a guardada, a
+          // mesma que o próximo provedor do ACS vai ler): para ele, este
+          // equipamento já tem dono e é conflito, nunca uma segunda tag.
+          if (!d.tags.includes(tag)) d.tags.push(tag);
           marcados += 1;
         }
       }
@@ -104,13 +121,41 @@ class DeviceScopeTagger {
     if (!tag) return null;
     let resumo;
     try {
-      const r = await this.run({ prefixes, apply: true });
+      const r = await this.run({ prefixes, apply: true, fresh: false });
       resumo = { at: new Date().toISOString(), tagged: r.tagged, conflictCount: r.conflictCount, error: null };
     } catch (error) {
       resumo = { at: new Date().toISOString(), tagged: 0, conflictCount: 0, error: error.message };
     }
     await AppState.upsert(LAST_AUTO_KEY, JSON.stringify(resumo));
     return resumo;
+  }
+
+  /** A passada automática tem o que fazer? Sem tag ou sem prefixo, está desligada. */
+  static async autoEnabled() {
+    if ((await this.autoPrefixes()).length === 0) return false;
+    return Boolean(String((await Setting.getByKey(DEVICE_SCOPE_KEY)) ?? '').trim());
+  }
+
+  /**
+   * `runAuto` no fundo, uma por provedor: a segunda chamada enquanto a
+   * primeira roda recebe a MESMA promessa, em vez de ler o ACS de novo. É a
+   * forma da sincronização de contatos — o agendador anda o relógio antes e
+   * não espera. O escopo do provedor viaja com a promessa.
+   */
+  static startAuto() {
+    const tenant = currentTenantId();
+    const emCurso = this.running.get(tenant);
+    if (emCurso) return emCurso;
+    const work = this.runAuto().finally(() => {
+      if (this.running.get(tenant) === work) this.running.delete(tenant);
+    });
+    this.running.set(tenant, work);
+    return work;
+  }
+
+  /** Espera as passadas automáticas em andamento — para os testes. */
+  static async idle() {
+    await Promise.allSettled([...this.running.values()]);
   }
 
   /** `{ at, tagged, conflictCount, error }` da última passada, ou `null`. */

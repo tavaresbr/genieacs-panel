@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: Setting } = await import('../src/models/Setting.js');
+const { default: DeviceService } = await import('../src/services/deviceService.js');
 
 const FLEET_SIZE = 30;
 const ONLINE_COUNT = 12;
@@ -305,6 +306,46 @@ describe('GET /api/devices pagination', () => {
     }
   });
 
+  /**
+   * A coluna de contratos vem com a página: a tela baixava `/sgp/links`
+   * inteiro (a tabela do provedor toda) para decorar 25 linhas. Sem a
+   * integração ligada a resposta diz que não há SGP e não carrega o campo.
+   */
+  it('carries the SGP link of each returned row, only while the integration is on', async () => {
+    const tenant = getDb().raw('(select id from tenants order by id limit 1)');
+    await asTenant(() => getDb()('sgp_links').insert([
+      { tenant_id: tenant, device_id: 'ONT-029', contract: '777', client_name: 'Assinante Um', state: 'blocked', link_mode: 'auto' },
+      { tenant_id: tenant, device_id: 'ONT-000', contract: '777', client_name: 'Assinante Um', state: 'blocked', link_mode: 'auto' }
+    ]));
+    try {
+      const off = await listDevices('?pageSize=5');
+      assert.equal(off.body.data.sgpAvailable, false);
+      assert.ok(!('sgpLink' in off.body.data.devices[0]));
+
+      const saved = await call(`${panelUrl}/api/sgp/config`, {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: { enabled: true, baseUrl: 'http://127.0.0.1:9', app: 'painel', token: 'sgp-token', linkMode: 'pppoe' }
+      });
+      assert.equal(saved.status, 200);
+
+      const { body } = await listDevices('?pageSize=5');
+      assert.equal(body.data.sgpAvailable, true);
+      const [first, second] = body.data.devices;
+      // A primeira linha é a ONT-029 (mais nova primeiro) e tem contrato; o
+      // contrato é dividido com a ONT-000, que está fora desta página — a
+      // contagem tem que olhar o provedor, não só a página.
+      assert.equal(first._id, 'ONT-029');
+      assert.equal(first.sgpLink.contract, '777');
+      assert.equal(first.sgpLink.state, 'blocked');
+      assert.equal(first.sgpLink.deviceCount, 2);
+      assert.equal(second.sgpLink, null);
+    } finally {
+      await call(`${panelUrl}/api/sgp/config`, { method: 'PUT', headers: authHeaders(token), body: { enabled: false } });
+      await asTenant(() => getDb()('sgp_links').whereIn('device_id', ['ONT-029', 'ONT-000']).del());
+    }
+  });
+
   it('combines a search with the pushed-down status filter', async () => {
     const { body } = await listDevices('?search=zte&status=online');
     // Odd indices are ZTE, and indices below 12 are online: 1, 3, 5, 7, 9, 11.
@@ -420,6 +461,32 @@ describe('GET /api/devices pagination', () => {
     // `Number('')` é zero — sem o teste de valor reportado ele cairia aqui, e
     // o painel afirmaria temperatura normal sobre quem não respondeu nada.
     assert.equal(temperatureDistribution.Normal, 0);
+  });
+
+  it('a busca lê a frota uma vez: trocar de página e refinar o termo filtram o que já veio', async () => {
+    DeviceService.forgetDashboards();
+    const fleetReads = () => genieAcs.requests.filter((r) => r.limit === null && r.skip === null && r.projection !== '_id');
+    const antes = fleetReads().length;
+
+    const primeira = await listDevices('?search=zte&pageSize=10');
+    const segunda = await listDevices('?search=zte&pageSize=10&page=2');
+    const refinada = await listDevices('?search=zte%20&pageSize=10');
+    const outra = await listDevices('?search=hg8245&pageSize=10');
+    assert.equal(fleetReads().length - antes, 1, 'uma leitura da frota para quatro pedidos');
+
+    // E as respostas são as mesmas que a leitura a cada pedido dava.
+    assert.equal(primeira.body.data.total, FLEET_SIZE / 2);
+    assert.equal(segunda.body.data.page, 2);
+    assert.equal(segunda.body.data.devices.length, FLEET_SIZE / 2 - 10);
+    const ids = new Set([...primeira.body.data.devices, ...segunda.body.data.devices].map((d) => d._id));
+    assert.equal(ids.size, FLEET_SIZE / 2, 'as duas páginas não se repetem');
+    assert.equal(refinada.body.data.total, primeira.body.data.total);
+    assert.equal(outra.body.data.total, FLEET_SIZE / 2);
+
+    // Um filtro de status diferente é outra frota, e vai ao ACS.
+    await listDevices('?search=zte&status=online');
+    assert.equal(fleetReads().length - antes, 2);
+    DeviceService.forgetDashboards();
   });
 
   it('counts without the total header when GenieACS omits it', async () => {

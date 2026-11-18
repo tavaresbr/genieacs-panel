@@ -1,5 +1,5 @@
 import AppState from '../models/AppState.js';
-import { tdb } from '../config/database.js';
+import { getDb, isSqlite, tdb } from '../config/database.js';
 import DeviceService from './deviceService.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
@@ -10,7 +10,7 @@ import AsaasProviderService from './asaasProviderService.js';
 import AsaasImportService from './asaasImportService.js';
 import TeiahExportService from './teiahExportService.js';
 import WaDunningService from './waDunningService.js';
-import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
+import { TENANT_JOB_CONCURRENCY, forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { AUDIT_RETENTION, BOT_EVENTS_RETENTION_DAYS } from '../config/retention.js';
 import AuditLog from '../models/AuditLog.js';
@@ -210,7 +210,14 @@ class SchedulerService {
     // `.env` e ficava larga para sempre quando ninguém pôs.
     this.tickPromise = refreshDeploymentSharing()
       .catch(() => {})
+      // Até `TENANT_JOB_CONCURRENCY` provedores ao mesmo tempo: em série, o
+      // provedor cujo ACS ou SGP demora segurava a cobrança, os lembretes e a
+      // suspensão de todos os que vinham depois dele. Cada passada é do seu
+      // provedor — escopo próprio (`runInTenant`), relógio próprio
+      // (`scheduler_state` é uma linha de `app_state` por provedor), travas
+      // próprias — então rodar lado a lado não mistura nada.
       .then(() => forEachTenant((tenant) => this.runJobs({ tenant }), {
+        concurrency: TENANT_JOB_CONCURRENCY,
         onError: (error, tenant) => {
           console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
         }
@@ -332,15 +339,23 @@ class SchedulerService {
 
     // As ONTs novas de um provedor num GenieACS compartilhado ganham a tag
     // dele pelo prefixo do login PPPoE — sem ela, ficariam invisíveis para o
-    // próprio dono. Desligado (sem tag ou sem prefixo), `runAuto` responde
-    // `null` e o relógio não anda, para a primeira passada sair logo que a
-    // plataforma ligar. Falha do ACS vira o resumo da passada, não exceção.
-    if (this.due(state.lastAutoTagAt, AUTO_TAG_INTERVAL_MS)) {
-      summary.autoTag = await DeviceScopeTagger.runAuto().catch((error) => {
+    // próprio dono. Desligado (sem tag ou sem prefixo), o relógio não anda,
+    // para a primeira passada sair logo que a plataforma ligar. Falha do ACS
+    // vira o resumo da passada (`lastAuto`), não exceção.
+    //
+    // No fundo, como a sincronização de contatos: a passada lê o ACS INTEIRO
+    // e marca um equipamento por vez, e esperá-la aqui segurava a emissão e a
+    // régua deste provedor atrás de uma leitura de minutos. Relógio antes,
+    // passada solta, e a trava de `startAuto` recusa a sobreposição.
+    if (
+      this.due(state.lastAutoTagAt, AUTO_TAG_INTERVAL_MS)
+      && await DeviceScopeTagger.autoEnabled().catch(() => false)
+    ) {
+      await this.writeState({ lastAutoTagAt: new Date().toISOString() });
+      summary.autoTag = 'started';
+      void DeviceScopeTagger.startAuto().catch((error) => {
         console.warn(`Device auto-tag failed: ${error.message}`);
-        return { error: error.message };
       });
-      if (summary.autoTag) await this.writeState({ lastAutoTagAt: new Date().toISOString() });
     }
 
     // Os lembretes de cobrança e a emissão rodam DENTRO do laço por provedor,
@@ -666,6 +681,16 @@ class SchedulerService {
         console.warn(`Retention pass failed for provider ${tenant.slug}: ${error.message}`);
       }
     });
+    // SQLite: as estatísticas do planejador envelhecem com o banco, e uma
+    // conexão do pool pode viver semanas sem reabrir (o `optimize` de
+    // `afterCreate` só roda na abertura). Uma vez por dia, depois da poda —
+    // que é justamente o que mais muda as tabelas —, `PRAGMA optimize` refaz
+    // só o que precisa. Postgres e MySQL têm autovacuum/analyze próprios.
+    if (isSqlite()) {
+      await getDb().raw('PRAGMA optimize').catch((error) => {
+        console.warn(`Could not optimize SQLite statistics: ${error.message}`);
+      });
+    }
   }
 }
 

@@ -39,7 +39,12 @@ import {
 import type { Device, Vendor } from '@/types'
 import { summonDeferredMessage } from '@/lib/device-actions'
 
-interface ProcessedDevice extends Device {
+/** A linha como a lista a devolve: com o contrato do SGP quando a integração está ligada. */
+interface ListedDevice extends Device {
+  sgpLink?: SgpLinkRow | null
+}
+
+interface ProcessedDevice extends ListedDevice {
   isOnline: boolean
   brand: string
 }
@@ -73,7 +78,7 @@ export default function DevicesPage() {
   // campo, por conta própria, e aquele teste provava uma leitura que ela não
   // fazia: um campo novo esquecido aqui passaria verde.
   const [inicial] = useState(() => filtersFromQuery(searchParams))
-  const [devices, setDevices] = useState<Device[]>([])
+  const [devices, setDevices] = useState<ListedDevice[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [paging, setPaging] = useState({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 })
   const [loading, setLoading] = useState(true)
@@ -84,7 +89,6 @@ export default function DevicesPage() {
   const [page, setPage] = useState(inicial.page)
   const [filterSgp, setFilterSgp] = useState<SgpFilter>(inicial.sgp)
   const [filterFocus, setFilterFocus] = useState<DeviceFocusFilter>(inicial.focus)
-  const [sgpLinks, setSgpLinks] = useState<Map<string, SgpLinkRow>>(new Map())
   const [sgpAvailable, setSgpAvailable] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [refreshNonce, setRefreshNonce] = useState(0)
@@ -236,8 +240,11 @@ export default function DevicesPage() {
         if (cancelled) return
 
         if (res.success && res.data) {
-          const payload = res.data as DeviceListResponse<Device>
+          const payload = res.data as DeviceListResponse<ListedDevice>
           setDevices(payload.devices || [])
+          // A coluna de contratos vem com a própria página; `sgpAvailable`
+          // falso (integração desligada ou sem `sgp.read`) a esconde.
+          setSgpAvailable(payload.sgpAvailable === true)
           setPaging({
             page: payload.page,
             pageSize: payload.pageSize,
@@ -288,29 +295,19 @@ export default function DevicesPage() {
     })
   }, [devices, vendors, findBrand])
 
-  // The SGP links load apart from the inventory: when the integration is off
-  // (or momentarily unreachable) the panel simply drops the contract column.
-  useEffect(() => {
-    let cancelled = false
-
-    ;(async () => {
-      const res = await sgpAPI.getLinks()
-      if (cancelled) return
-      if (!res.success || !res.data) {
-        setSgpAvailable(false)
-        setSgpLinks(new Map())
-        return
-      }
-      setSgpAvailable(true)
-      setSgpLinks(new Map((res.data.links || []).map((link) => [link.deviceId, link])))
-    })()
-
-    return () => { cancelled = true }
-  }, [refreshNonce])
+  // O contrato de cada linha chega com a página (`sgpLink`). Antes a tela
+  // baixava `/sgp/links` inteiro — a tabela do provedor toda, dezenas de
+  // milhares de linhas numa rede grande — a cada visita, para decorar 25.
+  const sgpLinks = useMemo(() => {
+    const links = new Map<string, SgpLinkRow>()
+    for (const device of devices) if (device.sgpLink) links.set(device._id, device.sgpLink)
+    return links
+  }, [devices])
 
   // Search, status and the dashboard slice are resolved by the API; only the
   // contract state, which the devices endpoint knows nothing about, is narrowed
-  // here — and only across the rows of the page that came back.
+  // here — and only across the rows of the page that came back (the counter
+  // beside the paging says how many of them are shown).
   const visibleDevices = useMemo<ProcessedDevice[]>(() => {
     if (!sgpAvailable || filterSgp === 'all') return processedDevices
     return processedDevices.filter((device) => {

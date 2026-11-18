@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { getDb, tdb } from '../config/database.js';
+import { invalidateContactDirectory } from '../config/contactDirectoryCache.js';
 import { alcanceDoAssinante } from './customerDataExportService.js';
 import { resolveStoredAttachment } from './waMediaFile.js';
 
@@ -374,6 +375,10 @@ class CustomerErasureService {
         updated_at: new Date()
       });
     });
+    // Depois do commit: a pessoa saiu de `sgp_links`, `sgp_contacts`,
+    // `sgp_clients` e `asaas_customers`, e a lista de contatos memorizada não
+    // pode continuar mostrando-a.
+    invalidateContactDirectory();
   }
 }
 

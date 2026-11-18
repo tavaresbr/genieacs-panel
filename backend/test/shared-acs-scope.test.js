@@ -21,6 +21,7 @@ const { default: GenieAcsEgress } = await import('../src/services/genieacsEgress
 const { forgetSharedAcs } = await import('../src/services/genieacs/direct.js');
 const { default: SchedulerService } = await import('../src/services/schedulerService.js');
 const { default: AppState } = await import('../src/models/AppState.js');
+const { default: DeviceScopeTagger } = await import('../src/services/deviceScopeTagger.js');
 
 // A guarda de egresso da SaaS recusa loopback, com razão — e o ACS de mentira
 // deste teste mora no loopback. A guarda tem os testes dela; aqui o que está em
@@ -146,6 +147,27 @@ describe('um GenieACS compartilhado, com a tag do provedor', () => {
     assert.equal(comTag.body.data.stats.total, 2);
   });
 
+  it('a posse conferida vale um minuto; a recusa nunca é guardada', async () => {
+    const conferencias = () => genie.state.requests.filter((r) => r.method === 'GET'
+      && /^\/devices\/?$/.test(r.path)
+      && /ONT-ALFA-1/.test(decodeURIComponent(r.search)) && /_tags/.test(decodeURIComponent(r.search))
+      && new URLSearchParams(r.search).get('projection') === '_id').length;
+    const antes = conferencias();
+    for (let vez = 0; vez < 3; vez += 1) {
+      const r = await api('/devices/reboot', { method: 'POST', body: { deviceId: 'ONT-ALFA-1' } });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+    }
+    assert.equal(conferencias() - antes, 1, 'três ações, uma pergunta de posse');
+    for (let vez = 0; vez < 2; vez += 1) {
+      const r = await api('/devices/reboot', { method: 'POST', body: { deviceId: 'ONT-BETA-1' } });
+      assert.equal(r.status, 404);
+    }
+    // A plataforma troca a tag: o que foi conferido com a tag velha não vale.
+    forgetSharedAcs();
+    await api('/devices/reboot', { method: 'POST', body: { deviceId: 'ONT-ALFA-1' } });
+    assert.equal(conferencias() - antes, 2);
+  });
+
   it('o detalhe de um equipamento de outro provedor é "não encontrado"', async () => {
     const { status } = await api(`/devices/${encodeURIComponent('ONT-BETA-1')}`);
     assert.equal(status, 404);
@@ -267,9 +289,13 @@ describe('a marcação automática pelo prefixo do PPPoE', () => {
     assert.equal(salvo.status, 200, JSON.stringify(salvo.body));
     assert.deepEqual(salvo.body.data.autoTagPrefixes, ['ta100', 'beta']);
 
+    // No fundo: a volta do agendador não espera a leitura do ACS inteiro.
     const resumo = await passada(alfa);
-    assert.equal(resumo.autoTag.tagged, 1);
-    assert.equal(resumo.autoTag.conflictCount, 1, 'a ONT da beta fica como conflito');
+    assert.equal(resumo.autoTag, 'started');
+    await DeviceScopeTagger.idle();
+    const ultima = await runInTenant(alfa, () => DeviceScopeTagger.lastAuto());
+    assert.equal(ultima.tagged, 1);
+    assert.equal(ultima.conflictCount, 1, 'a ONT da beta fica como conflito');
     assert.deepEqual(genie.state.tags, [{ deviceId: 'ONT-SEMDONO', tag: 'alfa', method: 'POST' }]);
 
     const { body } = await api(`/platform/tenants/${alfa}/genieacs`);
@@ -279,6 +305,29 @@ describe('a marcação automática pelo prefixo do PPPoE', () => {
     const segunda = await passada(alfa);
     assert.equal(segunda.autoTag, null, 'dentro de 15 minutos não passa de novo');
     assert.deepEqual(genie.state.tags, []);
+  });
+
+  it('lê só serial, login e tags, e os provedores do mesmo ACS dividem a leitura', async () => {
+    await runInTenant(alfa, () => Setting.upsert('deviceScopeAutoPrefixes', 'ta100'));
+    await runInTenant(beta, () => Setting.upsert('deviceScopeAutoPrefixes', 'ta100-novo'));
+    const antes = genie.state.requests.length;
+
+    const primeira = await runInTenant(alfa, () => DeviceScopeTagger.runAuto());
+    assert.equal(primeira.tagged, 1);
+    // O mesmo ACS, a mesma projeção: a beta usa a leitura que a alfa fez —
+    // e vê a ONT que a alfa acabou de marcar como DELA, nunca a marca de novo.
+    const segunda = await runInTenant(beta, () => DeviceScopeTagger.runAuto());
+    assert.equal(segunda.tagged, 0);
+    assert.equal(segunda.conflictCount, 1, 'a ONT que a alfa acabou de marcar é conflito para a beta');
+    assert.deepEqual(genie.state.tags, [{ deviceId: 'ONT-SEMDONO', tag: 'alfa', method: 'POST' }]);
+
+    const leituras = genie.state.requests.slice(antes)
+      .filter((r) => r.method === 'GET' && /^\/devices\/?$/.test(r.path));
+    assert.equal(leituras.length, 1, 'uma leitura do ACS para os dois provedores');
+    const projecao = new URLSearchParams(leituras[0].search).get('projection').split(',');
+    assert.ok(projecao.includes('_tags') && projecao.includes('_deviceId._SerialNumber'));
+    assert.ok(!projecao.some((caminho) => /WLANConfiguration|Optical|Temperature/.test(caminho)),
+      `nada da listagem que a marcação não lê: ${projecao.join(',')}`);
   });
 
   it('sem prefixo, ou sem tag, não faz nada', async () => {

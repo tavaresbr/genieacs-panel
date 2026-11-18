@@ -1,6 +1,12 @@
 import { tdb, tinsert } from '../config/database.js';
 import { timestampMs } from '../utils/helpers.js';
 
+/**
+ * Baldes por comando. Com as onze colunas, 200 linhas são 2.200 variáveis —
+ * folgado no teto do SQLite e no pacote do MySQL.
+ */
+const UPSERT_CHUNK = 200;
+
 function numberOrNull(value) {
   return value === null || value === undefined ? null : Number(value);
 }
@@ -25,31 +31,39 @@ class DeviceSampleHour {
   /**
    * Writes a batch of buckets, replacing any that are already there.
    *
-   * Read-then-write rather than `onConflict().merge()`: the `excluded.` form
-   * that makes merge useful is PostgreSQL and SQLite syntax, and MySQL spells
-   * it differently. `SgpEvent.insertIfNew` settled on the same shape for the
-   * same reason. The unique on (tenant, device, bucket) is what makes re-running
-   * a rollup a correction rather than a duplication.
+   * Substitui, não acumula: o rollup recalcula o balde inteiro a partir das
+   * amostras cruas da hora e reescreve todas as colunas — é isso que faz
+   * rodá-lo de novo ser correção e não duplicação. Por isso o `merge` abaixo
+   * sobrescreve as colunas com o valor novo, sem somar nada ao que havia.
+   *
+   * Era um SELECT e um UPDATE/INSERT por balde: uma frota de mil aparelhos com
+   * um dia de atraso dava 48 mil viagens ao banco numa passada. Agora é um
+   * `insert ... onConflict(tenant_id, device_id, bucket_at).merge(...)` por
+   * lote. O knex escreve isso nos três dialetos — `ON CONFLICT ... DO UPDATE
+   * SET col = excluded.col` no Postgres e no SQLite, `ON DUPLICATE KEY UPDATE
+   * col = VALUES(col)` no MySQL, que ignora a lista de colunas e casa pela
+   * única chave única da tabela além do id — exatamente essa.
    */
-  static async upsertMany(rows) {
-    if (!Array.isArray(rows) || rows.length === 0) return 0;
-    let written = 0;
-    for (const row of rows) {
-      const { device_id: deviceId, bucket_at: bucketAt, ...values } = row;
-      // eslint-disable-next-line no-await-in-loop -- one bucket at a time, by design
-      const existing = await tdb('device_sample_hours')
-        .where({ device_id: deviceId, bucket_at: bucketAt })
-        .first();
-      if (existing) {
-        // eslint-disable-next-line no-await-in-loop -- see above
-        await tdb('device_sample_hours').where({ id: existing.id }).update(values);
-      } else {
-        // eslint-disable-next-line no-await-in-loop -- see above
-        await tinsert('device_sample_hours', { device_id: deviceId, bucket_at: bucketAt, ...values });
-      }
-      written += 1;
+  static async upsertMany(input) {
+    if (!Array.isArray(input) || input.length === 0) return 0;
+    // O mesmo balde duas vezes num lote é erro no Postgres ("ON CONFLICT DO
+    // UPDATE command cannot affect row a second time"). O laço antigo deixava
+    // a última escrita valer; o mapa faz o mesmo.
+    const unicos = new Map();
+    for (const row of input) unicos.set(`${row.device_id} ${new Date(row.bucket_at).getTime()}`, row);
+    const rows = [...unicos.values()];
+    // `tenant_id` também fica de fora do merge: é parte da chave do conflito.
+    const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))]
+      .filter((column) => !['device_id', 'bucket_at', 'tenant_id', 'id'].includes(column));
+    for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
+      const chunk = rows.slice(i, i + UPSERT_CHUNK);
+      const insert = tinsert('device_sample_hours', chunk)
+        .onConflict(['tenant_id', 'device_id', 'bucket_at']);
+      // eslint-disable-next-line no-await-in-loop -- um lote por vez
+      await (columns.length ? insert.merge(columns) : insert.ignore());
     }
-    return written;
+    // Quantos baldes foram pedidos, como o laço antigo contava.
+    return input.length;
   }
 
   static async listRange(deviceId, fromMs, toMs, limit = 1000) {

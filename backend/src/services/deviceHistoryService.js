@@ -2,7 +2,7 @@ import AppState from '../models/AppState.js';
 import DeviceSample from '../models/DeviceSample.js';
 import DeviceSampleHour from '../models/DeviceSampleHour.js';
 import DeviceService from './deviceService.js';
-import { forEveryTenant } from '../config/tenantJobs.js';
+import { TENANT_JOB_CONCURRENCY, forEveryTenant } from '../config/tenantJobs.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { RAW_SAMPLE_RETENTION, HOURLY_SAMPLE_RETENTION } from '../config/retention.js';
 import { timestampMs } from '../utils/helpers.js';
@@ -52,6 +52,14 @@ class DeviceHistoryService {
   static configCache = new TenantCache(30_000);
 
   static timer = null;
+
+  /**
+   * A volta em andamento. O relógio é de minuto em minuto, e uma coleta de
+   * frota grande (ou um ACS lento) passa disso: sem a guarda, a volta seguinte
+   * começava por cima da que ainda não acabou, lia a mesma frota e gravava as
+   * mesmas amostras de novo. A sobreposição agora espera a que está no ar.
+   */
+  static tickPromise = null;
 
   static invalidateConfigCache() {
     this.configCache.clear();
@@ -131,15 +139,25 @@ class DeviceHistoryService {
    * not repeat it.
    */
   static async tick() {
+    if (this.tickPromise) return this.tickPromise;
     // `forEveryTenant`: a passada de um provedor suspenso é só a PODA — ver
     // `passForTenant`. Sem isso, `device_samples` e `device_sample_hours` dele
     // não tinham prazo nenhum, e a retenção padrão de 14 e 90 dias valia só
     // para quem estava ativo.
-    return forEveryTenant((tenant) => this.passForTenant(Date.now(), {
+    //
+    // Até `TENANT_JOB_CONCURRENCY` provedores lado a lado: tudo aqui é do
+    // provedor em escopo, e em série a frota lenta de um atrasava a coleta de
+    // todos os outros.
+    const work = forEveryTenant((tenant) => this.passForTenant(Date.now(), {
       retentionOnly: tenant.status !== 'active'
     }), {
+      concurrency: TENANT_JOB_CONCURRENCY,
       onError: (error) => console.warn(`Device history pass failed: ${error.message}`)
+    }).finally(() => {
+      if (this.tickPromise === work) this.tickPromise = null;
     });
+    this.tickPromise = work;
+    return work;
   }
 
   static async readStamp(key) {
@@ -167,8 +185,12 @@ class DeviceHistoryService {
 
     if (!retentionOnly
       && now - (await this.readStamp(LAST_SAMPLE_KEY)) >= config.intervalSeconds * 1000) {
-      summary.collected = await this.collect({ now });
+      // O carimbo ANTES da coleta, com o mesmo `now` de sempre: uma passada
+      // que começasse enquanto esta ainda lê a frota (um botão, um relógio
+      // atrasado) já a encontra feita e não lê nem grava de novo. `collect`
+      // nunca lança, então não há falha que o carimbo adiantado esconda.
       await this.writeStamp(LAST_SAMPLE_KEY, now);
+      summary.collected = await this.collect({ now });
     }
     if (!retentionOnly && now - (await this.readStamp(LAST_ROLLUP_KEY)) >= HOUR_MS) {
       summary.rolled = await this.rollup({ now });
@@ -196,7 +218,23 @@ class DeviceHistoryService {
       const fleet = await DeviceService.getTelemetryFleet();
       if (!Array.isArray(fleet) || fleet.length === 0) return summary;
 
-      const newest = await DeviceSample.newestInformByDevice();
+      // A última amostra de cada aparelho, lida só no último dia: quem informa
+      // está quase sempre ali, e o agrupamento sobre a tabela inteira era a
+      // consulta mais cara da coleta. O que fica de fora é quem está calado há
+      // mais de um dia — e para esse a ausência no mapa não prova nada: a ONT
+      // offline há três dias ainda mostra no GenieACS o mesmo `lastInform` que
+      // já foi gravado. Esses (só os que têm `lastInform` anterior à janela)
+      // são perguntados um a um, num lote, para a comparação abaixo continuar
+      // exatamente a de antes.
+      const since = now - DAY_MS;
+      const newest = await DeviceSample.newestInformByDevice({ sinceMs: since });
+      const fora = fleet
+        .filter((device) => device.deviceId && !newest.has(device.deviceId))
+        .filter((device) => Math.floor(timestampMs(device.lastInform) / 1000) * 1000 < since)
+        .map((device) => device.deviceId);
+      if (fora.length) {
+        for (const [id, at] of await DeviceSample.newestInformFor(fora)) newest.set(id, at);
+      }
       const rows = [];
       for (const device of fleet) {
         if (!device.deviceId) {

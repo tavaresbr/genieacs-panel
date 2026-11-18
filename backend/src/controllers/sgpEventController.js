@@ -1,5 +1,6 @@
 import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { sgpDeliveryCandidates } from '../config/deliveryCandidatesCache.js';
 import SgpEvent, { publicEvent } from '../models/SgpEvent.js';
 import SgpEventService from '../services/sgpEventService.js';
 import SgpService, { SgpError, WEBHOOK_PATH } from '../services/sgpService.js';
@@ -34,6 +35,13 @@ class SgpEventController {
    * log.
    */
   static async deliveryCandidates() {
+    // Montada uma vez a cada ~30 s por processo, e esquecida quando alguém
+    // salva a configuração do SGP ou muda o status de um provedor — ver
+    // `deliveryCandidatesCache.js`. A conferência continua contra todos.
+    return sgpDeliveryCandidates.remember(() => this.loadDeliveryCandidates());
+  }
+
+  static async loadDeliveryCandidates() {
     const tenants = await getDb()('tenants').where({ status: 'active' }).orderBy('id', 'asc');
     const candidates = [];
     for (const tenant of tenants) {

@@ -16,6 +16,7 @@ import AsaasProviderService from './asaasProviderService.js';
 import { normalizeTaxId } from '../utils/taxId.js';
 import { tdb } from '../config/database.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
+import { CONTACT_DIRECTORY_MAX_SEARCHES, contactDirectoryCache, invalidateContactDirectory } from '../config/contactDirectoryCache.js';
 
 /** The page the screen asks for, and the most it may ask for. */
 const DEFAULT_LIMIT = 50;
@@ -41,6 +42,15 @@ const CONTACT_CEILING = 50_000;
 export const CONTACT_STATES = Object.freeze(['active', 'blocked', 'cancelled', 'unknown', 'none']);
 
 const CONTACT_KEY = /^c:(\d+)$/;
+
+/**
+ * Os comparadores da ordenação, criados uma vez. `localeCompare` com locale
+ * monta um `Intl.Collator` novo a CADA comparação, e ordenar 50 mil contatos
+ * são perto de um milhão delas. O do contrato é o padrão do processo, como o
+ * `localeCompare` sem locale que ele substitui — a ordem não muda.
+ */
+const BY_NAME = new Intl.Collator('pt-BR');
+const BY_CONTRACT = new Intl.Collator();
 
 /**
  * How a contact is addressed from the browser: its contract when it has one,
@@ -115,6 +125,32 @@ class WaContactService {
    */
   static async gather({ search = '' } = {}) {
     const raw = String(search ?? '').trim();
+    // Por provedor (o `TenantCache`) e, dentro dele, por busca. Guarda a
+    // promessa, para que a página e o filtro clicados juntos esperem a mesma
+    // leitura; a que falha sai da memória. Ver `contactDirectoryCache.js` para
+    // quem invalida.
+    let porBusca = contactDirectoryCache.get();
+    if (!porBusca) porBusca = contactDirectoryCache.set(new Map());
+    const guardada = porBusca.get(raw);
+    if (guardada) return guardada;
+    const leitura = this.gatherFresh(raw);
+    // Poucas buscas por provedor: digitar "joão" cria "j", "jo", "joã"...
+    // Sai a mais antiga (o Map lembra a ordem de inserção).
+    if (porBusca.size >= CONTACT_DIRECTORY_MAX_SEARCHES) porBusca.delete(porBusca.keys().next().value);
+    porBusca.set(raw, leitura);
+    leitura.catch(() => {
+      if (porBusca.get(raw) === leitura) porBusca.delete(raw);
+    });
+    return leitura;
+  }
+
+  /** Esquece a lista memorizada do provedor — o diretório acabou de mudar. */
+  static invalidateCache() {
+    invalidateContactDirectory();
+  }
+
+  /** `gather` sem a memória: a leitura de verdade. */
+  static async gatherFresh(raw) {
 
     const linkRows = await this.searchTable('sgp_links', raw);
     const linkStates = new Map(linkRows.map((row) => [String(row.contract), row.state || 'unknown']));
@@ -134,8 +170,8 @@ class WaContactService {
 
     const everyone = [...withDevice, ...withoutDevice]
       .sort((a, b) => (
-      String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
-      || String(a.contract).localeCompare(String(b.contract))
+      BY_NAME.compare(String(a.clientName ?? ''), String(b.clientName ?? ''))
+      || BY_CONTRACT.compare(String(a.contract), String(b.contract))
     ));
     return this.markTeiah(await this.markAsaas(everyone));
   }
