@@ -101,7 +101,7 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
   // é como um teste faz a ONT "responder" — mudar o documento que o ACS guarda.
   // Tarefa aceita com 202 fica em `GET /tasks`, que é a fila do ACS.
   // `files` é a coleção de arquivos do ACS (firmware), como o NBI a devolve.
-  const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, taskStatusFor: null, respond, requests: [], onTask: null };
+  const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, taskStatusFor: null, respond, requests: [], onTask: null, applyTags: false, unsupported: [], unsupportedReply: 'empty' };
 
   const server = http.createServer((req, res) => {
     // O corpo em bytes: um firmware enviado (`PUT /files/<nome>`) não é texto,
@@ -213,11 +213,21 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
 
       const tagMatch = url.pathname.match(/^\/devices\/([^/]+)\/tags\/([^/]+)$/);
       if (tagMatch) {
-        state.tags.push({
+        const entry = {
           deviceId: decodeURIComponent(tagMatch[1]),
           tag: decodeURIComponent(tagMatch[2]),
           method: req.method
-        });
+        };
+        state.tags.push(entry);
+        // `applyTags`: a tag fica no documento, como no GenieACS — para quem
+        // lê de novo depois de marcar. Desligado, só registra (o de sempre).
+        if (state.applyTags) {
+          const device = state.devices.find((d) => d._id === entry.deviceId);
+          if (device) {
+            const tags = (device._tags || []).filter((t) => t !== entry.tag);
+            device._tags = req.method === 'DELETE' ? tags : [...tags, entry.tag];
+          }
+        }
         return send(200, {});
       }
 
@@ -230,6 +240,13 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
       if (url.pathname === '/devices' || url.pathname === '/devices/') {
         const query = url.searchParams.get('query');
         if (!query) return send(200, state.devices);
+        // Um GenieACS que não entende certos operadores: `unsupported` lista
+        // quais (`['$nin']`), e `unsupportedReply` diz o que ele faz com a
+        // busca que os usa — `'empty'` (responde nada, calado) ou um status.
+        if ((state.unsupported || []).some((operador) => query.includes(`"${operador}"`))) {
+          if (state.unsupportedReply === 'empty') return send(200, []);
+          return send(Number(state.unsupportedReply) || 400, { message: 'bad query' });
+        }
         let filter = {};
         try {
           filter = JSON.parse(query);
@@ -237,15 +254,30 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
           filter = {};
         }
         // `_id` como valor ou como `{ $in: [...] }`, `_tags` como valor (a tag do
-        // provedor num ACS compartilhado) e `$and` juntando os dois — as formas
-        // que o painel usa. O resto do filtro é ignorado, como sempre foi.
+        // provedor num ACS compartilhado) ou `{ $nin: [...] }` (a marcação
+        // automática), `$and`/`$or` juntando, e `{ $regex, $options }` num
+        // caminho qualquer (`a.b._value`) — as formas que o painel usa. O resto
+        // do filtro é ignorado, como sempre foi.
+        const valorEm = (device, caminho) => caminho.split('.').reduce(
+          (atual, parte) => (atual && typeof atual === 'object' ? atual[parte] : undefined), device
+        );
         const casa = (device, f) => {
-          if (Array.isArray(f.$and)) return f.$and.every((parte) => casa(device, parte || {}));
+          if (Array.isArray(f.$and) && !f.$and.every((parte) => casa(device, parte || {}))) return false;
+          if (Array.isArray(f.$or) && !f.$or.some((parte) => casa(device, parte || {}))) return false;
           if (f._id !== undefined) {
             if (Array.isArray(f._id?.$in)) { if (!f._id.$in.includes(device._id)) return false; }
             else if (device._id !== f._id) return false;
           }
-          if (f._tags !== undefined && !(device._tags || []).includes(f._tags)) return false;
+          const tags = device._tags || [];
+          if (Array.isArray(f._tags?.$nin)) { if (tags.some((tag) => f._tags.$nin.includes(tag))) return false; }
+          else if (f._tags !== undefined && !tags.includes(f._tags)) return false;
+          for (const [caminho, condicao] of Object.entries(f)) {
+            if (caminho.startsWith('$') || caminho === '_id' || caminho === '_tags') continue;
+            if (typeof condicao?.$regex === 'string') {
+              const valor = valorEm(device, caminho);
+              if (typeof valor !== 'string' || !new RegExp(condicao.$regex, condicao.$options || '').test(valor)) return false;
+            }
+          }
           return true;
         };
         return send(200, state.devices.filter((device) => casa(device, filter)));

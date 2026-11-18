@@ -45,8 +45,10 @@ import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { connectorFor } from './genieacs/connector.js';
-import { UNASSIGNED_SCOPE_TAG, deviceScopeSuspended } from './genieacs/direct.js';
-import { FLEET_READ_TIMEOUT_MS, createFleetReads, forgetFleetReads } from './genieacs/fleetReads.js';
+import { UNASSIGNED_SCOPE_TAG, deviceScopeSuspended, mergeScopeQuery } from './genieacs/direct.js';
+import {
+  FLEET_READ_TIMEOUT_MS, NBI_URL_BUDGET, createFleetReads, createFleetSnapshots, forgetFleetReads
+} from './genieacs/fleetReads.js';
 
 /** A página da coleção `files`, e quantas no máximo (10 000 arquivos). */
 const FIRMWARE_PAGE_SIZE = 500;
@@ -129,6 +131,8 @@ class DeviceService {
    * vez de pedir outra. Menor que a cadência do painel, para que a atualização
    * seguinte do próprio painel sempre vá ao ACS — o número não fica mais velho
    * do que já ficava. `GENIEACS_FLEET_READ_TTL_MS=0` desliga (fica só em voo).
+   * É também o prazo da foto da frota (`FLEET_SNAPSHOT_TTL_MS`), que serve o
+   * painel, os alertas, a telemetria, a identidade e o mapa.
    */
   static DASHBOARD_FLEET_TTL_MS = (() => {
     const raw = Number.parseInt(String(process.env.GENIEACS_FLEET_READ_TTL_MS ?? ''), 10);
@@ -147,9 +151,11 @@ class DeviceService {
   static FAULT_OWNERS_TTL_MS = 60_000;
 
   /**
-   * A frota do ACS inteiro que a marcação automática lê. A passada é a cada
-   * 15 min, e cada provedor do mesmo ACS lia a mesma frota inteira na mesma
-   * volta: dentro desta janela, os provedores seguintes usam a mesma leitura.
+   * A leitura fora do escopo que a marcação automática faz. A passada é a
+   * cada 15 min; dentro desta janela, quem fizer a MESMA busca no mesmo ACS
+   * usa a mesma leitura. A busca leva a tag do provedor (`_tags $nin`), então
+   * na prática é o mesmo provedor repetindo a passada — o console e o
+   * agendador logo um depois do outro.
    */
   static FLEET_IDENTITY_TTL_MS = 120_000;
 
@@ -182,6 +188,102 @@ class DeviceService {
       if (!Array.isArray(data)) throw new Error(label);
       return data;
     }, { ttlMs, fresh });
+  }
+
+  /**
+   * A foto da frota por provedor e escopo — ver `createFleetSnapshots`. O
+   * painel, a varredura de alertas, a telemetria do histórico, a identidade
+   * (sincronização de IDs, quedas, SGP) e o mapa leem a frota inteira com
+   * projeções diferentes; com a foto, dentro de `FLEET_SNAPSHOT_TTL_MS` é UMA
+   * leitura do ACS com a projeção de todos.
+   */
+  static fleetSnapshots = createFleetSnapshots();
+
+  /**
+   * Quanto a foto vale. O mesmo prazo do painel
+   * (`GENIEACS_FLEET_READ_TTL_MS`): é o painel que acorda a cada minuto, e os
+   * outros leitores periódicos aceitam a frota de alguns segundos atrás.
+   * Zero deixa só a leitura em voo compartilhada.
+   */
+  static get FLEET_SNAPSHOT_TTL_MS() {
+    return this.DASHBOARD_FLEET_TTL_MS;
+  }
+
+  /**
+   * Os leitores conhecidos da foto, e a projeção de cada um.
+   *
+   * É o que faz a PRIMEIRA leitura já trazer o que os outros vão pedir: quem
+   * vai ao ACS pede a união de todos, e quem chegar depois dentro do prazo é
+   * servido pela mesma foto. Um leitor fora daqui ainda funciona — o campo que
+   * a foto não tem faz uma leitura nova, que passa a ser a foto.
+   */
+  static fleetSnapshotConsumers = new Map([
+    ['dashboard', () => DeviceService.dashboardProjection().then((r) => r.projection)],
+    ['telemetry', () => DeviceService.telemetryProjection().then((r) => r.projection)],
+    ['identity', () => DeviceService.identityProjection().then((r) => r.projection)],
+    ['map', () => DeviceService.mapProjection().then((r) => r.projection)]
+  ]);
+
+  /** A projeção unida dos leitores conhecidos. Um que falhe fica de fora. */
+  static async fleetSnapshotUnion() {
+    const parts = await Promise.all([...this.fleetSnapshotConsumers.values()].map(
+      (projection) => Promise.resolve().then(projection).catch(() => [])
+    ));
+    return [...new Set(parts.flat().filter(Boolean))];
+  }
+
+  /**
+   * O tamanho da URL de uma leitura da frota com esta projeção — a busca do
+   * escopo incluída, como `applyScope` a monta.
+   */
+  static async fleetReadUrlLength(connector, scopeTag, projection) {
+    const query = { projection: projection.join(',') };
+    if (scopeTag) query.query = mergeScopeQuery(undefined, scopeTag);
+    return (await connector.urlFor(this.devicePath(''), query)).toString().length;
+  }
+
+  /**
+   * A frota inteira com (pelo menos) `fields`, pela foto do provedor.
+   *
+   * Só para a leitura da COLEÇÃO INTEIRA, sem busca: com filtro (um aparelho,
+   * a busca da lista, a marcação automática) a resposta é outra e vai por
+   * `fetchFleet`.
+   *
+   * A chave leva o provedor, o modo e a raiz do ACS e o escopo — a tag, ou
+   * `all` dentro de `withoutDeviceScope`. Uma leitura sem escopo nunca recebe
+   * a foto com escopo, nem o contrário; um provedor nunca recebe a de outro, e
+   * o mesmo provedor com outro endereço não recebe a do endereço antigo.
+   *
+   * Se a projeção unida não couber na URL (`NBI_URL_BUDGET`), cada um lê só o
+   * que pediu, como antes da foto.
+   */
+  static async readFleetSnapshot(fields, {
+    label = 'Invalid API response', fresh = false, timeoutMs = null
+  } = {}) {
+    const connector = await connectorFor();
+    const scopeTag = deviceScopeSuspended() ? null : ((await connector.scopeTag()) ?? null);
+    const escopo = deviceScopeSuspended() ? 'all' : `tag:${scopeTag ?? ''}`;
+    const key = `${currentTenantId()}|${connector.mode}|${await connector.rootUrl()}|${escopo}`;
+    const ttlMs = this.FLEET_SNAPSHOT_TTL_MS;
+    return this.fleetSnapshots.read(key, fields, {
+      ttlMs,
+      fresh,
+      union: async (wanted) => {
+        const union = await this.fleetSnapshotUnion();
+        const all = [...new Set([...wanted, ...union])];
+        return (await this.fleetReadUrlLength(connector, scopeTag, all)) > NBI_URL_BUDGET ? null : union;
+      },
+      separate: (wanted) => this.fetchFleet({ projection: wanted.join(',') }, {
+        label, ttlMs, fresh, timeoutMs
+      }),
+      load: async (projection) => {
+        const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') }, 'GET', null, {
+          timeoutMs: timeoutMs ?? this.FLEET_READ_TIMEOUT_MS
+        });
+        if (!Array.isArray(data)) throw new Error(label);
+        return data;
+      }
+    });
   }
 
   static dashboardCacheTtlMs = 60_000;
@@ -513,6 +615,20 @@ class DeviceService {
   static DEVICE_FOCUS_FILTERS = ['new24h', 'weak-signal', 'hot', 'many-clients'];
 
   /**
+   * O filtro do contrato do SGP: o estado do vínculo, ou `unlinked` para o
+   * aparelho sem vínculo nenhum. Lista fechada, como `status` e `focus` — o
+   * que não está aqui vira "todos". Quem decide se o filtro vale (integração
+   * ligada, `sgp.read`) é o controlador; aqui ele só é aplicado.
+   */
+  static DEVICE_SGP_FILTERS = ['active', 'blocked', 'cancelled', 'unknown', 'unlinked'];
+  static SGP_LINK_STATES = ['active', 'blocked', 'cancelled'];
+
+  static normalizeSgpFilter(raw) {
+    const value = String(raw ?? 'all').trim().toLowerCase();
+    return this.DEVICE_SGP_FILTERS.includes(value) ? value : 'all';
+  }
+
+  /**
    * Every listing parameter arrives from the browser, so each one is coerced and
    * clamped here instead of being trusted. `page` is only bounded from below:
    * the real upper bound depends on the total, which is known further down.
@@ -530,7 +646,8 @@ class DeviceService {
         : this.DEVICE_PAGE_SIZE_DEFAULT,
       search: String(query.search ?? '').trim().slice(0, this.DEVICE_SEARCH_MAX_LENGTH),
       status: ['online', 'offline', 'stale'].includes(rawStatus) ? rawStatus : 'all',
-      focus: this.DEVICE_FOCUS_FILTERS.includes(rawFocus) ? rawFocus : 'all'
+      focus: this.DEVICE_FOCUS_FILTERS.includes(rawFocus) ? rawFocus : 'all',
+      sgp: this.normalizeSgpFilter(query.sgp)
     };
   }
 
@@ -927,7 +1044,7 @@ class DeviceService {
    * de a contagem bater com o número que mandou o operador para cá.
    */
   static async getDevicesPage(options = {}) {
-    const { page, pageSize, search, status, focus } = this.normalizeDeviceListQuery(options);
+    const { page, pageSize, search, status, focus, sgp } = this.normalizeDeviceListQuery(options);
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = await this.ensureRxPowerPaths();
     const learnedTemperaturePaths = await this.readTemperaturePaths();
@@ -939,7 +1056,10 @@ class DeviceService {
     );
     const listQuery = this.buildDeviceListQuery(status, focus);
     const queryParam = listQuery ? JSON.stringify(listQuery) : null;
-    const passagemLocal = Boolean(search) || this.focusNeedsLocalPass(focus);
+    // O filtro do SGP também é do painel (`sgp_links`), não do NBI: entra na
+    // passagem local, e por isso a contagem e as páginas saem do recorte já
+    // filtrado — e não de 25 linhas filtradas na tela depois de paginadas.
+    const passagemLocal = Boolean(search) || this.focusNeedsLocalPass(focus) || sgp !== 'all';
 
     if (!passagemLocal) {
       const total = await this.countDevicesFromGenieAcs(queryParam);
@@ -985,8 +1105,14 @@ class DeviceService {
         .filter((device) => this.deviceMatchesFocus(device, focus));
     }, { ttlMs: this.SEARCH_MATCH_TTL_MS, gate: false });
 
-    const matches = !search ? await recortar() : await this.searchMatches.read(`${recorteKey}|${search}`, async () => {
-      const recorte = await recortar();
+    // A chave do recorte filtrado leva o filtro do SGP e a busca em JSON: a
+    // busca é texto livre, e sem a separação um termo como `active|x` poderia
+    // cair na entrada de outro filtro. O recorte sem nada por cima continua
+    // em `${recorteKey}|`, que JSON nenhum produz.
+    const filtrar = () => this.searchMatches.read(`${recorteKey}|${JSON.stringify({ sgp, search })}`, async () => {
+      let recorte = await recortar();
+      if (sgp !== 'all') recorte = await this.filterBySgpLink(recorte, sgp);
+      if (!search) return recorte;
       // O Customer ID é do painel, não do GenieACS, e por isso a busca é a
       // única que precisa dele — sobre o que o recorte já deixou passar.
       const ids = recorte.map((device) => device._id);
@@ -1005,6 +1131,7 @@ class DeviceService {
         needle
       ));
     }, { ttlMs: this.SEARCH_MATCH_TTL_MS, gate: false });
+    const matches = !search && sgp === 'all' ? await recortar() : await filtrar();
 
     const total = matches.length;
     const totalPages = Math.ceil(total / pageSize);
@@ -1028,7 +1155,25 @@ class DeviceService {
    * provedor: quem chama roda dentro de `withoutDeviceScope`, porque o que se
    * procura são justamente os equipamentos que ainda não têm tag.
    */
-  static async listFleetIdentity({ fresh = false } = {}) {
+  /**
+   * Os caminhos de onde `resolvePppoeUsername` pode tirar o login numa
+   * leitura de identidade: o VirtualParameter, o catálogo e os aprendidos.
+   */
+  static async pppoeLoginPaths() {
+    const virtualParams = await this.getVirtualParameters();
+    return [...new Set([
+      virtualParams.vpPppoeUsername,
+      ...PPPOE_FALLBACK_PATHS,
+      ...await this.readPppoePaths()
+    ].filter(Boolean))];
+  }
+
+  /**
+   * `query`: a busca da NBI (objeto), ou nenhuma para a frota inteira.
+   * `fallbackQuery`: a busca mais larga a usar quando `query` não cabe na URL
+   * (`NBI_URL_BUDGET`) — quem chama filtra de novo do lado de cá.
+   */
+  static async listFleetIdentity({ fresh = false, query = null, fallbackQuery = null } = {}) {
     const virtualParams = await this.getVirtualParameters();
     // Só o que a marcação lê: serial, login e tags. A projeção da listagem
     // (RX, temperatura, SSIDs, …) era a frota do ACS INTEIRO — de todos os
@@ -1038,9 +1183,7 @@ class DeviceService {
     const projection = [...new Set([
       '_id',
       '_deviceId._SerialNumber',
-      virtualParams.vpPppoeUsername,
-      ...PPPOE_FALLBACK_PATHS,
-      ...await this.readPppoePaths(),
+      ...await this.pppoeLoginPaths(),
       '_tags'
     ].filter(Boolean))];
     // Fora do escopo a frota é a do ACS, não a do provedor: os provedores que
@@ -1051,7 +1194,17 @@ class DeviceService {
     const shareKey = connector.mode === 'direct' && deviceScopeSuspended()
       ? `acs:${await connector.rootUrl()}`
       : null;
-    const rows = await this.fetchFleet({ projection: projection.join(',') }, {
+    let busca = query;
+    if (busca && fallbackQuery
+      && (await connector.urlFor(this.devicePath(''), {
+        query: JSON.stringify(busca), projection: projection.join(',')
+      })).toString().length > NBI_URL_BUDGET) {
+      busca = fallbackQuery;
+    }
+    const rows = await this.fetchFleet({
+      ...(busca ? { query: JSON.stringify(busca) } : {}),
+      projection: projection.join(',')
+    }, {
       ttlMs: this.FLEET_IDENTITY_TTL_MS, fresh, shareKey
     });
     return rows.map((item) => {
@@ -1092,7 +1245,7 @@ class DeviceService {
    * recorte grande demais é recusado sem trazer a frota.
    */
   static async getDevicesForExport(options = {}) {
-    const { search, status, focus } = this.normalizeDeviceListQuery(options);
+    const { search, status, focus, sgp } = this.normalizeDeviceListQuery(options);
     const max = this.DEVICE_EXPORT_MAX;
     const grandeDemais = () => new TranslatableError('device.exportTooLarge', { max: String(max) }, {
       status: 413,
@@ -1110,7 +1263,9 @@ class DeviceService {
     const listQuery = this.buildDeviceListQuery(status, focus);
     const queryParam = listQuery ? JSON.stringify(listQuery) : null;
 
-    if (!search && !this.focusNeedsLocalPass(focus)) {
+    // Com o filtro do SGP a contagem do NBI não é a do recorte (ela não sabe
+    // dos vínculos): o teto vale sobre o que o filtro deixar, mais abaixo.
+    if (!search && !this.focusNeedsLocalPass(focus) && sgp === 'all') {
       if ((await this.countDevicesFromGenieAcs(queryParam)) > max) throw grandeDemais();
     }
 
@@ -1121,6 +1276,8 @@ class DeviceService {
       ))
       .reverse()
       .filter((device) => this.deviceMatchesFocus(device, focus));
+    // O mesmo corte da lista, pela mesma leitura de `sgp_links` do provedor.
+    if (sgp !== 'all') matches = await this.filterBySgpLink(matches, sgp);
     const customerIds = await this.lookupCustomerIds(matches.map((device) => device._id));
     matches = matches.map((device) => ({ ...device, customerId: customerIds.get(String(device._id)) || null }));
     if (search) {
@@ -1135,7 +1292,25 @@ class DeviceService {
       }, needle));
     }
     if (matches.length > max) throw grandeDemais();
-    return { devices: matches, filters: { search, status, focus } };
+    return { devices: matches, filters: { search, status, focus, sgp } };
+  }
+
+  /**
+   * O recorte com só os aparelhos cujo vínculo do SGP casa com o filtro.
+   *
+   * UMA leitura da tabela do provedor (`sgp_links` passa por `tdb`), só
+   * `device_id` e `state`, e o cruzamento em memória: a frota já está aqui, e
+   * um `IN` em lotes de 500 sobre ela seria uma ida ao banco por lote. O estado
+   * que não é um dos três conhecidos é `unknown`, como `SgpService.linkState`
+   * lê — a coluna mostra a mesma coisa que o filtro escolhe.
+   */
+  static async filterBySgpLink(devices, sgp) {
+    const states = new Map();
+    for (const row of await SgpLink.listDeviceStates()) {
+      states.set(String(row.device_id), this.SGP_LINK_STATES.includes(row.state) ? row.state : 'unknown');
+    }
+    if (sgp === 'unlinked') return devices.filter((device) => !states.has(String(device._id)));
+    return devices.filter((device) => states.get(String(device._id)) === sgp);
   }
 
   /**
@@ -1186,7 +1361,7 @@ class DeviceService {
    * onde ninguém abriu a lista de equipamentos ainda conta `Unknown` — até a
    * primeira listagem, e não para sempre, que era o estado anterior.
    */
-  static async getDashboardDevices({ fresh = false } = {}) {
+  static async dashboardProjection() {
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
     const learnedTemperaturePaths = await this.readTemperaturePaths();
@@ -1212,9 +1387,15 @@ class DeviceService {
       '_lastInform',
       '_registered'
     ].filter(Boolean))];
-    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+    return { projection, virtualParams, learnedRxPaths, learnedTemperaturePaths };
+  }
+
+  static async getDashboardDevices({ fresh = false } = {}) {
+    const {
+      projection, virtualParams, learnedRxPaths, learnedTemperaturePaths
+    } = await this.dashboardProjection();
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS dashboard response',
-      ttlMs: this.DASHBOARD_FLEET_TTL_MS,
       fresh
     });
     return data.map((item) => this.processDeviceData(
@@ -1232,7 +1413,7 @@ class DeviceService {
    * axis: GenieACS only refreshes a parameter when the device informs, so the
    * inform is when the reading was actually taken.
    */
-  static async getTelemetryFleet() {
+  static async telemetryProjection() {
     const virtualParams = await this.getVirtualParameters();
     const projection = [
       '_id',
@@ -1243,7 +1424,12 @@ class DeviceService {
       ...TEMPERATURE_FALLBACK_PATHS,
       'InternetGatewayDevice.DeviceInfo.UpTime'
     ].filter(Boolean);
-    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+    return { projection, virtualParams };
+  }
+
+  static async getTelemetryFleet() {
+    const { projection, virtualParams } = await this.telemetryProjection();
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS telemetry response'
     });
     return data.map((item) => ({
@@ -1888,7 +2074,7 @@ class DeviceService {
     };
   }
 
-  static async getCustomerIdentityDevices() {
+  static async identityProjection() {
     const virtualParams = await this.getVirtualParameters();
     const projection = [
       '_id',
@@ -1901,11 +2087,22 @@ class DeviceService {
       ...PPPOE_FALLBACK_PATHS,
       ...await this.readPppoePaths()
     ].filter(Boolean);
+    return { projection, virtualParams };
+  }
+
+  /**
+   * `fresh`: quem o operador acabou de pedir (sincronizar IDs, sincronizar o
+   * SGP, a visão geral, a manutenção) vai ao ACS; os laços de fundo aceitam
+   * a foto da frota (`FLEET_SNAPSHOT_TTL_MS`).
+   */
+  static async getCustomerIdentityDevices({ fresh = false } = {}) {
+    const { projection, virtualParams } = await this.identityProjection();
     // A frota inteira numa resposta: com milhares de ONTs, os 15 s padrão do
     // conector não bastam e a sincronização de IDs morria com "aborted".
-    const data = await this.fetchFleet({ projection: projection.join(',') }, {
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS customer identity response',
-      timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
+      timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS,
+      fresh
     });
     return data.map((item) => ({
       _id: item._id || null,
@@ -1926,7 +2123,7 @@ class DeviceService {
    * Uma consulta só, com projeção, como a telemetria; o prazo é o mesmo da
    * sincronização de IDs, porque é a frota inteira numa resposta.
    */
-  static async getMapStatusFleet() {
+  static async mapProjection() {
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
     const projection = [
@@ -1939,7 +2136,12 @@ class DeviceService {
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths
     ].filter(Boolean);
-    const data = await this.fetchFleet({ projection: [...new Set(projection)].join(',') }, {
+    return { projection: [...new Set(projection)], virtualParams, learnedRxPaths };
+  }
+
+  static async getMapStatusFleet() {
+    const { projection, virtualParams, learnedRxPaths } = await this.mapProjection();
+    const data = await this.readFleetSnapshot(projection, {
       label: 'Invalid GenieACS map status response',
       timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
     });

@@ -616,8 +616,6 @@ const ko: Dictionary = {
   'devices.sgpSync.failed': 'SGP와 동기화할 수 없습니다',
   'devices.sgpSync.aria': '모든 장비의 계약을 SGP와 동기화',
   'devices.export.failed': '스프레드시트를 받지 못했습니다.',
-  'devices.export.sgpIgnored': '스프레드시트에는 검색, 상태, 포커스가 반영됩니다. ERP 필터는 이 화면에만 적용되며 포함되지 않습니다.',
-  'devices.shownLabel': '표시됨',
   'devices.refreshAria': '장비 목록 새로 고침',
   'devices.loadingAria': '장비 목록을 불러오는 중',
   'devices.error.title': '장비 목록을 사용할 수 없습니다',

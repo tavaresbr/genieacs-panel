@@ -529,6 +529,36 @@ Responde `200` para tudo que reconhece, inclusive o que ignora de propósito —
 os dois servidores reenviam em não-2xx, e reenviar um evento que descartamos de
 propósito vira laço.
 
+### Resposta antes do bot
+
+O webhook responde assim que o pedido está autenticado (as checagens de token
+continuam **antes** da resposta, e as recusas `400`/`401` não mudaram) e a
+mensagem está gravada. A gravação é a deduplicação: o índice único de
+`wa_messages.external_id` faz uma reentrega responder `duplicate: true` sem
+rodar nada de novo. Antes da resposta também ficam o opt-out ("SAIR") e o
+topo da caixa de entrada (`last_message_at`, `unread_count`, reabertura).
+
+O resto — botão de promoção, pesquisa de satisfação, vínculo do assinante,
+comprovante, bot, distribuição, push e IA — roda depois, na fila de
+`services/waInboundQueue.js`:
+
+- **uma corrente por conversa**: as mensagens do mesmo contato são processadas
+  uma de cada vez, na ordem em que foram gravadas; conversas diferentes correm
+  em paralelo;
+- **o provedor do evento**: cada tarefa roda em `runInTenant` com o
+  `tenant_id` da conta que recebeu, e enfileirar para outro provedor é recusado;
+- **falha não escapa**: o erro vira uma linha fixa no log
+  (`WhatsApp webhook background processing failed`), sem dado do pedido;
+- **tarefa travada não prende a conversa**: passados 120 s
+  (`WA_INBOUND_TASK_STALL_MS`), a corrente anda e a próxima mensagem é atendida;
+  a tarefa travada segue rodando, só deixa de bloquear;
+- **desligamento**: o `SIGTERM` espera até 10 s a fila esvaziar antes de
+  fechar o banco. A fila é só memória: um processo que morre perde o que estava
+  pendente (a reentrega cai na deduplicação), como já acontecia antes.
+
+O download de anexo continua antes da resposta, porque o caminho do arquivo é
+coluna da linha gravada.
+
 Evento canonicalizado para quatro nomes (`utils/wa/waEventos.js`):
 `qrcode_updated`, `connection_update`, `messages_upsert`, `messages_update`.
 
@@ -740,8 +770,10 @@ no shutdown. `wa_messages` **é** a fila; não existe tabela paralela.
 
 ## Bot de autoatendimento
 
-`services/waBotService.js`. Não tem rota: ele é chamado de dentro do webhook, no
-passo 9 de `gravarMensagem`, depois da mensagem gravada e depois do opt-out.
+`services/waBotService.js`. Não tem rota: ele é chamado pelo webhook, no
+passo 9 do processamento da mensagem, depois da mensagem gravada e depois do
+opt-out — já na fila da conversa, depois de o webhook ter respondido (ver
+"Resposta antes do bot").
 
 ### A regra de produto, e ela define o escopo inteiro
 
@@ -810,7 +842,7 @@ Todas obrigatórias; qualquer uma delas responde com silêncio.
 | --- | --- |
 | só `direction === 'in'` | o eco `fromMe` é o provedor digitando no próprio celular; respondê-lo mandaria as palavras dele de volta ao cliente dele |
 | nunca com humano no fio — **30 min** desde a última mensagem com `sent_by` (nota interna conta) | um atendente atropelado por um bot é pior que bot nenhum; 30 min cobre quem foi olhar a OLT e não deixa o chamado de ontem calar o bot hoje |
-| nunca duas vezes pela mesma mensagem | o índice único de `external_id` é a dedupe real (o reenvio nem chega aqui); o cinto é "existe saída com `id` maior que o da entrada" |
+| nunca duas vezes pela mesma mensagem | o índice único de `external_id` é a dedupe real (o reenvio nem chega aqui), e a fila por conversa roda um turno de cada vez; o cinto é "existe resposta do bot com `answers_message_id` igual ao id desta entrada" (0142). Não é "saída mais nova que a entrada": numa rajada ("oi" e logo "2ª via do boleto") a segunda mensagem é gravada antes de o bot responder a primeira, e essa leitura calava o pedido de verdade |
 | nunca em pedido de saída | `pedeSaida()` — responder um "SAIR" com mensagem é responder com o oposto do pedido |
 | teto de **3 respostas automáticas por hora por contato** | um auto-respondedor do outro lado vira laço, e um laço manda milhares de mensagens pelo número do provedor antes de alguém notar |
 | assinante não resolvido → `whatsapp.bot.notRecognised` | número não reconhecido **nunca** recebe dado de contrato |

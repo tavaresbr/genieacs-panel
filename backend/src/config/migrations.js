@@ -1767,6 +1767,25 @@ const WA_MESSAGE_REPLY_COLUMNS = [
 ];
 
 /**
+ * A mensagem de entrada a que uma resposta do BOT atende (0142): o id local da
+ * linha de entrada. Não é citação — `reply_to_id` é a citação, e o WhatsApp a
+ * mostra —, é só o registro de "o bot já respondeu ESTA mensagem".
+ *
+ * Existe porque o webhook passou a responder antes do bot (ver
+ * `waInboundQueue.js`): numa rajada ("oi" e logo "2ª via do boleto") a segunda
+ * mensagem é gravada antes de o bot responder a primeira, e a trava antiga
+ * ("existe resposta do bot com id maior que o desta entrada") lia a resposta
+ * da PRIMEIRA como resposta da segunda — e a pergunta de verdade ficava sem
+ * resposta. Agora a trava pergunta exatamente o que quer saber.
+ *
+ * Sem chave estrangeira de propósito: o varredor de histórico apaga mensagens
+ * antigas, e uma resposta não pode impedir que a entrada dela seja apagada.
+ */
+const WA_MESSAGE_ANSWERS_COLUMNS = [
+  ['answers_message_id', (t) => t.integer('answers_message_id').unsigned().nullable()]
+];
+
+/**
  * Reação e exclusão de uma mensagem (0114): `my_reaction` é o emoji que o
  * painel pôs nela; `deleted_at` marca a mensagem apagada (para todos no
  * WhatsApp, quando é nossa, ou só da tela do painel, quando é do cliente).
@@ -8019,6 +8038,22 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop -- idem
         await createIndexOnline(db, table, columns, name);
       }
+    }
+  },
+  {
+    /** A entrada a que a resposta do bot atende — ver `WA_MESSAGE_ANSWERS_COLUMNS`. */
+    id: '0142_wa_message_answers',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return true;
+      return (await missingColumns(db, 'wa_messages', WA_MESSAGE_ANSWERS_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return;
+      const missing = await missingColumns(db, 'wa_messages', WA_MESSAGE_ANSWERS_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_messages', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

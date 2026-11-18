@@ -616,8 +616,6 @@ const zhTW: Dictionary = {
   'devices.sgpSync.failed': '無法與 SGP 同步',
   'devices.sgpSync.aria': '將所有設備的合約與 SGP 同步',
   'devices.export.failed': '無法下載試算表。',
-  'devices.export.sgpIgnored': '試算表包含搜尋、狀態和焦點篩選。ERP 篩選僅作用於此頁面，不包含在試算表中。',
-  'devices.shownLabel': '已顯示',
   'devices.refreshAria': '重新整理設備清單',
   'devices.loadingAria': '正在載入設備清單',
   'devices.error.title': '設備清單無法使用',

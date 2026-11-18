@@ -8,6 +8,7 @@ import { offlineMessageKey } from '@/lib/genieacs-agent'
 import { firmwareUploadHeaders, type FirmwareMeta } from '@/lib/firmware'
 import { formatRelativeTime } from '@/lib/utils'
 import { clearSessionScopedStorage } from '@/lib/session-owner'
+import { deviceListQuery, type SgpFilter } from '@/lib/device-filters'
 import { crossTabAction, openSessionChannel } from '@/lib/cross-tab-session'
 import type { AffiliateCommissionStatus, AffiliatePayoutStatus, AffiliateStatus, PixKeyType } from '@/lib/affiliates'
 
@@ -3443,6 +3444,8 @@ export interface DeviceListParams {
   /** `stale`: last Inform older than 3 days, filtered server-side. */
   status?: 'all' | 'online' | 'offline' | 'stale'
   focus?: 'all' | 'new24h' | 'weak-signal' | 'hot' | 'many-clients'
+  /** O contrato do SGP — aplicado no servidor, antes de paginar. */
+  sgp?: SgpFilter
 }
 
 export interface DeviceListResponse<T> {
@@ -3452,6 +3455,8 @@ export interface DeviceListResponse<T> {
    * integração ligada e quem pede tem `sgp.read`.
    */
   sgpAvailable?: boolean
+  /** O filtro do SGP que o servidor aplicou de fato (`all` quando ignorado). */
+  sgpFilter?: SgpFilter
   page: number
   pageSize: number
   total: number
@@ -3538,13 +3543,7 @@ export interface SummonResult {
 
 export const devicesAPI = {
   getDevices: (params: DeviceListParams = {}) => {
-    const query = new URLSearchParams()
-    if (params.page !== undefined) query.set('page', String(params.page))
-    if (params.pageSize !== undefined) query.set('pageSize', String(params.pageSize))
-    if (params.search) query.set('search', params.search)
-    if (params.status && params.status !== 'all') query.set('status', params.status)
-    if (params.focus && params.focus !== 'all') query.set('focus', params.focus)
-    const search = query.toString()
+    const search = deviceListQuery(params).toString()
     return apiClient.get(`/devices${search ? `?${search}` : ''}`)
   },
 

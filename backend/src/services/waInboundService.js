@@ -22,6 +22,7 @@ import path from 'node:path';
 import { DATA_DIR } from '../config/paths.js';
 import PushService from './pushService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
+import WaInboundQueue from './waInboundQueue.js';
 
 /**
  * Os quatro tratadores do webhook de entrada.
@@ -386,19 +387,88 @@ async function gravarMensagem(account, item) {
     throw error;
   }
 
-  // 7. O pedido de saída, SÓ na entrada.
-  // Um eco de saída com "sair" é o operador digitando no próprio celular; tratá-lo
-  // como opt-out descadastraria o cliente por uma palavra que o provedor escreveu.
-  if (!fromMe && pedeSaida(texto)) {
-    await WaOptOut.record({
-      waPhone,
-      waLid,
-      conversationId: conversation.id,
-      origin: 'customer',
-      reasonText: texto
+  // A partir daqui a mensagem EXISTE: o insert acima é a deduplicação, e um
+  // reenvio do mesmo evento para na checagem lá em cima. O que falta — pesquisa,
+  // bot, distribuição, push, IA — vai para a fila da conversa e roda DEPOIS da
+  // resposta ao webhook (ver `waInboundQueue.js`): uma volta lenta do bot não
+  // pode mais estourar o prazo do Evolution e provocar reentrega.
+  //
+  // A vaga na fila é tomada AGORA, antes de qualquer outro await, porque é a
+  // ordem do insert que vale como ordem de chegada: dois eventos do mesmo
+  // contato processados em paralelo ainda têm o bot respondendo na ordem em
+  // que as mensagens foram gravadas. A tarefa espera `gravado` para começar —
+  // o passo 7 abaixo roda antes da resposta e antes dela.
+  // Se a conversa estava encerrada QUANDO esta mensagem chegou — antes de o
+  // passo 8 reabri-la. É o que a pesquisa de satisfação precisa saber.
+  const encerradaNaChegada = Boolean(conversation.closed_at);
+  let liberar;
+  const gravado = new Promise((resolve) => { liberar = resolve; });
+  let seguir = false;
+  WaInboundQueue.enqueue(account.tenant_id, conversation.id, async () => {
+    await gravado;
+    if (!seguir) return;
+    // A linha de novo, e não a lida no `ensure`: a tarefa anterior da mesma
+    // conversa pode ter acabado de vincular o contrato.
+    const atual = (await WaConversation.getById(conversation.id)) ?? conversation;
+    await depoisDeGravar({
+      conversation: atual, encerradaNaChegada, dados, mensagem, texto, fromMe, anexo, messageId, direction: linha.direction, agora
     });
+  });
+
+  try {
+    // 7. O pedido de saída, SÓ na entrada.
+    // Um eco de saída com "sair" é o operador digitando no próprio celular; tratá-lo
+    // como opt-out descadastraria o cliente por uma palavra que o provedor escreveu.
+    if (!fromMe && pedeSaida(texto)) {
+      await WaOptOut.record({
+        waPhone,
+        waLid,
+        conversationId: conversation.id,
+        origin: 'customer',
+        reasonText: texto
+      });
+    }
+
+    // O passo 8 vem para antes da resposta porque é só uma escrita e é o que
+    // põe a conversa no topo da caixa de entrada: o operador vê a mensagem na
+    // hora, mesmo com o bot de uma mensagem anterior ainda trabalhando.
+    // 8. O topo da lista de conversas.
+    const patch = { last_message_at: agora };
+    // Gente dos dois lados: o cliente escreveu, ou o provedor respondeu pelo
+    // próprio celular (o eco `fromMe`). Qualquer um dos dois tira a conversa de
+    // "Sem resposta" e a põe em "Abertas".
+    if (!conversation.engaged_at) patch.engaged_at = agora;
+    if (!fromMe) {
+      patch.last_inbound_at = agora;
+      // Quem escreveu de novo reabre o próprio fio. Encerrar é arquivar, e um
+      // arquivo não responde ninguém: sem isto, o cliente que volta a falar cai
+      // fora da lista padrão do operador e vira invisível — que é exatamente o
+      // contrário do que a lista existe para fazer. Só na ENTRADA: um eco de
+      // saída é o operador digitando, e não é notícia do cliente.
+      if (conversation.closed_at) patch.closed_at = null;
+      // Incremento no banco, não `lido + 1` em memória: dois eventos do mesmo
+      // contato chegam concorrentes e um leria o contador antes do outro escrever.
+      patch.unread_count = getDb().raw('unread_count + 1');
+    }
+    await WaConversation.update(conversation.id, patch);
+    seguir = true;
+  } finally {
+    // Sempre: uma vaga presa travaria a conversa inteira para sempre. Se o
+    // passo 7 falhou, a tarefa não faz nada e o erro sobe como antes (500).
+    liberar();
   }
 
+  return { handled: true, conversationId: conversation.id, direction: linha.direction };
+}
+
+/**
+ * Tudo o que vem depois de a mensagem estar gravada, na ordem de sempre.
+ *
+ * Roda na fila da conversa, já fora do pedido: nada aqui altera a resposta do
+ * webhook, e uma falha cai no `catch` da fila em vez de virar 500 — que, de
+ * qualquer forma, só traria uma reentrega que a deduplicação descartaria.
+ */
+async function depoisDeGravar({ conversation, encerradaNaChegada, dados, mensagem, texto, fromMe, anexo, messageId, direction, agora }) {
   // 7a. O pedido de não receber PROMOÇÃO ("parar", o botão "Parar promoções"
   // da Meta) e a volta ("VOLTAR"). Grava, responde uma vez e consome a
   // mensagem: o bot não a responde de novo e ela não vai para a fila. Nunca
@@ -415,31 +485,12 @@ async function gravarMensagem(account, item) {
   // Também numa conversa já reaberta pela nota baixa: o comentário que ela
   // pede chega com a conversa aberta, e `captureReply` só o aceita nesse caso.
   const pesquisa = !fromMe && !promocao?.consumed
-    ? await WaSatisfactionService.captureReply({ conversation, text: texto, closed: Boolean(conversation.closed_at) })
+    ? await WaSatisfactionService.captureReply({ conversation, text: texto, closed: encerradaNaChegada })
     : null;
   // A nota é gravada, mas NÃO deixa a conversa arquivada: um "1" do cliente
   // pode ser a escolha do menu e não a nota, e quem atende precisa ver que ele
   // falou. Qualquer mensagem do cliente numa conversa encerrada a reabre.
 
-  // 8. O topo da lista de conversas.
-  const patch = { last_message_at: agora };
-  // Gente dos dois lados: o cliente escreveu, ou o provedor respondeu pelo
-  // próprio celular (o eco `fromMe`). Qualquer um dos dois tira a conversa de
-  // "Sem resposta" e a põe em "Abertas".
-  if (!conversation.engaged_at) patch.engaged_at = agora;
-  if (!fromMe) {
-    patch.last_inbound_at = agora;
-    // Quem escreveu de novo reabre o próprio fio. Encerrar é arquivar, e um
-    // arquivo não responde ninguém: sem isto, o cliente que volta a falar cai
-    // fora da lista padrão do operador e vira invisível — que é exatamente o
-    // contrário do que a lista existe para fazer. Só na ENTRADA: um eco de
-    // saída é o operador digitando, e não é notícia do cliente.
-    if (conversation.closed_at) patch.closed_at = null;
-    // Incremento no banco, não `lido + 1` em memória: dois eventos do mesmo
-    // contato chegam concorrentes e um leria o contador antes do outro escrever.
-    patch.unread_count = getDb().raw('unread_count + 1');
-  }
-  await WaConversation.update(conversation.id, patch);
 
   // 8b. Quem é o assinante do outro lado.
   //
@@ -483,7 +534,7 @@ async function gravarMensagem(account, item) {
       conversation,
       messageId,
       body: texto,
-      direction: linha.direction
+      direction
     });
   }
 
@@ -499,7 +550,6 @@ async function gravarMensagem(account, item) {
     if (String(texto ?? '').trim()) void WaAiService.classificar(conversation);
   }
 
-  return { handled: true, conversationId: conversation.id, direction: linha.direction };
 }
 
 /**

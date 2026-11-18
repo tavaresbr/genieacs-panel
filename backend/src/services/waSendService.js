@@ -94,7 +94,8 @@ class WaSendService {
     source = 'operator',
     metaTemplate = null,
     replyToId = null,
-    marketing = false
+    marketing = false,
+    answersMessageId = null
   } = {}) {
     // Defaulting to 'operator' rather than to the caller's intent: a sender
     // that forgets to say must never end up claiming to be the bot, because
@@ -160,6 +161,11 @@ class WaSendService {
       conversation_id: conversation.id,
       direction: 'out',
       reply_to_id: citada && Number(citada.conversation_id) === Number(conversation.id) ? citada.id : null,
+      // Só o bot preenche: é a trava "nunca duas vezes pela mesma mensagem"
+      // de `waBotService.rotear`. Não é citação e não vai para o WhatsApp.
+      answers_message_id: source === 'bot' && Number.isInteger(Number(answersMessageId)) && Number(answersMessageId) > 0
+        ? Number(answersMessageId)
+        : null,
       body: text || textoDoModelo || (modelo ? modelo.name : null),
       meta_template: modelo ? JSON.stringify(modelo) : null,
       attachment_path: anexo?.path ?? null,

@@ -48,11 +48,12 @@ const { seedDefaults } = await import('../../src/config/seed.js');
 const { getDb, closePool, insertReturningId } = await import('../../src/config/database.js');
 const { runInTenant } = await import('../../src/config/tenantContext.js');
 const { agentHub, attachAgentHub } = await import('../../src/services/genieacs/agentHub.js');
+const { whenIdle: waInboundIdle } = await import('../../src/services/waInboundQueue.js');
 
 // Re-exported so fixtures reach for the same dialect-aware helper the models
 // use: `const [id] = await knex(...).insert(...)` only yields an id on SQLite
 // and MySQL, so a fixture written that way passes locally and fails on Postgres.
-export { app, portalApp, getDb, insertReturningId, runInTenant };
+export { app, portalApp, getDb, insertReturningId, runInTenant, waInboundIdle };
 
 /**
  * Runs a fixture as the installation's own provider — what a request resolves
@@ -164,6 +165,12 @@ export async function call(url, options = {}) {
     redirect: 'manual'
   });
   const text = await response.text();
+  // O webhook do WhatsApp responde antes de o bot terminar: o resto da
+  // mensagem roda na fila de `waInboundQueue.js`. Toda suíte que olha o efeito
+  // logo depois da entrega (resposta do bot, fila, distribuição) espera a fila
+  // esvaziar aqui, num lugar só. Quem precisa ver a resposta ANTES do bot —
+  // o teste da própria fila — chama `fetch` direto.
+  if (String(url).includes('/api/whatsapp-webhook')) await waInboundIdle();
   let body = null;
   try {
     body = text ? JSON.parse(text) : null;

@@ -8,7 +8,8 @@ import {
   getDb,
   insertReturningId,
   startTestServers,
-  stopTestServers
+  stopTestServers,
+  waInboundIdle
 } from './helpers/harness.js';
 import { buildDevice, startGenieAcsStub } from './helpers/genieacs-stub.js';
 
@@ -750,6 +751,98 @@ describe('the ceiling counts the bot and nothing else', () => {
     // The panel composed none of an inbound message, and neither did any of its
     // automatic senders — 'operator' is the value that means "not one of them".
     assert.equal(entrada.source, 'operator');
+  });
+});
+
+describe('a burst of messages from one contact', () => {
+  /** A entrega crua: o que o Evolution vê, sem esperar a fila do bot. */
+  async function entregaCrua(telefone, texto, externalId) {
+    const response = await fetch(`${panelUrl}/api/whatsapp-webhook?t=${WEBHOOK_TOKEN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'messages.upsert',
+        instance: INSTANCE,
+        data: {
+          key: { remoteJid: `${telefone}@s.whatsapp.net`, fromMe: false, id: externalId },
+          pushName: 'Cliente',
+          message: { conversation: texto },
+          messageType: 'conversation',
+          messageTimestamp: 1739990000
+        }
+      })
+    });
+    return { status: response.status, body: await response.json() };
+  }
+
+  it('answers both messages, in order, when the second is stored before the first is answered', async () => {
+    // "oi" e logo "2ª via do boleto": o webhook responde antes do bot, então a
+    // segunda mensagem é gravada enquanto o bot ainda trabalha na primeira. A
+    // resposta ao "oi" sai com id maior que o da segunda entrada — e a trava
+    // antiga ("resposta do bot mais nova que esta entrada") calava o pedido de
+    // verdade.
+    await limparFio(ASSINANTE);
+    let soltar;
+    const primeiraPresa = new Promise((resolve) => { soltar = resolve; });
+    const rotearOriginal = WaBotService.rotear;
+    WaBotService.rotear = async function rotearComPausa(p) {
+      if (p.body === 'oi') await primeiraPresa;
+      return rotearOriginal.call(this, p);
+    };
+    try {
+      const a = await entregaCrua(ASSINANTE, 'oi', 'BOT-RAJADA-1');
+      const b = await entregaCrua(ASSINANTE, 'quero a segunda via do boleto', 'BOT-RAJADA-2');
+      assert.equal(a.status, 200);
+      assert.equal(b.status, 200);
+      assert.equal(a.body.conversationId, b.body.conversationId);
+      soltar();
+      await waInboundIdle();
+    } finally {
+      soltar();
+      WaBotService.rotear = rotearOriginal;
+    }
+
+    const conversa = await conversaDe(ASSINANTE);
+    const entradas = await getDb()('wa_messages')
+      .where({ conversation_id: conversa.id, direction: 'in' })
+      .orderBy('id')
+      .select('id', 'external_id');
+    assert.deepEqual(entradas.map((e) => e.external_id), ['BOT-RAJADA-1', 'BOT-RAJADA-2']);
+    const [primeira, segunda] = entradas.map((e) => Number(e.id));
+
+    const saidas = await getDb()('wa_messages')
+      .where({ conversation_id: conversa.id, direction: 'out', source: 'bot' })
+      .orderBy('id')
+      .select('id', 'body', 'answers_message_id');
+    const daPrimeira = saidas.filter((m) => Number(m.answers_message_id) === primeira);
+    const daSegunda = saidas.filter((m) => Number(m.answers_message_id) === segunda);
+    assert.ok(daPrimeira.length >= 1, 'the greeting got its answer');
+    assert.ok(daSegunda.length >= 1, 'and so did the real request');
+    assert.ok(daSegunda.some((m) => String(m.body).includes(LINHA_DIGITAVEL)), 'with the invoice');
+    assert.ok(
+      Math.max(...daPrimeira.map((m) => Number(m.id))) < Math.min(...daSegunda.map((m) => Number(m.id))),
+      'the answers go out in the order the questions came in'
+    );
+    // As duas respostas existem, e ambas vieram depois da segunda entrada —
+    // exatamente o caso que a trava antiga lia como "já respondida".
+    assert.ok(daPrimeira.every((m) => Number(m.id) > segunda));
+  });
+
+  it('still refuses to answer the same inbound row twice', async () => {
+    const conversa = await fioVazio(ASSINANTE);
+    const entrada = await asTenant(() => insertReturningId('wa_messages', {
+      conversation_id: conversa.id,
+      direction: 'in',
+      body: 'quero a segunda via do boleto',
+      is_note: false,
+      created_at: new Date(),
+      updated_at: new Date()
+    }));
+    const pedido = { conversation: conversa, messageId: entrada, body: 'quero a segunda via do boleto', direction: 'in' };
+    const primeira = await asTenant(() => WaBotService.responder(pedido));
+    assert.equal(primeira.replied, true, primeira.reason ?? '');
+    const segunda = await asTenant(() => WaBotService.responder(pedido));
+    assert.deepEqual(segunda, { replied: false, reason: 'already_answered' });
   });
 });
 

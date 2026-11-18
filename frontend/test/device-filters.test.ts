@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   deviceExportQuery,
-  exportIgnoresSgp,
+  deviceListQuery,
   filtersFromQuery,
   filtersToQuery,
   focusFromQuery,
@@ -145,14 +145,28 @@ describe('a tela lê por aqui', () => {
 })
 
 describe('a query da planilha', () => {
-  it('leva busca, estado e foco, e nunca a página nem o filtro do ERP', () => {
-    const query = deviceExportQuery({ search: ' vila ', status: 'offline', focus: 'weak-signal' })
-    expect(query.toString()).toBe('search=vila&status=offline&focus=weak-signal')
-    expect(deviceExportQuery({ search: '', status: 'all', focus: 'all' }).toString()).toBe('')
+  it('leva busca, estado, foco e o filtro do SGP, e nunca a página', () => {
+    const query = deviceExportQuery({ search: ' vila ', status: 'offline', focus: 'weak-signal', sgp: 'blocked' })
+    expect(query.toString()).toBe('search=vila&status=offline&focus=weak-signal&sgp=blocked')
+    expect(deviceExportQuery({ search: '', status: 'all', focus: 'all', sgp: 'all' }).toString()).toBe('')
+  })
+})
+
+describe('a query de uma página da lista', () => {
+  it('leva o filtro do SGP para o servidor, que o aplica antes de paginar', () => {
+    const query = deviceListQuery({ page: 2, pageSize: 25, search: 'vila', status: 'online', focus: 'hot', sgp: 'blocked' })
+    expect(query.toString()).toBe('page=2&pageSize=25&search=vila&status=online&focus=hot&sgp=blocked')
+    expect(deviceListQuery({ sgp: 'unlinked' }).get('sgp')).toBe('unlinked')
   })
 
-  it('avisa quando o filtro do ERP está ligado, porque ele não entra', () => {
-    expect(exportIgnoresSgp({ sgp: 'all' })).toBe(false)
-    expect(exportIgnoresSgp({ sgp: 'blocked' })).toBe(true)
+  it('deixa os defaults de fora', () => {
+    expect(deviceListQuery({ search: '', status: 'all', focus: 'all', sgp: 'all' }).toString()).toBe('')
+    expect(deviceListQuery({}).toString()).toBe('')
+  })
+
+  it('a tela não filtra mais a página que voltou: manda o filtro na requisição', () => {
+    const tela = readFileSync(join(__dirname, '..', 'src', 'pages', 'devices.tsx'), 'utf8')
+    expect(tela).toMatch(/sgp: filterSgp/)
+    expect(tela).not.toContain('visibleDevices')
   })
 })

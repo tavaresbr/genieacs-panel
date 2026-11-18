@@ -616,8 +616,6 @@ const ja: Dictionary = {
   'devices.sgpSync.failed': 'SGP と同期できませんでした',
   'devices.sgpSync.aria': 'すべての機器の契約を SGP と同期',
   'devices.export.failed': '表をダウンロードできませんでした。',
-  'devices.export.sgpIgnored': '表には検索・状態・フォーカスが反映されます。ERP のフィルターはこの画面だけのもので、表には含まれません。',
-  'devices.shownLabel': '表示中',
   'devices.refreshAria': '機器一覧を更新',
   'devices.loadingAria': '機器一覧を読み込んでいます',
   'devices.error.title': '機器一覧を利用できません',

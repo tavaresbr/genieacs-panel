@@ -60,14 +60,10 @@ describe('a caixa do cabeçalho', () => {
 
 describe('"selecionar todos os N do filtro"', () => {
   it('só quando o total cabe no lote e ainda falta marcar', () => {
-    expect(canSelectWholeFilter(37, 25, false)).toBe(true)
-    expect(canSelectWholeFilter(BATCH_LIMIT, 0, false)).toBe(true)
-    expect(canSelectWholeFilter(BATCH_LIMIT + 1, 0, false)).toBe(false)
-    expect(canSelectWholeFilter(37, 37, false)).toBe(false)
-    expect(canSelectWholeFilter(0, 0, false)).toBe(false)
-  })
-
-  it('nunca com o filtro de contrato, que é aplicado só na tela', () => {
-    expect(canSelectWholeFilter(37, 0, true)).toBe(false)
+    expect(canSelectWholeFilter(37, 25)).toBe(true)
+    expect(canSelectWholeFilter(BATCH_LIMIT, 0)).toBe(true)
+    expect(canSelectWholeFilter(BATCH_LIMIT + 1, 0)).toBe(false)
+    expect(canSelectWholeFilter(37, 37)).toBe(false)
+    expect(canSelectWholeFilter(0, 0)).toBe(false)
   })
 })

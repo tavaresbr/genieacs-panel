@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 const { asTenant, authHeaders, call, defaultTenantId, getDb, startTestServers, stopTestServers } = await import('./helpers/harness.js');
 const { buildDevice, startGenieAcsStub } = await import('./helpers/genieacs-stub.js');
 const { default: Setting } = await import('../src/models/Setting.js');
+const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: MapStatusService } = await import('../src/services/mapStatusService.js');
 
 /**
@@ -83,6 +84,7 @@ before(async () => {
 afterEach(() => {
   globalThis.fetch = realFetch;
   MapStatusService.clearCache();
+  DeviceService.fleetSnapshots.forget();
 });
 
 after(async () => {

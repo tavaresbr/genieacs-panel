@@ -38,6 +38,23 @@ async function sgpLinksForPage(req, devices) {
 }
 
 /**
+ * O filtro do SGP que a lista aplica, ou `'all'` quando ele não vale: sem
+ * `sgp.read` ou com a integração desligada a coluna não aparece, e um filtro
+ * sobre uma coluna que o operador não vê esvaziaria a lista sem explicação.
+ * Valor fora da lista também vira `'all'`, como `status` e `focus`.
+ */
+async function sgpFilterFor(req) {
+  const wanted = DeviceService.normalizeSgpFilter(req.query?.sgp);
+  if (wanted === 'all' || !roleHas(req.user?.role, 'sgp.read')) return 'all';
+  try {
+    return SgpService.isReady(await SgpService.getConfig()) ? wanted : 'all';
+  } catch (error) {
+    console.error('Device list SGP filter error:', error);
+    return 'all';
+  }
+}
+
+/**
  * A recusa do escopo do provedor (ACS compartilhado) como resposta própria.
  *
  * O conector recusa equipamento que não é do provedor com "não encontrado", e
@@ -131,13 +148,14 @@ class DeviceController {
   /**
    * `GET /api/devices/export` — o recorte da lista numa planilha.
    *
-   * Os filtros são os da lista (`status`, `focus`, `search`), lidos pela mesma
-   * normalização; a trilha guarda quantas linhas saíram e o recorte, e diz só
+   * Os filtros são os da lista (`status`, `focus`, `search` e `sgp`, este com
+   * a mesma condição da lista: `sgp.read` e integração pronta), lidos pela
+   * mesma normalização; a trilha guarda quantas linhas saíram e o recorte, e diz só
    * SE houve busca — o texto buscado pode ser o nome de um assinante.
    */
   static async exportDevices(req, res) {
     try {
-      const { csv, count, filters } = await exportDevicesCsv(req.query);
+      const { csv, count, filters } = await exportDevicesCsv({ ...req.query, sgp: await sgpFilterFor(req) });
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.DEVICES_EXPORTED,
         subjectType: 'devices',
@@ -146,6 +164,7 @@ class DeviceController {
           count,
           status: filters.status,
           focus: filters.focus,
+          sgp: filters.sgp,
           search: Boolean(filters.search)
         }
       });
@@ -367,8 +386,9 @@ class DeviceController {
 
   static async getDevices(req, res) {
     try {
+      const sgpFilter = await sgpFilterFor(req);
       const { devices, page, pageSize, total, totalPages } =
-        await DeviceService.getDevicesPage(req.query);
+        await DeviceService.getDevicesPage({ ...req.query, sgp: sgpFilter });
       // Customer accounts are written on demand, so decoration is deliberately
       // limited to the page being returned instead of the whole fleet.
       const decoratedDevices = await CustomerService.decorateDevices(devices);
@@ -379,6 +399,8 @@ class DeviceController {
             ? decoratedDevices.map((device) => ({ ...device, sgpLink: sgp.get(String(device._id)) || null }))
             : decoratedDevices,
           sgpAvailable: Boolean(sgp),
+          // O filtro do SGP que valeu de fato — `'all'` quando foi ignorado.
+          sgpFilter,
           page,
           pageSize,
           total,

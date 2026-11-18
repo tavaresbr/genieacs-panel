@@ -2795,13 +2795,13 @@ class SgpService {
    * with no account carries a null id, which `contractToLinkRow` already
    * stores — `sgp_links.account_id` has been nullable since the table existed.
    */
-  static async syncTargets(config) {
+  static async syncTargets(config, { fresh = false } = {}) {
     const accounts = await CustomerAccount.getSyncTargets();
     if (config.linkMode !== 'pppoe') return accounts;
 
     let devices;
     try {
-      devices = await DeviceService.getCustomerIdentityDevices();
+      devices = await DeviceService.getCustomerIdentityDevices({ fresh });
     } catch (error) {
       // A sweep that reaches the accounts is worth more than no sweep.
       console.warn(`SGP fleet sync could not read the ONT fleet: ${error.message}`);
@@ -2873,12 +2873,17 @@ class SgpService {
     // First, so the refresh below confirms the links where they now are.
     let relinked = 0;
     let stranded = new Set();
+    // Pedida pelo operador: a frota é lida na hora uma vez (aqui), e a busca
+    // dos alvos logo abaixo usa essa mesma leitura — ou lê na hora ela mesma,
+    // se esta falhou.
+    let lidaAgora = false;
     try {
-      ({ relinked, stranded } = await this.relinkStale());
+      ({ relinked, stranded } = await this.relinkStale({ fresh: true }));
+      lidaAgora = true;
     } catch (error) {
       console.warn(`SGP fleet sync could not look for stranded links: ${error.message}`);
     }
-    const targets = (await this.syncTargets(config))
+    const targets = (await this.syncTargets(config, { fresh: !lidaAgora }))
       .filter((target) => !stranded.has(String(target.device_id)));
     const stored = new Map(
       (await SgpLink.getAll()).map((link) => [link.device_id, link])
@@ -3023,8 +3028,8 @@ class SgpService {
    * Returns the stranded ONTs too, so the sweep that follows does not look
    * their login up again and write the contract straight back onto them.
    */
-  static async relinkStale() {
-    const devices = await DeviceService.getCustomerIdentityDevices();
+  static async relinkStale({ fresh = false } = {}) {
+    const devices = await DeviceService.getCustomerIdentityDevices({ fresh });
     const links = new Map((await SgpLink.getAll()).map((link) => [link.device_id, link]));
     const now = Date.now();
     const ageOf = (device) => (device?._lastInform
@@ -3072,7 +3077,8 @@ class SgpService {
   // problem who has not called yet.
   static async getFleetOverview() {
     this.requireReady(await this.getConfig());
-    const devices = await DeviceService.getCustomerIdentityDevices();
+    // A tela que o operador abre: a frota de agora.
+    const devices = await DeviceService.getCustomerIdentityDevices({ fresh: true });
     const links = new Map(
       (await SgpLink.getAll()).map((link) => [link.device_id, link])
     );

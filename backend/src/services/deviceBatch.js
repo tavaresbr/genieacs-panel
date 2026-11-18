@@ -38,7 +38,7 @@ export function normalizeBatchIds(raw) {
 export function batchFilterLabel(filter) {
   if (!filter || typeof filter !== 'object' || Array.isArray(filter)) return null;
   const out = {};
-  for (const campo of ['search', 'status', 'focus']) {
+  for (const campo of ['search', 'status', 'focus', 'sgp']) {
     const valor = filter[campo];
     if (typeof valor === 'string' && valor.trim() && valor.trim() !== 'all') {
       out[campo] = valor.trim().slice(0, 64);
