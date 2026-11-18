@@ -973,7 +973,24 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
         setKeyboardHeight(next ? next.height : null)
       }
       // Sem teclado a página volta ao topo (a barra fixa e as abas ficam lá).
-      if (!next && window.scrollY !== 0) window.scrollTo(0, 0)
+      // Com `html/body` em `overflow:hidden` o `scrollY` fica 0 mesmo quando o iOS
+      // deixa a janela de layout deslocada depois de fechar o teclado (cabeçalho
+      // cortado, vazio embaixo): por isso o reset é sempre, não só se `scrollY ≠ 0`.
+      if (!next) {
+        window.scrollTo(0, 0)
+        const scroller = document.scrollingElement
+        if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0
+        // Janela ainda deslocada: solta a trava por um quadro, rola ao topo e trava de novo.
+        if (Math.abs(vv.offsetTop) > 1 && !fieldFocused()) {
+          root.style.overflow = before.rootOverflow
+          body.style.overflow = before.bodyOverflow
+          window.requestAnimationFrame(() => {
+            window.scrollTo(0, 0)
+            root.style.overflow = 'hidden'
+            body.style.overflow = 'hidden'
+          })
+        }
+      }
       const card = cardRef.current
       const rect = card?.getBoundingClientRect() ?? null
       // Rede de segurança: com o teclado aberto o cartão tem de cruzar a área
