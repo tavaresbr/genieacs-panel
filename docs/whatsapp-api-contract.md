@@ -529,6 +529,33 @@ Responde `200` para tudo que reconhece, inclusive o que ignora de propósito —
 os dois servidores reenviam em não-2xx, e reenviar um evento que descartamos de
 propósito vira laço.
 
+### Resposta antes do bot
+
+O webhook responde assim que o pedido está autenticado (as checagens de token
+continuam **antes** da resposta, e as recusas `400`/`401` não mudaram) e a
+mensagem está gravada. A gravação é a deduplicação: o índice único de
+`wa_messages.external_id` faz uma reentrega responder `duplicate: true` sem
+rodar nada de novo. Antes da resposta também ficam o opt-out ("SAIR") e o
+topo da caixa de entrada (`last_message_at`, `unread_count`, reabertura).
+
+O resto — botão de promoção, pesquisa de satisfação, vínculo do assinante,
+comprovante, bot, distribuição, push e IA — roda depois, na fila de
+`services/waInboundQueue.js`:
+
+- **uma corrente por conversa**: as mensagens do mesmo contato são processadas
+  uma de cada vez, na ordem em que foram gravadas; conversas diferentes correm
+  em paralelo;
+- **o provedor do evento**: cada tarefa roda em `runInTenant` com o
+  `tenant_id` da conta que recebeu, e enfileirar para outro provedor é recusado;
+- **falha não escapa**: o erro vira uma linha fixa no log
+  (`WhatsApp webhook background processing failed`), sem dado do pedido;
+- **desligamento**: o `SIGTERM` espera até 10 s a fila esvaziar antes de
+  fechar o banco. A fila é só memória: um processo que morre perde o que estava
+  pendente (a reentrega cai na deduplicação), como já acontecia antes.
+
+O download de anexo continua antes da resposta, porque o caminho do arquivo é
+coluna da linha gravada.
+
 Evento canonicalizado para quatro nomes (`utils/wa/waEventos.js`):
 `qrcode_updated`, `connection_update`, `messages_upsert`, `messages_update`.
 
@@ -740,8 +767,10 @@ no shutdown. `wa_messages` **é** a fila; não existe tabela paralela.
 
 ## Bot de autoatendimento
 
-`services/waBotService.js`. Não tem rota: ele é chamado de dentro do webhook, no
-passo 9 de `gravarMensagem`, depois da mensagem gravada e depois do opt-out.
+`services/waBotService.js`. Não tem rota: ele é chamado pelo webhook, no
+passo 9 do processamento da mensagem, depois da mensagem gravada e depois do
+opt-out — já na fila da conversa, depois de o webhook ter respondido (ver
+"Resposta antes do bot").
 
 ### A regra de produto, e ela define o escopo inteiro
 

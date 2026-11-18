@@ -9,6 +9,7 @@ import CustomerService from './services/customerService.js';
 import CustomerPortalPasswordService from './services/customerPortalPasswordService.js';
 import SchedulerService from './services/schedulerService.js';
 import WaOutboxWorker from './services/waOutboxWorker.js';
+import { drain as drainWaInbound } from './services/waInboundQueue.js';
 import WaAlertService from './services/waAlertService.js';
 import OutageWatcher from './services/outageWatcher.js';
 import DeviceHistoryService from './services/deviceHistoryService.js';
@@ -228,6 +229,13 @@ async function shutdown(signal) {
   }
   if (portalServer) {
     await new Promise((resolve) => portalServer.close(resolve));
+  }
+  // O webhook do WhatsApp responde antes de o bot terminar (ver
+  // `waInboundQueue.js`). Com os servidores fechados nada novo entra; o que já
+  // foi aceito ganha até 10 s para terminar antes de o banco fechar. O que
+  // passar disso se perde, como se perdia antes num processo que morria.
+  if (!await drainWaInbound(10_000)) {
+    console.warn('WhatsApp inbound queue not drained before shutdown');
   }
   await closePool();
   process.exit(0);
