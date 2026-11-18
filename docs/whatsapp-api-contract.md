@@ -549,6 +549,9 @@ comprovante, bot, distribuição, push e IA — roda depois, na fila de
   `tenant_id` da conta que recebeu, e enfileirar para outro provedor é recusado;
 - **falha não escapa**: o erro vira uma linha fixa no log
   (`WhatsApp webhook background processing failed`), sem dado do pedido;
+- **tarefa travada não prende a conversa**: passados 120 s
+  (`WA_INBOUND_TASK_STALL_MS`), a corrente anda e a próxima mensagem é atendida;
+  a tarefa travada segue rodando, só deixa de bloquear;
 - **desligamento**: o `SIGTERM` espera até 10 s a fila esvaziar antes de
   fechar o banco. A fila é só memória: um processo que morre perde o que estava
   pendente (a reentrega cai na deduplicação), como já acontecia antes.
