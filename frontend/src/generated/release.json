@@ -1,15 +1,15 @@
 {
-  "version": "1.47.2",
-  "build": 1746,
-  "sourceCommit": "03a4e9c0d2ef",
-  "releasedAt": "2026-11-17",
-  "basedOnTag": "v1.47.1",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/de10f87e363f...03a4e9c0d2ef",
+  "version": "1.47.3",
+  "build": 1749,
+  "sourceCommit": "fda513c82b7e",
+  "releasedAt": "2026-11-18",
+  "basedOnTag": "v1.47.2",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/2e13a9617b30...fda513c82b7e",
   "changes": [
     {
-      "shortHash": "20db6960",
+      "shortHash": "4ae816d8",
       "date": "2026-11-17",
-      "title": "Teclado do iPhone não empurra mais a caixa de escrever",
+      "title": "Caixa de escrever sem barra de preenchimento automático do iOS; histórico no ?wadebug=1",
       "category": "Fixed"
     }
   ]

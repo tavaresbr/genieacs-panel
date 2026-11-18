@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.47.3] - 2026-11-18
+
+### Fixed
+
+- Caixa de escrever sem barra de preenchimento automático do iOS; histórico no ?wadebug=1 (`4ae816d8`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/2e13a9617b30...fda513c82b7e)
+
 ## [1.47.2] - 2026-11-17
 
 ### Fixed
