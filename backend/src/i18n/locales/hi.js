@@ -980,7 +980,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "गुणवत्ता {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "दैनिक सीमा {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "स्थिति {to}",
-  'whatsapp.alerts.waWaiting': 'ग्राहक {contact} {minutes} मिनट से जवाब का इंतज़ार कर रहा है — एजेंट: {agent}',
+  'whatsapp.alerts.waWaiting': 'ग्राहक {contact} {minutes} मिनट से जवाब का इंतज़ार कर रहा है — एजेंट: {agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Last message: “{text}”',
   'whatsapp.alerts.noAgent': 'कोई एजेंट नहीं',
   // WhatsApp — बॉट उत्तरों का मुख्य पाठ
   'whatsapp.bot.invoiceDigitableLine': 'टाइप करने योग्य पंक्ति: {value}',

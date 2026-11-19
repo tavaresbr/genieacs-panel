@@ -980,7 +980,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "Qualität {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "Tageslimit {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "Status {to}",
-  'whatsapp.alerts.waWaiting': 'Kunde {contact} wartet seit {minutes} Min. auf Antwort — Mitarbeiter: {agent}',
+  'whatsapp.alerts.waWaiting': 'Kunde {contact} wartet seit {minutes} Min. auf Antwort — Mitarbeiter: {agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Last message: “{text}”',
   'whatsapp.alerts.noAgent': 'kein Mitarbeiter',
   // WhatsApp — corpo das respostas do bot
   'whatsapp.bot.invoiceDigitableLine': 'Zahlcode: {value}',

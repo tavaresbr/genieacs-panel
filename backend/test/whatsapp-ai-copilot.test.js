@@ -170,3 +170,40 @@ describe('POST /conversations/:id/ai-rewrite', () => {
     }
   });
 });
+
+describe('resumoDeEspera (o resumo do alerta de cliente esperando)', () => {
+  const resumoDe = async (id) => {
+    const { default: WaAiService } = await import('../src/services/waAiService.js');
+    return asTenant(() => WaAiService.resumoDeEspera(id));
+  };
+
+  it('a IA resume em poucas linhas, com o modelo rápido e o documento mascarado', async () => {
+    const c = await conversa([['in', 'Minha internet caiu, meu CPF é 123.456.789-09'], ['in', 'alguém?']]);
+    resposta = 'Quer: voltar a ter internet. Sugestão: abrir visita técnica.';
+    const r = await resumoDe(c.id);
+    assert.equal(r.fallback, false);
+    assert.match(r.text, /^Quer:/);
+    assert.ok(r.text.length <= 220);
+    assert.equal(pedidos[0].model, 'modelo-rapido');
+    assert.doesNotMatch(JSON.stringify(pedidos[0].messages), /123\.456\.789-09/);
+  });
+
+  it('plano B: sem chave da IA vale a última fala do cliente, mascarada e curta', async () => {
+    const c = await conversa([['in', 'Oi, meu CPF é 123.456.789-09'], ['out', 'Já vejo'], ['in', 'Preciso falar com alguém sobre a fatura']]);
+    await asTenant(() => WaBotConfigService.saveConfig({ ai: { enabled: false, suggest: false, apiKey: '' } }));
+    try {
+      const r = await resumoDe(c.id);
+      assert.equal(r.fallback, true);
+      assert.equal(r.text, 'Preciso falar com alguém sobre a fatura');
+      assert.equal(pedidos.length, 0, 'sem IA não há chamada');
+    } finally {
+      await asTenant(() => WaBotConfigService.saveConfig({ ai: { enabled: true, apiKey: 'chave-do-copiloto-123', baseUrl: aiUrl, model: 'modelo-grande', fastModel: 'modelo-rapido' } }));
+    }
+  });
+
+  it('conversa sem fala do cliente: texto vazio, sem erro', async () => {
+    const c = await conversa([['out', 'Bom dia']]);
+    const r = await resumoDe(c.id);
+    assert.equal(r.lastMessage, '');
+  });
+});

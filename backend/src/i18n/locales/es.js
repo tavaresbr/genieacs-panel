@@ -976,7 +976,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "calidad {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "límite diario {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "estado {to}",
-  'whatsapp.alerts.waWaiting': 'Cliente {contact} esperando respuesta hace {minutes} min — agente: {agent}',
+  'whatsapp.alerts.waWaiting': 'Cliente {contact} esperando respuesta hace {minutes} min — agente: {agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Último mensaje: “{text}”',
   'whatsapp.alerts.noAgent': 'sin agente',
   // WhatsApp — corpo das respostas do bot
   'whatsapp.bot.invoiceDigitableLine': 'Línea digitable: {value}',

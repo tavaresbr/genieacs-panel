@@ -980,7 +980,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "качество {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "дневной лимит {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "статус {to}",
-  'whatsapp.alerts.waWaiting': 'Клиент {contact} ждёт ответа {minutes} мин. — оператор: {agent}',
+  'whatsapp.alerts.waWaiting': 'Клиент {contact} ждёт ответа {minutes} мин. — оператор: {agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Last message: “{text}”',
   'whatsapp.alerts.noAgent': 'без оператора',
   // WhatsApp — тексты ответов бота
   'whatsapp.bot.invoiceDigitableLine': 'Банковский код: {value}',
