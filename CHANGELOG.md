@@ -7,6 +7,18 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.51.0] - 2026-11-19
+
+### New
+
+- Mensagem de timeout, setas nos grupos e menus, carregando/erro com tentar de novo (`0461e573`)
+
+### Fixed
+
+- Respostas atrasadas, foco do diálogo de encerrar, menu de número e ajustes pequenos (`a5efe02c`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/d174296a01f2...ffd01c26ac6c)
+
 ## [1.50.3] - 2026-11-19
 
 ### Fixed

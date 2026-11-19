@@ -1,16 +1,22 @@
 {
-  "version": "1.50.3",
-  "build": 1807,
-  "sourceCommit": "3d3707043635",
+  "version": "1.51.0",
+  "build": 1812,
+  "sourceCommit": "ffd01c26ac6c",
   "releasedAt": "2026-11-19",
-  "basedOnTag": "v1.50.2",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/b90c7a2a83e6...3d3707043635",
+  "basedOnTag": "v1.50.3",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/d174296a01f2...ffd01c26ac6c",
   "changes": [
     {
-      "shortHash": "153db258",
+      "shortHash": "a5efe02c",
       "date": "2026-11-18",
-      "title": "Abrir conversa no número certo (conectado, sem corrida) e menu de número com permissão de leitura",
+      "title": "Respostas atrasadas, foco do diálogo de encerrar, menu de número e ajustes pequenos",
       "category": "Fixed"
+    },
+    {
+      "shortHash": "0461e573",
+      "date": "2026-11-19",
+      "title": "Mensagem de timeout, setas nos grupos e menus, carregando/erro com tentar de novo",
+      "category": "New"
     }
   ]
 }
