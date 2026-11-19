@@ -35,12 +35,19 @@ export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
   const [planId, setPlanId] = useState('')
   const [plans, setPlans] = useState<SalesPlan[]>([])
 
+  // `onCancel` chega como função nova a cada render da página (a lista atualiza
+  // sozinha): guardada em ref, ela não refaz o efeito, e o foco não volta ao
+  // primeiro botão no meio de uma escolha (o seletor nativo fechava).
+  const cancelRef = useRef(onCancel)
+  useEffect(() => { cancelRef.current = onCancel }, [onCancel])
+  const busyRef = useRef(busy)
+  useEffect(() => { busyRef.current = busy }, [busy])
   useEffect(() => {
     first.current?.focus()
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel() }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busyRef.current) cancelRef.current() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
+  }, [])
 
   useEffect(() => {
     if (!sale) return
@@ -61,7 +68,7 @@ export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
 
   return createPortal(
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="close-survey-title">
-      <button type="button" className="absolute inset-0 cursor-default" onClick={onCancel} aria-label={t('common.close')} tabIndex={-1} />
+      <button type="button" className="absolute inset-0 cursor-default" onClick={() => { if (!busy) onCancel() }} aria-label={t('common.close')} tabIndex={-1} />
       <section className="modern-card relative w-full max-w-md space-y-4 p-5">
         <div>
           <h2 id="close-survey-title" className="text-lg font-semibold text-foreground">

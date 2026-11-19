@@ -9,7 +9,7 @@ export function AiChips({ conversation }: { conversation: WhatsAppConversation }
   const { t } = useTranslation()
   if (!conversation.aiTopic && !conversation.aiUrgency && !conversation.aiMood) return null
   const hint = t('whatsapp.ai.chip.hint')
-  const topic = {
+  const topic = ({
     fatura: t('whatsapp.ai.chip.topicFatura'),
     suporte: t('whatsapp.ai.chip.topicSuporte'),
     comercial: t('whatsapp.ai.chip.topicComercial'),
@@ -17,7 +17,7 @@ export function AiChips({ conversation }: { conversation: WhatsAppConversation }
     reclamacao: t('whatsapp.ai.chip.topicReclamacao'),
     elogio: t('whatsapp.ai.chip.topicElogio'),
     outro: t('whatsapp.ai.chip.topicOutro')
-  }[conversation.aiTopic ?? 'outro']
+  } as Record<string, string>)[conversation.aiTopic ?? 'outro'] ?? t('whatsapp.ai.chip.topicOutro')
   return (
     <>
       {conversation.aiUrgency === 'alta' && <span className="modern-badge-error" title={hint}>{t('whatsapp.ai.chip.urgent')}</span>}

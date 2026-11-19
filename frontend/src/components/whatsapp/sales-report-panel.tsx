@@ -27,6 +27,7 @@ export function SalesReportPanel() {
   const [report, setReport] = useState<SalesReport | null>(null)
   const [error, setError] = useState('')
   const alive = useRef(true)
+  const pedido = useRef(0)
 
   useEffect(() => {
     alive.current = true
@@ -35,13 +36,18 @@ export function SalesReportPanel() {
 
   const load = useCallback(async (periodo: Period) => {
     setError('')
+    const meu = ++pedido.current
     const res = await whatsappAPI.getSalesReport(periodo)
-    if (!alive.current) return
+    // Resposta lenta de um período que já não é o escolhido não sobrescreve a do atual.
+    if (!alive.current || meu !== pedido.current) return
     if (res.success && res.data) setReport(res.data)
     else setError(whatsappErrorMessage(t, res.code))
   }, [t])
 
-  useEffect(() => { void load(days) }, [days, load])
+  useEffect(() => {
+    setReport(null)
+    void load(days)
+  }, [days, load])
 
   const numero = (n: number) => new Intl.NumberFormat(intlLocale).format(n)
   const maxMotivo = report ? Math.max(1, ...REASONS.map((r) => report.lostReasons[r])) : 1

@@ -95,15 +95,18 @@ export function AiKnowledgePanel() {
 
   const gravarLugares = async (proximos: CoveragePlace[]) => {
     const res = await whatsappAPI.updateBotConfig({ ai: { coverage: proximos } })
-    if (res.success && res.data) { setLugares(res.data.ai.coverage ?? []); toast.success(t('settings.chatbot.coverageSaved')) }
-    else toast.error(res.message || whatsappErrorMessage(t, res.code))
+    if (res.success && res.data) { setLugares(res.data.ai.coverage ?? []); toast.success(t('settings.chatbot.coverageSaved')); return true }
+    toast.error(res.message || whatsappErrorMessage(t, res.code))
+    return false
   }
 
   const adicionarLugar = async () => {
     const nome = novoLugar.trim()
     if (!nome) return
-    setNovoLugar('')
-    await gravarLugares([...lugares, { name: nome, aliases: [] }])
+    // Mesmo nome (sem diferenciar maiúsculas) não entra duas vezes: a chave e o "remover" dependem do nome.
+    if (lugares.some((l) => l.name.toLowerCase() === nome.toLowerCase())) { setNovoLugar(''); return }
+    // O texto só some se gravou: se falhar, o operador não digita de novo.
+    if (await gravarLugares([...lugares, { name: nome, aliases: [] }])) setNovoLugar('')
   }
 
   const abrirApelidos = (lugar: CoveragePlace) => {
@@ -133,6 +136,8 @@ export function AiKnowledgePanel() {
     else toast.error(res.message || whatsappErrorMessage(t, res.code))
   }
 
+  const abertoRef = useRef<number | null | undefined>(undefined)
+  useEffect(() => { abertoRef.current = rascunho ? rascunho.id : undefined }, [rascunho])
   const patch = (parte: Partial<Rascunho>) => setRascunho((atual) => (atual ? { ...atual, ...parte } : atual))
 
   // A IA escreve (ou melhora) a resposta. Só rascunho: o texto cai na caixa, e o "Desfazer" devolve o anterior.
@@ -141,6 +146,8 @@ export function AiKnowledgePanel() {
     setEscrevendo(true)
     const res = await whatsappAPI.draftAiKnowledge({ kind: rascunho.kind, title: rascunho.title, triggers: rascunho.triggers, current: rascunho.answer })
     setEscrevendo(false)
+    // O operador fechou o item, ou abriu outro, enquanto a IA escrevia: o texto não é deste.
+    if (abertoRef.current !== rascunho.id) return
     if (res.success && res.data?.text) {
       setTextoAnterior(rascunho.answer)
       patch({ answer: res.data.text })

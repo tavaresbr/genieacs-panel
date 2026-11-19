@@ -41,6 +41,7 @@ export function AiUsagePanel() {
   const [report, setReport] = useState<AiUsageReport | null>(null)
   const [error, setError] = useState('')
   const alive = useRef(true)
+  const pedido = useRef(0)
 
   useEffect(() => {
     alive.current = true
@@ -49,13 +50,18 @@ export function AiUsagePanel() {
 
   const load = useCallback(async (periodo: Period) => {
     setError('')
+    const meu = ++pedido.current
     const res = await whatsappAPI.getAiUsage(periodo)
-    if (!alive.current) return
+    // Resposta lenta de um período que já não é o escolhido não sobrescreve a do atual.
+    if (!alive.current || meu !== pedido.current) return
     if (res.success && res.data) setReport(res.data)
     else setError(whatsappErrorMessage(t, res.code))
   }, [t])
 
-  useEffect(() => { void load(days) }, [days, load])
+  useEffect(() => {
+    setReport(null)
+    void load(days)
+  }, [days, load])
 
   const compact = new Intl.NumberFormat(intlLocale, { notation: 'compact', maximumFractionDigits: 1 })
   const numero = (n: number) => compact.format(n)

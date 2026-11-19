@@ -393,6 +393,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     listInFlight.current = true
     try {
       const { search: term, status: pile, assignee: dono, tag } = filterRef.current
+      const filtroDoPedido = JSON.stringify(filterRef.current)
       const res = await whatsappAPI.listConversations({
         limit: LIST_LIMIT,
         status: pile,
@@ -401,6 +402,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
         ...(term ? { search: term } : {})
       })
       if (!alive.current) return
+      // O filtro mudou com o pedido em voo: esta lista é de outro filtro (o `finally` já refaz o pedido).
+      if (JSON.stringify(filterRef.current) !== filtroDoPedido) return
       if (!res.success) {
         listFailures.current += 1
         listBlockedUntil.current = Date.now()
