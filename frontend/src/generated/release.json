@@ -1,15 +1,15 @@
 {
-  "version": "1.50.2",
-  "build": 1804,
-  "sourceCommit": "0e7fef156654",
-  "releasedAt": "2026-11-18",
-  "basedOnTag": "v1.50.1",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/b0d40da0f358...0e7fef156654",
+  "version": "1.50.3",
+  "build": 1807,
+  "sourceCommit": "3d3707043635",
+  "releasedAt": "2026-11-19",
+  "basedOnTag": "v1.50.2",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/b90c7a2a83e6...3d3707043635",
   "changes": [
     {
-      "shortHash": "e58b95a8",
+      "shortHash": "153db258",
       "date": "2026-11-18",
-      "title": "Fila por conversa, prazo total, pausa após chave/saldo, retry sem mídia, trava de preço mensal e base de conhecimento",
+      "title": "Abrir conversa no número certo (conectado, sem corrida) e menu de número com permissão de leitura",
       "category": "Fixed"
     }
   ]

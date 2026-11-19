@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.50.3] - 2026-11-19
+
+### Fixed
+
+- Abrir conversa no número certo (conectado, sem corrida) e menu de número com permissão de leitura (`153db258`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/b90c7a2a83e6...3d3707043635)
+
 ## [1.50.2] - 2026-11-18
 
 ### Fixed
