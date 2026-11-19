@@ -2105,6 +2105,7 @@ const de: Dictionary = {
   'api.missingPermission': 'Ihre Rolle erlaubt diese Aktion nicht.',
   'api.unknownError': 'Unbekannter Fehler',
   'api.networkError': 'Es ist ein Netzwerkfehler aufgetreten',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // Portal-Passwort des Kunden (Gerätedetails)
   'detail.portalPassword.label': 'Portal-Passwort',

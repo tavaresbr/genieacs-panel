@@ -2107,6 +2107,7 @@ const ru: Dictionary = {
   'api.missingPermission': 'Ваша роль не позволяет выполнить это действие.',
   'api.unknownError': 'Неизвестная ошибка',
   'api.networkError': 'Произошла сетевая ошибка',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // Пароль портала абонента (карточка устройства)
   'detail.portalPassword.label': 'Пароль портала',

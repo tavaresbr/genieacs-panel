@@ -2102,6 +2102,7 @@ const ptBR: Dictionary = {
   'api.missingPermission': 'Seu papel não permite esta ação.',
   'api.unknownError': 'Erro desconhecido',
   'api.networkError': 'Ocorreu um erro de rede',
+  'api.timeout': 'O servidor demorou demais para responder. Tente de novo.',
 
   // Senha do portal do cliente (detalhe do equipamento)
   'detail.portalPassword.label': 'Senha do portal',

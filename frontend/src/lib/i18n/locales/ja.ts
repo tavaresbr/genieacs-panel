@@ -2102,6 +2102,7 @@ const ja: Dictionary = {
   'api.missingPermission': '現在のロールではこの操作を実行できません。',
   'api.unknownError': '不明なエラー',
   'api.networkError': 'ネットワークエラーが発生しました',
+  'api.timeout': 'The server took too long to respond. Try again.',
   // 顧客ポータルのパスワード (機器の詳細)
   'detail.portalPassword.label': 'ポータルのパスワード',
   'detail.portalPassword.reveal': '表示',

@@ -2102,6 +2102,7 @@ const zhCN: Dictionary = {
   'api.missingPermission': '当前角色无法执行此操作。',
   'api.unknownError': '未知错误',
   'api.networkError': '发生了网络错误',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // 客户门户密码（设备详情）
   'detail.portalPassword.label': '门户密码',

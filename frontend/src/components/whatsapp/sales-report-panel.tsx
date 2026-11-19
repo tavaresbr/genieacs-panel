@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRovingKeys } from '@/lib/use-roving'
 import { whatsappAPI, type SaleLostReason, type SalesReport } from '@/lib/api'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -24,6 +25,8 @@ function Tile({ label, value, hint }: { label: string; value: string; hint?: str
 export function SalesReportPanel() {
   const { t, intlLocale } = useTranslation()
   const [days, setDays] = useState<Period>(30)
+  // Setas (e Home/End) trocam de período, como num grupo de radios.
+  const moverPeriodo = useRovingKeys('[role="radio"]', (i) => setDays(PERIODS[i]), { vertical: false })
   const [report, setReport] = useState<SalesReport | null>(null)
   const [error, setError] = useState('')
   const alive = useRef(true)
@@ -60,9 +63,9 @@ export function SalesReportPanel() {
             <h2 className="section-heading">{t('whatsapp.salesReport.title')}</h2>
             <p className="field-hint mt-1">{t('whatsapp.salesReport.description')}</p>
           </div>
-          <div className="tab-rail" role="radiogroup" aria-label={t('whatsapp.botReport.period')}>
+          <div className="tab-rail" role="radiogroup" aria-label={t('whatsapp.botReport.period')} onKeyDown={moverPeriodo}>
             {PERIODS.map((p) => (
-              <button key={p} type="button" role="radio" aria-checked={days === p} data-active={days === p} className="tab-button" onClick={() => setDays(p)}>
+              <button key={p} type="button" role="radio" aria-checked={days === p} tabIndex={days === p ? 0 : -1} data-active={days === p} className="tab-button" onClick={() => setDays(p)}>
                 {t('whatsapp.botReport.lastDays', { count: p })}
               </button>
             ))}

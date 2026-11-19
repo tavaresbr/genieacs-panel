@@ -34,6 +34,8 @@ export function AiKnowledgePanel() {
   const { t } = useTranslation()
   const toast = useToast()
   const [itens, setItens] = useState<AiKnowledgeItem[] | null>(null)
+  // A 1ª leitura falhou: o motivo e "Tentar novamente" no lugar de uma lista vazia.
+  const [erroCarga, setErroCarga] = useState<string | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
   const [lugares, setLugares] = useState<CoveragePlace[]>([])
   const [editandoApelidos, setEditandoApelidos] = useState<string | null>(null)
@@ -58,8 +60,12 @@ export function AiKnowledgePanel() {
 
   const carregar = useCallback(async () => {
     const [lista, config] = await Promise.all([whatsappAPI.listAiKnowledge(), whatsappAPI.getBotConfig()])
-    if (lista.success && lista.data) setItens(lista.data)
-    else toast.error(lista.message || t('settings.chatbot.kbLoadFailed'))
+    if (lista.success && lista.data) { setItens(lista.data); setErroCarga(null) }
+    else {
+      const motivo = lista.message || t('settings.chatbot.kbLoadFailed')
+      setErroCarga(motivo)
+      toast.error(motivo)
+    }
     if (config.success && config.data) {
       setLugares(config.data.ai.coverage ?? [])
       setTemChaveIa(config.data.ai.hasApiKey)
@@ -247,6 +253,17 @@ export function AiKnowledgePanel() {
         </div>
 
         {rascunho?.id === null && <div className="mt-4">{formulario}</div>}
+
+        {itens === null && (
+          <div className="mt-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm" role={erroCarga ? 'alert' : 'status'}>
+            {erroCarga ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[hsl(var(--status-danger))]">{erroCarga}</p>
+                <button type="button" className="modern-button-secondary" onClick={() => void carregar()}>{t('common.retry')}</button>
+              </div>
+            ) : <p className="text-muted-foreground">{t('common.loading')}</p>}
+          </div>
+        )}
 
         {itens !== null && demais.length === 0 && <p className="mt-4 text-sm text-muted-foreground">{t('settings.chatbot.kbEmpty')}</p>}
 

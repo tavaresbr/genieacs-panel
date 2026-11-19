@@ -2104,6 +2104,7 @@ const ko: Dictionary = {
   'api.missingPermission': '현재 역할로는 이 작업을 수행할 수 없습니다.',
   'api.unknownError': '알 수 없는 오류',
   'api.networkError': '네트워크 오류가 발생했습니다',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // 고객 포털 비밀번호 (장비 상세)
   'detail.portalPassword.label': '포털 비밀번호',
