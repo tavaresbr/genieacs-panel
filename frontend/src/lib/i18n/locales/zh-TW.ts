@@ -2102,6 +2102,7 @@ const zhTW: Dictionary = {
   'api.missingPermission': '目前的角色無法執行此操作。',
   'api.unknownError': '未知的錯誤',
   'api.networkError': '發生網路錯誤',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // 客戶入口網站密碼（設備詳細資料）
   'detail.portalPassword.label': '入口網站密碼',

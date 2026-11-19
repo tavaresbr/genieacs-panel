@@ -354,6 +354,11 @@ export function readTimeoutSignal(method: string | undefined, given?: AbortSigna
     : undefined
 }
 
+/** O que derrubou o pedido: o teto de tempo (`AbortSignal.timeout` lança `TimeoutError`) ou a rede. */
+export function readFailure(error: unknown): 'timeout' | 'network' {
+  return (error as { name?: string } | null)?.name === 'TimeoutError' ? 'timeout' : 'network'
+}
+
 class ApiClient {
   private baseURL: string
   /** O token de acesso: só aqui, na memória desta aba (0129). */
@@ -568,7 +573,8 @@ class ApiClient {
     } catch (error) {
       return {
         success: false,
-        message: translate(getActiveLocale(), 'api.networkError'),
+        // Estourou o teto de 30 s de uma leitura: é o servidor lento, não a rede caída.
+        message: translate(getActiveLocale(), readFailure(error) === 'timeout' ? 'api.timeout' : 'api.networkError'),
         error: error instanceof Error ? error.message : translate(getActiveLocale(), 'api.unknownError'),
       }
     }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRovingKeys } from '@/lib/use-roving'
 import { createPortal } from 'react-dom'
 import { whatsappAPI, type SalesPlan, type SaleLostReason, type SaleResult } from '@/lib/api'
 import { useTranslation } from '@/contexts/language-context'
@@ -19,6 +20,8 @@ type Choice = 'unknown' | 'won' | 'lost'
  * - "Esta conversa era uma venda. Fechou?" (`sale`): a IA entregou a conversa como
  *   venda; dizer como terminou alimenta o relatório de vendas. "Não sei" não grava.
  */
+const CHOICES: Choice[] = ['won', 'lost', 'unknown']
+
 export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
   busy: boolean
   /** Encerrar mandaria a pesquisa de satisfação. */
@@ -34,6 +37,7 @@ export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
   const [reason, setReason] = useState<SaleLostReason | ''>('')
   const [planId, setPlanId] = useState('')
   const [plans, setPlans] = useState<SalesPlan[]>([])
+  const moverEscolha = useRovingKeys('[role="radio"]', (i) => setChoice(CHOICES[i]), { vertical: false })
 
   // `onCancel` chega como função nova a cada render da página (a lista atualiza
   // sozinha): guardada em ref, ela não refaz o efeito, e o foco não volta ao
@@ -80,13 +84,14 @@ export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
         {sale && (
           <fieldset className="space-y-3 rounded-md border border-border p-3">
             <legend className="px-1 text-sm font-medium text-foreground">{t('whatsapp.closeSale.question')}</legend>
-            <div className="flex gap-2" role="radiogroup" aria-label={t('whatsapp.closeSale.question')}>
-              {(['won', 'lost', 'unknown'] as Choice[]).map((c) => (
+            <div className="flex gap-2" role="radiogroup" aria-label={t('whatsapp.closeSale.question')} onKeyDown={moverEscolha}>
+              {CHOICES.map((c) => (
                 <button
                   key={c}
                   type="button"
                   role="radio"
                   aria-checked={choice === c}
+                  tabIndex={choice === c ? 0 : -1}
                   data-active={choice === c}
                   className={`modern-button-secondary min-h-10 flex-1 ${choice === c ? 'ring-2 ring-[hsl(var(--primary))]' : ''}`}
                   onClick={() => setChoice(c)}

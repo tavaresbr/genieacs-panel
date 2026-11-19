@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRovingKeys } from '@/lib/use-roving'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappAPI, type WhatsAppAccount } from '@/lib/api'
 import { accountColor, accountName, WA_ACCOUNT_CLASS } from '@/lib/wa-account-color'
@@ -49,6 +50,7 @@ export function ChatNumberMenu({ accounts, onChoose, children }: ChatNumberMenuP
   const [open, setOpen] = useState(false)
   const first = useRef<HTMLButtonElement>(null)
   const wrapper = useRef<HTMLSpanElement>(null)
+  const moverItem = useRovingKeys('[role="menuitem"]', undefined, { horizontal: false })
 
   useEffect(() => {
     if (open) first.current?.focus()
@@ -76,7 +78,11 @@ export function ChatNumberMenu({ accounts, onChoose, children }: ChatNumberMenuP
         if (para && !event.currentTarget.contains(para)) setOpen(false)
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') setOpen(false)
+        if (event.key === 'Escape' && open) {
+          setOpen(false)
+          // O foco volta ao botão que abriu o menu, em vez de se perder no corpo da página.
+          wrapper.current?.querySelector<HTMLElement>(':scope > :not([role="menu"])')?.focus()
+        }
       }}
     >
       {children({
@@ -87,7 +93,7 @@ export function ChatNumberMenu({ accounts, onChoose, children }: ChatNumberMenuP
         }
       })}
       {choose && open && (
-        <div role="menu" aria-label={t('whatsapp.chatNumber.title')} className="absolute start-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+        <div role="menu" aria-label={t('whatsapp.chatNumber.title')} onKeyDown={moverItem} className="absolute start-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
           <p className="px-3 py-1.5 text-xs text-muted-foreground">{t('whatsapp.chatNumber.title')}</p>
           {accounts.map((account, i) => (
             <button

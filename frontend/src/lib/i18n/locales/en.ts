@@ -2104,6 +2104,7 @@ const en = {
   'api.missingPermission': 'Your role does not allow this action.',
   'api.unknownError': 'Unknown error',
   'api.networkError': 'A network error occurred',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // Customer portal password (device detail)
   'detail.portalPassword.label': 'Portal password',

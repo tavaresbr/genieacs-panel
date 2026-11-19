@@ -2077,6 +2077,7 @@ const hi: Dictionary = {
   'api.missingPermission': 'आपकी भूमिका इस कार्रवाई की अनुमति नहीं देती।',
   'api.unknownError': 'अज्ञात त्रुटि',
   'api.networkError': 'नेटवर्क त्रुटि हुई',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // ग्राहक पोर्टल पासवर्ड (उपकरण विवरण)
   'detail.portalPassword.label': 'पोर्टल पासवर्ड',

@@ -2102,6 +2102,7 @@ const es: Dictionary = {
   'api.missingPermission': 'Tu rol no permite esta acción.',
   'api.unknownError': 'Error desconocido',
   'api.networkError': 'Ocurrió un error de red',
+  'api.timeout': 'El servidor tardó demasiado en responder. Inténtalo de nuevo.',
 
   // Contraseña del portal del cliente (detalle del equipo)
   'detail.portalPassword.label': 'Contraseña del portal',

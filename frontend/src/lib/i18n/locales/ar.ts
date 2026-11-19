@@ -2077,6 +2077,7 @@ const ar: Dictionary = {
   'api.missingPermission': 'دورك لا يسمح بهذا الإجراء.',
   'api.unknownError': 'خطأ غير معروف',
   'api.networkError': 'حدث خطأ شبكي',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // كلمة مرور بوابة المشترك (تفاصيل الجهاز)
   'detail.portalPassword.label': 'كلمة مرور البوابة',

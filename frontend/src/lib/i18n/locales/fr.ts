@@ -2102,6 +2102,7 @@ const fr: Dictionary = {
   'api.missingPermission': 'Votre rôle ne permet pas cette action.',
   'api.unknownError': 'Erreur inconnue',
   'api.networkError': 'Une erreur réseau s’est produite',
+  'api.timeout': 'The server took too long to respond. Try again.',
 
   // Mot de passe du portail client (détail de l’équipement)
   'detail.portalPassword.label': 'Mot de passe du portail',

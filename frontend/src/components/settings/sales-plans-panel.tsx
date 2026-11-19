@@ -50,6 +50,8 @@ export function SalesPlansPanel() {
   const { t } = useTranslation()
   const toast = useToast()
   const [planos, setPlanos] = useState<SalesPlan[] | null>(null)
+  // A 1ª leitura falhou: a tela mostra o motivo e "Tentar novamente", em vez de uma lista vazia que parece de verdade.
+  const [erroCarga, setErroCarga] = useState<string | null>(null)
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
   const [busy, setBusy] = useState(false)
   const [coverage, setCoverage] = useState<string[]>([])
@@ -69,8 +71,12 @@ export function SalesPlansPanel() {
 
   const carregar = useCallback(async () => {
     const res = await whatsappAPI.listSalesPlans()
-    if (res.success && res.data) setPlanos(res.data)
-    else toast.error(res.message || t('settings.chatbot.plansLoadFailed'))
+    if (res.success && res.data) { setPlanos(res.data); setErroCarga(null) }
+    else {
+      const motivo = res.message || t('settings.chatbot.plansLoadFailed')
+      setErroCarga(motivo)
+      toast.error(motivo)
+    }
   }, [t, toast])
 
   useEffect(() => { void carregar() }, [carregar])
@@ -206,6 +212,17 @@ export function SalesPlansPanel() {
       </div>
 
       {rascunho?.id === null && <div className="mt-4">{formulario}</div>}
+
+      {planos === null && (
+        <div className="mt-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm" role={erroCarga ? 'alert' : 'status'}>
+          {erroCarga ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[hsl(var(--status-danger))]">{erroCarga}</p>
+              <button type="button" className="modern-button-secondary" onClick={() => void carregar()}>{t('common.retry')}</button>
+            </div>
+          ) : <p className="text-muted-foreground">{t('common.loading')}</p>}
+        </div>
+      )}
 
       {planos !== null && planos.length === 0 && (
         <p className="mt-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm text-muted-foreground">
