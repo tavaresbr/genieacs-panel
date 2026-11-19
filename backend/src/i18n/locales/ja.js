@@ -971,7 +971,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "品質 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "1日の上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "ステータス {to}",
-  'whatsapp.alerts.waWaiting': 'お客様 {contact} が {minutes} 分間返信を待っています — 担当者: {agent}',
+  'whatsapp.alerts.waWaiting': 'お客様 {contact} が {minutes} 分間返信を待っています — 担当者: {agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Last message: “{text}”',
   'whatsapp.alerts.noAgent': '担当者なし',
   // WhatsApp — ボットの応答本文
   'whatsapp.bot.invoiceDigitableLine': 'バーコード番号: {value}',

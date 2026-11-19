@@ -958,11 +958,41 @@ class WaAlertService {
         vars: {
           contact: item.contact || subject,
           minutes: item.minutes,
-          agent: item.assignedTo || t('whatsapp.alerts.noAgent')
+          agent: item.assignedTo || t('whatsapp.alerts.noAgent'),
+          // Preenchidos na hora de enviar (`enriquecerEspera`), não a cada varredura.
+          summary: '',
+          link: ''
         }
       });
     }
     return { firing, unknown };
+  }
+
+  /**
+   * O "o que o cliente quer" e o link da conversa, só na hora de ENVIAR o aviso
+   * de espera (uma chamada de IA por aviso, não por varredura). Nunca lança: sem
+   * resumo o aviso sai igual, como era.
+   */
+  static async enriquecerEspera(condition) {
+    if (condition?.rule !== 'wa_waiting') return;
+    try {
+      const { default: WaAiService } = await import('./waAiService.js');
+      const resumo = await WaAiService.resumoDeEspera(Number(condition.subject));
+      const t = translatorFor(DEFAULT_LOCALE);
+      const texto = resumo.fallback && resumo.text
+        ? t('whatsapp.alerts.waLastMessage', { text: resumo.text })
+        : resumo.text;
+      condition.vars = { ...condition.vars, summary: texto ? `\n${texto}` : '' };
+    } catch {
+      // sem resumo
+    }
+    try {
+      const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
+      const base = panelUrlFor(tenant);
+      if (base) condition.vars = { ...condition.vars, link: `\n${base}/whatsapp` };
+    } catch {
+      // sem link
+    }
   }
 
   /** Como o número aparece na mensagem: o apelido, e o telefone quando há. */
@@ -1122,6 +1152,7 @@ class WaAlertService {
         // Com carência, a linha abre calada e só fala se ainda estiver valendo
         // quando a carência passar; o que se resolve antes some sem mensagem.
         if (graceMs > 0) continue;
+        await this.enriquecerEspera(condition);
         const sent = await this.notify({ channels, condition, cleared: false });
         if (sent > 0) {
           summary.notified += sent;
@@ -1140,6 +1171,7 @@ class WaAlertService {
         || now - lastNotified >= rule.cooldownMinutes * 60_000;
       if (!cooledDown) continue;
 
+      await this.enriquecerEspera(condition);
       const sent = await this.notify({ channels, condition, cleared: false });
       if (sent > 0) {
         summary.notified += sent;
@@ -1211,7 +1243,8 @@ class WaAlertService {
     // celular de alguém não é o provedor "avisado". Nunca lança.
     await PushService.notifyAlert({ rule: condition.rule, cleared: Boolean(cleared), vars: condition.vars });
     const { digestMinutes } = await this.getSettings();
-    if (digestMinutes > 0) {
+    // "Cliente esperando" não espera o agrupamento: o aviso é para agora.
+    if (digestMinutes > 0 && condition.rule !== 'wa_waiting') {
       // Entra na fila do resumo. Conta como avisada (um por canal pronto) para o
       // cooldown e a recuperação funcionarem como se tivesse saído.
       await this.enqueueDigest({ rule: condition.rule, cleared: Boolean(cleared), text: body });

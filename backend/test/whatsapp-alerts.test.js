@@ -771,6 +771,9 @@ describe('a customer waiting for a person tells the team', () => {
     assert.equal(enviados.length, 1);
     assert.match(enviados[0].body, /Dona Maria/);
     assert.match(enviados[0].body, /sem atendente/);
+    // Sem IA neste teste: o plano B traz a última fala do cliente (e nenhum {placeholder} sobra).
+    assert.match(enviados[0].body, /Última mensagem: “alguém\?”/);
+    assert.doesNotMatch(enviados[0].body, /\{summary\}|\{link\}/);
 
     await scan({ now: now() + 5 * MINUTE });
     assert.equal((await outbox()).filter((m) => /esperando resposta/.test(m.body)).length, 1, 'não repete antes do intervalo');

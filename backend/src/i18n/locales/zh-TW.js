@@ -978,7 +978,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "品質 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "每日上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "狀態 {to}",
-  'whatsapp.alerts.waWaiting': '客戶 {contact} 已等待回覆 {minutes} 分鐘 — 客服：{agent}',
+  'whatsapp.alerts.waWaiting': '客戶 {contact} 已等待回覆 {minutes} 分鐘 — 客服：{agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Last message: “{text}”',
   'whatsapp.alerts.noAgent': '無客服',
   // WhatsApp — 機器人回覆的內文
   'whatsapp.bot.invoiceDigitableLine': '條碼號：{value}',

@@ -979,7 +979,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "质量 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "每日上限 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "状态 {to}",
-  'whatsapp.alerts.waWaiting': '客户 {contact} 已等待回复 {minutes} 分钟 — 客服：{agent}',
+  'whatsapp.alerts.waWaiting': '客户 {contact} 已等待回复 {minutes} 分钟 — 客服：{agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Last message: “{text}”',
   'whatsapp.alerts.noAgent': '无客服',
   // WhatsApp — 机器人回复的正文
   'whatsapp.bot.invoiceDigitableLine': '条形码号：{value}',

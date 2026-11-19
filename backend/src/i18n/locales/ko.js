@@ -977,7 +977,8 @@ export default {
   'whatsapp.alerts.metaQualityChange': "품질 {from} → {to}",
   'whatsapp.alerts.metaLimitChange': "일일 한도 {from} → {to}",
   'whatsapp.alerts.metaStatusChange': "상태 {to}",
-  'whatsapp.alerts.waWaiting': '고객 {contact}님이 {minutes}분째 답변을 기다리고 있습니다 — 상담원: {agent}',
+  'whatsapp.alerts.waWaiting': '고객 {contact}님이 {minutes}분째 답변을 기다리고 있습니다 — 상담원: {agent}{summary}{link}',
+  'whatsapp.alerts.waLastMessage': 'Last message: “{text}”',
   'whatsapp.alerts.noAgent': '상담원 없음',
   // WhatsApp — 봇 응답 본문
   'whatsapp.bot.invoiceDigitableLine': '바코드 번호: {value}',

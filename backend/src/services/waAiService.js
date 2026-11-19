@@ -22,7 +22,7 @@ import {
 } from '../utils/wa/waModeloIa.js';
 import { CLASSIFICACAO_INTERVALO_MS, lerClassificacao, promptDeClassificacao } from '../utils/wa/classificacaoIa.js';
 import { REGRA_DE_MIDIA, documentoDigitado, escolherMidias, limiteDaMidia, tipoDeMidia } from '../utils/wa/midiaIa.js';
-import { REESCRITA_ENTRADA_MAX, REESCRITA_MAX, RESUMO_MAX, limparTexto, modoDeReescrita, promptDeResumo, promptDeReescrita } from '../utils/wa/copilotoIa.js';
+import { ESPERA_MAX, REESCRITA_ENTRADA_MAX, REESCRITA_MAX, RESUMO_MAX, limparTexto, modoDeReescrita, promptDeEspera, promptDeResumo, promptDeReescrita, ultimaFalaDoCliente } from '../utils/wa/copilotoIa.js';
 import fsp from 'node:fs/promises';
 import { logSafe } from '../utils/logger.js';
 import { resolveStoredAttachment } from './waMediaFile.js';
@@ -535,6 +535,41 @@ class WaAiService {
       max: RESUMO_MAX,
       maxTokens: 500
     });
+  }
+
+  /**
+   * O "o que o cliente quer" do alerta de espera: 1 a 2 linhas, tudo mascarado.
+   * Nunca lança e nunca demora: sem IA (ou com erro, ou passados 8 s) vale a
+   * última fala do cliente; sem nem isso, `{ text: '', fallback: true }`.
+   *
+   * @returns {Promise<{ text: string, fallback: boolean, lastMessage: string }>}
+   */
+  static async resumoDeEspera(conversationId) {
+    let fio = [];
+    try {
+      fio = (await historico(conversationId, 12)).map((turno) => ({
+        role: turno.role,
+        content: mascararSensivel(typeof turno.content === 'string' ? turno.content : '')
+      })).filter((turno) => turno.content);
+    } catch {
+      return { text: '', fallback: true, lastMessage: '' };
+    }
+    const ultima = [...fio].reverse().find((turno) => turno.role === 'user');
+    const lastMessage = ultimaFalaDoCliente(ultima?.content);
+    try {
+      if (!fio.length || !(await AddonService.allows('ai'))) return { text: lastMessage, fallback: true, lastMessage };
+      const ai = await WaBotConfigService.aiSettings();
+      if (!ai.apiKey) return { text: lastMessage, fallback: true, lastMessage };
+      const transcricao = fio.map((turno) => `${turno.role === 'user' ? 'Cliente' : 'Equipe'}: ${turno.content}`).join('\n');
+      const resposta = await Promise.race([
+        this.copiloto({ ai, task: 'resumo', system: promptDeEspera({ empresa: await nomeDaEmpresa() }), user: transcricao, max: ESPERA_MAX, maxTokens: 150 }),
+        new Promise((_resolve, reject) => { setTimeout(() => reject(new Error('timeout')), 8000).unref?.(); })
+      ]);
+      const text = String(resposta?.text ?? '').replace(/\s+/g, ' ').trim();
+      return text ? { text, fallback: false, lastMessage } : { text: lastMessage, fallback: true, lastMessage };
+    } catch {
+      return { text: lastMessage, fallback: true, lastMessage };
+    }
   }
 
   /**
