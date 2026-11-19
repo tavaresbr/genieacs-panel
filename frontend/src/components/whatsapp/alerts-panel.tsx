@@ -8,6 +8,7 @@ import {
 } from '@/lib/api'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { Icon } from '@/components/ui/icon'
+import { RecipientList } from '@/components/whatsapp/recipient-list'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -139,10 +140,10 @@ interface AlertsForm {
   enabled: boolean
   intervalSeconds: string
   digestMinutes: string
-  /** The textarea verbatim, one number per line. Parsed only on save. */
-  recipients: string
-  /** O mesmo, um e-mail por linha. */
-  emailRecipients: string
+  /** Os números de plantão, já normalizados, um por item (`RecipientList`). */
+  recipients: string[]
+  /** O mesmo, os e-mails. */
+  emailRecipients: string[]
   /** O bloco do Telegram — ver `lib/alert-telegram.ts`. */
   telegram: TelegramForm
   rules: Record<WhatsAppAlertRule, RuleForm>
@@ -166,20 +167,12 @@ function toForm(settings: WhatsAppAlertSettings): AlertsForm {
     enabled: settings.enabled,
     intervalSeconds: String(settings.intervalSeconds),
     digestMinutes: String(settings.digestMinutes ?? 0),
-    recipients: (settings.recipients ?? []).join('\n'),
-    emailRecipients: (settings.emailRecipients ?? []).join('\n'),
+    recipients: [...(settings.recipients ?? [])],
+    emailRecipients: [...(settings.emailRecipients ?? [])],
     // O token nunca vem: o campo começa vazio, que quer dizer "manter".
     telegram: { token: '', chatId: settings.telegram?.chatId ?? '', remove: false },
     rules
   }
-}
-
-/** One number per line. Blank lines are not recipients, they are typing. */
-function parseRecipients(text: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
 }
 
 /**
@@ -264,14 +257,8 @@ export function AlertsPanel() {
     void load()
   }, [load])
 
-  const recipients = useMemo(
-    () => (form ? parseRecipients(form.recipients) : []),
-    [form]
-  )
-  const emailRecipients = useMemo(
-    () => (form ? parseRecipients(form.emailRecipients) : []),
-    [form]
-  )
+  const recipients = useMemo(() => form?.recipients ?? [], [form])
+  const emailRecipients = useMemo(() => form?.emailRecipients ?? [], [form])
   // Ninguém em canal nenhum: é esse o estado que o aviso grita, e agora são
   // dois canais — um número OU um e-mail já é alguém para acordar.
   const telegramOn = form ? telegramWillNotify(form.telegram, Boolean(stored?.telegram?.configured)) : false
@@ -500,19 +487,14 @@ export function AlertsPanel() {
                 block, because "alerts are on" and "somebody will hear about
                 it" are two different states and only one of them is visible. */}
             <div>
-              <label htmlFor="wa-alerts-recipients" className="field-label">
-                {t('whatsapp.alerts.recipients')}
-              </label>
-              <textarea
-                id="wa-alerts-recipients"
-                rows={4}
-                className="modern-input w-full font-mono text-sm"
-                value={form.recipients}
-                aria-describedby="wa-alerts-recipients-hint"
-                onChange={(event) => setForm((current) => (current
-                  ? { ...current, recipients: event.target.value }
-                  : current))}
-              />
+              <RecipientList
+                kind="phone"
+                items={form.recipients}
+                onChange={(next) => setForm((current) => (current ? { ...current, recipients: next } : current))}
+                label={t('whatsapp.alerts.recipients')}
+                hintId="wa-alerts-recipients-hint"
+                placeholder={t('whatsapp.alerts.rcptPhonePlaceholder')}
+              >
               {noRecipients ? (
                 <p
                   id="wa-alerts-recipients-hint"
@@ -531,26 +513,21 @@ export function AlertsPanel() {
                   {t('whatsapp.alerts.recipientsHint')}
                 </p>
               )}
+              </RecipientList>
             </div>
 
             {/* ── Os e-mails da equipe ─────────────────────────────────────
                 O segundo canal. Sem SMTP no servidor, o campo continua (a lista
                 fica guardada para o dia em que houver), mas diz que nada sai. */}
             <div>
-              <label htmlFor="wa-alerts-emails" className="field-label">
-                {t('whatsapp.alerts.emailRecipients')}
-              </label>
-              <textarea
-                id="wa-alerts-emails"
-                rows={3}
-                className="modern-input w-full font-mono text-sm"
-                value={form.emailRecipients}
-                aria-describedby="wa-alerts-emails-hint"
+              <RecipientList
+                kind="email"
+                items={form.emailRecipients}
+                onChange={(next) => setForm((current) => (current ? { ...current, emailRecipients: next } : current))}
+                label={t('whatsapp.alerts.emailRecipients')}
+                hintId="wa-alerts-emails-hint"
                 placeholder="plantao@provedor.com.br"
-                onChange={(event) => setForm((current) => (current
-                  ? { ...current, emailRecipients: event.target.value }
-                  : current))}
-              />
+              >
               {mailOff ? (
                 <p
                   id="wa-alerts-emails-hint"
@@ -564,6 +541,7 @@ export function AlertsPanel() {
                   {t('whatsapp.alerts.emailRecipientsHint')}
                 </p>
               )}
+              </RecipientList>
             </div>
 
             {/* ── O Telegram ─────────────────────────────────────────────
