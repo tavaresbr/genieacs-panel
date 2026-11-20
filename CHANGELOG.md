@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.55.0] - 2026-11-20
+
+### New
+
+- 2FA por código de WhatsApp nas ações sensíveis (`efb8a92a`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/ff3a6fc9f5ee...19a6f69074e8)
+
 ## [1.54.0] - 2026-11-20
 
 ### New
