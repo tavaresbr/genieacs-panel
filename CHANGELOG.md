@@ -7,6 +7,22 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.54.0] - 2026-11-20
+
+### New
+
+- Página estática pública de Política de Privacidade (`3aa72258`)
+
+### Fixed
+
+- Quedas em massa passam a ser detectadas mesmo sem canal de aviso pronto (`a020c91f`)
+
+### Maintenance
+
+- Contagem como número (Postgres devolve string) (`ee0fbe92`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/e21797706642...db9f0b377b77)
+
 ## [1.53.0] - 2026-11-20
 
 ### New

@@ -1,15 +1,27 @@
 {
-  "version": "1.53.0",
-  "build": 1818,
-  "sourceCommit": "7dbc73ea90ce",
+  "version": "1.54.0",
+  "build": 1824,
+  "sourceCommit": "db9f0b377b77",
   "releasedAt": "2026-11-20",
-  "basedOnTag": "v1.52.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/43152b545886...7dbc73ea90ce",
+  "basedOnTag": "v1.53.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/e21797706642...db9f0b377b77",
   "changes": [
     {
-      "shortHash": "30a1f14a",
-      "date": "2026-11-19",
-      "title": "Números de plantão e e-mails adicionados um a um",
+      "shortHash": "a020c91f",
+      "date": "2026-11-20",
+      "title": "Quedas em massa passam a ser detectadas mesmo sem canal de aviso pronto",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "ee0fbe92",
+      "date": "2026-11-20",
+      "title": "Contagem como número (Postgres devolve string)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "3aa72258",
+      "date": "2026-11-20",
+      "title": "Página estática pública de Política de Privacidade",
       "category": "New"
     }
   ]
