@@ -1,15 +1,15 @@
 {
-  "version": "1.52.0",
-  "build": 1815,
-  "sourceCommit": "5754351bfb42",
-  "releasedAt": "2026-11-19",
-  "basedOnTag": "v1.51.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/46cc705b5534...5754351bfb42",
+  "version": "1.53.0",
+  "build": 1818,
+  "sourceCommit": "7dbc73ea90ce",
+  "releasedAt": "2026-11-20",
+  "basedOnTag": "v1.52.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/43152b545886...7dbc73ea90ce",
   "changes": [
     {
-      "shortHash": "f061eb09",
+      "shortHash": "30a1f14a",
       "date": "2026-11-19",
-      "title": "Aviso de cliente esperando com resumo do que ele quer e link",
+      "title": "Números de plantão e e-mails adicionados um a um",
       "category": "New"
     }
   ]
