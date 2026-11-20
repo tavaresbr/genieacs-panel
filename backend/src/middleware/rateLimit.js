@@ -319,6 +319,14 @@ export const portalMutationLimiter = limiter({
   message: limitMessage('rateLimit.portalWifi', 'rate_limited_wifi')
 });
 
+/** O envio do código de 2FA: poucos por conta, porque cada um é uma mensagem de WhatsApp. */
+export const portalOtpLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  keyGenerator: accountKey,
+  message: limitMessage('rateLimit.portalRequests', 'rate_limited')
+});
+
 export const portalRevealLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 20,

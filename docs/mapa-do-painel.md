@@ -144,6 +144,7 @@ Proteções do login e das ações sensíveis:
 - **Trilha**: travas, trocas de Wi-Fi, revelações de senha e pedidos de liberação em confiança
   entram na tela Auditoria (autor `system`, com o ID do cliente). Nunca senha nem SSID.
 - Respostas do portal saem com `Cache-Control: no-store`.
+- **2FA opcional** (Configurações › Portal): código de 6 dígitos por WhatsApp nas ações sensíveis; quem não pode receber segue sem ele e a dispensa fica na Auditoria.
 - **Sair** encerra a sessão no servidor (cookie copiado deixa de valer). O assinante **troca a própria senha** no portal; o aviso por WhatsApp na troca de Wi-Fi é opcional (Configurações › Portal).
 
 ---

@@ -19,6 +19,7 @@ import { readDateFormat } from '../utils/dateFormat.js';
 import AccountLockout from '../models/AccountLockout.js';
 import AuditLog from '../models/AuditLog.js';
 import { notifyWifiChanged } from '../services/portalWifiNoticeService.js';
+import PortalTwoFactorService from '../services/portalTwoFactorService.js';
 import { newPasswordProblem } from '../utils/passwordPolicy.js';
 
 /**
@@ -54,6 +55,36 @@ async function allowedWifiIndexes() {
   if (!raw) return null;
   const indexes = raw.split(',').map((item) => Number(item.trim())).filter((n) => Number.isInteger(n) && n >= 1 && n <= 8);
   return indexes.length > 0 ? new Set(indexes) : null;
+}
+
+/**
+ * A porta do 2FA das ações sensíveis. Devolve `true` se a ação pode seguir; se
+ * não, já respondeu (403) e quem chamou deve parar.
+ *
+ * Desligado: segue. Ligado e sem como entregar o código (sem número, sem
+ * WhatsApp, "não perturbe"): segue e deixa a dispensa na trilha. Ligado e
+ * entregável: exige `twoFactorCode` no corpo.
+ */
+async function passTwoFactor(req, res) {
+  if (!(await PortalTwoFactorService.isEnabled())) return true;
+  if (!(await PortalTwoFactorService.channelFor(req.customer))) {
+    await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_2FA_SKIPPED, { reason: 'no_channel' });
+    return true;
+  }
+  const given = req.body?.twoFactorCode;
+  if (given === undefined || given === null || String(given).trim() === '') {
+    res.status(403).json(createErrorResponse(req.t('portal.twoFactorRequired'), null, 'two_factor_required'));
+    return false;
+  }
+  const result = await PortalTwoFactorService.verify(req.customer, given);
+  if (result === 'ok') return true;
+  await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_2FA_FAILED, { result });
+  res.status(403).json(createErrorResponse(
+    req.t(result === 'expired' ? 'portal.twoFactorExpired' : 'portal.twoFactorInvalid'),
+    null,
+    result === 'expired' ? 'two_factor_expired' : 'two_factor_invalid'
+  ));
+  return false;
 }
 
 class CustomerPortalController {
@@ -259,6 +290,8 @@ class CustomerPortalController {
         ));
       }
 
+      if (!(await passTwoFactor(req, res))) return undefined;
+
       // The device target is resolved only from the authenticated account.
       // Never accept a device ID supplied by the browser.
       const current = await DeviceService.getCustomerPortalOverview(
@@ -334,6 +367,7 @@ class CustomerPortalController {
         return res.status(401).json(createErrorResponse(req.t('portal.reauthRequired'), null, 'reauth_required'));
       }
       await AccountLockout.clear(tentativa.subject);
+      if (!(await passTwoFactor(req, res))) return undefined;
 
       const password = await CustomerWifiCredentialService.reveal(
         req.customer.id,
@@ -447,6 +481,7 @@ class CustomerPortalController {
         return res.status(401).json(createErrorResponse(req.t('portal.reauthRequired'), null, 'reauth_required'));
       }
       await AccountLockout.clear(tentativa.subject);
+      if (!(await passTwoFactor(req, res))) return undefined;
 
       if (!/^[A-Z0-9]{10,32}$/.test(next)) {
         return res.status(400).json(createErrorResponse(req.t('portal.newPasswordFormat'), null, 'invalid_new_password'));
@@ -466,6 +501,32 @@ class CustomerPortalController {
     } catch (error) {
       console.error('Customer portal password change error:', error);
       return res.status(500).json(createErrorResponse(req.t('portal.passwordChangeFailed'), null, 'password_change_failed'));
+    }
+  }
+
+  /**
+   * `POST /api/customer/2fa/send`: pede o código. `required:false` quando o
+   * provedor não liga o 2FA ou quando não há como entregar (a ação sensível
+   * segue sem código); `required:true` quando o código saiu (ou já saiu há
+   * pouco e ainda vale).
+   */
+  static async sendTwoFactor(req, res) {
+    try {
+      if (!(await PortalTwoFactorService.isEnabled())) {
+        return res.json(createResponse(req.t('portal.twoFactorNotRequired'), { required: false }, 'two_factor_off'));
+      }
+      const result = await PortalTwoFactorService.send(req.customer);
+      if (result.status === 'unavailable') {
+        await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_2FA_SKIPPED, { reason: 'send_unavailable' });
+        return res.json(createResponse(req.t('portal.twoFactorNotRequired'), { required: false }, 'two_factor_skipped'));
+      }
+      if (result.status === 'sent') {
+        await auditPortal(req, AuditLog.ACTIONS.PORTAL_CUSTOMER_2FA_SENT, {});
+      }
+      return res.json(createResponse(req.t('portal.twoFactorSent'), { required: true, resent: result.status === 'throttled' }, 'two_factor_sent'));
+    } catch (error) {
+      console.error('Customer portal 2FA send error:', error);
+      return res.status(500).json(createErrorResponse(req.t('portal.twoFactorFailed'), null, 'two_factor_failed'));
     }
   }
 

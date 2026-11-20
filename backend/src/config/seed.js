@@ -46,6 +46,8 @@ export const DEFAULT_SETTINGS = {
   portalWifiIndexes: '',
   // Aviso por WhatsApp ao assinante quando o Wi-Fi é trocado pelo portal; desligado até o provedor ligar.
   portalWifiChangeNotice: 'false',
+  // 2FA por WhatsApp nas ações sensíveis do portal; desligado até o provedor ligar.
+  portalTwoFactor: 'false',
   // Como as datas aparecem no painel e no portal (utils/dateFormat.js).
   // `auto` segue o idioma de quem olha — o que o painel sempre fez.
   dateFormat: 'auto'

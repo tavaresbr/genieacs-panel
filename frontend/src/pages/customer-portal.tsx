@@ -152,6 +152,10 @@ export default function CustomerPortal() {
   // está pedindo e o que foi digitado (nunca guardado depois do envio).
   const [reauthIndex, setReauthIndex] = useState<number | null>(null)
   const [reauthPassword, setReauthPassword] = useState('')
+  // 2FA por WhatsApp: a ação sensível volta com `two_factor_required` e a tela
+  // pede o código; `resolve` devolve o que foi digitado (ou `null` ao cancelar).
+  const [tfPrompt, setTfPrompt] = useState<{ resolve: (code: string | null) => void } | null>(null)
+  const [tfCode, setTfCode] = useState('')
   // Troca da senha do portal (formulário recolhido até o cliente abrir).
   const [pwOpen, setPwOpen] = useState(false)
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
@@ -365,6 +369,32 @@ export default function CustomerPortal() {
     }
   }
 
+  const askTwoFactorCode = () => new Promise<string | null>((resolve) => {
+    setTfCode('')
+    setTfPrompt({ resolve })
+  })
+
+  /**
+   * Roda a ação; se o servidor pedir o código de 2FA, pede o envio, mostra o
+   * campo e repete a ação com `twoFactorCode`. Até 3 códigos errados.
+   */
+  const withTwoFactor = async <T,>(run: (code?: string) => Promise<ApiResult<T>>): Promise<ApiResult<T>> => {
+    let result = await run()
+    for (let tries = 0; tries < 3; tries += 1) {
+      const code = result.code
+      if (code !== 'two_factor_required' && code !== 'two_factor_expired' && code !== 'two_factor_invalid') return result
+      if (code !== 'two_factor_invalid') {
+        const sent = await portalRequest<{ required: boolean }>('/2fa/send', { method: 'POST' })
+        if (sent.success && sent.data && sent.data.required === false) return run()
+      }
+      const typed = await askTwoFactorCode()
+      setTfPrompt(null)
+      if (!typed) return result
+      result = await run(typed)
+    }
+    return result
+  }
+
   const changePortalPassword = async (event: FormEvent) => {
     event.preventDefault()
     if (pwForm.next !== pwForm.confirm) {
@@ -374,10 +404,10 @@ export default function CustomerPortal() {
     setPwSaving(true)
     setPwFeedback(null)
     try {
-      const result = await portalRequest('/password', {
+      const result = await withTwoFactor((twoFactorCode) => portalRequest('/password', {
         method: 'POST',
-        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next })
-      })
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next, twoFactorCode })
+      }))
       if (!result.success) {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setPwFeedback({ type: 'error', message: result.message || t('portal.error.retry') })
@@ -431,10 +461,10 @@ export default function CustomerPortal() {
     setRevealingWifiPasswordIndex(index)
     setWifiFeedback(null)
     try {
-      const result = await portalRequest<{ password: string }>(`/wifi/${index}/password`, {
+      const result = await withTwoFactor((twoFactorCode) => portalRequest<{ password: string }>(`/wifi/${index}/password`, {
         method: 'POST',
-        body: JSON.stringify({ password: typed })
-      })
+        body: JSON.stringify({ password: typed, twoFactorCode })
+      }))
       setReauthPassword('')
       if (!result.success || !result.data?.password) {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
@@ -476,14 +506,15 @@ export default function CustomerPortal() {
     setWifiSaving(true)
     setWifiFeedback(null)
     try {
-      const result = await portalRequest<{ index: number; ssid: string }>('/wifi', {
+      const result = await withTwoFactor((twoFactorCode) => portalRequest<{ index: number; ssid: string }>('/wifi', {
         method: 'PUT',
         body: JSON.stringify({
           index: wifiEditor.index,
           ssid,
-          password: wifiEditor.password
+          password: wifiEditor.password,
+          twoFactorCode
         }),
-      })
+      }))
       if (!result.success) {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
@@ -618,6 +649,31 @@ export default function CustomerPortal() {
 
   return (
     <main className="min-h-screen bg-background">
+      {tfPrompt && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="portal-tf-title">
+          <form
+            className="modal-panel modern-card flex max-w-sm flex-col gap-4 p-5"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const code = tfCode.replace(/\D/g, '')
+              if (code.length === 6) tfPrompt.resolve(code)
+            }}
+          >
+            <h2 id="portal-tf-title" className="section-heading">{t('portal.twoFactor.title')}</h2>
+            <p className="text-sm text-muted-foreground">{t('portal.twoFactor.hint')}</p>
+            <div>
+              <label className="field-label" htmlFor="portal-tf-code">{t('portal.twoFactor.code')}</label>
+              <input id="portal-tf-code" className="modern-input font-mono tracking-widest" inputMode="numeric"
+                autoComplete="one-time-code" maxLength={6} autoFocus required value={tfCode}
+                onChange={(event) => setTfCode(event.target.value.replace(/\D/g, ''))} />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="modern-button" disabled={tfCode.length !== 6}>{t('portal.twoFactor.confirm')}</button>
+              <button type="button" className="modern-button-secondary" onClick={() => tfPrompt.resolve(null)}>{t('portal.twoFactor.cancel')}</button>
+            </div>
+          </form>
+        </div>
+      )}
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">

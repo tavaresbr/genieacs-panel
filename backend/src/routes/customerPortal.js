@@ -5,6 +5,7 @@ import {
   portalAccountLimiter,
   portalBillingLimiter,
   portalMutationLimiter,
+  portalOtpLimiter,
   portalRevealLimiter,
   portalUnlockLimiter,
   referralSubmitLimiter
@@ -67,6 +68,13 @@ router.post(
   portalAccountLimiter,
   portalUnlockLimiter,
   CustomerPortalController.trustUnlock
+);
+router.post(
+  '/2fa/send',
+  authenticatePortalCustomer,
+  portalAccountLimiter,
+  portalOtpLimiter,
+  CustomerPortalController.sendTwoFactor
 );
 router.post(
   '/password',
