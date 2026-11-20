@@ -265,7 +265,7 @@ describe('o incidente de queda em massa', () => {
       const incidentes = await listar();
       assert.equal(incidentes.length, 1);
       assert.equal(incidentes[0].status, 'open');
-      assert.equal((await getDb()('wa_alert_state').count({ n: '*' }).first()).n, 0, 'nada gravado como anunciado');
+      assert.equal(Number((await getDb()('wa_alert_state').count({ n: '*' }).first()).n), 0, 'nada gravado como anunciado');
       normal();
       await scan();
       assert.equal((await listar())[0].status, 'resolved');
