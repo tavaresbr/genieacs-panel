@@ -3929,6 +3929,20 @@ const CUSTOMER_SESSION_COLUMNS = [
   ['session_version', (t) => t.integer('session_version').notNullable().defaultTo(0)]
 ];
 
+/**
+ * O código de verificação em duas etapas do portal (0143): um por conta, só o
+ * hash, com validade, tentativas gastas e o instante do último envio (para
+ * segurar reenvio em rajada). Colunas na própria conta, e não tabela nova: só
+ * existe um código vivo por vez, e ele some com a conta e com o apagamento
+ * dos dados do assinante.
+ */
+const CUSTOMER_OTP_COLUMNS = [
+  ['otp_hash', (t) => t.string('otp_hash', 64).nullable()],
+  ['otp_expires_at', (t) => t.timestamp('otp_expires_at').nullable()],
+  ['otp_attempts', (t) => t.integer('otp_attempts').notNullable().defaultTo(0)],
+  ['otp_sent_at', (t) => t.timestamp('otp_sent_at').nullable()]
+];
+
 const OPERATOR_PROFILE_TABLES = [
   ['operator_profiles', operatorProfilesTable]
 ];
@@ -8052,6 +8066,22 @@ export const migrations = [
       const missing = await missingColumns(db, 'wa_messages', WA_MESSAGE_ANSWERS_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('wa_messages', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** O código de 2FA do portal — ver `CUSTOMER_OTP_COLUMNS`. */
+    id: '0143_customer_otp',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('customer_accounts'))) return true;
+      return (await missingColumns(db, 'customer_accounts', CUSTOMER_OTP_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('customer_accounts'))) return;
+      const missing = await missingColumns(db, 'customer_accounts', CUSTOMER_OTP_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('customer_accounts', (t) => {
         for (const add of missing) add(t);
       });
     }

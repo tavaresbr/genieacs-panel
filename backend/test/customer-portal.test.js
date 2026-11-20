@@ -326,3 +326,94 @@ describe('portal logout and password change', () => {
     assert.equal(row.password_ciphertext, null);
   });
 });
+
+describe('portal 2FA by WhatsApp code', () => {
+  const erin = { customerId: 'CSG-ERINERI-234571', password: null, id: null };
+  let cookie;
+  let Setting;
+  let Service;
+  let Accounts;
+  const sha = async (code) => (await import('node:crypto')).createHash('sha256').update(code).digest('hex');
+  const reveal = (body = {}) => call(`${portalUrl}/api/customer/wifi/1/password`, {
+    method: 'POST',
+    headers: { Cookie: cookie },
+    body: { password: erin.password, ...body }
+  });
+  const arm = async (code = '123456') => {
+    const hash = await sha(code);
+    await asTenant(() => Accounts.setOtp(erin.id, { hash, expiresAt: new Date(Date.now() + 60_000), sentAt: new Date() }));
+  };
+
+  before(async () => {
+    await createAccount(erin, 5);
+    Setting = (await import('../src/models/Setting.js')).default;
+    Service = (await import('../src/services/portalTwoFactorService.js')).default;
+    Accounts = (await import('../src/models/CustomerAccount.js')).default;
+    cookie = cookieHeader(sessionCookie((await call(`${portalUrl}/api/customer/login`, {
+      method: 'POST', body: { customerId: erin.customerId, password: erin.password }
+    })).response));
+  });
+
+  after(async () => {
+    await asTenant(() => Setting.upsert('portalTwoFactor', 'false'));
+  });
+
+  it('is off by default: no code is asked and send says not required', async () => {
+    assert.notEqual((await reveal()).body.code, 'two_factor_required');
+    const sent = await call(`${portalUrl}/api/customer/2fa/send`, { method: 'POST', headers: { Cookie: cookie } });
+    assert.equal(sent.body.data.required, false);
+  });
+
+  it('on, but with no way to deliver, the action goes ahead and the skip is audited', async () => {
+    await asTenant(() => Setting.upsert('portalTwoFactor', 'true'));
+    const res = await reveal();
+    assert.notEqual(res.body.code, 'two_factor_required');
+    const rows = await getDb()('audit_log').where({ action: 'portal_customer.twofactor_skipped' });
+    assert.ok(rows.length >= 1);
+    const sent = await call(`${portalUrl}/api/customer/2fa/send`, { method: 'POST', headers: { Cookie: cookie } });
+    assert.equal(sent.status, 200);
+    assert.equal(sent.body.data.required, false);
+  });
+
+  it('on and deliverable: asks for the code, refuses a wrong one, accepts the right one once', async () => {
+    const original = Service.channelFor;
+    Service.channelFor = async () => ({ phone: '5593999990000', wa: { id: 1 } });
+    try {
+      assert.equal((await reveal()).body.code, 'two_factor_required');
+      await arm('123456');
+      const wrong = await reveal({ twoFactorCode: '000000' });
+      assert.equal(wrong.status, 403);
+      assert.equal(wrong.body.code, 'two_factor_invalid');
+      const right = await reveal({ twoFactorCode: '123456' });
+      assert.notEqual(right.body.code, 'two_factor_required');
+      assert.notEqual(right.body.code, 'two_factor_invalid');
+      // Uso único: o mesmo código não vale de novo.
+      const again = await reveal({ twoFactorCode: '123456' });
+      assert.equal(again.body.code, 'two_factor_expired');
+    } finally {
+      Service.channelFor = original;
+    }
+  });
+
+  it('kills the code after five wrong attempts', async () => {
+    const original = Service.channelFor;
+    Service.channelFor = async () => ({ phone: '5593999990000', wa: { id: 1 } });
+    try {
+      await arm('654321');
+      for (let i = 0; i < 5; i += 1) {
+        assert.equal((await reveal({ twoFactorCode: '111111' })).status, 403);
+      }
+      const late = await reveal({ twoFactorCode: '654321' });
+      assert.equal(late.body.code, 'two_factor_expired');
+    } finally {
+      Service.channelFor = original;
+    }
+  });
+
+  it('the stored code is a hash, never the code', async () => {
+    await arm('424242');
+    const row = await getDb()('customer_accounts').where({ id: erin.id }).first();
+    assert.notEqual(row.otp_hash, '424242');
+    assert.equal(row.otp_hash.length, 64);
+  });
+});

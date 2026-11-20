@@ -129,6 +129,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'portalWifiIndexes',
   // Avisar o assinante por WhatsApp quando o Wi-Fi dele for trocado pelo portal.
   'portalWifiChangeNotice',
+  // Exigir código por WhatsApp nas ações sensíveis do portal (2FA).
+  'portalTwoFactor',
   // Como as datas aparecem em todo o painel e no portal. Ver utils/dateFormat.js.
   'dateFormat'
 ]);
@@ -178,7 +180,7 @@ function validateSetting(key, value) {
     if (!parts.every((item) => /^[1-8]$/.test(item))) return { errorKey: 'settings.validation.portalWifiIndexes' };
     return { value: [...new Set(parts)].sort().join(',') };
   }
-  if (key === 'portalWifiChangeNotice' && !['true', 'false'].includes(normalized)) {
+  if ((key === 'portalWifiChangeNotice' || key === 'portalTwoFactor') && !['true', 'false'].includes(normalized)) {
     return { errorKey: 'settings.validation.portalContactToggle' };
   }
   if (key === 'portalShowProviderContact' && !['true', 'false'].includes(normalized)) {

@@ -99,6 +99,21 @@ class CustomerAccount {
     return this.getById(id);
   }
 
+  /** Guarda um código novo (só o hash); zera as tentativas do anterior. */
+  static async setOtp(id, { hash, expiresAt, sentAt = new Date() }) {
+    await tdb('customer_accounts').where({ id }).update({
+      otp_hash: hash, otp_expires_at: expiresAt, otp_attempts: 0, otp_sent_at: sentAt
+    });
+  }
+
+  static async bumpOtpAttempt(id) {
+    await tdb('customer_accounts').where({ id }).increment('otp_attempts', 1);
+  }
+
+  static async clearOtp(id) {
+    await tdb('customer_accounts').where({ id }).update({ otp_hash: null, otp_expires_at: null, otp_attempts: 0 });
+  }
+
   /** Encerra toda sessão aberta do portal desta conta (o "sair"). */
   static async bumpSession(id) {
     await tdb('customer_accounts').where({ id }).increment('session_version', 1);

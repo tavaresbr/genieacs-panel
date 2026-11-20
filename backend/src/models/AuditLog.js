@@ -31,6 +31,11 @@ class AuditLog {
     PORTAL_CUSTOMER_WIFI_UPDATED: 'portal_customer.wifi_updated',
     PORTAL_CUSTOMER_WIFI_REVEALED: 'portal_customer.wifi_revealed',
     PORTAL_CUSTOMER_PASSWORD_CHANGED: 'portal_customer.password_changed',
+    // O 2FA por WhatsApp do portal: o código saiu, foi errado ou foi dispensado
+    // (sem número, sem WhatsApp, em silêncio ou recusado). Nunca o código.
+    PORTAL_CUSTOMER_2FA_SENT: 'portal_customer.twofactor_sent',
+    PORTAL_CUSTOMER_2FA_FAILED: 'portal_customer.twofactor_failed',
+    PORTAL_CUSTOMER_2FA_SKIPPED: 'portal_customer.twofactor_skipped',
     PORTAL_CUSTOMER_TRUST_UNLOCK: 'portal_customer.trust_unlock',
     GENIEACS_URL_CHANGED: 'genieacs.url_changed',
     GENIEACS_AUTH_CHANGED: 'genieacs.auth_changed',
