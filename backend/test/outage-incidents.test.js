@@ -252,6 +252,28 @@ describe('o incidente de queda em massa', () => {
     assert.equal(fechado.status, 'resolved');
   });
 
+  it('sem nenhum canal de aviso pronto o incidente abre do mesmo jeito (e nada é anunciado)', async () => {
+    // O número de alertas sai do ar: ninguém recebe aviso, mas a queda existe e o
+    // operador precisa vê-la no quadro para avisar os clientes.
+    const contas = await getDb()('whatsapp_accounts').select('id', 'status');
+    await getDb()('whatsapp_accounts').update({ status: 'disconnected' });
+    try {
+      queda();
+      const resumo = await scan();
+      assert.ok(resumo.skipped, 'a tela continua dizendo por que ninguém foi avisado');
+      assert.equal(resumo.notified, 0);
+      const incidentes = await listar();
+      assert.equal(incidentes.length, 1);
+      assert.equal(incidentes[0].status, 'open');
+      assert.equal((await getDb()('wa_alert_state').count({ n: '*' }).first()).n, 0, 'nada gravado como anunciado');
+      normal();
+      await scan();
+      assert.equal((await listar())[0].status, 'resolved');
+    } finally {
+      for (const conta of contas) await getDb()('whatsapp_accounts').where({ id: conta.id }).update({ status: conta.status });
+    }
+  });
+
   it('um id que não existe responde 404', async () => {
     const { status } = await call(`${panelUrl}/api/whatsapp/outages/999999`, { headers: authHeaders(token) });
     assert.equal(status, 404);
