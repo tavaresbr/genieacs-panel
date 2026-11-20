@@ -644,31 +644,37 @@ class WaAlertService {
         return summary;
       }
 
-      // Os canais, decididos ANTES de ler a frota — a regra de sempre: nenhum
-      // canal pronto, e a passagem para aqui, porque abrir condição que ninguém
-      // vai ouvir deixaria `wa_alert_state` dizendo que todos foram avisados.
+      // Os canais, decididos ANTES de ler a frota. Sem canal pronto não se abre
+      // condição de alerta (`wa_alert_state` diria que todos foram avisados sem
+      // ninguém ter ouvido), mas os INCIDENTES de queda em massa não dependem de
+      // ter para quem avisar: são o que o operador usa para avisar os clientes.
+      // Então a frota é lida mesmo assim, só para eles, e `skipped` segue com o
+      // motivo ("ninguém foi avisado").
       const channels = await this.readyChannels(settings);
-      if (!channels.whatsapp && !channels.email && !channels.telegram) {
-        summary.skipped = channels.reason;
-        return summary;
+      const hasChannel = Boolean(channels.whatsapp || channels.email || channels.telegram);
+      if (!hasChannel) summary.skipped = channels.reason;
+
+      if (hasChannel) {
+        // Os números de WhatsApp primeiro, e com o seu próprio acerto de contas:
+        // um GenieACS fora do ar não pode calar o aviso de que o atendimento
+        // parou — são problemas diferentes, e o segundo nem passa pela frota.
+        const contas = await this.evaluateAccounts(settings, now);
+        await this.reconcile({ ...contas, settings, channels, now, summary, scope: (rule) => rule === 'wa_disconnected' });
+        // Cliente esperando gente: também independe da frota.
+        const esperas = await this.evaluateWaiting(settings, now);
+        await this.reconcile({ ...esperas, settings, channels, now, summary, scope: (rule) => rule === 'wa_waiting' });
+
+        // Mensagens paradas na fila de saída: também independe da frota.
+        await this.avisarFilaTravada({ now });
       }
-
-      // Os números de WhatsApp primeiro, e com o seu próprio acerto de contas:
-      // um GenieACS fora do ar não pode calar o aviso de que o atendimento
-      // parou — são problemas diferentes, e o segundo nem passa pela frota.
-      const contas = await this.evaluateAccounts(settings, now);
-      await this.reconcile({ ...contas, settings, channels, now, summary, scope: (rule) => rule === 'wa_disconnected' });
-      // Cliente esperando gente: também independe da frota.
-      const esperas = await this.evaluateWaiting(settings, now);
-      await this.reconcile({ ...esperas, settings, channels, now, summary, scope: (rule) => rule === 'wa_waiting' });
-
-      // Mensagens paradas na fila de saída: também independe da frota.
-      await this.avisarFilaTravada({ now });
 
       let devices;
       try {
         devices = await DeviceService.getDashboardDevices();
       } catch (error) {
+        // Sem canal não há a quem avisar que o GenieACS caiu, e o motivo que a
+        // tela mostra continua sendo o dos canais.
+        if (!hasChannel) return summary;
         await this.avisarGenieAcs(error);
         throw error;
       }
@@ -676,12 +682,14 @@ class WaAlertService {
         // An empty fleet read is far more likely to be a broken GenieACS than a
         // provider with no ONTs, and treating it as "nothing is firing" would
         // blast a recovery message for every open condition at once.
-        summary.skipped = 'no_devices';
+        summary.skipped = summary.skipped || 'no_devices';
         return summary;
       }
 
       const { firing, unknown } = await this.evaluate(devices, settings, now);
-      await this.reconcile({ firing, unknown, settings, channels, now, summary, scope: (rule) => rule !== 'wa_disconnected' && rule !== 'wa_waiting' });
+      if (hasChannel) {
+        await this.reconcile({ firing, unknown, settings, channels, now, summary, scope: (rule) => rule !== 'wa_disconnected' && rule !== 'wa_waiting' });
+      }
       // O incidente de queda — o que o operador usa para avisar os CLIENTES.
       // À parte e calado: um incidente que não abre não derruba o alerta da
       // equipe, que já saiu.
