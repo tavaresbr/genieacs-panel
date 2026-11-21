@@ -7175,7 +7175,7 @@ export const whatsappAPI = {
   createTelegramLinkCode: () =>
     apiClient.post<{ code: string; expiresAt: string }>('/whatsapp/alerts/telegram/bot/link-code', {}),
   unlinkTelegram: (telegramUserId: string) =>
-    apiClient.delete<TelegramBotStatus>(`/whatsapp/alerts/telegram/bot/links/${encodeURIComponent(telegramUserId)}`),
+    apiClient.post<TelegramBotStatus>('/whatsapp/alerts/telegram/bot/unlink', { telegramUserId }),
 
   runAlertScan: () =>
     apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),

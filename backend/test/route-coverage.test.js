@@ -70,6 +70,7 @@ const PUBLICAS = new Map([
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor; duas credenciais, o token da instância e o bilhete da sonda de configuração, que só devolve o nonce recebido'],
   ['POST /api/billing-webhook', 'entrega do gateway de pagamento, montada antes do resolvedor e autenticada pelo token do deploy'],
   ['POST /api/asaas-webhook', 'entrega do Asaas da conta de um provedor, montada antes do resolvedor; o token do cabeçalho É a credencial e diz de qual provedor é — token repetido entre provedores é recusado; prova em asaas-webhook.test.js'],
+  ['POST /api/telegram-webhook/:tenantId', 'entrega do Telegram do bot de um provedor, montada antes do resolvedor; o segredo do webhook no cabeçalho É a credencial (só o hash fica guardado), e sem ele — ou com o bot desligado — é 401, igual para provedor inexistente; prova em telegram-bot-commands.test.js'],
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
   ['POST /api/auth/impersonate/redeem', 'o bilhete do console É a credencial: uso único, um minuto de vida, conferido por hash e contra o provedor do host'],
   ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal'],
@@ -162,6 +163,7 @@ const POR_ID = new Map([
   // --- Anexo servido por token assinado.
   ['GET /api/whatsapp/messages/:id/media', 'prova própria em whatsapp-media-tenancy.test.js, que pede a mídia da mensagem do vizinho'],
   ['GET /api/whatsapp-media/:id', 'idem, pelo token assinado, antes do resolvedor'],
+  ['POST /api/telegram-webhook/:tenantId', 'o provedor está no caminho (o pedido chega sem sessão, antes do resolvedor) e quem autoriza é o segredo do cabeçalho, conferido por hash no estado DAQUELE provedor; prova em telegram-bot-commands.test.js'],
 
   // --- O plano de controle está ACIMA dos provedores: aqui o id de outro
   // provedor é o trabalho da rota, não um vazamento. O que se prova nessas é
@@ -381,6 +383,10 @@ describe('toda rota sem sessão', () => {
       // motivo da prévia do convite, o token fora do caminho.
       'POST /api/public/receipt',
       'POST /api/sgp/events/webhook',
+      // A entrega do Telegram do bot de UM provedor: sem o segredo do webhook, 401;
+      // com ele, só roda o que o operador vinculado pode e escreve no estado do
+      // próprio provedor (o vínculo e os códigos).
+      'POST /api/telegram-webhook/:tenantId',
       'POST /api/whatsapp-webhook'
     ]);
   });
@@ -568,7 +574,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // `status_incidents`, tabela da PLATAFORMA, sem provedor nenhum para vazar.
   // Mesmo pedágio, duas vezes: duas linhas em `DO_CONSOLE` e duas aqui; prova
   // em platform-status.test.js. São 96.
-  const TETO_DE_EXCECOES = 96;
+  //
+  // E a entrega do Telegram (`/api/telegram-webhook/:tenantId`): o provedor está
+  // no caminho porque o pedido chega sem sessão, e quem autoriza é o segredo do
+  // cabeçalho. Sobe 96 → 97 aqui e 32 → 33 no teto de fora do console. Prova em
+  // telegram-bot-commands.test.js.
+  const TETO_DE_EXCECOES = 97;
 
 
   /**
@@ -659,7 +670,7 @@ describe('toda rota endereçada por um parâmetro', () => {
   // `TETO_DE_EXCECOES`). Não é id de linha de provedor — é a chave de uma
   // tabela da plataforma —, e a varredura, que prova o id do vizinho dando
   // 404, não tem o que provar ali; a prova de isolamento está em addons.test.js.
-  const TETO_FORA_DO_CONSOLE = 32;
+  const TETO_FORA_DO_CONSOLE = 33;
 
   it('deixa de fora só as que têm motivo, e não mais do que hoje', () => {
     const naoVarridas = comParametro
@@ -876,6 +887,9 @@ describe('a ordem das montagens em app.js', () => {
       // As três exceções, e as três são entregas de fora que trazem o provedor
       // no próprio corpo ou no token assinado.
       'app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);',
+      // A do bot do Telegram de cada provedor: o provedor vem no caminho e o
+      // segredo do cabeçalho é a credencial.
+      'app.use(TELEGRAM_WEBHOOK_PATH, telegramWebhookRoutes);',
       // A do gateway chega no endereço que a plataforma digitou no painel DELE
       // — o apex —, e o apex não nomeia provedor nenhum: resolvida por host,
       // ela levaria 404 antes do controlador e o pagamento de um cliente

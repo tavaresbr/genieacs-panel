@@ -88,14 +88,15 @@ class TelegramBotController {
 
   static async unlink(req, res) {
     try {
-      const removed = await TelegramBotService.revokeLink(req.params.telegramUserId);
+      const telegramUserId = String(req.body?.telegramUserId ?? '').slice(0, 32);
+      const removed = await TelegramBotService.revokeLink(telegramUserId);
       if (!removed) {
         throw new WaError('whatsapp.alerts.telegramBotLinkNotFound', { code: 'telegram_link_not_found', status: 404 });
       }
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.TELEGRAM_UNLINKED,
         subjectType: 'telegram',
-        subjectId: String(req.params.telegramUserId).slice(0, 32),
+        subjectId: telegramUserId,
         detail: null
       });
       return res.json(createResponse(req.t('whatsapp.alerts.telegramBotUnlinked'), await TelegramBotService.getPublicStatus()));

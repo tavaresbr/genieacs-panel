@@ -23,7 +23,7 @@ router.get('/alerts/telegram/bot', authenticateToken, requirePermission('whatsap
 router.post('/alerts/telegram/bot/enable', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.enable);
 router.post('/alerts/telegram/bot/disable', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.disable);
 router.post('/alerts/telegram/bot/link-code', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.linkCode);
-router.delete('/alerts/telegram/bot/links/:telegramUserId', authenticateToken, requirePermission('whatsapp.config'), TelegramBotController.unlink);
+router.post('/alerts/telegram/bot/unlink', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.unlink);
 
 // As quedas em massa que o alerta viu, e o aviso aos clientes atingidos. Ler é
 // de quem atende; avisar e fechar são de quem manda mensagem pelo provedor.

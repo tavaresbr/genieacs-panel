@@ -227,10 +227,10 @@ describe('vínculo e comandos', () => {
     await ligar();
     await vincular();
     const antes = (await api('')).body.data.links;
-    const del = await api(`/links/${antes[0].telegramUserId}`, 'DELETE');
+    const del = await api('/unlink', 'POST', { telegramUserId: antes[0].telegramUserId });
     assert.equal(del.status, 200);
     assert.equal(del.body.data.links.length, 0);
-    assert.equal((await api('/links/7001', 'DELETE')).status, 404);
+    assert.equal((await api('/unlink', 'POST', { telegramUserId: '7001' })).status, 404);
     chamadas = [];
     await hook(msg('/status'), segredo);
     await esperaMensagens(1);
