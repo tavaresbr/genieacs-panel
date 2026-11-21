@@ -37,8 +37,8 @@ router.post('/:tenantId', telegramWebhookLimiter, async (req, res) => {
     });
     if (!accepted) return res.sendStatus(401);
     return undefined;
-  } catch (error) {
-    console.warn('Telegram webhook failed', error?.name || 'Error');
+  } catch {
+    console.warn('Telegram webhook failed');
     // 200: um erro nosso não deve virar reentrega em laço do mesmo update.
     return res.headersSent ? undefined : res.sendStatus(200);
   }
