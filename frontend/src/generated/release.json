@@ -1,15 +1,15 @@
 {
-  "version": "1.55.0",
-  "build": 1827,
-  "sourceCommit": "19a6f69074e8",
-  "releasedAt": "2026-11-20",
-  "basedOnTag": "v1.54.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/ff3a6fc9f5ee...19a6f69074e8",
+  "version": "1.56.0",
+  "build": 1830,
+  "sourceCommit": "fbf8caf348ba",
+  "releasedAt": "2026-11-21",
+  "basedOnTag": "v1.55.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/18dff8fb5014...fbf8caf348ba",
   "changes": [
     {
-      "shortHash": "efb8a92a",
-      "date": "2026-11-20",
-      "title": "2FA por código de WhatsApp nas ações sensíveis",
+      "shortHash": "59f0619f",
+      "date": "2026-11-21",
+      "title": "Erro ao anexar mostra o status e o motivo do servidor quando não há código conhecido",
       "category": "New"
     }
   ]
