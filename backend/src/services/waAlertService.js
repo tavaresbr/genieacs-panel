@@ -147,6 +147,21 @@ const RULE_KEYS = Object.freeze({
  * dim is a maintenance item and repeating it more than every six hours only
  * teaches people to ignore the thread.
  */
+/**
+ * Os limites que a tela declara em cada regra (`RULES` em `alerts-panel.tsx`).
+ * O servidor os aplica também: quem chama a API direto, ou uma tela antiga,
+ * não pode gravar um `ont_offline` de -27 minutos nem um `temperature_high` de
+ * 9000 °C — o primeiro avisa de toda ONT, o segundo nunca avisa.
+ */
+const RULE_LIMITS = Object.freeze({
+  ont_offline: { min: 1, max: 1440 },
+  rx_power_low: { min: -60, max: 0 },
+  temperature_high: { min: 0, max: 120 },
+  mass_outage: { min: 2, max: 500 },
+  wa_disconnected: { min: 0, max: 120 },
+  wa_waiting: { min: 1, max: 240 }
+});
+
 const DEFAULT_RULES = Object.freeze({
   ont_offline: { enabled: true, threshold: 30, cooldownMinutes: 120 },
   rx_power_low: { enabled: true, threshold: -27, cooldownMinutes: 360 },
@@ -315,7 +330,9 @@ class WaAlertService {
         enabled: value.enabled === undefined ? fallback.enabled : value.enabled === true,
         // An absent threshold means "use the default", which is what the browser
         // sends for a rule whose box the operator emptied.
-        threshold: Number.isFinite(threshold) ? threshold : fallback.threshold,
+        threshold: Number.isFinite(threshold)
+          ? clamp(threshold, RULE_LIMITS[rule].min, RULE_LIMITS[rule].max, fallback.threshold)
+          : fallback.threshold,
         cooldownMinutes: clamp(value.cooldownMinutes, 1, 7 * 24 * 60, fallback.cooldownMinutes)
       };
     }
@@ -338,7 +355,7 @@ class WaAlertService {
       if (!text) continue;
       const number = normalizarTelefoneBr(text);
       if (!number) {
-        throw new WaError('whatsapp.error.invalidPhone', {
+        throw new WaError('whatsapp.alerts.invalidPhone', {
           code: 'invalid_phone',
           status: 400,
           vars: { phone: text }
@@ -347,7 +364,7 @@ class WaAlertService {
       if (!numbers.includes(number)) numbers.push(number);
     }
     if (numbers.length > MAX_RECIPIENTS) {
-      throw new WaError('whatsapp.error.tooManyRecipients', {
+      throw new WaError('whatsapp.alerts.tooManyRecipients', {
         code: 'too_many_recipients',
         status: 400,
         vars: { max: MAX_RECIPIENTS }
@@ -377,7 +394,7 @@ class WaAlertService {
       if (!emails.includes(text)) emails.push(text);
     }
     if (emails.length > MAX_RECIPIENTS) {
-      throw new WaError('whatsapp.error.tooManyRecipients', {
+      throw new WaError('whatsapp.alerts.tooManyRecipients', {
         code: 'too_many_recipients',
         status: 400,
         vars: { max: MAX_RECIPIENTS }

@@ -996,6 +996,9 @@ export default {
   'whatsapp.alerts.disabledSkip': 'アラートが無効なため、何も確認されませんでした',
   'whatsapp.alerts.noAlertNumber': 'アラート用途を持つ接続番号がありません',
   'whatsapp.alerts.noDevices': 'ネットワークを読み取れなかったため、何も確認されませんでした',
+  'whatsapp.alerts.addonRequired': 'WhatsApp アドオンが有効でないため、何も確認されませんでした',
+  'whatsapp.alerts.invalidPhone': '"{phone}" は使用できる電話番号ではないようです',
+  'whatsapp.alerts.tooManyRecipients': 'リストには最大 {max} 件まで登録できます',
 
   'whatsapp.messageRequeued': 'メッセージを送信待ちに戻しました',
   'whatsapp.messageReacted': "リアクションを送信しました",

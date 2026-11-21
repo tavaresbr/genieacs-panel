@@ -3671,6 +3671,7 @@ const hi: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'चेतावनियाँ बंद हैं, इसलिए कुछ जाँचा नहीं गया',
   'whatsapp.alerts.noAlertNumber': 'चेतावनियों के लिए कोई जुड़ा नंबर निर्धारित नहीं है',
   'whatsapp.alerts.noDevices': 'उपकरण सूची पढ़ी नहीं जा सकी, इसलिए कुछ जाँचा नहीं गया',
+  'whatsapp.alerts.addonRequired': 'WhatsApp ऐड-ऑन सक्रिय नहीं है, इसलिए कुछ भी जाँचा नहीं गया',
   'whatsapp.alerts.threshold': 'सीमा',
   'whatsapp.alerts.cooldown': 'चुप रहने की अवधि (मिनट)',
   'whatsapp.alerts.cooldownHint': 'वही चेतावनी उसी उपकरण के लिए दोबारा जारी होने से पहले कितनी देर रुकती है।',

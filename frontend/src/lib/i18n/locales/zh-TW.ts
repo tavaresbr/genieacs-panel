@@ -3693,6 +3693,7 @@ const zhTW: Dictionary = {
   'whatsapp.alerts.disabledSkip': '警示功能已關閉，因此未執行檢查',
   'whatsapp.alerts.noAlertNumber': '沒有已接入的號碼被設為警示用途',
   'whatsapp.alerts.noDevices': '無法讀取設備清單，因此未執行檢查',
+  'whatsapp.alerts.addonRequired': 'WhatsApp 附加元件未啟用，因此未執行檢查',
   'whatsapp.alerts.threshold': '臨界值',
   'whatsapp.alerts.cooldown': '靜默時間（分鐘）',
   'whatsapp.alerts.cooldownHint': '同一設備的同類警示再次觸發前需要等待的時間。',

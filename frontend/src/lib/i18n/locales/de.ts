@@ -3576,6 +3576,7 @@ const de: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'Die Warnungen sind aus, also wurde nichts geprüft',
   'whatsapp.alerts.noAlertNumber': 'Keine verbundene Nummer trägt den Zweck Warnungen',
   'whatsapp.alerts.noDevices': 'Das Netz konnte nicht gelesen werden, also wurde nichts geprüft',
+  'whatsapp.alerts.addonRequired': 'Das WhatsApp-Zusatzmodul ist nicht aktiv, also wurde nichts geprüft',
   'whatsapp.alerts.threshold': 'Schwelle',
   'whatsapp.alerts.cooldown': 'Ruhe halten für (Minuten)',
   'whatsapp.alerts.cooldownHint': 'Wie lange dieselbe Warnung wartet, bevor sie für dasselbe Gerät erneut auslösen darf.',

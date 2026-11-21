@@ -3699,6 +3699,7 @@ const it: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'Gli avvisi sono spenti, quindi non è stato controllato nulla',
   'whatsapp.alerts.noAlertNumber': 'Nessun numero connesso ha lo scopo avvisi',
   'whatsapp.alerts.noDevices': 'Non è stato possibile leggere la rete, quindi non è stato controllato nulla',
+  'whatsapp.alerts.addonRequired': 'Il componente WhatsApp non è attivo, quindi non è stato controllato nulla',
   'whatsapp.alerts.threshold': 'Soglia',
   'whatsapp.alerts.cooldown': 'Restare in silenzio per (minuti)',
   'whatsapp.alerts.cooldownHint': 'Quanto lo stesso avviso attende prima di poter scattare di nuovo per lo stesso dispositivo.',

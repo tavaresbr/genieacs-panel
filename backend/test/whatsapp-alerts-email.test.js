@@ -109,6 +109,63 @@ describe('os ajustes', () => {
     assert.match(body.message, /isso-nao-e-email/);
   });
 
+  it('guardam o resumo agrupado (digestMinutes) pelo PUT', async () => {
+    const put = (digestMinutes) => call(`${panelUrl}/api/whatsapp/alerts/settings`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { digestMinutes }
+    });
+    assert.equal((await put(15)).body.data.digestMinutes, 15);
+    const lido = await call(`${panelUrl}/api/whatsapp/alerts/settings`, { headers: authHeaders(token) });
+    assert.equal(lido.body.data.digestMinutes, 15, 'o select não pode voltar sozinho');
+    assert.equal((await put(0)).body.data.digestMinutes, 0);
+  });
+
+  it('prendem o limite de cada regra ao que a tela declara', async () => {
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: {
+        rules: {
+          ont_offline: { enabled: true, threshold: -27 },
+          temperature_high: { enabled: true, threshold: 9000 },
+          rx_power_low: { enabled: true, threshold: 5 },
+          wa_waiting: { enabled: true, threshold: 0 }
+        }
+      }
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    const { rules } = body.data;
+    assert.equal(rules.ont_offline.threshold, 1);
+    assert.equal(rules.temperature_high.threshold, 120);
+    assert.equal(rules.rx_power_low.threshold, 0);
+    assert.equal(rules.wa_waiting.threshold, 1);
+  });
+
+  it('recusam o telefone inválido com o número dele', async () => {
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { recipients: ['5593981110001', '123'] }
+    });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'invalid_phone');
+    assert.match(body.message, /123/);
+  });
+
+  it('recusam lista grande demais dizendo o limite, sem falar de campanha', async () => {
+    const emails = Array.from({ length: 21 }, (_, i) => `pessoa${i}@provedor.test`);
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { emailRecipients: emails }
+    });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'too_many_recipients');
+    assert.match(body.message, /20/);
+    assert.doesNotMatch(body.message, /campanha/i);
+  });
+
   it('ligar sem ninguém em canal nenhum é recusado', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
       method: 'PUT',

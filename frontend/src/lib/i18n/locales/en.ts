@@ -3695,6 +3695,7 @@ const en = {
   'whatsapp.alerts.disabledSkip': 'Alerts are switched off, so nothing was checked',
   'whatsapp.alerts.noAlertNumber': 'No connected number carries the alerts purpose',
   'whatsapp.alerts.noDevices': 'The fleet could not be read, so nothing was checked',
+  'whatsapp.alerts.addonRequired': 'The WhatsApp add-on is not active, so nothing was checked',
   'whatsapp.alerts.threshold': 'Threshold',
   'whatsapp.alerts.cooldown': 'Stay quiet for (minutes)',
   'whatsapp.alerts.cooldownHint': 'How long the same alert waits before it may fire again for the same device.',
