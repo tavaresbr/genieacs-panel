@@ -7,6 +7,15 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.56.1] - 2026-11-21
+
+### Maintenance
+
+- Salva o resumo agrupado, nomeia o número inválido, recusa sem add-on e prende os limites das regras (`b67af595`)
+- Plano de integração com Messenger (`c756c81d`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/c5901802de10...c035f539bd0b)
+
 ## [1.56.0] - 2026-11-21
 
 ### New

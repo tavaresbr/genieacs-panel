@@ -1,16 +1,22 @@
 {
-  "version": "1.56.0",
-  "build": 1830,
-  "sourceCommit": "fbf8caf348ba",
+  "version": "1.56.1",
+  "build": 1835,
+  "sourceCommit": "c035f539bd0b",
   "releasedAt": "2026-11-21",
-  "basedOnTag": "v1.55.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/18dff8fb5014...fbf8caf348ba",
+  "basedOnTag": "v1.56.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/c5901802de10...c035f539bd0b",
   "changes": [
     {
-      "shortHash": "59f0619f",
+      "shortHash": "b67af595",
       "date": "2026-11-21",
-      "title": "Erro ao anexar mostra o status e o motivo do servidor quando não há código conhecido",
-      "category": "New"
+      "title": "Salva o resumo agrupado, nomeia o número inválido, recusa sem add-on e prende os limites das regras",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c756c81d",
+      "date": "2026-11-21",
+      "title": "Plano de integração com Messenger",
+      "category": "Maintenance"
     }
   ]
 }
