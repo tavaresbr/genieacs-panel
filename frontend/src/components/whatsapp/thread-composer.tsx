@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
-import { whatsappErrorMessage } from '@/components/whatsapp-connection'
+import { isKnownWhatsappError, whatsappErrorMessage } from '@/components/whatsapp-connection'
+import { failureDetail } from '@/lib/failure-text'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappAPI, type MetaTemplatePayload, type RewriteMode, type WhatsAppMessage, type WhatsAppMetaTemplate } from '@/lib/api'
 import { formatFileSize } from '@/lib/firmware'
@@ -374,8 +375,14 @@ export function ThreadComposer({ optedOut, sending, onSend, replyTo = null, onCa
           if (!stored.success || !stored.data) {
             // Para aqui: este arquivo e os seguintes ficam na caixa, na mesma
             // ordem, e o próximo Enviar recomeça exatamente deste.
+            // Um código que a tela traduz vira a frase dele; sem código, o status
+            // e o motivo que o servidor deu (disco cheio, proxy…) acompanham o aviso.
+            const base = whatsappErrorMessage(t, stored.code, { max: MAX_ATTACHMENT_MB })
+            const detail = isKnownWhatsappError(stored.code)
+              ? ''
+              : failureDetail({ status: stored.status, error: stored.error }, [t('api.unknownError')])
             toast.error(
-              whatsappErrorMessage(t, stored.code, { max: MAX_ATTACHMENT_MB }),
+              `${base}${detail}`,
               { title: `${t('whatsapp.inbox.sendFailed')} — ${picked.file.name}` }
             )
             return
