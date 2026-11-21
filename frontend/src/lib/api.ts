@@ -134,6 +134,8 @@ export interface ApiResponse<T = any> {
   message?: string
   error?: string
   code?: string
+  /** O status HTTP, só numa recusa: para a tela dizer "HTTP 500" quando o servidor não deu um código. */
+  status?: number
   /** Only on a refusal that says why in a short code (the SMTP test: `auth`, `connection`...). */
   reason?: string
   /**
@@ -540,6 +542,7 @@ class ApiClient {
           // com `client_max_body_size` curto): a tela precisa de um código para
           // dizer isso, em vez de "a requisição falhou".
           code: data.code ?? (response.status === 413 ? 'proxy_payload_too_large' : undefined),
+          status: response.status,
           ...(typeof data.reason === 'string' ? { reason: data.reason } : {}),
           // Forwarded, not rebuilt away: see `skipped` above.
           ...(data.skipped ? { skipped: data.skipped } : {}),
