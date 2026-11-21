@@ -72,6 +72,8 @@ import { BILLING_WEBHOOK_PATH } from './config/billingWebhookPath.js';
 import asaasWebhookRoutes from './routes/asaasWebhook.js';
 import { ASAAS_WEBHOOK_PATH } from './config/asaasWebhookPath.js';
 import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
+import { TELEGRAM_WEBHOOK_PATH } from './config/telegramWebhookPath.js';
+import telegramWebhookRoutes from './routes/telegramWebhook.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
 import { BRANDING_UPLOAD_PATHS, brandingRawBody } from './services/platformBrandingService.js';
@@ -295,6 +297,10 @@ app.use(express.json({ limit: '1mb' }));
 // pontas divergirem é justamente a falha que essa conferência existe para
 // impedir.
 app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);
+
+// O bot de comandos do Telegram: público pelo mesmo motivo (quem chama é o
+// Telegram), autenticado pelo segredo do webhook no header, com teto próprio.
+app.use(TELEGRAM_WEBHOOK_PATH, telegramWebhookRoutes);
 
 // Mesma razão, mesmo lugar na pilha, e mais uma que é só desta: a entrega do
 // gateway de pagamento chega no endereço que a plataforma digitou no painel

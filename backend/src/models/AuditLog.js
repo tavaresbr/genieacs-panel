@@ -62,6 +62,10 @@ class AuditLog {
     // O bot ou o grupo do Telegram dos alertas mudou. `{ tokenChanged, chatId }`
     // — o grupo não é segredo e é o que se procura; o token nunca vem aqui.
     ALERTS_TELEGRAM_CHANGED: 'alerts.telegram_changed',
+    // O bot de comandos: ligado/desligado, e um Telegram vinculado ou desvinculado de um operador.
+    TELEGRAM_BOT_CHANGED: 'telegram_bot.changed',
+    TELEGRAM_LINKED: 'telegram_bot.linked',
+    TELEGRAM_UNLINKED: 'telegram_bot.unlinked',
     // A régua de cobrança automática foi ligada, desligada ou teve as etapas
     // trocadas. Ligar é o ato que faz o painel mandar mensagem sozinho para
     // centenas de assinantes, e a pergunta "quem ligou isso?" tem que ter

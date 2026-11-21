@@ -9,6 +9,7 @@ import {
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { Icon } from '@/components/ui/icon'
 import { RecipientList } from '@/components/whatsapp/recipient-list'
+import { TelegramBotPanel } from '@/components/whatsapp/telegram-bot-panel'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -604,6 +605,9 @@ export function AlertsPanel() {
                 )}
               </div>
             </fieldset>
+
+            {/* Os comandos do bot agem na hora (não esperam o Salvar), por isso ficam num bloco à parte. */}
+            <TelegramBotPanel botSaved={Boolean(stored?.telegram?.configured)} />
 
             {/* ── The four rules ──────────────────────────────────────────
                 One row each, and each row carries its own unit sentence under

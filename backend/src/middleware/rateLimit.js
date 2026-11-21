@@ -368,6 +368,18 @@ export const telegramTestLimiter = limiter({
   message: limitMessage('rateLimit.telegramTest', 'rate_limited_telegram')
 });
 
+/**
+ * Ligar/desligar o bot de comandos e gerar código de vínculo. Cada chamada fala
+ * com o Telegram ou escreve um segredo, mas é gesto de quem administra: o teto
+ * é folgado para quem está acertando o bot e curto para um laço.
+ */
+export const telegramBotAdminLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.telegramBotAdmin', 'rate_limited_telegram')
+});
+
 export const sgpAdminLimiter = limiter({
   windowMs: 60 * 1000,
   max: 60,
@@ -627,6 +639,18 @@ export const portalPasswordAdminLimiter = limiter({
 export const waWebhookLimiter = limiter({
   windowMs: 60 * 1000,
   max: 600,
+  keyGenerator: ipKey,
+  message: { success: false, error: 'too many webhook deliveries' }
+});
+
+/**
+ * O webhook do bot do Telegram: público, sem sessão. A chave é o endereço de
+ * origem (os servidores do Telegram), com teto folgado para uma sala movimentada
+ * e curto o bastante para segurar quem finge ser o Telegram.
+ */
+export const telegramWebhookLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 300,
   keyGenerator: ipKey,
   message: { success: false, error: 'too many webhook deliveries' }
 });

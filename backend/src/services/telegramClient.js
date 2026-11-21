@@ -53,18 +53,20 @@ export function telegramRefusal(status, description = '') {
 }
 
 /**
- * Manda um texto. Nunca lança.
+ * Chama um método da Bot API. Nunca lança.
  *
- * @returns {Promise<{ ok: true } | { ok: false, code: string, description: string | null }>}
+ * É o único lugar que monta a URL com o token; por isso nenhuma exceção ou erro
+ * sai daqui com ela.
+ *
+ * @returns {Promise<{ ok: true, result: any } | { ok: false, code: string, description: string | null }>}
  */
-export async function sendTelegramMessage({ token, chatId, text }) {
-  const corpo = String(text ?? '').slice(0, TELEGRAM_TEXT_MAX);
+export async function callTelegram(token, method, payload = {}) {
   let resposta;
   try {
-    resposta = await fetcher(`${TELEGRAM_API}/bot${token}/sendMessage`, {
+    resposta = await fetcher(`${TELEGRAM_API}/bot${token}/${method}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: corpo, disable_web_page_preview: true }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS)
     });
   } catch {
@@ -77,7 +79,55 @@ export async function sendTelegramMessage({ token, chatId, text }) {
   } catch {
     dados = null;
   }
-  if (resposta.ok && dados?.ok) return { ok: true };
+  if (resposta.ok && dados?.ok) return { ok: true, result: dados.result ?? null };
   const description = typeof dados?.description === 'string' ? dados.description.slice(0, 200) : null;
   return { ok: false, code: telegramRefusal(resposta.status, description), description };
+}
+
+/**
+ * Manda um texto. Nunca lança.
+ *
+ * `parseMode` ('HTML') e `replyMarkup` (teclado inline) são opcionais: o alerta
+ * continua texto puro, e só o bot de comandos os usa.
+ *
+ * @returns {Promise<{ ok: true } | { ok: false, code: string, description: string | null }>}
+ */
+export async function sendTelegramMessage({ token, chatId, text, parseMode, replyMarkup }) {
+  const corpo = String(text ?? '').slice(0, TELEGRAM_TEXT_MAX);
+  const payload = { chat_id: chatId, text: corpo, disable_web_page_preview: true };
+  if (parseMode) payload.parse_mode = parseMode;
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  const resultado = await callTelegram(token, 'sendMessage', payload);
+  return resultado.ok ? { ok: true } : resultado;
+}
+
+/** Escapa o que vem de fora (nome de cliente, login) para `parse_mode: 'HTML'`. */
+export function escapeTelegramHtml(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Registra o webhook. `secretToken` volta em todo pedido no header
+ * `X-Telegram-Bot-Api-Secret-Token`; só os updates de mensagem e de botão são
+ * pedidos, que é tudo o que o bot lê.
+ */
+export function setTelegramWebhook({ token, url, secretToken }) {
+  return callTelegram(token, 'setWebhook', {
+    url,
+    secret_token: secretToken,
+    allowed_updates: ['message', 'callback_query'],
+    drop_pending_updates: true
+  });
+}
+
+export function deleteTelegramWebhook({ token }) {
+  return callTelegram(token, 'deleteWebhook', { drop_pending_updates: true });
+}
+
+/** Responde o toque num botão inline (tira o "carregando" do botão). */
+export function answerTelegramCallback({ token, callbackQueryId, text }) {
+  return callTelegram(token, 'answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    ...(text ? { text: String(text).slice(0, 200) } : {})
+  });
 }
