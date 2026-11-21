@@ -249,7 +249,7 @@ class TelegramBotService {
       if (update?.callback_query) await this.handleCallback(ctx, update.callback_query);
       else if (update?.message) await this.handleMessage(ctx, update.message);
     } catch (error) {
-      console.warn(`Telegram bot update failed: ${String(error?.message || 'error').replace(/[\r\n]+/g, ' ').slice(0, 120)}`);
+      console.warn('Telegram bot update failed', error?.name || 'Error');
     }
   }
 
@@ -312,7 +312,7 @@ class TelegramBotService {
       const answer = await handler.run({ arg, operator });
       await this.reply(ctx, chatId, answer.text, answer.replyMarkup);
     } catch (error) {
-      console.warn(`Telegram command /${command} failed: ${String(error?.message || 'error').replace(/[\r\n]+/g, ' ').slice(0, 120)}`);
+      console.warn('Telegram bot command failed', error?.name || 'Error');
       await this.reply(ctx, chatId, TEXT.failed);
     }
   }
