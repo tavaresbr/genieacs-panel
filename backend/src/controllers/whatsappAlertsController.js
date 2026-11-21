@@ -30,6 +30,7 @@ class WhatsAppAlertsController {
       const settings = await WaAlertService.saveSettings({
         enabled: body.enabled,
         intervalSeconds: body.intervalSeconds,
+        digestMinutes: body.digestMinutes,
         recipients: body.recipients,
         emailRecipients: body.emailRecipients,
         telegram: body.telegram,
@@ -93,7 +94,8 @@ class WhatsAppAlertsController {
         no_alert_number: ['whatsapp.alerts.noAlertNumber', 'no_alert_number', 409],
         no_recipients: ['whatsapp.alerts.noRecipients', 'no_alert_recipients', 409],
         mail_not_configured: ['whatsapp.alerts.mailNotConfigured', 'mail_not_configured', 409],
-        no_devices: ['whatsapp.alerts.noDevices', 'no_devices', 502]
+        no_devices: ['whatsapp.alerts.noDevices', 'no_devices', 502],
+        addon_required: ['whatsapp.alerts.addonRequired', 'addon_required', 403]
       };
       const refusal = summary.skipped ? REFUSALS[summary.skipped] : null;
       if (refusal) {

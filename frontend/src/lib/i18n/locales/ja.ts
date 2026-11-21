@@ -3711,6 +3711,7 @@ const ja: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'アラートが無効なため、何も確認されませんでした',
   'whatsapp.alerts.noAlertNumber': 'アラート用途を持つ接続番号がありません',
   'whatsapp.alerts.noDevices': 'ネットワークを読み取れなかったため、何も確認されませんでした',
+  'whatsapp.alerts.addonRequired': 'WhatsApp アドオンが有効でないため、何も確認されませんでした',
   'whatsapp.alerts.threshold': 'しきい値',
   'whatsapp.alerts.cooldown': '沈黙する時間（分）',
   'whatsapp.alerts.cooldownHint': '同じ機器について同じアラートが再び鳴るまで待つ時間です。',

@@ -516,6 +516,28 @@ describe('a scan that cannot say anything says why', () => {
     }
   });
 
+  it('refuses, with its own code, when the WhatsApp add-on is not active', async () => {
+    await setRules(onlyRule('ont_offline', { threshold: 30 }));
+    fleet = [device('dev-sem-addon', { _lastInform: informedMinutesAgo(120) })];
+
+    const { default: AddonService } = await import('../src/services/addonService.js');
+    const real = AddonService.allows;
+    AddonService.allows = async (feature) => (feature === 'whatsapp' ? false : real.call(AddonService, feature));
+    try {
+      const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/scan`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: {}
+      });
+      // Sem isto a tela mostrava "varredura feita" quando nada foi verificado.
+      assert.equal(status, 403);
+      assert.equal(body.code, 'addon_required');
+      assert.equal(body.success, false);
+    } finally {
+      AddonService.allows = real;
+    }
+  });
+
   it('runs a pass from the route and reports what it did', async () => {
     await setRules(onlyRule('ont_offline', { threshold: 30, cooldownMinutes: 60 }));
     fleet = [device('dev-rota', { _lastInform: informedMinutesAgo(90) })];

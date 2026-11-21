@@ -337,8 +337,13 @@ export function AlertsPanel() {
         return
       }
       // The machine `code`, never the `message`: an unknown code degrades to
-      // the generic failure.
-      toast.error(whatsappErrorMessage(t, res.code))
+      // the generic failure. The three refusals that NAME the offending entry
+      // are the exception — the server already put the number/address/limit in
+      // the sentence, in the operator's language, and a generic "invalid
+      // phone" would leave them hunting through a list of twenty.
+      const named = res.code === 'invalid_phone' || res.code === 'invalid_email'
+        || res.code === 'too_many_recipients'
+      toast.error(named && res.message ? res.message : whatsappErrorMessage(t, res.code))
     } finally {
       setSaving(false)
     }

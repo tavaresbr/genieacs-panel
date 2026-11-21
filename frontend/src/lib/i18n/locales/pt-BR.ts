@@ -3693,6 +3693,7 @@ const ptBR: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'Os alertas estão desligados, então nada foi verificado',
   'whatsapp.alerts.noAlertNumber': 'Nenhum número conectado tem a finalidade de alertas',
   'whatsapp.alerts.noDevices': 'Não foi possível ler a rede, então nada foi verificado',
+  'whatsapp.alerts.addonRequired': 'O complemento de WhatsApp não está ativo, então nada foi verificado',
   'whatsapp.alerts.threshold': 'Limite',
   'whatsapp.alerts.cooldown': 'Ficar quieto por (minutos)',
   'whatsapp.alerts.cooldownHint': 'Quanto o mesmo alerta espera antes de poder disparar de novo para o mesmo equipamento.',

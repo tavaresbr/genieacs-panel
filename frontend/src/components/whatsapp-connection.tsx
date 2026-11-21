@@ -147,6 +147,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   no_alert_number: 'whatsapp.alerts.noAlertNumber',
   alerts_disabled: 'whatsapp.alerts.disabledSkip',
   no_devices: 'whatsapp.alerts.noDevices',
+  addon_required: 'whatsapp.alerts.addonRequired',
   scan_failed: 'whatsapp.error.scanFailed',
   meta_webhook_failed: 'whatsapp.error.metaWebhookFailed',
   meta_health_failed: 'whatsapp.error.metaHealthFailed'

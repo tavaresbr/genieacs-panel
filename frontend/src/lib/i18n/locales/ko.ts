@@ -3698,6 +3698,7 @@ const ko: Dictionary = {
   'whatsapp.alerts.disabledSkip': '알림이 꺼져 있어 아무것도 확인하지 않았습니다',
   'whatsapp.alerts.noAlertNumber': '알림 용도로 지정된 연결 번호가 없습니다',
   'whatsapp.alerts.noDevices': '장비 목록을 읽지 못해 아무것도 확인하지 않았습니다',
+  'whatsapp.alerts.addonRequired': 'WhatsApp 애드온이 활성화되어 있지 않아 아무것도 확인하지 않았습니다',
   'whatsapp.alerts.threshold': '임계값',
   'whatsapp.alerts.cooldown': '재알림 대기 시간 (분)',
   'whatsapp.alerts.cooldownHint': '같은 장비에 대해 같은 알림이 다시 발송되기까지 기다리는 시간입니다.',

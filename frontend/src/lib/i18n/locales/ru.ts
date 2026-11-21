@@ -3701,6 +3701,7 @@ const ru: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'Оповещения выключены, поэтому проверка не выполнялась',
   'whatsapp.alerts.noAlertNumber': 'Ни один подключённый номер не назначен для оповещений',
   'whatsapp.alerts.noDevices': 'Не удалось прочитать список устройств, поэтому проверка не выполнялась',
+  'whatsapp.alerts.addonRequired': 'Дополнение WhatsApp не активно, поэтому проверка не выполнялась',
   'whatsapp.alerts.threshold': 'Порог',
   'whatsapp.alerts.cooldown': 'Пауза перед повтором (минуты)',
   'whatsapp.alerts.cooldownHint': 'Сколько ждёт одно и то же оповещение, прежде чем сработать снова для того же устройства.',

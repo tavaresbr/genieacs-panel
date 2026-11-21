@@ -3391,6 +3391,7 @@ const fr: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'Les alertes sont désactivées, donc rien n’a été vérifié',
   'whatsapp.alerts.noAlertNumber': 'Aucun numéro connecté ne porte la finalité alertes',
   'whatsapp.alerts.noDevices': 'Le réseau n’a pas pu être lu, donc rien n’a été vérifié',
+  'whatsapp.alerts.addonRequired': 'Le module WhatsApp n\'est pas activé, donc rien n\'a été vérifié',
   'whatsapp.alerts.threshold': 'Seuil',
   'whatsapp.alerts.cooldown': 'Rester silencieux (minutes)',
   'whatsapp.alerts.cooldownHint': 'Combien de temps la même alerte attend avant de pouvoir se déclencher à nouveau pour le même équipement.',

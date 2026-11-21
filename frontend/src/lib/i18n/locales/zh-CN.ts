@@ -3693,6 +3693,7 @@ const zhCN: Dictionary = {
   'whatsapp.alerts.disabledSkip': '告警功能已关闭，因此未执行检查',
   'whatsapp.alerts.noAlertNumber': '没有已接入的号码被设为告警用途',
   'whatsapp.alerts.noDevices': '无法读取设备清单，因此未执行检查',
+  'whatsapp.alerts.addonRequired': 'WhatsApp 附加组件未启用，因此未执行检查',
   'whatsapp.alerts.threshold': '阈值',
   'whatsapp.alerts.cooldown': '静默时长（分钟）',
   'whatsapp.alerts.cooldownHint': '同一设备的同类告警再次触发前需要等待的时间。',

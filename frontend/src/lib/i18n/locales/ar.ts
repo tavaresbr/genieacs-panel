@@ -3671,6 +3671,7 @@ const ar: Dictionary = {
   'whatsapp.alerts.disabledSkip': 'التنبيهات معطّلة، لذا لم يُفحص شيء',
   'whatsapp.alerts.noAlertNumber': 'لا يوجد رقم مرتبط مخصّص للتنبيهات',
   'whatsapp.alerts.noDevices': 'تعذّرت قراءة قائمة الأجهزة، لذا لم يُفحص شيء',
+  'whatsapp.alerts.addonRequired': 'إضافة واتساب غير مفعّلة، لذا لم يُفحص شيء',
   'whatsapp.alerts.threshold': 'العتبة',
   'whatsapp.alerts.cooldown': 'فترة الصمت (بالدقائق)',
   'whatsapp.alerts.cooldownHint': 'كم ينتظر التنبيه نفسه قبل أن يتكرّر للجهاز نفسه.',
