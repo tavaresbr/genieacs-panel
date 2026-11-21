@@ -160,6 +160,11 @@ type Translate = (key: TranslationKey, vars?: Record<string, string | number>) =
  * reached the screen literally, so the composer had been keeping its own copy
  * of two entries from this map rather than render `{max}` to somebody.
  */
+/** O código é um dos que a tela sabe traduzir? */
+export function isKnownWhatsappError(code?: string): boolean {
+  return Boolean(code && ERROR_KEYS[code])
+}
+
 export function whatsappErrorMessage(
   t: Translate,
   code?: string,
