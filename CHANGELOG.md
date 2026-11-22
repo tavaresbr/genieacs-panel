@@ -7,6 +7,25 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.57.0] - 2026-11-22
+
+### New
+
+- Dados do responsável na política de privacidade estática (`e29e796b`)
+- Bot de comandos da equipe via webhook (`cffb30d3`)
+
+### Fixed
+
+- Não registrar valores do usuário nos logs do bot (`ba5e6dbe`)
+- Logs do bot sem nenhum dado de erro (`c70ecd43`)
+- Declara a rota do webhook na cobertura de rotas e troca o DELETE por POST (`06e1ebd1`)
+
+### Maintenance
+
+- Fixa o instante do aparelho vivo no teste de histórico (`ab378dc5`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/c667e1ead895...9844a27db90d)
+
 ## [1.56.1] - 2026-11-21
 
 ### Maintenance
