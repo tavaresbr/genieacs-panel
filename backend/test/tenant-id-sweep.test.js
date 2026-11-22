@@ -302,6 +302,20 @@ async function semear(tenantId, slug) {
       attempts: 1
     });
 
+    // O Messenger: a Página (sem token, para que o controle de desconectar não
+    // alcance a rede) e uma conversa dela, sem mensagem recente — o controle de
+    // envio responde `window_closed` (409), que só se alcança depois de achá-la.
+    alvo.messengerPage = await semearLinha('messenger_pages', {
+      page_id: `9${slug.replace(/\D/g, '') || '0'}${Date.now()}`.slice(0, 32),
+      page_name: `Página do ${slug}`,
+      status: 'connected'
+    });
+    alvo.messengerConversation = await semearLinha('messenger_conversations', {
+      page_row_id: alvo.messengerPage,
+      psid: `psid-${slug}`,
+      name: `Pessoa do ${slug}`
+    });
+
     // O contrato do SGP, um por provedor e não o mesmo nos dois, pelo motivo
     // da planta de fibra acima: o que se pergunta é se o contrato do VIZINHO
     // abre conversa aqui. Com telefone, para que o controle chegue a abrir.

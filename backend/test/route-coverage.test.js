@@ -93,6 +93,8 @@ const PUBLICAS = new Map([
   ['GET /api/public/plans', 'o catálogo à venda: só planos ativos e marcados como públicos, sem id nem contagem'],
   ['GET /api/public/slug-available', 'a mesma pergunta que o cadastro faz ao gravar, feita antes; responde só livre/ocupado'],
   ['GET /api/public/cnpj', 'o cadastro da Receita, que é público; limite apertado porque sai para uma API de fora'],
+  ['GET /api/messenger-webhook', 'a verificação do webhook da Meta: devolve o desafio NUMÉRICO se o verify token da plataforma bater, e nada mais; não lê dado de provedor; prova em messenger.test.js'],
+  ['POST /api/messenger-webhook', 'entrega do Messenger, montada antes do resolvedor; a assinatura X-Hub-Signature-256 do corpo bruto É a credencial (falha fechada sem o segredo do app), e o provedor é o dono da Página nomeada no evento; prova em messenger.test.js'],
   ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço'],
   // O recibo pelo link do bot do WhatsApp da plataforma: o token assinado é a
   // credencial; prova em platform-owner-bot.test.js.
@@ -372,6 +374,9 @@ describe('toda rota sem sessão', () => {
       // O pedido de demonstração da página pública. Só INSERE em `leads`, que
       // é tabela da plataforma, sem `tenant_id` — não há cadastro de provedor
       // nenhum ao alcance dela.
+      // A entrega do Messenger: só escreve em `messenger_*` do provedor dono da
+      // Página que o evento nomeia, e só com a assinatura da Meta válida.
+      'POST /api/messenger-webhook',
       'POST /api/public/leads',
       // A pesquisa de satisfação (0123): `answer` grava a nota na linha de
       // `platform_nps` que o hash do token acha — de UM provedor, o do token —,
@@ -887,6 +892,9 @@ describe('a ordem das montagens em app.js', () => {
       // As três exceções, e as três são entregas de fora que trazem o provedor
       // no próprio corpo ou no token assinado.
       'app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);',
+      // A do Messenger: a Meta chama um endereço só, e o provedor é o dono da
+      // Página que o evento nomeia. Autenticada pela assinatura do corpo bruto.
+      'app.use(MESSENGER_WEBHOOK_PATH, messengerWebhookRoutes);',
       // A do bot do Telegram de cada provedor: o provedor vem no caminho e o
       // segredo do cabeçalho é a credencial.
       'app.use(TELEGRAM_WEBHOOK_PATH, telegramWebhookRoutes);',
