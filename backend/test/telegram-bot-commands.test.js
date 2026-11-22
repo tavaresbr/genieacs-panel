@@ -5,6 +5,7 @@ import { authHeaders, call, defaultTenantId, getDb, startTestServers, stopTestSe
 const { default: WaAlertService } = await import('../src/services/waAlertService.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { setTelegramFetcher } = await import('../src/services/telegramClient.js');
+const { resetTelegramRateLimit } = await import('../src/services/telegramBotService.js');
 
 /**
  * O bot de comandos do Telegram.
@@ -25,6 +26,9 @@ let chamadas = [];
 let realDashboard;
 let realPage;
 let realBase;
+let realReboot;
+let rebooted = [];
+let devicesResult;
 
 const api = (path, method = 'GET', body) => call(`${panelUrl}/api/whatsapp/alerts/telegram/bot${path}`, { method, headers: authHeaders(token), body });
 const put = (body) => call(`${panelUrl}/api/whatsapp/alerts/settings`, { method: 'PUT', headers: authHeaders(token), body });
@@ -68,10 +72,13 @@ before(async () => {
   realDashboard = DeviceService.getDashboardData;
   realPage = DeviceService.getDevicesPage;
   DeviceService.getDashboardData = async () => ({ stats: { total: 10, online: 7, offline: 3, new24h: 1 } });
-  DeviceService.getDevicesPage = async () => ({
+  realReboot = DeviceService.rebootDevice;
+  DeviceService.rebootDevice = async (id) => { rebooted.push(id); return { ok: true }; };
+  devicesResult = () => ({
     devices: [{ _id: 'dev-1', SerialNumber: 'ZTEG1', pppoe: 'joao.silva', rxpower: '-21', _lastInform: new Date(Date.now() - 3600_000).toISOString() }],
     page: 1, pageSize: 10, total: 1, totalPages: 1
   });
+  DeviceService.getDevicesPage = async () => devicesResult();
   setTelegramFetcher(async (url, options) => {
     chamadas.push({ url, body: JSON.parse(options.body) });
     return new Response(JSON.stringify({ ok: true, result: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -87,6 +94,7 @@ after(async () => {
   setTelegramFetcher(null);
   DeviceService.getDashboardData = realDashboard;
   DeviceService.getDevicesPage = realPage;
+  DeviceService.rebootDevice = realReboot;
   if (realBase === undefined) delete process.env.PUBLIC_BASE_URL; else process.env.PUBLIC_BASE_URL = realBase;
   WaAlertService.stop();
   await stopTestServers();
@@ -96,7 +104,10 @@ beforeEach(async () => {
   await getDb()('app_state').whereIn('key', ['telegram_bot', 'whatsapp_alert_settings']).del();
   WaAlertService.settingsCache.clear();
   chamadas = [];
+  rebooted = [];
+  resetTelegramRateLimit();
   segredo = undefined;
+  await getDb()('audit_log').where({ action: 'device.rebooted' }).del();
 });
 
 describe('ligar o bot', () => {
@@ -235,5 +246,112 @@ describe('vínculo e comandos', () => {
     await hook(msg('/status'), segredo);
     await esperaMensagens(1);
     assert.match(enviadas('sendMessage')[0].body.text, /não está vinculado/);
+  });
+});
+
+const toque = (data, { from = 7001, chat = from, messageId = 55 } = {}) => ({
+  update_id: 2,
+  callback_query: { id: 'cb1', data, from: { id: from, username: `u${from}`, is_bot: false }, message: { message_id: messageId, chat: { id: chat, type: 'private' } } }
+});
+const botoes = () => enviadas('sendMessage').at(-1).body.reply_markup.inline_keyboard[0];
+async function pedirReboot(termo = 'joao') {
+  await hook(msg(`/reboot ${termo}`), segredo);
+  await esperaMensagens(enviadas('sendMessage').length + 1);
+}
+const aguardaTempo = () => new Promise((resolve) => setTimeout(resolve, 150));
+
+describe('/reboot com confirmação', () => {
+  beforeEach(async () => {
+    await ligar();
+    await vincular();
+    chamadas = [];
+  });
+
+  it('um alvo: pede confirmação com botões e não reinicia antes do toque', async () => {
+    await pedirReboot();
+    const [ok, cancel] = botoes();
+    assert.match(ok.callback_data, /^rb:[0-9a-f]{16}:y$/);
+    assert.match(cancel.callback_data, /^rb:[0-9a-f]{16}:n$/);
+    assert.ok(!ok.callback_data.includes('dev-1'), 'o id do aparelho não pode ir no botão');
+    assert.deepEqual(rebooted, []);
+  });
+
+  it('mais de um alvo: lista e não pede confirmação', async () => {
+    const um = devicesResult;
+    devicesResult = () => ({ devices: [um().devices[0], { ...um().devices[0], _id: 'dev-2', pppoe: 'joao.souza' }], page: 1, pageSize: 5, total: 2, totalPages: 1 });
+    try {
+      await pedirReboot();
+      const ultima = enviadas('sendMessage').at(-1).body;
+      assert.match(ultima.text, /Refine/);
+      assert.equal(ultima.reply_markup, undefined);
+    } finally {
+      devicesResult = um;
+    }
+  });
+
+  it('Confirmar reinicia uma vez, audita via telegram e o nonce não vale de novo', async () => {
+    await pedirReboot();
+    const [ok] = botoes();
+    await hook(toque(ok.callback_data), segredo);
+    await esperaMensagens(2);
+    assert.deepEqual(rebooted, ['dev-1']);
+    assert.match(enviadas('sendMessage').at(-1).body.text, /Reinício enviado/);
+    assert.equal(enviadas('editMessageReplyMarkup').length, 1);
+    const [linha] = await getDb()('audit_log').where({ action: 'device.rebooted' });
+    assert.equal(linha.actor_username, 'operator');
+    assert.equal(JSON.parse(linha.detail).via, 'telegram');
+
+    await hook(toque(ok.callback_data), segredo);
+    await aguardaTempo();
+    assert.deepEqual(rebooted, ['dev-1'], 'reuso do nonce reiniciou de novo');
+  });
+
+  it('Cancelar não reinicia', async () => {
+    await pedirReboot();
+    const [, cancel] = botoes();
+    await hook(toque(cancel.callback_data), segredo);
+    await esperaMensagens(2);
+    assert.deepEqual(rebooted, []);
+    assert.match(enviadas('sendMessage').at(-1).body.text, /cancelado/);
+  });
+
+  it('o toque de outro Telegram é ignorado e não gasta o pedido', async () => {
+    await pedirReboot();
+    const [ok] = botoes();
+    await hook(toque(ok.callback_data, { from: 7002 }), segredo);
+    await aguardaTempo();
+    assert.deepEqual(rebooted, []);
+    await hook(toque(ok.callback_data), segredo);
+    await esperaMensagens(2);
+    assert.deepEqual(rebooted, ['dev-1']);
+  });
+
+  it('pedido vencido não reinicia', async () => {
+    await pedirReboot();
+    const [ok] = botoes();
+    const row = await getDb()('app_state').where({ key: 'telegram_bot' }).first();
+    const state = JSON.parse(row.value);
+    state.pending = state.pending.map((p) => ({ ...p, expiresAt: Date.now() - 1000 }));
+    await getDb()('app_state').where({ key: 'telegram_bot' }).update({ value: JSON.stringify(state) });
+    await hook(toque(ok.callback_data), segredo);
+    await aguardaTempo();
+    assert.deepEqual(rebooted, []);
+  });
+
+  it('papel sem devices.write: recusa no comando e, se rebaixado depois, no toque', async () => {
+    await pedirReboot();
+    const [ok] = botoes();
+    await getDb()('tenant_users').update({ role: 'viewer' });
+    try {
+      await hook(toque(ok.callback_data), segredo);
+      await esperaMensagens(2);
+      assert.match(enviadas('sendMessage').at(-1).body.text, /não tem permissão/);
+      assert.deepEqual(rebooted, []);
+      await hook(msg('/reboot joao'), segredo);
+      await esperaMensagens(3);
+      assert.match(enviadas('sendMessage').at(-1).body.text, /não tem permissão/);
+    } finally {
+      await getDb()('tenant_users').update({ role: 'owner' });
+    }
   });
 });
