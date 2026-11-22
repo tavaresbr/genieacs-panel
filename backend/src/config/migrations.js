@@ -3848,6 +3848,90 @@ const waAiUsageTable = (db) => (t) => {
 
 const WA_AI_USAGE_TABLES = [['wa_ai_usage', waAiUsageTable]];
 
+/**
+ * O Messenger (0144): a Página do Facebook que o provedor conectou, as conversas
+ * por PSID e as mensagens. Tabelas próprias, e não colunas em `wa_*`, porque o
+ * WhatsApp é todo centrado em telefone (`wa_phone_e164`, opt-out por telefone) e
+ * passa pelo Evolution — ver `docs/messenger-integration-plan.md`.
+ *
+ * `page_id` é único em TODO o painel, e é de propósito: o webhook da Meta chega
+ * sem sessão, e o id da Página no evento é o que diz de que provedor ele é.
+ */
+const messengerPagesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('page_id', 32).notNullable().unique();
+  t.string('page_name', 128);
+  // O token da Página, cifrado (secretBox). Nunca sai do servidor.
+  t.text('page_token');
+  t.string('status', 16).notNullable().defaultTo('connected');
+  t.timestamp('subscribed_at');
+  t.string('webhook_error', 255);
+  t.timestamp('webhook_refused_at');
+  t.string('webhook_refused_reason', 64);
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id'], 'messenger_pages_tenant_idx');
+};
+
+const messengerConversationsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('page_row_id').unsigned().notNullable()
+    .references('id').inTable('messenger_pages').onDelete('CASCADE');
+  // O id da pessoa NA PÁGINA. Não é telefone nem identifica a pessoa fora dela.
+  t.string('psid', 64).notNullable();
+  t.string('name', 128);
+  // Quem é, quando soubermos: o mesmo vínculo que a conversa do WhatsApp tem.
+  t.string('contract', 64);
+  t.integer('customer_account_id').unsigned()
+    .references('id').inTable('customer_accounts').onDelete('SET NULL');
+  t.timestamp('last_message_at');
+  t.timestamp('last_inbound_at');
+  t.integer('unread_count').notNullable().defaultTo(0);
+  t.timestamp('closed_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['page_row_id', 'psid'], 'messenger_conv_page_psid_uq');
+  t.index(['tenant_id', 'last_message_at'], 'messenger_conv_recent_idx');
+  t.index(['tenant_id', 'contract'], 'messenger_conv_contract_idx');
+};
+
+const messengerMessagesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('conversation_id').unsigned().notNullable()
+    .references('id').inTable('messenger_conversations').onDelete('CASCADE');
+  t.string('direction', 3).notNullable(); // 'in' | 'out'
+  // O `mid` da Meta. Único por provedor: a Meta reentrega eventos, e é isto que
+  // impede a mesma mensagem de entrar duas vezes. NULL até a Meta aceitar uma de saída.
+  t.string('external_id', 128);
+  t.text('body');
+  t.string('attachment_type', 32);
+  t.text('attachment_url');
+  // 'operator' | 'page'. O eco de uma resposta dada fora do painel entra como 'page'.
+  t.string('source', 16).notNullable().defaultTo('operator');
+  // sent | delivered | read | failed. NULL para entrada.
+  t.string('delivery_status', 16);
+  t.string('delivery_error', 255);
+  t.integer('sent_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('read_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'external_id'], 'messenger_msg_external_uq');
+  t.index(['conversation_id', 'created_at'], 'messenger_msg_conv_idx');
+};
+
+// A ordem importa: a Página antes das conversas, e estas antes das mensagens.
+const MESSENGER_TABLES = [
+  ['messenger_pages', messengerPagesTable],
+  ['messenger_conversations', messengerConversationsTable],
+  ['messenger_messages', messengerMessagesTable]
+];
+
 const PUSH_TABLES = [
   ['push_subscriptions', pushSubscriptionsTable],
   ['push_preferences', pushPreferencesTable]
@@ -4002,7 +4086,8 @@ export const SCHEMA_TABLES = [
   ...WA_SALES_PLAN_TABLES,
   ...WA_AI_KNOWLEDGE_TABLES,
   ...OPERATOR_PROFILE_TABLES,
-  ...WA_AI_USAGE_TABLES
+  ...WA_AI_USAGE_TABLES,
+  ...MESSENGER_TABLES
 ].map(([name]) => name);
 
 /**
@@ -8084,6 +8169,20 @@ export const migrations = [
       await db.schema.alterTable('customer_accounts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** O Messenger — ver `MESSENGER_TABLES`. */
+    id: '0144_messenger',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('messenger_messages');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of MESSENGER_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];

@@ -106,6 +106,11 @@ export const SCOPED_TABLES = new Set([
   'wa_ai_knowledge',
   // O consumo da IA do WhatsApp por dia e tarefa (só contadores, nenhum texto).
   'wa_ai_usage',
+  // O Messenger: a Página conectada (com o token cifrado) e as conversas e
+  // mensagens por PSID. Dado de assinante, e de um provedor só.
+  'messenger_pages',
+  'messenger_conversations',
+  'messenger_messages',
   // Os modelos aprovados na conta da Meta de cada número oficial.
   'wa_meta_templates',
   'wa_broadcasts',

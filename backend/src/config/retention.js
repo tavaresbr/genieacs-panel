@@ -248,6 +248,9 @@ export const SEM_PRAZO = Object.freeze({
   mapping_edges: 'a ligação entre dois nós da planta; sai quando o operador remove a ligação ou limpa o mapa',
   // Atendimento (WhatsApp)
   wa_conversations: 'a conversa e o telefone do assinante; o varredor de mensagens se recusa a tocá-la, por desenho — sai pela exclusão do art. 18',
+  // Atendimento (Messenger)
+  messenger_conversations: 'a conversa e o PSID da pessoa na Página; nenhuma rotina a apaga por idade — sai ao desconectar a Página (em cascata) ou pela exclusão do art. 18',
+  messenger_messages: 'o texto e o link do anexo trocados no Messenger; nenhuma rotina os apaga por idade — saem junto com a conversa',
   wa_opt_outs: 'quem pediu para não receber mensagens; nenhuma rotina o apaga',
   wa_marketing_opt_outs: 'quem pediu para não receber promoções, e quando voltou; nenhuma rotina o apaga — apagar seria desfazer o pedido',
   wa_satisfaction: 'a avaliação do atendimento dada pelo assinante; sai só pela exclusão do art. 18',

@@ -1,6 +1,8 @@
 # Plano: integração com Facebook Messenger
 
-Status: proposta (nenhum código de Messenger existe ainda).
+Status: Fase 1 implementada no backend (migração `0144_messenger`, webhook, entrada, envio, conexão da Página,
+API `/api/messenger`, LGPD e testes). Falta a tela (frontend), o vínculo com o assinante, o outbox com retry e a
+revisão da Meta. Desvios do plano original estão em "Como ficou" no fim.
 
 ## O que o código atual diz
 
@@ -79,3 +81,24 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
 ## Ordem de implementação
 1. Migração + modelos  2. Webhook (GET/POST + HMAC)  3. Inbound + dedup  4. Conexão da Página
 5. Envio + outbox + janela 24 h  6. API/permissões/add-on  7. UI  8. Testes + docs  9. Fase 2.
+
+## Como ficou (Fase 1, backend)
+
+- **Webhook síncrono e idempotente**, não assíncrono: `POST /api/messenger-webhook` valida a assinatura sobre o
+  corpo bruto, grava e só então responde 200. Um 500 faz a Meta reentregar, e o `mid` único impede duplicar.
+  Assinatura inválida → 401 sem ler o corpo; Página desconhecida ou corpo ilegível → 200 (reentregar não conserta).
+- **Envio direto, sem outbox**: `messengerSendService` chama a Graph na hora e grava `sent` ou `failed` com o
+  motivo. O outbox com retry fica para quando houver envio automático (bot/avisos); hoje todo envio é de um
+  operador olhando a tela.
+- **Sem tabela de opt-out**: a Fase 1 só responde a quem escreveu (janela de 24 h) e nunca inicia contato, que é
+  o que o opt-out bloqueia. Entra junto com qualquer envio proativo.
+- **Permissões e add-on do WhatsApp** (`whatsapp.read/send/config`, `requireAddon('whatsapp')`) em vez de
+  `messenger.*`: o atendimento é um só e não exige mexer na matriz de papéis.
+- **Segredos da plataforma**: `META_APP_SECRET` e `MESSENGER_VERIFY_TOKEN` (ver `backend/.env.example`).
+  Sem eles o webhook recusa tudo e a conexão de Página responde 503.
+- **Conexão de Página** recebe `pageId` + `pageToken` (a tela fará o login do Facebook e entregará o token da
+  Página); o painel confere o token na Graph, assina `messages, message_deliveries, message_reads,
+  messaging_postbacks` e guarda o token cifrado.
+- **LGPD**: `messenger_conversations`/`messenger_messages` entram no dossiê e na exclusão do assinante (por
+  `customer_account_id` ou `contract`); `messenger_pages` está em `SEM_DADO_DE_ASSINANTE`. Como ainda não há
+  vínculo, hoje nenhuma conversa casa com um assinante — o alcance passa a valer quando o vínculo existir.

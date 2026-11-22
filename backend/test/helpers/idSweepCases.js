@@ -21,6 +21,41 @@
  */
 export const casos = [
   {
+    // O Messenger. As três rotas da conversa vêm antes da que desconecta a
+    // Página: o controle desta apaga a Página e, em cascata, a conversa.
+    chave: 'messengerConversation',
+    label: 'GET /api/messenger/conversations/:id/messages',
+    method: 'GET',
+    path: (id) => `/api/messenger/conversations/${id}/messages`,
+    tabela: 'messenger_conversations'
+  },
+  {
+    // No controle, a conversa semeada não tem mensagem recente e a resposta é
+    // 409 (janela fechada) — que só se chega DEPOIS de achar a conversa, e sem
+    // chamar a Meta.
+    chave: 'messengerConversation',
+    label: 'POST /api/messenger/conversations/:id/messages',
+    method: 'POST',
+    path: (id) => `/api/messenger/conversations/${id}/messages`,
+    body: { text: 'oi' },
+    tabela: 'messenger_conversations'
+  },
+  {
+    chave: 'messengerConversation',
+    label: 'POST /api/messenger/conversations/:id/closed',
+    method: 'POST',
+    path: (id) => `/api/messenger/conversations/${id}/closed`,
+    body: { closed: true },
+    tabela: 'messenger_conversations'
+  },
+  {
+    chave: 'messengerPage',
+    label: 'DELETE /api/messenger/pages/:id',
+    method: 'DELETE',
+    path: (id) => `/api/messenger/pages/${id}`,
+    tabela: 'messenger_pages'
+  },
+  {
     // O dossiê LGPD de um assinante. A rota mais perigosa da lista: devolve
     // tudo o que existe sobre uma pessoa, e apontá-la para o id do vizinho
     // entregaria o dossiê de um assinante de outro ISP.

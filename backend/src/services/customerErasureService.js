@@ -107,7 +107,7 @@ class CustomerErasureService {
    */
   static async survey(account) {
     const alcance = await alcanceDoAssinante(account);
-    const { contratos, documentos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos } = alcance;
+    const { contratos, documentos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos } = alcance;
 
     const contar = async (tabela, montar) => {
       const [linha] = await montar(tdb(tabela)).count({ n: '*' });
@@ -139,6 +139,10 @@ class CustomerErasureService {
       maintenance_window_devices: manutencoes.length,
       device_swaps: trocas.length,
       wa_conversations: conversaIds.length,
+      messenger_conversations: messengerConversaIds.length,
+      messenger_messages: messengerConversaIds.length
+        ? await contar('messenger_messages', (q) => q.whereIn('conversation_id', messengerConversaIds))
+        : 0,
       wa_messages: conversaIds.length
         ? await contar('wa_messages', (q) => q.whereIn('conversation_id', conversaIds))
         : 0,
@@ -220,13 +224,18 @@ class CustomerErasureService {
    * que o que foi gravado na trilha seja o que vai ser executado.
    */
   static async erase(account, { alcance }) {
-    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, noIds } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, noIds } = alcance;
     const idsDe = (linhas) => linhas.map((l) => l.id);
     const marca = `erased:${account.id}`;
 
     await getDb().transaction(async (trx) => {
       // Filhas antes da mãe, como a exclusão de provedor.
       await tdb('customer_wifi_credentials', trx).where({ account_id: account.id }).del();
+
+      if (messengerConversaIds.length) {
+        await tdb('messenger_messages', trx).whereIn('conversation_id', messengerConversaIds).del();
+        await tdb('messenger_conversations', trx).whereIn('id', messengerConversaIds).del();
+      }
 
       if (conversaIds.length) {
         await tdb('wa_bot_events', trx).whereIn('conversation_id', conversaIds).del();
