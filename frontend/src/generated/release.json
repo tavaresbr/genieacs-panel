@@ -1,22 +1,46 @@
 {
-  "version": "1.56.1",
-  "build": 1835,
-  "sourceCommit": "c035f539bd0b",
-  "releasedAt": "2026-11-21",
-  "basedOnTag": "v1.56.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/c5901802de10...c035f539bd0b",
+  "version": "1.57.0",
+  "build": 1844,
+  "sourceCommit": "9844a27db90d",
+  "releasedAt": "2026-11-22",
+  "basedOnTag": "v1.56.1",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/c667e1ead895...9844a27db90d",
   "changes": [
     {
-      "shortHash": "b67af595",
+      "shortHash": "e29e796b",
       "date": "2026-11-21",
-      "title": "Salva o resumo agrupado, nomeia o número inválido, recusa sem add-on e prende os limites das regras",
+      "title": "Dados do responsável na política de privacidade estática",
+      "category": "New"
+    },
+    {
+      "shortHash": "ab378dc5",
+      "date": "2026-11-21",
+      "title": "Fixa o instante do aparelho vivo no teste de histórico",
       "category": "Maintenance"
     },
     {
-      "shortHash": "c756c81d",
+      "shortHash": "cffb30d3",
       "date": "2026-11-21",
-      "title": "Plano de integração com Messenger",
-      "category": "Maintenance"
+      "title": "Bot de comandos da equipe via webhook",
+      "category": "New"
+    },
+    {
+      "shortHash": "ba5e6dbe",
+      "date": "2026-11-21",
+      "title": "Não registrar valores do usuário nos logs do bot",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "c70ecd43",
+      "date": "2026-11-21",
+      "title": "Logs do bot sem nenhum dado de erro",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "06e1ebd1",
+      "date": "2026-11-21",
+      "title": "Declara a rota do webhook na cobertura de rotas e troca o DELETE por POST",
+      "category": "Fixed"
     }
   ]
 }
