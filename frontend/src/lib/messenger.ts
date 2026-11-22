@@ -25,9 +25,12 @@ export function remainingParts(ms: number): { hours: number; minutes: number } {
   return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 }
 }
 
-/** O nome na lista: o da pessoa, ou o fim do PSID quando o Messenger não deu nome. */
-export function messengerTitle(conversation: Pick<MessengerConversation, 'name' | 'psid'>): string {
-  const name = conversation.name?.trim()
+/**
+ * O nome na lista: o do cliente a que a conversa foi vinculada, senão o que o
+ * Messenger deu, senão o fim do PSID.
+ */
+export function messengerTitle(conversation: Pick<MessengerConversation, 'name' | 'psid'> & { clientName?: string | null }): string {
+  const name = conversation.clientName?.trim() || conversation.name?.trim()
   return name || `…${conversation.psid.slice(-6)}`
 }
 
@@ -49,6 +52,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   page_mismatch: 'messenger.error.pageMismatch',
   page_not_found: 'messenger.error.pageNotFound',
   messenger_unconfigured: 'messenger.error.unconfigured',
+  subscriber_not_found: 'messenger.error.subscriberNotFound',
   meta_refused: 'messenger.error.metaRefused',
 }
 

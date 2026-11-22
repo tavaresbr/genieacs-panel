@@ -40,6 +40,12 @@ describe('o título e a prévia da conversa', () => {
     expect(messengerTitle({ name: '   ', psid: '1234567890' })).toBe('…567890')
   })
 
+  it('o cliente vinculado vence o nome do Messenger', () => {
+    expect(messengerTitle({ name: 'maria fb', clientName: 'Maria da Silva', psid: '1234567890' })).toBe('Maria da Silva')
+    expect(messengerTitle({ name: 'maria fb', clientName: null, psid: '1234567890' })).toBe('maria fb')
+    expect(messengerTitle({ name: null, clientName: '  ', psid: '1234567890' })).toBe('…567890')
+  })
+
   it('a prévia cabe numa linha', () => {
     expect(singleLine('a\n  b\tc')).toBe('a b c')
     expect(singleLine(null)).toBe('')
@@ -52,6 +58,7 @@ describe('os códigos de erro do servidor', () => {
     expect(messengerErrorKey('window_closed')).toBe('messenger.error.windowClosed')
     expect(messengerErrorKey('page_already_connected')).toBe('messenger.error.pageAlreadyConnected')
     expect(messengerErrorKey('messenger_unconfigured')).toBe('messenger.error.unconfigured')
+    expect(messengerErrorKey('subscriber_not_found')).toBe('messenger.error.subscriberNotFound')
   })
 
   it('código desconhecido ou ausente cai na genérica, sem repetir texto cru', () => {

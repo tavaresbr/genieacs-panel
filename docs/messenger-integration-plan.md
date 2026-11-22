@@ -2,7 +2,7 @@
 
 Status: Fase 1 implementada no backend (migração `0144_messenger`, webhook, entrada, envio, conexão da Página,
 API `/api/messenger`, LGPD e testes). A tela (`/messenger`: caixa de entrada e Páginas conectadas) também está pronta. Falta o
-vínculo com o assinante, o outbox com retry e a revisão da Meta. Desvios do plano original estão em "Como ficou" no fim.
+o outbox com retry e a revisão da Meta. O vínculo com o assinante é manual (ver abaixo). Desvios do plano original estão em "Como ficou" no fim.
 
 ## O que o código atual diz
 
@@ -113,3 +113,16 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   inglês, como as outras chaves novas do projeto).
 - Não há ainda prévia da última mensagem na lista (o endpoint não a devolve) nem login do Facebook: o token da
   Página é colado.
+
+### Vínculo com o assinante (manual)
+- O PSID não traz telefone, então não há vínculo automático como no WhatsApp: o atendente busca o cliente
+  no cadastro (a mesma busca de contatos do WhatsApp) e vincula pela conversa. O vínculo é o mesmo do WhatsApp
+  — contrato do SGP (`contract`, com `customer_account_id` quando a ONT do contrato tem conta no portal) ou o
+  cliente sem contrato (`sgp_contact_id`, migração `0145`) —, e `bound_via = 'operator'`.
+- `POST/DELETE /api/messenger/conversations/:id/subscriber` (`whatsapp.send`). Contrato de outro provedor, ou
+  inexistente, dá o mesmo 404 `subscriber_not_found`.
+- A lista e a conversa mostram o nome do cliente (o da ONT vence o do cadastro, como no WhatsApp); o dossiê e a
+  exclusão do assinante alcançam a conversa por conta, contrato ou `sgp_contact_id`.
+- Ainda fora: vínculo automático por link `m.me/<Página>?ref=<token>` emitido na fatura ou no portal do cliente
+  (exige token assinado, tratar `referral`/`postback` no webhook e um botão no portal) e por fluxo de bot que
+  pede CPF/contrato.

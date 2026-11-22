@@ -6782,6 +6782,10 @@ export interface MessengerConversation {
   psid: string
   name: string | null
   contract: string | null
+  sgpContactId: number | null
+  /** O cliente do SGP a que a conversa foi vinculada, se foi. */
+  clientName: string | null
+  linked: boolean
   lastMessageAt: string | null
   lastInboundAt: string | null
   unreadCount: number
@@ -6824,6 +6828,11 @@ export const messengerAPI = {
     apiClient.post<MessengerMessage>(`/messenger/conversations/${id}/messages`, { text }),
   setClosed: (id: number, closed: boolean) =>
     apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/closed`, { closed }),
+  /** `key` é o do contato (`WhatsAppContact.key`): o contrato, ou `c:<id>` sem contrato. */
+  linkSubscriber: (id: number, key: string) =>
+    apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/subscriber`, { contract: key }),
+  unlinkSubscriber: (id: number) =>
+    apiClient.delete<MessengerConversation>(`/messenger/conversations/${id}/subscriber`),
 }
 
 export const whatsappAPI = {

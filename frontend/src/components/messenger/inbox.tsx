@@ -10,6 +10,7 @@ import {
   singleLine,
   windowRemainingMs,
 } from '@/lib/messenger'
+import { MessengerSubscriberLinker } from '@/components/messenger/subscriber-linker'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -149,6 +150,7 @@ function Thread({
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [linking, setLinking] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -209,19 +211,58 @@ function Thread({
     }
   }
 
+  const handleUnlink = async () => {
+    const res = await messengerAPI.unlinkSubscriber(conversation.id)
+    if (res.success && res.data) {
+      toast.success(t('messenger.link.unlinked'))
+      setCurrent(res.data)
+      onChanged()
+    } else {
+      toast.error(t(messengerErrorKey(res.code)))
+    }
+  }
+
   return (
     <>
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <button type="button" className="md:hidden max-sm:min-h-10 text-sm font-semibold text-primary" onClick={onBack}>
           {t('messenger.back')}
         </button>
-        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{messengerTitle(current)}</h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold text-foreground">{messengerTitle(current)}</h3>
+          {current.linked && (
+            <p className="truncate font-mono text-[0.7rem] text-muted-foreground">
+              {current.contract ?? t('messenger.link.noContract')}
+            </p>
+          )}
+        </div>
+        {canSend && (
+          <button
+            type="button"
+            className="modern-button-secondary max-sm:min-h-10"
+            onClick={() => (current.linked ? void handleUnlink() : setLinking((open) => !open))}
+          >
+            {t(current.linked ? 'messenger.link.unlink' : 'messenger.link.button')}
+          </button>
+        )}
         {canSend && (
           <button type="button" className="modern-button-secondary max-sm:min-h-10" onClick={() => void handleClosed()}>
             {t(current.closedAt === null ? 'messenger.archive' : 'messenger.reopen')}
           </button>
         )}
       </div>
+
+      {linking && !current.linked && (
+        <MessengerSubscriberLinker
+          conversation={current}
+          onCancel={() => setLinking(false)}
+          onLinked={(linked) => {
+            setCurrent(linked)
+            setLinking(false)
+            onChanged()
+          }}
+        />
+      )}
 
       <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3" role="list">
         {messages.map((message) => (

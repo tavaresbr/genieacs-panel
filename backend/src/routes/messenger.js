@@ -15,6 +15,9 @@ router.delete('/pages/:id', authenticateToken, requirePermission('whatsapp.confi
 router.get('/conversations', authenticateToken, requirePermission('whatsapp.read'), MessengerController.listConversations);
 router.get('/conversations/:id/messages', authenticateToken, requirePermission('whatsapp.read'), MessengerController.listMessages);
 router.post('/conversations/:id/messages', authenticateToken, requirePermission('whatsapp.send'), whatsappSendLimiter, MessengerController.send);
+// Dizer de quem é a conversa é trabalho de quem atende: `whatsapp.send`, como o vínculo do WhatsApp.
+router.post('/conversations/:id/subscriber', authenticateToken, requirePermission('whatsapp.send'), MessengerController.linkSubscriber);
+router.delete('/conversations/:id/subscriber', authenticateToken, requirePermission('whatsapp.send'), MessengerController.unlinkSubscriber);
 router.post('/conversations/:id/closed', authenticateToken, requirePermission('whatsapp.send'), MessengerController.setClosed);
 
 export default router;
