@@ -1,46 +1,34 @@
 {
-  "version": "1.57.0",
-  "build": 1844,
-  "sourceCommit": "9844a27db90d",
+  "version": "1.58.0",
+  "build": 1850,
+  "sourceCommit": "00813edb35aa",
   "releasedAt": "2026-11-22",
-  "basedOnTag": "v1.56.1",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/c667e1ead895...9844a27db90d",
+  "basedOnTag": "v1.57.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/fa8da78dfa89...00813edb35aa",
   "changes": [
     {
-      "shortHash": "e29e796b",
-      "date": "2026-11-21",
-      "title": "Dados do responsável na política de privacidade estática",
+      "shortHash": "00c7a529",
+      "date": "2026-11-22",
+      "title": "Fase 1 — webhook, entrada, envio, conexão de Página e LGPD",
       "category": "New"
     },
     {
-      "shortHash": "ab378dc5",
-      "date": "2026-11-21",
-      "title": "Fixa o instante do aparelho vivo no teste de histórico",
+      "shortHash": "06ef6e69",
+      "date": "2026-11-22",
+      "title": "Só devolve desafio numérico na verificação do webhook",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "4ebc2f7d",
+      "date": "2026-11-22",
+      "title": "Declara o webhook e cobre as rotas com id na varredura de provedores",
       "category": "Maintenance"
     },
     {
-      "shortHash": "cffb30d3",
-      "date": "2026-11-21",
-      "title": "Bot de comandos da equipe via webhook",
-      "category": "New"
-    },
-    {
-      "shortHash": "ba5e6dbe",
-      "date": "2026-11-21",
-      "title": "Não registrar valores do usuário nos logs do bot",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "c70ecd43",
-      "date": "2026-11-21",
-      "title": "Logs do bot sem nenhum dado de erro",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "06e1ebd1",
-      "date": "2026-11-21",
-      "title": "Declara a rota do webhook na cobertura de rotas e troca o DELETE por POST",
-      "category": "Fixed"
+      "shortHash": "c2460d45",
+      "date": "2026-11-22",
+      "title": "Registra a retenção das conversas e mensagens",
+      "category": "Maintenance"
     }
   ]
 }

@@ -7,6 +7,23 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.58.0] - 2026-11-22
+
+### New
+
+- Fase 1 — webhook, entrada, envio, conexão de Página e LGPD (`00c7a529`)
+
+### Fixed
+
+- Só devolve desafio numérico na verificação do webhook (`06ef6e69`)
+
+### Maintenance
+
+- Declara o webhook e cobre as rotas com id na varredura de provedores (`4ebc2f7d`)
+- Registra a retenção das conversas e mensagens (`c2460d45`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/fa8da78dfa89...00813edb35aa)
+
 ## [1.57.0] - 2026-11-22
 
 ### New
