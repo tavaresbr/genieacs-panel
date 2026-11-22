@@ -6164,6 +6164,19 @@ export interface WaitingReport {
   }>
 }
 
+export interface TelegramBotStatus {
+  enabled: boolean
+  /** Se há um token de bot guardado (ele nunca vem). */
+  botConfigured: boolean
+  links: Array<{
+    telegramUserId: string
+    telegramUsername: string | null
+    userId: number
+    username: string | null
+    linkedAt: string
+  }>
+}
+
 export interface WhatsAppAlertSettings {
   enabled: boolean
   intervalSeconds: number
@@ -7150,6 +7163,19 @@ export const whatsappAPI = {
   /** Uma mensagem de teste no grupo do Telegram dos alertas. */
   testAlertTelegram: () =>
     apiClient.post<{ sent: boolean }>('/whatsapp/alerts/telegram/test', {}),
+
+  // ── Bot de comandos do Telegram ──────────────────────────────────────
+  getTelegramBot: () =>
+    apiClient.get<TelegramBotStatus>('/whatsapp/alerts/telegram/bot'),
+  enableTelegramBot: () =>
+    apiClient.post<TelegramBotStatus>('/whatsapp/alerts/telegram/bot/enable', {}),
+  disableTelegramBot: () =>
+    apiClient.post<TelegramBotStatus>('/whatsapp/alerts/telegram/bot/disable', {}),
+  /** O código de uso único que o operador manda ao bot (`/vincular <código>`). */
+  createTelegramLinkCode: () =>
+    apiClient.post<{ code: string; expiresAt: string }>('/whatsapp/alerts/telegram/bot/link-code', {}),
+  unlinkTelegram: (telegramUserId: string) =>
+    apiClient.post<TelegramBotStatus>('/whatsapp/alerts/telegram/bot/unlink', { telegramUserId }),
 
   runAlertScan: () =>
     apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),

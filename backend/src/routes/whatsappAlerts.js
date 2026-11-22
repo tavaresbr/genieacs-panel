@@ -1,9 +1,10 @@
 import express from 'express';
 import WhatsAppAlertsController from '../controllers/whatsappAlertsController.js';
+import TelegramBotController from '../controllers/telegramBotController.js';
 import OutageController from '../controllers/outageController.js';
 import MaintenanceController from '../controllers/maintenanceController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { telegramTestLimiter } from '../middleware/rateLimit.js';
+import { telegramBotAdminLimiter, telegramTestLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -15,6 +16,14 @@ router.put('/alerts/settings', authenticateToken, requirePermission('whatsapp.co
 router.post('/alerts/scan', authenticateToken, requirePermission('whatsapp.config'), WhatsAppAlertsController.scan);
 // Uma mensagem de teste no grupo do Telegram: é o que diz se o bot está lá.
 router.post('/alerts/telegram/test', authenticateToken, requirePermission('whatsapp.config'), telegramTestLimiter, WhatsAppAlertsController.testTelegram);
+
+// O bot de comandos (/status, /offline...): liga o webhook, gera o código de
+// vínculo e administra os Telegrams vinculados. Mesma capacidade dos alertas.
+router.get('/alerts/telegram/bot', authenticateToken, requirePermission('whatsapp.config'), TelegramBotController.status);
+router.post('/alerts/telegram/bot/enable', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.enable);
+router.post('/alerts/telegram/bot/disable', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.disable);
+router.post('/alerts/telegram/bot/link-code', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.linkCode);
+router.post('/alerts/telegram/bot/unlink', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramBotController.unlink);
 
 // As quedas em massa que o alerta viu, e o aviso aos clientes atingidos. Ler é
 // de quem atende; avisar e fechar são de quem manda mensagem pelo provedor.
