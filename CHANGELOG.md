@@ -7,6 +7,19 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.60.0] - 2026-11-22
+
+### New
+
+- Tela do Messenger (caixa de entrada e Páginas conectadas) (`d1c21278`)
+- Vínculo da conversa com o assinante (`deec2517`)
+
+### Maintenance
+
+- Registra a tela no plano (`b75cacc1`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/01e764f1a406...6cd48946f9c9)
+
 ## [1.59.0] - 2026-11-22
 
 ### New

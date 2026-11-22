@@ -1,15 +1,27 @@
 {
-  "version": "1.59.0",
-  "build": 1853,
-  "sourceCommit": "71ebc77ae870",
+  "version": "1.60.0",
+  "build": 1859,
+  "sourceCommit": "6cd48946f9c9",
   "releasedAt": "2026-11-22",
-  "basedOnTag": "v1.58.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/a5c42b4b2197...71ebc77ae870",
+  "basedOnTag": "v1.59.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/01e764f1a406...6cd48946f9c9",
   "changes": [
     {
-      "shortHash": "39770403",
+      "shortHash": "d1c21278",
       "date": "2026-11-22",
-      "title": "/reboot com confirmação por botão e auditoria",
+      "title": "Tela do Messenger (caixa de entrada e Páginas conectadas)",
+      "category": "New"
+    },
+    {
+      "shortHash": "b75cacc1",
+      "date": "2026-11-22",
+      "title": "Registra a tela no plano",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "deec2517",
+      "date": "2026-11-22",
+      "title": "Vínculo da conversa com o assinante",
       "category": "New"
     }
   ]
