@@ -135,12 +135,16 @@ describe('sample collection', () => {
     // dela é perguntado à parte. Um inform de dois dias atrás, mais novo que o
     // de três dias gravado, ainda é amostra nova — e o de três dias de novo não.
     const velho = Date.now() - 3 * DAY;
-    fleet = [reading('ont-dark', { informAt: velho }), reading('ont-live', { informAt: Date.now() - 60_000 })];
+    // Um instante só: dois `Date.now()` separados por um milissegundo dão ao
+    // aparelho vivo um inform "mais novo" na segunda leitura e contam como
+    // amostra nova — o teste falhava quando a máquina estava lenta.
+    const vivo = Date.now() - 60_000;
+    fleet = [reading('ont-dark', { informAt: velho }), reading('ont-live', { informAt: vivo })];
     await collect({});
 
     fleet = [
       reading('ont-dark', { informAt: velho + DAY }),
-      reading('ont-live', { informAt: Date.now() - 60_000 }),
+      reading('ont-live', { informAt: vivo }),
       reading('ont-new', { informAt: velho })
     ];
     const summary = await collect({});
