@@ -10,6 +10,7 @@ import { roleHas } from '../config/permissions.js';
 import { segredosIguais } from '../utils/wa/waWebhookAuth.js';
 import {
   answerTelegramCallback,
+  clearTelegramButtons,
   deleteTelegramWebhook,
   escapeTelegramHtml as esc,
   sendTelegramMessage,
@@ -42,6 +43,8 @@ const MAX_LINKS = 50;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 20;
 const PAGE_SIZE = 10;
+const REBOOT_TTL_MS = 2 * 60 * 1000;
+const MAX_PENDING_REBOOTS = 20;
 
 const hash = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 
@@ -52,6 +55,7 @@ const TEXT = Object.freeze({
     '/offline — ONTs offline (paginado)',
     '/cliente &lt;termo&gt; — procura por PPPoE, serial ou id',
     '/falhas — últimas falhas do ACS',
+    '/reboot &lt;PPPoE, serial ou id&gt; — reinicia uma ONT (pede confirmação)',
     '/vincular &lt;código&gt; — liga este Telegram ao seu usuário do painel',
     '/desvincular — remove o vínculo'
   ].join('\n'),
@@ -63,7 +67,11 @@ const TEXT = Object.freeze({
   forbidden: 'Seu usuário não tem permissão para este comando.',
   rate: 'Muitos comandos seguidos. Aguarde um minuto.',
   failed: 'Não consegui consultar o painel agora. Tente de novo em instantes.',
-  unknown: 'Comando desconhecido. Envie /ajuda.'
+  unknown: 'Comando desconhecido. Envie /ajuda.',
+  rebootExpired: 'Pedido expirado ou já usado. Envie /reboot de novo.',
+  rebootCancelled: 'Reinício cancelado.',
+  rebootDone: (name) => `Reinício enviado para <code>${esc(name)}</code>.`,
+  rebootFailed: 'Não consegui enviar o reinício ao ACS.'
 });
 
 /** Limite por usuário do Telegram, em memória: basta para segurar um laço. */
@@ -83,6 +91,11 @@ function rateLimited(tgUserId, now = Date.now()) {
     }
   }
   return false;
+}
+
+/** Para os testes: zera a janela de limite por usuário. */
+export function resetTelegramRateLimit() {
+  hits.clear();
 }
 
 const plain = (value) => {
@@ -123,6 +136,7 @@ class TelegramBotService {
       enabled: parsed.enabled === true,
       secretHash: typeof parsed.secretHash === 'string' ? parsed.secretHash : '',
       links: Array.isArray(parsed.links) ? parsed.links : [],
+      pending: (Array.isArray(parsed.pending) ? parsed.pending : []).filter((entry) => Number(entry.expiresAt) > now),
       codes: (Array.isArray(parsed.codes) ? parsed.codes : []).filter((entry) => Number(entry.expiresAt) > now)
     };
   }
@@ -309,7 +323,7 @@ class TelegramBotService {
     if (!handler) return void this.reply(ctx, chatId, TEXT.unknown);
     if (!roleHas(operator.role, handler.permission)) return void this.reply(ctx, chatId, TEXT.forbidden);
     try {
-      const answer = await handler.run({ arg, operator });
+      const answer = await handler.run({ arg, operator, from });
       await this.reply(ctx, chatId, answer.text, answer.replyMarkup);
     } catch {
       console.warn('Telegram bot command failed');
@@ -317,22 +331,83 @@ class TelegramBotService {
     }
   }
 
-  /** Os botões de página do /offline: `off:<página>`. */
+  /** Os botões inline: página do /offline (`off:<n>`) e confirmação do /reboot (`rb:<nonce>:y|n`). */
   static async handleCallback(ctx, query) {
     const from = query.from;
     const chat = query.message?.chat;
-    const answered = () => answerTelegramCallback({ token: ctx.token, callbackQueryId: query.id });
+    const answered = (text) => answerTelegramCallback({ token: ctx.token, callbackQueryId: query.id, text });
     if (!from || from.is_bot || !this.chatAllowed(ctx, chat) || rateLimited(String(from.id))) return void answered();
     const operator = await this.resolveOperator(from.id);
-    const match = /^off:(\d{1,4})$/.exec(String(query.data || ''));
-    if (!operator || !match || !roleHas(operator.role, COMMANDS.offline.permission)) return void answered();
+    if (!operator) return void answered();
+    const data = String(query.data || '');
+
+    const page = /^off:(\d{1,4})$/.exec(data);
+    if (page) {
+      if (!roleHas(operator.role, COMMANDS.offline.permission)) return void answered();
+      await answered();
+      try {
+        const answer = await COMMANDS.offline.run({ arg: page[1], operator });
+        await this.reply(ctx, chat.id, answer.text, answer.replyMarkup);
+      } catch {
+        await this.reply(ctx, chat.id, TEXT.failed);
+      }
+      return undefined;
+    }
+
+    const reboot = /^rb:([0-9a-f]{16}):([yn])$/.exec(data);
+    if (reboot) return this.handleRebootChoice(ctx, query, from, chat, operator, reboot[1], reboot[2] === 'y', answered);
+    return void answered();
+  }
+
+  /**
+   * O toque em Confirmar/Cancelar. O pedido é consumido ANTES de agir (uso
+   * único, mesmo se o ACS falhar), só vale para quem o fez, e a permissão é
+   * conferida de novo agora: o papel pode ter mudado nos dois minutos.
+   */
+  static async handleRebootChoice(ctx, query, from, chat, operator, nonce, confirmed, answered) {
+    const state = await this.readState();
+    const wanted = hash(nonce);
+    const entry = state.pending.find((item) => item.hash === wanted);
+    if (!entry || String(entry.tgUserId) !== String(from.id)) return void answered(TEXT.rebootExpired);
+    await this.writeState({ ...state, pending: state.pending.filter((item) => item !== entry) });
+    if (query.message?.message_id) {
+      await clearTelegramButtons({ token: ctx.token, chatId: chat.id, messageId: query.message.message_id });
+    }
+    if (!confirmed) {
+      await answered();
+      return void this.reply(ctx, chat.id, TEXT.rebootCancelled);
+    }
+    if (!roleHas(operator.role, COMMANDS.reboot.permission)) {
+      await answered();
+      return void this.reply(ctx, chat.id, TEXT.forbidden);
+    }
     await answered();
     try {
-      const answer = await COMMANDS.offline.run({ arg: match[1], operator });
-      await this.reply(ctx, chat.id, answer.text, answer.replyMarkup);
+      await DeviceService.rebootDevice(entry.deviceId);
+      await AuditLog.record({
+        action: AuditLog.ACTIONS.DEVICE_REBOOTED,
+        actorUserId: operator.userId,
+        actorUsername: operator.username,
+        subjectType: 'device',
+        subjectId: String(entry.deviceId).slice(0, 128),
+        detail: { via: 'telegram' }
+      });
+      await this.reply(ctx, chat.id, TEXT.rebootDone(entry.label || entry.deviceId));
     } catch {
-      await this.reply(ctx, chat.id, TEXT.failed);
+      await this.reply(ctx, chat.id, TEXT.rebootFailed);
     }
+    return undefined;
+  }
+
+  /** Guarda o pedido e devolve o nonce que vai no botão (o id do aparelho nunca vai nele). */
+  static async createRebootRequest({ deviceId, label, tgUserId, userId }) {
+    const state = await this.readState();
+    const nonce = crypto.randomBytes(8).toString('hex');
+    const pending = [...state.pending, {
+      hash: hash(nonce), deviceId, label, tgUserId: String(tgUserId), userId, expiresAt: Date.now() + REBOOT_TTL_MS
+    }].slice(-MAX_PENDING_REBOOTS);
+    await this.writeState({ ...state, pending });
+    return nonce;
   }
 }
 
@@ -377,6 +452,30 @@ const COMMANDS = {
       if (devices.length === 0) return { text: 'Nada encontrado.' };
       const more = result.total > devices.length ? `\n… e mais ${result.total - devices.length}. Refine a busca.` : '';
       return { text: [`<b>${result.total} resultado(s)</b>`, ...devices.map(deviceLine)].join('\n') + more };
+    }
+  },
+  reboot: {
+    permission: 'devices.write',
+    async run({ arg, operator, from }) {
+      if (!arg) return { text: 'Use: /reboot &lt;PPPoE, serial ou id&gt;' };
+      const result = await DeviceService.getDevicesPage({ search: arg.slice(0, 64), pageSize: 5, page: 1 });
+      const devices = result?.devices || [];
+      if (devices.length === 0) return { text: 'Nada encontrado.' };
+      if (devices.length > 1 || result.total > 1) {
+        return { text: [`<b>${result.total} aparelhos</b> combinam. Refine a busca para um só:`, ...devices.map(deviceLine)].join('\n') };
+      }
+      const [device] = devices;
+      const label = plain(device.pppoe) || plain(device.SerialNumber) || plain(device._id);
+      const nonce = await TelegramBotService.createRebootRequest({
+        deviceId: String(device._id), label, tgUserId: from.id, userId: operator.userId
+      });
+      return {
+        text: `Reiniciar <code>${esc(label)}</code>? O cliente fica sem internet por alguns minutos.`,
+        replyMarkup: { inline_keyboard: [[
+          { text: 'Confirmar', callback_data: `rb:${nonce}:y` },
+          { text: 'Cancelar', callback_data: `rb:${nonce}:n` }
+        ]] }
+      };
     }
   },
   falhas: {

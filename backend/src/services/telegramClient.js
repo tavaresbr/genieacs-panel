@@ -131,3 +131,12 @@ export function answerTelegramCallback({ token, callbackQueryId, text }) {
     ...(text ? { text: String(text).slice(0, 200) } : {})
   });
 }
+
+/** Tira os botões de uma mensagem já respondida (um toque só vale uma vez). */
+export function clearTelegramButtons({ token, chatId, messageId }) {
+  return callTelegram(token, 'editMessageReplyMarkup', {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: { inline_keyboard: [] }
+  });
+}
