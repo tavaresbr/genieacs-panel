@@ -1,8 +1,8 @@
 # Plano: integração com Facebook Messenger
 
 Status: Fase 1 implementada no backend (migração `0144_messenger`, webhook, entrada, envio, conexão da Página,
-API `/api/messenger`, LGPD e testes). Falta a tela (frontend), o vínculo com o assinante, o outbox com retry e a
-revisão da Meta. Desvios do plano original estão em "Como ficou" no fim.
+API `/api/messenger`, LGPD e testes). A tela (`/messenger`: caixa de entrada e Páginas conectadas) também está pronta. Falta o
+vínculo com o assinante, o outbox com retry e a revisão da Meta. Desvios do plano original estão em "Como ficou" no fim.
 
 ## O que o código atual diz
 
@@ -102,3 +102,14 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
 - **LGPD**: `messenger_conversations`/`messenger_messages` entram no dossiê e na exclusão do assinante (por
   `customer_account_id` ou `contract`); `messenger_pages` está em `SEM_DADO_DE_ASSINANTE`. Como ainda não há
   vínculo, hoje nenhuma conversa casa com um assinante — o alcance passa a valer quando o vínculo existir.
+
+### Tela (`/messenger`)
+- Caixa de entrada com abertas/arquivadas, conversa com recibos, aviso da janela de 24 h (o campo de resposta
+  fecha, e o servidor continua sendo quem recusa), arquivar/reabrir. Atualiza por polling (15 s a lista, 8 s a
+  conversa aberta).
+- Painel "Páginas do Facebook" (só com `whatsapp.config`): conectar por ID + token da Página, estado da
+  assinatura, desconectar com confirmação. O token só vai do campo ao servidor.
+- Item de menu "Messenger" (`whatsapp.read`); textos nos 13 idiomas (pt-BR e es traduzidos; os demais em
+  inglês, como as outras chaves novas do projeto).
+- Não há ainda prévia da última mensagem na lista (o endpoint não a devolve) nem login do Facebook: o token da
+  Página é colado.
