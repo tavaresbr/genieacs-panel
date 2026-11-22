@@ -73,6 +73,7 @@ export const SEM_DADO_DE_ASSINANTE = Object.freeze({
   whatsapp_accounts: 'instâncias de WhatsApp do provedor',
   wa_templates: 'modelos de mensagem',
   wa_ai_usage: 'contadores de uso da IA por dia e tarefa (sem texto, sem assinante)',
+  messenger_pages: 'as Páginas do Facebook que o provedor conectou (token cifrado), nenhum assinante — a conversa sai em messenger_conversations',
   wa_ai_knowledge: 'base de conhecimento da IA de vendas (texto do provedor, sem assinante)',
   wa_sales_plans: 'catálogo de planos que a IA de vendas oferece (do provedor, sem assinante)',
   wa_meta_templates: 'modelos aprovados da Meta (texto do provedor, sem assinante)',
@@ -246,6 +247,16 @@ export async function alcanceDoAssinante(account) {
       .orderBy('id')
     : [];
 
+  // O Messenger: a conversa liga ao assinante pela conta ou pelo contrato, os
+  // mesmos vínculos da conversa do WhatsApp. (O PSID não é telefone, então não
+  // há busca por número.)
+  const conversasMessenger = (contratos.length || account.id)
+    ? await tdb('messenger_conversations').where((q) => {
+      q.where({ customer_account_id: account.id });
+      if (contratos.length) q.orWhereIn('contract', contratos);
+    }).orderBy('id')
+    : [];
+
   return {
     deviceIds,
     posses,
@@ -263,6 +274,8 @@ export async function alcanceDoAssinante(account) {
     asaasCobrancas,
     conversas,
     conversaIds: conversas.map((c) => c.id),
+    messengerConversaIds: conversasMessenger.map((c) => c.id),
+    conversasMessenger,
     eventos,
     amostras,
     horas,
@@ -402,7 +415,7 @@ class CustomerDataExportService {
 
     const {
       deviceIds, naPosse, emPosseAgora, contratos, telefones: todosTelefones, vinculos, contatos,
-      clientes, documentos, asaasClientes, asaasCobrancas, conversas, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
+      clientes, documentos, asaasClientes, asaasCobrancas, conversas, conversaIds, conversasMessenger, messengerConversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
     } = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -476,6 +489,10 @@ class CustomerDataExportService {
       : []);
     guardar('wa_messages', conversaIds.length
       ? await tdb('wa_messages').whereIn('conversation_id', conversaIds).orderBy('id')
+      : []);
+    guardar('messenger_conversations', conversasMessenger);
+    guardar('messenger_messages', messengerConversaIds.length
+      ? await tdb('messenger_messages').whereIn('conversation_id', messengerConversaIds).orderBy('id')
       : []);
     guardar('wa_opt_outs', (todosTelefones.length || conversaIds.length)
       ? await tdb('wa_opt_outs').where((q) => {

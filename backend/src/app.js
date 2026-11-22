@@ -72,6 +72,9 @@ import { BILLING_WEBHOOK_PATH } from './config/billingWebhookPath.js';
 import asaasWebhookRoutes from './routes/asaasWebhook.js';
 import { ASAAS_WEBHOOK_PATH } from './config/asaasWebhookPath.js';
 import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
+import messengerWebhookRoutes from './routes/messengerWebhook.js';
+import messengerRoutes from './routes/messenger.js';
+import { MESSENGER_WEBHOOK_PATH } from './config/messengerWebhookPath.js';
 import { TELEGRAM_WEBHOOK_PATH } from './config/telegramWebhookPath.js';
 import telegramWebhookRoutes from './routes/telegramWebhook.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
@@ -216,6 +219,9 @@ app.use(cors({
 // parser below skips it. A `verify` hook on the global parser would instead
 // copy every request body in the process.
 app.use(WEBHOOK_PATH, express.raw({ type: '*/*', limit: '64kb' }));
+// O webhook do Messenger: a assinatura da Meta é do corpo BRUTO, então ele é
+// reservado aqui, antes do parser de JSON, como o do SGP.
+app.use(MESSENGER_WEBHOOK_PATH, express.raw({ type: '*/*', limit: '256kb' }));
 // The operator's attachment upload, reserved here for the same reason and in
 // the same way: its body is the file itself, and the global parser below is
 // sized for JSON — a 12 MB photo posted past this line would fail as a parse
@@ -297,6 +303,7 @@ app.use(express.json({ limit: '1mb' }));
 // pontas divergirem é justamente a falha que essa conferência existe para
 // impedir.
 app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);
+app.use(MESSENGER_WEBHOOK_PATH, messengerWebhookRoutes);
 
 // O bot de comandos do Telegram: público pelo mesmo motivo (quem chama é o
 // Telegram), autenticado pelo segredo do webhook no header, com teto próprio.
@@ -457,6 +464,9 @@ app.use('/api/contacts', contactRoutes);
 // isso continua aberto para quem não tem o add-on.
 app.use('/api/whatsapp', requireAddon('whatsapp', { except: WHATSAPP_ADDON_EXEMPT_PATHS }));
 app.use('/api/whatsapp', whatsappRoutes);
+// O Messenger vive sob o mesmo add-on do WhatsApp (o atendimento é um só).
+app.use('/api/messenger', requireAddon('whatsapp'));
+app.use('/api/messenger', messengerRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);
 app.use('/api/whatsapp', whatsappBillingRoutes);
