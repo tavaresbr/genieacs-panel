@@ -133,11 +133,11 @@ describe('quem enxerga quais telas', () => {
     expect(hrefs).toEqual(['/dashboard', '/devices', '/network-map'])
   })
 
-  it('e ao tech o do viewer mais WhatsApp e Contatos', () => {
+  it('e ao tech o do viewer mais WhatsApp, Messenger e Contatos', () => {
     const hrefs = visibleMenuScreens({ can: comoPapel('tech'), isSaas: true, isPlatformAdmin: false })
       .map((s) => s.href)
 
-    expect(hrefs).toEqual(['/dashboard', '/whatsapp', '/devices', '/contacts', '/network-map'])
+    expect(hrefs).toEqual(['/dashboard', '/whatsapp', '/messenger', '/devices', '/contacts', '/network-map'])
   })
 
   /**

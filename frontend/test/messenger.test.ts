@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest'
+import {
+  MESSENGER_REPLY_WINDOW_MS,
+  isPageId,
+  messengerErrorKey,
+  messengerTitle,
+  remainingParts,
+  singleLine,
+  windowRemainingMs,
+} from '@/lib/messenger'
+
+const NOW = Date.parse('2026-11-22T12:00:00Z')
+
+describe('a janela de resposta do Messenger', () => {
+  it('conta 24 h a partir da última mensagem da pessoa', () => {
+    const lastInbound = new Date(NOW - 2 * 3600_000).toISOString()
+    expect(windowRemainingMs(lastInbound, NOW)).toBe(MESSENGER_REPLY_WINDOW_MS - 2 * 3600_000)
+  })
+
+  it('fechada depois de 24 h, e nunca negativa', () => {
+    expect(windowRemainingMs(new Date(NOW - 25 * 3600_000).toISOString(), NOW)).toBe(0)
+  })
+
+  it('sem mensagem da pessoa, ou com data ilegível, está fechada', () => {
+    expect(windowRemainingMs(null, NOW)).toBe(0)
+    expect(windowRemainingMs(undefined, NOW)).toBe(0)
+    expect(windowRemainingMs('ontem', NOW)).toBe(0)
+  })
+
+  it('separa horas e minutos', () => {
+    expect(remainingParts(5 * 3600_000 + 30 * 60_000 + 59_000)).toEqual({ hours: 5, minutes: 30 })
+    expect(remainingParts(-1)).toEqual({ hours: 0, minutes: 0 })
+  })
+})
+
+describe('o título e a prévia da conversa', () => {
+  it('usa o nome, ou o fim do PSID quando não há', () => {
+    expect(messengerTitle({ name: ' Maria ', psid: '1234567890' })).toBe('Maria')
+    expect(messengerTitle({ name: null, psid: '1234567890' })).toBe('…567890')
+    expect(messengerTitle({ name: '   ', psid: '1234567890' })).toBe('…567890')
+  })
+
+  it('a prévia cabe numa linha', () => {
+    expect(singleLine('a\n  b\tc')).toBe('a b c')
+    expect(singleLine(null)).toBe('')
+    expect(singleLine('x'.repeat(100), 10)).toBe(`${'x'.repeat(9)}…`)
+  })
+})
+
+describe('os códigos de erro do servidor', () => {
+  it('cada código conhecido tem a própria mensagem', () => {
+    expect(messengerErrorKey('window_closed')).toBe('messenger.error.windowClosed')
+    expect(messengerErrorKey('page_already_connected')).toBe('messenger.error.pageAlreadyConnected')
+    expect(messengerErrorKey('messenger_unconfigured')).toBe('messenger.error.unconfigured')
+  })
+
+  it('código desconhecido ou ausente cai na genérica, sem repetir texto cru', () => {
+    expect(messengerErrorKey('algo_novo')).toBe('messenger.error.generic')
+    expect(messengerErrorKey(undefined)).toBe('messenger.error.generic')
+  })
+
+  it('confere o id da Página como o servidor: só dígitos', () => {
+    expect(isPageId('1000000001')).toBe(true)
+    expect(isPageId(' 1000000001 ')).toBe(true)
+    expect(isPageId('abc')).toBe(false)
+    expect(isPageId('123')).toBe(false)
+  })
+})

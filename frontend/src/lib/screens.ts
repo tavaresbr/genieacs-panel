@@ -52,6 +52,7 @@ export type MenuScreen = {
 export const MENU_SCREENS: readonly MenuScreen[] = [
   { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', permission: 'devices.list', group: 'operation' },
   { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', permission: 'whatsapp.read', group: 'operation' },
+  { href: '/messenger', labelKey: 'sidebar.nav.messenger', descriptionKey: 'sidebar.nav.messengerDescription', icon: 'chat', permission: 'whatsapp.read', group: 'operation' },
   { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', permission: 'devices.list', group: 'operation' },
   { href: '/contacts', labelKey: 'sidebar.nav.contacts', descriptionKey: 'sidebar.nav.contactsDescription', icon: 'contacts', permission: 'whatsapp.read', group: 'operation' },
   { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', permission: 'map.read', group: 'operation' },
