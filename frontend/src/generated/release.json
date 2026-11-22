@@ -1,34 +1,16 @@
 {
-  "version": "1.58.0",
-  "build": 1850,
-  "sourceCommit": "00813edb35aa",
+  "version": "1.59.0",
+  "build": 1853,
+  "sourceCommit": "71ebc77ae870",
   "releasedAt": "2026-11-22",
-  "basedOnTag": "v1.57.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/fa8da78dfa89...00813edb35aa",
+  "basedOnTag": "v1.58.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/a5c42b4b2197...71ebc77ae870",
   "changes": [
     {
-      "shortHash": "00c7a529",
+      "shortHash": "39770403",
       "date": "2026-11-22",
-      "title": "Fase 1 — webhook, entrada, envio, conexão de Página e LGPD",
+      "title": "/reboot com confirmação por botão e auditoria",
       "category": "New"
-    },
-    {
-      "shortHash": "06ef6e69",
-      "date": "2026-11-22",
-      "title": "Só devolve desafio numérico na verificação do webhook",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "4ebc2f7d",
-      "date": "2026-11-22",
-      "title": "Declara o webhook e cobre as rotas com id na varredura de provedores",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "c2460d45",
-      "date": "2026-11-22",
-      "title": "Registra a retenção das conversas e mensagens",
-      "category": "Maintenance"
     }
   ]
 }
