@@ -251,10 +251,17 @@ export async function alcanceDoAssinante(account) {
   // mesmos vínculos da conversa do WhatsApp. (O PSID não é telefone, então não
   // há busca por número.)
   const conversasMessenger = (contratos.length || account.id)
-    ? await tdb('messenger_conversations').where((q) => {
+    ? (await tdb('messenger_conversations').where((q) => {
       q.where({ customer_account_id: account.id });
       if (contratos.length) q.orWhereIn('contract', contratos);
-    }).orderBy('id')
+      // O cliente sem ONT no painel: o contrato do cadastro, ou a linha sem contrato.
+      const contratosDoCadastro = contatos.map((c) => c.contract).filter(Boolean);
+      if (contratosDoCadastro.length) q.orWhereIn('contract', contratosDoCadastro);
+      if (contatoIds.length) q.orWhereIn('sgp_contact_id', contatoIds);
+    }).orderBy('id')).filter((c) => (
+      // Uma conversa ligada a OUTRA conta é daquela pessoa, como no WhatsApp.
+      c.customer_account_id !== null && c.customer_account_id !== undefined ? minha(c.customer_account_id) : true
+    ))
     : [];
 
   return {

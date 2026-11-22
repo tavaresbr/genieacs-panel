@@ -49,6 +49,26 @@ export const casos = [
     tabela: 'messenger_conversations'
   },
   {
+    // Vincular a conversa a um contrato. No controle o contrato não existe, e a
+    // resposta é `subscriber_not_found` — que só se chega DEPOIS de achar a
+    // conversa; o que não pode aparecer é `conversation_not_found`.
+    chave: 'messengerConversation',
+    label: 'POST /api/messenger/conversations/:id/subscriber',
+    method: 'POST',
+    path: (id) => `/api/messenger/conversations/${id}/subscriber`,
+    body: { contract: 'CONTRATO-QUE-NAO-EXISTE' },
+    tabela: 'messenger_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'messengerConversation',
+    label: 'DELETE /api/messenger/conversations/:id/subscriber',
+    method: 'DELETE',
+    path: (id) => `/api/messenger/conversations/${id}/subscriber`,
+    tabela: 'messenger_conversations'
+  },
+  {
     chave: 'messengerPage',
     label: 'DELETE /api/messenger/pages/:id',
     method: 'DELETE',

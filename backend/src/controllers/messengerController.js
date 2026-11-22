@@ -3,6 +3,7 @@ import MessengerConversation from '../models/MessengerConversation.js';
 import MessengerMessage from '../models/MessengerMessage.js';
 import MessengerPageService, { MessengerError, publicPage, messengerConfigured } from '../services/messengerPageService.js';
 import MessengerSendService, { windowOpen } from '../services/messengerSendService.js';
+import MessengerLinkService from '../services/messengerLinkService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 function fail(res, error, fallback) {
@@ -13,12 +14,16 @@ function fail(res, error, fallback) {
   return res.status(500).json(createErrorResponse(fallback, error.message));
 }
 
-const publicConversation = (c) => ({
+const publicConversation = (c, clientName = null) => ({
   id: c.id,
   pageRowId: c.page_row_id,
   psid: c.psid,
   name: c.name,
   contract: c.contract,
+  sgpContactId: c.sgp_contact_id ? Number(c.sgp_contact_id) : null,
+  /** O cliente do SGP a que a conversa foi vinculada, se foi. */
+  clientName,
+  linked: Boolean(c.contract || c.sgp_contact_id),
   lastMessageAt: c.last_message_at,
   lastInboundAt: c.last_inbound_at,
   unreadCount: c.unread_count,
@@ -83,7 +88,8 @@ class MessengerController {
       const rows = await MessengerConversation.listRecent({
         limit: req.query?.limit, offset: req.query?.offset, status: req.query?.status
       });
-      return res.json(createResponse('ok', rows.map(publicConversation)));
+      const names = await MessengerLinkService.clientNames(rows);
+      return res.json(createResponse('ok', rows.map((c) => publicConversation(c, names.get(c.id)))));
     } catch (error) {
       return fail(res, error, 'could not load conversations');
     }
@@ -100,7 +106,10 @@ class MessengerController {
       });
       if (conversation.unread_count) await MessengerConversation.update(id, { unread_count: 0 });
       return res.json(createResponse('ok', {
-        conversation: publicConversation({ ...conversation, unread_count: 0 }),
+        conversation: publicConversation(
+          { ...conversation, unread_count: 0 },
+          (await MessengerLinkService.clientNames([conversation])).get(conversation.id)
+        ),
         messages: rows.map(publicMessage)
       }));
     } catch (error) {
@@ -120,6 +129,25 @@ class MessengerController {
     }
   }
 
+  /** Vincular a conversa a um assinante: `{ contract }` (o contrato, ou `c:<id>`). */
+  static async linkSubscriber(req, res) {
+    try {
+      const row = await MessengerLinkService.link(Number(req.params.id), req.body?.contract);
+      return res.json(createResponse('ok', publicConversation(row, (await MessengerLinkService.clientNames([row])).get(row.id))));
+    } catch (error) {
+      return fail(res, error, 'could not link subscriber');
+    }
+  }
+
+  static async unlinkSubscriber(req, res) {
+    try {
+      const row = await MessengerLinkService.unlink(Number(req.params.id));
+      return res.json(createResponse('ok', publicConversation(row)));
+    } catch (error) {
+      return fail(res, error, 'could not unlink subscriber');
+    }
+  }
+
   /** Arquivar ou reabrir: `{ closed: true | false }`. */
   static async setClosed(req, res) {
     try {
@@ -129,7 +157,7 @@ class MessengerController {
       }
       if (typeof req.body?.closed !== 'boolean') throw new MessengerError('invalid_body', '`closed` must be true or false');
       const row = await MessengerConversation.update(id, { closed_at: req.body.closed ? new Date() : null });
-      return res.json(createResponse('ok', publicConversation(row)));
+      return res.json(createResponse('ok', publicConversation(row, (await MessengerLinkService.clientNames([row])).get(row.id))));
     } catch (error) {
       return fail(res, error, 'could not update conversation');
     }

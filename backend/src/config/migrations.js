@@ -3925,6 +3925,19 @@ const messengerMessagesTable = (db) => (t) => {
   t.index(['conversation_id', 'created_at'], 'messenger_msg_conv_idx');
 };
 
+/**
+ * O vínculo da conversa do Messenger com o assinante (0145): `sgp_contact_id`
+ * para o cliente sem contrato (como em `wa_conversations`) e `bound_via` para
+ * dizer quem vinculou ('operator'). `contract` e `customer_account_id` já
+ * existiam desde a 0144. Sem chave estrangeira, como a coluna irmã do WhatsApp:
+ * o cadastro do SGP é reescrito pela sincronização e o vínculo não pode
+ * impedi-la.
+ */
+const MESSENGER_LINK_COLUMNS = [
+  ['sgp_contact_id', (t) => t.integer('sgp_contact_id').unsigned().nullable()],
+  ['bound_via', (t) => t.string('bound_via', 16).nullable()]
+];
+
 // A ordem importa: a Página antes das conversas, e estas antes das mensagens.
 const MESSENGER_TABLES = [
   ['messenger_pages', messengerPagesTable],
@@ -8183,6 +8196,22 @@ export const migrations = [
       for (const [name, builder] of MESSENGER_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
+    }
+  },
+  {
+    /** O vínculo da conversa do Messenger com o assinante — ver `MESSENGER_LINK_COLUMNS`. */
+    id: '0145_messenger_subscriber_link',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('messenger_conversations'))) return true;
+      return (await missingColumns(db, 'messenger_conversations', MESSENGER_LINK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('messenger_conversations'))) return;
+      const missing = await missingColumns(db, 'messenger_conversations', MESSENGER_LINK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('messenger_conversations', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

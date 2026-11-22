@@ -6757,6 +6757,84 @@ export interface AiKnowledgeItem {
 
 export type AiKnowledgeInput = Partial<Pick<AiKnowledgeItem, 'kind' | 'title' | 'triggers' | 'answer' | 'active'>>
 
+/** `GET /messenger/status`: se a plataforma tem o app da Meta configurado, e o caminho do webhook. */
+export interface MessengerStatus {
+  configured: boolean
+  webhookPath: string
+}
+
+/** Uma Página do Facebook conectada. O token nunca chega ao navegador. */
+export interface MessengerPage {
+  id: number
+  pageId: string
+  pageName: string | null
+  status: 'connected' | 'error'
+  subscribedAt: string | null
+  webhookError: string | null
+  webhookRefusedAt: string | null
+  webhookRefusedReason: string | null
+  createdAt: string
+}
+
+export interface MessengerConversation {
+  id: number
+  pageRowId: number
+  psid: string
+  name: string | null
+  contract: string | null
+  sgpContactId: number | null
+  /** O cliente do SGP a que a conversa foi vinculada, se foi. */
+  clientName: string | null
+  linked: boolean
+  lastMessageAt: string | null
+  lastInboundAt: string | null
+  unreadCount: number
+  closedAt: string | null
+  /** Se ainda dá para responder (24 h desde a última mensagem da pessoa). */
+  windowOpen: boolean
+}
+
+export type MessengerDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'
+
+export interface MessengerMessage {
+  id: number
+  conversationId: number
+  direction: 'in' | 'out'
+  body: string | null
+  attachmentType: string | null
+  attachmentUrl: string | null
+  /** `page` = escrita fora do painel (eco). */
+  source: 'operator' | 'page'
+  deliveryStatus: MessengerDeliveryStatus | null
+  deliveryError: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+export const messengerAPI = {
+  status: () => apiClient.get<MessengerStatus>('/messenger/status'),
+  listPages: () => apiClient.get<MessengerPage[]>('/messenger/pages'),
+  connectPage: (pageId: string, pageToken: string) =>
+    apiClient.post<MessengerPage>('/messenger/pages', { pageId, pageToken }),
+  disconnectPage: (id: number) => apiClient.delete<null>(`/messenger/pages/${id}`),
+  listConversations: (status: 'open' | 'closed' = 'open') =>
+    apiClient.get<MessengerConversation[]>(`/messenger/conversations?status=${status}`),
+  /** Abrir a conversa zera o não lido: quem a abre é quem a leu. */
+  listMessages: (id: number) =>
+    apiClient.get<{ conversation: MessengerConversation; messages: MessengerMessage[] }>(
+      `/messenger/conversations/${id}/messages`
+    ),
+  send: (id: number, text: string) =>
+    apiClient.post<MessengerMessage>(`/messenger/conversations/${id}/messages`, { text }),
+  setClosed: (id: number, closed: boolean) =>
+    apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/closed`, { closed }),
+  /** `key` é o do contato (`WhatsAppContact.key`): o contrato, ou `c:<id>` sem contrato. */
+  linkSubscriber: (id: number, key: string) =>
+    apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/subscriber`, { contract: key }),
+  unlinkSubscriber: (id: number) =>
+    apiClient.delete<MessengerConversation>(`/messenger/conversations/${id}/subscriber`),
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),

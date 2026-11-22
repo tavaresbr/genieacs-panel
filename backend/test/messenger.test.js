@@ -285,6 +285,94 @@ describe('API do painel', () => {
   });
 });
 
+describe('vínculo com o assinante', () => {
+  const convOf = async (tenant, psid) => getDb()('messenger_conversations').where({ tenant_id: tenant, psid }).first();
+  let convId;
+  let accountId;
+
+  before(async () => {
+    convId = (await convOf(alfa, 'psid-1')).id;
+    const db = getDb();
+    accountId = (await db('customer_accounts').insert({
+      tenant_id: alfa, customer_id: 'CSG-MSG-1', device_id: 'ONT-MSG-1', identity_hash: 'a'.repeat(64),
+      software_id: 'V1', pppoe_username: 'maria.msg', active: true
+    }).returning('id'))[0];
+    accountId = typeof accountId === 'object' ? accountId.id : accountId;
+    await db('sgp_links').insert({ tenant_id: alfa, device_id: 'ONT-MSG-1', contract: 'CT-ALFA-1', client_name: 'Maria da Silva', state: 'active' });
+    await db('sgp_contacts').insert({ tenant_id: alfa, contract: 'CT-ALFA-SEM-ONT', client_name: 'João Sem ONT' });
+    await db('sgp_links').insert({ tenant_id: beta, device_id: 'ONT-MSG-BETA', contract: 'CT-BETA-1', client_name: 'Cliente do Beta', state: 'active' });
+  });
+
+  it('sem vínculo, a conversa não tem cliente', async () => {
+    const list = (await api('/conversations')).body.data.find((c) => c.id === convId);
+    assert.equal(list.linked, false);
+    assert.equal(list.clientName, null);
+  });
+
+  it('vincula a um contrato: guarda contrato e conta do portal, e a lista traz o nome', async () => {
+    const res = await api(`/conversations/${convId}/subscriber`, { method: 'POST', body: { contract: 'CT-ALFA-1' } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.contract, 'CT-ALFA-1');
+    assert.equal(res.body.data.clientName, 'Maria da Silva');
+    assert.equal(res.body.data.linked, true);
+    const row = await convOf(alfa, 'psid-1');
+    assert.equal(row.customer_account_id, accountId);
+    assert.equal(row.bound_via, 'operator');
+    const list = (await api('/conversations')).body.data.find((c) => c.id === convId);
+    assert.equal(list.clientName, 'Maria da Silva');
+    const thread = await api(`/conversations/${convId}/messages`);
+    assert.equal(thread.body.data.conversation.clientName, 'Maria da Silva');
+  });
+
+  it('vincula a um cliente do cadastro sem ONT pelo contrato, e a um sem contrato por c:<id>', async () => {
+    const semOnt = await api(`/conversations/${convId}/subscriber`, { method: 'POST', body: { contract: 'CT-ALFA-SEM-ONT' } });
+    assert.equal(semOnt.status, 200, JSON.stringify(semOnt.body));
+    assert.equal(semOnt.body.data.clientName, 'João Sem ONT');
+    assert.equal((await convOf(alfa, 'psid-1')).customer_account_id, null);
+
+    const contato = await getDb()('sgp_contacts').insert({ tenant_id: alfa, contract: null, client_name: 'Ana Sem Contrato' }).returning('id');
+    const contatoId = typeof contato[0] === 'object' ? contato[0].id : contato[0];
+    const semContrato = await api(`/conversations/${convId}/subscriber`, { method: 'POST', body: { contract: `c:${contatoId}` } });
+    assert.equal(semContrato.status, 200, JSON.stringify(semContrato.body));
+    assert.equal(semContrato.body.data.contract, null);
+    assert.equal(semContrato.body.data.sgpContactId, contatoId);
+    assert.equal(semContrato.body.data.clientName, 'Ana Sem Contrato');
+    assert.equal(semContrato.body.data.linked, true);
+  });
+
+  it('contrato que não existe, ou que é de outro provedor, dá o mesmo 404', async () => {
+    const nunca = await api(`/conversations/${convId}/subscriber`, { method: 'POST', body: { contract: 'CT-NUNCA' } });
+    const doBeta = await api(`/conversations/${convId}/subscriber`, { method: 'POST', body: { contract: 'CT-BETA-1' } });
+    assert.equal(nunca.status, 404);
+    assert.equal(nunca.body.code, 'subscriber_not_found');
+    assert.equal(doBeta.status, 404);
+    assert.deepEqual(doBeta.body, nunca.body);
+    assert.equal((await api(`/conversations/${convId}/subscriber`, { method: 'POST', body: {} })).body.code, 'invalid_body');
+  });
+
+  it('o contrato vinculado entra no dossiê do assinante', async () => {
+    await api(`/conversations/${convId}/subscriber`, { method: 'POST', body: { contract: 'CT-ALFA-1' } });
+    const { alcanceDoAssinante } = await import('../src/services/customerDataExportService.js');
+    const { default: CustomerAccount } = await import('../src/models/CustomerAccount.js');
+    const alcance = await runInTenant(alfa, async () => alcanceDoAssinante(await CustomerAccount.getById(accountId)));
+    assert.deepEqual(alcance.messengerConversaIds, [convId]);
+  });
+
+  it('desvincula', async () => {
+    const res = await api(`/conversations/${convId}/subscriber`, { method: 'DELETE' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.linked, false);
+    const row = await convOf(alfa, 'psid-1');
+    assert.deepEqual([row.contract, row.sgp_contact_id, row.customer_account_id, row.bound_via], [null, null, null, null]);
+  });
+
+  it('a conversa de outro provedor é 404 ao vincular e ao desvincular', async () => {
+    const doBeta = await getDb()('messenger_conversations').where({ tenant_id: beta }).first();
+    assert.equal((await api(`/conversations/${doBeta.id}/subscriber`, { method: 'POST', body: { contract: 'CT-ALFA-1' } })).status, 404);
+    assert.equal((await api(`/conversations/${doBeta.id}/subscriber`, { method: 'DELETE' })).status, 404);
+  });
+});
+
 describe('conexão da Página', () => {
   const graph = (handler) => setMetaGraphFetcher(async (url, init) => handler(String(url), init));
   const ok = (data) => new Response(JSON.stringify(data), { status: 200 });
