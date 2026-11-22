@@ -84,6 +84,13 @@ describe('GET /api/messenger-webhook (verificação)', () => {
     assert.equal(r.status, 200);
     assert.equal(await r.text(), '12345');
   });
+  it('só devolve desafio numérico: texto do chamador nunca é refletido', async () => {
+    const r = await fetch(`${hook()}?hub.mode=subscribe&hub.verify_token=token-de-verificacao&hub.challenge=${encodeURIComponent('<script>alert(1)</script>')}`);
+    assert.equal(r.status, 400);
+    assert.ok(!(await r.text()).includes('<script>'));
+    const vazio = await fetch(`${hook()}?hub.mode=subscribe&hub.verify_token=token-de-verificacao`);
+    assert.equal(vazio.status, 400);
+  });
   it('recusa token errado ou modo errado', async () => {
     assert.equal((await fetch(`${hook()}?hub.mode=subscribe&hub.verify_token=errado&hub.challenge=1`)).status, 403);
     assert.equal((await fetch(`${hook()}?hub.mode=ping&hub.verify_token=token-de-verificacao&hub.challenge=1`)).status, 403);

@@ -19,7 +19,11 @@ router.get('/', waWebhookLimiter, (req, res) => {
     && req.query['hub.mode'] === 'subscribe'
     && safeEqual(req.query['hub.verify_token'], expected);
   if (!ok) return res.sendStatus(403);
-  return res.type('text/plain').send(String(req.query['hub.challenge'] ?? ''));
+  // O desafio da Meta é um número. Só dígitos voltam: devolver o valor cru da
+  // query seria refletir texto do chamador na resposta (XSS refletido).
+  const challenge = String(req.query['hub.challenge'] ?? '');
+  if (!/^\d{1,32}$/.test(challenge)) return res.sendStatus(400);
+  return res.type('text/plain').send(challenge);
 });
 
 /**
