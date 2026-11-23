@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.65.0] - 2026-11-23
+
+### New
+
+- Caixa de atendimento do Telegram dos clientes (etapa 1) (`a8191b24`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/832d38b0cedd...89ddfa308d2d)
+
 ## [1.64.0] - 2026-11-23
 
 ### New
