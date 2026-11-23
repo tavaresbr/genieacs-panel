@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { telegramChatAPI, type TelegramChatBot } from '@/lib/api'
+import { telegramChatAPI, type TelegramChatBot, type TelegramNoticeKind, type TelegramNoticeSettings } from '@/lib/api'
 import { telegramChatErrorKey } from '@/lib/telegram-chat'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -18,6 +18,7 @@ export function TelegramCustomerBotPanel() {
   const [bot, setBot] = useState<TelegramChatBot | null>(null)
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
+  const [notices, setNotices] = useState<TelegramNoticeSettings | null>(null)
 
   const load = useCallback(async () => {
     const res = await telegramChatAPI.getBot()
@@ -25,9 +26,30 @@ export function TelegramCustomerBotPanel() {
     else toast.error(t(telegramChatErrorKey(res.code)))
   }, [t, toast])
 
+  const loadNotices = useCallback(async () => {
+    const res = await telegramChatAPI.getNotices()
+    if (res.success && res.data) setNotices(res.data)
+  }, [])
+
   useEffect(() => {
     void load()
-  }, [load])
+    void loadNotices()
+  }, [load, loadNotices])
+
+  const toggleNotice = async (kind: TelegramNoticeKind, value: boolean) => {
+    setBusy(true)
+    try {
+      const res = await telegramChatAPI.saveNotices({ [kind]: value })
+      if (res.success && res.data) {
+        setNotices(res.data)
+        toast.success(t('common.success'))
+      } else {
+        toast.error(t(telegramChatErrorKey(res.code)))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const run = async (action: () => Promise<{ success: boolean; data?: TelegramChatBot; code?: string }>, after?: () => void) => {
     setBusy(true)
@@ -106,6 +128,26 @@ export function TelegramCustomerBotPanel() {
         </div>
       )}
       {bot.webhookError && <p className="field-hint" role="alert">{bot.webhookError}</p>}
+
+      {/* Quais avisos saem TAMBÉM pelo Telegram (o WhatsApp não muda). Só chegam a quem vinculou o Telegram e não mandou /parar. */}
+      {notices && (
+        <div className="space-y-2 border-t border-border pt-3">
+          <h4 className="text-sm font-semibold">{t('telegramChat.notices.title')}</h4>
+          <p className="field-hint">{t('telegramChat.notices.hint')}</p>
+          {(['outage', 'maintenance', 'billing', 'campaign'] as const).map((kind) => (
+            <label key={kind} className="flex cursor-pointer items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                checked={notices[kind]}
+                disabled={busy}
+                onChange={(event) => void toggleNotice(kind, event.target.checked)}
+              />
+              <span>{t(`telegramChat.notices.${kind}`)}</span>
+            </label>
+          ))}
+        </div>
+      )}
     </fieldset>
   )
 }

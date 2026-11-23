@@ -180,6 +180,55 @@ describe('o incidente de queda em massa', () => {
     assert.ok(trilha, 'o aviso não foi para a trilha');
   });
 
+  it('o Telegram dos clientes avisa além do WhatsApp, só a quem vinculou, e o "normalizado" só a quem recebeu', async () => {
+    const { default: TelegramCustomerBot } = await import('../src/models/TelegramCustomerBot.js');
+    const { default: TelegramConversation } = await import('../src/models/TelegramConversation.js');
+    const { encryptBotToken } = await import('../src/services/telegramCustomerBotService.js');
+    for (const tabela of ['telegram_notices', 'telegram_messages', 'telegram_conversations', 'telegram_customer_bots']) {
+      await getDb()(tabela).del();
+    }
+    const bot = await asTenant(() => TelegramCustomerBot.create({
+      bot_username: 'provedor_bot', token: encryptBotToken('555666777:AAHcliente-token-do-bot-de-clientes-bem-longo'), enabled: true
+    }));
+    const vincula = (chatId, contract) => asTenant(async () => {
+      const c = await TelegramConversation.ensure({ botRowId: bot.id, chatId });
+      return TelegramConversation.update(c.id, { contract });
+    });
+    const afetado = await vincula('7001', '801');
+    await vincula('7002', '805'); // o contrato 5 está na queda, mas sem telefone: o Telegram ainda avisa
+    await vincula('7003', '806'); // o contrato 6 não está na queda
+    queda();
+    await scan();
+    const [incidente] = await listar();
+    const aviso = await call(`${panelUrl}/api/whatsapp/outages/${incidente.id}/notify`, {
+      method: 'POST', headers: authHeaders(token), body: { eta: 'hoje às 18h' }
+    });
+    // O WhatsApp saiu exatamente como antes.
+    assert.equal(aviso.body.data.sent, 2);
+    assert.equal(aviso.body.data.skippedOptOut, 1);
+    const doTelegram = await getDb()('telegram_messages').where({ source: 'notice' }).orderBy('id');
+    assert.deepEqual(doTelegram.map((m) => m.conversation_id).sort(), (await getDb()('telegram_conversations').whereIn('contract', ['801', '805']).select('id')).map((c) => c.id).sort());
+    assert.match(doTelegram[0].body, /ODP Centro/);
+    assert.ok(doTelegram.some((m) => m.conversation_id === afetado.id));
+
+    // "Avisar de novo" não repete no Telegram.
+    await call(`${panelUrl}/api/whatsapp/outages/${incidente.id}/notify`, { method: 'POST', headers: authHeaders(token), body: {} });
+    assert.equal((await getDb()('telegram_messages').where({ source: 'notice' })).length, 2);
+
+    const fim = await call(`${panelUrl}/api/whatsapp/outages/${incidente.id}/resolve`, { method: 'POST', headers: authHeaders(token), body: {} });
+    assert.equal(fim.status, 200, JSON.stringify(fim.body));
+    const apos = await getDb()('telegram_messages').where({ source: 'notice' }).orderBy('id');
+    assert.equal(apos.length, 4, 'o "normalizado" deveria ir às duas conversas avisadas');
+    const fechamentos = apos.slice(2);
+    assert.deepEqual(fechamentos.map((m) => m.conversation_id).sort(), doTelegram.map((m) => m.conversation_id).sort());
+    assert.ok(fechamentos.every((m) => m.body && m.body !== doTelegram[0].body), 'o fechamento deve ser outro texto, não o aviso de novo');
+    const naoAvisada = await getDb()('telegram_conversations').where({ contract: '806' }).first();
+    assert.equal((await getDb()('telegram_messages').where({ conversation_id: naoAvisada.id })).length, 0, 'quem não estava na queda foi avisado');
+    for (const tabela of ['telegram_notices', 'telegram_messages', 'telegram_conversations', 'telegram_customer_bots']) {
+      await getDb()(tabela).del();
+    }
+  });
+
   it('o bot responde a queda a quem pergunta "sem internet"', async () => {
     queda();
     await scan();

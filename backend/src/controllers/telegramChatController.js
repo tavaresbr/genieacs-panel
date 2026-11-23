@@ -7,6 +7,7 @@ import TelegramCustomerBotService, { TelegramChatError, publicBot } from '../ser
 import TelegramSendService from '../services/telegramSendService.js';
 import TelegramLinkService from '../services/telegramLinkService.js';
 import TelegramLinkTokenService from '../services/telegramLinkTokenService.js';
+import SubscriberNoticeService from '../services/subscriberNoticeService.js';
 import { MessengerError } from '../services/messengerPageService.js';
 import { panelUrlFor } from '../services/mail/index.js';
 import { telegramCustomerWebhookUrl } from '../config/telegramCustomerWebhookPath.js';
@@ -53,6 +54,8 @@ const publicConversation = (c, clientName = null, lastMessage = null) => ({
   closedAt: c.closed_at,
   /** O cliente bloqueou o bot: nada sai até ele escrever de novo. */
   blocked: Boolean(c.blocked_at),
+  /** O cliente mandou /parar: não recebe avisos, mas continua conversando. */
+  noticesOff: Boolean(c.notices_off_at),
   lastMessage: publicPreview(lastMessage)
 });
 
@@ -136,6 +139,34 @@ class TelegramChatController {
       return res.json(createResponse('ok', publicBot(row)));
     } catch (error) {
       return fail(res, error, 'could not remove the bot');
+    }
+  }
+
+  /** Quais avisos (fatura, queda, manutenção, campanha) saem também pelo Telegram. */
+  static async getNotices(req, res) {
+    try {
+      return res.json(createResponse('ok', await SubscriberNoticeService.getSettings()));
+    } catch (error) {
+      return fail(res, error, 'could not load notice settings');
+    }
+  }
+
+  static async saveNotices(req, res) {
+    try {
+      const before = await SubscriberNoticeService.getSettings();
+      const after = await SubscriberNoticeService.saveSettings(req.body);
+      const changed = Object.keys(after).filter((kind) => after[kind] !== before[kind]);
+      if (changed.length) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.TELEGRAM_NOTICES_CHANGED,
+          subjectType: 'telegram',
+          subjectId: null,
+          detail: Object.fromEntries(changed.map((kind) => [kind, after[kind]]))
+        });
+      }
+      return res.json(createResponse('ok', after));
+    } catch (error) {
+      return fail(res, error, 'could not save notice settings');
     }
   }
 

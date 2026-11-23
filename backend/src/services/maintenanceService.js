@@ -1,3 +1,4 @@
+import SubscriberNoticeService from './subscriberNoticeService.js';
 import WaMetaTemplateService from './waMetaTemplateService.js';
 import MappingEdge from '../models/MappingEdge.js';
 import MappingNode from '../models/MappingNode.js';
@@ -318,6 +319,14 @@ class MaintenanceService {
       .whereNotNull('phone_e164');
     const texto = janela.message || (await this.textos(janela)).notice;
     const { enviados, pulados } = await this.enviar(pendentes, texto, `notify ${id}`);
+    // O Telegram dos clientes, AO LADO do WhatsApp: uma vez por janela, a quem
+    // vinculou o Telegram a um contrato do nó. Nunca lança.
+    const contratosDoNo = (await tdb('maintenance_window_devices')
+      .where({ window_id: id }).whereNotNull('contract').select('contract'))
+      .map((row) => row.contract);
+    await SubscriberNoticeService.notifyTelegram({
+      contracts: contratosDoNo, kind: 'maintenance', refKey: `manutencao:${id}:aviso`, body: texto
+    });
     const agora = new Date();
     if (enviados.length) {
       await tdb('maintenance_window_devices')
@@ -345,12 +354,19 @@ class MaintenanceService {
     // Outra passada (ou outro clique) já fechou: não manda de novo.
     if (!atualizou) return;
     if (!janela.notice_sent_at) return;
+    const textos = await this.textos(janela);
+    // O fechamento também no Telegram, só a quem recebeu o aviso da janela.
+    await SubscriberNoticeService.notifyFollowUp({
+      kind: 'maintenance',
+      fromRefKey: `manutencao:${janela.id}:aviso`,
+      refKey: `manutencao:${janela.id}:${status}`,
+      body: textos[textoChave]
+    });
     const avisados = await tdb('maintenance_window_devices')
       .where({ window_id: janela.id })
       .whereNotNull('notified_at')
       .whereNotNull('phone_e164');
     if (avisados.length === 0) return;
-    const textos = await this.textos(janela);
     const { semConta } = await this.enviar(avisados, textos[textoChave], `${status} ${janela.id}`);
     if (!semConta) await tdb('maintenance_windows').where({ id: janela.id }).update({ closing_sent_at: new Date() });
   }
