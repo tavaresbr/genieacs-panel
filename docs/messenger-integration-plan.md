@@ -74,8 +74,8 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
 ## Fora do código (caminho crítico)
 - App Meta com produto Messenger; **App Review** de `pages_messaging` (+ `pages_manage_metadata`,
   `pages_show_list`) e Business Verification — é o que mais demora; começar já.
-- Política de privacidade/exclusão de dados (callback de data deletion) e inclusão do canal em
-  `docs/lgpd-inventario-de-dados.md` (retenção, opt-out).
+- Política de privacidade (URL no app da Meta) e inclusão do canal em `docs/lgpd-inventario-de-dados.md`.
+  Os callbacks de desautorização e exclusão de dados já existem (ver "Avisos da Meta sobre o usuário do Facebook").
 - Cobrança ativa por Messenger é muito limitada (sem templates): manter WhatsApp para isso.
 
 ## Ordem de implementação
@@ -202,7 +202,10 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   processo cair DEPOIS de a Meta aceitar e ANTES de gravar o `mid`, a retomada pode mandar a mensagem de novo — a
   Meta não oferece chave de idempotência no Send API.
 - A conversa mostra "Na fila" / "Vai tentar de novo (tentativa N de 7)" e passa a se atualizar a cada 3 s enquanto
-  houver resposta a caminho. Sem botão de reenviar à mão: uma mensagem `failed` se digita de novo.
+  houver resposta a caminho. Uma mensagem `failed` tem o botão **Reenviar** (`POST /api/messenger/messages/:id/retry`, `whatsapp.send`): devolve
+  a mensagem à fila do zero (tentativas e motivo limpos) e tenta já, com as regras de um envio novo (janela de 24 h
+  aberta, Página conectada). Só vale para saída que a Meta nunca aceitou; dois cliques seguidos mandam uma vez só
+  (UPDATE condicional). Responde 201/202/502 como o envio.
 
 ## Login do Facebook
 
@@ -223,3 +226,42 @@ Em vez de colar o ID e o token, quem configura clica em **Entrar com o Facebook*
 - Como no Embedded Signup do WhatsApp, o SDK só funciona nos domínios cadastrados no app da Meta; em outro o popup
   abre e o login falha.
 - Continua valendo a revisão da Meta: sem `pages_messaging` aprovado o app só fala com quem tem função nele.
+
+## Avisos da Meta sobre o usuário do Facebook
+
+A Meta exige, para aprovar um app com Login do Facebook, uma URL de **desautorização** e outra de **exclusão de
+dados**. No painel do app (Configurações → Básico / Login do Facebook → Configurações) cadastre:
+
+| Campo | URL |
+|---|---|
+| Callback de desautorização | `https://<painel>/api/messenger-webhook/deauthorize` |
+| URL de solicitação de exclusão de dados | `https://<painel>/api/messenger-webhook/data-deletion` |
+
+- Os dois recebem `POST` (formulário) com `signed_request`; a credencial é a assinatura HMAC-SHA256 com
+  `META_APP_SECRET` (falha fechada: sem segredo ou assinatura ruim, 401, e nada é tocado).
+- O `user_id` é o do usuário NO APP, gravado em `messenger_pages.facebook_user_id` (migração `0149`) quando a Página é
+  conectada pelo login do Facebook; só esse número, sem nome nem e-mail. Página colada à mão não guarda o id de ninguém.
+- **Desautorização**: as Páginas daquele usuário (em todos os provedores) vão para "requer atenção"
+  (`facebook_deauthorized`); nada é apagado.
+- **Exclusão de dados**: apaga o token e o id no app dessas Páginas (`facebook_data_deleted`; ficam sem assinatura até
+  alguém reconectar). Responde `{ url, confirmation_code }`. As conversas **não** são apagadas: são do provedor e dos
+  clientes dele, e o pedido de titular delas segue o fluxo LGPD do provedor.
+- A `url` aponta para `/api/messenger-webhook/deletion-status?code=…`: página de texto fixo que só confirma códigos
+  emitidos pelo painel (o código leva a data e um HMAC, sem guardar nada em banco) e nunca imprime o que veio na URL.
+
+## Anexos recebidos
+
+O link do anexo que vem no evento é de CDN da Meta e expira, então o painel **baixa e guarda o arquivo**.
+- Em segundo plano (não atrasa a resposta ao webhook), depois de gravar a mensagem; a reentrega não baixa de novo.
+- Só `https` e só hosts da Meta (`fbcdn.net`, `fbsbx.com`, `facebook.com`, `cdninstagram.com`), pela guarda anti-SSRF
+  do WhatsApp (`safeFetch`: o endereço aprovado é o conectado). Teto de 25 MB e 20 s. Nada aqui lança: anexo que não
+  desceu é mensagem sem arquivo (o link original fica como último recurso) e o webhook segue respondendo 200.
+- O tipo gravado (`attachment_mime`) vem de uma lista fechada (imagem, áudio, vídeo e PDF comuns; SVG e HTML nunca):
+  o resto é `application/octet-stream`. O nome no disco é nosso (`messenger-media/t<provedor>/<conversa>/<mensagem>-<hex>.<ext>`).
+- `GET /api/messenger/messages/:id/attachment` (`whatsapp.read`): a mesma leitura confinada a `DATA_DIR` do WhatsApp
+  (`resolveStoredAttachment`, que refaz o `realpath` a cada pedido), `inline` só para imagem conhecida, `nosniff`,
+  `Content-Security-Policy: sandbox`, `no-store`. O caminho nunca sai do servidor; todo jeito de não ter o arquivo é o mesmo 404.
+- Os arquivos saem do disco ao desconectar a Página e na exclusão do art. 18 do assinante (antes das linhas, como no WhatsApp).
+- Migração `0150`: `attachment_path`, `attachment_mime`, `attachment_size` em `messenger_messages`.
+- **Limite:** não há varredura de arquivos órfãos nem prazo por idade (como o texto da conversa); só áudio/vídeo/arquivo
+  baixam por botão (a tela não toca áudio nem vídeo). **Envio de anexo pelo painel continua fora.**

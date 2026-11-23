@@ -53,6 +53,8 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   no_page: 'messenger.error.noPage',
   notice_too_long: 'messenger.error.noticeTooLong',
   send_refused: 'messenger.error.sendRefused',
+  not_retryable: 'messenger.error.notRetryable',
+  message_not_found: 'messenger.error.messageNotFound',
   meta_refused: 'messenger.error.metaRefused',
   facebook_login_unconfigured: 'messenger.error.facebookUnconfigured',
   page_not_administered: 'messenger.error.pageNotAdministered',
@@ -116,6 +118,20 @@ export function deliveryLabel(message: Pick<MessengerMessage, 'deliveryStatus' |
     return { kind: 'retrying', attempt: message.attempts, max: MESSENGER_MAX_ATTEMPTS }
   }
   return { kind: 'status', status: message.deliveryStatus }
+}
+
+/** Só estes tipos aparecem na própria bolha; o resto (inclusive SVG) é download. */
+export function isInlineImageMime(mime: string | null | undefined): boolean {
+  return ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(String(mime ?? '').toLowerCase())
+}
+
+/** A resposta pode ser reenviada à mão: falhou, é nossa (saída) e a Meta nunca a aceitou. */
+export function canRetryMessage(
+  message: Pick<MessengerMessage, 'direction' | 'deliveryStatus'>,
+  windowOpen: boolean,
+  canSend: boolean
+): boolean {
+  return canSend && windowOpen && message.direction === 'out' && message.deliveryStatus === 'failed'
 }
 
 /** O que o popup `/messenger-connect.html` manda ao painel. */

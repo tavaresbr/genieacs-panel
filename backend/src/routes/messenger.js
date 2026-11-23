@@ -24,6 +24,8 @@ router.post('/links', authenticateToken, requirePermission('whatsapp.send'), wha
 
 router.get('/conversations', authenticateToken, requirePermission('whatsapp.read'), MessengerController.listConversations);
 router.get('/conversations/:id/messages', authenticateToken, requirePermission('whatsapp.read'), MessengerController.listMessages);
+router.get('/messages/:id/attachment', authenticateToken, requirePermission('whatsapp.read'), MessengerController.attachment);
+router.post('/messages/:id/retry', authenticateToken, requirePermission('whatsapp.send'), whatsappSendLimiter, MessengerController.retry);
 router.post('/conversations/:id/messages', authenticateToken, requirePermission('whatsapp.send'), whatsappSendLimiter, MessengerController.send);
 // Dizer de quem é a conversa é trabalho de quem atende: `whatsapp.send`, como o vínculo do WhatsApp.
 router.post('/conversations/:id/subscriber', authenticateToken, requirePermission('whatsapp.send'), MessengerController.linkSubscriber);

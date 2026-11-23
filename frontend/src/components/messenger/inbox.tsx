@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { messengerAPI, type MessengerConversation, type MessengerMessage, type MessengerPreview } from '@/lib/api'
 import {
   MESSENGER_MAX_TEXT,
+  canRetryMessage,
   deliveryLabel,
   hasPendingMessages,
   messengerErrorKey,
@@ -13,6 +14,7 @@ import {
   sameLocalDay,
   windowRemainingMs,
 } from '@/lib/messenger'
+import { MessengerAttachment } from '@/components/messenger/attachment'
 import { MessengerSubscriberLinker } from '@/components/messenger/subscriber-linker'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
@@ -184,6 +186,7 @@ function Thread({
   const [messages, setMessages] = useState<MessengerMessage[]>([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [retryingId, setRetryingId] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [linking, setLinking] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
@@ -246,6 +249,26 @@ function Thread({
       }
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleRetry = async (messageId: number) => {
+    if (retryingId !== null) return
+    setRetryingId(messageId)
+    try {
+      const res = await messengerAPI.retryMessage(messageId)
+      if (res.success && res.data) {
+        if (res.data.deliveryStatus === 'queued') toast.info(t('messenger.sendQueued'))
+      } else if (res.code === 'send_refused') {
+        toast.error(t('messenger.error.sendRefused'))
+      } else {
+        toast.error(t(messengerErrorKey(res.code)))
+      }
+      // Qualquer que seja o desfecho a conversa muda (novo estado, ou janela fechada): recarrega.
+      await load()
+      onChanged()
+    } finally {
+      setRetryingId(null)
     }
   }
 
@@ -325,7 +348,8 @@ function Thread({
               ) : !message.attachmentType ? (
                 <p className="text-muted-foreground">{t('messenger.noText')}</p>
               ) : null}
-              {message.attachmentType && (
+              {message.attachmentStored && <MessengerAttachment message={message} />}
+              {message.attachmentType && !message.attachmentStored && (
                 <p className="text-xs text-muted-foreground">
                   {t('messenger.attachment', { type: message.attachmentType })}
                   {message.attachmentUrl && /^https:\/\//i.test(message.attachmentUrl) && (
@@ -358,6 +382,16 @@ function Thread({
                     </span>
                   )
                 })()}
+                {canRetryMessage(message, windowOpen, canSend) && (
+                  <button
+                    type="button"
+                    className="text-primary hover:underline disabled:opacity-50"
+                    disabled={retryingId !== null}
+                    onClick={() => void handleRetry(message.id)}
+                  >
+                    {t('messenger.retry')}
+                  </button>
+                )}
               </p>
             </div>
           </li>

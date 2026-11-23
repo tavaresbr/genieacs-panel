@@ -62,6 +62,13 @@ async function exchange(userToken) {
   return longLived;
 }
 
+/** O id do usuário NO APP (só o número): é o `user_id` dos avisos de desautorização e exclusão. */
+async function appUserId(longToken) {
+  const result = await graphRequest({ path: '/me', metaToken: longToken, query: { fields: 'id' } });
+  const id = String(result.data?.id ?? '');
+  return result.ok && /^\d{1,32}$/.test(id) ? id : null;
+}
+
 /** Todas as Páginas que o usuário administra, com o token de cada uma (só aqui dentro). */
 async function accounts(longToken) {
   const pages = [];
@@ -101,10 +108,11 @@ class MessengerFacebookLoginService {
     const token = cleanUserToken(userToken);
     const id = String(pageId ?? '').trim();
     if (!isMetaId(id)) throw new MessengerError('invalid_page_id', 'invalid page id');
-    const page = (await accounts(await exchange(token))).find((p) => p.id === id);
+    const longToken = await exchange(token);
+    const page = (await accounts(longToken)).find((p) => p.id === id);
     if (!page) throw new MessengerError('page_not_administered', 'the user does not administer this page', 403);
     if (!page.token) throw new MessengerError('missing_token', 'meta did not return a token for this page', 502);
-    return MessengerPageService.connect({ pageId: id, pageToken: page.token });
+    return MessengerPageService.connect({ pageId: id, pageToken: page.token, facebookUserId: await appUserId(longToken) });
   }
 }
 

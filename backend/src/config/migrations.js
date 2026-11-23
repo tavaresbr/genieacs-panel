@@ -3875,6 +3875,27 @@ const messengerPagesTable = (db) => (t) => {
   t.index(['tenant_id'], 'messenger_pages_tenant_idx');
 };
 
+/**
+ * Quem conectou a Página pelo login do Facebook (0148): o id do usuário NO APP
+ * (`/me`, o `user_id` que a Meta manda nos avisos de desautorização e de
+ * exclusão de dados). Só esse número — nome e e-mail não são lidos. Vazio para
+ * a Página conectada à mão, que a Meta não consegue associar a ninguém.
+ */
+const MESSENGER_PAGE_FACEBOOK_COLUMNS = [
+  ['facebook_user_id', (t) => t.string('facebook_user_id', 32).nullable()]
+];
+
+/**
+ * O arquivo do anexo recebido no Messenger (0149): onde ficou em disco (relativo
+ * a DATA_DIR), o tipo (de uma lista fechada) e o tamanho. O link original da
+ * Meta (`attachment_url`) expira e fica só como último recurso.
+ */
+const MESSENGER_ATTACHMENT_COLUMNS = [
+  ['attachment_path', (t) => t.string('attachment_path', 255).nullable()],
+  ['attachment_mime', (t) => t.string('attachment_mime', 64).nullable()],
+  ['attachment_size', (t) => t.integer('attachment_size').unsigned().nullable()]
+];
+
 const messengerConversationsTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -8412,6 +8433,39 @@ export const migrations = [
       for (const [name, builder] of TELEGRAM_CHAT_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
+    }
+  },
+  {
+    /** Quem conectou a Página pelo login do Facebook — ver `MESSENGER_PAGE_FACEBOOK_COLUMNS`. */
+    id: '0149_messenger_page_facebook_user',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('messenger_pages'))) return true;
+      return (await missingColumns(db, 'messenger_pages', MESSENGER_PAGE_FACEBOOK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('messenger_pages'))) return;
+      const missing = await missingColumns(db, 'messenger_pages', MESSENGER_PAGE_FACEBOOK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('messenger_pages', (t) => {
+        for (const add of missing) add(t);
+        t.index(['facebook_user_id'], 'messenger_pages_fb_user_idx');
+      });
+    }
+  },
+  {
+    /** O arquivo do anexo recebido — ver `MESSENGER_ATTACHMENT_COLUMNS`. */
+    id: '0150_messenger_attachment_file',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return true;
+      return (await missingColumns(db, 'messenger_messages', MESSENGER_ATTACHMENT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return;
+      const missing = await missingColumns(db, 'messenger_messages', MESSENGER_ATTACHMENT_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('messenger_messages', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

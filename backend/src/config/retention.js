@@ -285,7 +285,7 @@ export const SEM_PRAZO = Object.freeze({
   wa_conversations: 'a conversa e o telefone do assinante; o varredor de mensagens se recusa a tocá-la, por desenho — sai pela exclusão do art. 18',
   // Atendimento (Messenger)
   messenger_conversations: 'a conversa e o PSID da pessoa na Página; nenhuma rotina a apaga por idade — sai ao desconectar a Página (em cascata) ou pela exclusão do art. 18',
-  messenger_messages: 'o texto e o link do anexo trocados no Messenger; nenhuma rotina os apaga por idade — saem junto com a conversa',
+  messenger_messages: 'o texto trocado no Messenger e o arquivo do anexo recebido (em `messenger-media/`, no disco do painel); nenhuma rotina os apaga por idade — saem junto com a conversa, e o arquivo é apagado do disco ao desconectar a Página e na exclusão do art. 18',
   // Atendimento (Telegram dos clientes)
   telegram_conversations: 'a conversa e o id do chat da pessoa no Telegram; nenhuma rotina a apaga por idade — sai pela exclusão do art. 18 ou junto com o provedor',
   telegram_messages: 'o texto trocado no Telegram; nenhuma rotina o apaga por idade — sai junto com a conversa',

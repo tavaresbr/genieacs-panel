@@ -1,3 +1,4 @@
+import MessengerMediaService from './messengerMediaService.js';
 import fs from 'node:fs/promises';
 import { getDb, tdb } from '../config/database.js';
 import { invalidateContactDirectory } from '../config/contactDirectoryCache.js';
@@ -206,8 +207,18 @@ class CustomerErasureService {
    * É a mesma ordem que a varredura de mídia já usa, pelo mesmo motivo escrito
    * lá: contabilidade por último, e só para arquivo que realmente saiu.
    */
-  static async apagarAnexos(conversaIds) {
-    if (!conversaIds.length) return { files: 0 };
+  static async apagarAnexos(conversaIds, messengerConversaIds = []) {
+    // Os anexos do Messenger saem pelo mesmo caminho: bytes dele, apagados antes das linhas.
+    let doMessenger = 0;
+    if (messengerConversaIds.length) {
+      const arquivos = await tdb('messenger_messages')
+        .whereIn('conversation_id', messengerConversaIds)
+        .whereNotNull('attachment_path')
+        .select('attachment_path');
+      await MessengerMediaService.removeFiles(arquivos);
+      doMessenger = arquivos.length;
+    }
+    if (!conversaIds.length) return { files: doMessenger };
     const linhas = await tdb('wa_messages')
       .whereIn('conversation_id', conversaIds)
       .whereNotNull('attachment_path')
@@ -222,7 +233,7 @@ class CustomerErasureService {
       await fs.unlink(arquivo.absolutePath);
       apagados += 1;
     }
-    return { files: apagados };
+    return { files: apagados + doMessenger };
   }
 
   /**
