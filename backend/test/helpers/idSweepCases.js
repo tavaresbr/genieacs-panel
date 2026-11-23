@@ -1081,6 +1081,16 @@ export const casos = [
     coluna: 'contract'
   },
   {
+    // A consulta guardada, de qualquer idade: a chave do vizinho não acha ficha
+    // (404), então nenhuma consulta de outro provedor é lida nem gravada.
+    chave: 'sgpContract',
+    label: 'POST /api/contacts/:key/teiah/stored',
+    method: 'POST',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/teiah/stored`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  {
     chave: 'sgpContract',
     label: 'POST /api/contacts/:key/teiah/apply',
     method: 'POST',

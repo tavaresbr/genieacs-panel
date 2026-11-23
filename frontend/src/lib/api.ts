@@ -4422,6 +4422,10 @@ export const contactsAPI = {
       ...(limitPassword ? { limitPassword } : {})
     }),
 
+  /** Files on the record the consultation the panel already holds, of any age: never asks the TeiaH, costs nothing. */
+  teiahStored: (key: string) =>
+    apiClient.post<{ teiah: ContactTeiah; cached: boolean; stored: boolean }>(`/contacts/${encodeURIComponent(key)}/teiah/stored`, {}),
+
   /** The TeiaH's report PDF of this client (from its history: no new paid call). */
   /** The TeiaH check of an installation address (a paid call, kept 30 days). */
   teiahAddress: (address: { zip: string; street: string; number: string; district?: string; complement?: string }, fresh = false, limitPassword?: string) =>

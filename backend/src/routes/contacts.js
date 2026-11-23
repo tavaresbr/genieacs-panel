@@ -140,6 +140,16 @@ router.post(
   sgpAdminLimiter,
   ContactController.teiahConsult
 );
+// The consultation the panel already paid for, of any age: filed on the record
+// without asking the TeiaH again. No cost, so no limiter beyond the usual.
+router.post(
+  '/:key/teiah/stored',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('teiah.act'),
+  sgpAdminLimiter,
+  ContactController.teiahStored
+);
 // The TeiaH's report PDF of the client, from its history: no new paid call.
 router.get(
   '/:key/teiah/report',

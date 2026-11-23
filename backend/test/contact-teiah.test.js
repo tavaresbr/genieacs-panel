@@ -395,6 +395,87 @@ describe('não consultar de novo o que foi consultado há pouco', () => {
   });
 });
 
+describe('ver a consulta guardada, de qualquer idade, sem custo', () => {
+  const stored = (key) => call(`${panelUrl}/api/contacts/${key}/teiah/stored`, { method: 'POST', ...auth() });
+  const age = (document, days) => asTenant(() => getDb()('teiah_consultations').where({ document })
+    .update({ consulted_at: new Date(Date.now() - days * 86_400_000) }));
+  const count = (cpf) => consultas.filter((c) => c === cpf).length;
+  const usage = async () => asTenant(() => TeiahService.monthUsage());
+
+  it('traz a consulta de 90 dias e preenche a ficha sem chamar a TeiaH nem gastar', async () => {
+    await addContract('T-300', 'Eva Antiga', CPF_E);
+    // Garante uma consulta guardada (a ficha a reaproveita) e a envelhece.
+    await call(`${panelUrl}/api/contacts/T-300/teiah`, { method: 'POST', ...auth() });
+    await age(CPF_E, 90);
+    const before = count(CPF_E);
+    const gasto = await usage();
+
+    const res = await stored('T-300');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.stored, true);
+    assert.deepEqual(res.body.data.teiah.phones, ['5593966665555']);
+    assert.equal(count(CPF_E), before, 'nenhuma chamada à TeiaH');
+    assert.deepEqual(await usage(), gasto, 'o gasto do mês não muda');
+
+    const ficha = await call(`${panelUrl}/api/contacts/T-300`, auth());
+    assert.equal(ficha.body.data.teiah.phones[0], '5593966665555', 'a ficha mostra os dados');
+    const em = Date.parse(res.body.data.teiah.consultedAt);
+    assert.ok(Date.now() - em > 80 * 86_400_000, 'mostra a data da consulta original, não a de agora');
+  });
+
+  it('vale mesmo com o limite mensal estourado e a TeiaH desligada', async () => {
+    await addContract('T-301', 'Eva Limite', CPF_E);
+    const guards = await asTenant(() => TeiahService.getGuards());
+    const config = await asTenant(() => TeiahService.getConfig());
+    await asTenant(() => TeiahService.saveGuards({ monthlyLimit: 0.01 }));
+    await asTenant(() => TeiahService.saveConfig({ enabled: false }));
+    try {
+      const res = await stored('T-301');
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+    } finally {
+      await asTenant(() => TeiahService.saveGuards({ monthlyLimit: guards.monthlyLimit }));
+      await asTenant(() => TeiahService.saveConfig({ enabled: config.enabled }));
+    }
+  });
+
+  it('sem consulta guardada para o CPF, recusa com teiah_no_stored e nada é consultado', async () => {
+    await addContract('T-302', 'Dani Sem Consulta', CPF_D);
+    await asTenant(() => getDb()('teiah_consultations').where({ document: CPF_D }).del());
+    const before = count(CPF_D);
+    const res = await stored('T-302');
+    assert.equal(res.status, 404);
+    assert.equal(res.body.code, 'teiah_no_stored');
+    assert.equal(count(CPF_D), before);
+  });
+
+  it('um cliente sem CPF/CNPJ válido recebe invalid_document', async () => {
+    await addContract('T-303', 'Sem Documento', '123');
+    const res = await stored('T-303');
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'invalid_document');
+  });
+
+  it('quem não tem teiah.act não vê a consulta guardada (grava na ficha)', async () => {
+    const SENHA_DO_TECNICO = ['senha', 'do', 'tecnico', 'guardada', '1'].join('-');
+    const created = await call(`${panelUrl}/api/users`, {
+      method: 'POST', ...auth(),
+      body: { username: 'tecnico-guardada', password: SENHA_DO_TECNICO, email: 'tecnico-guardada@exemplo.test', role: 'tech' }
+    });
+    assert.ok([200, 201].includes(created.status), JSON.stringify(created.body));
+    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: { username: 'tecnico-guardada', password: SENHA_DO_TECNICO } });
+    const res = await call(`${panelUrl}/api/contacts/T-300/teiah/stored`, { method: 'POST', headers: authHeaders(login.body.data.token) });
+    assert.equal(res.status, 403);
+    assert.equal(res.body.code, 'missing_permission');
+  });
+
+  it('a trilha marca que veio da consulta guardada, sem o documento', async () => {
+    const rows = await asTenant(() => getDb()('audit_log').where({ action: 'contact.teiah_lookup' }));
+    const guardada = rows.filter((row) => JSON.parse(row.detail).stored === true);
+    assert.ok(guardada.length >= 1);
+    for (const row of guardada) assert.equal(row.detail.includes(CPF_E), false);
+  });
+});
+
 describe('relatório da TeiaH na ficha', () => {
   const relatorio = (key, mode) => fetch(`${panelUrl}/api/contacts/${key}/teiah/report${mode ? `?mode=${mode}` : ''}`, auth());
 
