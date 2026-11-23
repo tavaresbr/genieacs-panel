@@ -2,7 +2,7 @@
 
 Status: Fase 1 implementada no backend (migração `0144_messenger`, webhook, entrada, envio, conexão da Página,
 API `/api/messenger`, LGPD e testes). A tela (`/messenger`: caixa de entrada e Páginas conectadas) também está pronta. Falta o
-o outbox com retry e a revisão da Meta. O vínculo com o assinante é manual (ver abaixo). Desvios do plano original estão em "Como ficou" no fim.
+a revisão da Meta e o login do Facebook. O vínculo com o assinante é manual (ver abaixo). Desvios do plano original estão em "Como ficou" no fim.
 
 ## O que o código atual diz
 
@@ -173,5 +173,33 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   mostra como "Mensagem automática".
 - **Configuração do provedor** (`GET/PUT /api/messenger/settings`, `whatsapp.config`): ligar/desligar (ligada por
   padrão) e trocar o texto (até 500 caracteres; vazio volta ao de fábrica), na tela do Messenger.
-- Limite: se a primeira tentativa falhar na Meta, não há nova tentativa automática (o link já foi gasto). A fila
-  de reenvio, quando existir, cobre isso.
+- A confirmação passa pela fila de saída (abaixo): uma falha passageira da Meta é tentada de novo.
+
+### Fila de reenvio (saída)
+- `messenger_messages` É a fila (como `wa_messages`): estados `queued` (espera a vez ou o recuo), `sending` e depois
+  `sent`/`failed`; colunas `attempts`, `claimed_at` e `next_attempt_at` (migração `0147`).
+- **O envio tenta já.** `MessengerSendService.sendText` valida o que dá para dizer na hora (texto, janela, Página),
+  grava a mensagem como `queued` e chama a mesma `deliver()` do laço de fundo: o caso comum sai na hora (201). O que
+  a Meta ou a rede não aguentaram fica na fila (202) e é reenviado pelo `MessengerOutboxWorker` (passada a cada 5 s,
+  iniciada por `server.js`); recusa da Meta por motivo dela fica `failed` com o motivo (502, código `send_refused`).
+- **Recuo:** a mesma curva da fila do WhatsApp — 30 s, 1, 2, 4, 8 e 16 min, sete tentativas, teto de 30 min (um teste
+  confere que as duas não divergem).
+- **O que é passageiro e o que não é:** rede fora, 5xx, 429 e os códigos de cota da Graph (1, 2, 4, 17, 32, 341, 613)
+  tentam de novo; token inválido (190/102/401) e qualquer outra recusa nomeada pela Meta (janela, pessoa
+  indisponível, permissão, parâmetro) não mudam com o tempo e falham na hora. Token inválido também põe a Página em
+  "requer atenção", e novas respostas são recusadas até ela ser reconectada. Diferente da fila do WhatsApp (que na
+  dúvida tenta de novo), aqui a Meta diz o que houve, então só a dúvida sobre o transporte cai para tentar de novo.
+- **O que a fila nunca faz:**
+  - mandar uma mensagem duas vezes — o claim é um UPDATE condicional (duas passadas ao mesmo tempo: uma só pega) e o
+    `mid` é único por provedor;
+  - desrespeitar a janela — conferida de novo a cada tentativa, e uma mensagem que esperou o recuo e viu a janela
+    fechar falha na hora, sem chamar a Meta;
+  - passar na frente: uma resposta espera a irmã mais antiga da mesma conversa que aguarda nova tentativa (até 10
+    min; depois disso uma falha não segura a conversa);
+  - criar uma segunda bolha quando o eco da Meta (`is_echo`) chega antes da confirmação: a linha do eco é adotada
+    (ganha a origem e o autor da mensagem) e a da fila sai.
+- Uma mensagem "enviando" há mais de 5 min é considerada abandonada (o processo caiu) e retomada. Limite: se o
+  processo cair DEPOIS de a Meta aceitar e ANTES de gravar o `mid`, a retomada pode mandar a mensagem de novo — a
+  Meta não oferece chave de idempotência no Send API.
+- A conversa mostra "Na fila" / "Vai tentar de novo (tentativa N de 7)" e passa a se atualizar a cada 3 s enquanto
+  houver resposta a caminho. Sem botão de reenviar à mão: uma mensagem `failed` se digita de novo.

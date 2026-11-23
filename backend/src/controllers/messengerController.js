@@ -61,6 +61,8 @@ const publicMessage = (m) => ({
   source: m.source,
   deliveryStatus: m.delivery_status,
   deliveryError: m.delivery_error,
+  /** Tentativas feitas (a fila tenta até 7 vezes antes de desistir). */
+  attempts: Number(m.attempts || 0),
   readAt: m.read_at,
   createdAt: m.created_at
 });
@@ -188,8 +190,12 @@ class MessengerController {
       const message = await MessengerSendService.sendText(
         Number(req.params.id), req.body?.text, req.user?.userId ?? null
       );
-      return res.status(message.delivery_status === 'failed' ? 502 : 201)
-        .json(createResponse('ok', publicMessage(message)));
+      // 201 saiu; 202 ficou na fila (a Meta ou a rede não aguentou agora, e a fila
+      // tenta de novo); 502 a Meta recusou por motivo dela.
+      const status = message.delivery_status === 'failed' ? 502 : message.delivery_status === 'sent' ? 201 : 202;
+      // `send_refused` na recusa: o corpo de um erro HTTP não chega à tela, e o código é o
+      // que a manda recarregar a conversa, onde a mensagem ficou gravada com o motivo.
+      return res.status(status).json(createResponse('ok', publicMessage(message), status === 502 ? 'send_refused' : null));
     } catch (error) {
       return fail(res, error, 'could not send message');
     }

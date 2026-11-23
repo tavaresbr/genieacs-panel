@@ -62,7 +62,8 @@ class MessengerLinkedNoticeService {
   }
 
   /**
-   * Manda a confirmação. Devolve `{ sent, reason }` (para o teste e o log).
+   * Manda a confirmação (pela fila: uma falha passageira da Meta é tentada de novo).
+   * Devolve `{ sent, reason }` (para o teste e o log).
    *
    * O clique no link é uma interação da pessoa, então vale como a última dela
    * para a janela de 24 h — mesmo quando o evento não trouxe mensagem nenhuma
@@ -86,9 +87,10 @@ class MessengerLinkedNoticeService {
       const message = await MessengerSendService.sendText(
         conversationId, config.text || DEFAULT_NOTICE, null, { source: 'system' }
       );
-      return message?.delivery_status === 'sent'
-        ? { sent: true, reason: null }
-        : { sent: false, reason: 'meta_refused' };
+      // 'queued' = a Meta ou a rede não aguentou agora e a fila tenta de novo;
+      // 'failed' = a Meta recusou por motivo dela (o motivo fica na mensagem).
+      if (message?.delivery_status === 'sent') return { sent: true, reason: null };
+      return { sent: false, reason: message?.delivery_status === 'queued' ? 'queued' : 'meta_refused' };
     } catch (error) {
       console.warn(`[messenger] could not send the link confirmation: ${error.message}`);
       return { sent: false, reason: error instanceof MessengerError ? error.code : 'error' };

@@ -3967,6 +3967,20 @@ const messengerLinkTokensTable = (db) => (t) => {
 
 const MESSENGER_LINK_TOKEN_TABLES = [['messenger_link_tokens', messengerLinkTokensTable]];
 
+/**
+ * A fila de saída do Messenger (0147): `messenger_messages` É a fila, como
+ * `wa_messages` é a do WhatsApp. `attempts` conta as tentativas, `claimed_at`
+ * diz quando um worker a pegou (para retomar a que ficou abandonada) e
+ * `next_attempt_at` é quando a próxima tentativa vence — sem ela, "na fila"
+ * seria "agora" e o recuo não seria recuo. Estados novos de `delivery_status`:
+ * `queued` e `sending`.
+ */
+const MESSENGER_OUTBOX_COLUMNS = [
+  ['attempts', (t) => t.integer('attempts').notNullable().defaultTo(0)],
+  ['claimed_at', (t) => t.timestamp('claimed_at').nullable()],
+  ['next_attempt_at', (t) => t.timestamp('next_attempt_at').nullable()]
+];
+
 // A ordem importa: a Página antes das conversas, e estas antes das mensagens.
 const MESSENGER_TABLES = [
   ['messenger_pages', messengerPagesTable],
@@ -8256,6 +8270,23 @@ export const migrations = [
       for (const [name, builder] of MESSENGER_LINK_TOKEN_TABLES) {
         await createTableIfMissing(db, name, builder(db));
       }
+    }
+  },
+  {
+    /** A fila de saída do Messenger — ver `MESSENGER_OUTBOX_COLUMNS`. */
+    id: '0147_messenger_outbox',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return true;
+      return (await missingColumns(db, 'messenger_messages', MESSENGER_OUTBOX_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return;
+      const missing = await missingColumns(db, 'messenger_messages', MESSENGER_OUTBOX_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('messenger_messages', (t) => {
+        for (const add of missing) add(t);
+        t.index(['delivery_status', 'next_attempt_at'], 'messenger_msg_outbox_idx');
+      });
     }
   }
 ];

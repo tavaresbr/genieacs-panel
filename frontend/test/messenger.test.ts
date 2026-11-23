@@ -5,6 +5,9 @@ import {
   messengerErrorKey,
   messengerTitle,
   remainingParts,
+  MESSENGER_MAX_ATTEMPTS,
+  deliveryLabel,
+  hasPendingMessages,
   previewContent,
   sameLocalDay,
   windowRemainingMs,
@@ -73,6 +76,7 @@ describe('os códigos de erro do servidor', () => {
     expect(messengerErrorKey('messenger_unconfigured')).toBe('messenger.error.unconfigured')
     expect(messengerErrorKey('subscriber_not_found')).toBe('messenger.error.subscriberNotFound')
     expect(messengerErrorKey('notice_too_long')).toBe('messenger.error.noticeTooLong')
+    expect(messengerErrorKey('send_refused')).toBe('messenger.error.sendRefused')
   })
 
   it('código desconhecido ou ausente cai na genérica, sem repetir texto cru', () => {
@@ -85,5 +89,25 @@ describe('os códigos de erro do servidor', () => {
     expect(isPageId(' 1000000001 ')).toBe(true)
     expect(isPageId('abc')).toBe(false)
     expect(isPageId('123')).toBe(false)
+  })
+})
+
+describe('a fila de saída na conversa', () => {
+  it('só as respostas ainda a caminho pedem a atualização mais rápida', () => {
+    expect(hasPendingMessages([{ direction: 'out', deliveryStatus: 'queued' }])).toBe(true)
+    expect(hasPendingMessages([{ direction: 'out', deliveryStatus: 'sending' }])).toBe(true)
+    expect(hasPendingMessages([
+      { direction: 'out', deliveryStatus: 'sent' },
+      { direction: 'out', deliveryStatus: 'failed' },
+      { direction: 'in', deliveryStatus: null },
+    ])).toBe(false)
+    expect(hasPendingMessages([])).toBe(false)
+  })
+
+  it('a que já falhou e espera na fila mostra a tentativa; o resto, o próprio estado', () => {
+    expect(deliveryLabel({ deliveryStatus: 'queued', attempts: 2 })).toEqual({ kind: 'retrying', attempt: 2, max: MESSENGER_MAX_ATTEMPTS })
+    expect(deliveryLabel({ deliveryStatus: 'queued', attempts: 0 })).toEqual({ kind: 'status', status: 'queued' })
+    expect(deliveryLabel({ deliveryStatus: 'failed', attempts: 7 })).toEqual({ kind: 'status', status: 'failed' })
+    expect(deliveryLabel({ deliveryStatus: null, attempts: 0 })).toBeNull()
   })
 })

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { messengerAPI, type MessengerConversation, type MessengerMessage, type MessengerPreview } from '@/lib/api'
 import {
   MESSENGER_MAX_TEXT,
+  deliveryLabel,
+  hasPendingMessages,
   messengerErrorKey,
   messengerTitle,
   previewContent,
@@ -19,6 +21,8 @@ import { useTranslation } from '@/contexts/language-context'
 /** Com que frequência a caixa e a conversa aberta se atualizam. */
 const LIST_POLL_MS = 15_000
 const THREAD_POLL_MS = 8_000
+/** Com uma resposta ainda a caminho (na fila, ou enviando), a conversa se atualiza mais depressa. */
+const THREAD_POLL_PENDING_MS = 3_000
 
 /**
  * A caixa do Messenger: lista de conversas e a conversa aberta.
@@ -194,14 +198,19 @@ function Thread({
     }
   }, [conversation.id, t, toast])
 
+  const pending = hasPendingMessages(messages)
+
   useEffect(() => {
     void load()
+  }, [load])
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       setNow(Date.now())
       void load()
-    }, THREAD_POLL_MS)
+    }, pending ? THREAD_POLL_PENDING_MS : THREAD_POLL_MS)
     return () => window.clearInterval(timer)
-  }, [load])
+  }, [load, pending])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
@@ -220,6 +229,14 @@ function Thread({
       const res = await messengerAPI.send(conversation.id, body)
       if (res.success && res.data) {
         setText('')
+        // Saiu, ou ficou na fila (a Meta ou a rede não aguentou agora e a fila tenta de novo).
+        if (res.data.deliveryStatus === 'queued') toast.info(t('messenger.sendQueued'))
+        await load()
+        onChanged()
+      } else if (res.code === 'send_refused') {
+        // A Meta recusou: a mensagem ficou gravada como falha, com o motivo, na conversa.
+        setText('')
+        toast.error(t('messenger.error.sendRefused'))
         await load()
         onChanged()
       } else {
@@ -330,12 +347,17 @@ function Thread({
                 <span>{formatDateTime(message.createdAt)}</span>
                 {message.direction === 'out' && message.source === 'page' && <span>{t('messenger.sentOutside')}</span>}
                 {message.direction === 'out' && message.source === 'system' && <span>{t('messenger.sentAutomatic')}</span>}
-                {message.direction === 'out' && message.deliveryStatus && (
-                  <span className={message.deliveryStatus === 'failed' ? 'text-[hsl(var(--status-danger))]' : ''}>
-                    {t(`messenger.status.${message.deliveryStatus}`)}
-                    {message.deliveryStatus === 'failed' && message.deliveryError ? ` — ${message.deliveryError}` : ''}
-                  </span>
-                )}
+                {message.direction === 'out' && message.deliveryStatus && (() => {
+                  const label = deliveryLabel(message)
+                  return (
+                    <span className={message.deliveryStatus === 'failed' ? 'text-[hsl(var(--status-danger))]' : ''}>
+                      {label?.kind === 'retrying'
+                        ? t('messenger.status.retrying', { attempt: label.attempt, max: label.max })
+                        : t(`messenger.status.${message.deliveryStatus}`)}
+                      {message.deliveryStatus === 'failed' && message.deliveryError ? ` — ${message.deliveryError}` : ''}
+                    </span>
+                  )
+                })()}
               </p>
             </div>
           </li>

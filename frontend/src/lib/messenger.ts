@@ -1,4 +1,4 @@
-import type { MessengerConversation, MessengerPreview } from '@/lib/api'
+import type { MessengerConversation, MessengerMessage, MessengerPreview } from '@/lib/api'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
 
 /** A janela de resposta do Messenger: 24 h depois da última mensagem da pessoa. */
@@ -52,6 +52,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   subscriber_not_found: 'messenger.error.subscriberNotFound',
   no_page: 'messenger.error.noPage',
   notice_too_long: 'messenger.error.noticeTooLong',
+  send_refused: 'messenger.error.sendRefused',
   meta_refused: 'messenger.error.metaRefused',
 }
 
@@ -89,4 +90,27 @@ export function sameLocalDay(a: string | number | Date, b: string | number | Dat
   return first.getFullYear() === second.getFullYear()
     && first.getMonth() === second.getMonth()
     && first.getDate() === second.getDate()
+}
+
+/** O número de tentativas que a fila faz antes de desistir (o do servidor). */
+export const MESSENGER_MAX_ATTEMPTS = 7
+
+/** Há alguma resposta ainda a caminho? Então vale olhar a conversa com mais frequência. */
+export function hasPendingMessages(messages: ReadonlyArray<Pick<MessengerMessage, 'direction' | 'deliveryStatus'>>): boolean {
+  return messages.some((m) => m.direction === 'out' && (m.deliveryStatus === 'queued' || m.deliveryStatus === 'sending'))
+}
+
+/**
+ * O estado de uma resposta como a conversa o mostra: o próprio estado, ou "vai
+ * tentar de novo" para a que já falhou ao menos uma vez e espera na fila.
+ */
+export function deliveryLabel(message: Pick<MessengerMessage, 'deliveryStatus' | 'attempts'>):
+  | { kind: 'status'; status: NonNullable<MessengerMessage['deliveryStatus']> }
+  | { kind: 'retrying'; attempt: number; max: number }
+  | null {
+  if (!message.deliveryStatus) return null
+  if (message.deliveryStatus === 'queued' && message.attempts > 0) {
+    return { kind: 'retrying', attempt: message.attempts, max: MESSENGER_MAX_ATTEMPTS }
+  }
+  return { kind: 'status', status: message.deliveryStatus }
 }

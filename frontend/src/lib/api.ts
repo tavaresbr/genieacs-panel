@@ -6815,7 +6815,8 @@ export interface MessengerConversation {
   lastMessage: MessengerPreview | null
 }
 
-export type MessengerDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'
+/** `queued` = na fila (a Meta ou a rede não aguentou agora; tenta de novo); `sending` = no ar. */
+export type MessengerDeliveryStatus = 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
 
 export interface MessengerMessage {
   id: number
@@ -6828,6 +6829,8 @@ export interface MessengerMessage {
   source: 'operator' | 'page' | 'system'
   deliveryStatus: MessengerDeliveryStatus | null
   deliveryError: string | null
+  /** Tentativas de envio feitas (a fila desiste na sétima). */
+  attempts: number
   readAt: string | null
   createdAt: string
 }
