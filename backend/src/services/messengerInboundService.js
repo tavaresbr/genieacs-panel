@@ -3,6 +3,7 @@ import MessengerConversation from '../models/MessengerConversation.js';
 import MessengerMessage from '../models/MessengerMessage.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { tdb } from '../config/database.js';
+import MessengerLinkTokenService, { refOf } from './messengerLinkTokenService.js';
 
 const BODY_LIMIT = 4000;
 const URL_LIMIT = 2000;
@@ -74,7 +75,13 @@ async function handleEvent(page, event) {
     if (event.message) await handleMessage(page, event);
     else if (event.read) await handleReceipt(page, event, 'read');
     else if (event.delivery) await handleReceipt(page, event, 'delivered');
-    // `postback` e `referral` ficam para o vínculo com o assinante (próxima etapa).
+    // O link `m.me/<Página>?ref=…` chega como `referral` (quem já tinha conversa),
+    // dentro de `postback` (quem a abre agora) ou dentro da primeira mensagem.
+    // Só vale de quem escreve: o eco é a Página falando.
+    const ref = refOf(event);
+    if (ref && !event.message?.is_echo) {
+      await MessengerLinkTokenService.redeem({ page, psid: event.sender?.id, ref });
+    }
   } catch (error) {
     console.error('[messenger] could not handle event:', error.message);
   }

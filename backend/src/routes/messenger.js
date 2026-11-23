@@ -10,7 +10,11 @@ const router = express.Router();
 router.get('/status', authenticateToken, requirePermission('whatsapp.read'), MessengerController.status);
 router.get('/pages', authenticateToken, requirePermission('whatsapp.config'), MessengerController.listPages);
 router.post('/pages', authenticateToken, requirePermission('whatsapp.config'), MessengerController.connectPage);
+router.post('/pages/:id/subscribe', authenticateToken, requirePermission('whatsapp.config'), MessengerController.resubscribePage);
 router.delete('/pages/:id', authenticateToken, requirePermission('whatsapp.config'), MessengerController.disconnectPage);
+
+// O link de vínculo é falar COMO o provedor com o assinante: `whatsapp.send`.
+router.post('/links', authenticateToken, requirePermission('whatsapp.send'), whatsappSendLimiter, MessengerController.createLink);
 
 router.get('/conversations', authenticateToken, requirePermission('whatsapp.read'), MessengerController.listConversations);
 router.get('/conversations/:id/messages', authenticateToken, requirePermission('whatsapp.read'), MessengerController.listMessages);

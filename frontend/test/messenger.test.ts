@@ -5,7 +5,8 @@ import {
   messengerErrorKey,
   messengerTitle,
   remainingParts,
-  singleLine,
+  previewContent,
+  sameLocalDay,
   windowRemainingMs,
 } from '@/lib/messenger'
 
@@ -46,10 +47,22 @@ describe('o título e a prévia da conversa', () => {
     expect(messengerTitle({ name: null, clientName: '  ', psid: '1234567890' })).toBe('…567890')
   })
 
-  it('a prévia cabe numa linha', () => {
-    expect(singleLine('a\n  b\tc')).toBe('a b c')
-    expect(singleLine(null)).toBe('')
-    expect(singleLine('x'.repeat(100), 10)).toBe(`${'x'.repeat(9)}…`)
+})
+
+describe('a prévia da última mensagem', () => {
+  it('mostra o texto; sem texto, o tipo do anexo; sem nada, vazio', () => {
+    expect(previewContent({ text: 'Oi', attachmentType: null })).toEqual({ kind: 'text', text: 'Oi' })
+    expect(previewContent({ text: 'Oi', attachmentType: 'image' })).toEqual({ kind: 'text', text: 'Oi' })
+    expect(previewContent({ text: null, attachmentType: 'image' })).toEqual({ kind: 'attachment', type: 'image' })
+    expect(previewContent({ text: '', attachmentType: null })).toEqual({ kind: 'empty' })
+  })
+
+  it('a lista mostra a hora de hoje e a data do resto', () => {
+    const now = new Date(2026, 10, 23, 15, 0, 0)
+    expect(sameLocalDay(new Date(2026, 10, 23, 1, 0, 0), now)).toBe(true)
+    expect(sameLocalDay(new Date(2026, 10, 22, 23, 59, 0), now)).toBe(false)
+    expect(sameLocalDay(new Date(2025, 10, 23, 15, 0, 0), now)).toBe(false)
+    expect(sameLocalDay('não é data', now)).toBe(false)
   })
 })
 

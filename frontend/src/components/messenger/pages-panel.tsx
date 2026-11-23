@@ -64,6 +64,25 @@ export function MessengerPagesPanel({ webhookPath, onChanged }: { webhookPath: s
     }
   }
 
+  const handleResubscribe = async (page: MessengerPage) => {
+    setBusy(true)
+    try {
+      const res = await messengerAPI.resubscribePage(page.id)
+      if (res.success && res.data) {
+        if (res.data.status === 'error') {
+          toast.error(t('messenger.pages.connectedWithError', { error: res.data.webhookError ?? '' }))
+        } else {
+          toast.success(t('messenger.pages.resubscribed'))
+        }
+        await load()
+      } else {
+        toast.error(t(messengerErrorKey(res.code)))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleDisconnect = async (page: MessengerPage) => {
     const name = page.pageName || page.pageId
     if (!(await confirm(t('messenger.pages.disconnectConfirm', { name }), { danger: true }))) return
@@ -116,6 +135,15 @@ export function MessengerPagesPanel({ webhookPath, onChanged }: { webhookPath: s
                 >
                   {t(page.status === 'error' ? 'messenger.pages.statusError' : 'messenger.pages.statusConnected')}
                 </span>
+                <button
+                  type="button"
+                  className="modern-button-secondary max-sm:min-h-10"
+                  title={t('messenger.pages.resubscribeHint')}
+                  disabled={busy}
+                  onClick={() => void handleResubscribe(page)}
+                >
+                  {t('messenger.pages.resubscribe')}
+                </button>
                 <button
                   type="button"
                   className="modern-button-danger max-sm:min-h-10"

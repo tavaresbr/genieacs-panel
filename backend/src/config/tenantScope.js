@@ -111,6 +111,8 @@ export const SCOPED_TABLES = new Set([
   'messenger_pages',
   'messenger_conversations',
   'messenger_messages',
+  // Os links de vínculo (`?ref=`): só o hash do token, e a quem vincula.
+  'messenger_link_tokens',
   // Os modelos aprovados na conta da Meta de cada número oficial.
   'wa_meta_templates',
   'wa_broadcasts',

@@ -6778,6 +6778,15 @@ export interface MessengerPage {
   createdAt: string
 }
 
+/** A última mensagem de uma conversa, como a lista a recebe (texto já limitado a uma linha). */
+export interface MessengerPreview {
+  direction: 'in' | 'out'
+  text: string | null
+  attachmentType: string | null
+  deliveryStatus: MessengerDeliveryStatus | null
+  at: string
+}
+
 export interface MessengerConversation {
   id: number
   pageRowId: number
@@ -6794,6 +6803,8 @@ export interface MessengerConversation {
   closedAt: string | null
   /** Se ainda dá para responder (24 h desde a última mensagem da pessoa). */
   windowOpen: boolean
+  /** Só na lista de conversas; nas demais respostas, `null`. */
+  lastMessage: MessengerPreview | null
 }
 
 export type MessengerDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'
@@ -6830,6 +6841,11 @@ export const messengerAPI = {
     apiClient.post<MessengerMessage>(`/messenger/conversations/${id}/messages`, { text }),
   setClosed: (id: number, closed: boolean) =>
     apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/closed`, { closed }),
+  /** Assina de novo os campos do webhook (depois de um campo novo, como os links de vínculo). */
+  resubscribePage: (id: number) => apiClient.post<MessengerPage>(`/messenger/pages/${id}/subscribe`, {}),
+  /** O link `m.me/<Página>?ref=…` que vincula a conversa ao assinante quando ele o abre. */
+  createLink: (contract: string) =>
+    apiClient.post<{ url: string; expiresAt: string }>('/messenger/links', { contract }),
   /** `key` é o do contato (`WhatsAppContact.key`): o contrato, ou `c:<id>` sem contrato. */
   linkSubscriber: (id: number, key: string) =>
     apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/subscriber`, { contract: key }),

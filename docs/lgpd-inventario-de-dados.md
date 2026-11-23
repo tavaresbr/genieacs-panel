@@ -143,6 +143,7 @@ diz isso; escolher um número para elas é decisão de negócio que ainda não f
 | Dado | Tabela | Prazo padrão | Limites | Quem muda | Relógio | O que a poda poupa |
 | --- | --- | --- | --- | --- | --- | --- |
 | Trilha de auditoria | `audit_log` | **365 dias** | 30–3650 dias | o provedor, numa tela — e o teto do plano pode encurtar o que ele escolheu | created_at | — |
+| Links de vínculo do Messenger | `messenger_link_tokens` | **30 dias** | — | ninguém: fixo no código | expires_at | links que ainda não venceram, usados ou não |
 | Eventos do bot | `wa_bot_events` | **180 dias** | — | ninguém: fixo no código | created_at | — |
 | Execuções de ativação | `provisioning_runs` | **90 dias** | 1–365 dias | o provedor, numa tela | updated_at | execuções ainda em andamento ou pendentes — só as terminadas saem |
 | Eventos do SGP | `sgp_events` | **90 dias** | 1–365 dias | o provedor, numa tela | updated_at | eventos ainda não processados — só os processados ou ignorados saem |

@@ -6,7 +6,7 @@ import { graphRequest, isMetaId } from './metaGraphClient.js';
 const pageTokenBox = createSecretBox('skygenpanel-messenger-page-token-v1');
 
 /** Os campos que a Página precisa assinar para o painel receber conversa e recibo. */
-export const SUBSCRIBED_FIELDS = 'messages,message_deliveries,message_reads,messaging_postbacks';
+export const SUBSCRIBED_FIELDS = 'messages,message_deliveries,message_reads,messaging_postbacks,messaging_referrals';
 
 export class MessengerError extends Error {
   constructor(code, message, status = 400) {
@@ -101,6 +101,18 @@ class MessengerPageService {
       return MessengerPage.update(row.id, { subscribed_at: new Date(), webhook_error: null, status: 'connected' });
     }
     return MessengerPage.update(row.id, { webhook_error: String(result.error).slice(0, 255), status: 'error' });
+  }
+
+  /**
+   * Assina de novo os campos do webhook de uma Página já conectada — para
+   * quem conectou antes de um campo novo existir (os links de vínculo precisam
+   * de `messaging_referrals`). Recusa sem tocar na Meta se não há token guardado.
+   */
+  static async resubscribe(id) {
+    const row = await MessengerPage.getById(id);
+    if (!row) throw new MessengerError('page_not_found', 'page not found', 404);
+    if (!decryptPageToken(row.page_token)) throw new MessengerError('missing_token', 'no page token is stored', 400);
+    return this.subscribe(row);
   }
 
   /** Desconecta: cancela a assinatura (se der) e apaga a Página e, em cascata, o que veio dela. */

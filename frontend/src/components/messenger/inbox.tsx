@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { messengerAPI, type MessengerConversation, type MessengerMessage } from '@/lib/api'
+import { messengerAPI, type MessengerConversation, type MessengerMessage, type MessengerPreview } from '@/lib/api'
 import {
   MESSENGER_MAX_TEXT,
   messengerErrorKey,
   messengerTitle,
+  previewContent,
   remainingParts,
-  singleLine,
+  sameLocalDay,
   windowRemainingMs,
 } from '@/lib/messenger'
 import { MessengerSubscriberLinker } from '@/components/messenger/subscriber-linker'
@@ -28,16 +29,20 @@ const THREAD_POLL_MS = 8_000
  * erro, e uma resposta que ainda assim passe é recusada lá.
  */
 export function MessengerInbox({ canSend, hasPages }: { canSend: boolean; hasPages: boolean }) {
-  const { t } = useTranslation()
+  const { t, formatDate, formatTime } = useTranslation()
   const toast = useToast()
   const [status, setStatus] = useState<'open' | 'closed'>('open')
   const [conversations, setConversations] = useState<MessengerConversation[] | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  // O "agora" da lista (hoje mostra a hora, o resto a data): atualizado a cada recarga, não a cada render.
+  const [now, setNow] = useState(() => Date.now())
 
   const loadList = useCallback(async () => {
     const res = await messengerAPI.listConversations(status)
-    if (res.success && res.data) setConversations(res.data)
-    else if (conversations === null) toast.error(t('messenger.loadFailed'))
+    if (res.success && res.data) {
+      setConversations(res.data)
+      setNow(Date.now())
+    } else if (conversations === null) toast.error(t('messenger.loadFailed'))
     // `conversations` fica fora das dependências de propósito: o aviso é só da
     // primeira carga, e a atualização periódica não pode refazer o efeito.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,6 +53,17 @@ export function MessengerInbox({ canSend, hasPages }: { canSend: boolean; hasPag
     const timer = window.setInterval(() => void loadList(), LIST_POLL_MS)
     return () => window.clearInterval(timer)
   }, [loadList])
+
+  /** "Você: …" para o que a equipe mandou, o texto, ou o tipo do anexo. */
+  const previewLabel = (preview: MessengerPreview) => {
+    const content = previewContent(preview)
+    const text = content.kind === 'text'
+      ? content.text
+      : content.kind === 'attachment'
+        ? t('messenger.attachment', { type: content.type })
+        : t('messenger.noText')
+    return preview.direction === 'out' ? t('messenger.preview.you', { text }) : text
+  }
 
   const selected = useMemo(
     () => conversations?.find((c) => c.id === selectedId) ?? null,
@@ -100,12 +116,27 @@ export function MessengerInbox({ canSend, hasPages }: { canSend: boolean; hasPag
                     <span className={`min-w-0 flex-1 truncate text-sm text-foreground ${conversation.unreadCount ? 'font-semibold' : ''}`}>
                       {messengerTitle(conversation)}
                     </span>
+                    {conversation.lastMessage && (
+                      <span className="shrink-0 font-mono text-[0.68rem] tabular-nums text-muted-foreground">
+                        {sameLocalDay(conversation.lastMessage.at, now)
+                          ? formatTime(conversation.lastMessage.at)
+                          : formatDate(conversation.lastMessage.at)}
+                      </span>
+                    )}
                     {conversation.unreadCount > 0 && (
                       <span className="modern-badge" aria-label={t('messenger.unread', { count: conversation.unreadCount })}>
                         {conversation.unreadCount}
                       </span>
                     )}
                   </span>
+                  {conversation.lastMessage && (
+                    <span
+                      className={`block truncate text-xs ${conversation.unreadCount ? 'text-foreground' : 'text-muted-foreground'}`}
+                      data-testid="messenger-preview"
+                    >
+                      {previewLabel(conversation.lastMessage)}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

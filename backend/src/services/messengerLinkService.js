@@ -25,9 +25,13 @@ class MessengerLinkService {
     return conversation;
   }
 
-  /** Vincula a conversa ao contrato (ou `c:<id>`) que o atendente escolheu. */
-  static async link(id, key) {
-    const conversation = await this.get(id);
+  /**
+   * A quem a chave (contrato, ou `c:<id>`) aponta: o vínculo que vai para a
+   * conversa ou para o link. Lança 404 `subscriber_not_found` quando não há —
+   * e é a MESMA resposta para um contrato que nunca existiu e para o de outro
+   * provedor, porque a leitura é escopada.
+   */
+  static async resolveTarget(key) {
     const wanted = String(key ?? '').trim();
     if (!wanted) throw new MessengerError('invalid_body', '`contract` is required');
 
@@ -43,11 +47,17 @@ class MessengerLinkService {
     const link = links[0] ?? null;
     // O mesmo caminho do WhatsApp: a conta do portal é a da ONT do contrato.
     const account = link?.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
-    const binding = link
+    return link
       ? { contract: link.contract, sgp_contact_id: null, customer_account_id: account?.id ?? null }
       : contact.contract
         ? { contract: contact.contract, sgp_contact_id: null, customer_account_id: null }
         : { contract: null, sgp_contact_id: contact.id, customer_account_id: null };
+  }
+
+  /** Vincula a conversa ao contrato (ou `c:<id>`) que o atendente escolheu. */
+  static async link(id, key) {
+    const conversation = await this.get(id);
+    const binding = await this.resolveTarget(key);
     return MessengerConversation.update(conversation.id, { ...binding, bound_via: 'operator' });
   }
 

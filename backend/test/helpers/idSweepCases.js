@@ -69,6 +69,16 @@ export const casos = [
     tabela: 'messenger_conversations'
   },
   {
+    // Assinar de novo os campos do webhook. No controle a Página semeada não tem
+    // token e a resposta é 400 (`missing_token`) — que só se chega DEPOIS de
+    // achar a Página, e sem chamar a Meta.
+    chave: 'messengerPage',
+    label: 'POST /api/messenger/pages/:id/subscribe',
+    method: 'POST',
+    path: (id) => `/api/messenger/pages/${id}/subscribe`,
+    tabela: 'messenger_pages'
+  },
+  {
     chave: 'messengerPage',
     label: 'DELETE /api/messenger/pages/:id',
     method: 'DELETE',

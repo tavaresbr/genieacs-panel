@@ -4,6 +4,7 @@ import MessengerMessage from '../models/MessengerMessage.js';
 import MessengerPageService, { MessengerError, publicPage, messengerConfigured } from '../services/messengerPageService.js';
 import MessengerSendService, { windowOpen } from '../services/messengerSendService.js';
 import MessengerLinkService from '../services/messengerLinkService.js';
+import MessengerLinkTokenService from '../services/messengerLinkTokenService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 function fail(res, error, fallback) {
@@ -14,7 +15,23 @@ function fail(res, error, fallback) {
   return res.status(500).json(createErrorResponse(fallback, error.message));
 }
 
-const publicConversation = (c, clientName = null) => ({
+/** Quanto da mensagem a lista leva: a prévia cabe numa linha, e o resto só sai ao abrir a conversa. */
+const PREVIEW_LIMIT = 120;
+
+/** A prévia da última mensagem como a lista a recebe, ou `null` sem mensagens. */
+export function publicPreview(message) {
+  if (!message) return null;
+  const flat = String(message.body ?? '').replace(/\s+/g, ' ').trim();
+  return {
+    direction: message.direction,
+    text: flat ? (flat.length > PREVIEW_LIMIT ? `${flat.slice(0, PREVIEW_LIMIT - 1)}…` : flat) : null,
+    attachmentType: message.attachment_type ?? null,
+    deliveryStatus: message.delivery_status ?? null,
+    at: message.created_at
+  };
+}
+
+const publicConversation = (c, clientName = null, lastMessage = null) => ({
   id: c.id,
   pageRowId: c.page_row_id,
   psid: c.psid,
@@ -28,7 +45,9 @@ const publicConversation = (c, clientName = null) => ({
   lastInboundAt: c.last_inbound_at,
   unreadCount: c.unread_count,
   closedAt: c.closed_at,
-  windowOpen: windowOpen(c)
+  windowOpen: windowOpen(c),
+  /** A última mensagem, só na lista; nas demais respostas, `null`. */
+  lastMessage: publicPreview(lastMessage)
 });
 
 const publicMessage = (m) => ({
@@ -83,13 +102,39 @@ class MessengerController {
     }
   }
 
+  /** Assina de novo os campos do webhook da Página (depois de um campo novo). */
+  static async resubscribePage(req, res) {
+    try {
+      const row = await MessengerPageService.resubscribe(Number(req.params.id));
+      return res.json(createResponse('ok', publicPage(row)));
+    } catch (error) {
+      return fail(res, error, 'could not subscribe page');
+    }
+  }
+
+  /**
+   * Emite o link `m.me/<Página>?ref=…` que vincula a conversa ao assinante
+   * quando ele o abre. O atendente o manda ao cliente (WhatsApp, e-mail, fatura).
+   */
+  static async createLink(req, res) {
+    try {
+      const { url, expiresAt } = await MessengerLinkTokenService.create(req.body?.contract, {
+        source: 'operator', userId: req.user?.userId ?? null
+      });
+      return res.status(201).json(createResponse('ok', { url, expiresAt }));
+    } catch (error) {
+      return fail(res, error, 'could not create link');
+    }
+  }
+
   static async listConversations(req, res) {
     try {
       const rows = await MessengerConversation.listRecent({
         limit: req.query?.limit, offset: req.query?.offset, status: req.query?.status
       });
       const names = await MessengerLinkService.clientNames(rows);
-      return res.json(createResponse('ok', rows.map((c) => publicConversation(c, names.get(c.id)))));
+      const previews = await MessengerMessage.lastOfConversations(rows.map((c) => c.id));
+      return res.json(createResponse('ok', rows.map((c) => publicConversation(c, names.get(c.id), previews.get(c.id)))));
     } catch (error) {
       return fail(res, error, 'could not load conversations');
     }
