@@ -3199,6 +3199,8 @@ const zhTW: Dictionary = {
   'whatsapp.variable.pix': "PIX",
   'whatsapp.variable.linha_digitavel': "數位行",
   'whatsapp.variable.link_boleto': "帳單連結",
+  'whatsapp.variable.link_messenger': 'Messenger link',
+  'whatsapp.templates.messengerHint': '{{link_messenger}} is optional: it puts a single-use link to continue the conversation on Messenger, linked to this subscriber. Without a connected Messenger Page the line that cites it is left out and the message still goes. Put it alone on its own line.',
   'whatsapp.campaign.detail.open': "查看收件人",
   'whatsapp.campaign.detail.hint': "本次群發的每位收件人及訊息結果。",
   'whatsapp.campaign.detail.filter': "篩選收件人",

@@ -3176,6 +3176,8 @@ const hi: Dictionary = {
   'whatsapp.variable.pix': "PIX",
   'whatsapp.variable.linha_digitavel': "डिजिटल लाइन",
   'whatsapp.variable.link_boleto': "बोलेटो लिंक",
+  'whatsapp.variable.link_messenger': 'Messenger link',
+  'whatsapp.templates.messengerHint': '{{link_messenger}} is optional: it puts a single-use link to continue the conversation on Messenger, linked to this subscriber. Without a connected Messenger Page the line that cites it is left out and the message still goes. Put it alone on its own line.',
   'whatsapp.campaign.detail.open': "प्राप्तकर्ता देखें",
   'whatsapp.campaign.detail.hint': "इस अभियान का हर व्यक्ति और संदेश का क्या हुआ।",
   'whatsapp.campaign.detail.filter': "प्राप्तकर्ता फ़िल्टर करें",

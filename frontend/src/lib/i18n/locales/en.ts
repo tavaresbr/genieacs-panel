@@ -3201,6 +3201,8 @@ const en = {
   'whatsapp.variable.pix': "PIX",
   'whatsapp.variable.linha_digitavel': "digitable line",
   'whatsapp.variable.link_boleto': "boleto link",
+  'whatsapp.variable.link_messenger': 'Messenger link',
+  'whatsapp.templates.messengerHint': '{{link_messenger}} is optional: it puts a single-use link to continue the conversation on Messenger, linked to this subscriber. Without a connected Messenger Page the line that cites it is left out and the message still goes. Put it alone on its own line.',
   'whatsapp.campaign.detail.open': "View recipients",
   'whatsapp.campaign.detail.hint': "Each person this campaign was addressed to, and what happened to the message.",
   'whatsapp.campaign.detail.filter': "Filter recipients",

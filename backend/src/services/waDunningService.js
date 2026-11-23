@@ -1,3 +1,4 @@
+import MessengerLinkTokenService from './messengerLinkTokenService.js';
 import AppState from '../models/AppState.js';
 import SgpLink from '../models/SgpLink.js';
 import WaConversation from '../models/WaConversation.js';
@@ -23,6 +24,7 @@ import {
   diasEntre,
   maisAntigaEmAberto,
   modeloEhLembrete,
+  modeloCitaLinkMessenger,
   renderCobranca,
   separarCodigos,
   variaveisDeCobranca,
@@ -781,6 +783,22 @@ class WaDunningService {
     // Outra passada chegou primeiro. Não é erro: é o índice fazendo o trabalho.
     if (!sendId) return null;
     if (result) return result;
+
+    // O link do Messenger (`{{link_messenger}}`, de uso único) só agora, que a
+    // mensagem vai de fato sair: simulação, intervalo e corrida já ficaram para
+    // trás, e nenhum deles deixa um link emitido à toa. Até aqui o texto foi
+    // montado SEM ele (a linha que o cita saiu); com link, monta de novo. O
+    // modelo da Meta vai como foi aprovado, sem a variável.
+    if (!metaTemplate && template && modeloCitaLinkMessenger(template.body)) {
+      const extra = await MessengerLinkTokenService.varsForTemplate(template.body, subscriber.contract);
+      if (extra.link_messenger) {
+        const vars = { ...variaveisDeCobranca(fatura, subscriber.clientName, now), ...extra };
+        const aparte = translatorFor(DEFAULT_LOCALE)('whatsapp.dunning.codeSentNext');
+        const separados = separarCodigos(template.body, vars, { pix: aparte, linha_digitavel: aparte });
+        const refeito = renderCobranca(template.body, separados ? separados.vars : vars);
+        if (refeito !== null) body = refeito;
+      }
+    }
 
     try {
       const message = await this.enqueue({ account, subscriber, body, metaTemplate });

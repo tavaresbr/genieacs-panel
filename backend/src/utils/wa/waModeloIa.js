@@ -30,7 +30,8 @@ const DESCRICAO = Object.freeze({
   dias_para_vencer: 'dias que faltam para vencer (só existe antes do vencimento)',
   pix: 'código PIX copia e cola (o sistema preenche)',
   linha_digitavel: 'linha digitável do boleto (o sistema preenche)',
-  link_boleto: 'link do boleto (o sistema preenche)'
+  link_boleto: 'link do boleto (o sistema preenche)',
+  link_messenger: 'link para o cliente continuar a conversa pelo Messenger (opcional: sem ele, a linha que o cita some; coloque-o sozinho numa linha)'
 });
 
 export function tomValido(tom) {

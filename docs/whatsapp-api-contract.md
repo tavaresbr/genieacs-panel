@@ -1739,7 +1739,13 @@ aqui fica girando para sempre.
 ## Modelos de cobrança
 
 Variáveis aceitas: `nome`, `valor`, `vencimento`, `dias_atraso`,
-`dias_para_vencer`, `pix`, `linha_digitavel`, `link_boleto`.
+`dias_para_vencer`, `pix`, `linha_digitavel`, `link_boleto` e `link_messenger`.
+
+`link_messenger` é a única **opcional**: vazia, NÃO recusa a mensagem — a linha que a
+cita sai inteira (e o resto segue pela regra 1). Ela vira um link `m.me/<Página>?ref=…`
+de uso único, emitido para o contrato da cobrança no momento do envio (régua,
+campanha de cobrança e segunda via), e só se o modelo a cita. Sem Página do Messenger
+conectada, ou sem cadastro do contrato, fica vazia. A simulação da régua não emite.
 
 Duas regras que o renderizador impõe, e que não dependem da disciplina de quem
 opera:

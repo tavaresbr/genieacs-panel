@@ -15,7 +15,8 @@ const VARIABLE_LABELS: Record<string, TranslationKey> = {
   dias_para_vencer: 'whatsapp.variable.dias_para_vencer',
   pix: 'whatsapp.variable.pix',
   linha_digitavel: 'whatsapp.variable.linha_digitavel',
-  link_boleto: 'whatsapp.variable.link_boleto'
+  link_boleto: 'whatsapp.variable.link_boleto',
+  link_messenger: 'whatsapp.variable.link_messenger'
 }
 
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string

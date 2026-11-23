@@ -3199,6 +3199,8 @@ const ptBR: Dictionary = {
   'whatsapp.variable.pix': "PIX",
   'whatsapp.variable.linha_digitavel': "linha digitável",
   'whatsapp.variable.link_boleto': "link do boleto",
+  'whatsapp.variable.link_messenger': 'link do Messenger',
+  'whatsapp.templates.messengerHint': '{{link_messenger}} é opcional: coloca um link de uso único para continuar a conversa pelo Messenger, já vinculado a este assinante. Sem uma Página do Messenger conectada, a linha que o cita é retirada e a mensagem sai mesmo assim. Coloque-o sozinho numa linha.',
   'whatsapp.campaign.detail.open': "Ver destinatários",
   'whatsapp.campaign.detail.hint': "Cada pessoa desta campanha e o que aconteceu com a mensagem.",
   'whatsapp.campaign.detail.filter': "Filtrar destinatários",
