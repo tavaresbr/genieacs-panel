@@ -6770,7 +6770,16 @@ export type AiKnowledgeInput = Partial<Pick<AiKnowledgeItem, 'kind' | 'title' | 
 /** `GET /messenger/status`: se a plataforma tem o app da Meta configurado, e o caminho do webhook. */
 export interface MessengerStatus {
   configured: boolean
+  /** O login do Facebook: pronto (app id + segredos) e o id do app que o popup usa. */
+  facebookLogin: { available: boolean; appId: string }
   webhookPath: string
+}
+
+/** Uma Página que o usuário do Facebook administra (sem token). */
+export interface MessengerFacebookPage {
+  id: string
+  name: string
+  connected: boolean
 }
 
 /** Uma Página do Facebook conectada. O token nunca chega ao navegador. */
@@ -6815,7 +6824,8 @@ export interface MessengerConversation {
   lastMessage: MessengerPreview | null
 }
 
-export type MessengerDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'
+/** `queued` = na fila (a Meta ou a rede não aguentou agora; tenta de novo); `sending` = no ar. */
+export type MessengerDeliveryStatus = 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
 
 export interface MessengerMessage {
   id: number
@@ -6828,6 +6838,8 @@ export interface MessengerMessage {
   source: 'operator' | 'page' | 'system'
   deliveryStatus: MessengerDeliveryStatus | null
   deliveryError: string | null
+  /** Tentativas de envio feitas (a fila desiste na sétima). */
+  attempts: number
   readAt: string | null
   createdAt: string
 }
@@ -6849,6 +6861,11 @@ export const messengerAPI = {
   listPages: () => apiClient.get<MessengerPage[]>('/messenger/pages'),
   connectPage: (pageId: string, pageToken: string) =>
     apiClient.post<MessengerPage>('/messenger/pages', { pageId, pageToken }),
+  /** O token é o do USUÁRIO (curta duração) que o popup do Facebook entregou; o servidor faz o resto. */
+  facebookPages: (userToken: string) =>
+    apiClient.post<MessengerFacebookPage[]>('/messenger/facebook/pages', { userToken }),
+  facebookConnect: (userToken: string, pageId: string) =>
+    apiClient.post<MessengerPage>('/messenger/facebook/connect', { userToken, pageId }),
   disconnectPage: (id: number) => apiClient.delete<null>(`/messenger/pages/${id}`),
   listConversations: (status: 'open' | 'closed' = 'open') =>
     apiClient.get<MessengerConversation[]>(`/messenger/conversations?status=${status}`),

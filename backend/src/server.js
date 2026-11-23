@@ -9,6 +9,7 @@ import CustomerService from './services/customerService.js';
 import CustomerPortalPasswordService from './services/customerPortalPasswordService.js';
 import SchedulerService from './services/schedulerService.js';
 import WaOutboxWorker from './services/waOutboxWorker.js';
+import MessengerOutboxWorker from './services/messengerOutboxWorker.js';
 import { drain as drainWaInbound } from './services/waInboundQueue.js';
 import WaAlertService from './services/waAlertService.js';
 import OutageWatcher from './services/outageWatcher.js';
@@ -153,6 +154,9 @@ export const startServer = async () => {
       // longer. It reads the integration's enabled flag inside each tick, so
       // this arms the driver whether or not WhatsApp is configured.
       WaOutboxWorker.start();
+      // A fila do Messenger: a mesma razão, outro canal. Só leva o que a Meta ou a
+      // rede não aguentou no envio imediato, com recuo.
+      MessengerOutboxWorker.start();
       // The technical-alert scan has its own driver for the opposite reason to
       // the outbox: a pass reads the whole fleet from GenieACS, so it is paced
       // by the operator's `intervalSeconds` rather than by a fixed tick. Like
@@ -218,6 +222,7 @@ async function shutdown(signal) {
   console.log(`Received ${signal}; shutting down`);
   SchedulerService.stop();
   WaOutboxWorker.stop();
+  MessengerOutboxWorker.stop();
   WaAlertService.stop();
   OutageWatcher.stop();
   DeviceHistoryService.stop();

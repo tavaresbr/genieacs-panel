@@ -7,6 +7,7 @@ import MessengerLinkService from '../services/messengerLinkService.js';
 import MessengerLinkTokenService from '../services/messengerLinkTokenService.js';
 import MessengerLinkedNoticeService from '../services/messengerLinkedNoticeService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import MessengerFacebookLoginService, { facebookAppId, facebookLoginAvailable } from '../services/messengerFacebookLoginService.js';
 
 function fail(res, error, fallback) {
   if (error instanceof MessengerError) {
@@ -61,6 +62,8 @@ const publicMessage = (m) => ({
   source: m.source,
   deliveryStatus: m.delivery_status,
   deliveryError: m.delivery_error,
+  /** Tentativas feitas (a fila tenta até 7 vezes antes de desistir). */
+  attempts: Number(m.attempts || 0),
   readAt: m.read_at,
   createdAt: m.created_at
 });
@@ -69,6 +72,7 @@ class MessengerController {
   static async status(req, res) {
     return res.json(createResponse('ok', {
       configured: messengerConfigured(),
+      facebookLogin: { available: facebookLoginAvailable(), appId: facebookAppId() },
       webhookPath: MessengerPageService.webhookPath()
     }));
   }
@@ -88,6 +92,26 @@ class MessengerController {
         pageId: req.body?.pageId,
         pageToken: req.body?.pageToken
       });
+      return res.status(201).json(createResponse('ok', publicPage(row)));
+    } catch (error) {
+      return fail(res, error, 'could not connect page');
+    }
+  }
+
+  /** Passo 1 do login do Facebook: as Páginas que a pessoa administra (sem token). */
+  static async facebookPages(req, res) {
+    try {
+      const pages = await MessengerFacebookLoginService.listPages(req.body?.userToken);
+      return res.json(createResponse('ok', pages));
+    } catch (error) {
+      return fail(res, error, 'could not list facebook pages');
+    }
+  }
+
+  /** Passo 2: conecta a Página escolhida. */
+  static async facebookConnect(req, res) {
+    try {
+      const row = await MessengerFacebookLoginService.connect(req.body?.userToken, req.body?.pageId);
       return res.status(201).json(createResponse('ok', publicPage(row)));
     } catch (error) {
       return fail(res, error, 'could not connect page');
@@ -188,8 +212,12 @@ class MessengerController {
       const message = await MessengerSendService.sendText(
         Number(req.params.id), req.body?.text, req.user?.userId ?? null
       );
-      return res.status(message.delivery_status === 'failed' ? 502 : 201)
-        .json(createResponse('ok', publicMessage(message)));
+      // 201 saiu; 202 ficou na fila (a Meta ou a rede não aguentou agora, e a fila
+      // tenta de novo); 502 a Meta recusou por motivo dela.
+      const status = message.delivery_status === 'failed' ? 502 : message.delivery_status === 'sent' ? 201 : 202;
+      // `send_refused` na recusa: o corpo de um erro HTTP não chega à tela, e o código é o
+      // que a manda recarregar a conversa, onde a mensagem ficou gravada com o motivo.
+      return res.status(status).json(createResponse('ok', publicMessage(message), status === 502 ? 'send_refused' : null));
     } catch (error) {
       return fail(res, error, 'could not send message');
     }

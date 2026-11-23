@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Conectar Messenger – Tavares Fibra</title>
+<style>
+  :root { --bg:#f4f6f5; --card:#fff; --ink:#1b2a25; --muted:#5b6b65; --fb:#1877f2; --err:#b42318; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:420px; margin:48px auto; padding:0 16px; }
+  .card { background:var(--card); border-radius:12px; padding:24px; box-shadow:0 1px 3px rgba(0,0,0,.08); text-align:center; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  p { color:var(--muted); line-height:1.5; }
+  button { background:var(--fb); border:0; border-radius:6px; color:#fff; cursor:pointer; font-size:16px; font-weight:600; height:44px; padding:0 24px; }
+  button:disabled { opacity:.5; cursor:wait; }
+  #status { margin-top:16px; font-weight:600; }
+  .err { color:var(--err); }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>Conectar o Messenger</h1>
+    <p>Entre com o Facebook de quem administra a Página. Depois você escolhe, no painel, quais Páginas conectar.</p>
+    <button id="btn" type="button">Entrar com o Facebook</button>
+    <div id="status" role="status"></div>
+  </div>
+</main>
+<!-- Sem script inline: a CSP desta página só libera o SDK da Meta e arquivos do próprio painel. -->
+<script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+<script defer src="/messenger-connect.js"></script>
+</body>
+</html>

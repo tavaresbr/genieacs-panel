@@ -1,25 +1,26 @@
 import MessengerPage from '../models/MessengerPage.js';
 import MessengerConversation from '../models/MessengerConversation.js';
 import MessengerMessage from '../models/MessengerMessage.js';
-import { graphRequest } from './metaGraphClient.js';
-import { MessengerError, decryptPageToken } from './messengerPageService.js';
+import MessengerOutboxWorker from './messengerOutboxWorker.js';
+import { MessengerError } from './messengerPageService.js';
+import { windowOpen } from '../utils/messenger/messengerWindow.js';
 
-/** A janela de resposta do Messenger: 24 h depois da última mensagem da pessoa. */
-export const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
+export { REPLY_WINDOW_MS, windowOpen } from '../utils/messenger/messengerWindow.js';
 export const MAX_TEXT = 2000;
-
-/** Se ainda dá para responder (fora da janela a Meta recusa, e é melhor dizer aqui). */
-export function windowOpen(conversation, now = Date.now()) {
-  if (!conversation?.last_inbound_at) return false;
-  const last = new Date(conversation.last_inbound_at).getTime();
-  return Number.isFinite(last) && now - last <= REPLY_WINDOW_MS;
-}
 
 class MessengerSendService {
   /**
-   * Responde numa conversa. Falha com `MessengerError` e NÃO grava nada se a
-   * janela fechou ou o texto é inválido; se a Meta recusar, grava a tentativa
-   * como `failed` com o motivo, para o operador ver o que aconteceu.
+   * Responde numa conversa.
+   *
+   * O que o servidor pode dizer na hora — texto vazio ou longo, conversa
+   * inexistente, janela fechada, Página fora — falha com `MessengerError` e NÃO
+   * grava nada. Passando disso a mensagem ENTRA NA FILA e é tentada já, pela
+   * mesma `deliver()` do laço de fundo: o caso comum sai na hora, e o que a Meta
+   * ou a rede não aguentaram fica 'queued' (nova tentativa com recuo) em vez de
+   * se perder. Uma recusa permanente da Meta fica 'failed', com o motivo.
+   *
+   * O resultado é o estado em que a mensagem ficou: 'sent', 'queued' (vai
+   * tentar de novo) ou 'failed'.
    */
   static async sendText(conversationId, text, userId = null, { source = 'operator' } = {}) {
     const body = String(text ?? '').trim();
@@ -36,33 +37,17 @@ class MessengerSendService {
       throw new MessengerError('page_unavailable', 'the page is not connected', 409);
     }
 
-    const result = await graphRequest({
-      method: 'POST',
-      path: `/${page.page_id}/messages`,
-      metaToken: decryptPageToken(page.page_token),
-      body: {
-        recipient: { id: conversation.psid },
-        messaging_type: 'RESPONSE',
-        message: { text: body }
-      }
-    });
-
-    const mid = result.ok ? String(result.data?.message_id ?? '').slice(0, 128) || null : null;
     const { message } = await MessengerMessage.insert({
       conversation_id: conversation.id,
       direction: 'out',
-      external_id: mid,
       body,
       // 'operator' (a equipe) ou 'system' (mensagem automática, como a confirmação do vínculo).
       source,
-      delivery_status: result.ok ? 'sent' : 'failed',
-      delivery_error: result.ok ? null : String(result.error).slice(0, 255),
+      delivery_status: 'queued',
       sent_by: userId
     });
-    if (result.ok) {
-      await MessengerConversation.update(conversation.id, { last_message_at: new Date() });
-    }
-    return message;
+    const { id } = await MessengerOutboxWorker.deliver(message.id);
+    return MessengerMessage.getById(id);
   }
 }
 
