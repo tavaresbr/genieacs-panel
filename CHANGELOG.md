@@ -7,6 +7,21 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.62.0] - 2026-11-23
+
+### New
+
+- Menu lateral agrupado no console e submenu de Configurações com grupos (`d1d1a07b`)
+- Confirmação à pessoa depois do vínculo por link (`c6248310`)
+
+### Maintenance
+
+- Testar em cada número e e-mail da lista e cartão com o estado dos canais (`e4a0e64c`)
+- Alterações não salvas, intervalo em minutos e resultado completo da varredura (`256bba9b`)
+- Afiliados considera só texto visível (o menu do celular repete 'Afiliados') (`0e7ee1d6`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/3a2a083efbc6...fb644c991225)
+
 ## [1.61.0] - 2026-11-23
 
 ### New
