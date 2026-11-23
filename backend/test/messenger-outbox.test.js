@@ -273,7 +273,9 @@ describe('o que a fila nunca faz', () => {
     responder = null;
     calls.length = 0;
     const segunda = await db()('messenger_messages').insert({
-      tenant_id: alfa, conversation_id: conv, direction: 'out', body: 'Segunda', source: 'operator', delivery_status: 'queued'
+      tenant_id: alfa, conversation_id: conv, direction: 'out', body: 'Segunda', source: 'operator', delivery_status: 'queued',
+      // Como o modelo grava: sem o default do banco, que no MySQL é em segundos e pode ordenar antes da primeira.
+      created_at: new Date(), updated_at: new Date()
     }).returning('id');
     const segundaId = typeof segunda[0] === 'object' ? segunda[0].id : segunda[0];
     await MessengerOutboxWorker.tick();
