@@ -1319,6 +1319,8 @@ const de: Dictionary = {
   'settings.chatbot.aiPrivacy': 'Gesprächsnachrichten werden an den konfigurierten KI-Anbieter gesendet, der Ihnen die Nutzung direkt in Rechnung stellt. Beginnen Sie mit Vorschlägen für Mitarbeiter, bevor Sie die automatische Beantwortung aktivieren.',
   'settings.chatbot.optionsHint': 'Was der Bot anbietet. Die Nummern sind fest: Eine deaktivierte Option verschwindet, ohne die anderen umzunummerieren.',
   'settings.chatbot.option.invoice': 'Rechnungskopie',
+  'settings.chatbot.invoiceLeadDays': 'Anstehende Rechnung ab wie vielen Tagen vor Fälligkeit senden (0 bis 30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'Wer die Rechnung anfordert, erhält PIX und Zahlschein nur, wenn sie überfällig ist oder innerhalb dieser Frist fällig wird. Davor nennt der Bot das Datum und fragt, ob sie jetzt gewünscht wird. 0 = nur überfällig oder heute fällig.',
   'settings.chatbot.option.signal': 'Verbindungsstatus',
   'settings.chatbot.option.human': 'Mit einem Mitarbeiter sprechen',
   'settings.chatbot.option.humanHint': 'Auch ausgeblendet kann der Kunde „Mitarbeiter“ schreiben: Der Bot hält niemanden fest.',

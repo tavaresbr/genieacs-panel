@@ -1319,6 +1319,8 @@ const it: Dictionary = {
   'settings.chatbot.aiPrivacy': 'I messaggi delle conversazioni vengono inviati al fornitore di IA configurato, che ti addebita direttamente l’utilizzo. Inizia con i suggerimenti agli operatori prima di attivare le risposte automatiche.',
   'settings.chatbot.optionsHint': 'Cosa offre il bot. I numeri sono fissi: un\'opzione disattivata scompare senza rinumerare le altre.',
   'settings.chatbot.option.invoice': 'Copia della fattura',
+  'settings.chatbot.invoiceLeadDays': 'Invia la fattura in arrivo da quanti giorni prima della scadenza (0-30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'Chi chiede la fattura riceve PIX e bollettino solo se è scaduta o scade entro questo termine. Prima, il bot indica la data e chiede se la vuole subito. 0 = solo scaduta o in scadenza oggi.',
   'settings.chatbot.option.signal': 'Stato della connessione',
   'settings.chatbot.option.human': 'Parlare con un operatore',
   'settings.chatbot.option.humanHint': 'Nascosta dal menu, il cliente può comunque scrivere "operatore": il bot non blocca mai nessuno.',

@@ -1318,6 +1318,8 @@ const en = {
   'settings.chatbot.aiPrivacy': 'Conversation messages are sent to the configured AI provider, which bills you directly for usage. Start with agent suggestions before turning on automatic answering.',
   'settings.chatbot.optionsHint': 'What the bot offers. Numbers are fixed: a disabled option disappears from the menu without renumbering the others.',
   'settings.chatbot.option.invoice': 'Invoice copy',
+  'settings.chatbot.invoiceLeadDays': 'Send an upcoming invoice from how many days before it is due (0 to 30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'Someone who asks for the invoice gets the PIX and slip only if it is overdue or due within this many days. Before that, the bot gives the date and asks whether they want it now. 0 = only overdue or due today.',
   'settings.chatbot.option.signal': 'Connection status',
   'settings.chatbot.option.human': 'Talk to an agent',
   'settings.chatbot.option.humanHint': 'Hidden from the menu, customers can still write "agent": the bot never traps anyone.',

@@ -199,6 +199,7 @@ export function ChatbotTab() {
         messages: config.messages,
         hours: config.hours,
         satisfaction: config.satisfaction,
+        invoice: config.invoice,
         distribution: config.distribution,
         autoTags: config.autoTags,
         ai: {
@@ -505,6 +506,23 @@ export function ChatbotTab() {
             <div className="mt-4 grid gap-6 md:grid-cols-2">
               <div className="grid content-start gap-4">
                 <Caixa checked={config.options.invoice} onChange={(v) => setOption('invoice', v)} title={t('settings.chatbot.option.invoice')} />
+                <label className="grid max-w-xs gap-1 text-sm">
+                  <span className="font-medium">{t('settings.chatbot.invoiceLeadDays')}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    step={1}
+                    className="modern-input"
+                    disabled={!config.options.invoice}
+                    value={config.invoice.leadDays}
+                    onChange={(event) => {
+                      const dias = Math.floor(Number(event.target.value))
+                      patch({ invoice: { leadDays: Number.isFinite(dias) ? Math.min(30, Math.max(0, dias)) : 0 } })
+                    }}
+                  />
+                  <span className="field-hint">{t('settings.chatbot.invoiceLeadDaysHint')}</span>
+                </label>
                 <Caixa checked={config.options.signal} onChange={(v) => setOption('signal', v)} title={t('settings.chatbot.option.signal')} />
                 <Caixa
                   checked={config.options.human}

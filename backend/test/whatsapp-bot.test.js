@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import {
@@ -116,7 +116,7 @@ function startSgpStub() {
             {
               numerodocumento: '900123',
               valor: '129,90',
-              vencimento: '10/10/2026',
+              vencimento: vencimentoSgp,
               status: 'Em aberto',
               linha_digitavel: LINHA_DIGITAVEL,
               pix: PIX,
@@ -269,6 +269,13 @@ async function unicaResposta(telefone, texto) {
   assert.equal(saidas.length, 1, `expected exactly one answer, got ${saidas.length}`);
   return saidas[0];
 }
+
+/** O vencimento (DD/MM/AAAA) que o SGP de mentira devolve para a fatura em aberto. */
+let vencimentoSgp = '10/10/2026';
+const emDias = (dias) => {
+  const d = new Date(Date.now() + dias * 24 * 60 * 60 * 1000);
+  return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+};
 
 /** A fatura sai em três mensagens: o resumo, o PIX e a linha digitável. */
 async function faturaEmMensagens(telefone, texto) {
@@ -1269,5 +1276,102 @@ describe('o relatório do chatbot', () => {
     assert.equal((await relatorio(7)).invoicesSent, 0);
     assert.equal((await relatorio(30)).invoicesSent, 1);
     assert.equal((await relatorio(5)).days, 7);
+  });
+});
+
+describe('o pedido de fatura só entrega a fatura dentro do prazo', () => {
+  const pedir = async (texto) => {
+    await limparFio(ASSINANTE);
+    await receber(ASSINANTE, texto);
+    return respostas(ASSINANTE);
+  };
+  const ultimoEvento = async () => getDb()('wa_bot_events').orderBy('id', 'desc').first();
+  /** O que o cliente recebeu DEPOIS desta mensagem: o fio não é apagado, o passo mora nele. */
+  const responder = async (texto) => {
+    const antes = (await respostas(ASSINANTE)).length;
+    await receber(ASSINANTE, texto);
+    return (await respostas(ASSINANTE)).slice(antes);
+  };
+  const semCodigos = (saidas) => saidas.every((m) => !String(m).includes(LINHA_DIGITAVEL) && !String(m).includes(PIX));
+
+  afterEach(async () => {
+    vencimentoSgp = '10/10/2026';
+    await asTenant(() => WaBotConfigService.saveConfig({ invoice: { leadDays: 5 } }));
+  });
+
+  it('manda a fatura que vence dentro do prazo', async () => {
+    vencimentoSgp = emDias(3);
+    const saidas = await pedir('segunda via do boleto');
+    assert.equal(saidas.length, 3);
+    assert.ok(saidas.includes(LINHA_DIGITAVEL));
+  });
+
+  it('fora do prazo só avisa a data e pergunta se quer agora, sem nenhum código', async () => {
+    vencimentoSgp = emDias(10);
+    const saidas = await pedir('segunda via do boleto');
+    assert.equal(saidas.length, 1);
+    assert.ok(semCodigos(saidas));
+    assert.match(saidas[0], /não tem fatura em aberto agora/i);
+    assert.ok(saidas[0].includes(vencimentoSgp), 'diz quando vence');
+    assert.match(saidas[0], /Deseja receber a fatura agora\?/);
+    assert.equal((await ultimoEvento()).intent, 'noOpenInvoice', 'o relatório não conta como 2ª via enviada');
+  });
+
+  it('com o "sim" logo depois, manda a fatura', async () => {
+    vencimentoSgp = emDias(10);
+    await pedir('segunda via do boleto');
+    const saidas = await responder('sim');
+    assert.equal(saidas.length, 3);
+    assert.ok(saidas.includes(LINHA_DIGITAVEL));
+    assert.equal((await ultimoEvento()).intent, 'fatura');
+  });
+
+  it('com "não", agradece e não manda nada; um novo "sim" já não vale', async () => {
+    vencimentoSgp = emDias(10);
+    await pedir('segunda via do boleto');
+    const saidas = await responder('não, obrigado');
+    assert.equal(saidas.length, 1);
+    assert.ok(semCodigos(saidas));
+    assert.ok(semCodigos(await responder('sim')), 'o passo acabou com o "não"');
+  });
+
+  it('o "sim" de uma conversa sem pergunta pendente não manda fatura', async () => {
+    vencimentoSgp = emDias(10);
+    const saidas = await pedir('sim');
+    assert.ok(semCodigos(saidas));
+  });
+
+  it('o prazo configurado vale: 15 dias libera a de 10; 0 segura a de amanhã', async () => {
+    vencimentoSgp = emDias(10);
+    await asTenant(() => WaBotConfigService.saveConfig({ invoice: { leadDays: 15 } }));
+    assert.equal((await pedir('segunda via do boleto')).length, 3);
+
+    vencimentoSgp = emDias(1);
+    await asTenant(() => WaBotConfigService.saveConfig({ invoice: { leadDays: 0 } }));
+    assert.ok(semCodigos(await pedir('segunda via do boleto')));
+  });
+
+  it('a fatura vencida sai mesmo com prazo 0', async () => {
+    await asTenant(() => WaBotConfigService.saveConfig({ invoice: { leadDays: 0 } }));
+    assert.equal((await pedir('segunda via do boleto')).length, 3);
+  });
+
+  it('o prazo é validado pela rota', async () => {
+    for (const leadDays of [-1, 31, 2.5, 'abc']) {
+      const { status, body } = await call(`${panelUrl}/api/whatsapp/bot-config`, {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: { invoice: { leadDays } }
+      });
+      assert.equal(status, 400, `leadDays ${leadDays}`);
+      assert.equal(body.code, 'invalid_invoice_lead_days');
+    }
+    const ok = await call(`${panelUrl}/api/whatsapp/bot-config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { invoice: { leadDays: 7 } }
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.data.invoice.leadDays, 7);
   });
 });

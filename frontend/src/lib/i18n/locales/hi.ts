@@ -1308,6 +1308,8 @@ const hi: Dictionary = {
   'settings.chatbot.aiPrivacy': 'बातचीत के संदेश कॉन्फ़िगर किए गए AI प्रदाता को भेजे जाते हैं, जो उपयोग का शुल्क सीधे आपसे लेता है। स्वचालित जवाब चालू करने से पहले एजेंटों के लिए सुझावों से शुरुआत करें।',
   'settings.chatbot.optionsHint': 'बॉट क्या देता है। नंबर तय हैं: बंद विकल्प बाकी के नंबर बदले बिना गायब हो जाता है।',
   'settings.chatbot.option.invoice': 'बिल की प्रति',
+  'settings.chatbot.invoiceLeadDays': 'आने वाला बिल देय तिथि से कितने दिन पहले भेजें (0 से 30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'बिल माँगने वाले को PIX और स्लिप तभी मिलती है जब बिल देय हो चुका हो या इस अवधि में देय हो। उससे पहले बॉट तारीख बताता है और पूछता है कि अभी चाहिए या नहीं। 0 = केवल बकाया या आज देय।',
   'settings.chatbot.option.signal': 'कनेक्शन स्थिति',
   'settings.chatbot.option.human': 'एजेंट से बात करें',
   'settings.chatbot.option.humanHint': 'मेनू से छिपा होने पर भी ग्राहक "एजेंट" लिख सकता है: बॉट किसी को रोकता नहीं।',

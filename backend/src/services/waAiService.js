@@ -1,3 +1,4 @@
+import { CONFIRMACAO } from '../utils/wa/confirmacao.js';
 import SgpService from './sgpService.js';
 import { mascararSensivel, nomeSeguro } from '../utils/wa/sensivel.js';
 import WaBotService from './waBotService.js';
@@ -61,8 +62,7 @@ const RODADAS = 4;
 const PERFIS = { economico: 'quer economizar', equilibrado: 'busca equilíbrio entre preço e velocidade', qualidade: 'prioriza qualidade e velocidade' };
 const RESPOSTA_MAX = 3000;
 
-/** Um "sim" curto: confirma o desbloqueio. Frase longa não vale — pode ser outro assunto, ou uma instrução. */
-export const CONFIRMACAO = /^(?:sim|s|confirmo|confirmado|pode(?: sim| liberar)?|quero|ok|isso|isso mesmo|claro)[\s.!]*$/i;
+export { CONFIRMACAO };
 
 const REGRAS = [
   'Você é o atendente virtual do provedor de internet {empresa}, no WhatsApp. Responda sempre em português do Brasil, com mensagens curtas, educadas e objetivas (no máximo 3 frases curtas, sem markdown).',
@@ -969,9 +969,10 @@ class WaAiService {
     try {
       switch (chamada.name) {
         case 'consultar_fatura': {
-          const partes = await WaBotService.partesFatura(link);
-          const semFatura = partes[0] === await WaBotConfigService.message('noOpenInvoice');
-          if (semFatura) return { paraModelo: `Sem fatura em aberto. Diga ao cliente: ${partes[0]}`, intent: 'noOpenInvoice' };
+          const pedido = await WaBotService.pedidoDeFatura(link);
+          if (pedido.intent === 'noOpenInvoice') return { paraModelo: `Sem fatura em aberto. Diga ao cliente: ${pedido.partes[0]}`, intent: 'noOpenInvoice' };
+          if (pedido.intent === 'invoiceNotYet') return await this.faturaAntecipada({ conversation, link, pedido });
+          const partes = pedido.partes;
           return {
             // O modelo lê só o resumo (valor e vencimento): PIX, linha digitável e
             // link são anexados pelo servidor e não passam pelo provedor de IA.
@@ -1063,6 +1064,53 @@ class WaAiService {
       vars: { name: nome, plan: plano || '—', area: endereco || '—', phone: conversation.wa_phone_e164 ?? '—' }
     });
     return { transferir: true, texto: null, intent: 'lead', paraModelo: 'Interesse registrado.' };
+  }
+
+  /**
+   * A fatura pedida fora do prazo: o cliente só a recebe se disser "sim".
+   *
+   * Quem confere é o servidor, não o modelo (o mesmo desenho de `liberar`): a
+   * 1ª chamada só grava o passo e manda perguntar; a seguinte entrega a
+   * fatura se, e somente se, a última fala do cliente DEPOIS da pergunta foi
+   * uma confirmação curta. Sem isso, um modelo enganado mandaria o código de
+   * pagamento de uma fatura que o provedor decidiu não adiantar.
+   */
+  static async faturaAntecipada({ conversation, link, pedido }) {
+    const ultimaDoCliente = () => tdb('wa_messages')
+      .where({ conversation_id: conversation.id, direction: 'in', is_note: false })
+      .orderBy('id', 'desc')
+      .first('id', 'body');
+    const pendente = WaBotService.passoAtivo(conversation) === WaBotService.PASSO_FATURA;
+    const quando = `a próxima vence em ${String(pedido.proxima.dueDate).slice(0, 10)} e só fica disponível a partir de ${pedido.proxima.liberaEm}`;
+    if (!pendente) {
+      const base = await ultimaDoCliente();
+      await WaBotService.gravarPasso(conversation, {
+        bot_step: WaBotService.PASSO_FATURA,
+        bot_step_data: JSON.stringify({ depoisDe: base?.id ?? 0 }),
+        bot_step_at: new Date()
+      });
+      return {
+        paraModelo: `Não há fatura vencida nem dentro do prazo de envio: ${quando}. Diga isso ao cliente e pergunte se ele quer receber a fatura agora. NÃO chame consultar_fatura de novo até ele responder.`,
+        intent: 'noOpenInvoice'
+      };
+    }
+    let depoisDe = 0;
+    try { depoisDe = Number(JSON.parse(conversation.bot_step_data || '{}').depoisDe) || 0; } catch { depoisDe = 0; }
+    const ultima = await ultimaDoCliente();
+    if (!ultima || Number(ultima.id) <= depoisDe) {
+      return { paraModelo: 'O cliente ainda não respondeu se quer a fatura agora. Pergunte e aguarde; não chame consultar_fatura de novo.' };
+    }
+    await WaBotService.gravarPasso(conversation, { bot_step: null, bot_step_data: null, bot_step_at: null });
+    if (!CONFIRMACAO.test(String(ultima.body ?? '').trim())) {
+      return { paraModelo: 'O cliente não confirmou. Não envie a fatura; diga que é só pedir de novo quando quiser, ou ofereça outra ajuda.' };
+    }
+    const liberada = await WaBotService.pedidoDeFatura(link, { confirmado: true });
+    if (liberada.intent !== 'fatura') return { paraModelo: `Sem fatura em aberto. Diga ao cliente: ${liberada.partes[0]}`, intent: 'noOpenInvoice' };
+    return {
+      paraModelo: `Fatura encontrada. O valor, o vencimento e os códigos de pagamento (PIX, linha digitável, link) serão enviados logo depois da sua resposta, em mensagens separadas. Não os escreva nem repita; só diga que estão logo abaixo. Resumo: ${resumoDaFatura(liberada.partes[0])}`,
+      anexo: liberada.partes,
+      intent: 'fatura'
+    };
   }
 
   /**

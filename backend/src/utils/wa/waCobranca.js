@@ -270,3 +270,34 @@ export function situacaoFinanceira(faturas, now = new Date(), timezone = 'Americ
   const oldestDueDate = abertas.length ? String(abertas[0].dueDate).slice(0, 10) : null;
   return { oldestDueDate, ...situacaoPorVencimento(oldestDueDate, now, timezone) };
 }
+
+/**
+ * A fatura que o cliente recebe quando PEDE a fatura (menu do bot ou IA).
+ *
+ *  1. Há vencida (ou vencendo hoje): a mais antiga delas.
+ *  2. Senão, a mais próxima a vencer, se faltam `dias` ou menos.
+ *  3. Senão, nada — `proxima` é a que o cliente ainda não pode receber e
+ *     `liberaEm` o dia (AAAA-MM-DD) em que passa a poder.
+ *
+ * O dia de vencimento conta como vencida, como em `diasEntre(..) >= 0` para o
+ * resto do painel: quem pede a fatura no dia dela não é "adiantado".
+ *
+ * @returns {{ fatura: object|null, proxima: object|null, liberaEm: string|null }}
+ */
+export function faturaParaPedido(faturas, hoje = new Date(), dias = 5) {
+  const abertas = (faturas || [])
+    .filter((f) => f && !f.paid && f.dueDate && diasEntre(f.dueDate, hoje) !== null)
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  if (abertas.length === 0) return { fatura: null, proxima: null, liberaEm: null };
+
+  const vencidas = abertas.filter((f) => diasEntre(f.dueDate, hoje) >= 0);
+  if (vencidas.length > 0) return { fatura: vencidas[0], proxima: null, liberaEm: null };
+
+  const proxima = abertas[0];
+  const faltam = -diasEntre(proxima.dueDate, hoje);
+  if (faltam <= dias) return { fatura: proxima, proxima: null, liberaEm: null };
+
+  const venc = new Date(proxima.dueDate);
+  const libera = new Date(Date.UTC(venc.getUTCFullYear(), venc.getUTCMonth(), venc.getUTCDate() - dias));
+  return { fatura: null, proxima, liberaEm: libera.toISOString().slice(0, 10) };
+}

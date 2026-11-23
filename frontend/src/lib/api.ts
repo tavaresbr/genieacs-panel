@@ -6533,6 +6533,8 @@ export interface BotConfig {
   hours: { enabled: boolean; timezone: string; week: BotHoursDay[] }
   /** A pesquisa de satisfação ao encerrar uma conversa com atendente. */
   satisfaction: { enabled: boolean }
+  /** Dias antes do vencimento em que quem pede a fatura já a recebe (0 a 30). */
+  invoice: { leadDays: number }
   /** A distribuição automática das conversas entre quem está disponível. */
   distribution: { enabled: boolean }
   /** Etiqueta automática pelo assunto do pedido ao bot; ids de `WhatsAppTag`, ou null. */
