@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { messengerAPI, type MessengerStatus } from '@/lib/api'
 import { MessengerInbox } from '@/components/messenger/inbox'
-import { MessengerNoticeSettings } from '@/components/messenger/notice-settings'
-import { MessengerPagesPanel } from '@/components/messenger/pages-panel'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -51,16 +50,13 @@ export default function MessengerPage() {
       )}
       <MessengerInbox canSend={can('whatsapp.send')} hasPages={hasPages} />
       {canConfig && (
-        <MessengerPagesPanel
-          webhookPath={status?.webhookPath ?? null}
-          facebookAppId={status?.facebookLogin?.available ? status.facebookLogin.appId : null}
-          onChanged={() => {
-            void loadStatus()
-            void loadHasPages()
-          }}
-        />
+        <p className="field-hint">
+          {t('messenger.configureInIntegrations')}{' '}
+          <Link to="/settings?tab=messenger" className="font-semibold text-primary hover:underline">
+            {t('messenger.configureInIntegrationsLink')}
+          </Link>
+        </p>
       )}
-      {canConfig && <MessengerNoticeSettings />}
     </div>
   )
 }

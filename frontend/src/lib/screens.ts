@@ -152,6 +152,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { tab: 'whatsapp', labelKey: 'sidebar.nav.whatsapp' },
   { tab: 'chatbot', labelKey: 'settings.tab.chatbot', permission: 'whatsapp.config' },
   { tab: 'telegram', labelKey: 'settings.tab.telegram', permission: 'whatsapp.config' },
+  // O rótulo é o do menu (`sidebar.nav.messenger`), como o do WhatsApp acima.
+  { tab: 'messenger', labelKey: 'sidebar.nav.messenger', permission: 'whatsapp.config' },
   { tab: 'security', labelKey: 'settings.tab.security' },
   { tab: 'vendors', labelKey: 'settings.tab.vendors' },
   { tab: 'wifi-security', labelKey: 'settings.tab.wifiSecurity' },
