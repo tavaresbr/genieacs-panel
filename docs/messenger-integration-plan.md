@@ -74,8 +74,8 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
 ## Fora do código (caminho crítico)
 - App Meta com produto Messenger; **App Review** de `pages_messaging` (+ `pages_manage_metadata`,
   `pages_show_list`) e Business Verification — é o que mais demora; começar já.
-- Política de privacidade/exclusão de dados (callback de data deletion) e inclusão do canal em
-  `docs/lgpd-inventario-de-dados.md` (retenção, opt-out).
+- Política de privacidade (URL no app da Meta) e inclusão do canal em `docs/lgpd-inventario-de-dados.md`.
+  Os callbacks de desautorização e exclusão de dados já existem (ver "Avisos da Meta sobre o usuário do Facebook").
 - Cobrança ativa por Messenger é muito limitada (sem templates): manter WhatsApp para isso.
 
 ## Ordem de implementação
@@ -223,3 +223,25 @@ Em vez de colar o ID e o token, quem configura clica em **Entrar com o Facebook*
 - Como no Embedded Signup do WhatsApp, o SDK só funciona nos domínios cadastrados no app da Meta; em outro o popup
   abre e o login falha.
 - Continua valendo a revisão da Meta: sem `pages_messaging` aprovado o app só fala com quem tem função nele.
+
+## Avisos da Meta sobre o usuário do Facebook
+
+A Meta exige, para aprovar um app com Login do Facebook, uma URL de **desautorização** e outra de **exclusão de
+dados**. No painel do app (Configurações → Básico / Login do Facebook → Configurações) cadastre:
+
+| Campo | URL |
+|---|---|
+| Callback de desautorização | `https://<painel>/api/messenger-webhook/deauthorize` |
+| URL de solicitação de exclusão de dados | `https://<painel>/api/messenger-webhook/data-deletion` |
+
+- Os dois recebem `POST` (formulário) com `signed_request`; a credencial é a assinatura HMAC-SHA256 com
+  `META_APP_SECRET` (falha fechada: sem segredo ou assinatura ruim, 401, e nada é tocado).
+- O `user_id` é o do usuário NO APP, gravado em `messenger_pages.facebook_user_id` (migração `0148`) quando a Página é
+  conectada pelo login do Facebook; só esse número, sem nome nem e-mail. Página colada à mão não guarda o id de ninguém.
+- **Desautorização**: as Páginas daquele usuário (em todos os provedores) vão para "requer atenção"
+  (`facebook_deauthorized`); nada é apagado.
+- **Exclusão de dados**: apaga o token e o id no app dessas Páginas (`facebook_data_deleted`; ficam sem assinatura até
+  alguém reconectar). Responde `{ url, confirmation_code }`. As conversas **não** são apagadas: são do provedor e dos
+  clientes dele, e o pedido de titular delas segue o fluxo LGPD do provedor.
+- A `url` aponta para `/api/messenger-webhook/deletion-status?code=…`: página de texto fixo que só confirma códigos
+  emitidos pelo painel (o código leva a data e um HMAC, sem guardar nada em banco) e nunca imprime o que veio na URL.

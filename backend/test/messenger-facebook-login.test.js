@@ -29,6 +29,7 @@ function graph({ exchange = () => ok({ access_token: 'LONGA' }), accounts } = {}
         { id: '7000000009', name: 'Já conectada', access_token: 'PT-NOVE' }
       ]
     });
+    if (/\/v[\d.]+\/me\?/.test(u)) return ok({ id: '5550001' });
     if (u.includes('/subscribed_apps')) return ok({ success: true });
     const id = u.match(/\/v[\d.]+\/(\d+)/)?.[1];
     return ok({ id, name: `Página ${id}` });
@@ -88,6 +89,7 @@ describe('login do Facebook', () => {
     const row = await getDb()('messenger_pages').where({ page_id: '7000000007' }).first();
     assert.equal(decryptPageToken(row.page_token), 'PT-SETE');
     assert.ok(row.subscribed_at);
+    assert.equal(row.facebook_user_id, '5550001', 'guarda quem conectou, para os avisos da Meta');
   });
 
   it('não conecta Página que o usuário não administra', async () => {

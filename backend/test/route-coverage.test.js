@@ -94,6 +94,9 @@ const PUBLICAS = new Map([
   ['GET /api/public/slug-available', 'a mesma pergunta que o cadastro faz ao gravar, feita antes; responde só livre/ocupado'],
   ['GET /api/public/cnpj', 'o cadastro da Receita, que é público; limite apertado porque sai para uma API de fora'],
   ['GET /api/messenger-webhook', 'a verificação do webhook da Meta: devolve o desafio NUMÉRICO se o verify token da plataforma bater, e nada mais; não lê dado de provedor; prova em messenger.test.js'],
+  ['POST /api/messenger-webhook/deauthorize', 'aviso da Meta de que o usuário do Facebook removeu o app: a assinatura do signed_request É a credencial (falha fechada sem o segredo); só marca como "requer atenção" as Páginas que aquele usuário conectou; prova em messenger-facebook-notices.test.js'],
+  ['POST /api/messenger-webhook/data-deletion', 'pedido de exclusão de dados da Meta: a assinatura do signed_request É a credencial; apaga o token e o id no app das Páginas que aquele usuário conectou e devolve o código de confirmação; prova em messenger-facebook-notices.test.js'],
+  ['GET /api/messenger-webhook/deletion-status', 'a página de status do pedido: texto fixo, só confirma códigos emitidos pelo painel (HMAC); não lê dado de provedor; prova em messenger-facebook-notices.test.js'],
   ['POST /api/messenger-webhook', 'entrega do Messenger, montada antes do resolvedor; a assinatura X-Hub-Signature-256 do corpo bruto É a credencial (falha fechada sem o segredo do app), e o provedor é o dono da Página nomeada no evento; prova em messenger.test.js'],
   ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço'],
   // O recibo pelo link do bot do WhatsApp da plataforma: o token assinado é a
@@ -377,6 +380,11 @@ describe('toda rota sem sessão', () => {
       // A entrega do Messenger: só escreve em `messenger_*` do provedor dono da
       // Página que o evento nomeia, e só com a assinatura da Meta válida.
       'POST /api/messenger-webhook',
+      // Os avisos da Meta sobre o usuário do Facebook (desautorização e
+      // exclusão de dados): só mexem nas Páginas que o `user_id` do
+      // `signed_request` assinado conectou.
+      'POST /api/messenger-webhook/data-deletion',
+      'POST /api/messenger-webhook/deauthorize',
       'POST /api/public/leads',
       // A pesquisa de satisfação (0123): `answer` grava a nota na linha de
       // `platform_nps` que o hash do token acha — de UM provedor, o do token —,

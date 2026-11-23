@@ -61,7 +61,7 @@ class MessengerPageService {
    * entra confirmado — a Meta diz de que Página ele é, e o id que o operador
    * digitou tem de bater.
    */
-  static async connect({ pageId, pageToken }) {
+  static async connect({ pageId, pageToken, facebookUserId = null }) {
     const id = String(pageId ?? '').trim();
     const token = String(pageToken ?? '').trim();
     if (!isMetaId(id)) throw new MessengerError('invalid_page_id', 'invalid page id');
@@ -83,7 +83,8 @@ class MessengerPageService {
       page_id: id,
       page_name: String(identity.data?.name ?? '').slice(0, 128) || null,
       page_token: encryptPageToken(token),
-      status: 'connected'
+      status: 'connected',
+      facebook_user_id: facebookUserId ? String(facebookUserId) : null
     });
     return this.subscribe(row);
   }
