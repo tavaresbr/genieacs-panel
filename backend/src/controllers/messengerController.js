@@ -5,6 +5,7 @@ import MessengerPageService, { MessengerError, publicPage, messengerConfigured }
 import MessengerSendService, { windowOpen } from '../services/messengerSendService.js';
 import MessengerLinkService from '../services/messengerLinkService.js';
 import MessengerLinkTokenService from '../services/messengerLinkTokenService.js';
+import MessengerLinkedNoticeService from '../services/messengerLinkedNoticeService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 function fail(res, error, fallback) {
@@ -99,6 +100,26 @@ class MessengerController {
       return res.json(createResponse('ok'));
     } catch (error) {
       return fail(res, error, 'could not disconnect page');
+    }
+  }
+
+  /** A confirmação que a pessoa recebe ao abrir o link de vínculo: ligada? e com que texto. */
+  static async getSettings(req, res) {
+    try {
+      return res.json(createResponse('ok', { linkedNotice: await MessengerLinkedNoticeService.read() }));
+    } catch (error) {
+      return fail(res, error, 'could not load settings');
+    }
+  }
+
+  static async saveSettings(req, res) {
+    try {
+      const notice = req.body?.linkedNotice;
+      if (!notice || typeof notice !== 'object') throw new MessengerError('invalid_body', '`linkedNotice` is required');
+      const linkedNotice = await MessengerLinkedNoticeService.save({ enabled: notice.enabled, text: notice.text });
+      return res.json(createResponse('ok', { linkedNotice }));
+    } catch (error) {
+      return fail(res, error, 'could not save settings');
     }
   }
 

@@ -143,7 +143,7 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   do portal só aparece com o cartão de contato ligado e uma Página conectada (`provider.messenger`).
 - **LGPD/retenção:** os links entram no dossiê e na exclusão do assinante; registros vencidos há mais de 30 dias
   são podados pelo agendador (`MESSENGER_LINK_TOKEN_RETENTION_DAYS`).
-- Fora: confirmar o vínculo à pessoa por uma resposta no Messenger.
+- A confirmação à pessoa no Messenger: ver abaixo.
 
 ### Link do Messenger na cobrança do WhatsApp (`{{link_messenger}}`)
 - Variável **opcional** dos modelos de cobrança: o provedor escolhe onde ela vai (e em quais modelos) escrevendo-a
@@ -158,3 +158,20 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   atendente usa o botão "Link do Messenger" da tela do contato.
 - Limite: numa campanha de cobrança o link é emitido ao montar o rascunho; um rascunho parado por mais de 7 dias
   tem links vencidos.
+
+### Confirmação à pessoa depois do vínculo por link
+- Quando um link é resgatado e a conversa é vinculada, a própria pessoa recebe uma mensagem no Messenger
+  ("Recebemos o seu contato… já vinculamos esta conversa ao seu cadastro… Como podemos ajudar?"). Só quando
+  ESTE evento vinculou: link inválido, já gasto, vencido ou conversa já vinculada não confirmam, e a reentrega do
+  mesmo evento não confirma de novo (o link já foi gasto).
+- **Nunca leva nome, contrato nem dado do cadastro.** O link não prova quem o abriu; um link repassado não pode
+  entregar esses dados a quem o recebeu. O texto não tem variáveis de propósito.
+- É resposta a uma ação da pessoa, então cabe na janela de 24 h: o clique no link conta como a última interação
+  dela (`last_inbound_at`), mesmo quando o evento não traz mensagem (`referral`, `postback`). Se a Meta recusar, a
+  tentativa fica gravada como falha, com o motivo, e o webhook responde 200 do mesmo jeito (o vínculo já está
+  feito; a Meta não deve reentregar um evento tratado). A mensagem fica com `source = 'system'` e a conversa a
+  mostra como "Mensagem automática".
+- **Configuração do provedor** (`GET/PUT /api/messenger/settings`, `whatsapp.config`): ligar/desligar (ligada por
+  padrão) e trocar o texto (até 500 caracteres; vazio volta ao de fábrica), na tela do Messenger.
+- Limite: se a primeira tentativa falhar na Meta, não há nova tentativa automática (o link já foi gasto). A fila
+  de reenvio, quando existir, cobre isso.

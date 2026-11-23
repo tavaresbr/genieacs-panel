@@ -329,6 +329,7 @@ function Thread({
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[0.68rem] text-muted-foreground">
                 <span>{formatDateTime(message.createdAt)}</span>
                 {message.direction === 'out' && message.source === 'page' && <span>{t('messenger.sentOutside')}</span>}
+                {message.direction === 'out' && message.source === 'system' && <span>{t('messenger.sentAutomatic')}</span>}
                 {message.direction === 'out' && message.deliveryStatus && (
                   <span className={message.deliveryStatus === 'failed' ? 'text-[hsl(var(--status-danger))]' : ''}>
                     {t(`messenger.status.${message.deliveryStatus}`)}

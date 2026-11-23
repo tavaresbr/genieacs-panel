@@ -150,7 +150,7 @@ class MessengerLinkTokenService {
         bound_via: 'link',
         updated_at: new Date()
       });
-      return { linked: true, reason: null };
+      return { linked: true, reason: null, conversationId: conversation.id };
     });
   }
 }

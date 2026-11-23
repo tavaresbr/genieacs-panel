@@ -6824,16 +6824,28 @@ export interface MessengerMessage {
   body: string | null
   attachmentType: string | null
   attachmentUrl: string | null
-  /** `page` = escrita fora do painel (eco). */
-  source: 'operator' | 'page'
+  /** `page` = escrita fora do painel (eco); `system` = mensagem automática (a confirmação do vínculo). */
+  source: 'operator' | 'page' | 'system'
   deliveryStatus: MessengerDeliveryStatus | null
   deliveryError: string | null
   readAt: string | null
   createdAt: string
 }
 
+/** A confirmação que a pessoa recebe ao abrir o link de vínculo. */
+export interface MessengerLinkedNotice {
+  enabled: boolean
+  /** O texto do provedor; vazio = o de fábrica. */
+  text: string
+  defaultText: string
+}
+
 export const messengerAPI = {
   status: () => apiClient.get<MessengerStatus>('/messenger/status'),
+  getSettings: () => apiClient.get<{ linkedNotice: MessengerLinkedNotice }>('/messenger/settings'),
+  /** Campo ausente mantém o gravado; `text: ''` volta ao texto de fábrica. */
+  saveSettings: (linkedNotice: { enabled?: boolean; text?: string }) =>
+    apiClient.put<{ linkedNotice: MessengerLinkedNotice }>('/messenger/settings', { linkedNotice }),
   listPages: () => apiClient.get<MessengerPage[]>('/messenger/pages'),
   connectPage: (pageId: string, pageToken: string) =>
     apiClient.post<MessengerPage>('/messenger/pages', { pageId, pageToken }),

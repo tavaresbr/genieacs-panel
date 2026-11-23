@@ -72,6 +72,7 @@ describe('os códigos de erro do servidor', () => {
     expect(messengerErrorKey('page_already_connected')).toBe('messenger.error.pageAlreadyConnected')
     expect(messengerErrorKey('messenger_unconfigured')).toBe('messenger.error.unconfigured')
     expect(messengerErrorKey('subscriber_not_found')).toBe('messenger.error.subscriberNotFound')
+    expect(messengerErrorKey('notice_too_long')).toBe('messenger.error.noticeTooLong')
   })
 
   it('código desconhecido ou ausente cai na genérica, sem repetir texto cru', () => {

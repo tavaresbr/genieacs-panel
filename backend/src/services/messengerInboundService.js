@@ -4,6 +4,7 @@ import MessengerMessage from '../models/MessengerMessage.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { tdb } from '../config/database.js';
 import MessengerLinkTokenService, { refOf } from './messengerLinkTokenService.js';
+import MessengerLinkedNoticeService from './messengerLinkedNoticeService.js';
 
 const BODY_LIMIT = 4000;
 const URL_LIMIT = 2000;
@@ -80,7 +81,12 @@ async function handleEvent(page, event) {
     // Só vale de quem escreve: o eco é a Página falando.
     const ref = refOf(event);
     if (ref && !event.message?.is_echo) {
-      await MessengerLinkTokenService.redeem({ page, psid: event.sender?.id, ref });
+      const redeemed = await MessengerLinkTokenService.redeem({ page, psid: event.sender?.id, ref });
+      // A pessoa abriu o link e foi vinculada: confirma no próprio Messenger.
+      // Só quando ESTE evento vinculou — a reentrega (link já gasto) não repete.
+      if (redeemed.linked) {
+        await MessengerLinkedNoticeService.notify({ conversationId: redeemed.conversationId, at: event.timestamp });
+      }
     }
   } catch (error) {
     console.error('[messenger] could not handle event:', error.message);

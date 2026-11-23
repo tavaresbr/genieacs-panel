@@ -21,7 +21,7 @@ class MessengerSendService {
    * janela fechou ou o texto é inválido; se a Meta recusar, grava a tentativa
    * como `failed` com o motivo, para o operador ver o que aconteceu.
    */
-  static async sendText(conversationId, text, userId = null) {
+  static async sendText(conversationId, text, userId = null, { source = 'operator' } = {}) {
     const body = String(text ?? '').trim();
     if (!body) throw new MessengerError('empty_message', 'message is empty');
     if (body.length > MAX_TEXT) throw new MessengerError('message_too_long', `message exceeds ${MAX_TEXT} characters`);
@@ -53,7 +53,8 @@ class MessengerSendService {
       direction: 'out',
       external_id: mid,
       body,
-      source: 'operator',
+      // 'operator' (a equipe) ou 'system' (mensagem automática, como a confirmação do vínculo).
+      source,
       delivery_status: result.ok ? 'sent' : 'failed',
       delivery_error: result.ok ? null : String(result.error).slice(0, 255),
       sent_by: userId

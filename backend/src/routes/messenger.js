@@ -8,6 +8,9 @@ const router = express.Router();
 // As mesmas capacidades do WhatsApp: ler a caixa é `whatsapp.read`, responder é
 // `whatsapp.send` (falar COMO o provedor) e conectar a Página é `whatsapp.config`.
 router.get('/status', authenticateToken, requirePermission('whatsapp.read'), MessengerController.status);
+// O que a pessoa lê no Messenger em nome do provedor é configuração: `whatsapp.config`.
+router.get('/settings', authenticateToken, requirePermission('whatsapp.config'), MessengerController.getSettings);
+router.put('/settings', authenticateToken, requirePermission('whatsapp.config'), MessengerController.saveSettings);
 router.get('/pages', authenticateToken, requirePermission('whatsapp.config'), MessengerController.listPages);
 router.post('/pages', authenticateToken, requirePermission('whatsapp.config'), MessengerController.connectPage);
 router.post('/pages/:id/subscribe', authenticateToken, requirePermission('whatsapp.config'), MessengerController.resubscribePage);

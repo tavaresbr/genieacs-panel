@@ -13,6 +13,7 @@ const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount
 const { default: WaDunningService } = await import('../src/services/waDunningService.js');
 const { default: MessengerLinkTokenService } = await import('../src/services/messengerLinkTokenService.js');
 const { encryptPageToken } = await import('../src/services/messengerPageService.js');
+const { setMetaGraphFetcher } = await import('../src/services/metaGraphClient.js');
 
 /**
  * `{{link_messenger}}` numa cobrança automática (a régua).
@@ -95,6 +96,8 @@ const linkSgp = async (contract) => {
 };
 
 before(async () => {
+  // A confirmação ao abrir o link vai para a Graph: nenhuma chamada de verdade sai daqui.
+  setMetaGraphFetcher(async () => new Response(JSON.stringify({ message_id: 'm.stub' }), { status: 200 }));
   ({ panelUrl } = await startTestServers());
   const sgpUrl = await startSgpStub();
   const setup = await call(`${panelUrl}/api/auth/setup`, {
