@@ -237,7 +237,12 @@ describe('a caixa de atendimento', () => {
   async function conversaAberta() {
     await ligar();
     await hook(fromCliente('Estou sem internet'), segredo);
-    await espera(async () => (await conversas()).length === 1);
+    // A conversa nasce antes da mensagem e do contador de não lidos; espera
+    // tudo assentar (o MySQL é mais lento e expunha a corrida).
+    await espera(async () => {
+      const [c] = await conversas();
+      return Boolean(c) && Number(c.unread_count) === 1 && (await mensagens()).length === 1;
+    });
     return (await conversas())[0];
   }
 
