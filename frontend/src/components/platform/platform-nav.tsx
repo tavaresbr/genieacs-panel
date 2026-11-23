@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
 
 export interface NavGroup<K extends string> {
   /** Chave i18n do título do grupo. */
   label: TranslationKey
-  items: ReadonlyArray<readonly [K, TranslationKey]>
+  items: ReadonlyArray<readonly [K, TranslationKey, string?]>
 }
 
 /**
@@ -41,16 +42,17 @@ export function PlatformSidebar<K extends string>({ groups, active, onSelect, ar
             <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               {t(grupo.label)}
             </p>
-            {grupo.items.map(([chave, rotulo]) => (
+            {grupo.items.map(([chave, rotulo, icone]) => (
               <button
                 key={chave}
                 type="button"
                 onClick={() => { onSelect(chave); setOpen(false) }}
                 aria-current={active === chave ? 'page' : undefined}
-                className={`rounded-md px-3 py-2 text-left text-sm font-semibold transition ${active === chave
+                className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold transition ${active === chave
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
               >
+                {icone && <Icon name={icone} size={16} className="shrink-0" />}
                 {t(rotulo)}
               </button>
             ))}

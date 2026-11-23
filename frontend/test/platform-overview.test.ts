@@ -27,6 +27,7 @@ describe('a aba na URL', () => {
   it('troca a aba mantendo os outros parâmetros; a padrão sai da URL', () => {
     expect(withPlatformTab('?tab=plans&x=1', 'revenue').toString()).toBe('tab=revenue&x=1')
     expect(withPlatformTab('x=1', 'settings').toString()).toBe('x=1&tab=settings')
+    expect(withPlatformTab('tab=settings&sub=mail', 'plans').toString()).toBe('tab=plans')
     expect(withPlatformTab('?tab=plans&x=1', 'home').toString()).toBe('x=1')
     expect(withPlatformTab(new URLSearchParams('tab=help'), 'home').toString()).toBe('')
   })

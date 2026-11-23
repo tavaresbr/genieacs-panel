@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { PlatformIntegrations } from '@/components/platform/platform-integrations'
 import { PlatformProfileForm } from '@/components/platform/platform-profile'
 import { PlatformAlertsSettings } from '@/components/platform/platform-alerts'
@@ -13,11 +14,13 @@ import { useTranslation } from '@/contexts/language-context'
 
 type Sub = 'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders' | 'accounting'
 
+const SUBS: readonly Sub[] = ['profile', 'alerts', 'mail', 'integrations', 'reminders', 'accounting']
+
 const GROUPS = [
-  { label: 'platform.nav.company', items: [['profile', 'platform.settings.profile']] },
-  { label: 'platform.nav.communication', items: [['alerts', 'platform.settings.alerts'], ['mail', 'platform.settings.mail']] },
-  { label: 'platform.nav.billing', items: [['reminders', 'platform.settings.reminders'], ['integrations', 'platform.tabs.integrations'], ['accounting', 'platform.settings.accounting']] }
-] as const satisfies ReadonlyArray<{ label: string, items: ReadonlyArray<readonly [Sub, string]> }>
+  { label: 'platform.nav.company', items: [['profile', 'platform.settings.profile', 'building']] },
+  { label: 'platform.nav.communication', items: [['alerts', 'platform.settings.alerts', 'bell'], ['mail', 'platform.settings.mail', 'chat']] },
+  { label: 'platform.nav.billing', items: [['reminders', 'platform.settings.reminders', 'invoice'], ['integrations', 'platform.tabs.integrations', 'globe'], ['accounting', 'platform.settings.accounting', 'document']] }
+] as const satisfies ReadonlyArray<{ label: string, items: ReadonlyArray<readonly [Sub, string, string?]> }>
 
 /**
  * Configurações do console, com submenu: os dados da empresa que vende o SaaS
@@ -25,17 +28,29 @@ const GROUPS = [
  * quem opera a plataforma (0112), e o e-mail de teste do SMTP do deploy. E a
  * régua de cobrança (0121).
  */
-export function PlatformSettings({ initialSub = 'profile', initialAlertsTab = 'settings' }: {
+export function PlatformSettings({ initialSub, initialAlertsTab = 'settings' }: {
   /** O submenu aberto ao montar (o painel Início abre direto nos alertas). */
-  initialSub?: 'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders' | 'accounting'
+  initialSub?: Sub
   initialAlertsTab?: 'settings' | 'history'
 } = {}) {
   const { t } = useTranslation()
-  const [sub, setSub] = useState<'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders' | 'accounting'>(initialSub)
+  // A seção mora na URL (`?sub=`), como a aba: recarregar mantém onde se estava.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const doUrl = searchParams.get('sub') as Sub | null
+  const [sub, setSub] = useState<Sub>(initialSub ?? (doUrl && SUBS.includes(doUrl) ? doUrl : 'profile'))
+  const escolher = (proxima: Sub) => {
+    setSub(proxima)
+    setSearchParams((atual) => {
+      const params = new URLSearchParams(atual)
+      if (proxima === 'profile') params.delete('sub')
+      else params.set('sub', proxima)
+      return params
+    }, { replace: true })
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
-      <PlatformSidebar ariaLabel={t('platform.tabs.settings')} active={sub} onSelect={setSub} groups={GROUPS} />
+      <PlatformSidebar ariaLabel={t('platform.tabs.settings')} active={sub} onSelect={escolher} groups={GROUPS} />
       <div className="min-w-0">
         {sub === 'profile' && <PlatformProfileForm />}
         {sub === 'alerts' && <PlatformAlertsPanel settings={<PlatformAlertsSettings />} initialTab={initialAlertsTab} />}
