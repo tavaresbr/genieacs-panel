@@ -16,12 +16,12 @@ export type PlatformTab = (typeof PLATFORM_TABS)[number]
 
 /** Os grupos do menu lateral do console (só a apresentação: as abas são as mesmas). */
 export const PLATFORM_NAV_GROUPS = [
-  { label: 'platform.nav.overview', items: [['home', 'platform.tabs.home']] },
-  { label: 'platform.nav.clients', items: [['tenants', 'platform.tabs.tenants'], ['leads', 'platform.tabs.leads'], ['affiliates', 'platform.tabs.affiliates']] },
-  { label: 'platform.nav.finance', items: [['plans', 'platform.tabs.plans'], ['subscriptions', 'platform.tabs.subscriptions'], ['delinquency', 'platform.tabs.delinquency'], ['revenue', 'platform.tabs.revenue'], ['coupons', 'platform.tabs.coupons']] },
-  { label: 'platform.nav.platform', items: [['admins', 'platform.tabs.admins'], ['audit', 'platform.tabs.audit'], ['deployment', 'platform.tabs.deployment'], ['status', 'platform.tabs.status'], ['catalogue', 'platform.tabs.catalogue']] },
-  { label: 'platform.nav.system', items: [['settings', 'platform.tabs.settings'], ['help', 'platform.tabs.help']] }
-] as const satisfies ReadonlyArray<{ label: string, items: ReadonlyArray<readonly [PlatformTab, string]> }>
+  { label: 'platform.nav.overview', items: [['home', 'platform.tabs.home', 'home']] },
+  { label: 'platform.nav.clients', items: [['tenants', 'platform.tabs.tenants', 'building'], ['leads', 'platform.tabs.leads', 'contacts'], ['affiliates', 'platform.tabs.affiliates', 'sparkles']] },
+  { label: 'platform.nav.finance', items: [['plans', 'platform.tabs.plans', 'box'], ['subscriptions', 'platform.tabs.subscriptions', 'invoice'], ['delinquency', 'platform.tabs.delinquency', 'warning'], ['revenue', 'platform.tabs.revenue', 'chart'], ['coupons', 'platform.tabs.coupons', 'filter']] },
+  { label: 'platform.nav.platform', items: [['admins', 'platform.tabs.admins', 'lock'], ['audit', 'platform.tabs.audit', 'trail'], ['deployment', 'platform.tabs.deployment', 'server'], ['status', 'platform.tabs.status', 'signal'], ['catalogue', 'platform.tabs.catalogue', 'database']] },
+  { label: 'platform.nav.system', items: [['settings', 'platform.tabs.settings', 'settings'], ['help', 'platform.tabs.help', 'info']] }
+] as const satisfies ReadonlyArray<{ label: string, items: ReadonlyArray<readonly [PlatformTab, string, string?]> }>
 
 export const DEFAULT_PLATFORM_TAB: PlatformTab = 'home'
 
@@ -37,6 +37,8 @@ export function parsePlatformTab(valor: string | null | undefined): PlatformTab 
  */
 export function withPlatformTab(search: string | URLSearchParams, tab: PlatformTab): URLSearchParams {
   const params = new URLSearchParams(search)
+  // A seção das Configurações (`?sub=`) não vale para as outras abas.
+  params.delete('sub')
   if (tab === DEFAULT_PLATFORM_TAB) params.delete('tab')
   else params.set('tab', tab)
   return params
