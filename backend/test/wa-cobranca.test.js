@@ -11,7 +11,8 @@ import {
   separarCodigos,
   modeloEhLembrete,
   variaveisDesconhecidas,
-  maisAntigaEmAberto
+  maisAntigaEmAberto,
+  faturaParaPedido
 } from '../src/utils/wa/waCobranca.js';
 
 const HOJE = new Date('2026-09-08T12:00:00Z');
@@ -179,5 +180,43 @@ describe('separarCodigos', () => {
 
   test('sem citação de código devolve null, e o modelo sai como está', () => {
     assert.equal(separarCodigos('Oi {{nome}}, boleto {{link_boleto}}', vars, marcas), null);
+  });
+});
+
+describe('faturaParaPedido', () => {
+  const hoje = new Date('2026-12-01T15:00:00Z');
+  const aberta = (dueDate) => ({ id: dueDate, dueDate, paid: false });
+  const escolha = (faturas, dias = 5) => faturaParaPedido(faturas, hoje, dias);
+
+  test('vencida e vencendo hoje saem sempre, a mais antiga primeiro', () => {
+    assert.equal(escolha([aberta('2026-11-30'), aberta('2026-11-20')], 0).fatura.dueDate, '2026-11-20');
+    assert.equal(escolha([aberta('2026-12-01')], 0).fatura.dueDate, '2026-12-01');
+  });
+
+  test('a vencer sai dentro do prazo e não passa dele', () => {
+    assert.equal(escolha([aberta('2026-12-06')]).fatura.dueDate, '2026-12-06');
+    const fora = escolha([aberta('2026-12-07')]);
+    assert.equal(fora.fatura, null);
+    assert.equal(fora.proxima.dueDate, '2026-12-07');
+    assert.equal(fora.liberaEm, '2026-12-02', 'vence dia 7, prazo 5: libera no dia 2');
+  });
+
+  test('prazo 0 segura a de amanhã; prazo maior libera', () => {
+    assert.equal(escolha([aberta('2026-12-02')], 0).fatura, null);
+    assert.equal(escolha([aberta('2026-12-10')], 15).fatura.dueDate, '2026-12-10');
+  });
+
+  test('entre duas a vencer, a mais próxima; paga e sem data ficam de fora', () => {
+    const r = escolha([aberta('2026-12-20'), aberta('2026-12-12'), { ...aberta('2026-12-02'), paid: true }, { id: 'x' }]);
+    assert.equal(r.proxima.dueDate, '2026-12-12');
+  });
+
+  test('nada em aberto não quebra', () => {
+    assert.deepEqual(escolha([]), { fatura: null, proxima: null, liberaEm: null });
+    assert.deepEqual(escolha(undefined), { fatura: null, proxima: null, liberaEm: null });
+  });
+
+  test('uma vencida ganha de uma a vencer dentro do prazo', () => {
+    assert.equal(escolha([aberta('2026-12-03'), aberta('2026-11-25')]).fatura.dueDate, '2026-11-25');
   });
 });

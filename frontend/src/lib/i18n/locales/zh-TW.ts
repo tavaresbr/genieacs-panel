@@ -1316,6 +1316,8 @@ const zhTW: Dictionary = {
   'settings.chatbot.aiPrivacy': '對話訊息會傳送給已設定的 AI 服務商，使用費用由其直接向您收取。建議先從為客服人員提供建議開始，再開啟自動回覆。',
   'settings.chatbot.optionsHint': '機器人提供的內容。編號固定：關閉的選項會消失，但不會改變其他選項的編號。',
   'settings.chatbot.option.invoice': '帳單副本',
+  'settings.chatbot.invoiceLeadDays': '距到期多少天起發送即將到期的帳單（0–30）',
+  'settings.chatbot.invoiceLeadDaysHint': '索取帳單的人僅在帳單已逾期或在此天數內到期時才會收到 PIX 與繳費單。在此之前，機器人會告知日期並詢問是否現在領取。0 = 僅限已逾期或今天到期。',
   'settings.chatbot.option.signal': '連線狀態',
   'settings.chatbot.option.human': '聯絡客服人員',
   'settings.chatbot.option.humanHint': '即使在選單中隱藏，客戶仍可輸入「客服」：機器人不會困住任何人。',

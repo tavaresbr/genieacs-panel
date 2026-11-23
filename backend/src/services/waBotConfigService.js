@@ -26,6 +26,11 @@ const AI_MODEL_MAX = 64;
  * guardados lá, onde o bot já os lê, e esta tela só os lê e grava por lá — uma
  * chave em dois lugares é como os dois discordam.
  */
+/** Prazo, em dias antes do vencimento, em que o pedido de fatura já entrega a fatura a vencer. */
+export const INVOICE_LEAD_DAYS_DEFAULT = 5;
+export const INVOICE_LEAD_DAYS_MIN = 0;
+export const INVOICE_LEAD_DAYS_MAX = 30;
+
 const CONFIG_KEY = 'wa_bot_config';
 
 /** Os textos que o provedor pode trocar. Só os SEM variável: um `{amount}` apagado sem querer vira uma fatura sem valor. */
@@ -71,6 +76,9 @@ function padroes() {
     hours: { enabled: false, timezone: 'America/Sao_Paulo', week: semanaPadrao() },
     // Desligada até o provedor ligar: é uma mensagem a mais para o cliente.
     satisfaction: { enabled: false },
+    // Quantos dias antes do vencimento o cliente que PEDE a fatura já a recebe.
+    // Antes disso o bot só avisa a data e pergunta se ele quer agora.
+    invoice: { leadDays: INVOICE_LEAD_DAYS_DEFAULT },
     // A distribuição automática para quem está disponível. Desligada: atribuir
     // à mão (assumir, transferir) funciona sempre.
     distribution: { enabled: false },
@@ -206,6 +214,17 @@ function lerDistribuicao(raw, atual) {
   return { enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true };
 }
 
+function lerFatura(raw, atual) {
+  if (raw === undefined) return atual;
+  if (!raw || typeof raw !== 'object') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_invoice');
+  if (raw.leadDays === undefined) return atual;
+  const dias = Number(raw.leadDays);
+  if (!Number.isInteger(dias) || dias < INVOICE_LEAD_DAYS_MIN || dias > INVOICE_LEAD_DAYS_MAX) {
+    throw invalido('whatsapp.error.invalidBotConfig', 'invalid_invoice_lead_days');
+  }
+  return { leadDays: dias };
+}
+
 function lerPesquisa(raw, atual) {
   if (raw === undefined) return atual;
   if (!raw || typeof raw !== 'object') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_satisfaction');
@@ -291,6 +310,7 @@ class WaBotConfigService {
         week: Array.isArray(salvo.hours?.week) && salvo.hours.week.length === 7 ? salvo.hours.week : base.hours.week
       },
       satisfaction: { ...base.satisfaction, ...(salvo.satisfaction || {}) },
+      invoice: { ...base.invoice, ...(salvo.invoice || {}) },
       distribution: { ...base.distribution, ...(salvo.distribution || {}) },
       autoTags: { ...base.autoTags, ...(salvo.autoTags || {}) },
       ai: { ...base.ai, ...(salvo.ai || {}) }
@@ -431,6 +451,7 @@ class WaBotConfigService {
       messages: lerMensagens(patch.messages, atual.messages),
       hours: lerHorario(patch.hours, atual.hours),
       satisfaction: lerPesquisa(patch.satisfaction, atual.satisfaction),
+      invoice: lerFatura(patch.invoice, atual.invoice),
       distribution: lerDistribuicao(patch.distribution, atual.distribution),
       autoTags: lerAutoTags(patch.autoTags, atual.autoTags),
       ai: lerIa(patch.ai, atual.ai)

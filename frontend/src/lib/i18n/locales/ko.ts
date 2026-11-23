@@ -1316,6 +1316,8 @@ const ko: Dictionary = {
   'settings.chatbot.aiPrivacy': '대화 메시지는 설정된 AI 제공업체로 전송되며, 사용 요금은 제공업체가 직접 청구합니다. 자동 응답을 켜기 전에 상담원 답변 제안부터 시작해 보세요.',
   'settings.chatbot.optionsHint': '봇이 제공하는 항목. 번호는 고정되어 있어, 끈 항목은 다른 번호를 바꾸지 않고 사라집니다.',
   'settings.chatbot.option.invoice': '청구서 사본',
+  'settings.chatbot.invoiceLeadDays': '만기 며칠 전부터 다음 청구서를 보낼지 (0~30)',
+  'settings.chatbot.invoiceLeadDaysHint': '청구서를 요청한 사람은 연체되었거나 이 기간 안에 만기가 되는 경우에만 PIX와 납부서를 받습니다. 그 전에는 봇이 날짜를 안내하고 지금 받을지 묻습니다. 0 = 연체 또는 오늘 만기만.',
   'settings.chatbot.option.signal': '연결 상태',
   'settings.chatbot.option.human': '상담원과 대화',
   'settings.chatbot.option.humanHint': '메뉴에서 숨겨도 고객은 "상담원"이라고 쓸 수 있습니다. 봇은 아무도 가두지 않습니다.',

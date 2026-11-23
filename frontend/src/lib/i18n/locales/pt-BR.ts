@@ -1316,6 +1316,8 @@ const ptBR: Dictionary = {
   'settings.chatbot.aiPrivacy': 'As mensagens das conversas são enviadas ao provedor de IA configurado, que cobra o uso diretamente de você. Comece pelas sugestões aos atendentes antes de ligar o atendimento automático.',
   'settings.chatbot.optionsHint': 'O que o bot oferece. Os números ficam fixos: uma opção desligada some do menu sem mudar o número das outras.',
   'settings.chatbot.option.invoice': '2ª via do boleto',
+  'settings.chatbot.invoiceLeadDays': 'Enviar a fatura a vencer a partir de quantos dias antes (0 a 30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'Quem pede a fatura recebe PIX e boleto só se ela já venceu ou vence dentro deste prazo. Antes disso o bot avisa a data e pergunta se a pessoa quer receber agora. 0 = só vencida ou vencendo hoje.',
   'settings.chatbot.option.signal': 'Situação da conexão',
   'settings.chatbot.option.human': 'Falar com um atendente',
   'settings.chatbot.option.humanHint': 'Escondida do menu, o cliente ainda pode escrever "atendente": o bot nunca prende ninguém.',

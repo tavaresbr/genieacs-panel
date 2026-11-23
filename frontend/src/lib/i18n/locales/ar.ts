@@ -1308,6 +1308,8 @@ const ar: Dictionary = {
   'settings.chatbot.aiPrivacy': 'تُرسَل رسائل المحادثات إلى مزوّد الذكاء الاصطناعي المُعدّ، الذي يحاسبك على الاستخدام مباشرة. ابدأ باقتراحات موظفي الدعم قبل تشغيل الرد التلقائي.',
   'settings.chatbot.optionsHint': 'ما يقدمه البوت. الأرقام ثابتة: الخيار المعطّل يختفي دون تغيير أرقام البقية.',
   'settings.chatbot.option.invoice': 'نسخة الفاتورة',
+  'settings.chatbot.invoiceLeadDays': 'إرسال الفاتورة القادمة قبل كم يومًا من الاستحقاق (0 إلى 30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'من يطلب الفاتورة يحصل على PIX والقسيمة فقط إذا استحقت أو تستحق خلال هذه المدة. قبل ذلك يذكر البوت التاريخ ويسأل إن كان يريدها الآن. 0 = المستحقة أو التي تستحق اليوم فقط.',
   'settings.chatbot.option.signal': 'حالة الاتصال',
   'settings.chatbot.option.human': 'التحدث مع موظف',
   'settings.chatbot.option.humanHint': 'حتى لو أُخفي من القائمة يمكن للعميل كتابة "موظف": البوت لا يحتجز أحدًا.',

@@ -1,3 +1,4 @@
+import { logSafe } from '../utils/logger.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import DeviceService from './deviceService.js';
 import SgpService from './sgpService.js';
@@ -17,7 +18,8 @@ import AddonService from './addonService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
-import { comoDataBr, comoReal, maisAntigaEmAberto } from '../utils/wa/waCobranca.js';
+import { comoDataBr, comoReal, faturaParaPedido } from '../utils/wa/waCobranca.js';
+import { CONFIRMACAO, NEGACAO } from '../utils/wa/confirmacao.js';
 import { normalizarTexto, pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import { isValidCnpj, isValidCpf, normalizeTaxId } from '../utils/taxId.js';
 
@@ -290,6 +292,12 @@ const PASSO_DOCUMENTO = 'aguardando_documento';
 const PASSO_ESCOLHA = 'escolhendo_contrato';
 /** A IA pediu o desbloqueio em confiança e espera o "sim" do cliente. */
 const PASSO_LIBERACAO = 'ia_confirmar_liberacao';
+/** O cliente pediu a fatura fora do prazo e o bot perguntou se ele a quer agora: espera o "sim". */
+const PASSO_FATURA = 'confirmar_fatura_antecipada';
+/** Como o da liberação: o "sim" de quem volta horas depois não é desta pergunta. */
+const PASSO_FATURA_VALIDADE_MS = 5 * 60 * 1000;
+/** Sem prazo nenhum: quem já disse "sim", ou não tem conversa onde perguntar. */
+const SEM_PRAZO_DIAS = 36500;
 
 /**
  * Server-side text has no request locale: a WhatsApp message carries no
@@ -318,41 +326,52 @@ async function linkDoPortal() {
 }
 
 /**
- * A fatura em aberto mais antiga entre as fontes do provedor (ou `null`).
+ * A fatura que o pedido do cliente entrega entre as em aberto das fontes do
+ * provedor, e — fora do prazo — a que ele ainda não pode receber.
  *
  * O SGP é a fonte do contrato e fala primeiro; a conta Asaas, quando o provedor
  * deixou o bot consultá-la, acrescenta o que o SGP não tem (ver
  * `mergeOpenInvoices`). Uma fatura do Asaas só sai daqui depois de relida ao
  * vivo — se o Asaas diz que já foi paga, a próxima é a escolhida.
+ *
+ * `ignorarPrazo`: o cliente já disse "sim" à oferta; vale a mais próxima.
+ *
+ * @returns {Promise<{ fatura: object|null, proxima: object|null, liberaEm: string|null }>}
  */
-async function faturaAberta(link) {
+async function faturaAberta(link, { ignorarPrazo = false } = {}) {
   const { invoices } = await SgpService.listInvoices({ contract: link.contract, onlyOpen: true });
   await BillingStatusService.record(link.contract, invoices);
   const asaas = await InvoiceSourceService.asaasInvoicesForContract(link.contract);
-  return maisAntigaDe(mergeOpenInvoices(invoices, asaas));
+  const { invoice } = await WaBotConfigService.getConfig();
+  return escolherFatura(mergeOpenInvoices(invoices, asaas), ignorarPrazo ? SEM_PRAZO_DIAS : invoice.leadDays);
 }
 
 /** A mais antiga das abertas, completada se for do Asaas; tenta a seguinte se a lida ao vivo já não estiver aberta. */
 async function maisAntigaDe(faturas) {
+  return (await escolherFatura(faturas, SEM_PRAZO_DIAS)).fatura;
+}
+
+async function escolherFatura(faturas, dias) {
   let restantes = [...faturas];
   for (let tentativa = 0; tentativa < 5; tentativa += 1) {
-    // `true` for the reminder flag: the dunning rule refuses a not-yet-due
-    // invoice because a dunning message has nothing to charge for. Here the
-    // customer ASKED, and "you have one due on the 10th" is the answer.
-    const { fatura } = maisAntigaEmAberto(restantes, new Date(), true);
-    if (!fatura) return null;
-    if (fatura.source !== 'asaas') return fatura;
+    // Quem PEDIU a fatura recebe a a vencer também, mas só dentro do prazo
+    // (`invoice.leadDays`): "você tem uma para o dia 10" cedo demais vira
+    // código de pagamento solto na conversa.
+    const escolha = faturaParaPedido(restantes, new Date(), dias);
+    const { fatura } = escolha;
+    if (!fatura) return escolha;
+    if (fatura.source !== 'asaas') return escolha;
     // eslint-disable-next-line no-await-in-loop -- uma por vez: a seguinte só se pede se esta já não estava aberta
     const pronta = await AsaasInvoiceService.completeForBot(fatura);
-    if (pronta) return pronta;
+    if (pronta) return { ...escolha, fatura: pronta };
     restantes = restantes.filter((f) => f !== fatura);
   }
-  return null;
+  return { fatura: null, proxima: null, liberaEm: null };
 }
 
 /** The oldest open invoice, spelled out. */
 async function responderFatura(link) {
-  const fatura = await faturaAberta(link);
+  const { fatura } = await faturaAberta(link, { ignorarPrazo: true });
   if (!fatura) return WaBotConfigService.message('noOpenInvoice');
 
   const linhas = [t('whatsapp.bot.invoice', {
@@ -386,8 +405,35 @@ async function responderFatura(link) {
  *
  * @returns {Promise<string[]>}
  */
-async function faturaEmPartes(link) {
-  return partesDaFatura(await faturaAberta(link));
+async function faturaEmPartes(link, opcoes = {}) {
+  return (await pedidoDeFatura(link, opcoes)).partes;
+}
+
+/**
+ * O pedido de fatura de quem escreveu: as mensagens e o que aconteceu.
+ *
+ * `intent`: `fatura` (saiu), `noOpenInvoice` (nada em aberto) ou
+ * `invoiceNotYet` (há uma, mas fora do prazo: só o aviso e a pergunta "quer
+ * agora?"). Com `conversation`, o aviso grava o passo que espera o "sim"; sem
+ * ela (a IA, que guarda o próprio passo) só o aviso.
+ */
+async function pedidoDeFatura(link, { conversation = null, confirmado = false } = {}) {
+  const { fatura, proxima, liberaEm } = await faturaAberta(link, { ignorarPrazo: confirmado });
+  if (fatura) return { partes: await partesDaFatura(fatura), intent: 'fatura' };
+  if (!proxima) return { partes: await partesDaFatura(null), intent: 'noOpenInvoice', fatura: null };
+
+  const aviso = t('whatsapp.bot.invoiceNotYet', {
+    dueDate: comoDataBr(proxima.dueDate),
+    availableFrom: comoDataBr(liberaEm)
+  });
+  const proximaInfo = { dueDate: proxima.dueDate, liberaEm };
+  if (!conversation) return { partes: [aviso], intent: 'invoiceNotYet', proxima: proximaInfo };
+  await gravarPassoDaConversa(conversation, {
+    bot_step: PASSO_FATURA,
+    bot_step_data: null,
+    bot_step_at: new Date()
+  });
+  return { partes: [`${aviso}\n\n${t('whatsapp.bot.invoiceOffer')}`], intent: 'invoiceNotYet', proxima: proximaInfo };
 }
 
 /** As mensagens de uma fatura já escolhida (ou a resposta de "sem fatura em aberto"). */
@@ -565,11 +611,19 @@ async function responderLiberacao(link, conversation) {
   return linhas.join('\n');
 }
 
+async function gravarPassoDaConversa(conversation, patch) {
+  await tdb('wa_conversations')
+    .where({ id: conversation.id })
+    .update({ ...patch, updated_at: new Date() });
+  Object.assign(conversation, patch);
+}
+
 /** O passo gravado, ou `null` quando não há ou já venceu. */
 function passoAtivo(conversation) {
   if (!conversation?.bot_step || !conversation.bot_step_at) return null;
   const desde = new Date(conversation.bot_step_at).getTime();
-  const validade = conversation.bot_step === PASSO_LIBERACAO ? PASSO_LIBERACAO_VALIDADE_MS : PASSO_VALIDADE_MS;
+  const validade = conversation.bot_step === PASSO_LIBERACAO ? PASSO_LIBERACAO_VALIDADE_MS
+    : conversation.bot_step === PASSO_FATURA ? PASSO_FATURA_VALIDADE_MS : PASSO_VALIDADE_MS;
   return Date.now() - desde < validade ? conversation.bot_step : null;
 }
 
@@ -601,6 +655,10 @@ class WaBotService {
   static PASSO_LIBERACAO_VALIDADE_MS = PASSO_LIBERACAO_VALIDADE_MS;
 
   static PASSO_LIBERACAO = PASSO_LIBERACAO;
+
+  static PASSO_FATURA = PASSO_FATURA;
+
+  static pedidoDeFatura = pedidoDeFatura;
 
   static passoAtivo = passoAtivo;
 
@@ -802,6 +860,36 @@ class WaBotService {
       }
     }
 
+    // A pergunta "quer receber a fatura agora?" espera um "sim" curto. O passo
+    // acaba aqui, seja qual for a resposta: um "não" fecha a oferta e qualquer
+    // outra coisa é outro assunto, que segue o caminho de sempre.
+    const recente = (await tdb('wa_conversations').where({ id: conversation.id }).first()) || conversation;
+    if (passoAtivo(recente) === PASSO_FATURA) {
+      await this.gravarPasso(conversation, { bot_step: null, bot_step_data: null, bot_step_at: null });
+      const resposta = String(texto ?? '').trim();
+      if (CONFIRMACAO.test(resposta) && (await WaBotConfigService.getConfig()).options.invoice) {
+        let partes = null;
+        try {
+          partes = await faturaEmPartes(link, { confirmado: true });
+        } catch (error) {
+          console.error(`waBot fatura antecipada: ${JSON.stringify(logSafe(error?.code || error?.message, 200))}`);
+        }
+        if (!partes) {
+          await this.responderCom(conversation, await textoDePassagem('handoff'));
+          return { replied: true, intent: 'handoff', from: 'fatura' };
+        }
+        for (const mensagem of partes) {
+          // eslint-disable-next-line no-await-in-loop
+          await this.responderCom(conversation, mensagem);
+        }
+        return { replied: true, intent: 'fatura' };
+      }
+      if (NEGACAO.test(resposta)) {
+        await this.responderCom(conversation, t('whatsapp.bot.invoiceDeclined'));
+        return { replied: true, intent: 'invoiceDeclined' };
+      }
+    }
+
     if (intencao === 'menu') {
       await this.responderCom(conversation, await menuPara(link));
       return { replied: true, intent: 'menu' };
@@ -826,9 +914,14 @@ class WaBotService {
     }
 
     let resposta = null;
+    let intencaoRespondida = intencao;
     try {
       if (intencao === 'portal') resposta = await responderPortal();
-      else if (intencao === 'fatura') resposta = await faturaEmPartes(link);
+      else if (intencao === 'fatura') {
+        const pedido = await pedidoDeFatura(link, { conversation });
+        resposta = pedido.partes;
+        intencaoRespondida = pedido.intent;
+      }
       else if (intencao === 'sinal') {
         const manutencao = link.device_id ? await responderManutencao(link, conversation) : null;
         if (manutencao) {
@@ -862,11 +955,9 @@ class WaBotService {
       await this.responderCom(conversation, mensagem);
     }
     // Para o relatório: "2ª via enviada" é a fatura que saiu, não o pedido
-    // respondido com "você não tem fatura em aberto".
-    if (intencao === 'fatura' && mensagens[0] === await WaBotConfigService.message('noOpenInvoice')) {
-      return { replied: true, intent: 'noOpenInvoice' };
-    }
-    return { replied: true, intent: intencao };
+    // respondido com "você não tem fatura em aberto" nem o aviso de que ainda
+    // não está no prazo.
+    return { replied: true, intent: intencaoRespondida === 'invoiceNotYet' ? 'noOpenInvoice' : intencaoRespondida };
   }
 
   /**
@@ -1052,10 +1143,7 @@ class WaBotService {
 
   /** Grava o passo da identificação nesta conversa. */
   static async gravarPasso(conversation, patch) {
-    await tdb('wa_conversations')
-      .where({ id: conversation.id })
-      .update({ ...patch, updated_at: new Date() });
-    Object.assign(conversation, patch);
+    return gravarPassoDaConversa(conversation, patch);
   }
 
   /**

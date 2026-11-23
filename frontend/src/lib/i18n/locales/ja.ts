@@ -1316,6 +1316,8 @@ const ja: Dictionary = {
   'settings.chatbot.aiPrivacy': '会話のメッセージは設定したAIプロバイダーに送信され、利用料金はプロバイダーから直接請求されます。自動応答をオンにする前に、まず担当者への提案から始めてください。',
   'settings.chatbot.optionsHint': 'ボットが提供する内容。番号は固定で、無効にした項目は他の番号を変えずに消えます。',
   'settings.chatbot.option.invoice': '請求書の再発行',
+  'settings.chatbot.invoiceLeadDays': '期日の何日前から次回の請求書を送るか（0〜30）',
+  'settings.chatbot.invoiceLeadDaysHint': '請求書を依頼した人には、期日を過ぎているか、この日数以内に期日が来る場合のみ PIX と払込票を送ります。それより前は日付を案内し、今すぐ必要か確認します。0 = 期限切れまたは本日期日のみ。',
   'settings.chatbot.option.signal': '接続状況',
   'settings.chatbot.option.human': '担当者と話す',
   'settings.chatbot.option.humanHint': 'メニューに表示しなくても、顧客は「担当者」と書けます。ボットが誰かを閉じ込めることはありません。',

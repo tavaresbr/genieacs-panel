@@ -1316,6 +1316,8 @@ const fr: Dictionary = {
   'settings.chatbot.aiPrivacy': 'Les messages des conversations sont envoyés au fournisseur d’IA configuré, qui vous facture directement l’utilisation. Commencez par les suggestions aux agents avant d’activer la réponse automatique.',
   'settings.chatbot.optionsHint': 'Ce que propose le bot. Les numéros sont fixes : une option désactivée disparaît sans renuméroter les autres.',
   'settings.chatbot.option.invoice': 'Copie de la facture',
+  'settings.chatbot.invoiceLeadDays': 'Envoyer la facture à venir à partir de combien de jours avant l\'échéance (0 à 30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'Qui demande la facture reçoit le PIX et le bordereau seulement si elle est échue ou arrive à échéance dans ce délai. Avant, le bot donne la date et demande si la personne la veut maintenant. 0 = seulement échue ou échéant aujourd\'hui.',
   'settings.chatbot.option.signal': 'État de la connexion',
   'settings.chatbot.option.human': 'Parler à un conseiller',
   'settings.chatbot.option.humanHint': 'Masquée du menu, le client peut toujours écrire « conseiller » : le bot ne bloque jamais personne.',

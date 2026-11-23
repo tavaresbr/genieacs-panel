@@ -35,6 +35,13 @@ const CONTRACT = '8800';
 const ASSINANTE = '5593981140001';
 const DESCONHECIDO = '5593981149999';
 const DOC = '52998224725';
+/** O vencimento (DD/MM/AAAA) da fatura em aberto que o SGP de mentira devolve. */
+let vencimentoSgp = '10/10/2026';
+const emDias = (dias) => {
+  const d = new Date(Date.now() + dias * 24 * 60 * 60 * 1000);
+  return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+};
+
 const PIX = '00020126580014BR.GOV.BCB.PIX0136ia-teste-chave-pix5204000053039865802BR';
 const SENHA_WIFI = 'senha-wifi-que-nunca-sai';
 
@@ -78,7 +85,7 @@ function startSgpStub() {
         return send({ status: 0, msg: 'Cliente não encontrado' });
       }
       if (req.url.startsWith('/api/ura/titulos')) {
-        return send({ status: 1, titulos: [{ numerodocumento: 'IA1', valor: '99,90', vencimento: '10/10/2026', status: 'Em aberto', pix: PIX }] });
+        return send({ status: 1, titulos: [{ numerodocumento: 'IA1', valor: '99,90', vencimento: vencimentoSgp, status: 'Em aberto', pix: PIX }] });
       }
       res.writeHead(404);
       return res.end('{}');
@@ -989,6 +996,38 @@ describe('a IA atendendo', () => {
     assert.equal(pedidosIa[1].payload.messages.at(-1).role, 'tool');
     // O provedor de IA não lê o código de pagamento: só o resumo da fatura.
     assert.equal(JSON.stringify(pedidosIa).includes(PIX), false, 'o PIX não vai ao provedor de IA');
+  });
+
+  it('fatura fora do prazo: a IA pergunta, e só o "sim" do cliente libera o código', async () => {
+    vencimentoSgp = emDias(10);
+    try {
+      await limparFio(ASSINANTE);
+      roteiro = [{ tool: 'consultar_fatura' }, { content: 'Sua próxima fatura ainda não está disponível. Quer receber agora?' }];
+      await receber(ASSINANTE, 'me manda a fatura');
+      let saidas = await respostas(ASSINANTE);
+      assert.ok(!saidas.includes(PIX), 'nenhum código antes do "sim"');
+      assert.match(pedidosIa[1].payload.messages.at(-1).content, /pergunte se ele quer receber a fatura agora/i);
+      const antes = saidas.length;
+
+      // O modelo tenta chamar de novo, mas o cliente respondeu outra coisa: nada sai.
+      roteiro = [{ tool: 'consultar_fatura' }, { content: 'Tudo bem, qualquer coisa me chame.' }];
+      await receber(ASSINANTE, 'qual o horário de vocês?');
+      saidas = await respostas(ASSINANTE);
+      assert.ok(!saidas.includes(PIX), 'sem confirmação o código não sai');
+
+      // Nova pergunta e, agora sim, o "sim".
+      await limparFio(ASSINANTE);
+      roteiro = [{ tool: 'consultar_fatura' }, { content: 'Quer receber agora?' }];
+      await receber(ASSINANTE, 'fatura');
+      roteiro = [{ tool: 'consultar_fatura' }, { content: 'Pronto, os dados estão logo abaixo.' }];
+      await receber(ASSINANTE, 'sim');
+      saidas = await respostas(ASSINANTE);
+      assert.ok(saidas.includes(PIX), 'depois do "sim" o PIX sai, exatamente como o SGP mandou');
+      assert.equal(JSON.stringify(pedidosIa).includes(PIX), false, 'o PIX não vai ao provedor de IA');
+      assert.ok(antes >= 1);
+    } finally {
+      vencimentoSgp = '10/10/2026';
+    }
   });
 
   it('a IA escreve um PIX por conta própria: o código é mascarado antes de sair', async () => {

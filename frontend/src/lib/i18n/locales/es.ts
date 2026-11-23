@@ -1316,6 +1316,8 @@ const es: Dictionary = {
   'settings.chatbot.aiPrivacy': 'Los mensajes de las conversaciones se envían al proveedor de IA configurado, que te cobra el uso directamente. Empieza por las sugerencias a los agentes antes de activar la atención automática.',
   'settings.chatbot.optionsHint': 'Lo que ofrece el bot. Los números son fijos: una opción desactivada desaparece sin cambiar el número de las demás.',
   'settings.chatbot.option.invoice': 'Segunda vía de la factura',
+  'settings.chatbot.invoiceLeadDays': 'Enviar la factura próxima desde cuántos días antes (0 a 30)',
+  'settings.chatbot.invoiceLeadDaysHint': 'Quien pide la factura recibe PIX y boleto solo si ya venció o vence dentro de este plazo. Antes, el bot informa la fecha y pregunta si la quiere ahora. 0 = solo vencida o que vence hoy.',
   'settings.chatbot.option.signal': 'Estado de la conexión',
   'settings.chatbot.option.human': 'Hablar con un agente',
   'settings.chatbot.option.humanHint': 'Oculta del menú, el cliente aún puede escribir "agente": el bot nunca atrapa a nadie.',

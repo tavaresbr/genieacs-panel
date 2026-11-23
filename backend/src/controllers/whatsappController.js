@@ -158,6 +158,7 @@ class WhatsAppController {
         messages: body.messages,
         hours: body.hours,
         satisfaction: body.satisfaction,
+        invoice: body.invoice,
         distribution: body.distribution,
         autoTags: body.autoTags,
         ai: body.ai
