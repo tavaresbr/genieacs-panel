@@ -59,6 +59,7 @@ const NAO_E_DESTINO = {
   'portal.suproveedor.com': 'endereço de exemplo em placeholder',
   'provedor.sgp.net.br': 'endereço de exemplo em placeholder',
   'wa.me': 'link de clique-para-conversar que o usuário abre; o painel não envia nada',
+  't.me': 'link de clique-para-conversar do Telegram que o usuário abre; o painel só o monta (`?start=` é um código aleatório de uso único) e não envia nada a ele',
   'm.me': 'link de clique-para-conversar do Messenger que o usuário abre; o painel só o monta e não envia nada a ele (o `ref` é um código aleatório de uso único)',
   'waze.com': 'link de navegação que o usuário abre; o painel não envia nada',
   'www.google.com': 'link de rota que o usuário abre; o painel não envia nada',

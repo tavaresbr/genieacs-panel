@@ -144,6 +144,7 @@ diz isso; escolher um número para elas é decisão de negócio que ainda não f
 | --- | --- | --- | --- | --- | --- | --- |
 | Trilha de auditoria | `audit_log` | **365 dias** | 30–3650 dias | o provedor, numa tela — e o teto do plano pode encurtar o que ele escolheu | created_at | — |
 | Links de vínculo do Messenger | `messenger_link_tokens` | **30 dias** | — | ninguém: fixo no código | expires_at | links que ainda não venceram, usados ou não |
+| Links de vínculo do Telegram dos clientes | `telegram_link_tokens` | **30 dias** | — | ninguém: fixo no código | expires_at | links que ainda não venceram, usados ou não |
 | Eventos do bot | `wa_bot_events` | **180 dias** | — | ninguém: fixo no código | created_at | — |
 | Execuções de ativação | `provisioning_runs` | **90 dias** | 1–365 dias | o provedor, numa tela | updated_at | execuções ainda em andamento ou pendentes — só as terminadas saem |
 | Eventos do SGP | `sgp_events` | **90 dias** | 1–365 dias | o provedor, numa tela | updated_at | eventos ainda não processados — só os processados ou ignorados saem |
@@ -159,7 +160,7 @@ diz isso; escolher um número para elas é decisão de negócio que ainda não f
 
 Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **vale** é o menor dos dois, e "para sempre" vira o próprio teto (`SubscriptionService.effectiveRetention`). É a única janela que o provedor não escolheu: a tela mostra o número dele, não o que vale.
 
-### 4.2 O que nenhuma rotina apaga por idade — 28 tabelas com dado de assinante
+### 4.2 O que nenhuma rotina apaga por idade — 30 tabelas com dado de assinante
 
 "Sem prazo" não é "nunca sai": várias têm saída pelo ciclo de vida, e todas as do assinante saem pela exclusão do art. 18. O que não existe é uma rotina que as apague porque ficaram velhas.
 
@@ -177,6 +178,8 @@ Onde a coluna "Quem muda" diz que o teto do plano pode encurtar, a janela que **
 | `wa_conversations` | a conversa e o telefone do assinante; o varredor de mensagens se recusa a tocá-la, por desenho — sai pela exclusão do art. 18 |
 | `messenger_conversations` | a conversa e o PSID da pessoa na Página; nenhuma rotina a apaga por idade — sai ao desconectar a Página (em cascata) ou pela exclusão do art. 18 |
 | `messenger_messages` | o texto e o link do anexo trocados no Messenger; nenhuma rotina os apaga por idade — saem junto com a conversa |
+| `telegram_conversations` | a conversa e o id do chat da pessoa no Telegram; nenhuma rotina a apaga por idade — sai pela exclusão do art. 18 ou junto com o provedor |
+| `telegram_messages` | o texto trocado no Telegram; nenhuma rotina o apaga por idade — sai junto com a conversa |
 | `wa_opt_outs` | quem pediu para não receber mensagens; nenhuma rotina o apaga |
 | `wa_marketing_opt_outs` | quem pediu para não receber promoções, e quando voltou; nenhuma rotina o apaga — apagar seria desfazer o pedido |
 | `wa_satisfaction` | a avaliação do atendimento dada pelo assinante; sai só pela exclusão do art. 18 |

@@ -76,6 +76,9 @@ import messengerWebhookRoutes from './routes/messengerWebhook.js';
 import messengerRoutes from './routes/messenger.js';
 import { MESSENGER_WEBHOOK_PATH } from './config/messengerWebhookPath.js';
 import { TELEGRAM_WEBHOOK_PATH } from './config/telegramWebhookPath.js';
+import { TELEGRAM_CUSTOMER_WEBHOOK_PATH } from './config/telegramCustomerWebhookPath.js';
+import telegramCustomerWebhookRoutes from './routes/telegramCustomerWebhook.js';
+import telegramChatRoutes from './routes/telegramChat.js';
 import telegramWebhookRoutes from './routes/telegramWebhook.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
@@ -309,6 +312,10 @@ app.use(MESSENGER_WEBHOOK_PATH, messengerWebhookRoutes);
 // Telegram), autenticado pelo segredo do webhook no header, com teto próprio.
 app.use(TELEGRAM_WEBHOOK_PATH, telegramWebhookRoutes);
 
+// O bot de CLIENTES do Telegram: outro bot, outro token, outro segredo e outra
+// rota — o webhook do bot da equipe e o deste não podem ser o mesmo.
+app.use(TELEGRAM_CUSTOMER_WEBHOOK_PATH, telegramCustomerWebhookRoutes);
+
 // Mesma razão, mesmo lugar na pilha, e mais uma que é só desta: a entrega do
 // gateway de pagamento chega no endereço que a plataforma digitou no painel
 // DELE — o apex, na prática —, e o apex não nomeia provedor nenhum. Resolvida
@@ -467,6 +474,9 @@ app.use('/api/whatsapp', whatsappRoutes);
 // O Messenger vive sob o mesmo add-on do WhatsApp (o atendimento é um só).
 app.use('/api/messenger', requireAddon('whatsapp'));
 app.use('/api/messenger', messengerRoutes);
+// O Telegram dos clientes vive sob o mesmo add-on (o atendimento é um só).
+app.use('/api/telegram-chat', requireAddon('whatsapp'));
+app.use('/api/telegram-chat', telegramChatRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);
 app.use('/api/whatsapp', whatsappBillingRoutes);

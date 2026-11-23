@@ -31,6 +31,7 @@ const SettingsPage = lazy(() => import('@/pages/settings'))
 const AuditPage = lazy(() => import('@/pages/audit'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
 const MessengerPage = lazy(() => import('@/pages/messenger'))
+const TelegramChatPage = lazy(() => import('@/pages/telegram-chat'))
 const ContactsPage = lazy(() => import('@/pages/contacts'))
 const SiteMapPage = lazy(() => import('@/pages/site-map'))
 const AccountPage = lazy(() => import('@/pages/account'))
@@ -455,6 +456,7 @@ function ProviderRoutes() {
                   <Route element={<PermissionRoute permission="whatsapp.read" />}>
                     <Route path="/whatsapp" element={<WhatsAppPage />} />
                     <Route path="/messenger" element={<MessengerPage />} />
+                    <Route path="/telegram-chat" element={<TelegramChatPage />} />
                     <Route path="/contacts" element={<ContactsPage />} />
                     <Route path="/contacts/:key" element={<ContactDetailPage />} />
                   </Route>
