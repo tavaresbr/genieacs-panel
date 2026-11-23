@@ -306,6 +306,88 @@ describe('o que a fila nunca faz', () => {
   });
 });
 
+describe('reenviar à mão', () => {
+  const retry = (id) => api(`/messages/${id}/retry`, { method: 'POST', body: {} });
+
+  it('devolve a falhada à fila do zero e ela sai (201)', async () => {
+    const conv = await newConversation(alfa, 'psid-retry-ok');
+    responder = () => refused(400, 100, 'parâmetro inválido');
+    const failed = (await send(conv, 'De novo')).body.data;
+    assert.equal(failed.deliveryStatus, 'failed');
+    responder = null;
+    calls.length = 0;
+    const res = await retry(failed.id);
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.data.deliveryStatus, 'sent');
+    assert.equal(res.body.data.deliveryError, null);
+    assert.equal(res.body.data.attempts, 1, 'as tentativas recomeçam');
+    assert.equal(calls.filter((c) => c.body.message.text === 'De novo').length, 1);
+  });
+
+  it('se a Meta recusa de novo: 502 e continua falhada com o novo motivo', async () => {
+    const conv = await newConversation(alfa, 'psid-retry-again');
+    responder = () => refused(400, 100, 'primeiro motivo');
+    const failed = (await send(conv, 'Teimosa')).body.data;
+    responder = () => refused(400, 200, 'segundo motivo');
+    const res = await retry(failed.id);
+    assert.equal(res.status, 502);
+    assert.equal(res.body.code, 'send_refused');
+    assert.match(res.body.data.deliveryError, /segundo motivo/);
+  });
+
+  it('dois cliques seguidos mandam UMA vez só', async () => {
+    const conv = await newConversation(alfa, 'psid-retry-race');
+    responder = () => refused(400, 100, 'x');
+    const failed = (await send(conv, 'Corrida')).body.data;
+    responder = null;
+    calls.length = 0;
+    const [a, b] = await Promise.all([retry(failed.id), retry(failed.id)]);
+    assert.deepEqual([a.status, b.status].sort(), [201, 409]);
+    assert.equal(calls.filter((c) => c.body.message.text === 'Corrida').length, 1);
+  });
+
+  it('só reenvia o que falhou: enviada, na fila e recebida dão 409', async () => {
+    const conv = await newConversation(alfa, 'psid-retry-state');
+    responder = null;
+    const sent = (await send(conv, 'Já foi')).body.data;
+    assert.equal((await retry(sent.id)).body.code, 'not_retryable');
+    responder = down;
+    const queued = (await send(conv, 'Na fila')).body.data;
+    assert.equal(queued.deliveryStatus, 'queued');
+    assert.equal((await retry(queued.id)).body.code, 'not_retryable');
+    const [inId] = await db()('messenger_messages').insert({
+      tenant_id: alfa, conversation_id: conv, direction: 'in', body: 'Oi', created_at: new Date(), updated_at: new Date()
+    }).returning('id');
+    assert.equal((await retry(typeof inId === 'object' ? inId.id : inId)).status, 409);
+  });
+
+  it('com a janela fechada não reenvia e não chama a Meta', async () => {
+    const conv = await newConversation(alfa, 'psid-retry-window');
+    responder = () => refused(400, 100, 'x');
+    const failed = (await send(conv, 'Tarde demais')).body.data;
+    await db()('messenger_conversations').where({ id: conv }).update({ last_inbound_at: new Date(Date.now() - 25 * 3600_000) });
+    responder = null;
+    calls.length = 0;
+    const res = await retry(failed.id);
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'window_closed');
+    assert.equal(calls.length, 0);
+    assert.equal((await row(failed.id)).delivery_status, 'failed', 'continua falhada');
+  });
+
+  it('mensagem de outro provedor ou inexistente: 404', async () => {
+    const convB = await newConversation(beta, 'psid-retry-beta');
+    const [idB] = await db()('messenger_messages').insert({
+      tenant_id: beta, conversation_id: convB, direction: 'out', body: 'Do beta', delivery_status: 'failed',
+      created_at: new Date(), updated_at: new Date()
+    }).returning('id');
+    const id = typeof idB === 'object' ? idB.id : idB;
+    assert.equal((await retry(id)).status, 404);
+    assert.equal((await row(id)).delivery_status, 'failed');
+    assert.equal((await retry(999999)).status, 404);
+  });
+});
+
 describe('cada provedor com a sua fila', () => {
   it('uma passada atende os dois provedores, cada um com o token da própria Página', async () => {
     const convA = await newConversation(alfa, 'psid-iso-a');

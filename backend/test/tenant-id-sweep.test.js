@@ -315,6 +315,13 @@ async function semear(tenantId, slug) {
       psid: `psid-${slug}`,
       name: `Pessoa do ${slug}`
     });
+    // Uma mensagem de ENTRADA (não reenviável): o controle de reenvio responde
+    // `not_retryable` (409), depois de achá-la.
+    alvo.messengerMessage = await semearLinha('messenger_messages', {
+      conversation_id: alvo.messengerConversation,
+      direction: 'in',
+      body: `Oi do ${slug}`
+    });
 
     // O contrato do SGP, um por provedor e não o mesmo nos dois, pelo motivo
     // da planta de fibra acima: o que se pergunta é se o contrato do VIZINHO

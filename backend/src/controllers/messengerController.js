@@ -223,6 +223,17 @@ class MessengerController {
     }
   }
 
+  /** Reenvia à mão uma resposta que falhou. Mesmos status do envio: 201, 202 ou 502. */
+  static async retry(req, res) {
+    try {
+      const message = await MessengerSendService.retry(Number(req.params.id));
+      const status = message.delivery_status === 'failed' ? 502 : message.delivery_status === 'sent' ? 201 : 202;
+      return res.status(status).json(createResponse('ok', publicMessage(message), status === 502 ? 'send_refused' : null));
+    } catch (error) {
+      return fail(res, error, 'could not retry message');
+    }
+  }
+
   /** Vincular a conversa a um assinante: `{ contract }` (o contrato, ou `c:<id>`). */
   static async linkSubscriber(req, res) {
     try {

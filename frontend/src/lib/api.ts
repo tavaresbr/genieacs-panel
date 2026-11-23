@@ -6878,6 +6878,8 @@ export const messengerAPI = {
     apiClient.post<MessengerMessage>(`/messenger/conversations/${id}/messages`, { text }),
   setClosed: (id: number, closed: boolean) =>
     apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/closed`, { closed }),
+  /** Reenvia à mão uma resposta que falhou (a fila já desistiu dela). */
+  retryMessage: (id: number) => apiClient.post<MessengerMessage>(`/messenger/messages/${id}/retry`, {}),
   /** Assina de novo os campos do webhook (depois de um campo novo, como os links de vínculo). */
   resubscribePage: (id: number) => apiClient.post<MessengerPage>(`/messenger/pages/${id}/subscribe`, {}),
   /** O link `m.me/<Página>?ref=…` que vincula a conversa ao assinante quando ele o abre. */

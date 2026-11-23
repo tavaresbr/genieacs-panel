@@ -202,7 +202,10 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   processo cair DEPOIS de a Meta aceitar e ANTES de gravar o `mid`, a retomada pode mandar a mensagem de novo — a
   Meta não oferece chave de idempotência no Send API.
 - A conversa mostra "Na fila" / "Vai tentar de novo (tentativa N de 7)" e passa a se atualizar a cada 3 s enquanto
-  houver resposta a caminho. Sem botão de reenviar à mão: uma mensagem `failed` se digita de novo.
+  houver resposta a caminho. Uma mensagem `failed` tem o botão **Reenviar** (`POST /api/messenger/messages/:id/retry`, `whatsapp.send`): devolve
+  a mensagem à fila do zero (tentativas e motivo limpos) e tenta já, com as regras de um envio novo (janela de 24 h
+  aberta, Página conectada). Só vale para saída que a Meta nunca aceitou; dois cliques seguidos mandam uma vez só
+  (UPDATE condicional). Responde 201/202/502 como o envio.
 
 ## Login do Facebook
 

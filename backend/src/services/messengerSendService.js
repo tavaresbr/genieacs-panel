@@ -49,6 +49,33 @@ class MessengerSendService {
     const { id } = await MessengerOutboxWorker.deliver(message.id);
     return MessengerMessage.getById(id);
   }
+
+  /**
+   * Reenvia à mão uma resposta que falhou (a fila já desistiu dela). Vale as
+   * mesmas regras de um envio novo — a janela de 24 h precisa estar aberta e a
+   * Página conectada — e devolve a mensagem ao estado em que ela ficou.
+   */
+  static async retry(messageId) {
+    const message = await MessengerMessage.getById(messageId);
+    if (!message) throw new MessengerError('message_not_found', 'message not found', 404);
+    if (message.direction !== 'out' || message.delivery_status !== 'failed' || message.external_id) {
+      throw new MessengerError('not_retryable', 'only a failed reply can be sent again', 409);
+    }
+    const conversation = await MessengerConversation.getById(message.conversation_id);
+    if (!conversation) throw new MessengerError('conversation_not_found', 'conversation not found', 404);
+    if (!windowOpen(conversation)) {
+      throw new MessengerError('window_closed', 'the 24-hour reply window is closed', 409);
+    }
+    const page = await MessengerPage.getById(conversation.page_row_id);
+    if (!page || page.status === 'error') {
+      throw new MessengerError('page_unavailable', 'the page is not connected', 409);
+    }
+    if (!(await MessengerMessage.requeueFailed(message.id))) {
+      throw new MessengerError('not_retryable', 'only a failed reply can be sent again', 409);
+    }
+    const { id } = await MessengerOutboxWorker.deliver(message.id);
+    return MessengerMessage.getById(id);
+  }
 }
 
 export default MessengerSendService;
