@@ -6894,6 +6894,8 @@ export const messengerAPI = {
 export interface TelegramChatBot {
   configured: boolean
   enabled: boolean
+  /** Se o bot responde fatura, conexão e menu a quem está vinculado (desligado por padrão). */
+  autoReply: boolean
   botUsername: string | null
   botName: string | null
   webhookError: string | null
@@ -6957,6 +6959,7 @@ export const telegramChatAPI = {
   saveBot: (token: string) => apiClient.put<TelegramChatBot>('/telegram-chat/bot', { token }),
   enable: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/enable', {}),
   disable: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/disable', {}),
+  setAutoReply: (enabled: boolean) => apiClient.post<TelegramChatBot>('/telegram-chat/bot/auto-reply', { enabled }),
   /** Esquece o token (e desliga); as conversas ficam. */
   disconnect: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/disconnect', {}),
   listConversations: (status: 'open' | 'closed' = 'open') =>

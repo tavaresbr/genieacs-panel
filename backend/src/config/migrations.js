@@ -4135,6 +4135,19 @@ const telegramNoticesTable = (db) => (t) => {
 
 const TELEGRAM_NOTICE_TABLES = [['telegram_notices', telegramNoticesTable]];
 
+/**
+ * As respostas automáticas do Telegram dos clientes (0150): `auto_reply` liga o
+ * bot que responde fatura, conexão e menu (DESLIGADO por padrão: responder o
+ * cliente por conta própria é decisão do provedor), e `bot_paused_until` cala o
+ * bot numa conversa depois de o cliente pedir um atendente.
+ */
+const TELEGRAM_BOT_AUTOREPLY_COLUMNS = [
+  ['auto_reply', (t) => t.boolean('auto_reply').notNullable().defaultTo(false)]
+];
+const TELEGRAM_CONVERSATION_BOT_COLUMNS = [
+  ['bot_paused_until', (t) => t.timestamp('bot_paused_until').nullable()]
+];
+
 const PUSH_TABLES = [
   ['push_subscriptions', pushSubscriptionsTable],
   ['push_preferences', pushPreferencesTable]
@@ -8478,6 +8491,26 @@ export const migrations = [
       }
       for (const [name, builder] of TELEGRAM_NOTICE_TABLES) {
         await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
+    /** As respostas automáticas do Telegram dos clientes — ver `TELEGRAM_BOT_AUTOREPLY_COLUMNS`. */
+    id: '0150_telegram_customer_autoreply',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('telegram_customer_bots'))) return true;
+      return (await missingColumns(db, 'telegram_customer_bots', TELEGRAM_BOT_AUTOREPLY_COLUMNS)).length === 0
+        && (await missingColumns(db, 'telegram_conversations', TELEGRAM_CONVERSATION_BOT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('telegram_customer_bots'))) return;
+      const bots = await missingColumns(db, 'telegram_customer_bots', TELEGRAM_BOT_AUTOREPLY_COLUMNS);
+      if (bots.length) {
+        await db.schema.alterTable('telegram_customer_bots', (t) => { for (const add of bots) add(t); });
+      }
+      const conv = await missingColumns(db, 'telegram_conversations', TELEGRAM_CONVERSATION_BOT_COLUMNS);
+      if (conv.length) {
+        await db.schema.alterTable('telegram_conversations', (t) => { for (const add of conv) add(t); });
       }
     }
   }

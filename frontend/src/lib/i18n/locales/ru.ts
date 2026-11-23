@@ -2737,6 +2737,8 @@ const ru: Dictionary = {
   'telegramChat.notices.maintenance': 'Уведомления о плановых работах',
   'telegramChat.notices.billing': 'Напоминания о просроченных счетах',
   'telegramChat.notices.campaign': 'Рассылки',
+  'telegramChat.autoReply.label': 'Отвечать клиентам автоматически',
+  'telegramChat.autoReply.hint': 'Бот отвечает на запросы о счёте, подключении и меню от клиентов, привязавших Telegram к договору, теми же ответами, что и бот WhatsApp. Он никогда не отправляет пароли Wi-Fi или портала и молчит, пока в беседе есть сотрудник. Непривязанным клиентам предлагается запросить ссылку.',
   'settings.whatsapp.kicker': 'Внешняя интеграция',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': 'Подключает один или несколько номеров WhatsApp через ваш собственный сервер Evolution API. Токены хранятся в зашифрованном виде и никогда не возвращаются в браузер.',

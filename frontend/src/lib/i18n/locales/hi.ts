@@ -2707,6 +2707,8 @@ const hi: Dictionary = {
   'telegramChat.notices.maintenance': 'निर्धारित रखरखाव की सूचनाएँ',
   'telegramChat.notices.billing': 'बकाया बिल की याद दिलाना',
   'telegramChat.notices.campaign': 'अभियान',
+  'telegramChat.autoReply.label': 'ग्राहकों को अपने आप जवाब दें',
+  'telegramChat.autoReply.hint': 'बॉट उन ग्राहकों के बिल, कनेक्शन और मेनू के अनुरोधों का जवाब देता है जिन्होंने Telegram को अनुबंध से जोड़ा है, WhatsApp बॉट जैसे ही जवाबों के साथ। यह Wi-Fi या पोर्टल पासवर्ड कभी नहीं भेजता और टीम का कोई सदस्य बातचीत में हो तो चुप रहता है। जुड़े न होने वाले ग्राहकों से लिंक माँगने को कहा जाता है।',
   'settings.whatsapp.kicker': 'बाहरी एकीकरण',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': 'आपके अपने Evolution API सर्वर के ज़रिए एक या अधिक WhatsApp नंबर जोड़ता है। टोकन एन्क्रिप्ट करके सहेजे जाते हैं और ब्राउज़र को कभी वापस नहीं भेजे जाते।',

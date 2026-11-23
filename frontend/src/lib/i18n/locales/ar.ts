@@ -2708,6 +2708,8 @@ const ar: Dictionary = {
   'telegramChat.notices.maintenance': 'إشعارات الصيانة المجدولة',
   'telegramChat.notices.billing': 'تذكيرات الفواتير المتأخرة',
   'telegramChat.notices.campaign': 'الحملات',
+  'telegramChat.autoReply.label': 'الرد على العملاء تلقائيًا',
+  'telegramChat.autoReply.hint': 'يردّ البوت على طلبات الفاتورة والاتصال والقائمة من العملاء الذين ربطوا Telegram بعقدهم، بنفس ردود بوت WhatsApp. لا يرسل أبدًا كلمات مرور Wi-Fi أو البوابة، ويصمت ما دام أحد أفراد الفريق في المحادثة. يُطلب من العملاء غير المرتبطين طلب الرابط.',
   'settings.whatsapp.kicker': 'تكامل خارجي',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': 'يربط رقمًا أو أكثر من أرقام WhatsApp عبر خادم Evolution API تُشغّله بنفسك. وتُحفظ الرموز مشفّرة ولا تعود إلى المتصفّح أبدًا.',

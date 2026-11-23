@@ -129,6 +129,23 @@ export function TelegramCustomerBotPanel() {
       )}
       {bot.webhookError && <p className="field-hint" role="alert">{bot.webhookError}</p>}
 
+      {/* O bot que responde fatura, conexão e menu a quem vinculou o Telegram: desligado por padrão. */}
+      {bot.configured && (
+        <div className="space-y-1 border-t border-border pt-3">
+          <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold">
+            <input
+              type="checkbox"
+              className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+              checked={bot.autoReply}
+              disabled={busy}
+              onChange={(event) => void run(() => telegramChatAPI.setAutoReply(event.target.checked))}
+            />
+            <span>{t('telegramChat.autoReply.label')}</span>
+          </label>
+          <p className="field-hint">{t('telegramChat.autoReply.hint')}</p>
+        </div>
+      )}
+
       {/* Quais avisos saem TAMBÉM pelo Telegram (o WhatsApp não muda). Só chegam a quem vinculou o Telegram e não mandou /parar. */}
       {notices && (
         <div className="space-y-2 border-t border-border pt-3">

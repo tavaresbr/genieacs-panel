@@ -3,6 +3,7 @@ import TelegramMessage from '../models/TelegramMessage.js';
 import TelegramCustomerBotService from './telegramCustomerBotService.js';
 import TelegramLinkTokenService, { TOKEN_FORMAT } from './telegramLinkTokenService.js';
 import TelegramSendService from './telegramSendService.js';
+import TelegramBotRouter from './telegramBotRouter.js';
 import { tdb } from '../config/database.js';
 
 const BODY_LIMIT = 4000;
@@ -111,7 +112,14 @@ async function handleMessage(message) {
     return;
   }
 
-  if (!start) return;
+  // O bot que responde fatura, conexão e menu (desligado por padrão): só para
+  // texto, e depois de todos os comandos acima.
+  if (!start) {
+    if (typeof message.text === 'string') {
+      await TelegramBotRouter.answer({ conversation: await TelegramConversation.getById(conversation.id), text: message.text });
+    }
+    return;
+  }
   const fresh = await TelegramConversation.getById(conversation.id);
   if (start.token) {
     const redeemed = await TelegramLinkTokenService.redeem({ conversation: fresh, token: start.token });

@@ -127,7 +127,7 @@ describe('ligar o bot de clientes', () => {
     assert.match(hookCall.body.secret_token, /^[0-9a-f]{64}$/);
     const status = await api('/bot');
     assert.deepEqual(status.body.data, {
-      configured: true, enabled: true, botUsername: 'provedor_clientes_bot', botName: 'Provedor Bot', webhookError: null
+      configured: true, enabled: true, autoReply: false, botUsername: 'provedor_clientes_bot', botName: 'Provedor Bot', webhookError: null
     });
     const bruto = JSON.stringify(status.body);
     assert.ok(!bruto.includes(TOKEN) && !bruto.includes(hookCall.body.secret_token));

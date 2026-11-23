@@ -11,6 +11,7 @@ router.get('/bot', authenticateToken, requirePermission('whatsapp.read'), Telegr
 router.put('/bot', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.saveBot);
 router.post('/bot/enable', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.enable);
 router.post('/bot/disable', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.disable);
+router.post('/bot/auto-reply', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.setAutoReply);
 router.post('/bot/disconnect', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.disconnect);
 
 // Quais avisos saem pelo Telegram: ler é de quem atende, mudar é configuração.

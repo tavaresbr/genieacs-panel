@@ -2731,6 +2731,8 @@ const es: Dictionary = {
   'telegramChat.notices.maintenance': 'Avisos de mantenimiento programado',
   'telegramChat.notices.billing': 'Recordatorios de factura vencida',
   'telegramChat.notices.campaign': 'Campañas',
+  'telegramChat.autoReply.label': 'Responder a los clientes automáticamente',
+  'telegramChat.autoReply.hint': 'El bot responde solicitudes de factura, conexión y menú de quienes vincularon su Telegram a un contrato, con las mismas respuestas del bot de WhatsApp. Nunca envía contraseñas de Wi-Fi ni del portal y se calla mientras alguien del equipo está en la conversación. A quienes no están vinculados se les orienta a pedir el enlace.',
   'settings.whatsapp.kicker': 'Integración externa',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': 'Conecta uno o más números de WhatsApp a través de un servidor Evolution API propio. Los tokens se guardan cifrados y nunca vuelven al navegador.',

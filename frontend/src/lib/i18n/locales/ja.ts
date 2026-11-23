@@ -2730,6 +2730,8 @@ const ja: Dictionary = {
   'telegramChat.notices.maintenance': '計画メンテナンスの通知',
   'telegramChat.notices.billing': '延滞請求のリマインダー',
   'telegramChat.notices.campaign': 'キャンペーン',
+  'telegramChat.autoReply.label': 'お客様に自動で返信する',
+  'telegramChat.autoReply.hint': 'Telegramを契約に連携したお客様からの請求・接続・メニューの問い合わせに、WhatsAppボットと同じ回答で返信します。Wi-Fiやポータルのパスワードは決して送らず、チームの誰かが会話中のあいだは返信しません。未連携のお客様にはリンクを依頼するよう案内します。',
   'settings.whatsapp.kicker': '外部連携',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': '自社で運用する Evolution API サーバー経由で、1 つ以上の WhatsApp 番号を接続します。トークンは暗号化して保存され、ブラウザーに返されることはありません。',

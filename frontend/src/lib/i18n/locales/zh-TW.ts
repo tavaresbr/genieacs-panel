@@ -2731,6 +2731,8 @@ const zhTW: Dictionary = {
   'telegramChat.notices.maintenance': '計畫維護通知',
   'telegramChat.notices.billing': '逾期帳單提醒',
   'telegramChat.notices.campaign': '行銷活動',
+  'telegramChat.autoReply.label': '自動回覆客戶',
+  'telegramChat.autoReply.hint': '機器人以與 WhatsApp 機器人相同的回答，回覆已將 Telegram 綁定到合約的客戶關於帳單、連線和選單的請求。它絕不傳送 Wi-Fi 或入口網站密碼，並在團隊成員參與對話期間保持沉默。未綁定的客戶會被引導索取連結。',
   'settings.whatsapp.kicker': '外部整合',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': '透過您自建的 Evolution API 伺服器接入一或多個 WhatsApp 號碼。權杖加密儲存，絕不會回傳到瀏覽器。',

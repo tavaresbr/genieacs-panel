@@ -2733,6 +2733,8 @@ const en = {
   'telegramChat.notices.maintenance': 'Scheduled maintenance notices',
   'telegramChat.notices.billing': 'Overdue invoice reminders',
   'telegramChat.notices.campaign': 'Campaigns',
+  'telegramChat.autoReply.label': 'Answer customers automatically',
+  'telegramChat.autoReply.hint': 'The bot answers invoice, connection and menu requests from customers who linked their Telegram to a contract, using the same answers as the WhatsApp bot. It never sends Wi-Fi or portal passwords, and stays quiet while a team member is in the conversation. Customers not linked are asked to request the link.',
   'settings.whatsapp.kicker': 'External integration',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': 'Connects one or more WhatsApp numbers through an Evolution API server you run. Tokens are stored encrypted and never returned to the browser.',

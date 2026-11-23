@@ -129,6 +129,21 @@ class TelegramChatController {
     }
   }
 
+  /** Liga/desliga as respostas automáticas do bot de clientes: `{ enabled: true | false }`. */
+  static async setAutoReply(req, res) {
+    try {
+      if (typeof req.body?.enabled !== 'boolean') throw new TelegramChatError('invalid_body', '`enabled` must be true or false');
+      const row = await TelegramCustomerBotService.setAutoReply(req.body.enabled);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TELEGRAM_CHAT_BOT_CHANGED,
+        subjectType: 'telegram', subjectId: null, detail: { change: 'autoReply', enabled: req.body.enabled }
+      });
+      return res.json(createResponse('ok', publicBot(row)));
+    } catch (error) {
+      return fail(res, error, 'could not change the automatic replies');
+    }
+  }
+
   static async disconnect(req, res) {
     try {
       const row = await TelegramCustomerBotService.disconnect();

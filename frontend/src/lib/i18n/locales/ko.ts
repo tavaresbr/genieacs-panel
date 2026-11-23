@@ -2735,6 +2735,8 @@ const ko: Dictionary = {
   'telegramChat.notices.maintenance': '예정된 점검 알림',
   'telegramChat.notices.billing': '연체 청구서 알림',
   'telegramChat.notices.campaign': '캠페인',
+  'telegramChat.autoReply.label': '고객에게 자동으로 답변',
+  'telegramChat.autoReply.hint': 'Telegram을 계약에 연동한 고객의 청구서·연결·메뉴 문의에 WhatsApp 봇과 같은 답변으로 응답합니다. Wi-Fi나 포털 비밀번호는 절대 보내지 않으며, 팀원이 대화 중일 때는 응답하지 않습니다. 연동하지 않은 고객에게는 링크를 요청하도록 안내합니다.',
   'settings.whatsapp.kicker': '외부 연동',
   'settings.whatsapp.title': 'WhatsApp — Evolution API',
   'settings.whatsapp.description': '직접 운영하는 Evolution API 서버를 통해 하나 이상의 WhatsApp 번호를 연결합니다. 토큰은 암호화되어 저장되며 브라우저로 다시 전달되지 않습니다.',
