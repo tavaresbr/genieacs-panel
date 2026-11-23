@@ -1,16 +1,28 @@
 {
-  "version": "1.63.0",
-  "build": 1888,
-  "sourceCommit": "ab94e3359ba4",
+  "version": "1.64.0",
+  "build": 1893,
+  "sourceCommit": "9c2a601b2da2",
   "releasedAt": "2026-11-23",
-  "basedOnTag": "v1.62.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/1a09708d6c36...ab94e3359ba4",
+  "basedOnTag": "v1.63.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/a2bc911dc783...9c2a601b2da2",
   "changes": [
     {
-      "shortHash": "4dec4a32",
+      "shortHash": "af097e63",
       "date": "2026-11-23",
-      "title": "Ícones no menu lateral e seção das Configurações na URL (?sub=)",
+      "title": "Fila de reenvio das respostas",
       "category": "New"
+    },
+    {
+      "shortHash": "f1aa1b30",
+      "date": "2026-11-23",
+      "title": "Login do Facebook para conectar Páginas",
+      "category": "New"
+    },
+    {
+      "shortHash": "1ab39c42",
+      "date": "2026-11-23",
+      "title": "A segunda mensagem do teste de ordem leva created_at como o modelo grava",
+      "category": "Maintenance"
     }
   ]
 }

@@ -7,6 +7,19 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.64.0] - 2026-11-23
+
+### New
+
+- Fila de reenvio das respostas (`af097e63`)
+- Login do Facebook para conectar Páginas (`f1aa1b30`)
+
+### Maintenance
+
+- A segunda mensagem do teste de ordem leva created_at como o modelo grava (`1ab39c42`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/a2bc911dc783...9c2a601b2da2)
+
 ## [1.63.0] - 2026-11-23
 
 ### New
