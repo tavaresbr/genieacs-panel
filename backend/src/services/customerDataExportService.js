@@ -74,6 +74,7 @@ export const SEM_DADO_DE_ASSINANTE = Object.freeze({
   wa_templates: 'modelos de mensagem',
   wa_ai_usage: 'contadores de uso da IA por dia e tarefa (sem texto, sem assinante)',
   messenger_pages: 'as Páginas do Facebook que o provedor conectou (token cifrado), nenhum assinante — a conversa sai em messenger_conversations',
+  telegram_customer_bots: 'o bot do Telegram dos clientes (token cifrado e hash do segredo do webhook), nenhum assinante — a conversa sai em telegram_conversations',
   wa_ai_knowledge: 'base de conhecimento da IA de vendas (texto do provedor, sem assinante)',
   wa_sales_plans: 'catálogo de planos que a IA de vendas oferece (do provedor, sem assinante)',
   wa_meta_templates: 'modelos aprovados da Meta (texto do provedor, sem assinante)',
@@ -264,6 +265,27 @@ export async function alcanceDoAssinante(account) {
     ))
     : [];
 
+  // O Telegram dos clientes: o mesmo vínculo (conta, contrato ou cadastro sem
+  // contrato). O chat_id não é telefone, então também não há busca por número.
+  const conversasTelegram = (contratos.length || account.id)
+    ? (await tdb('telegram_conversations').where((q) => {
+      q.where({ customer_account_id: account.id });
+      if (contratos.length) q.orWhereIn('contract', contratos);
+      const contratosDoCadastro = contatos.map((c) => c.contract).filter(Boolean);
+      if (contratosDoCadastro.length) q.orWhereIn('contract', contratosDoCadastro);
+      if (contatoIds.length) q.orWhereIn('sgp_contact_id', contatoIds);
+    }).orderBy('id')).filter((c) => (
+      c.customer_account_id !== null && c.customer_account_id !== undefined ? minha(c.customer_account_id) : true
+    ))
+    : [];
+
+  const linksTelegram = await tdb('telegram_link_tokens').where((q) => {
+    q.where({ customer_account_id: account.id });
+    const contratosDoCadastro = [...contratos, ...contatos.map((c) => c.contract).filter(Boolean)];
+    if (contratosDoCadastro.length) q.orWhereIn('contract', contratosDoCadastro);
+    if (contatoIds.length) q.orWhereIn('sgp_contact_id', contatoIds);
+  }).orderBy('id');
+
   // Os links de vínculo emitidos para este assinante (só o hash do token e a
   // quem vincula): pela conta, pelo contrato ou pelo cadastro sem contrato.
   const linksMessenger = await tdb('messenger_link_tokens').where((q) => {
@@ -291,6 +313,9 @@ export async function alcanceDoAssinante(account) {
     conversas,
     conversaIds: conversas.map((c) => c.id),
     messengerConversaIds: conversasMessenger.map((c) => c.id),
+    telegramConversaIds: conversasTelegram.map((c) => c.id),
+    linksTelegram,
+    conversasTelegram,
     linksMessenger,
     conversasMessenger,
     eventos,
@@ -432,7 +457,7 @@ class CustomerDataExportService {
 
     const {
       deviceIds, naPosse, emPosseAgora, contratos, telefones: todosTelefones, vinculos, contatos,
-      clientes, documentos, asaasClientes, asaasCobrancas, conversas, conversaIds, conversasMessenger, messengerConversaIds, linksMessenger, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
+      clientes, documentos, asaasClientes, asaasCobrancas, conversas, conversaIds, conversasMessenger, messengerConversaIds, linksMessenger, conversasTelegram, telegramConversaIds, linksTelegram, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
     } = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -509,6 +534,11 @@ class CustomerDataExportService {
       : []);
     guardar('messenger_conversations', conversasMessenger);
     guardar('messenger_link_tokens', linksMessenger);
+    guardar('telegram_conversations', conversasTelegram);
+    guardar('telegram_link_tokens', linksTelegram);
+    guardar('telegram_messages', telegramConversaIds.length
+      ? await tdb('telegram_messages').whereIn('conversation_id', telegramConversaIds).orderBy('id')
+      : []);
     guardar('messenger_messages', messengerConversaIds.length
       ? await tdb('messenger_messages').whereIn('conversation_id', messengerConversaIds).orderBy('id')
       : []);

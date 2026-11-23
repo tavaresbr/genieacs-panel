@@ -137,7 +137,7 @@ describe('quem enxerga quais telas', () => {
     const hrefs = visibleMenuScreens({ can: comoPapel('tech'), isSaas: true, isPlatformAdmin: false })
       .map((s) => s.href)
 
-    expect(hrefs).toEqual(['/dashboard', '/whatsapp', '/messenger', '/devices', '/contacts', '/network-map'])
+    expect(hrefs).toEqual(['/dashboard', '/whatsapp', '/messenger', '/telegram-chat', '/devices', '/contacts', '/network-map'])
   })
 
   /**

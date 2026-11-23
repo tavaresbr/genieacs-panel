@@ -66,6 +66,8 @@ class AuditLog {
     TELEGRAM_BOT_CHANGED: 'telegram_bot.changed',
     TELEGRAM_LINKED: 'telegram_bot.linked',
     TELEGRAM_UNLINKED: 'telegram_bot.unlinked',
+    // O bot do Telegram dos CLIENTES: token trocado, ligado, desligado ou removido.
+    TELEGRAM_CHAT_BOT_CHANGED: 'telegram_chat_bot.changed',
     // A régua de cobrança automática foi ligada, desligada ou teve as etapas
     // trocadas. Ligar é o ato que faz o painel mandar mensagem sozinho para
     // centenas de assinantes, e a pergunta "quem ligou isso?" tem que ter

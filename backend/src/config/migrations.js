@@ -3988,6 +3988,116 @@ const MESSENGER_TABLES = [
   ['messenger_messages', messengerMessagesTable]
 ];
 
+/**
+ * O Telegram dos CLIENTES (0148): o segundo bot do provedor, que fala com o
+ * assinante. É outro bot que o da equipe (`app_state['telegram_bot']`): um token
+ * tem um webhook só, e o da equipe responde comando de operador a qualquer
+ * privado. Tabelas próprias, no formato de `messenger_*` — o motivo está em
+ * `docs/messenger-integration-plan.md`: `wa_*` é amarrado a telefone.
+ *
+ *   telegram_customer_bots  o bot (um por provedor): token cifrado, o @usuário e o
+ *                           HASH do segredo do webhook (o segredo em si não se guarda)
+ *   telegram_conversations  uma por pessoa (`chat_id`; no privado é o id da pessoa)
+ *   telegram_messages       o que foi trocado; `external_id` = `chat_id:message_id`
+ *   telegram_link_tokens    o `?start=` do link t.me/<bot>?start=<token>
+ */
+const telegramCustomerBotsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('bot_id', 32);
+  t.string('bot_username', 64);
+  t.string('bot_name', 128);
+  // O token do bot, cifrado (secretBox). Nunca sai do servidor.
+  t.text('token');
+  t.string('webhook_secret_hash', 64);
+  t.boolean('enabled').notNullable().defaultTo(false);
+  t.string('webhook_error', 255);
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id'], 'telegram_customer_bots_tenant_uq');
+};
+
+const telegramConversationsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('bot_row_id').unsigned().notNullable()
+    .references('id').inTable('telegram_customer_bots').onDelete('CASCADE');
+  // O id do chat. No privado é o id da pessoa; não é telefone.
+  t.string('chat_id', 32).notNullable();
+  t.string('name', 128);
+  t.string('username', 64);
+  // Quem é, quando soubermos: o mesmo vínculo do WhatsApp e do Messenger.
+  t.string('contract', 64);
+  t.integer('sgp_contact_id').unsigned().nullable();
+  t.integer('customer_account_id').unsigned()
+    .references('id').inTable('customer_accounts').onDelete('SET NULL');
+  // 'operator' (a equipe vinculou) | 'link' (o cliente abriu o link).
+  t.string('bound_via', 16).nullable();
+  t.timestamp('last_message_at');
+  t.timestamp('last_inbound_at');
+  t.integer('unread_count').notNullable().defaultTo(0);
+  t.timestamp('closed_at');
+  // O cliente bloqueou o bot (a Telegram devolveu 403): nada mais sai até ele voltar.
+  t.timestamp('blocked_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['bot_row_id', 'chat_id'], 'telegram_conv_bot_chat_uq');
+  t.index(['tenant_id', 'last_message_at'], 'telegram_conv_recent_idx');
+  t.index(['tenant_id', 'contract'], 'telegram_conv_contract_idx');
+};
+
+const telegramMessagesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('conversation_id').unsigned().notNullable()
+    .references('id').inTable('telegram_conversations').onDelete('CASCADE');
+  t.string('direction', 3).notNullable(); // 'in' | 'out'
+  // `chat_id:message_id`. O message_id da Telegram é sequencial POR CHAT e vale
+  // para os dois lados, então o par é único — e é o que impede a mesma
+  // mensagem de entrar duas vezes quando a Telegram reentrega.
+  t.string('external_id', 80);
+  t.text('body');
+  // 'customer' (entrada) | 'operator' | 'system' (confirmação do vínculo etc.).
+  t.string('source', 16).notNullable().defaultTo('operator');
+  // sent | failed. NULL para entrada.
+  t.string('delivery_status', 16);
+  t.string('delivery_error', 255);
+  t.integer('sent_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'external_id'], 'telegram_msg_external_uq');
+  t.index(['conversation_id', 'created_at'], 'telegram_msg_conv_idx');
+};
+
+const telegramLinkTokensTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('token_hash', 64).notNullable().unique();
+  t.string('contract', 64).nullable();
+  t.integer('sgp_contact_id').unsigned().nullable();
+  t.integer('customer_account_id').unsigned().nullable()
+    .references('id').inTable('customer_accounts').onDelete('CASCADE');
+  t.string('source', 16).notNullable();
+  t.integer('created_by').unsigned().nullable()
+    .references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('used_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'expires_at'], 'telegram_link_tokens_expiry_idx');
+};
+
+// A ordem importa: o bot antes das conversas, e estas antes das mensagens.
+const TELEGRAM_CHAT_TABLES = [
+  ['telegram_customer_bots', telegramCustomerBotsTable],
+  ['telegram_conversations', telegramConversationsTable],
+  ['telegram_messages', telegramMessagesTable],
+  ['telegram_link_tokens', telegramLinkTokensTable]
+];
+
 const PUSH_TABLES = [
   ['push_subscriptions', pushSubscriptionsTable],
   ['push_preferences', pushPreferencesTable]
@@ -4144,7 +4254,8 @@ export const SCHEMA_TABLES = [
   ...OPERATOR_PROFILE_TABLES,
   ...WA_AI_USAGE_TABLES,
   ...MESSENGER_TABLES,
-  ...MESSENGER_LINK_TOKEN_TABLES
+  ...MESSENGER_LINK_TOKEN_TABLES,
+  ...TELEGRAM_CHAT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -8287,6 +8398,20 @@ export const migrations = [
         for (const add of missing) add(t);
         t.index(['delivery_status', 'next_attempt_at'], 'messenger_msg_outbox_idx');
       });
+    }
+  },
+  {
+    /** O Telegram dos clientes — ver `TELEGRAM_CHAT_TABLES`. */
+    id: '0148_telegram_customer_chat',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('telegram_messages');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of TELEGRAM_CHAT_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];

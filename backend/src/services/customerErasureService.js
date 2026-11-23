@@ -107,7 +107,7 @@ class CustomerErasureService {
    */
   static async survey(account) {
     const alcance = await alcanceDoAssinante(account);
-    const { contratos, documentos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, linksMessenger, eventos, amostras, horas, quedas, manutencoes, trocas, nos } = alcance;
+    const { contratos, documentos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, linksMessenger, telegramConversaIds, linksTelegram, eventos, amostras, horas, quedas, manutencoes, trocas, nos } = alcance;
 
     const contar = async (tabela, montar) => {
       const [linha] = await montar(tdb(tabela)).count({ n: '*' });
@@ -141,6 +141,11 @@ class CustomerErasureService {
       wa_conversations: conversaIds.length,
       messenger_conversations: messengerConversaIds.length,
       messenger_link_tokens: linksMessenger.length,
+      telegram_conversations: telegramConversaIds.length,
+      telegram_link_tokens: linksTelegram.length,
+      telegram_messages: telegramConversaIds.length
+        ? await contar('telegram_messages', (q) => q.whereIn('conversation_id', telegramConversaIds))
+        : 0,
       messenger_messages: messengerConversaIds.length
         ? await contar('messenger_messages', (q) => q.whereIn('conversation_id', messengerConversaIds))
         : 0,
@@ -225,7 +230,7 @@ class CustomerErasureService {
    * que o que foi gravado na trilha seja o que vai ser executado.
    */
   static async erase(account, { alcance }) {
-    const { contratos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, linksMessenger, eventos, amostras, horas, quedas, manutencoes, trocas, noIds } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, linksMessenger, telegramConversaIds, linksTelegram, eventos, amostras, horas, quedas, manutencoes, trocas, noIds } = alcance;
     const idsDe = (linhas) => linhas.map((l) => l.id);
     const marca = `erased:${account.id}`;
 
@@ -233,6 +238,13 @@ class CustomerErasureService {
       // Filhas antes da mãe, como a exclusão de provedor.
       await tdb('customer_wifi_credentials', trx).where({ account_id: account.id }).del();
 
+      if (linksTelegram.length) {
+        await tdb('telegram_link_tokens', trx).whereIn('id', linksTelegram.map((l) => l.id)).del();
+      }
+      if (telegramConversaIds.length) {
+        await tdb('telegram_messages', trx).whereIn('conversation_id', telegramConversaIds).del();
+        await tdb('telegram_conversations', trx).whereIn('id', telegramConversaIds).del();
+      }
       if (linksMessenger.length) {
         await tdb('messenger_link_tokens', trx).whereIn('id', linksMessenger.map((l) => l.id)).del();
       }

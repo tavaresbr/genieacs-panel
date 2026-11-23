@@ -78,6 +78,7 @@ after(async () => {
 async function semear() {
   const db = getDb();
   for (const tabela of [
+    'telegram_messages', 'telegram_link_tokens', 'telegram_conversations', 'telegram_customer_bots',
     'wa_messages', 'wa_conversations', 'wa_opt_outs', 'wa_broadcast_recipients',
     'wa_broadcasts', 'whatsapp_accounts', 'sgp_events', 'sgp_links',
     'device_samples', 'device_sample_hours', 'device_swaps',
@@ -165,6 +166,14 @@ async function semear() {
       direction: 'in',
       external_id: `msg-${slug}`,
       body: `Minha internet caiu — Fulana do ${slug}`
+    });
+    // O Telegram dos clientes: o bot, a conversa vinculada ao contrato e a mensagem dela.
+    const botId = await tinsertReturningId('telegram_customer_bots', { bot_username: `bot_${slug}`, enabled: false });
+    const conversaTgId = await tinsertReturningId('telegram_conversations', {
+      bot_row_id: botId, chat_id: `7000${slug === 'meu' ? 1 : 2}`, name: `Fulana do ${slug}`, contract: `CONTRATO-${slug}`
+    });
+    await tinsertReturningId('telegram_messages', {
+      conversation_id: conversaTgId, direction: 'in', external_id: `tg-${slug}`, body: `Oi, sou a Fulana do ${slug}`
     });
     await tinsertReturningId('wa_opt_outs', {
       wa_phone_e164: `551199999000${slug === 'meu' ? 1 : 2}`,
@@ -272,6 +281,14 @@ describe('o que a exclusão destrói', () => {
     await vazia('device_samples', { tenant_id: meu, device_id: 'ONT-ANTIGA-meu' });
     await vazia('wa_messages', { tenant_id: meu });
     await vazia('wa_conversations', { tenant_id: meu });
+  });
+
+  it('e a conversa do Telegram dos clientes, sem tocar na do vizinho nem no bot', async () => {
+    assert.equal((await apagar()).status, 200);
+    assert.equal(await cru('telegram_messages', { tenant_id: meu }), undefined, 'a mensagem do Telegram ficou');
+    assert.equal(await cru('telegram_conversations', { tenant_id: meu }), undefined, 'a conversa do Telegram ficou');
+    assert.ok(await cru('telegram_conversations', { tenant_id: vizinho }), 'a conversa do vizinho foi apagada');
+    assert.ok(await cru('telegram_customer_bots', { tenant_id: meu }), 'o bot do provedor foi apagado');
   });
 
   it('e os bytes do anexo no disco, não só a linha que apontava para ele', async () => {
@@ -462,6 +479,8 @@ describe('o serviço, por dentro', () => {
     assert.equal(rowCounts.sgp_events, 1);
     assert.equal(rowCounts.device_samples, 2, 'a da ONT atual e a da anterior');
     assert.equal(rowCounts.wa_conversations, 1);
+    assert.equal(rowCounts.telegram_conversations, 1);
+    assert.equal(rowCounts.telegram_messages, 1);
     assert.equal(rowCounts.mapping_nodes, 1);
     // E a linha continua inteira: levantar não é apagar.
     assert.ok(await cru('customer_wifi_credentials', { tenant_id: meu }));
