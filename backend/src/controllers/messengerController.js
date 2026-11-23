@@ -6,6 +6,8 @@ import MessengerSendService, { windowOpen } from '../services/messengerSendServi
 import MessengerLinkService from '../services/messengerLinkService.js';
 import MessengerLinkTokenService from '../services/messengerLinkTokenService.js';
 import MessengerLinkedNoticeService from '../services/messengerLinkedNoticeService.js';
+import { resolveStoredAttachment, streamAttachment } from '../services/waMediaFile.js';
+import MessengerMediaService from '../services/messengerMediaService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import MessengerFacebookLoginService, { facebookAppId, facebookLoginAvailable } from '../services/messengerFacebookLoginService.js';
 
@@ -59,6 +61,10 @@ const publicMessage = (m) => ({
   body: m.body,
   attachmentType: m.attachment_type,
   attachmentUrl: m.attachment_url,
+  /** O arquivo está guardado no painel: a tela o busca por `GET /messenger/messages/:id/attachment`. */
+  attachmentStored: Boolean(m.attachment_path),
+  attachmentMime: m.attachment_mime ?? null,
+  attachmentSize: m.attachment_size ?? null,
   source: m.source,
   deliveryStatus: m.delivery_status,
   deliveryError: m.delivery_error,
@@ -220,6 +226,39 @@ class MessengerController {
       return res.status(status).json(createResponse('ok', publicMessage(message), status === 502 ? 'send_refused' : null));
     } catch (error) {
       return fail(res, error, 'could not send message');
+    }
+  }
+
+  /**
+   * O arquivo do anexo recebido. O caminho gravado nunca sai do servidor: a
+   * mesma leitura confinada do WhatsApp (`resolveStoredAttachment`) o reabre
+   * dentro de `DATA_DIR` a cada pedido. Todo jeito de não ter o arquivo (sem
+   * anexo, caminho fora, arquivo sumido, mensagem de outro provedor) é o mesmo 404.
+   */
+  static async attachment(req, res) {
+    try {
+      const message = await MessengerMessage.getById(Number(req.params.id));
+      const resolved = message
+        ? await resolveStoredAttachment({ attachment_path: message.attachment_path, attachment_type: message.attachment_mime })
+        : null;
+      if (!resolved) return res.status(404).json(createErrorResponse('attachment not found', 'attachment_not_found'));
+      // O arquivo é de um desconhecido e abre na origem do painel: sem script, sem nada além do próprio arquivo.
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+      res.setHeader('Cache-Control', 'private, no-store');
+      return streamAttachment(res, resolved);
+    } catch (error) {
+      return fail(res, error, 'could not load attachment');
+    }
+  }
+
+  /** Reenvia à mão uma resposta que falhou. Mesmos status do envio: 201, 202 ou 502. */
+  static async retry(req, res) {
+    try {
+      const message = await MessengerSendService.retry(Number(req.params.id));
+      const status = message.delivery_status === 'failed' ? 502 : message.delivery_status === 'sent' ? 201 : 202;
+      return res.status(status).json(createResponse('ok', publicMessage(message), status === 502 ? 'send_refused' : null));
+    } catch (error) {
+      return fail(res, error, 'could not retry message');
     }
   }
 

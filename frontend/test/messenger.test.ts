@@ -12,6 +12,8 @@ import {
   sameLocalDay,
   windowRemainingMs,
   parseFacebookLoginMessage,
+  canRetryMessage,
+  isInlineImageMime,
 } from '@/lib/messenger'
 
 const NOW = Date.parse('2026-11-22T12:00:00Z')
@@ -134,5 +136,26 @@ describe('parseFacebookLoginMessage', () => {
     expect(parseFacebookLoginMessage({ origin, source: popup, data: { type: 'x', accessToken: 'a' } }, popup, origin)).toBeNull()
     expect(parseFacebookLoginMessage({ origin, source: popup, data: 'texto' }, popup, origin)).toBeNull()
     expect(parseFacebookLoginMessage({ origin, source: popup, data: good }, null, origin)).toBeNull()
+  })
+})
+
+describe('canRetryMessage', () => {
+  const failed = { direction: 'out' as const, deliveryStatus: 'failed' as const }
+  it('só oferece reenviar a saída falhada, com a janela aberta e permissão de enviar', () => {
+    expect(canRetryMessage(failed, true, true)).toBe(true)
+    expect(canRetryMessage(failed, false, true)).toBe(false)
+    expect(canRetryMessage(failed, true, false)).toBe(false)
+    expect(canRetryMessage({ ...failed, deliveryStatus: 'sent' }, true, true)).toBe(false)
+    expect(canRetryMessage({ ...failed, deliveryStatus: 'queued' }, true, true)).toBe(false)
+    expect(canRetryMessage({ ...failed, direction: 'in' }, true, true)).toBe(false)
+  })
+})
+
+describe('isInlineImageMime', () => {
+  it('só imagem conhecida aparece na bolha; SVG e o resto são download', () => {
+    for (const ok of ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'IMAGE/PNG']) expect(isInlineImageMime(ok)).toBe(true)
+    for (const no of ['image/svg+xml', 'text/html', 'application/pdf', 'application/octet-stream', '', null, undefined]) {
+      expect(isInlineImageMime(no)).toBe(false)
+    }
   })
 })

@@ -1,5 +1,6 @@
 import MessengerPage from '../models/MessengerPage.js';
 import MessengerConversation from '../models/MessengerConversation.js';
+import MessengerMediaService from './messengerMediaService.js';
 import MessengerMessage from '../models/MessengerMessage.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { tdb } from '../config/database.js';
@@ -33,7 +34,7 @@ async function handleMessage(page, event) {
   const { body, attachmentType, attachmentUrl } = parseMessage(message);
   const at = new Date(Number(event.timestamp) || Date.now());
 
-  const { created } = await MessengerMessage.insert({
+  const { message: stored, created } = await MessengerMessage.insert({
     conversation_id: conversation.id,
     direction: isEcho ? 'out' : 'in',
     external_id: String(message.mid).slice(0, 128),
@@ -46,6 +47,8 @@ async function handleMessage(page, event) {
   });
   // Reentrega: a mensagem já estava aqui e a conversa já foi atualizada.
   if (!created) return;
+  // O link da Meta expira: o arquivo desce em segundo plano, sem atrasar a resposta ao webhook.
+  if (stored?.attachment_url) MessengerMediaService.captureInBackground(stored);
 
   if (isEcho) {
     await MessengerConversation.update(conversation.id, { last_message_at: at });

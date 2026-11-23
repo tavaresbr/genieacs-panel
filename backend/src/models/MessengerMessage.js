@@ -85,6 +85,29 @@ class MessengerMessage {
     return this.getById(id);
   }
 
+  /**
+   * Devolve uma mensagem que FALHOU para a fila, do zero (tentativas, recuo e
+   * motivo limpos). UPDATE condicional conferido pelo número de linhas: dois
+   * cliques seguidos casam uma vez só, e a mensagem não vira duas tentativas.
+   * Só vale para saída que a Meta nunca aceitou (`external_id` vazio).
+   *
+   * @returns {Promise<boolean>} `true` se esta chamada a devolveu à fila
+   */
+  static async requeueFailed(id) {
+    const changed = await tdb('messenger_messages')
+      .where({ id, direction: 'out', delivery_status: 'failed' })
+      .whereNull('external_id')
+      .update({
+        delivery_status: 'queued',
+        attempts: 0,
+        next_attempt_at: null,
+        claimed_at: null,
+        delivery_error: null,
+        updated_at: new Date()
+      });
+    return changed > 0;
+  }
+
   static async listByConversation(conversationId, { limit = 100, beforeId = null } = {}) {
     const query = tdb('messenger_messages').where({ conversation_id: conversationId });
     if (beforeId) query.where('id', '<', beforeId);

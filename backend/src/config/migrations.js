@@ -3875,6 +3875,27 @@ const messengerPagesTable = (db) => (t) => {
   t.index(['tenant_id'], 'messenger_pages_tenant_idx');
 };
 
+/**
+ * Quem conectou a Página pelo login do Facebook (0148): o id do usuário NO APP
+ * (`/me`, o `user_id` que a Meta manda nos avisos de desautorização e de
+ * exclusão de dados). Só esse número — nome e e-mail não são lidos. Vazio para
+ * a Página conectada à mão, que a Meta não consegue associar a ninguém.
+ */
+const MESSENGER_PAGE_FACEBOOK_COLUMNS = [
+  ['facebook_user_id', (t) => t.string('facebook_user_id', 32).nullable()]
+];
+
+/**
+ * O arquivo do anexo recebido no Messenger (0149): onde ficou em disco (relativo
+ * a DATA_DIR), o tipo (de uma lista fechada) e o tamanho. O link original da
+ * Meta (`attachment_url`) expira e fica só como último recurso.
+ */
+const MESSENGER_ATTACHMENT_COLUMNS = [
+  ['attachment_path', (t) => t.string('attachment_path', 255).nullable()],
+  ['attachment_mime', (t) => t.string('attachment_mime', 64).nullable()],
+  ['attachment_size', (t) => t.integer('attachment_size').unsigned().nullable()]
+];
+
 const messengerConversationsTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -4099,7 +4120,7 @@ const TELEGRAM_CHAT_TABLES = [
 ];
 
 /**
- * Os avisos do Telegram dos clientes (0149).
+ * Os avisos do Telegram dos clientes (0151).
  *
  * `telegram_messages` ganha a fila de saída (como `messenger_messages` na 0147):
  * `attempts`, `claimed_at` e `next_attempt_at`. `telegram_conversations` ganha
@@ -4136,7 +4157,7 @@ const telegramNoticesTable = (db) => (t) => {
 const TELEGRAM_NOTICE_TABLES = [['telegram_notices', telegramNoticesTable]];
 
 /**
- * As respostas automáticas do Telegram dos clientes (0150): `auto_reply` liga o
+ * As respostas automáticas do Telegram dos clientes (0152): `auto_reply` liga o
  * bot que responde fatura, conexão e menu (DESLIGADO por padrão: responder o
  * cliente por conta própria é decisão do provedor), e `bot_paused_until` cala o
  * bot numa conversa depois de o cliente pedir um atendente.
@@ -8466,8 +8487,41 @@ export const migrations = [
     }
   },
   {
+    /** Quem conectou a Página pelo login do Facebook — ver `MESSENGER_PAGE_FACEBOOK_COLUMNS`. */
+    id: '0149_messenger_page_facebook_user',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('messenger_pages'))) return true;
+      return (await missingColumns(db, 'messenger_pages', MESSENGER_PAGE_FACEBOOK_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('messenger_pages'))) return;
+      const missing = await missingColumns(db, 'messenger_pages', MESSENGER_PAGE_FACEBOOK_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('messenger_pages', (t) => {
+        for (const add of missing) add(t);
+        t.index(['facebook_user_id'], 'messenger_pages_fb_user_idx');
+      });
+    }
+  },
+  {
+    /** O arquivo do anexo recebido — ver `MESSENGER_ATTACHMENT_COLUMNS`. */
+    id: '0150_messenger_attachment_file',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return true;
+      return (await missingColumns(db, 'messenger_messages', MESSENGER_ATTACHMENT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return;
+      const missing = await missingColumns(db, 'messenger_messages', MESSENGER_ATTACHMENT_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('messenger_messages', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
     /** Os avisos do Telegram dos clientes — ver `TELEGRAM_OUTBOX_COLUMNS`. */
-    id: '0149_telegram_customer_notices',
+    id: '0151_telegram_customer_notices',
     async isApplied(db) {
       if (!(await db.schema.hasTable('telegram_messages'))) return true;
       if (!(await db.schema.hasTable('telegram_notices'))) return false;
@@ -8496,7 +8550,7 @@ export const migrations = [
   },
   {
     /** As respostas automáticas do Telegram dos clientes — ver `TELEGRAM_BOT_AUTOREPLY_COLUMNS`. */
-    id: '0150_telegram_customer_autoreply',
+    id: '0152_telegram_customer_autoreply',
     async isApplied(db) {
       if (!(await db.schema.hasTable('telegram_customer_bots'))) return true;
       return (await missingColumns(db, 'telegram_customer_bots', TELEGRAM_BOT_AUTOREPLY_COLUMNS)).length === 0

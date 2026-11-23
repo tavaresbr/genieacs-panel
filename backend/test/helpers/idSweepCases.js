@@ -87,6 +87,26 @@ export const casos = [
     tabela: 'messenger_conversations'
   },
   {
+    // O arquivo do anexo. A mensagem semeada tem um arquivo de verdade em disco,
+    // então o controle SERVE (200) e o vizinho dá 404.
+    chave: 'messengerMessage',
+    label: 'GET /api/messenger/messages/:id/attachment',
+    method: 'GET',
+    path: (id) => `/api/messenger/messages/${id}/attachment`,
+    tabela: 'messenger_messages'
+  },
+  {
+    // Reenviar uma resposta que falhou. No controle a mensagem semeada é uma
+    // ENTRADA, e a resposta é `not_retryable` (409) — que só se alcança depois
+    // de achá-la, e sem chamar a Meta; o que não pode aparecer é 404 no controle.
+    chave: 'messengerMessage',
+    label: 'POST /api/messenger/messages/:id/retry',
+    method: 'POST',
+    path: (id) => `/api/messenger/messages/${id}/retry`,
+    body: {},
+    tabela: 'messenger_messages'
+  },
+  {
     chave: 'messengerConversation',
     label: 'POST /api/messenger/conversations/:id/closed',
     method: 'POST',

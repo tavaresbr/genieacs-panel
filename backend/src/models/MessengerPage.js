@@ -40,6 +40,30 @@ class MessengerPage {
     return Boolean(await this.getByPageId(pageId));
   }
 
+  /**
+   * As Páginas que ESTE usuário do Facebook conectou, de todos os provedores:
+   * a Meta avisa a desautorização e a exclusão de dados por usuário, sem
+   * sessão nenhuma.
+   *
+   * tenant-scope-exempt: the notice names a Facebook user, not a provider.
+   */
+  static async listByFacebookUser(facebookUserId) {
+    return runUnscoped(
+      'Meta deauthorization/deletion notices arrive with no session; the Facebook user id names the pages',
+      async () => getDb()('messenger_pages').where({ facebook_user_id: String(facebookUserId) })
+    );
+  }
+
+  /** tenant-scope-exempt: same as `listByFacebookUser` — one Facebook user, every provider they connected. */
+  static async updateByFacebookUser(facebookUserId, patch) {
+    return runUnscoped(
+      'Meta deauthorization/deletion notices arrive with no session; the Facebook user id names the pages',
+      async () => getDb()('messenger_pages')
+        .where({ facebook_user_id: String(facebookUserId) })
+        .update({ ...patch, updated_at: new Date() })
+    );
+  }
+
   static async create(row) {
     const id = await tinsertReturningId('messenger_pages', row);
     return this.getById(id);

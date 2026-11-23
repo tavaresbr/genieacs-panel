@@ -1,6 +1,8 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * O portão da Fase 8, na forma que o plano exige: **`GET /:id` com id de B
@@ -49,6 +51,7 @@ const { getDb, startTestServers, stopTestServers } = await import('./helpers/har
 const { casos } = await import('./helpers/idSweepCases.js');
 const { runInTenant } = await import('../src/config/tenantContext.js');
 const { tinsertReturningId } = await import('../src/config/database.js');
+const { DATA_DIR } = await import('../src/config/paths.js');
 
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
@@ -314,6 +317,19 @@ async function semear(tenantId, slug) {
       page_row_id: alvo.messengerPage,
       psid: `psid-${slug}`,
       name: `Pessoa do ${slug}`
+    });
+    // Uma mensagem de ENTRADA (não reenviável): o controle de reenvio responde
+    // `not_retryable` (409), depois de achá-la.
+    const arquivoDeAnexo = path.join('messenger-media', `t-sweep-${slug}`, 'seed.png');
+    fs.mkdirSync(path.dirname(path.join(DATA_DIR, arquivoDeAnexo)), { recursive: true });
+    fs.writeFileSync(path.join(DATA_DIR, arquivoDeAnexo), Buffer.from('89504e470d0a1a0a', 'hex'));
+    alvo.messengerMessage = await semearLinha('messenger_messages', {
+      conversation_id: alvo.messengerConversation,
+      direction: 'in',
+      body: `Oi do ${slug}`,
+      // Com um arquivo de verdade: o controle da rota do anexo SERVE (200).
+      attachment_path: arquivoDeAnexo,
+      attachment_mime: 'image/png'
     });
 
     // O Telegram dos clientes: o bot (sem token, desligado) e uma conversa dele.
