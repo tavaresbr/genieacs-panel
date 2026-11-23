@@ -7,6 +7,7 @@ import MessengerLinkService from '../services/messengerLinkService.js';
 import MessengerLinkTokenService from '../services/messengerLinkTokenService.js';
 import MessengerLinkedNoticeService from '../services/messengerLinkedNoticeService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import MessengerFacebookLoginService, { facebookAppId, facebookLoginAvailable } from '../services/messengerFacebookLoginService.js';
 
 function fail(res, error, fallback) {
   if (error instanceof MessengerError) {
@@ -71,6 +72,7 @@ class MessengerController {
   static async status(req, res) {
     return res.json(createResponse('ok', {
       configured: messengerConfigured(),
+      facebookLogin: { available: facebookLoginAvailable(), appId: facebookAppId() },
       webhookPath: MessengerPageService.webhookPath()
     }));
   }
@@ -90,6 +92,26 @@ class MessengerController {
         pageId: req.body?.pageId,
         pageToken: req.body?.pageToken
       });
+      return res.status(201).json(createResponse('ok', publicPage(row)));
+    } catch (error) {
+      return fail(res, error, 'could not connect page');
+    }
+  }
+
+  /** Passo 1 do login do Facebook: as Páginas que a pessoa administra (sem token). */
+  static async facebookPages(req, res) {
+    try {
+      const pages = await MessengerFacebookLoginService.listPages(req.body?.userToken);
+      return res.json(createResponse('ok', pages));
+    } catch (error) {
+      return fail(res, error, 'could not list facebook pages');
+    }
+  }
+
+  /** Passo 2: conecta a Página escolhida. */
+  static async facebookConnect(req, res) {
+    try {
+      const row = await MessengerFacebookLoginService.connect(req.body?.userToken, req.body?.pageId);
       return res.status(201).json(createResponse('ok', publicPage(row)));
     } catch (error) {
       return fail(res, error, 'could not connect page');

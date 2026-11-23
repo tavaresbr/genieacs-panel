@@ -53,6 +53,7 @@ export default function MessengerPage() {
       {canConfig && (
         <MessengerPagesPanel
           webhookPath={status?.webhookPath ?? null}
+          facebookAppId={status?.facebookLogin?.available ? status.facebookLogin.appId : null}
           onChanged={() => {
             void loadStatus()
             void loadHasPages()

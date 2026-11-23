@@ -2,7 +2,7 @@
 
 Status: Fase 1 implementada no backend (migração `0144_messenger`, webhook, entrada, envio, conexão da Página,
 API `/api/messenger`, LGPD e testes). A tela (`/messenger`: caixa de entrada e Páginas conectadas) também está pronta. Falta o
-a revisão da Meta e o login do Facebook. O vínculo com o assinante é manual (ver abaixo). Desvios do plano original estão em "Como ficou" no fim.
+a revisão da Meta. O vínculo com o assinante é manual (ver abaixo). Desvios do plano original estão em "Como ficou" no fim.
 
 ## O que o código atual diz
 
@@ -114,7 +114,7 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
 - A lista mostra a prévia da última mensagem (texto numa linha, limitado a 120 caracteres no servidor; "Você:" para
   o que a equipe mandou; o tipo do anexo quando não há texto) e a hora (hoje) ou a data. "Última" é a última
   gravada (maior `id`), não a de maior hora: a Meta pode entregar fora de ordem. A URL do anexo não vai na lista.
-- Não há ainda login do Facebook: o token da Página é colado.
+- O token da Página também pode ser colado à mão (ver "Login do Facebook" para o caminho sem colar).
 
 ### Vínculo com o assinante (manual)
 - O PSID não traz telefone, então não há vínculo automático como no WhatsApp: o atendente busca o cliente
@@ -203,3 +203,23 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   Meta não oferece chave de idempotência no Send API.
 - A conversa mostra "Na fila" / "Vai tentar de novo (tentativa N de 7)" e passa a se atualizar a cada 3 s enquanto
   houver resposta a caminho. Sem botão de reenviar à mão: uma mensagem `failed` se digita de novo.
+
+## Login do Facebook
+
+Em vez de colar o ID e o token, quem configura clica em **Entrar com o Facebook** na tela do Messenger.
+
+- Liga com `META_APP_ID` (id do app, público) além de `META_APP_SECRET` e `MESSENGER_VERIFY_TOKEN`. Sem o id, a tela
+  só mostra o formulário manual; `GET /api/messenger/status` traz `facebookLogin: { available, appId }`.
+- O painel abre o popup `/messenger-connect.html?app=<id>` (arquivo estático, como o do WhatsApp; a CSP da rota é a
+  mesma, só com os domínios do Facebook). O SDK da Meta faz o `FB.login` com `pages_show_list`, `pages_messaging` e
+  `pages_manage_metadata` e a página devolve ao painel **só o token de curta duração do usuário**, por
+  `postMessage` para a própria origem; o painel só aceita a mensagem da janela que ele abriu.
+- `POST /messenger/facebook/pages` troca esse token pelo de longa duração (`fb_exchange_token`, com o segredo do app,
+  só no servidor), lê `/me/accounts` e devolve `{ id, name, connected }` por Página — nenhum token.
+- `POST /messenger/facebook/connect` (`userToken` + `pageId`) repete a troca, pega o token que a Meta entregou para
+  aquela Página (sem prazo quando o do usuário é de longa duração) e passa por `MessengerPageService.connect`: o mesmo
+  caminho da conexão manual (confere identidade, assina o webhook, guarda cifrado). Página que o usuário não
+  administra dá 403 `page_not_administered`. Nada é guardado entre os dois passos; o navegador reenvia o token.
+- Como no Embedded Signup do WhatsApp, o SDK só funciona nos domínios cadastrados no app da Meta; em outro o popup
+  abre e o login falha.
+- Continua valendo a revisão da Meta: sem `pages_messaging` aprovado o app só fala com quem tem função nele.

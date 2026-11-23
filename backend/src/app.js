@@ -676,11 +676,15 @@ export function errorHandler(err, req, res, next) {
  * A janela do `FB.login` é um popup: não passa pela CSP, mas depende de COOP
  * desligado (`crossOriginOpenerPolicy: false`, acima) para avisar o opener.
  *
+ * A página de login do Messenger (`messenger-connect.html`) é a mesma coisa:
+ * o popup que o painel abre para a pessoa entrar com o Facebook e escolher as
+ * Páginas; ela só devolve o token do usuário ao painel (mesma origem).
+ *
  * Sem filtro por host: a Meta só aceita o SDK na origem cadastrada no app
  * (`tr69.com.br`), então em qualquer outro nome a página abre e o botão falha.
  */
 const CSP_DIRECTIVES = helmetOptions.contentSecurityPolicy.directives;
-app.get('/whatsapp-signup.html', helmet.contentSecurityPolicy({
+app.get(['/whatsapp-signup.html', '/messenger-connect.html'], helmet.contentSecurityPolicy({
   directives: {
     ...CSP_DIRECTIVES,
     scriptSrc: ["'self'", 'https://connect.facebook.net'],

@@ -13,6 +13,9 @@ router.get('/settings', authenticateToken, requirePermission('whatsapp.config'),
 router.put('/settings', authenticateToken, requirePermission('whatsapp.config'), MessengerController.saveSettings);
 router.get('/pages', authenticateToken, requirePermission('whatsapp.config'), MessengerController.listPages);
 router.post('/pages', authenticateToken, requirePermission('whatsapp.config'), MessengerController.connectPage);
+// O login do Facebook: o navegador entrega o token do usuário, o servidor faz o resto.
+router.post('/facebook/pages', authenticateToken, requirePermission('whatsapp.config'), MessengerController.facebookPages);
+router.post('/facebook/connect', authenticateToken, requirePermission('whatsapp.config'), MessengerController.facebookConnect);
 router.post('/pages/:id/subscribe', authenticateToken, requirePermission('whatsapp.config'), MessengerController.resubscribePage);
 router.delete('/pages/:id', authenticateToken, requirePermission('whatsapp.config'), MessengerController.disconnectPage);
 

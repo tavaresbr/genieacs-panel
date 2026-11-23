@@ -54,6 +54,9 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   notice_too_long: 'messenger.error.noticeTooLong',
   send_refused: 'messenger.error.sendRefused',
   meta_refused: 'messenger.error.metaRefused',
+  facebook_login_unconfigured: 'messenger.error.facebookUnconfigured',
+  page_not_administered: 'messenger.error.pageNotAdministered',
+  invalid_token: 'messenger.error.facebookToken',
 }
 
 /**
@@ -113,4 +116,25 @@ export function deliveryLabel(message: Pick<MessengerMessage, 'deliveryStatus' |
     return { kind: 'retrying', attempt: message.attempts, max: MESSENGER_MAX_ATTEMPTS }
   }
   return { kind: 'status', status: message.deliveryStatus }
+}
+
+/** O que o popup `/messenger-connect.html` manda ao painel. */
+export const FACEBOOK_LOGIN_MESSAGE = 'messenger-fb-login'
+
+export type FacebookLoginResult = { accessToken: string } | { error: string }
+
+/**
+ * Lê a mensagem do popup. Só vale a que vem da própria origem do painel E da
+ * janela que ele abriu; qualquer outra (inclusive de outra aba) é ignorada.
+ */
+export function parseFacebookLoginMessage(
+  event: { origin: string; source: unknown; data: unknown },
+  popup: unknown,
+  origin: string
+): FacebookLoginResult | null {
+  if (event.origin !== origin || !popup || event.source !== popup) return null
+  const data = event.data as { type?: unknown; accessToken?: unknown; error?: unknown } | null
+  if (!data || typeof data !== 'object' || data.type !== FACEBOOK_LOGIN_MESSAGE) return null
+  if (typeof data.accessToken === 'string' && data.accessToken) return { accessToken: data.accessToken }
+  return { error: typeof data.error === 'string' ? data.error : 'cancelled' }
 }

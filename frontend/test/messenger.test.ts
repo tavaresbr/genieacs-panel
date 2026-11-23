@@ -11,6 +11,7 @@ import {
   previewContent,
   sameLocalDay,
   windowRemainingMs,
+  parseFacebookLoginMessage,
 } from '@/lib/messenger'
 
 const NOW = Date.parse('2026-11-22T12:00:00Z')
@@ -109,5 +110,29 @@ describe('a fila de saída na conversa', () => {
     expect(deliveryLabel({ deliveryStatus: 'queued', attempts: 0 })).toEqual({ kind: 'status', status: 'queued' })
     expect(deliveryLabel({ deliveryStatus: 'failed', attempts: 7 })).toEqual({ kind: 'status', status: 'failed' })
     expect(deliveryLabel({ deliveryStatus: null, attempts: 0 })).toBeNull()
+  })
+})
+
+describe('parseFacebookLoginMessage', () => {
+  const popup = {}
+  const origin = 'https://painel.exemplo.com.br'
+  const good = { type: 'messenger-fb-login', accessToken: 'EAAB' }
+
+  it('aceita o token da janela que o painel abriu, na própria origem', () => {
+    expect(parseFacebookLoginMessage({ origin, source: popup, data: good }, popup, origin)).toEqual({ accessToken: 'EAAB' })
+  })
+
+  it('devolve o cancelamento', () => {
+    expect(
+      parseFacebookLoginMessage({ origin, source: popup, data: { type: 'messenger-fb-login', error: 'cancelled' } }, popup, origin)
+    ).toEqual({ error: 'cancelled' })
+  })
+
+  it('ignora outra origem, outra janela e outro tipo de mensagem', () => {
+    expect(parseFacebookLoginMessage({ origin: 'https://evil.example', source: popup, data: good }, popup, origin)).toBeNull()
+    expect(parseFacebookLoginMessage({ origin, source: {}, data: good }, popup, origin)).toBeNull()
+    expect(parseFacebookLoginMessage({ origin, source: popup, data: { type: 'x', accessToken: 'a' } }, popup, origin)).toBeNull()
+    expect(parseFacebookLoginMessage({ origin, source: popup, data: 'texto' }, popup, origin)).toBeNull()
+    expect(parseFacebookLoginMessage({ origin, source: popup, data: good }, null, origin)).toBeNull()
   })
 })

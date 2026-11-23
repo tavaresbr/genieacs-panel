@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { messengerAPI, type MessengerPage } from '@/lib/api'
-import { isPageId, messengerErrorKey } from '@/lib/messenger'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { messengerAPI, type MessengerFacebookPage, type MessengerPage } from '@/lib/api'
+import { isPageId, messengerErrorKey, parseFacebookLoginMessage } from '@/lib/messenger'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -14,7 +14,16 @@ import { useTranslation } from '@/contexts/language-context'
  * além do envio: o servidor confere na Meta, guarda cifrado e nunca o devolve,
  * então esta tela não tem o que mostrar de volta.
  */
-export function MessengerPagesPanel({ webhookPath, onChanged }: { webhookPath: string | null; onChanged: () => void }) {
+export function MessengerPagesPanel({
+  webhookPath,
+  facebookAppId,
+  onChanged
+}: {
+  webhookPath: string | null
+  /** O app da Meta do login do Facebook; vazio quando a plataforma não o configurou. */
+  facebookAppId?: string | null
+  onChanged: () => void
+}) {
   const { t, formatDateTime } = useTranslation()
   const toast = useToast()
   const { confirm, element: confirmElement } = useConfirm()
@@ -22,6 +31,10 @@ export function MessengerPagesPanel({ webhookPath, onChanged }: { webhookPath: s
   const [pageId, setPageId] = useState('')
   const [pageToken, setPageToken] = useState('')
   const [busy, setBusy] = useState(false)
+  // O token do USUÁRIO que o popup entregou: vive só aqui, até a escolha da Página.
+  const [facebookToken, setFacebookToken] = useState<string | null>(null)
+  const [facebookPages, setFacebookPages] = useState<MessengerFacebookPage[] | null>(null)
+  const popupRef = useRef<Window | null>(null)
 
   const load = useCallback(async () => {
     const res = await messengerAPI.listPages()
@@ -54,6 +67,75 @@ export function MessengerPagesPanel({ webhookPath, onChanged }: { webhookPath: s
         }
         setPageId('')
         setPageToken('')
+        await load()
+        onChanged()
+      } else {
+        toast.error(t(messengerErrorKey(res.code)))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const loadFacebookPages = useCallback(
+    async (accessToken: string) => {
+      setBusy(true)
+      try {
+        const res = await messengerAPI.facebookPages(accessToken)
+        if (res.success && res.data) {
+          setFacebookToken(accessToken)
+          setFacebookPages(res.data)
+        } else {
+          setFacebookToken(null)
+          setFacebookPages(null)
+          toast.error(t(messengerErrorKey(res.code)))
+        }
+      } finally {
+        setBusy(false)
+      }
+    },
+    [t, toast]
+  )
+
+  // O popup avisa por postMessage; só vale a mensagem da janela que abrimos.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const result = parseFacebookLoginMessage(event, popupRef.current, window.location.origin)
+      if (!result) return
+      popupRef.current = null
+      if ('accessToken' in result) void loadFacebookPages(result.accessToken)
+      else toast.error(t('messenger.pages.facebookCancelled'))
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [loadFacebookPages, t, toast])
+
+  const handleFacebookLogin = () => {
+    if (!facebookAppId) return
+    const popup = window.open(
+      `/messenger-connect.html?app=${encodeURIComponent(facebookAppId)}`,
+      'messenger-facebook-login',
+      'popup,width=520,height=640'
+    )
+    if (!popup) {
+      toast.error(t('messenger.pages.facebookPopupBlocked'))
+      return
+    }
+    popupRef.current = popup
+  }
+
+  const handleFacebookConnect = async (page: MessengerFacebookPage) => {
+    if (!facebookToken) return
+    setBusy(true)
+    try {
+      const res = await messengerAPI.facebookConnect(facebookToken, page.id)
+      if (res.success && res.data) {
+        if (res.data.status === 'error') {
+          toast.error(t('messenger.pages.connectedWithError', { error: res.data.webhookError ?? '' }))
+        } else {
+          toast.success(t('messenger.pages.connected'))
+        }
+        setFacebookPages((list) => list?.map((p) => (p.id === page.id ? { ...p, connected: true } : p)) ?? null)
         await load()
         onChanged()
       } else {
@@ -158,6 +240,43 @@ export function MessengerPagesPanel({ webhookPath, onChanged }: { webhookPath: s
         </ul>
       )}
 
+      {facebookAppId && (
+        <div className="space-y-3">
+          <button type="button" className="modern-button" disabled={busy} onClick={handleFacebookLogin}>
+            {t('messenger.pages.facebookLogin')}
+          </button>
+          {facebookPages && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">{t('messenger.pages.facebookPick')}</p>
+              {facebookPages.length === 0 && <p className="field-hint">{t('messenger.pages.facebookNone')}</p>}
+              <ul className="divide-y divide-border rounded-md border border-border" role="list">
+                {facebookPages.map((page) => (
+                  <li key={page.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{page.name || page.id}</p>
+                      <p className="font-mono text-[0.72rem] text-muted-foreground">{page.id}</p>
+                    </div>
+                    {page.connected ? (
+                      <span className="modern-badge">{t('messenger.pages.facebookAlready')}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="modern-button-secondary max-sm:min-h-10"
+                        disabled={busy}
+                        onClick={() => void handleFacebookConnect(page)}
+                      >
+                        {t('messenger.pages.connect')}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {facebookAppId && <p className="text-sm font-medium text-foreground">{t('messenger.pages.manualTitle')}</p>}
       <form onSubmit={(event) => void handleConnect(event)} className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="field-label">{t('messenger.pages.pageId')}</span>
