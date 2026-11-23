@@ -1,27 +1,63 @@
 {
-  "version": "1.60.0",
-  "build": 1859,
-  "sourceCommit": "6cd48946f9c9",
-  "releasedAt": "2026-11-22",
-  "basedOnTag": "v1.59.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/01e764f1a406...6cd48946f9c9",
+  "version": "1.61.0",
+  "build": 1875,
+  "sourceCommit": "a9d503e95edb",
+  "releasedAt": "2026-11-23",
+  "basedOnTag": "v1.60.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/ab8518cb3aa1...a9d503e95edb",
   "changes": [
     {
-      "shortHash": "d1c21278",
-      "date": "2026-11-22",
-      "title": "Tela do Messenger (caixa de entrada e Páginas conectadas)",
+      "shortHash": "d608c9c1",
+      "date": "2026-11-23",
+      "title": "Vínculo automático por link (?ref=)",
       "category": "New"
     },
     {
-      "shortHash": "b75cacc1",
-      "date": "2026-11-22",
-      "title": "Registra a tela no plano",
+      "shortHash": "5b33bab4",
+      "date": "2026-11-23",
+      "title": "Pedido de fatura só entrega a fatura dentro do prazo e pergunta se quer receber agora",
       "category": "Maintenance"
     },
     {
-      "shortHash": "deec2517",
-      "date": "2026-11-22",
-      "title": "Vínculo da conversa com o assinante",
+      "shortHash": "2b360048",
+      "date": "2026-11-23",
+      "title": "Log do erro da fatura antecipada passa por logSafe (CodeQL)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f54c5eed",
+      "date": "2026-11-23",
+      "title": "I18n(telegram): traduz as chaves do bot de comandos em 10 línguas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f0b72940",
+      "date": "2026-11-23",
+      "title": "Declara o Messenger na lista de compartilhamento",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "451f3f60",
+      "date": "2026-11-23",
+      "title": "Prévia da última mensagem na lista de conversas",
+      "category": "New"
+    },
+    {
+      "shortHash": "988ffae5",
+      "date": "2026-11-23",
+      "title": "Link da política de privacidade na aba Sobre e no cadastro",
+      "category": "New"
+    },
+    {
+      "shortHash": "72f9ef19",
+      "date": "2026-11-23",
+      "title": "Link do Messenger nas cobranças do WhatsApp ({{link_messenger}})",
+      "category": "New"
+    },
+    {
+      "shortHash": "c53c17c2",
+      "date": "2026-11-23",
+      "title": "Card e aba do Telegram em Configuração → Integrações",
       "category": "New"
     }
   ]

@@ -7,6 +7,25 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.61.0] - 2026-11-23
+
+### New
+
+- Vínculo automático por link (?ref=) (`d608c9c1`)
+- Prévia da última mensagem na lista de conversas (`451f3f60`)
+- Link da política de privacidade na aba Sobre e no cadastro (`988ffae5`)
+- Link do Messenger nas cobranças do WhatsApp ({{link_messenger}}) (`72f9ef19`)
+- Card e aba do Telegram em Configuração → Integrações (`c53c17c2`)
+
+### Maintenance
+
+- Pedido de fatura só entrega a fatura dentro do prazo e pergunta se quer receber agora (`5b33bab4`)
+- Log do erro da fatura antecipada passa por logSafe (CodeQL) (`2b360048`)
+- I18n(telegram): traduz as chaves do bot de comandos em 10 línguas (`f54c5eed`)
+- Declara o Messenger na lista de compartilhamento (`f0b72940`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/ab8518cb3aa1...a9d503e95edb)
+
 ## [1.60.0] - 2026-11-22
 
 ### New
