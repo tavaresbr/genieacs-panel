@@ -1,16 +1,40 @@
 {
-  "version": "1.65.0",
-  "build": 1896,
-  "sourceCommit": "89ddfa308d2d",
+  "version": "1.66.0",
+  "build": 1905,
+  "sourceCommit": "5c6e286475e0",
   "releasedAt": "2026-11-23",
-  "basedOnTag": "v1.64.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/832d38b0cedd...89ddfa308d2d",
+  "basedOnTag": "v1.65.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/62b656c1bbb9...5c6e286475e0",
   "changes": [
     {
-      "shortHash": "a8191b24",
+      "shortHash": "bc209c67",
       "date": "2026-11-23",
-      "title": "Caixa de atendimento do Telegram dos clientes (etapa 1)",
+      "title": "Callbacks de desautorização e exclusão de dados do Facebook",
       "category": "New"
+    },
+    {
+      "shortHash": "c04e60fe",
+      "date": "2026-11-23",
+      "title": "Botão Reenviar para a resposta que falhou",
+      "category": "New"
+    },
+    {
+      "shortHash": "b051e5f7",
+      "date": "2026-11-23",
+      "title": "Baixa e guarda o anexo recebido; imagem aparece na conversa",
+      "category": "New"
+    },
+    {
+      "shortHash": "bfff10b5",
+      "date": "2026-11-23",
+      "title": "O log da falha do anexo não imprime texto vindo de fora",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "7a170f8f",
+      "date": "2026-11-23",
+      "title": "O log da falha do anexo só usa motivos fixos",
+      "category": "Fixed"
     }
   ]
 }

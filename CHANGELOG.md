@@ -7,6 +7,21 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.66.0] - 2026-11-23
+
+### New
+
+- Callbacks de desautorização e exclusão de dados do Facebook (`bc209c67`)
+- Botão Reenviar para a resposta que falhou (`c04e60fe`)
+- Baixa e guarda o anexo recebido; imagem aparece na conversa (`b051e5f7`)
+
+### Fixed
+
+- O log da falha do anexo não imprime texto vindo de fora (`bfff10b5`)
+- O log da falha do anexo só usa motivos fixos (`7a170f8f`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/62b656c1bbb9...5c6e286475e0)
+
 ## [1.65.0] - 2026-11-23
 
 ### New
