@@ -104,7 +104,10 @@ class MessengerMediaService {
       return true;
     } catch (error) {
       if (absolute) await fsp.rm(absolute, { force: true }).catch(() => {});
-      console.warn(`[messenger] could not store attachment of message ${message.id}: ${String(error?.message ?? error).slice(0, 120)}`);
+      // Só o id (número nosso) e a classe/código do erro, com o alfabeto restrito: a mensagem do erro
+      // pode carregar o endereço do anexo, que veio de fora, e quebra de linha nela forjaria entrada de log.
+      const reason = String(error?.code ?? error?.name ?? 'Error').replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 40);
+      console.warn(`[messenger] could not store attachment of message ${Number(message.id)}: ${reason}`);
       return false;
     }
   }
