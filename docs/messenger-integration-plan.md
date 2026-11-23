@@ -143,5 +143,18 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   do portal só aparece com o cartão de contato ligado e uma Página conectada (`provider.messenger`).
 - **LGPD/retenção:** os links entram no dossiê e na exclusão do assinante; registros vencidos há mais de 30 dias
   são podados pelo agendador (`MESSENGER_LINK_TOKEN_RETENTION_DAYS`).
-- Fora: mandar o link automaticamente na fatura enviada pelo WhatsApp, e confirmar o vínculo à pessoa por uma
-  resposta no Messenger.
+- Fora: confirmar o vínculo à pessoa por uma resposta no Messenger.
+
+### Link do Messenger na cobrança do WhatsApp (`{{link_messenger}}`)
+- Variável **opcional** dos modelos de cobrança: o provedor escolhe onde ela vai (e em quais modelos) escrevendo-a
+  no texto, numa linha só dela. Cada cobrança leva um link de uso único para o contrato daquela pessoa; quando ela
+  o abre no Messenger, a conversa nasce vinculada (`bound_via = 'link'`, `source = 'invoice'` no token).
+- **Opcional de verdade:** a regra 1 do renderizador (variável vazia recusa a mensagem) abre uma exceção só para
+  ela — vazia, a linha que a cita sai e a cobrança vai. Sem isso, uma Página fora do ar bloquearia a cobrança.
+- Onde vale: régua automática, campanha de cobrança e segunda via. Na régua o link é emitido só no instante em
+  que a mensagem vai para a fila (depois da simulação, do intervalo mínimo e da corrida entre passadas), então
+  nenhum deles deixa link emitido à toa. O modelo aprovado da Meta (número oficial fora da janela) vai como foi
+  aprovado, sem a variável. O "Enviar na conversa" (mensagens fixas de resumo, PIX e linha) não leva o link: lá o
+  atendente usa o botão "Link do Messenger" da tela do contato.
+- Limite: numa campanha de cobrança o link é emitido ao montar o rascunho; um rascunho parado por mais de 7 dias
+  tem links vencidos.

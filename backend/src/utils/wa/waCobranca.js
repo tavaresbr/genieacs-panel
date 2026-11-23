@@ -31,6 +31,17 @@
  * incluir faturas a vencer — o modelo se autodeclara.
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * ─────────────────────────────────────────────────────────────────────────
+ * EXCEÇÃO À REGRA 1 — variável OPCIONAL
+ *
+ * `link_messenger` não é dado da fatura: é um convite a conversar por outro
+ * canal. Sem ele a cobrança continua perfeitamente válida, e recusá-la porque a
+ * Página do Facebook está fora do ar, ou porque o contrato ainda não tem
+ * cadastro, bloquearia dinheiro por causa de um extra. Por isso, vazia, ela NÃO
+ * recusa: some junto com a LINHA em que está ("Prefere o Messenger? {{link}}"
+ * sem o link seria texto solto). O modelo que tem a variável sozinha numa
+ * mensagem, sem mais nada, continua recusando (ficaria vazio).
+ *
  * Note que isto é o OPOSTO de um render de chat, que mantém o placeholder não
  * preenchido para o operador ver e completar. Ali há alguém olhando; aqui a
  * mensagem sai sozinha para centenas de pessoas.
@@ -45,8 +56,15 @@ export const VARIAVEIS_DE_COBRANCA = Object.freeze([
   'dias_para_vencer',
   'pix',
   'linha_digitavel',
-  'link_boleto'
+  'link_boleto',
+  'link_messenger'
 ]);
+
+/**
+ * As que, vazias, NÃO recusam a mensagem: a linha que as cita é que sai. Ver a
+ * exceção à regra 1 no topo deste arquivo.
+ */
+export const VARIAVEIS_OPCIONAIS = Object.freeze(['link_messenger']);
 
 const PLACEHOLDER = /\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g;
 
@@ -107,7 +125,9 @@ export function variaveisDeCobranca(fatura, nome, hoje = new Date()) {
     dias_para_vencer: atraso !== null && atraso <= 0 ? String(Math.abs(atraso)) : '',
     pix: String(fatura?.pix ?? '').trim(),
     linha_digitavel: String(fatura?.digitableLine ?? '').trim(),
-    link_boleto: String(fatura?.link ?? '').trim()
+    link_boleto: String(fatura?.link ?? '').trim(),
+    // Preenchida por quem envia, com um link de uso único (`MessengerLinkTokenService`); aqui nasce vazia.
+    link_messenger: ''
   };
 }
 
@@ -148,16 +168,35 @@ export function separarCodigos(modelo, vars, marcas) {
  * @returns {string|null} `null` quando qualquer variável citada está vazia
  */
 export function renderCobranca(modelo, vars) {
-  let faltou = false;
-  const texto = String(modelo ?? '').replace(PLACEHOLDER, (_completo, chave) => {
+  const vazia = (chave) => {
     const v = vars?.[chave];
-    if (v === undefined || v === null || v === '') {
+    return v === undefined || v === null || v === '';
+  };
+  // As linhas que citam uma variável opcional vazia saem inteiras; o resto do
+  // texto segue pela regra 1.
+  const linhas = String(modelo ?? '').split('\n');
+  const mantidas = linhas.filter((linha) => {
+    const citadas = [...linha.matchAll(PLACEHOLDER)].map((m) => m[1]);
+    return !citadas.some((chave) => VARIAVEIS_OPCIONAIS.includes(chave) && vazia(chave));
+  });
+  const algumaSaiu = mantidas.length !== linhas.length;
+
+  let faltou = false;
+  let texto = mantidas.join('\n').replace(PLACEHOLDER, (_completo, chave) => {
+    if (vazia(chave)) {
       faltou = true;
       return '';
     }
-    return String(v);
+    return String(vars[chave]);
   });
-  return faltou ? null : texto;
+  if (faltou) return null;
+  if (algumaSaiu) {
+    // Tira o buraco que a linha deixou (uma linha em branco sobrando) e as pontas.
+    texto = texto.replace(/\n{3,}/g, '\n\n').trim();
+    // O modelo era só a variável opcional: não sobra mensagem.
+    if (!texto) return null;
+  }
+  return texto;
 }
 
 /**
@@ -187,6 +226,11 @@ export function modeloCitaOsDoisEspelhos(modelo) {
   return /\{\{\s*dias_atraso\s*\}\}/.test(texto) && modeloEhLembrete(texto);
 }
 
+/** O modelo pede o link do Messenger? Só então quem envia emite um (de uso único). */
+export function modeloCitaLinkMessenger(modelo) {
+  return /\{\{\s*link_messenger\s*\}\}/.test(String(modelo ?? ''));
+}
+
 /** As variáveis que o modelo cita e o disparo não sabe preencher. */
 export function variaveisDesconhecidas(modelo) {
   const citadas = [...String(modelo ?? '').matchAll(PLACEHOLDER)].map((m) => m[1]);
@@ -200,6 +244,8 @@ export function variaveisDesconhecidas(modelo) {
 export function variaveisVazias(modelo, vars) {
   const citadas = [...String(modelo ?? '').matchAll(PLACEHOLDER)].map((m) => m[1]);
   return [...new Set(citadas)].filter((chave) => {
+    // Uma opcional vazia não é o porquê de nenhuma recusa.
+    if (VARIAVEIS_OPCIONAIS.includes(chave)) return false;
     const v = vars?.[chave];
     return v === undefined || v === null || v === '';
   });

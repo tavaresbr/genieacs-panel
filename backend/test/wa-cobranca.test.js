@@ -11,6 +11,9 @@ import {
   separarCodigos,
   modeloEhLembrete,
   variaveisDesconhecidas,
+  variaveisVazias,
+  modeloCitaLinkMessenger,
+  VARIAVEIS_OPCIONAIS,
   maisAntigaEmAberto,
   faturaParaPedido
 } from '../src/utils/wa/waCobranca.js';
@@ -106,6 +109,59 @@ describe('the refusal rule', () => {
 
   test('a template with no variables always renders', () => {
     assert.equal(renderCobranca('Passe na loja', {}), 'Passe na loja');
+  });
+});
+
+describe('a variável opcional link_messenger', () => {
+  const MODELO = 'Olá {{nome}}, sua fatura de {{valor}} venceu.\nPrefere o Messenger? {{link_messenger}}\nSe já pagou, desconsidere.';
+  const base = () => variaveisDeCobranca(vencida, 'João', HOJE);
+
+  test('com o link, entra no texto como qualquer variável', () => {
+    const texto = renderCobranca(MODELO, { ...base(), link_messenger: 'https://m.me/1000000001?ref=abc' });
+    assert.equal(texto, 'Olá João, sua fatura de R$ 129,90 venceu.\nPrefere o Messenger? https://m.me/1000000001?ref=abc\nSe já pagou, desconsidere.');
+  });
+
+  test('sem o link NÃO recusa a cobrança: a linha que o cita sai inteira', () => {
+    const texto = renderCobranca(MODELO, base());
+    assert.equal(texto, 'Olá João, sua fatura de R$ 129,90 venceu.\nSe já pagou, desconsidere.');
+    assert.ok(!texto.includes('Messenger'));
+  });
+
+  test('a linha que sai não deixa buraco de linhas em branco', () => {
+    const modelo = 'Olá {{nome}}.\n\nMessenger: {{link_messenger}}\n\nObrigado.';
+    assert.equal(renderCobranca(modelo, base()), 'Olá João.\n\nObrigado.');
+  });
+
+  test('a regra 1 continua valendo para todo o resto', () => {
+    // Um PIX vazio ainda recusa, mesmo com o link opcional presente.
+    const semPix = variaveisDeCobranca({ ...vencida, pix: '' }, 'João', HOJE);
+    assert.equal(renderCobranca('PIX: {{pix}}\nMessenger: {{link_messenger}}', { ...semPix, link_messenger: 'https://m.me/1?ref=x' }), null);
+    assert.equal(renderCobranca('PIX: {{pix}}\nMessenger: {{link_messenger}}', semPix), null);
+  });
+
+  test('um modelo que é só a variável opcional vazia não vira mensagem vazia', () => {
+    assert.equal(renderCobranca('{{link_messenger}}', base()), null);
+    assert.equal(renderCobranca('  {{link_messenger}}  ', base()), null);
+  });
+
+  test('a variável opcional vazia não aparece como motivo de recusa', () => {
+    assert.deepEqual(variaveisVazias('PIX: {{pix}} {{link_messenger}}', { pix: '', link_messenger: '' }), ['pix']);
+    assert.deepEqual(variaveisVazias('{{link_messenger}}', {}), []);
+  });
+
+  test('é uma variável conhecida, opcional, e o modelo diz se pede o link', () => {
+    assert.ok(VARIAVEIS_DE_COBRANCA.includes('link_messenger'));
+    assert.deepEqual([...VARIAVEIS_OPCIONAIS], ['link_messenger']);
+    assert.deepEqual(variaveisDesconhecidas(MODELO), []);
+    assert.equal(modeloCitaLinkMessenger(MODELO), true);
+    assert.equal(modeloCitaLinkMessenger('{{ link_messenger }}'), true);
+    assert.equal(modeloCitaLinkMessenger('Olá {{nome}}'), false);
+    assert.equal(modeloCitaLinkMessenger(null), false);
+  });
+
+  test('o resto dos modelos renderiza igual a antes', () => {
+    assert.equal(renderCobranca('Olá {{nome}}', base()), 'Olá João');
+    assert.equal(renderCobranca('Linha 1\n\n\n\nLinha 2', {}), 'Linha 1\n\n\n\nLinha 2', 'sem opcional, o texto não é mexido');
   });
 });
 

@@ -2897,6 +2897,8 @@ const fr: Dictionary = {
   'whatsapp.variable.pix': "PIX",
   'whatsapp.variable.linha_digitavel': "ligne numérique",
   'whatsapp.variable.link_boleto': "lien du boleto",
+  'whatsapp.variable.link_messenger': 'Messenger link',
+  'whatsapp.templates.messengerHint': '{{link_messenger}} is optional: it puts a single-use link to continue the conversation on Messenger, linked to this subscriber. Without a connected Messenger Page the line that cites it is left out and the message still goes. Put it alone on its own line.',
   'whatsapp.campaign.detail.open': "Voir les destinataires",
   'whatsapp.campaign.detail.hint': "Chaque personne de cette campagne et ce qu’il est advenu du message.",
   'whatsapp.campaign.detail.filter': "Filtrer les destinataires",
