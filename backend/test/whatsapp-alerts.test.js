@@ -836,3 +836,89 @@ describe('a customer waiting for a person tells the team', () => {
     assert.equal(item.contact, 'Dona Maria');
   });
 });
+
+describe('o teste de um destinatário da lista', () => {
+  const testar = (body) => call(`${panelUrl}/api/whatsapp/alerts/test`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body
+  });
+
+  it('enfileira a mensagem só para aquele número, como alerta', async () => {
+    await reset();
+    await setRules(onlyRule('ont_offline'), { recipients: [ON_CALL, SECOND_ON_CALL] });
+    const { status, body } = await testar({ channel: 'whatsapp', to: SECOND_ON_CALL });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.queued, true);
+    const saidas = await getDb()('wa_messages').where({ direction: 'out' });
+    assert.equal(saidas.length, 1, 'só o número testado recebe');
+    assert.equal(saidas[0].source, 'alert');
+    assert.match(saidas[0].body, /Teste de alerta/);
+    const conversa = await getDb()('wa_conversations').where({ id: saidas[0].conversation_id }).first();
+    assert.equal(conversa.wa_phone_e164, SECOND_ON_CALL);
+  });
+
+  it('recusa destino que não está salvo, sem enviar nada', async () => {
+    await reset();
+    await setRules(onlyRule('ont_offline'));
+    const { status, body } = await testar({ channel: 'whatsapp', to: '5593988887777' });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'recipient_not_saved');
+    assert.equal((await getDb()('wa_messages').where({ direction: 'out' })).length, 0);
+  });
+
+  it('recusa canal desconhecido', async () => {
+    const { status, body } = await testar({ channel: 'sms', to: ON_CALL });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'invalid_test_channel');
+  });
+
+  it('sem o número de alertas, recusa com o código da varredura', async () => {
+    await reset();
+    await setRules(onlyRule('ont_offline'));
+    await asTenant(() => WhatsAppAccount.update(alertsAccountId, { status: 'disconnected' }));
+    try {
+      const { status, body } = await testar({ channel: 'whatsapp', to: ON_CALL });
+      assert.equal(status, 409);
+      assert.equal(body.code, 'no_alert_number');
+    } finally {
+      await asTenant(() => WhatsAppAccount.update(alertsAccountId, { status: 'connected' }));
+    }
+  });
+
+  it('sem o add-on de WhatsApp, recusa com addon_required', async () => {
+    await reset();
+    await setRules(onlyRule('ont_offline'));
+    const { default: AddonService } = await import('../src/services/addonService.js');
+    const real = AddonService.allows;
+    AddonService.allows = async (feature) => (feature === 'whatsapp' ? false : real.call(AddonService, feature));
+    try {
+      const { status, body } = await testar({ channel: 'whatsapp', to: ON_CALL });
+      assert.equal(status, 403);
+      assert.equal(body.code, 'addon_required');
+    } finally {
+      AddonService.allows = real;
+    }
+  });
+
+  it('exige a permissão de configuração', async () => {
+    const { status } = await call(`${panelUrl}/api/whatsapp/alerts/test`, {
+      method: 'POST',
+      body: { channel: 'whatsapp', to: ON_CALL }
+    });
+    assert.equal(status, 401);
+  });
+
+  it('as configurações trazem o estado de cada canal, sem segredo', async () => {
+    await reset();
+    await setRules(onlyRule('ont_offline'), { recipients: [ON_CALL, SECOND_ON_CALL] });
+    const { body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, { headers: authHeaders(token) });
+    assert.equal(body.data.channels.whatsapp.numberConnected, true);
+    assert.equal(body.data.channels.whatsapp.recipients, 2);
+    assert.equal(body.data.channels.whatsapp.addon, true);
+    assert.equal(body.data.channels.email.recipients, 0);
+    assert.equal(typeof body.data.channels.email.smtp, 'boolean');
+    assert.equal(body.data.channels.telegram.configured, false);
+    assert.equal(JSON.stringify(body.data.channels).includes('token'), false);
+  });
+});

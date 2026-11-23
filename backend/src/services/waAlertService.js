@@ -470,8 +470,23 @@ class WaAlertService {
     const whatsappReady = Boolean(account && settings.recipients.length > 0);
     const emailReady = Boolean(mailConfigured() && settings.emailRecipients.length > 0);
     const telegramReady = Boolean(settings.telegram.token && settings.telegram.chatId);
+    const config = await WhatsAppConfigService.getConfig();
+    const addon = await AddonService.allows('whatsapp');
     return {
       ...settings,
+      // Para o cartão "Canais" da tela: o que cada canal precisa para sair, sem
+      // segredo nenhum. A varredura recusa pelas mesmas razões.
+      channels: {
+        whatsapp: {
+          configured: WhatsAppConfigService.isReady(config),
+          addon,
+          numberConnected: Boolean(account),
+          recipients: settings.recipients.length
+        },
+        email: { smtp: mailConfigured(), recipients: settings.emailRecipients.length },
+        telegram: { configured: Boolean(settings.telegram.token), ready: telegramReady }
+      },
+      lastScanAt: (await this.readLastScanAt()) || null,
       // O token NUNCA: só se há um guardado, e o grupo, que não é segredo.
       telegram: { configured: Boolean(settings.telegram.token), chatId: settings.telegram.chatId },
       hasAlertsNumber: Boolean(account),
@@ -1585,6 +1600,59 @@ class WaAlertService {
       code: resultado.code,
       status: 502
     });
+  }
+
+  /**
+   * A mensagem de teste de UM destinatário da lista, o botão "Testar" da linha.
+   *
+   * O destino tem de ser um dos já SALVOS: a rota não é um disparador livre de
+   * mensagens para qualquer número, só a confirmação de que quem está na escala
+   * recebe. O que a varredura recusaria (sem número de alertas, sem add-on, sem
+   * SMTP) o teste recusa igual — com o mesmo código, para a tela dizer o motivo.
+   *
+   * No WhatsApp "ok" quer dizer ENFILEIRADO: a entrega é do worker do outbox.
+   *
+   * @returns {Promise<{ channel: string, queued: boolean }>}
+   */
+  static async sendRecipientTest({ channel, to }) {
+    const settings = await this.getSettings();
+    const invalido = (code) => new WaError('whatsapp.alerts.testInvalid', { code, status: 400 });
+    if (channel !== 'whatsapp' && channel !== 'email') throw invalido('invalid_test_channel');
+    const alvo = String(to ?? '').trim();
+    const salvos = channel === 'whatsapp' ? settings.recipients : settings.emailRecipients;
+    const destino = channel === 'whatsapp' ? normalizarTelefoneBr(alvo) : alvo.toLowerCase();
+    if (!destino || !salvos.includes(destino)) {
+      throw new WaError('whatsapp.alerts.recipientNotSaved', { code: 'recipient_not_saved', status: 400 });
+    }
+
+    const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
+    const nome = tenant?.name || 'SkyGenPanel';
+    const body = translatorFor(DEFAULT_LOCALE)('whatsapp.alerts.testMessage', { name: nome });
+
+    if (channel === 'email') {
+      if (!mailConfigured()) {
+        throw new WaError('whatsapp.alerts.mailNotConfigured', { code: 'mail_not_configured', status: 409 });
+      }
+      const enviado = await mailTransport().send({ to: destino, subject: this.emailSubject(body, nome), text: body });
+      if (!enviado) throw new WaError('whatsapp.alerts.mailFailed', { code: 'mail_failed', status: 502 });
+      return { channel, queued: false };
+    }
+
+    const config = await WhatsAppConfigService.getConfig();
+    if (!WhatsAppConfigService.isReady(config)) {
+      throw new WaError('whatsapp.error.notConfigured', { code: 'not_configured', status: 409 });
+    }
+    if (!(await AddonService.allows('whatsapp'))) {
+      throw new WaError('whatsapp.alerts.addonRequired', { code: 'addon_required', status: 403 });
+    }
+    const account = await WhatsAppAccount.getForPurpose('alerts');
+    if (!account) throw new WaError('whatsapp.alerts.noAlertNumber', { code: 'no_alert_number', status: 409 });
+    if ((await this.dialableRecipients([destino])).length === 0) {
+      throw new WaError('whatsapp.alerts.noRecipients', { code: 'no_alert_recipients', status: 409 });
+    }
+    const enfileirados = await this.notifyWhatsApp({ account, recipients: [destino] }, body);
+    if (enfileirados === 0) throw new WaError('whatsapp.alerts.testNotEnqueued', { code: 'test_not_enqueued', status: 502 });
+    return { channel, queued: true };
   }
 
   /**

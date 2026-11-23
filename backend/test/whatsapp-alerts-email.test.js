@@ -87,6 +87,41 @@ beforeEach(async () => {
   desligarSmtp();
 });
 
+describe('o teste de um e-mail da lista', () => {
+  const testar = (to) => call(`${panelUrl}/api/whatsapp/alerts/test`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: { channel: 'email', to }
+  });
+
+  it('entrega ao SMTP só o endereço testado', async () => {
+    ligarSmtp();
+    await regras({ emailRecipients: ['plantao@provedor.test', 'noc@provedor.test'] });
+    const { status, body } = await testar('NOC@provedor.test');
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.queued, false);
+    assert.equal(mensagens().length, 1);
+    assert.match(mensagens()[0], /noc@provedor\.test/);
+    assert.match(mensagens()[0], /Teste de alerta/);
+  });
+
+  it('recusa endereço que não está salvo', async () => {
+    ligarSmtp();
+    await regras({ emailRecipients: ['plantao@provedor.test'] });
+    const { status, body } = await testar('outro@provedor.test');
+    assert.equal(status, 400);
+    assert.equal(body.code, 'recipient_not_saved');
+    assert.equal(mensagens().length, 0);
+  });
+
+  it('sem SMTP no servidor, diz o motivo', async () => {
+    await regras({ emailRecipients: ['plantao@provedor.test'] });
+    const { status, body } = await testar('plantao@provedor.test');
+    assert.equal(status, 409);
+    assert.equal(body.code, 'mail_not_configured');
+  });
+});
+
 describe('os ajustes', () => {
   it('guardam os e-mails minúsculos e sem repetição', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {

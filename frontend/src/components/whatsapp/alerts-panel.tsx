@@ -8,6 +8,7 @@ import {
 } from '@/lib/api'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { Icon } from '@/components/ui/icon'
+import { AlertChannels } from '@/components/whatsapp/alert-channels'
 import { RecipientList } from '@/components/whatsapp/recipient-list'
 import { TelegramBotPanel } from '@/components/whatsapp/telegram-bot-panel'
 import { useToast } from '@/components/ui/toast'
@@ -350,6 +351,13 @@ export function AlertsPanel() {
     }
   }
 
+  /** "Testar" de uma linha: o servidor só aceita item já salvo e diz o motivo se não sai. */
+  const testRecipient = (channel: 'whatsapp' | 'email') => async (item: string) => {
+    const res = await whatsappAPI.testAlertRecipient(channel, item)
+    if (res.success) return { ok: true, queued: res.data?.queued === true }
+    return { ok: false, reason: whatsappErrorMessage(t, res.code) }
+  }
+
   const handleTelegramTest = async () => {
     setTestingTelegram(true)
     try {
@@ -420,6 +428,12 @@ export function AlertsPanel() {
               <Icon name="check" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-success))]" />
               <span>{scanResult}</span>
             </p>
+          )}
+
+          {stored?.channels && (
+            <div className="mt-6">
+              <AlertChannels channels={stored.channels} />
+            </div>
           )}
 
           <div className="mt-6 space-y-6">
@@ -496,6 +510,8 @@ export function AlertsPanel() {
               <RecipientList
                 kind="phone"
                 items={form.recipients}
+                saved={stored?.recipients ?? []}
+                onTest={testRecipient('whatsapp')}
                 onChange={(next) => setForm((current) => (current ? { ...current, recipients: next } : current))}
                 label={t('whatsapp.alerts.recipients')}
                 hintId="wa-alerts-recipients-hint"
@@ -529,6 +545,8 @@ export function AlertsPanel() {
               <RecipientList
                 kind="email"
                 items={form.emailRecipients}
+                saved={stored?.emailRecipients ?? []}
+                onTest={testRecipient('email')}
                 onChange={(next) => setForm((current) => (current ? { ...current, emailRecipients: next } : current))}
                 label={t('whatsapp.alerts.emailRecipients')}
                 hintId="wa-alerts-emails-hint"

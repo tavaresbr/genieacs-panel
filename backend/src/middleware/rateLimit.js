@@ -369,6 +369,17 @@ export const telegramTestLimiter = limiter({
 });
 
 /**
+ * "Testar" em cada número ou e-mail de plantão. Cada clique põe uma mensagem
+ * de verdade no telefone de alguém: o teto é curto, por usuário.
+ */
+export const alertTestLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 6,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.alertTest', 'rate_limited_alert_test')
+});
+
+/**
  * Ligar/desligar o bot de comandos e gerar código de vínculo. Cada chamada fala
  * com o Telegram ou escreve um segredo, mas é gesto de quem administra: o teto
  * é folgado para quem está acertando o bot e curto para um laço.

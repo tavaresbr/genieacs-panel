@@ -75,6 +75,20 @@ class WhatsAppAlertsController {
     }
   }
 
+  /** Uma mensagem de teste para um número ou e-mail da lista salva. */
+  static async testRecipient(req, res) {
+    try {
+      const { channel, to } = req.body ?? {};
+      const result = await WaAlertService.sendRecipientTest({ channel, to });
+      return res.json(createResponse(
+        req.t(result.queued ? 'whatsapp.alerts.testQueued' : 'whatsapp.alerts.testSent'),
+        result
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.alerts.testFailed');
+    }
+  }
+
   static async scan(req, res) {
     try {
       const summary = await WaAlertService.scan();
