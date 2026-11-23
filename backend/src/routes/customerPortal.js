@@ -42,6 +42,13 @@ router.get(
   CustomerPortalController.overview
 );
 router.post(
+  '/messenger-link',
+  authenticatePortalCustomer,
+  portalAccountLimiter,
+  portalMutationLimiter,
+  CustomerPortalController.messengerLink
+);
+router.post(
   '/wifi/:index/password',
   authenticatePortalCustomer,
   portalAccountLimiter,

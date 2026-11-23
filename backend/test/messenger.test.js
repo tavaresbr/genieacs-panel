@@ -12,6 +12,7 @@ const { encryptPageToken, decryptPageToken } = await import('../src/services/mes
 const { default: MessengerConversation } = await import('../src/models/MessengerConversation.js');
 const { default: MessengerMessage } = await import('../src/models/MessengerMessage.js');
 
+const metaCalls = [];
 let panelUrl;
 let token;
 let alfa;
@@ -45,6 +46,10 @@ async function seedPage(tenantId, pageId, tokenValue = 'tok') {
 
 before(async () => {
   ({ panelUrl } = await startTestServers());
+  setMetaGraphFetcher(async (url) => {
+    metaCalls.push(String(url));
+    return new Response('{}', { status: 500 });
+  });
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST', body: { username: 'dona', password: 'dona-senha-123', email: 'dona@exemplo.test' }
   });
@@ -370,6 +375,161 @@ describe('vínculo com o assinante', () => {
     const doBeta = await getDb()('messenger_conversations').where({ tenant_id: beta }).first();
     assert.equal((await api(`/conversations/${doBeta.id}/subscriber`, { method: 'POST', body: { contract: 'CT-ALFA-1' } })).status, 404);
     assert.equal((await api(`/conversations/${doBeta.id}/subscriber`, { method: 'DELETE' })).status, 404);
+  });
+});
+
+describe('link de vínculo automático (?ref=)', () => {
+  const refOfUrl = (url) => new URL(url).searchParams.get('ref');
+  const post = (body) => api('/links', { method: 'POST', body });
+  const referral = (psid, ref, shape = 'referral') => {
+    const base = { sender: { id: psid }, recipient: { id: '1000000001' }, timestamp: Date.now() };
+    const r = { ref, source: 'SHORTLINK', type: 'OPEN_THREAD' };
+    const event = shape === 'postback'
+      ? { ...base, postback: { title: 'Get Started', payload: 'GET_STARTED', referral: r } }
+      : shape === 'message'
+        ? { ...base, message: { mid: `m.ref.${psid}.${ref.slice(0, 6)}`, text: 'oi', referral: r } }
+        : { ...base, referral: r };
+    return { object: 'page', entry: [{ id: '1000000001', messaging: [event] }] };
+  };
+  const convOf = (psid) => getDb()('messenger_conversations').where({ tenant_id: alfa, psid }).first();
+
+  it('emite um link m.me da Página conectada; só o hash do token fica guardado', async () => {
+    const res = await post({ contract: 'CT-ALFA-1' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.match(res.body.data.url, /^https:\/\/m\.me\/1000000001\?ref=[A-Za-z0-9_-]{22}$/);
+    assert.ok(new Date(res.body.data.expiresAt).getTime() > Date.now() + 6 * 24 * 3600_000);
+    const ref = refOfUrl(res.body.data.url);
+    const rows = await getDb()('messenger_link_tokens').where({ tenant_id: alfa });
+    assert.equal(rows.length, 1);
+    assert.notEqual(rows[0].token_hash, ref);
+    assert.equal(rows[0].token_hash, crypto.createHash('sha256').update(ref).digest('hex'));
+    assert.equal(rows[0].contract, 'CT-ALFA-1');
+    assert.equal(rows[0].source, 'operator');
+    assert.equal(JSON.stringify(rows).includes(ref), false);
+  });
+
+  it('contrato inexistente e contrato de outro provedor dão o mesmo 404; sem corpo, 400', async () => {
+    const nunca = await post({ contract: 'CT-NUNCA' });
+    const doBeta = await post({ contract: 'CT-BETA-1' });
+    assert.equal(nunca.status, 404);
+    assert.deepEqual(doBeta.body, nunca.body);
+    assert.equal((await post({})).body.code, 'invalid_body');
+  });
+
+  it('abrir o link vincula a conversa de quem abriu, pelos três formatos de evento', async () => {
+    for (const [psid, shape] of [['psid-ref-a', 'referral'], ['psid-ref-b', 'postback'], ['psid-ref-c', 'message']]) {
+      const ref = refOfUrl((await post({ contract: 'CT-ALFA-1' })).body.data.url);
+      assert.equal(await deliver(referral(psid, ref, shape)), 200);
+      const conv = await convOf(psid);
+      assert.ok(conv, `${shape}: a conversa tem que existir`);
+      assert.equal(conv.contract, 'CT-ALFA-1', shape);
+      assert.equal(conv.bound_via, 'link', shape);
+      assert.equal(conv.customer_account_id, (await getDb()('customer_accounts').where({ device_id: 'ONT-MSG-1' }).first()).id, shape);
+    }
+    const lista = (await api('/conversations')).body.data.find((c) => c.psid === 'psid-ref-a');
+    assert.equal(lista.clientName, 'Maria da Silva');
+    assert.equal(lista.linked, true);
+  });
+
+  it('o link é de uso único: a segunda pessoa não é vinculada nem ganha conversa', async () => {
+    const ref = refOfUrl((await post({ contract: 'CT-ALFA-1' })).body.data.url);
+    assert.equal(await deliver(referral('psid-once-1', ref)), 200);
+    assert.equal(await deliver(referral('psid-once-2', ref)), 200);
+    assert.equal((await convOf('psid-once-1')).contract, 'CT-ALFA-1');
+    assert.equal(await convOf('psid-once-2'), undefined);
+  });
+
+  it('a reentrega do mesmo evento não gasta nem duplica nada', async () => {
+    const ref = refOfUrl((await post({ contract: 'CT-ALFA-1' })).body.data.url);
+    const evento = referral('psid-redeliver', ref);
+    assert.equal(await deliver(evento), 200);
+    assert.equal(await deliver(evento), 200);
+    const n = await getDb()('messenger_conversations').where({ tenant_id: alfa, psid: 'psid-redeliver' }).count({ n: '*' }).first();
+    assert.equal(Number(n.n), 1);
+  });
+
+  it('duas pessoas abrindo ao mesmo tempo: só uma é vinculada', async () => {
+    const ref = refOfUrl((await post({ contract: 'CT-ALFA-1' })).body.data.url);
+    await Promise.all([deliver(referral('psid-race-1', ref)), deliver(referral('psid-race-2', ref))]);
+    const vinculadas = [await convOf('psid-race-1'), await convOf('psid-race-2')].filter((c) => c?.contract === 'CT-ALFA-1');
+    assert.equal(vinculadas.length, 1);
+  });
+
+  it('link vencido não vincula', async () => {
+    const ref = refOfUrl((await post({ contract: 'CT-ALFA-1' })).body.data.url);
+    await getDb()('messenger_link_tokens')
+      .where({ token_hash: crypto.createHash('sha256').update(ref).digest('hex') })
+      .update({ expires_at: new Date(Date.now() - 1000) });
+    assert.equal(await deliver(referral('psid-expired', ref)), 200);
+    assert.equal(await convOf('psid-expired'), undefined);
+  });
+
+  it('não sobrescreve um vínculo que o atendente já fez', async () => {
+    assert.equal(await deliver(inbound('1000000001', 'psid-keep', 'm.keep', 'oi')), 200);
+    const conv = await convOf('psid-keep');
+    await api(`/conversations/${conv.id}/subscriber`, { method: 'POST', body: { contract: 'CT-ALFA-SEM-ONT' } });
+    const ref = refOfUrl((await post({ contract: 'CT-ALFA-1' })).body.data.url);
+    assert.equal(await deliver(referral('psid-keep', ref)), 200);
+    const depois = await convOf('psid-keep');
+    assert.equal(depois.contract, 'CT-ALFA-SEM-ONT');
+    assert.equal(depois.bound_via, 'operator');
+    // E o link continua valendo para quem ainda não tem vínculo.
+    assert.equal(await deliver(referral('psid-fresh', ref)), 200);
+    assert.equal((await convOf('psid-fresh')).contract, 'CT-ALFA-1');
+  });
+
+  it('um ref que não é do painel, ou de outro provedor, é ignorado', async () => {
+    assert.equal(await deliver(referral('psid-junk', 'campanha-natal')), 200);
+    assert.equal(await convOf('psid-junk'), undefined);
+    // Um token VÁLIDO do beta, entregue na Página do alfa.
+    const tokenBeta = crypto.randomBytes(16).toString('base64url');
+    await getDb()('messenger_link_tokens').insert({
+      tenant_id: beta, token_hash: crypto.createHash('sha256').update(tokenBeta).digest('hex'),
+      contract: 'CT-BETA-1', source: 'operator', expires_at: new Date(Date.now() + 3600_000)
+    });
+    assert.equal(await deliver(referral('psid-cross', tokenBeta)), 200);
+    assert.equal(await convOf('psid-cross'), undefined);
+    const doBeta = await getDb()('messenger_link_tokens').where({ tenant_id: beta }).first();
+    assert.equal(doBeta.used_at, null, 'o token do beta não pode ter sido gasto');
+  });
+
+  it('sem Página conectada, não há para onde apontar: 409', async () => {
+    await getDb()('messenger_pages').where({ page_id: '1000000001' }).update({ status: 'error' });
+    const res = await post({ contract: 'CT-ALFA-1' });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'no_page');
+    await getDb()('messenger_pages').where({ page_id: '1000000001' }).update({ status: 'connected' });
+  });
+
+  it('assinar de novo os campos do webhook: recusa sem token e não toca na Meta', async () => {
+    const [semToken] = await getDb()('messenger_pages').insert({
+      tenant_id: alfa, page_id: '7000000007', page_name: 'Sem token', page_token: null, status: 'connected'
+    }).returning('id');
+    const id = typeof semToken === 'object' ? semToken.id : semToken;
+    const antes = metaCalls.length;
+    const res = await api(`/pages/${id}/subscribe`, { method: 'POST' });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'missing_token');
+    assert.equal(metaCalls.length, antes);
+    await getDb()('messenger_pages').where({ id }).del();
+  });
+
+  it('assinar de novo, com token: pede à Meta os campos, inclusive messaging_referrals', async () => {
+    const page = await getDb()('messenger_pages').where({ page_id: '1000000001' }).first();
+    let body = null;
+    setMetaGraphFetcher(async (url, init) => {
+      if (String(url).endsWith('/subscribed_apps')) body = JSON.parse(init.body);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+    const res = await api(`/pages/${page.id}/subscribe`, { method: 'POST' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.status, 'connected');
+    assert.ok(body.subscribed_fields.includes('messaging_referrals'));
+  });
+
+  it('a assinatura inclui messaging_referrals', async () => {
+    const { SUBSCRIBED_FIELDS } = await import('../src/services/messengerPageService.js');
+    assert.ok(SUBSCRIBED_FIELDS.split(',').includes('messaging_referrals'));
   });
 });
 

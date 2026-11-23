@@ -107,7 +107,7 @@ class CustomerErasureService {
    */
   static async survey(account) {
     const alcance = await alcanceDoAssinante(account);
-    const { contratos, documentos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos } = alcance;
+    const { contratos, documentos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, linksMessenger, eventos, amostras, horas, quedas, manutencoes, trocas, nos } = alcance;
 
     const contar = async (tabela, montar) => {
       const [linha] = await montar(tdb(tabela)).count({ n: '*' });
@@ -140,6 +140,7 @@ class CustomerErasureService {
       device_swaps: trocas.length,
       wa_conversations: conversaIds.length,
       messenger_conversations: messengerConversaIds.length,
+      messenger_link_tokens: linksMessenger.length,
       messenger_messages: messengerConversaIds.length
         ? await contar('messenger_messages', (q) => q.whereIn('conversation_id', messengerConversaIds))
         : 0,
@@ -224,7 +225,7 @@ class CustomerErasureService {
    * que o que foi gravado na trilha seja o que vai ser executado.
    */
   static async erase(account, { alcance }) {
-    const { contratos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, noIds } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, messengerConversaIds, linksMessenger, eventos, amostras, horas, quedas, manutencoes, trocas, noIds } = alcance;
     const idsDe = (linhas) => linhas.map((l) => l.id);
     const marca = `erased:${account.id}`;
 
@@ -232,6 +233,9 @@ class CustomerErasureService {
       // Filhas antes da mãe, como a exclusão de provedor.
       await tdb('customer_wifi_credentials', trx).where({ account_id: account.id }).del();
 
+      if (linksMessenger.length) {
+        await tdb('messenger_link_tokens', trx).whereIn('id', linksMessenger.map((l) => l.id)).del();
+      }
       if (messengerConversaIds.length) {
         await tdb('messenger_messages', trx).whereIn('conversation_id', messengerConversaIds).del();
         await tdb('messenger_conversations', trx).whereIn('id', messengerConversaIds).del();

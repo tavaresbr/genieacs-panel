@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
-import { hasContact, mailtoHref, telHref, whatsappHref, type ProviderContact } from '@/lib/portal-contact'
+import { hasContact, mailtoHref, messengerHref, telHref, whatsappHref, type ProviderContact } from '@/lib/portal-contact'
 import { Icon } from '@/components/ui/icon'
 import { QrCode } from '@/components/qr-code'
 import { useWifiStatusFilter, WifiStatusFilterControl } from '@/components/wifi-status-filter'
@@ -163,6 +163,8 @@ export default function CustomerPortal() {
   const [pwFeedback, setPwFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [billing, setBilling] = useState<PortalBilling | null>(null)
   const [providerContact, setProviderContact] = useState<ProviderContact | null>(null)
+  const [messengerBusy, setMessengerBusy] = useState(false)
+  const [messengerFailed, setMessengerFailed] = useState(false)
   const [billingLoading, setBillingLoading] = useState(false)
   const [billingError, setBillingError] = useState('')
   const [unlockPending, setUnlockPending] = useState(false)
@@ -366,6 +368,24 @@ export default function CustomerPortal() {
       setError(t('portal.error.retry'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  // O botão do Messenger: o servidor emite um link de uso único com o contrato
+  // de quem está logado, e a conversa nasce vinculada a ele. Navega na mesma
+  // aba (o celular abre o aplicativo), e só para um endereço `m.me` conferido.
+  const openMessenger = async () => {
+    setMessengerBusy(true)
+    setMessengerFailed(false)
+    try {
+      const result = await portalRequest<{ url: string }>('/messenger-link', { method: 'POST' })
+      const href = result.success ? messengerHref(result.data?.url) : null
+      if (href) window.location.assign(href)
+      else setMessengerFailed(true)
+    } catch {
+      setMessengerFailed(true)
+    } finally {
+      setMessengerBusy(false)
     }
   }
 
@@ -1226,6 +1246,11 @@ export default function CustomerPortal() {
                     <Icon name="chat" size={17} /> {t('portal.contact.whatsapp')}
                   </a>
                 )}
+                {providerContact.messenger && (
+                  <button type="button" className="modern-button" disabled={messengerBusy} onClick={() => void openMessenger()}>
+                    <Icon name="chat" size={17} /> {t('portal.contact.messenger')}
+                  </button>
+                )}
                 {telHref(providerContact.phone) && (
                   <a className="modern-button-secondary max-w-full" href={telHref(providerContact.phone) as string}>
                     <Icon name="phone" size={17} className="shrink-0" /> <span className="min-w-0 break-all">{providerContact.phone}</span>
@@ -1237,6 +1262,9 @@ export default function CustomerPortal() {
                   </a>
                 )}
               </div>
+              {messengerFailed && (
+                <p className="mt-3 text-sm text-destructive" role="alert">{t('portal.contact.messengerFailed')}</p>
+              )}
               {providerContact.address && (
                 <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
                   <Icon name="pin" size={16} className="mt-0.5 shrink-0" />

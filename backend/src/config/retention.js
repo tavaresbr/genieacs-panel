@@ -57,6 +57,13 @@ export const LOCKOUT_STALE_DAYS = 1;
  * - `source`: o arquivo que lê o número da janela, relativo a `backend/src/`. O teste
  *   confere que ele existe e que importa este registro.
  */
+/**
+ * Quanto tempo um link de vínculo do Messenger fica no banco depois de vencer.
+ * O link vale 7 dias (`messengerLinkTokenService.js`); o registro do que foi
+ * emitido e resgatado fica mais 30, e então sai.
+ */
+export const MESSENGER_LINK_TOKEN_RETENTION_DAYS = 30;
+
 export const WINDOWS = Object.freeze([
   {
     id: 'audit',
@@ -67,6 +74,19 @@ export const WINDOWS = Object.freeze([
     clock: 'created_at',
     spares: null,
     personalData: 'quem fez o quê, e sobre qual assinante',
+    source: 'services/schedulerService.js'
+  },
+  {
+    id: 'messenger-link-tokens',
+    label: 'Links de vínculo do Messenger',
+    tables: ['messenger_link_tokens'],
+    defaultDays: MESSENGER_LINK_TOKEN_RETENTION_DAYS,
+    minDays: null,
+    maxDays: null,
+    configuredBy: 'fixed',
+    clock: 'expires_at',
+    spares: 'links que ainda não venceram, usados ou não',
+    personalData: 'a quem o link vincula (contrato ou conta do portal); só o hash do token é guardado',
     source: 'services/schedulerService.js'
   },
   {

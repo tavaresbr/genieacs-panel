@@ -264,6 +264,15 @@ export async function alcanceDoAssinante(account) {
     ))
     : [];
 
+  // Os links de vínculo emitidos para este assinante (só o hash do token e a
+  // quem vincula): pela conta, pelo contrato ou pelo cadastro sem contrato.
+  const linksMessenger = await tdb('messenger_link_tokens').where((q) => {
+    q.where({ customer_account_id: account.id });
+    const contratosDoCadastro = [...contratos, ...contatos.map((c) => c.contract).filter(Boolean)];
+    if (contratosDoCadastro.length) q.orWhereIn('contract', contratosDoCadastro);
+    if (contatoIds.length) q.orWhereIn('sgp_contact_id', contatoIds);
+  }).orderBy('id');
+
   return {
     deviceIds,
     posses,
@@ -282,6 +291,7 @@ export async function alcanceDoAssinante(account) {
     conversas,
     conversaIds: conversas.map((c) => c.id),
     messengerConversaIds: conversasMessenger.map((c) => c.id),
+    linksMessenger,
     conversasMessenger,
     eventos,
     amostras,
@@ -422,7 +432,7 @@ class CustomerDataExportService {
 
     const {
       deviceIds, naPosse, emPosseAgora, contratos, telefones: todosTelefones, vinculos, contatos,
-      clientes, documentos, asaasClientes, asaasCobrancas, conversas, conversaIds, conversasMessenger, messengerConversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
+      clientes, documentos, asaasClientes, asaasCobrancas, conversas, conversaIds, conversasMessenger, messengerConversaIds, linksMessenger, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
     } = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -498,6 +508,7 @@ class CustomerDataExportService {
       ? await tdb('wa_messages').whereIn('conversation_id', conversaIds).orderBy('id')
       : []);
     guardar('messenger_conversations', conversasMessenger);
+    guardar('messenger_link_tokens', linksMessenger);
     guardar('messenger_messages', messengerConversaIds.length
       ? await tdb('messenger_messages').whereIn('conversation_id', messengerConversaIds).orderBy('id')
       : []);

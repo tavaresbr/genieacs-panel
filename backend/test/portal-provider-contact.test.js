@@ -103,7 +103,9 @@ describe('GET /api/customer/provider', () => {
     assert.equal((await salvar('portalShowProviderContact', 'true')).status, 200);
     const res = await contato();
     assert.equal(res.status, 200);
-    assert.deepEqual(Object.keys(res.body.data).sort(), ['address', 'email', 'enabled', 'name', 'phone', 'whatsapp']);
+    // `messenger` só diz se há uma Página conectada (para o botão); nenhum dado dela.
+    assert.deepEqual(Object.keys(res.body.data).sort(), ['address', 'email', 'enabled', 'messenger', 'name', 'phone', 'whatsapp']);
+    assert.equal(res.body.data.messenger, false);
     assert.equal(res.body.data.name, 'Fibra Itaituba');
     assert.equal(res.body.data.phone, '93 3518-0000');
     assert.equal(res.body.data.email, 'contato@fibra.test');

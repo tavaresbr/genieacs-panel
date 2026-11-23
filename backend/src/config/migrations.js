@@ -3938,6 +3938,35 @@ const MESSENGER_LINK_COLUMNS = [
   ['bound_via', (t) => t.string('bound_via', 16).nullable()]
 ];
 
+/**
+ * Os links de vínculo do Messenger (0146): o `?ref=` de um `m.me/<Página>?ref=…`.
+ *
+ * O token é opaco e aleatório, e só o HASH dele é guardado: um vazamento do
+ * banco não entrega links que ainda valham. É de uso ÚNICO e vence (`expires_at`):
+ * um link repassado não vincula uma segunda pessoa ao mesmo assinante. Guarda a
+ * quem ele vincula (contrato, cliente sem contrato ou conta do portal) e de onde
+ * veio (`source`: 'operator' ou 'portal'); `used_at` marca o resgate.
+ */
+const messengerLinkTokensTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('token_hash', 64).notNullable().unique();
+  t.string('contract', 64).nullable();
+  t.integer('sgp_contact_id').unsigned().nullable();
+  t.integer('customer_account_id').unsigned().nullable()
+    .references('id').inTable('customer_accounts').onDelete('CASCADE');
+  t.string('source', 16).notNullable();
+  t.integer('created_by').unsigned().nullable()
+    .references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('used_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'expires_at'], 'messenger_link_tokens_expiry_idx');
+};
+
+const MESSENGER_LINK_TOKEN_TABLES = [['messenger_link_tokens', messengerLinkTokensTable]];
+
 // A ordem importa: a Página antes das conversas, e estas antes das mensagens.
 const MESSENGER_TABLES = [
   ['messenger_pages', messengerPagesTable],
@@ -4100,7 +4129,8 @@ export const SCHEMA_TABLES = [
   ...WA_AI_KNOWLEDGE_TABLES,
   ...OPERATOR_PROFILE_TABLES,
   ...WA_AI_USAGE_TABLES,
-  ...MESSENGER_TABLES
+  ...MESSENGER_TABLES,
+  ...MESSENGER_LINK_TOKEN_TABLES
 ].map(([name]) => name);
 
 /**
@@ -8212,6 +8242,20 @@ export const migrations = [
       await db.schema.alterTable('messenger_conversations', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** Os links de vínculo do Messenger — ver `MESSENGER_LINK_TOKEN_TABLES`. */
+    id: '0146_messenger_link_tokens',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('messenger_link_tokens');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of MESSENGER_LINK_TOKEN_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];

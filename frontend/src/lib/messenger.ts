@@ -53,6 +53,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   page_not_found: 'messenger.error.pageNotFound',
   messenger_unconfigured: 'messenger.error.unconfigured',
   subscriber_not_found: 'messenger.error.subscriberNotFound',
+  no_page: 'messenger.error.noPage',
   meta_refused: 'messenger.error.metaRefused',
 }
 

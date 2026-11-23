@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brazilDigits, hasContact, mailtoHref, telHref, whatsappHref } from '@/lib/portal-contact'
+import { brazilDigits, hasContact, mailtoHref, messengerHref, telHref, whatsappHref } from '@/lib/portal-contact'
 
 describe('portal-contact', () => {
   it('normaliza telefone brasileiro para 55 + DDD + número', () => {
@@ -23,5 +23,22 @@ describe('portal-contact', () => {
     expect(hasContact({ enabled: false })).toBe(false)
     expect(hasContact({ enabled: true, name: 'Fibra' })).toBe(false)
     expect(hasContact({ enabled: true, name: 'Fibra', phone: '93 3518-0000' })).toBe(true)
+  })
+
+  it('o Messenger conta como contato, mesmo sem telefone nem e-mail', () => {
+    expect(hasContact({ enabled: true, name: 'Fibra', messenger: true })).toBe(true)
+    expect(hasContact({ enabled: true, name: 'Fibra', messenger: false })).toBe(false)
+  })
+
+  it('só navega para um link m.me da Página com o ref do painel', () => {
+    const ok = 'https://m.me/1000000001?ref=AbCdEfGhIjKlMnOpQrStUv'
+    expect(messengerHref(ok)).toBe(ok)
+    expect(messengerHref('http://m.me/1000000001?ref=AbCdEfGhIjKlMnOpQrStUv')).toBeNull()
+    expect(messengerHref('https://m.me.evil.test/1000000001?ref=AbCdEfGhIjKlMnOpQrStUv')).toBeNull()
+    expect(messengerHref('https://evil.test/?u=https://m.me/1000000001?ref=AbCdEfGhIjKlMnOpQrStUv')).toBeNull()
+    expect(messengerHref('https://m.me/nome-da-pagina?ref=AbCdEfGhIjKlMnOpQrStUv')).toBeNull()
+    expect(messengerHref('https://m.me/1000000001?ref=curto')).toBeNull()
+    expect(messengerHref('javascript:alert(1)')).toBeNull()
+    expect(messengerHref(undefined)).toBeNull()
   })
 })

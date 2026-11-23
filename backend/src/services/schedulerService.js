@@ -12,7 +12,7 @@ import TeiahExportService from './teiahExportService.js';
 import WaDunningService from './waDunningService.js';
 import { TENANT_JOB_CONCURRENCY, forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
-import { AUDIT_RETENTION, BOT_EVENTS_RETENTION_DAYS } from '../config/retention.js';
+import { AUDIT_RETENTION, BOT_EVENTS_RETENTION_DAYS, MESSENGER_LINK_TOKEN_RETENTION_DAYS } from '../config/retention.js';
 import AuditLog from '../models/AuditLog.js';
 import Setting from '../models/Setting.js';
 import AuthTicket from '../models/AuthTicket.js';
@@ -663,6 +663,11 @@ class SchedulerService {
       await tdb('wa_bot_events').where('created_at', '<', new Date(Date.now() - BOT_EVENTS_RETENTION_DAYS * 24 * 3600_000)).del()
         .catch((error) => {
           console.warn(`Could not prune bot events: ${error.message}`);
+        });
+      // Os links de vínculo do Messenger vencidos há mais de 30 dias.
+      await tdb('messenger_link_tokens').where('expires_at', '<', new Date(Date.now() - MESSENGER_LINK_TOKEN_RETENTION_DAYS * 24 * 3600_000)).del()
+        .catch((error) => {
+          console.warn(`Could not prune Messenger link tokens: ${error.message}`);
         });
       // O consumo da IA: o painel olha 30 dias; 180 sobram.
       await tdb('wa_ai_usage').where('day', '<', new Date(Date.now() - BOT_EVENTS_RETENTION_DAYS * 24 * 3600_000).toISOString().slice(0, 10)).del()

@@ -6828,6 +6828,11 @@ export const messengerAPI = {
     apiClient.post<MessengerMessage>(`/messenger/conversations/${id}/messages`, { text }),
   setClosed: (id: number, closed: boolean) =>
     apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/closed`, { closed }),
+  /** Assina de novo os campos do webhook (depois de um campo novo, como os links de vínculo). */
+  resubscribePage: (id: number) => apiClient.post<MessengerPage>(`/messenger/pages/${id}/subscribe`, {}),
+  /** O link `m.me/<Página>?ref=…` que vincula a conversa ao assinante quando ele o abre. */
+  createLink: (contract: string) =>
+    apiClient.post<{ url: string; expiresAt: string }>('/messenger/links', { contract }),
   /** `key` é o do contato (`WhatsAppContact.key`): o contrato, ou `c:<id>` sem contrato. */
   linkSubscriber: (id: number, key: string) =>
     apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/subscriber`, { contract: key }),

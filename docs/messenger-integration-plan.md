@@ -123,6 +123,23 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   inexistente, dá o mesmo 404 `subscriber_not_found`.
 - A lista e a conversa mostram o nome do cliente (o da ONT vence o do cadastro, como no WhatsApp); o dossiê e a
   exclusão do assinante alcançam a conversa por conta, contrato ou `sgp_contact_id`.
-- Ainda fora: vínculo automático por link `m.me/<Página>?ref=<token>` emitido na fatura ou no portal do cliente
-  (exige token assinado, tratar `referral`/`postback` no webhook e um botão no portal) e por fluxo de bot que
-  pede CPF/contrato.
+- Vínculo automático por link: ver abaixo. Ainda fora: fluxo de bot que pede CPF/contrato.
+
+### Vínculo automático por link (`?ref=`)
+- O painel emite `https://m.me/<id da Página>?ref=<token>` e, quando o assinante o abre, o evento chega ao
+  webhook como `referral` (quem já tinha conversa), dentro de `postback` (quem a abre agora) ou na primeira
+  mensagem; a conversa é vinculada ao contrato do link (`bound_via = 'link'`). A assinatura da Página passa a
+  incluir `messaging_referrals` (Páginas já conectadas usam "Atualizar inscrição", `POST /pages/:id/subscribe`).
+- **Token:** 16 bytes aleatórios em base64url; só o SHA-256 fica guardado (`messenger_link_tokens`, migração
+  `0146`). **Uso único** e vence em 7 dias (resgate atômico, `used_at is null` no UPDATE, numa transação com o
+  vínculo). O resgate roda no provedor dono da Página e a leitura é escopada: token de outro provedor não existe.
+  **Nunca sobrescreve** um vínculo já feito (o do atendente vale mais). O que o link NÃO prova é quem o abriu —
+  quem o tem, vincula —, por isso fica marcado e o atendente pode desvincular.
+- **Quem emite:** o atendente, em "Link do Messenger" na tela do contato (`POST /api/messenger/links`,
+  `whatsapp.send`); e o próprio assinante logado no portal, pelo botão "Messenger" do cartão de contato do
+  provedor (`POST /api/customer/messenger-link`, contrato da ONT dele — o vínculo de maior confiança). O botão
+  do portal só aparece com o cartão de contato ligado e uma Página conectada (`provider.messenger`).
+- **LGPD/retenção:** os links entram no dossiê e na exclusão do assinante; registros vencidos há mais de 30 dias
+  são podados pelo agendador (`MESSENGER_LINK_TOKEN_RETENTION_DAYS`).
+- Fora: mandar o link automaticamente na fatura enviada pelo WhatsApp, e confirmar o vínculo à pessoa por uma
+  resposta no Messenger.

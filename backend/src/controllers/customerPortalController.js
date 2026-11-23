@@ -1,3 +1,5 @@
+import MessengerLinkTokenService from '../services/messengerLinkTokenService.js';
+import { MessengerError } from '../services/messengerPageService.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import CustomerService from '../services/customerService.js';
 import CustomerPortalPasswordService from '../services/customerPortalPasswordService.js';
@@ -199,6 +201,8 @@ class CustomerPortalController {
         .join(' · ') || null;
       return res.json(createResponse(req.t('portal.providerReady'), {
         enabled: true,
+        // Há uma Página do Messenger conectada: o portal oferece o botão.
+        messenger: Boolean(await MessengerLinkTokenService.activePage()),
         name: text(row?.name),
         phone: text(phone) ?? text(row?.billing_phone),
         whatsapp: text(whatsapp),
@@ -208,6 +212,25 @@ class CustomerPortalController {
     } catch (error) {
       console.error('Customer portal provider contact error:', error);
       return res.status(500).json(createErrorResponse(req.t('portal.providerUnavailable'), null, 'provider_unavailable'));
+    }
+  }
+
+  /**
+   * O link do Messenger do próprio assinante logado: o `?ref=` carrega o
+   * contrato da ONT DELE, então ao abrir a conversa ela já nasce vinculada.
+   * É o vínculo de maior confiança, porque quem pede está autenticado no portal.
+   */
+  static async messengerLink(req, res) {
+    try {
+      const { url } = await MessengerLinkTokenService.createForPortalCustomer(req.customer);
+      return res.json(createResponse(req.t('portal.providerReady'), { url }, 'messenger_link_ok'));
+    } catch (error) {
+      if (error instanceof MessengerError) {
+        // Sem Página conectada ou sem contrato: a tela só some com o botão.
+        return res.status(error.status).json(createErrorResponse(error.message, null, error.code));
+      }
+      console.error('Customer portal Messenger link error:', error);
+      return res.status(500).json(createErrorResponse(req.t('portal.providerUnavailable'), null, 'messenger_link_unavailable'));
     }
   }
 

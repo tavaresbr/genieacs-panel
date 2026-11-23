@@ -9,6 +9,8 @@ export interface ProviderContact {
   whatsapp?: string | null
   email?: string | null
   address?: string | null
+  /** Há uma Página do Messenger conectada: o portal oferece o botão. */
+  messenger?: boolean
 }
 
 /**
@@ -40,5 +42,15 @@ export function mailtoHref(value: string | null | undefined): string | null {
 
 /** Há algo para mostrar no cartão? Ligado e sem nenhum dado, o cartão some. */
 export function hasContact(contact: ProviderContact | null): contact is ProviderContact {
-  return Boolean(contact?.enabled && (contact.phone || contact.whatsapp || contact.email || contact.address))
+  return Boolean(contact?.enabled && (contact.phone || contact.whatsapp || contact.email || contact.address || contact.messenger))
+}
+
+/**
+ * O link do Messenger que o servidor devolve, conferido antes de navegar: só
+ * `https://m.me/<id da Página>?ref=<token>`. Qualquer outra coisa — uma resposta
+ * adulterada, um erro — não é navegada.
+ */
+export function messengerHref(value: unknown): string | null {
+  const url = String(value ?? '')
+  return /^https:\/\/m\.me\/\d{5,32}\?ref=[A-Za-z0-9_-]{16,64}$/.test(url) ? url : null
 }

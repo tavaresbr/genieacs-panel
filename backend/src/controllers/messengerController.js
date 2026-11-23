@@ -4,6 +4,7 @@ import MessengerMessage from '../models/MessengerMessage.js';
 import MessengerPageService, { MessengerError, publicPage, messengerConfigured } from '../services/messengerPageService.js';
 import MessengerSendService, { windowOpen } from '../services/messengerSendService.js';
 import MessengerLinkService from '../services/messengerLinkService.js';
+import MessengerLinkTokenService from '../services/messengerLinkTokenService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 function fail(res, error, fallback) {
@@ -80,6 +81,31 @@ class MessengerController {
       return res.json(createResponse('ok'));
     } catch (error) {
       return fail(res, error, 'could not disconnect page');
+    }
+  }
+
+  /** Assina de novo os campos do webhook da Página (depois de um campo novo). */
+  static async resubscribePage(req, res) {
+    try {
+      const row = await MessengerPageService.resubscribe(Number(req.params.id));
+      return res.json(createResponse('ok', publicPage(row)));
+    } catch (error) {
+      return fail(res, error, 'could not subscribe page');
+    }
+  }
+
+  /**
+   * Emite o link `m.me/<Página>?ref=…` que vincula a conversa ao assinante
+   * quando ele o abre. O atendente o manda ao cliente (WhatsApp, e-mail, fatura).
+   */
+  static async createLink(req, res) {
+    try {
+      const { url, expiresAt } = await MessengerLinkTokenService.create(req.body?.contract, {
+        source: 'operator', userId: req.user?.userId ?? null
+      });
+      return res.status(201).json(createResponse('ok', { url, expiresAt }));
+    } catch (error) {
+      return fail(res, error, 'could not create link');
     }
   }
 
