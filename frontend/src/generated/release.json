@@ -1,39 +1,15 @@
 {
-  "version": "1.62.0",
-  "build": 1885,
-  "sourceCommit": "fb644c991225",
+  "version": "1.63.0",
+  "build": 1888,
+  "sourceCommit": "ab94e3359ba4",
   "releasedAt": "2026-11-23",
-  "basedOnTag": "v1.61.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/3a2a083efbc6...fb644c991225",
+  "basedOnTag": "v1.62.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/1a09708d6c36...ab94e3359ba4",
   "changes": [
     {
-      "shortHash": "e4a0e64c",
+      "shortHash": "4dec4a32",
       "date": "2026-11-23",
-      "title": "Testar em cada número e e-mail da lista e cartão com o estado dos canais",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "256bba9b",
-      "date": "2026-11-23",
-      "title": "Alterações não salvas, intervalo em minutos e resultado completo da varredura",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d1d1a07b",
-      "date": "2026-11-23",
-      "title": "Menu lateral agrupado no console e submenu de Configurações com grupos",
-      "category": "New"
-    },
-    {
-      "shortHash": "0e7ee1d6",
-      "date": "2026-11-23",
-      "title": "Afiliados considera só texto visível (o menu do celular repete 'Afiliados')",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "c6248310",
-      "date": "2026-11-23",
-      "title": "Confirmação à pessoa depois do vínculo por link",
+      "title": "Ícones no menu lateral e seção das Configurações na URL (?sub=)",
       "category": "New"
     }
   ]
