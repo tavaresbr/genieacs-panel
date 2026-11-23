@@ -150,6 +150,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   // mesma seção em 13 idiomas.
   { tab: 'whatsapp', labelKey: 'sidebar.nav.whatsapp' },
   { tab: 'chatbot', labelKey: 'settings.tab.chatbot', permission: 'whatsapp.config' },
+  { tab: 'telegram', labelKey: 'settings.tab.telegram', permission: 'whatsapp.config' },
   { tab: 'security', labelKey: 'settings.tab.security' },
   { tab: 'vendors', labelKey: 'settings.tab.vendors' },
   { tab: 'wifi-security', labelKey: 'settings.tab.wifiSecurity' },

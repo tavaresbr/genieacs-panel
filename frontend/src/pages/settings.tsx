@@ -72,6 +72,7 @@ import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MarketingOptOutPanel } from '@/components/settings/marketing-opt-out-panel'
 import { IntegrationsHub } from '@/components/settings/integrations-hub'
+import { TelegramTab } from '@/components/settings/telegram-tab'
 import { SectionTabs } from '@/components/settings/section-tabs'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
@@ -109,7 +110,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
   'provider', 'general', 'virtual-params', 'customer-portal', 'integrations', 'sgp', 'asaas', 'teiah', 'focuschat', 'provisioning',
-  'whatsapp', 'chatbot', 'security', 'vendors', 'wifi-security', 'database', 'about'
+  'whatsapp', 'chatbot', 'telegram', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
 /**
@@ -117,7 +118,7 @@ const SETTINGS_TABS = [
  * Continuam abrindo por `?tab=sgp` etc., e a trilha acende "Integrações"
  * enquanto uma delas está aberta.
  */
-const INTEGRATION_TABS = ['sgp', 'asaas', 'teiah', 'focuschat', 'whatsapp', 'chatbot']
+const INTEGRATION_TABS = ['sgp', 'asaas', 'teiah', 'focuschat', 'whatsapp', 'chatbot', 'telegram']
 
 /**
  * Os painéis de dentro das abas do SGP já vêm com margem e linha em cima, de
@@ -1921,6 +1922,7 @@ export default function Settings() {
             canAsaas={can('asaas.config')}
             canFocusChat={can('settings.write')}
             canChatbot={can('whatsapp.config')}
+            canTelegram={can('whatsapp.config')}
           />
         )}
         {INTEGRATION_TABS.includes(activeTab) && (
@@ -4238,6 +4240,8 @@ export default function Settings() {
         )}
 
         {activeTab === 'chatbot' && can('whatsapp.config') && <ChatbotTab />}
+
+        {activeTab === 'telegram' && can('whatsapp.config') && <TelegramTab />}
 
         {activeTab === 'about' && <AboutTab appName={tenantName} />}
 

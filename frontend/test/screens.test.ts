@@ -216,12 +216,13 @@ describe('as seções da Configuração', () => {
    * As duas que têm capacidade própria — as mesmas que `IntegrationsHub` já
    * esconde. Oferecer o link aqui seria contornar aquela regra pela porta nova.
    */
-  it('e escondem TeiaH e chatbot de quem não tem a capacidade delas', () => {
+  it('e escondem TeiaH, chatbot e Telegram de quem não tem a capacidade delas', () => {
     const so = papelQuePode('settings.read')
     const tabs = visibleSettingsSections({ can: so, isSaas: true }).map((s) => s.tab)
 
     expect(tabs).not.toContain('teiah')
     expect(tabs).not.toContain('chatbot')
+    expect(tabs).not.toContain('telegram')
     expect(tabs).toContain('sgp')
   })
 })
