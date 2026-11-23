@@ -8,6 +8,7 @@ process.env.MESSENGER_VERIFY_TOKEN = 'token-de-verificacao';
 const { authHeaders, call, defaultTenantId, getDb, startTestServers, stopTestServers } = await import('./helpers/harness.js');
 const { default: CustomerPortalPasswordService } = await import('../src/services/customerPortalPasswordService.js');
 const { encryptPageToken } = await import('../src/services/messengerPageService.js');
+const { setMetaGraphFetcher } = await import('../src/services/metaGraphClient.js');
 
 /**
  * O botão "Messenger" do portal do assinante: o link nasce do contrato da ONT de
@@ -23,6 +24,8 @@ let tenantId;
 let accountId;
 
 before(async () => {
+  // A confirmação ao abrir o link vai para a Graph: nenhuma chamada de verdade sai daqui.
+  setMetaGraphFetcher(async () => new Response(JSON.stringify({ message_id: 'm.stub' }), { status: 200 }));
   ({ panelUrl, portalUrl } = await startTestServers());
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST', body: { username: 'operator', password: 'operator-password-1', email: 'operator@exemplo.test' }

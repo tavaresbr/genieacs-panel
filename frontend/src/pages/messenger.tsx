@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { messengerAPI, type MessengerStatus } from '@/lib/api'
 import { MessengerInbox } from '@/components/messenger/inbox'
+import { MessengerNoticeSettings } from '@/components/messenger/notice-settings'
 import { MessengerPagesPanel } from '@/components/messenger/pages-panel'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
@@ -58,6 +59,7 @@ export default function MessengerPage() {
           }}
         />
       )}
+      {canConfig && <MessengerNoticeSettings />}
     </div>
   )
 }

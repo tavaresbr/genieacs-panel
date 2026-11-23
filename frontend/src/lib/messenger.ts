@@ -7,6 +7,9 @@ export const MESSENGER_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000
 /** O limite de texto que o servidor aceita numa resposta. */
 export const MESSENGER_MAX_TEXT = 2000
 
+/** O limite do texto da confirmação do vínculo (o do servidor). */
+export const MESSENGER_NOTICE_MAX = 500
+
 /**
  * Quanto falta para a janela fechar, em milissegundos; 0 se já fechou ou se a
  * pessoa nunca escreveu. É a mesma conta do servidor, só para MOSTRAR — quem
@@ -48,6 +51,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   messenger_unconfigured: 'messenger.error.unconfigured',
   subscriber_not_found: 'messenger.error.subscriberNotFound',
   no_page: 'messenger.error.noPage',
+  notice_too_long: 'messenger.error.noticeTooLong',
   meta_refused: 'messenger.error.metaRefused',
 }
 

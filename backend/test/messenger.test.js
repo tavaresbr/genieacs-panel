@@ -11,6 +11,7 @@ const { verifyMetaSignature } = await import('../src/utils/messenger/messengerSi
 const { encryptPageToken, decryptPageToken } = await import('../src/services/messengerPageService.js');
 const { default: MessengerConversation } = await import('../src/models/MessengerConversation.js');
 const { default: MessengerMessage } = await import('../src/models/MessengerMessage.js');
+const noticeModule = await import('../src/services/messengerLinkedNoticeService.js');
 
 const metaCalls = [];
 let panelUrl;
@@ -530,6 +531,143 @@ describe('link de vínculo automático (?ref=)', () => {
   it('a assinatura inclui messaging_referrals', async () => {
     const { SUBSCRIBED_FIELDS } = await import('../src/services/messengerPageService.js');
     assert.ok(SUBSCRIBED_FIELDS.split(',').includes('messaging_referrals'));
+  });
+});
+
+describe('confirmação à pessoa depois do vínculo por link', () => {
+  const { DEFAULT_NOTICE } = noticeModule;
+  const sent = [];
+  let seq = 0;
+  const referral = (psid, ref) => ({
+    object: 'page',
+    entry: [{ id: '1000000001', messaging: [{ sender: { id: psid }, recipient: { id: '1000000001' }, timestamp: Date.now(), referral: { ref, source: 'SHORTLINK', type: 'OPEN_THREAD' } }] }]
+  });
+  const newRef = async (contract = 'CT-ALFA-1') => new URL((await api('/links', { method: 'POST', body: { contract } })).body.data.url).searchParams.get('ref');
+  const conv = (psid) => getDb()('messenger_conversations').where({ tenant_id: alfa, psid }).first();
+  const messagesOf = async (psid) => getDb()('messenger_messages').where({ conversation_id: (await conv(psid)).id }).orderBy('id');
+  const okGraph = () => setMetaGraphFetcher(async (url, init) => {
+    if (String(url).endsWith('/messages')) sent.push(JSON.parse(init.body));
+    // Um id novo a cada chamada (a Meta nunca repete): `sent` é zerada entre os testes, o contador não.
+    seq += 1;
+    return new Response(JSON.stringify({ message_id: `m.sys.${seq}` }), { status: 200 });
+  });
+  const saveNotice = (linkedNotice) => api('/settings', { method: 'PUT', body: { linkedNotice } });
+
+  before(okGraph);
+  after(async () => {
+    await saveNotice({ enabled: true, text: '' });
+    setMetaGraphFetcher(async (url) => { metaCalls.push(String(url)); return new Response('{}', { status: 500 }); });
+  });
+
+  it('o texto de fábrica é uma confirmação curta e não entrega nada do cadastro', () => {
+    assert.ok(DEFAULT_NOTICE.length > 20 && DEFAULT_NOTICE.length < 300);
+    for (const segredo of ['Maria', 'Silva', 'CT-', 'contrato ']) assert.ok(!DEFAULT_NOTICE.includes(segredo), segredo);
+  });
+
+  it('abrir o link vincula e a pessoa recebe a confirmação no Messenger, como resposta', async () => {
+    sent.length = 0;
+    assert.equal(await deliver(referral('psid-conf-1', await newRef())), 200);
+    assert.equal((await conv('psid-conf-1')).contract, 'CT-ALFA-1');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].recipient.id, 'psid-conf-1');
+    assert.equal(sent[0].messaging_type, 'RESPONSE');
+    assert.equal(sent[0].message.text, DEFAULT_NOTICE);
+    // Nada do cadastro vai para quem abriu o link — ele pode não ser o assinante.
+    assert.ok(!JSON.stringify(sent[0]).includes('Maria'));
+    assert.ok(!JSON.stringify(sent[0]).includes('CT-ALFA-1'));
+  });
+
+  it('a confirmação fica gravada como mensagem automática, e abre a janela de resposta', async () => {
+    const [msg] = await messagesOf('psid-conf-1');
+    assert.equal(msg.direction, 'out');
+    assert.equal(msg.source, 'system');
+    assert.equal(msg.delivery_status, 'sent');
+    assert.equal(msg.sent_by, null);
+    const c = await conv('psid-conf-1');
+    assert.ok(c.last_inbound_at, 'o clique no link é a última interação dela');
+    assert.equal(c.unread_count, 0, 'a confirmação não conta como não lida');
+    const item = (await api('/conversations')).body.data.find((x) => x.psid === 'psid-conf-1');
+    assert.equal(item.windowOpen, true);
+    assert.equal(item.lastMessage.direction, 'out');
+  });
+
+  it('a reentrega do mesmo evento não confirma de novo', async () => {
+    sent.length = 0;
+    const ref = await newRef();
+    const evento = referral('psid-conf-2', ref);
+    assert.equal(await deliver(evento), 200);
+    assert.equal(await deliver(evento), 200);
+    assert.equal(sent.length, 1);
+    assert.equal((await messagesOf('psid-conf-2')).length, 1);
+  });
+
+  it('sem vínculo novo não há confirmação: link inválido, já gasto, ou conversa já vinculada', async () => {
+    sent.length = 0;
+    assert.equal(await deliver(referral('psid-conf-3', 'campanha-natal')), 200);
+    const usada = await newRef();
+    assert.equal(await deliver(referral('psid-conf-4', usada)), 200);
+    sent.length = 0;
+    assert.equal(await deliver(referral('psid-conf-5', usada)), 200);
+    assert.equal(sent.length, 0, 'o link já foi gasto');
+    // Conversa já vinculada pelo atendente: o link não vincula e não confirma.
+    assert.equal(await deliver(inbound('1000000001', 'psid-conf-6', 'm.c6', 'oi')), 200);
+    const c6 = await conv('psid-conf-6');
+    await api(`/conversations/${c6.id}/subscriber`, { method: 'POST', body: { contract: 'CT-ALFA-SEM-ONT' } });
+    sent.length = 0;
+    assert.equal(await deliver(referral('psid-conf-6', await newRef())), 200);
+    assert.equal(sent.length, 0);
+  });
+
+  it('as configurações: ligada por padrão, texto de fábrica, e só quem configura edita', async () => {
+    const lida = await api('/settings');
+    assert.equal(lida.status, 200, JSON.stringify(lida.body));
+    assert.deepEqual(lida.body.data.linkedNotice, { enabled: true, text: '', defaultText: DEFAULT_NOTICE });
+    assert.equal((await call(`${panelUrl}/api/messenger/settings`)).status, 401);
+  });
+
+  it('o texto do provedor vale no lugar do de fábrica, aparado, e vazio volta ao de fábrica', async () => {
+    const salvo = await saveNotice({ text: '  Oi! Já vinculamos você.\nComo ajudamos?  ' });
+    assert.equal(salvo.status, 200, JSON.stringify(salvo.body));
+    assert.equal(salvo.body.data.linkedNotice.text, 'Oi! Já vinculamos você.\nComo ajudamos?');
+    assert.equal(salvo.body.data.linkedNotice.enabled, true, 'campo ausente mantém o gravado');
+    sent.length = 0;
+    assert.equal(await deliver(referral('psid-conf-7', await newRef())), 200);
+    assert.equal(sent[0].message.text, 'Oi! Já vinculamos você.\nComo ajudamos?');
+    await saveNotice({ text: '' });
+    sent.length = 0;
+    assert.equal(await deliver(referral('psid-conf-8', await newRef())), 200);
+    assert.equal(sent[0].message.text, DEFAULT_NOTICE);
+  });
+
+  it('recusa texto longo demais e corpo inválido, sem gravar', async () => {
+    const longo = await saveNotice({ text: 'x'.repeat(501) });
+    assert.equal(longo.status, 400);
+    assert.equal(longo.body.code, 'notice_too_long');
+    assert.equal((await saveNotice({ enabled: 'sim' })).body.code, 'invalid_body');
+    assert.equal((await api('/settings', { method: 'PUT', body: {} })).body.code, 'invalid_body');
+    assert.equal((await api('/settings')).body.data.linkedNotice.text, '');
+  });
+
+  it('desligada, a pessoa é vinculada do mesmo jeito mas não recebe nada', async () => {
+    assert.equal((await saveNotice({ enabled: false })).body.data.linkedNotice.enabled, false);
+    sent.length = 0;
+    assert.equal(await deliver(referral('psid-conf-9', await newRef())), 200);
+    assert.equal((await conv('psid-conf-9')).contract, 'CT-ALFA-1');
+    assert.equal(sent.length, 0);
+    assert.equal((await messagesOf('psid-conf-9')).length, 0);
+    await saveNotice({ enabled: true });
+  });
+
+  it('se a Meta recusar, o vínculo fica, o webhook responde 200 e a falha fica gravada', async () => {
+    setMetaGraphFetcher(async () => new Response(JSON.stringify({ error: { code: 10, message: 'fora da janela' } }), { status: 400 }));
+    const ref = await newRef();
+    assert.equal(await deliver(referral('psid-conf-10', ref)), 200);
+    assert.equal((await conv('psid-conf-10')).contract, 'CT-ALFA-1');
+    const [msg] = await messagesOf('psid-conf-10');
+    assert.equal(msg.source, 'system');
+    assert.equal(msg.delivery_status, 'failed');
+    assert.match(msg.delivery_error, /fora da janela/);
+    okGraph();
   });
 });
 
