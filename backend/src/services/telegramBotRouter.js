@@ -73,7 +73,7 @@ class TelegramBotRouter {
       // O que não dá para dizer (bloqueado, bot fora) não é falha; o resto vai
       // ao log, sem o texto da mensagem.
       if (!['chat_blocked', 'bot_unavailable'].includes(error?.code)) {
-        console.error('telegram bot:', error?.name || 'Error');
+        console.error('telegram bot failed');
       }
       return { replied: false, reason: 'error' };
     }
@@ -189,10 +189,10 @@ class TelegramBotRouter {
         }
         resposta = link.device_id ? await WaBotService.textoSinal(link) : t('whatsapp.bot.noDevice');
       }
-    } catch (error) {
+    } catch {
       // SGP fora, GenieACS inalcançável, contrato que o ERP não conhece: o
       // cliente fez uma pergunta de verdade e merece mais que o silêncio.
-      console.error(`telegram bot ${intencao}:`, error?.name || 'Error');
+      console.error('telegram bot could not build the answer');
       resposta = null;
     }
 

@@ -37,8 +37,8 @@ class TelegramOutboxWorker {
   static start() {
     if (this.timer) return this.timer;
     this.timer = setInterval(() => {
-      void this.tick().catch((error) => {
-        console.warn(`Telegram outbox tick failed: ${error.name || 'Error'}`);
+      void this.tick().catch(() => {
+        console.warn('Telegram outbox tick failed');
       });
     }, TICK_INTERVAL_MS);
     this.timer.unref();
@@ -77,8 +77,8 @@ class TelegramOutboxWorker {
         else if (outcome === 'failed') summary.failed += 1;
         else if (outcome === 'retry') summary.retry += 1;
       }
-    } catch (error) {
-      console.warn(`Telegram outbox tick failed: ${error.name || 'Error'}`);
+    } catch {
+      console.warn('Telegram outbox tick failed');
     }
     return summary;
   }

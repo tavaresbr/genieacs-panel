@@ -139,8 +139,8 @@ class TelegramInboundService {
   static async process(update) {
     try {
       if (update?.message) await handleMessage(update.message);
-    } catch (error) {
-      console.error('[telegram-chat] could not handle update:', error.name || 'Error');
+    } catch {
+      console.error('[telegram-chat] could not handle update');
     }
   }
 }
