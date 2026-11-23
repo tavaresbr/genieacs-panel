@@ -27,6 +27,8 @@ import { AcsHealthStatus } from '@/components/platform/acs-health-status'
 import { TenantMembers } from '@/components/platform/tenant-members'
 import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { OnboardingBadge, OnboardingStuckFilter, useOnboardingSummaries } from '@/components/platform/tenant-onboarding'
+import { PlatformSidebar } from '@/components/platform/platform-nav'
+import { PLATFORM_NAV_GROUPS } from '@/lib/platform-overview'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -527,64 +529,17 @@ export default function PlatformPage() {
           )}
         </header>
 
-        {/* No celular, uma faixa que rola de lado: as onze abas quebradas em
-            linhas ocupavam a primeira tela inteira antes do conteúdo. */}
-        <nav className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" aria-label={t('platform.title')}>
-          {([
-            // Início, primeiro e padrão: os números de agora e o atalho para
-            // a aba de cada um.
-            ['home', 'platform.tabs.home'],
-            ['tenants', 'platform.tabs.tenants'],
-            ['plans', 'platform.tabs.plans'],
-            // Ao lado de Planos: é o catálogo visto do lado de quem paga — quem
-            // está em dia, quem deve, e a mão para dar baixa ou renegociar.
-            ['subscriptions', 'platform.tabs.subscriptions'],
-            // Logo depois: o recorte de quem deve, com as ações em massa.
-            ['delinquency', 'platform.tabs.delinquency'],
-            // Depois de Assinaturas: a mesma carteira, somada — quanto entra por
-            // mês, quanto entrou e voltou, e de que plano vem.
-            ['revenue', 'platform.tabs.revenue'],
-            // Os cupons de desconto, ao lado de quem os usa.
-            ['coupons', 'platform.tabs.coupons'],
-            // Quem pediu demonstração pela página pública — o funil antes da
-            // assinatura.
-            ['leads', 'platform.tabs.leads'],
-            ['admins', 'platform.tabs.admins'],
-            ['audit', 'platform.tabs.audit'],
-            // Configurações: os dados da empresa que vende o SaaS (o que o site
-            // mostra) e as integrações (a conta Asaas). Telas de configurar
-            // uma vez, antes das de consulta.
-            ['settings', 'platform.tabs.settings'],
-            // As duas últimas são as de consulta mais rara: não se abre o
-            // console para olhar variável de ambiente nem catálogo de
-            // fabricante, abre-se quando alguma coisa não chegou ou um
-            // provedor não está reconhecendo os aparelhos dele.
-            ['deployment', 'platform.tabs.deployment'],
-            // A página de status (0128): as verificações automáticas e os
-            // incidentes e manutenções que a página pública mostra. Ao lado
-            // do deploy, que é a outra tela de "o que está no ar".
-            ['status', 'platform.tabs.status'],
-            ['catalogue', 'platform.tabs.catalogue'],
-            // O manual de cobrança, por último: é o que se abre quando não se
-            // sabe em qual das outras abas está a resposta.
-            ['help', 'platform.tabs.help'],
-            // O programa de afiliados (0126): cadastro, aprovação e o lote mensal.
-            ['affiliates', 'platform.tabs.affiliates']
-          ] as const).map(([chave, rotulo]) => (
-            <button
-              key={chave}
-              type="button"
-              onClick={() => {
-                setSettingsDeep(null)
-                setAba(chave)
-              }}
-              aria-current={aba === chave ? 'page' : undefined}
-              className={`shrink-0 whitespace-nowrap ${aba === chave ? 'modern-button' : 'modern-button-secondary'}`}
-            >
-              {t(rotulo)}
-            </button>
-          ))}
-        </nav>
+        <div className="grid gap-6 lg:grid-cols-[14rem_1fr]">
+        <PlatformSidebar
+          ariaLabel={t('platform.title')}
+          active={aba}
+          groups={PLATFORM_NAV_GROUPS}
+          onSelect={(chave) => {
+            setSettingsDeep(null)
+            setAba(chave)
+          }}
+        />
+        <div className="min-w-0">
 
         {aba === 'home' && <PlatformOverviewTab onNavigate={irPara} />}
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
@@ -744,6 +699,8 @@ export default function PlatformPage() {
           </table>
         </div>
         )}
+        </div>
+        </div>
       </div>
     </div>
   )

@@ -14,6 +14,15 @@ export const PLATFORM_TABS = [
 
 export type PlatformTab = (typeof PLATFORM_TABS)[number]
 
+/** Os grupos do menu lateral do console (só a apresentação: as abas são as mesmas). */
+export const PLATFORM_NAV_GROUPS = [
+  { label: 'platform.nav.overview', items: [['home', 'platform.tabs.home']] },
+  { label: 'platform.nav.clients', items: [['tenants', 'platform.tabs.tenants'], ['leads', 'platform.tabs.leads'], ['affiliates', 'platform.tabs.affiliates']] },
+  { label: 'platform.nav.finance', items: [['plans', 'platform.tabs.plans'], ['subscriptions', 'platform.tabs.subscriptions'], ['delinquency', 'platform.tabs.delinquency'], ['revenue', 'platform.tabs.revenue'], ['coupons', 'platform.tabs.coupons']] },
+  { label: 'platform.nav.platform', items: [['admins', 'platform.tabs.admins'], ['audit', 'platform.tabs.audit'], ['deployment', 'platform.tabs.deployment'], ['status', 'platform.tabs.status'], ['catalogue', 'platform.tabs.catalogue']] },
+  { label: 'platform.nav.system', items: [['settings', 'platform.tabs.settings'], ['help', 'platform.tabs.help']] }
+] as const satisfies ReadonlyArray<{ label: string, items: ReadonlyArray<readonly [PlatformTab, string]> }>
+
 export const DEFAULT_PLATFORM_TAB: PlatformTab = 'home'
 
 /** A aba de um valor de `?tab=`: o desconhecido (ou ausente) é a padrão. */
