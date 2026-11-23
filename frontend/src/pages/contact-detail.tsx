@@ -43,6 +43,7 @@ import {
   type AddressForm
 } from '@/lib/contact-address'
 import { MessengerLinkButton } from '@/components/contacts/messenger-link'
+import { TelegramLinkButton } from '@/components/contacts/telegram-link'
 
 
 /** An address on one line, from its parts or as the SGP sent it. */
@@ -323,6 +324,7 @@ export default function ContactDetailPage() {
             )}
             <DevicesButton contracts={profile.contracts} />
             {can('whatsapp.send') && <MessengerLinkButton contracts={profile.contracts} />}
+            {can('whatsapp.send') && <TelegramLinkButton contracts={profile.contracts} />}
             {can('whatsapp.send') && (
               <ChatNumberMenu accounts={numbers} onChoose={(accountId) => void openConversation(undefined, accountId)}>
                 {({ onClick, expanded }) => (

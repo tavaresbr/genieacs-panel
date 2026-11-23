@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { whatsappAPI, type WhatsAppAlertSettings } from '@/lib/api'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { TelegramBotPanel } from '@/components/whatsapp/telegram-bot-panel'
+import { TelegramCustomerBotPanel } from '@/components/settings/telegram-customer-bot-panel'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { telegramCanTest, telegramPatch, type TelegramForm } from '@/lib/alert-telegram'
@@ -140,6 +141,9 @@ export function TelegramTab() {
 
       {/* Os comandos agem na hora (não esperam o Salvar), por isso ficam num bloco à parte. */}
       <TelegramBotPanel botSaved={Boolean(stored.telegram?.configured)} />
+
+      {/* O bot dos CLIENTES é outro bot, com token e webhook próprios. */}
+      <TelegramCustomerBotPanel />
     </section>
   )
 }

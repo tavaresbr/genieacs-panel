@@ -6898,6 +6898,86 @@ export const messengerAPI = {
     apiClient.delete<MessengerConversation>(`/messenger/conversations/${id}/subscriber`),
 }
 
+/** O bot do Telegram dos CLIENTES: o token nunca chega ao navegador. */
+export interface TelegramChatBot {
+  configured: boolean
+  enabled: boolean
+  botUsername: string | null
+  botName: string | null
+  webhookError: string | null
+}
+
+/** A última mensagem de uma conversa do Telegram, como a lista a recebe (texto já limitado a uma linha). */
+export interface TelegramChatPreview {
+  direction: 'in' | 'out'
+  text: string | null
+  deliveryStatus: 'sent' | 'failed' | null
+  at: string
+}
+
+export interface TelegramChatConversation {
+  id: number
+  chatId: string
+  name: string | null
+  username: string | null
+  contract: string | null
+  sgpContactId: number | null
+  /** O cliente do SGP a que a conversa foi vinculada, se foi. */
+  clientName: string | null
+  linked: boolean
+  /** `operator` = a equipe vinculou; `link` = o cliente abriu o link. */
+  boundVia: 'operator' | 'link' | null
+  lastMessageAt: string | null
+  lastInboundAt: string | null
+  unreadCount: number
+  closedAt: string | null
+  /** O cliente bloqueou o bot: nada sai até ele escrever de novo. */
+  blocked: boolean
+  /** Só na lista de conversas; nas demais respostas, `null`. */
+  lastMessage: TelegramChatPreview | null
+}
+
+export interface TelegramChatMessage {
+  id: number
+  conversationId: number
+  direction: 'in' | 'out'
+  body: string | null
+  /** `customer` = entrada; `system` = mensagem automática (a confirmação do vínculo). */
+  source: 'customer' | 'operator' | 'system'
+  deliveryStatus: 'sent' | 'failed' | null
+  deliveryError: string | null
+  createdAt: string
+}
+
+export const telegramChatAPI = {
+  getBot: () => apiClient.get<TelegramChatBot>('/telegram-chat/bot'),
+  /** O Telegram confere o token; só entra confirmado. */
+  saveBot: (token: string) => apiClient.put<TelegramChatBot>('/telegram-chat/bot', { token }),
+  enable: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/enable', {}),
+  disable: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/disable', {}),
+  /** Esquece o token (e desliga); as conversas ficam. */
+  disconnect: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/disconnect', {}),
+  listConversations: (status: 'open' | 'closed' = 'open') =>
+    apiClient.get<TelegramChatConversation[]>(`/telegram-chat/conversations?status=${status}`),
+  /** Abrir a conversa zera o não lido: quem a abre é quem a leu. */
+  listMessages: (id: number) =>
+    apiClient.get<{ conversation: TelegramChatConversation; messages: TelegramChatMessage[] }>(
+      `/telegram-chat/conversations/${id}/messages`
+    ),
+  send: (id: number, text: string) =>
+    apiClient.post<TelegramChatMessage>(`/telegram-chat/conversations/${id}/messages`, { text }),
+  setClosed: (id: number, closed: boolean) =>
+    apiClient.post<TelegramChatConversation>(`/telegram-chat/conversations/${id}/closed`, { closed }),
+  /** O link `t.me/<bot>?start=…` que vincula a conversa ao assinante quando ele o abre. */
+  createLink: (contract: string) =>
+    apiClient.post<{ url: string; expiresAt: string }>('/telegram-chat/links', { contract }),
+  /** `key` é o do contato (`WhatsAppContact.key`): o contrato, ou `c:<id>` sem contrato. */
+  linkSubscriber: (id: number, key: string) =>
+    apiClient.post<TelegramChatConversation>(`/telegram-chat/conversations/${id}/subscriber`, { contract: key }),
+  unlinkSubscriber: (id: number) =>
+    apiClient.delete<TelegramChatConversation>(`/telegram-chat/conversations/${id}/subscriber`),
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),

@@ -21,6 +21,52 @@
  */
 export const casos = [
   {
+    // O Telegram dos clientes. Nenhuma destas rotas apaga a linha do bot, então a
+    // ordem não importa. No controle o bot está desligado: a resposta é 409
+    // `bot_unavailable`, que só se chega DEPOIS de achar a conversa, e sem
+    // chamar o Telegram.
+    chave: 'telegramConversation',
+    label: 'GET /api/telegram-chat/conversations/:id/messages',
+    method: 'GET',
+    path: (id) => `/api/telegram-chat/conversations/${id}/messages`,
+    tabela: 'telegram_conversations'
+  },
+  {
+    chave: 'telegramConversation',
+    label: 'POST /api/telegram-chat/conversations/:id/messages',
+    method: 'POST',
+    path: (id) => `/api/telegram-chat/conversations/${id}/messages`,
+    body: { text: 'oi' },
+    tabela: 'telegram_conversations'
+  },
+  {
+    chave: 'telegramConversation',
+    label: 'POST /api/telegram-chat/conversations/:id/closed',
+    method: 'POST',
+    path: (id) => `/api/telegram-chat/conversations/${id}/closed`,
+    body: { closed: true },
+    tabela: 'telegram_conversations'
+  },
+  {
+    // Vincular a um contrato que não existe: a resposta é `subscriber_not_found`,
+    // que só se chega DEPOIS de achar a conversa.
+    chave: 'telegramConversation',
+    label: 'POST /api/telegram-chat/conversations/:id/subscriber',
+    method: 'POST',
+    path: (id) => `/api/telegram-chat/conversations/${id}/subscriber`,
+    body: { contract: 'CONTRATO-QUE-NAO-EXISTE' },
+    tabela: 'telegram_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'telegramConversation',
+    label: 'DELETE /api/telegram-chat/conversations/:id/subscriber',
+    method: 'DELETE',
+    path: (id) => `/api/telegram-chat/conversations/${id}/subscriber`,
+    tabela: 'telegram_conversations'
+  },
+  {
     // O Messenger. As três rotas da conversa vêm antes da que desconecta a
     // Página: o controle desta apaga a Página e, em cascata, a conversa.
     chave: 'messengerConversation',

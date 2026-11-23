@@ -140,3 +140,31 @@ export function clearTelegramButtons({ token, chatId, messageId }) {
     reply_markup: { inline_keyboard: [] }
   });
 }
+
+/**
+ * Quem é o bot deste token (`getMe`): confere o token e traz o @usuário para o
+ * link `t.me/<usuario>?start=…`.
+ */
+export function getTelegramMe({ token }) {
+  return callTelegram(token, 'getMe', {});
+}
+
+/**
+ * Manda um texto e devolve o `message_id` que a Telegram deu (para a deduplicação
+ * e o par `chat_id:message_id` da caixa). Nunca lança. `description` vem do
+ * Telegram e não contém o token.
+ *
+ * @returns {Promise<{ ok: true, messageId: number|null } | { ok: false, code: string, description: string|null }>}
+ */
+export async function sendTelegramMessageWithId({ token, chatId, text, parseMode, replyMarkup }) {
+  const payload = {
+    chat_id: chatId,
+    text: String(text ?? '').slice(0, TELEGRAM_TEXT_MAX),
+    disable_web_page_preview: true
+  };
+  if (parseMode) payload.parse_mode = parseMode;
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  const result = await callTelegram(token, 'sendMessage', payload);
+  if (result.ok) return { ok: true, messageId: Number(result.result?.message_id) || null };
+  return result;
+}

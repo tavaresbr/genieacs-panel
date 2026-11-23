@@ -64,6 +64,9 @@ export const LOCKOUT_STALE_DAYS = 1;
  */
 export const MESSENGER_LINK_TOKEN_RETENTION_DAYS = 30;
 
+/** O mesmo prazo para os links de vínculo do Telegram dos clientes (`telegramLinkTokenService.js`). */
+export const TELEGRAM_LINK_TOKEN_RETENTION_DAYS = 30;
+
 export const WINDOWS = Object.freeze([
   {
     id: 'audit',
@@ -81,6 +84,18 @@ export const WINDOWS = Object.freeze([
     label: 'Links de vínculo do Messenger',
     tables: ['messenger_link_tokens'],
     defaultDays: MESSENGER_LINK_TOKEN_RETENTION_DAYS,
+    minDays: null,
+    maxDays: null,
+    configuredBy: 'fixed',
+    clock: 'expires_at',
+    spares: 'links que ainda não venceram, usados ou não',
+    personalData: 'a quem o link vincula (contrato ou conta do portal); só o hash do token é guardado',
+    source: 'services/schedulerService.js'
+  },  {
+    id: 'telegram-link-tokens',
+    label: 'Links de vínculo do Telegram dos clientes',
+    tables: ['telegram_link_tokens'],
+    defaultDays: TELEGRAM_LINK_TOKEN_RETENTION_DAYS,
     minDays: null,
     maxDays: null,
     configuredBy: 'fixed',
@@ -270,7 +285,10 @@ export const SEM_PRAZO = Object.freeze({
   wa_conversations: 'a conversa e o telefone do assinante; o varredor de mensagens se recusa a tocá-la, por desenho — sai pela exclusão do art. 18',
   // Atendimento (Messenger)
   messenger_conversations: 'a conversa e o PSID da pessoa na Página; nenhuma rotina a apaga por idade — sai ao desconectar a Página (em cascata) ou pela exclusão do art. 18',
-  messenger_messages: 'o texto trocados no Messenger e o arquivo do anexo recebido (em `messenger-media/`, no disco do painel); nenhuma rotina os apaga por idade — saem junto com a conversa, e o arquivo é apagado do disco ao desconectar a Página e na exclusão do art. 18',
+  messenger_messages: 'o texto trocado no Messenger e o arquivo do anexo recebido (em `messenger-media/`, no disco do painel); nenhuma rotina os apaga por idade — saem junto com a conversa, e o arquivo é apagado do disco ao desconectar a Página e na exclusão do art. 18',
+  // Atendimento (Telegram dos clientes)
+  telegram_conversations: 'a conversa e o id do chat da pessoa no Telegram; nenhuma rotina a apaga por idade — sai pela exclusão do art. 18 ou junto com o provedor',
+  telegram_messages: 'o texto trocado no Telegram; nenhuma rotina o apaga por idade — sai junto com a conversa',
   wa_opt_outs: 'quem pediu para não receber mensagens; nenhuma rotina o apaga',
   wa_marketing_opt_outs: 'quem pediu para não receber promoções, e quando voltou; nenhuma rotina o apaga — apagar seria desfazer o pedido',
   wa_satisfaction: 'a avaliação do atendimento dada pelo assinante; sai só pela exclusão do art. 18',

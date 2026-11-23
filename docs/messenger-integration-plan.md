@@ -239,7 +239,7 @@ dados**. No painel do app (Configurações → Básico / Login do Facebook → C
 
 - Os dois recebem `POST` (formulário) com `signed_request`; a credencial é a assinatura HMAC-SHA256 com
   `META_APP_SECRET` (falha fechada: sem segredo ou assinatura ruim, 401, e nada é tocado).
-- O `user_id` é o do usuário NO APP, gravado em `messenger_pages.facebook_user_id` (migração `0148`) quando a Página é
+- O `user_id` é o do usuário NO APP, gravado em `messenger_pages.facebook_user_id` (migração `0149`) quando a Página é
   conectada pelo login do Facebook; só esse número, sem nome nem e-mail. Página colada à mão não guarda o id de ninguém.
 - **Desautorização**: as Páginas daquele usuário (em todos os provedores) vão para "requer atenção"
   (`facebook_deauthorized`); nada é apagado.
@@ -262,6 +262,6 @@ O link do anexo que vem no evento é de CDN da Meta e expira, então o painel **
   (`resolveStoredAttachment`, que refaz o `realpath` a cada pedido), `inline` só para imagem conhecida, `nosniff`,
   `Content-Security-Policy: sandbox`, `no-store`. O caminho nunca sai do servidor; todo jeito de não ter o arquivo é o mesmo 404.
 - Os arquivos saem do disco ao desconectar a Página e na exclusão do art. 18 do assinante (antes das linhas, como no WhatsApp).
-- Migração `0149`: `attachment_path`, `attachment_mime`, `attachment_size` em `messenger_messages`.
+- Migração `0150`: `attachment_path`, `attachment_mime`, `attachment_size` em `messenger_messages`.
 - **Limite:** não há varredura de arquivos órfãos nem prazo por idade (como o texto da conversa); só áudio/vídeo/arquivo
   baixam por botão (a tela não toca áudio nem vídeo). **Envio de anexo pelo painel continua fora.**

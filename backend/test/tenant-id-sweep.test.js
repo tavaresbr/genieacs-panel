@@ -332,6 +332,17 @@ async function semear(tenantId, slug) {
       attachment_mime: 'image/png'
     });
 
+    // O Telegram dos clientes: o bot (sem token, desligado) e uma conversa dele.
+    alvo.telegramBot = await semearLinha('telegram_customer_bots', {
+      bot_username: `bot_${slug.replace(/\W/g, '').slice(0, 20)}`,
+      enabled: false
+    });
+    alvo.telegramConversation = await semearLinha('telegram_conversations', {
+      bot_row_id: alvo.telegramBot,
+      chat_id: `${Date.now()}${slug.replace(/\D/g, '').slice(0, 4)}`.slice(0, 32),
+      name: `Pessoa do ${slug}`
+    });
+
     // O contrato do SGP, um por provedor e não o mesmo nos dois, pelo motivo
     // da planta de fibra acima: o que se pergunta é se o contrato do VIZINHO
     // abre conversa aqui. Com telefone, para que o controle chegue a abrir.
