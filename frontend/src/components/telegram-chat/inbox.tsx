@@ -110,6 +110,9 @@ export function TelegramChatInbox({ canSend, botOn }: { canSend: boolean; botOn:
                       </span>
                     )}
                   </span>
+                  {conversation.noticesOff && (
+                    <span className="block truncate text-[0.68rem] text-muted-foreground">{t('telegramChat.noticesOff')}</span>
+                  )}
                   {conversation.lastMessage && (
                     <span
                       className={`block truncate text-xs ${conversation.unreadCount ? 'text-foreground' : 'text-muted-foreground'}`}
@@ -289,7 +292,7 @@ function Thread({
                 : <p className="text-muted-foreground">{t('messenger.noText')}</p>}
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[0.68rem] text-muted-foreground">
                 <span>{formatDateTime(message.createdAt)}</span>
-                {message.direction === 'out' && message.source === 'system' && <span>{t('messenger.sentAutomatic')}</span>}
+                {message.direction === 'out' && (message.source === 'system' || message.source === 'notice') && <span>{t('messenger.sentAutomatic')}</span>}
                 {message.direction === 'out' && message.deliveryStatus && (
                   <span className={message.deliveryStatus === 'failed' ? 'text-[hsl(var(--status-danger))]' : ''}>
                     {t(`messenger.status.${message.deliveryStatus}`)}
@@ -305,6 +308,7 @@ function Thread({
       {canSend && (
         <form onSubmit={(event) => void handleSend(event)} className="space-y-2 border-t border-border p-3">
           {current.blocked && <p className="field-hint" role="status">{t('telegramChat.blocked')}</p>}
+          {current.noticesOff && !current.blocked && <p className="field-hint" role="status">{t('telegramChat.noticesOff')}</p>}
           <div className="flex items-end gap-2">
             <textarea
               className="modern-input min-h-12 flex-1"

@@ -13,6 +13,10 @@ router.post('/bot/enable', authenticateToken, requirePermission('whatsapp.config
 router.post('/bot/disable', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.disable);
 router.post('/bot/disconnect', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.disconnect);
 
+// Quais avisos saem pelo Telegram: ler é de quem atende, mudar é configuração.
+router.get('/notices', authenticateToken, requirePermission('whatsapp.read'), TelegramChatController.getNotices);
+router.put('/notices', authenticateToken, requirePermission('whatsapp.config'), telegramBotAdminLimiter, TelegramChatController.saveNotices);
+
 // O link de vínculo é falar COMO o provedor com o assinante: `whatsapp.send`.
 router.post('/links', authenticateToken, requirePermission('whatsapp.send'), whatsappSendLimiter, TelegramChatController.createLink);
 

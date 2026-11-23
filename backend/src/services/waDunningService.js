@@ -1,3 +1,4 @@
+import SubscriberNoticeService from './subscriberNoticeService.js';
 import MessengerLinkTokenService from './messengerLinkTokenService.js';
 import AppState from '../models/AppState.js';
 import SgpLink from '../models/SgpLink.js';
@@ -814,6 +815,16 @@ class WaDunningService {
           break;
         }
       }
+      // O Telegram dos clientes, AO LADO do WhatsApp e desligado por padrão
+      // (cobrança em canal novo é decisão do provedor): o texto e, em seguida, os
+      // códigos em mensagens só deles. Uma vez por contrato, fatura e etapa.
+      // Nunca lança.
+      await SubscriberNoticeService.notifyTelegram({
+        contracts: [subscriber.contract],
+        kind: 'billing',
+        refKey: `${subscriber.contract}:${invoiceKey}:${step.offsetDays}`,
+        body: [body, ...codigos]
+      });
       return { status: 'queued', item };
     } catch (error) {
       // A linha fica como pulada, com o motivo: sem ela a etapa seria tentada

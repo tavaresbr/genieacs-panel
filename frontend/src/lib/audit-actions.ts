@@ -132,6 +132,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'telegram_bot.linked': 'audit.action.telegramLinked',
   'telegram_bot.unlinked': 'audit.action.telegramUnlinked',
   'telegram_chat_bot.changed': 'audit.action.telegramChatBotChanged',
+  'telegram_chat_notices.changed': 'audit.action.telegramNoticesChanged',
   'whatsapp.dunning_enabled': 'audit.action.whatsappDunningEnabled',
   'whatsapp.dunning_disabled': 'audit.action.whatsappDunningDisabled',
   'whatsapp.dunning_saved': 'audit.action.whatsappDunningSaved',
