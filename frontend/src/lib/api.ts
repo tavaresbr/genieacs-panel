@@ -6189,6 +6189,14 @@ export interface WhatsAppAlertSettings {
   mailConfigured?: boolean
   /** Só na leitura: se há um bot guardado (o token nunca vem) e o grupo. */
   telegram?: { configured: boolean; chatId: string }
+  /** Só na leitura: o que cada canal precisa para sair (cartão "Canais de aviso"). */
+  channels?: {
+    whatsapp: { configured: boolean; addon: boolean; numberConnected: boolean; recipients: number }
+    email: { smtp: boolean; recipients: number }
+    telegram: { configured: boolean; ready: boolean }
+  }
+  /** Só na leitura: a última varredura, em ms, ou null se nunca rodou. */
+  lastScanAt?: number | null
   rules: Record<WhatsAppAlertRule, { enabled: boolean; threshold: number | null; cooldownMinutes: number }>
 }
 
@@ -7256,6 +7264,10 @@ export const whatsappAPI = {
   ) =>
     apiClient.put<WhatsAppAlertSettings>('/whatsapp/alerts/settings', settings),
 
+  /** Uma mensagem de teste para UM número ou e-mail da lista já salva. `queued`: no WhatsApp só entrou na fila. */
+  testAlertRecipient: (channel: 'whatsapp' | 'email', to: string) =>
+    apiClient.post<{ channel: string; queued: boolean }>('/whatsapp/alerts/test', { channel, to }),
+
   /** Uma mensagem de teste no grupo do Telegram dos alertas. */
   testAlertTelegram: () =>
     apiClient.post<{ sent: boolean }>('/whatsapp/alerts/telegram/test', {}),
@@ -7274,7 +7286,7 @@ export const whatsappAPI = {
     apiClient.post<TelegramBotStatus>('/whatsapp/alerts/telegram/bot/unlink', { telegramUserId }),
 
   runAlertScan: () =>
-    apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),
+    apiClient.post<{ fired: number; cleared: number; notified?: number }>('/whatsapp/alerts/scan', {}),
 
   // ── Inbox ────────────────────────────────────────────────────────────
   // `search` matches the phone, the pushed WhatsApp name, the contract and the

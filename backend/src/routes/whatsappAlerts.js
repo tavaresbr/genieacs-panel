@@ -4,7 +4,7 @@ import TelegramBotController from '../controllers/telegramBotController.js';
 import OutageController from '../controllers/outageController.js';
 import MaintenanceController from '../controllers/maintenanceController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { telegramBotAdminLimiter, telegramTestLimiter } from '../middleware/rateLimit.js';
+import { alertTestLimiter, telegramBotAdminLimiter, telegramTestLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -14,6 +14,8 @@ const router = express.Router();
 router.get('/alerts/settings', authenticateToken, requirePermission('whatsapp.config'), WhatsAppAlertsController.getSettings);
 router.put('/alerts/settings', authenticateToken, requirePermission('whatsapp.config'), WhatsAppAlertsController.updateSettings);
 router.post('/alerts/scan', authenticateToken, requirePermission('whatsapp.config'), WhatsAppAlertsController.scan);
+// Uma mensagem de teste para UM número ou e-mail da lista já salva.
+router.post('/alerts/test', authenticateToken, requirePermission('whatsapp.config'), alertTestLimiter, WhatsAppAlertsController.testRecipient);
 // Uma mensagem de teste no grupo do Telegram: é o que diz se o bot está lá.
 router.post('/alerts/telegram/test', authenticateToken, requirePermission('whatsapp.config'), telegramTestLimiter, WhatsAppAlertsController.testTelegram);
 
