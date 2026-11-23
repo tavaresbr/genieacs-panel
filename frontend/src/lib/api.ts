@@ -6776,6 +6776,15 @@ export interface MessengerPage {
   createdAt: string
 }
 
+/** A última mensagem de uma conversa, como a lista a recebe (texto já limitado a uma linha). */
+export interface MessengerPreview {
+  direction: 'in' | 'out'
+  text: string | null
+  attachmentType: string | null
+  deliveryStatus: MessengerDeliveryStatus | null
+  at: string
+}
+
 export interface MessengerConversation {
   id: number
   pageRowId: number
@@ -6792,6 +6801,8 @@ export interface MessengerConversation {
   closedAt: string | null
   /** Se ainda dá para responder (24 h desde a última mensagem da pessoa). */
   windowOpen: boolean
+  /** Só na lista de conversas; nas demais respostas, `null`. */
+  lastMessage: MessengerPreview | null
 }
 
 export type MessengerDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed'

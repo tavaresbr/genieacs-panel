@@ -111,8 +111,10 @@ dedup de `mid`, janela de 24 h, isolamento entre tenants, cifra do token da Pág
   assinatura, desconectar com confirmação. O token só vai do campo ao servidor.
 - Item de menu "Messenger" (`whatsapp.read`); textos nos 13 idiomas (pt-BR e es traduzidos; os demais em
   inglês, como as outras chaves novas do projeto).
-- Não há ainda prévia da última mensagem na lista (o endpoint não a devolve) nem login do Facebook: o token da
-  Página é colado.
+- A lista mostra a prévia da última mensagem (texto numa linha, limitado a 120 caracteres no servidor; "Você:" para
+  o que a equipe mandou; o tipo do anexo quando não há texto) e a hora (hoje) ou a data. "Última" é a última
+  gravada (maior `id`), não a de maior hora: a Meta pode entregar fora de ordem. A URL do anexo não vai na lista.
+- Não há ainda login do Facebook: o token da Página é colado.
 
 ### Vínculo com o assinante (manual)
 - O PSID não traz telefone, então não há vínculo automático como no WhatsApp: o atendente busca o cliente

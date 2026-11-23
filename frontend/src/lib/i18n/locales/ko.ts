@@ -2613,6 +2613,7 @@ const ko: Dictionary = {
   'messenger.archive': 'Archive',
   'messenger.reopen': 'Reopen',
   'messenger.noText': '(no text)',
+  'messenger.preview.you': 'You: {text}',
   'messenger.attachment': 'Attachment: {type}',
   'messenger.openAttachment': 'Open attachment',
   'messenger.sentOutside': 'Sent outside the panel',

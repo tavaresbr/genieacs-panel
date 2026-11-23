@@ -2609,6 +2609,7 @@ const ptBR: Dictionary = {
   'messenger.archive': 'Arquivar',
   'messenger.reopen': 'Reabrir',
   'messenger.noText': '(sem texto)',
+  'messenger.preview.you': 'Você: {text}',
   'messenger.attachment': 'Anexo: {type}',
   'messenger.openAttachment': 'Abrir anexo',
   'messenger.sentOutside': 'Enviada fora do painel',

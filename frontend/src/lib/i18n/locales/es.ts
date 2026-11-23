@@ -2609,6 +2609,7 @@ const es: Dictionary = {
   'messenger.archive': 'Archivar',
   'messenger.reopen': 'Reabrir',
   'messenger.noText': '(sin texto)',
+  'messenger.preview.you': 'Tú: {text}',
   'messenger.attachment': 'Adjunto: {type}',
   'messenger.openAttachment': 'Abrir adjunto',
   'messenger.sentOutside': 'Enviado fuera del panel',

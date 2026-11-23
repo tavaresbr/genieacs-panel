@@ -533,6 +533,71 @@ describe('link de vínculo automático (?ref=)', () => {
   });
 });
 
+describe('prévia da última mensagem na lista', () => {
+  const previewOf = async (psid) => (await api('/conversations')).body.data.find((c) => c.psid === psid)?.lastMessage;
+  const withAttachment = (psid, mid) => ({
+    object: 'page',
+    entry: [{ id: '1000000001', messaging: [{
+      sender: { id: psid }, recipient: { id: '1000000001' }, timestamp: Date.now(),
+      message: { mid, attachments: [{ type: 'image', payload: { url: 'https://cdn.exemplo.test/foto.jpg' } }] }
+    }] }]
+  });
+  const echo = (psid, mid, text) => ({
+    object: 'page',
+    entry: [{ id: '1000000001', messaging: [{
+      sender: { id: '1000000001' }, recipient: { id: psid }, timestamp: Date.now(),
+      message: { mid, text, is_echo: true }
+    }] }]
+  });
+
+  it('traz a última mensagem gravada, numa linha só e limitada', async () => {
+    assert.equal(await deliver(inbound('1000000001', 'psid-prev', 'm.p1', 'primeira')), 200);
+    const longa = `Linha um\n   linha  dois ${'x'.repeat(300)}`;
+    assert.equal(await deliver(inbound('1000000001', 'psid-prev', 'm.p2', longa)), 200);
+    const prev = await previewOf('psid-prev');
+    assert.equal(prev.direction, 'in');
+    assert.equal(prev.text.length, 120);
+    assert.ok(prev.text.endsWith('…'));
+    assert.ok(prev.text.startsWith('Linha um linha dois x'));
+    assert.ok(!/\s{2,}|\n/.test(prev.text), 'sem quebra de linha nem espaço duplo');
+    assert.equal(prev.attachmentType, null);
+    assert.equal(prev.deliveryStatus, null);
+  });
+
+  it('mensagem só com anexo: sem texto, com o tipo do anexo', async () => {
+    assert.equal(await deliver(withAttachment('psid-prev', 'm.p3')), 200);
+    const prev = await previewOf('psid-prev');
+    assert.equal(prev.text, null);
+    assert.equal(prev.attachmentType, 'image');
+    // A URL do anexo não vai na lista: só ao abrir a conversa.
+    assert.ok(!JSON.stringify(prev).includes('cdn.exemplo.test'));
+  });
+
+  it('a resposta da Página vira a última, com a direção de saída', async () => {
+    assert.equal(await deliver(echo('psid-prev', 'm.p4', 'Já estamos verificando')), 200);
+    const prev = await previewOf('psid-prev');
+    assert.equal(prev.direction, 'out');
+    assert.equal(prev.text, 'Já estamos verificando');
+    assert.equal(prev.deliveryStatus, 'sent');
+  });
+
+  it('cada conversa mostra a sua, e a sem mensagens vem com null', async () => {
+    const [vazia] = await getDb()('messenger_conversations').insert({
+      tenant_id: alfa, page_row_id: (await getDb()('messenger_pages').where({ page_id: '1000000001' }).first()).id, psid: 'psid-vazia'
+    }).returning('id');
+    assert.ok(vazia);
+    assert.equal(await previewOf('psid-vazia'), null);
+    assert.equal((await previewOf('psid-1')).text !== undefined, true);
+    assert.notEqual((await previewOf('psid-prev')).text, (await previewOf('psid-1')).text);
+  });
+
+  it('não mostra prévia de mensagem de outro provedor', async () => {
+    const lista = (await api('/conversations')).body.data;
+    const todas = JSON.stringify(lista);
+    assert.ok(!todas.includes('mensagem do beta'), 'a mensagem do beta não pode aparecer na lista do alfa');
+  });
+});
+
 describe('conexão da Página', () => {
   const graph = (handler) => setMetaGraphFetcher(async (url, init) => handler(String(url), init));
   const ok = (data) => new Response(JSON.stringify(data), { status: 200 });

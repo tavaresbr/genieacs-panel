@@ -28,6 +28,30 @@ class MessengerMessage {
     }
   }
 
+  /**
+   * A última mensagem gravada de cada conversa, para a prévia da lista — em duas
+   * leituras para a página inteira (e não uma por linha). "Última" é a de maior
+   * `id`, a última que entrou, e não a de maior hora: a Meta pode entregar fora
+   * de ordem, e a prévia mostra o que o painel recebeu por último.
+   *
+   * @returns {Promise<Map<number, object>>} conversa → mensagem
+   */
+  static async lastOfConversations(conversationIds) {
+    const ids = [...new Set((conversationIds ?? []).map(Number).filter(Number.isInteger))];
+    if (ids.length === 0) return new Map();
+    const latest = await tdb('messenger_messages')
+      .whereIn('conversation_id', ids)
+      .groupBy('conversation_id')
+      .select('conversation_id')
+      .max({ last_id: 'id' });
+    const lastIds = latest.map((row) => row.last_id);
+    if (lastIds.length === 0) return new Map();
+    const rows = await tdb('messenger_messages')
+      .whereIn('id', lastIds)
+      .select('id', 'conversation_id', 'direction', 'body', 'attachment_type', 'delivery_status', 'created_at');
+    return new Map(rows.map((row) => [Number(row.conversation_id), row]));
+  }
+
   static async update(id, patch) {
     await tdb('messenger_messages').where({ id }).update({ ...patch, updated_at: new Date() });
     return this.getById(id);

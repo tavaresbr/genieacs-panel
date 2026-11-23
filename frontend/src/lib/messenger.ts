@@ -1,4 +1,4 @@
-import type { MessengerConversation } from '@/lib/api'
+import type { MessengerConversation, MessengerPreview } from '@/lib/api'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
 
 /** A janela de resposta do Messenger: 24 h depois da última mensagem da pessoa. */
@@ -34,12 +34,6 @@ export function messengerTitle(conversation: Pick<MessengerConversation, 'name' 
   return name || `…${conversation.psid.slice(-6)}`
 }
 
-/** Texto que cabe na linha da lista, sem quebra. */
-export function singleLine(text: string | null | undefined, max = 80): string {
-  const flat = (text ?? '').replace(/\s+/g, ' ').trim()
-  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat
-}
-
 const ERROR_KEYS: Record<string, TranslationKey> = {
   window_closed: 'messenger.error.windowClosed',
   empty_message: 'messenger.error.emptyMessage',
@@ -69,4 +63,26 @@ export function messengerErrorKey(code: string | undefined): TranslationKey {
 /** O PSID e o id da Página só têm dígitos; o servidor confere de novo. */
 export function isPageId(value: string): boolean {
   return /^\d{5,32}$/.test(value.trim())
+}
+
+/** O que a prévia mostra de uma mensagem: o texto, o anexo, ou nada. */
+export type PreviewContent =
+  | { kind: 'text'; text: string }
+  | { kind: 'attachment'; type: string }
+  | { kind: 'empty' }
+
+export function previewContent(preview: Pick<MessengerPreview, 'text' | 'attachmentType'>): PreviewContent {
+  if (preview.text) return { kind: 'text', text: preview.text }
+  if (preview.attachmentType) return { kind: 'attachment', type: preview.attachmentType }
+  return { kind: 'empty' }
+}
+
+/** Duas datas no mesmo dia do calendário local — a lista mostra a hora de hoje e a data do resto. */
+export function sameLocalDay(a: string | number | Date, b: string | number | Date): boolean {
+  const first = new Date(a)
+  const second = new Date(b)
+  if (Number.isNaN(first.getTime()) || Number.isNaN(second.getTime())) return false
+  return first.getFullYear() === second.getFullYear()
+    && first.getMonth() === second.getMonth()
+    && first.getDate() === second.getDate()
 }
