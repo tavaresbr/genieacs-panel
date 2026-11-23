@@ -120,6 +120,11 @@ export function deliveryLabel(message: Pick<MessengerMessage, 'deliveryStatus' |
   return { kind: 'status', status: message.deliveryStatus }
 }
 
+/** Só estes tipos aparecem na própria bolha; o resto (inclusive SVG) é download. */
+export function isInlineImageMime(mime: string | null | undefined): boolean {
+  return ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(String(mime ?? '').toLowerCase())
+}
+
 /** A resposta pode ser reenviada à mão: falhou, é nossa (saída) e a Meta nunca a aceitou. */
 export function canRetryMessage(
   message: Pick<MessengerMessage, 'direction' | 'deliveryStatus'>,

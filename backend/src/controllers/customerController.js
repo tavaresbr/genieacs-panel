@@ -130,7 +130,7 @@ class CustomerController {
 
       // Os bytes dos anexos primeiro, e fora da transação: ver o comentário no
       // serviço. Uma falha aqui interrompe antes de qualquer escrita no banco.
-      const anexos = await CustomerErasureService.apagarAnexos(alcance.conversaIds);
+      const anexos = await CustomerErasureService.apagarAnexos(alcance.conversaIds, alcance.messengerConversaIds);
       await CustomerErasureService.erase(account, { alcance });
 
       return res.json(createResponse(req.t('customers.erased'), {

@@ -2,6 +2,8 @@ import MessengerPage from '../models/MessengerPage.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { MESSENGER_WEBHOOK_PATH } from '../config/messengerWebhookPath.js';
 import { graphRequest, isMetaId } from './metaGraphClient.js';
+import MessengerMediaService from './messengerMediaService.js';
+import { tdb } from '../config/database.js';
 
 const pageTokenBox = createSecretBox('skygenpanel-messenger-page-token-v1');
 
@@ -125,7 +127,13 @@ class MessengerPageService {
       // Melhor esforço: a Página some do painel mesmo que a Meta esteja fora.
       await graphRequest({ method: 'DELETE', path: `/${row.page_id}/subscribed_apps`, metaToken: token });
     }
+    // Os arquivos dos anexos saem junto com as mensagens (que somem em cascata com a Página).
+    const files = await tdb('messenger_messages')
+      .whereIn('conversation_id', tdb('messenger_conversations').where({ page_row_id: row.id }).select('id'))
+      .whereNotNull('attachment_path')
+      .select('attachment_path');
     await MessengerPage.remove(id);
+    await MessengerMediaService.removeFiles(files);
   }
 }
 

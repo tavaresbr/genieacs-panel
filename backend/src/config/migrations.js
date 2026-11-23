@@ -3885,6 +3885,17 @@ const MESSENGER_PAGE_FACEBOOK_COLUMNS = [
   ['facebook_user_id', (t) => t.string('facebook_user_id', 32).nullable()]
 ];
 
+/**
+ * O arquivo do anexo recebido no Messenger (0149): onde ficou em disco (relativo
+ * a DATA_DIR), o tipo (de uma lista fechada) e o tamanho. O link original da
+ * Meta (`attachment_url`) expira e fica só como último recurso.
+ */
+const MESSENGER_ATTACHMENT_COLUMNS = [
+  ['attachment_path', (t) => t.string('attachment_path', 255).nullable()],
+  ['attachment_mime', (t) => t.string('attachment_mime', 64).nullable()],
+  ['attachment_size', (t) => t.integer('attachment_size').unsigned().nullable()]
+];
+
 const messengerConversationsTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -8313,6 +8324,22 @@ export const migrations = [
       await db.schema.alterTable('messenger_pages', (t) => {
         for (const add of missing) add(t);
         t.index(['facebook_user_id'], 'messenger_pages_fb_user_idx');
+      });
+    }
+  },
+  {
+    /** O arquivo do anexo recebido — ver `MESSENGER_ATTACHMENT_COLUMNS`. */
+    id: '0149_messenger_attachment_file',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return true;
+      return (await missingColumns(db, 'messenger_messages', MESSENGER_ATTACHMENT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('messenger_messages'))) return;
+      const missing = await missingColumns(db, 'messenger_messages', MESSENGER_ATTACHMENT_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('messenger_messages', (t) => {
+        for (const add of missing) add(t);
       });
     }
   }

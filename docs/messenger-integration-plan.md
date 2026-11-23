@@ -248,3 +248,20 @@ dados**. No painel do app (Configurações → Básico / Login do Facebook → C
   clientes dele, e o pedido de titular delas segue o fluxo LGPD do provedor.
 - A `url` aponta para `/api/messenger-webhook/deletion-status?code=…`: página de texto fixo que só confirma códigos
   emitidos pelo painel (o código leva a data e um HMAC, sem guardar nada em banco) e nunca imprime o que veio na URL.
+
+## Anexos recebidos
+
+O link do anexo que vem no evento é de CDN da Meta e expira, então o painel **baixa e guarda o arquivo**.
+- Em segundo plano (não atrasa a resposta ao webhook), depois de gravar a mensagem; a reentrega não baixa de novo.
+- Só `https` e só hosts da Meta (`fbcdn.net`, `fbsbx.com`, `facebook.com`, `cdninstagram.com`), pela guarda anti-SSRF
+  do WhatsApp (`safeFetch`: o endereço aprovado é o conectado). Teto de 25 MB e 20 s. Nada aqui lança: anexo que não
+  desceu é mensagem sem arquivo (o link original fica como último recurso) e o webhook segue respondendo 200.
+- O tipo gravado (`attachment_mime`) vem de uma lista fechada (imagem, áudio, vídeo e PDF comuns; SVG e HTML nunca):
+  o resto é `application/octet-stream`. O nome no disco é nosso (`messenger-media/t<provedor>/<conversa>/<mensagem>-<hex>.<ext>`).
+- `GET /api/messenger/messages/:id/attachment` (`whatsapp.read`): a mesma leitura confinada a `DATA_DIR` do WhatsApp
+  (`resolveStoredAttachment`, que refaz o `realpath` a cada pedido), `inline` só para imagem conhecida, `nosniff`,
+  `Content-Security-Policy: sandbox`, `no-store`. O caminho nunca sai do servidor; todo jeito de não ter o arquivo é o mesmo 404.
+- Os arquivos saem do disco ao desconectar a Página e na exclusão do art. 18 do assinante (antes das linhas, como no WhatsApp).
+- Migração `0149`: `attachment_path`, `attachment_mime`, `attachment_size` em `messenger_messages`.
+- **Limite:** não há varredura de arquivos órfãos nem prazo por idade (como o texto da conversa); só áudio/vídeo/arquivo
+  baixam por botão (a tela não toca áudio nem vídeo). **Envio de anexo pelo painel continua fora.**

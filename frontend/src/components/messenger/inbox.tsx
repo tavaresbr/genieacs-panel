@@ -14,6 +14,7 @@ import {
   sameLocalDay,
   windowRemainingMs,
 } from '@/lib/messenger'
+import { MessengerAttachment } from '@/components/messenger/attachment'
 import { MessengerSubscriberLinker } from '@/components/messenger/subscriber-linker'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
@@ -347,7 +348,8 @@ function Thread({
               ) : !message.attachmentType ? (
                 <p className="text-muted-foreground">{t('messenger.noText')}</p>
               ) : null}
-              {message.attachmentType && (
+              {message.attachmentStored && <MessengerAttachment message={message} />}
+              {message.attachmentType && !message.attachmentStored && (
                 <p className="text-xs text-muted-foreground">
                   {t('messenger.attachment', { type: message.attachmentType })}
                   {message.attachmentUrl && /^https:\/\//i.test(message.attachmentUrl) && (

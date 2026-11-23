@@ -6834,6 +6834,10 @@ export interface MessengerMessage {
   body: string | null
   attachmentType: string | null
   attachmentUrl: string | null
+  /** O arquivo está guardado no painel (a tela o busca por `fetchAttachment`); o link acima expira. */
+  attachmentStored: boolean
+  attachmentMime: string | null
+  attachmentSize: number | null
   /** `page` = escrita fora do painel (eco); `system` = mensagem automática (a confirmação do vínculo). */
   source: 'operator' | 'page' | 'system'
   deliveryStatus: MessengerDeliveryStatus | null
@@ -6878,6 +6882,8 @@ export const messengerAPI = {
     apiClient.post<MessengerMessage>(`/messenger/conversations/${id}/messages`, { text }),
   setClosed: (id: number, closed: boolean) =>
     apiClient.post<MessengerConversation>(`/messenger/conversations/${id}/closed`, { closed }),
+  /** Os bytes do anexo guardado, como blob: um `<img src>` não leva o cabeçalho de sessão. */
+  fetchAttachment: (messageId: number) => apiClient.getBlob(`/messenger/messages/${messageId}/attachment`),
   /** Reenvia à mão uma resposta que falhou (a fila já desistiu dela). */
   retryMessage: (id: number) => apiClient.post<MessengerMessage>(`/messenger/messages/${id}/retry`, {}),
   /** Assina de novo os campos do webhook (depois de um campo novo, como os links de vínculo). */

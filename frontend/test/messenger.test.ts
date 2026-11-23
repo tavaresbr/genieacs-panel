@@ -13,6 +13,7 @@ import {
   windowRemainingMs,
   parseFacebookLoginMessage,
   canRetryMessage,
+  isInlineImageMime,
 } from '@/lib/messenger'
 
 const NOW = Date.parse('2026-11-22T12:00:00Z')
@@ -147,5 +148,14 @@ describe('canRetryMessage', () => {
     expect(canRetryMessage({ ...failed, deliveryStatus: 'sent' }, true, true)).toBe(false)
     expect(canRetryMessage({ ...failed, deliveryStatus: 'queued' }, true, true)).toBe(false)
     expect(canRetryMessage({ ...failed, direction: 'in' }, true, true)).toBe(false)
+  })
+})
+
+describe('isInlineImageMime', () => {
+  it('só imagem conhecida aparece na bolha; SVG e o resto são download', () => {
+    for (const ok of ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'IMAGE/PNG']) expect(isInlineImageMime(ok)).toBe(true)
+    for (const no of ['image/svg+xml', 'text/html', 'application/pdf', 'application/octet-stream', '', null, undefined]) {
+      expect(isInlineImageMime(no)).toBe(false)
+    }
   })
 })
