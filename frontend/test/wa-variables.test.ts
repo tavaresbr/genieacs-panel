@@ -7,6 +7,7 @@ const t = (key: string, vars?: Record<string, string | number>) =>
 describe('template variable labels', () => {
   it('traduz a variável conhecida e devolve o nome cru da desconhecida', () => {
     expect(variableLabel(t, 'pix')).toBe('whatsapp.variable.pix')
+    expect(variableLabel(t, 'link_messenger')).toBe('whatsapp.variable.link_messenger')
     expect(variableLabel(t, 'nova_variavel')).toBe('nova_variavel')
   })
 

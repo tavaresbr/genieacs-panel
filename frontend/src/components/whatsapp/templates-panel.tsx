@@ -45,7 +45,8 @@ const VARIABLES = [
   'dias_para_vencer',
   'pix',
   'linha_digitavel',
-  'link_boleto'
+  'link_boleto',
+  'link_messenger'
 ] as const
 
 /**
@@ -461,6 +462,9 @@ export function TemplatesPanel() {
                 </button>
               ))}
             </div>
+            {draft.category !== 'atendimento' && (
+              <p className="field-hint mt-1.5">{t('whatsapp.templates.messengerHint')}</p>
+            )}
           </div>
 
           {metaTemplates.length > 0 && draft.category !== 'atendimento' && (

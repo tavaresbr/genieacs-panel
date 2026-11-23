@@ -5,6 +5,7 @@ import SgpLink from '../models/SgpLink.js';
 import { getDb, tdb, tinsert } from '../config/database.js';
 import MessengerLinkService from './messengerLinkService.js';
 import { MessengerError } from './messengerPageService.js';
+import { modeloCitaLinkMessenger } from '../utils/wa/waCobranca.js';
 
 /** Quanto tempo um link vale: o assinante tem uma semana para abri-lo. */
 export const LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -70,6 +71,32 @@ class MessengerLinkTokenService {
     return this.issue(page, {
       contract: link.contract, sgp_contact_id: null, customer_account_id: account.id
     }, { source: 'portal', userId: null });
+  }
+
+  /**
+   * A variável `{{link_messenger}}` de um modelo de cobrança: um link de uso
+   * único para o contrato, ou nada.
+   *
+   * Só emite se o modelo CITA a variável (a maioria não cita, e emitir à toa
+   * encheria a tabela). E NUNCA lança: o link é um extra da cobrança, e uma
+   * Página fora do ar, um contrato sem cadastro ou um erro de banco não podem
+   * virar "a cobrança não saiu". Sem link a variável fica vazia, e o render
+   * tira a linha que a cita (`renderCobranca`, exceção à regra 1).
+   *
+   * @returns {Promise<{ link_messenger?: string }>} para espalhar nas variáveis
+   */
+  static async varsForTemplate(body, contract) {
+    if (!modeloCitaLinkMessenger(body) || !contract) return {};
+    try {
+      const { url } = await this.create(contract, { source: 'invoice', userId: null });
+      return { link_messenger: url };
+    } catch (error) {
+      // "Sem Página" e "contrato desconhecido" são esperados; o resto vale um aviso.
+      if (!(error instanceof MessengerError)) {
+        console.warn(`[messenger] could not issue an invoice link: ${error.message}`);
+      }
+      return {};
+    }
   }
 
   static async issue(page, binding, { source, userId }) {

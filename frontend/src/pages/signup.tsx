@@ -305,12 +305,14 @@ export default function Signup() {
         {/* The platform's own host has no login to go back to: whoever has a
             panel signs in at that panel's address. */}
         {!isPlatformHost ? (
-          <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
+          <p className="mt-5 flex flex-wrap items-center justify-center gap-x-4 text-center text-xs leading-5 text-muted-foreground">
             <Link to="/login" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('signup.backToLogin')}</Link>
+            <Link to="/privacidade" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('login.privacyLink')}</Link>
           </p>
         ) : (
-          <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
+          <p className="mt-5 flex flex-wrap items-center justify-center gap-x-4 text-center text-xs leading-5 text-muted-foreground">
             <Link to="/" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('signup.backToSite')}</Link>
+            <Link to="/privacidade" className="inline-flex min-h-10 items-center underline lg:min-h-0">{t('login.privacyLink')}</Link>
           </p>
         )}
       </div>

@@ -1,3 +1,4 @@
+import MessengerLinkTokenService from './messengerLinkTokenService.js';
 import WaMetaTemplateService from './waMetaTemplateService.js';
 import SgpService, { SgpError } from './sgpService.js';
 import AsaasBillingSource, { isAsaasContract } from './asaasBillingSource.js';
@@ -232,7 +233,9 @@ class WaBillingService {
         else skipped.noInvoice += 1;
         continue;
       }
-      const vars = variaveisDeCobranca(fatura, subscriber.clientName, hoje);
+      // Um link do Messenger por destinatário, se o modelo pedir (uso único).
+      // eslint-disable-next-line no-await-in-loop -- um por destinatário, no mesmo ritmo do SGP
+      const vars = { ...variaveisDeCobranca(fatura, subscriber.clientName, hoje), ...(await MessengerLinkTokenService.varsForTemplate(body, subscriber.contract)) };
       const rendered = renderCobranca(body, vars);
       // A null render means a variable the body cites has no value. The
       // recipient is DROPPED — never sent a partial message. "PIX: " with

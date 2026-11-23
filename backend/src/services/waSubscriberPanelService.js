@@ -1,3 +1,4 @@
+import MessengerLinkTokenService from './messengerLinkTokenService.js';
 import SgpService, { SgpError, deriveContractState } from './sgpService.js';
 import TeiahService from './teiahService.js';
 import DeviceService from './deviceService.js';
@@ -490,7 +491,9 @@ class WaSubscriberPanelService {
         { code: soFuturas ? 'future_only' : 'no_invoice', status: 409 }
       );
     }
-    const text = renderCobranca(body, variaveisDeCobranca(fatura, name, hoje));
+    // O link do Messenger é de uso único e vai no texto que o operador vai enviar.
+    const vars = { ...variaveisDeCobranca(fatura, name, hoje), ...(await MessengerLinkTokenService.varsForTemplate(body, clean)) };
+    const text = renderCobranca(body, vars);
     if (text === null) {
       throw new WaError('whatsapp.error.secondCopyIncomplete', { code: 'template_incomplete', status: 409 });
     }
