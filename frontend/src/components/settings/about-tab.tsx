@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { Icon } from '@/components/ui/icon'
 import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal'
 import { useAuth } from '@/contexts/auth-context'
@@ -121,6 +122,11 @@ export function AboutTab({ appName }: { appName: string }) {
           )}
           <Linha rotulo={t('settings.about.edition')}>
             {t(isSaas ? 'settings.about.editionSaas' : 'settings.about.editionSelfHosted')}
+          </Linha>
+          <Linha rotulo={t('login.privacyLink')}>
+            <Link to="/privacidade" target="_blank" rel="noopener" className="text-primary underline hover:no-underline">
+              /privacidade
+            </Link>
           </Linha>
         </dl>
       </section>
