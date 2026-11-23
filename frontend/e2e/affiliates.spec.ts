@@ -30,7 +30,7 @@ test.describe('o console', () => {
     await expect(page.getByLabel('Aprovar agora')).toBeChecked()
     await shot(page, 'affiliates-01-console-form')
     await page.getByRole('button', { name: 'Cadastrar afiliado' }).click()
-    await expect(page.getByText('Afiliado cadastrado').first()).toBeVisible()
+    await expect(page.getByText('Afiliado cadastrado').filter({ visible: true }).first()).toBeVisible()
 
     const cartao = page.getByRole('listitem').filter({ hasText: NOVO.email })
     await expect(cartao.getByText('Ativo', { exact: true })).toBeVisible()
@@ -44,7 +44,7 @@ test.describe('o console', () => {
       void dialog.accept()
     })
     await cartao.getByRole('button', { name: 'Link de senha' }).click()
-    await expect(page.getByText(/Link de senha copiado|Afiliado/).first()).toBeVisible()
+    await expect(page.getByText(/Link de senha copiado|Afiliado/).filter({ visible: true }).first()).toBeVisible()
     const link = doPrompt ?? await page.evaluate(() => navigator.clipboard.readText())
     expect(link).toMatch(/\/afiliados#senha=[0-9a-f]{64}$/)
     await shot(page, 'affiliates-02-console-created')
