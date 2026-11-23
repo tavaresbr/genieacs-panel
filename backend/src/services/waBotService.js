@@ -1,3 +1,4 @@
+import { logSafe } from '../utils/logger.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import DeviceService from './deviceService.js';
 import SgpService from './sgpService.js';
@@ -871,7 +872,7 @@ class WaBotService {
         try {
           partes = await faturaEmPartes(link, { confirmado: true });
         } catch (error) {
-          console.error('waBot fatura antecipada:', error?.message || error);
+          console.error(`waBot fatura antecipada: ${JSON.stringify(logSafe(error?.code || error?.message, 200))}`);
         }
         if (!partes) {
           await this.responderCom(conversation, await textoDePassagem('handoff'));
