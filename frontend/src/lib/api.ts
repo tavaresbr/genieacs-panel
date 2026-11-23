@@ -7286,7 +7286,7 @@ export const whatsappAPI = {
     apiClient.post<TelegramBotStatus>('/whatsapp/alerts/telegram/bot/unlink', { telegramUserId }),
 
   runAlertScan: () =>
-    apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),
+    apiClient.post<{ fired: number; cleared: number; notified?: number }>('/whatsapp/alerts/scan', {}),
 
   // ── Inbox ────────────────────────────────────────────────────────────
   // `search` matches the phone, the pushed WhatsApp name, the contract and the

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatRelativeTime } from '@/lib/utils'
 import {
   whatsappAPI,
   type WhatsAppAlertRule,
@@ -15,6 +16,13 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { telegramCanTest, telegramPatch, telegramWillNotify, type TelegramForm } from '@/lib/alert-telegram'
+import {
+  INTERVAL_MAX_MINUTES,
+  INTERVAL_MIN_MINUTES,
+  isFormDirty,
+  minutesToSeconds,
+  secondsToMinutes
+} from '@/lib/alert-form'
 
 /**
  * The four rules, in the order the service evaluates them, each with the ONE
@@ -107,7 +115,6 @@ const RULES: ReadonlyArray<{
 /** The service clamps to these; the inputs say so rather than letting the
  *  operator type a number that is quietly replaced on the way in. */
 const INTERVAL_MIN_S = 60
-const INTERVAL_MAX_S = 3600
 const COOLDOWN_MIN_MIN = 1
 const COOLDOWN_MAX_MIN = 7 * 24 * 60
 
@@ -140,7 +147,8 @@ interface RuleForm {
 
 interface AlertsForm {
   enabled: boolean
-  intervalSeconds: string
+  /** Em MINUTOS na tela; a API fala em segundos (`lib/alert-form.ts`). */
+  intervalMinutes: string
   digestMinutes: string
   /** Os números de plantão, já normalizados, um por item (`RecipientList`). */
   recipients: string[]
@@ -167,7 +175,7 @@ function toForm(settings: WhatsAppAlertSettings): AlertsForm {
   }
   return {
     enabled: settings.enabled,
-    intervalSeconds: String(settings.intervalSeconds),
+    intervalMinutes: secondsToMinutes(settings.intervalSeconds),
     digestMinutes: String(settings.digestMinutes ?? 0),
     recipients: [...(settings.recipients ?? [])],
     emailRecipients: [...(settings.emailRecipients ?? [])],
@@ -239,6 +247,8 @@ export function AlertsPanel() {
    * answer "did that do anything?".
    */
   const [scanResult, setScanResult] = useState<string | null>(null)
+  /** Quantos avisos a última varredura manual mandou (`data.notified`). */
+  const [scanNotified, setScanNotified] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -258,6 +268,21 @@ export function AlertsPanel() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const dirty = useMemo(
+    () => Boolean(form && stored && isFormDirty(form, toForm(stored))),
+    [form, stored]
+  )
+  // Sair com mudança pendente perde o que foi digitado: o navegador pergunta.
+  useEffect(() => {
+    if (!dirty) return undefined
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
 
   const recipients = useMemo(() => form?.recipients ?? [], [form])
   const emailRecipients = useMemo(() => form?.emailRecipients ?? [], [form])
@@ -321,7 +346,7 @@ export function AlertsPanel() {
       }
       const res = await whatsappAPI.updateAlertSettings({
         enabled: form.enabled,
-        intervalSeconds: parseInteger(form.intervalSeconds, stored?.intervalSeconds ?? INTERVAL_MIN_S),
+        intervalSeconds: minutesToSeconds(form.intervalMinutes, stored?.intervalSeconds ?? INTERVAL_MIN_S),
         digestMinutes: Number(form.digestMinutes) || 0,
         recipients,
         emailRecipients,
@@ -378,10 +403,19 @@ export function AlertsPanel() {
       const res = await whatsappAPI.runAlertScan()
       if (res.success) {
         setScanResult(res.message || t('common.success'))
+        setScanNotified(typeof res.data?.notified === 'number' ? res.data.notified : null)
         toast.success(res.message || t('common.success'))
+        // Só a hora da última varredura e os canais: o resto do que foi lido
+        // não pode desfazer o que a pessoa está digitando no formulário.
+        const fresh = await whatsappAPI.getAlertSettings()
+        if (fresh.success && fresh.data) {
+          const { lastScanAt, channels } = fresh.data
+          setStored((current) => (current ? { ...current, lastScanAt, channels } : current))
+        }
         return
       }
       setScanResult(null)
+      setScanNotified(null)
       toast.error(whatsappErrorMessage(t, res.code))
     } finally {
       setScanning(false)
@@ -395,16 +429,29 @@ export function AlertsPanel() {
           <h2 className="section-heading">{t('whatsapp.alerts.title')}</h2>
           <p className="section-description">{t('whatsapp.alerts.description')}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => void handleScan()}
-          disabled={loading || scanning || !form}
-          className="modern-button-secondary shrink-0"
-        >
-          <Icon name="refresh" size={16} className={scanning ? 'animate-spin' : undefined} />
-          {t('whatsapp.alerts.runScan')}
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {dirty && (
+            <span className="rounded-full bg-[hsl(var(--status-warning)/0.15)] px-2.5 py-1 text-xs font-medium text-foreground" role="status">
+              {t('whatsapp.alerts.unsaved')}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleScan()}
+            disabled={loading || scanning || !form}
+            className="modern-button-secondary"
+          >
+            <Icon name="refresh" size={16} className={scanning ? 'animate-spin' : undefined} />
+            {t('whatsapp.alerts.runScan')}
+          </button>
+        </div>
       </div>
+      {dirty && (
+        <p className="mt-3 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning)/0.45)] bg-[hsl(var(--status-warning)/0.11)] px-3 py-2 text-sm leading-5 text-foreground">
+          <Icon name="warning" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-warning))]" />
+          <span>{t('whatsapp.alerts.unsavedScanWarning')}</span>
+        </p>
+      )}
 
       {loading ? (
         <p className="mt-6 text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -426,9 +473,17 @@ export function AlertsPanel() {
               role="status"
             >
               <Icon name="check" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-success))]" />
-              <span>{scanResult}</span>
+              <span>
+                {scanResult}
+                {scanNotified !== null && <span className="block">{t('whatsapp.alerts.scanNotified', { count: scanNotified })}</span>}
+              </span>
             </p>
           )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            {stored?.lastScanAt
+              ? t('whatsapp.alerts.lastScan', { when: formatRelativeTime(new Date(stored.lastScanAt).toISOString()) })
+              : t('whatsapp.alerts.neverScanned')}
+          </p>
 
           {stored?.channels && (
             <div className="mt-6">
@@ -453,25 +508,28 @@ export function AlertsPanel() {
 
             <div>
               <label htmlFor="wa-alerts-interval" className="field-label">
-                {t('whatsapp.alerts.interval')}
+                {t('whatsapp.alerts.intervalMinutes')}
               </label>
               <input
                 id="wa-alerts-interval"
                 type="number"
                 inputMode="numeric"
-                min={INTERVAL_MIN_S}
-                max={INTERVAL_MAX_S}
-                step={30}
+                min={INTERVAL_MIN_MINUTES}
+                max={INTERVAL_MAX_MINUTES}
+                step={1}
                 className="modern-input sm:max-w-48"
-                value={form.intervalSeconds}
+                value={form.intervalMinutes}
                 onChange={(event) => setForm((current) => (current
-                  ? { ...current, intervalSeconds: event.target.value }
+                  ? { ...current, intervalMinutes: event.target.value }
                   : current))}
                 onBlur={() => setForm((current) => {
                   if (!current) return current
-                  const raw = current.intervalSeconds.trim()
-                  if (raw && Number.isFinite(Number(raw))) return current
-                  return { ...current, intervalSeconds: String(stored?.intervalSeconds ?? INTERVAL_MIN_S) }
+                  const raw = current.intervalMinutes.trim()
+                  if (raw && Number.isFinite(Number(raw))) {
+                    // O número que vale é o que fica na caixa: 999 vira 60, 0 vira 1.
+                    return { ...current, intervalMinutes: String(minutesToSeconds(raw, 60) / 60) }
+                  }
+                  return { ...current, intervalMinutes: secondsToMinutes(stored?.intervalSeconds ?? INTERVAL_MIN_S) }
                 })}
               />
             </div>
@@ -705,11 +763,12 @@ export function AlertsPanel() {
             <button
               type="button"
               onClick={() => void handleSave()}
-              disabled={saving}
+              disabled={saving || !dirty}
               className="modern-button"
             >
               {saving ? t('common.saving') : t('common.save')}
             </button>
+            {dirty && <span className="self-center text-sm text-muted-foreground">{t('whatsapp.alerts.unsaved')}</span>}
           </div>
         </>
       )}
