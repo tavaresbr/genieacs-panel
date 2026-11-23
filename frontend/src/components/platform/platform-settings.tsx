@@ -8,7 +8,16 @@ import { PlatformAlertsPanel } from '@/components/platform/platform-alert-histor
 import { PlatformMailSettings } from '@/components/platform/platform-mail'
 import { PlatformReminderPolicy } from '@/components/platform/platform-reminders'
 import { PlatformAccountingSettings } from '@/components/platform/platform-accounting'
+import { PlatformSidebar } from '@/components/platform/platform-nav'
 import { useTranslation } from '@/contexts/language-context'
+
+type Sub = 'profile' | 'alerts' | 'mail' | 'integrations' | 'reminders' | 'accounting'
+
+const GROUPS = [
+  { label: 'platform.nav.company', items: [['profile', 'platform.settings.profile']] },
+  { label: 'platform.nav.communication', items: [['alerts', 'platform.settings.alerts'], ['mail', 'platform.settings.mail']] },
+  { label: 'platform.nav.billing', items: [['reminders', 'platform.settings.reminders'], ['integrations', 'platform.tabs.integrations'], ['accounting', 'platform.settings.accounting']] }
+] as const satisfies ReadonlyArray<{ label: string, items: ReadonlyArray<readonly [Sub, string]> }>
 
 /**
  * Configurações do console, com submenu: os dados da empresa que vende o SaaS
@@ -26,28 +35,7 @@ export function PlatformSettings({ initialSub = 'profile', initialAlertsTab = 's
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
-      <nav aria-label={t('platform.tabs.settings')} className="flex gap-2 overflow-x-auto lg:flex-col">
-        {([
-          ['profile', 'platform.settings.profile'],
-          ['alerts', 'platform.settings.alerts'],
-          ['mail', 'platform.settings.mail'],
-          ['integrations', 'platform.tabs.integrations'],
-          ['reminders', 'platform.settings.reminders'],
-          ['accounting', 'platform.settings.accounting']
-        ] as const).map(([chave, rotulo]) => (
-          <button
-            key={chave}
-            type="button"
-            onClick={() => setSub(chave)}
-            aria-current={sub === chave ? 'page' : undefined}
-            className={`shrink-0 rounded-md px-3 py-2 text-left text-sm font-semibold transition ${sub === chave
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
-          >
-            {t(rotulo)}
-          </button>
-        ))}
-      </nav>
+      <PlatformSidebar ariaLabel={t('platform.tabs.settings')} active={sub} onSelect={setSub} groups={GROUPS} />
       <div className="min-w-0">
         {sub === 'profile' && <PlatformProfileForm />}
         {sub === 'alerts' && <PlatformAlertsPanel settings={<PlatformAlertsSettings />} initialTab={initialAlertsTab} />}
