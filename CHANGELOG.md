@@ -7,6 +7,25 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.67.0] - 2026-11-24
+
+### New
+
+- Avisos aos clientes pelo Telegram, além do WhatsApp (etapa 2) (`3ab08fb9`)
+- Respostas automáticas do bot de clientes (etapa 3) (`1a827b87`)
+- Card do Messenger em Configuração → Integrações (`c01e641f`)
+
+### Fixed
+
+- Logs do bot de clientes sem dado do cliente nem do erro (`21def6d6`)
+
+### Maintenance
+
+- Wait for message and unread count before reading the inbox (MySQL race) (`3211c2e0`)
+- Botão "Ver consulta guardada" na ficha, sem custo e sem limite de data (`4fa7031a`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/1113c44a1f5d...2c47e79e70f8)
+
 ## [1.66.0] - 2026-11-23
 
 ### New

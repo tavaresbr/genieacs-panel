@@ -1,40 +1,46 @@
 {
-  "version": "1.66.0",
-  "build": 1905,
-  "sourceCommit": "5c6e286475e0",
-  "releasedAt": "2026-11-23",
-  "basedOnTag": "v1.65.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/62b656c1bbb9...5c6e286475e0",
+  "version": "1.67.0",
+  "build": 1917,
+  "sourceCommit": "2c47e79e70f8",
+  "releasedAt": "2026-11-24",
+  "basedOnTag": "v1.66.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/1113c44a1f5d...2c47e79e70f8",
   "changes": [
     {
-      "shortHash": "bc209c67",
+      "shortHash": "3ab08fb9",
       "date": "2026-11-23",
-      "title": "Callbacks de desautorização e exclusão de dados do Facebook",
+      "title": "Avisos aos clientes pelo Telegram, além do WhatsApp (etapa 2)",
       "category": "New"
     },
     {
-      "shortHash": "c04e60fe",
+      "shortHash": "1a827b87",
       "date": "2026-11-23",
-      "title": "Botão Reenviar para a resposta que falhou",
+      "title": "Respostas automáticas do bot de clientes (etapa 3)",
       "category": "New"
     },
     {
-      "shortHash": "b051e5f7",
+      "shortHash": "21def6d6",
       "date": "2026-11-23",
-      "title": "Baixa e guarda o anexo recebido; imagem aparece na conversa",
-      "category": "New"
-    },
-    {
-      "shortHash": "bfff10b5",
-      "date": "2026-11-23",
-      "title": "O log da falha do anexo não imprime texto vindo de fora",
+      "title": "Logs do bot de clientes sem dado do cliente nem do erro",
       "category": "Fixed"
     },
     {
-      "shortHash": "7a170f8f",
+      "shortHash": "3211c2e0",
       "date": "2026-11-23",
-      "title": "O log da falha do anexo só usa motivos fixos",
-      "category": "Fixed"
+      "title": "Wait for message and unread count before reading the inbox (MySQL race)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c01e641f",
+      "date": "2026-11-23",
+      "title": "Card do Messenger em Configuração → Integrações",
+      "category": "New"
+    },
+    {
+      "shortHash": "4fa7031a",
+      "date": "2026-11-23",
+      "title": "Botão \"Ver consulta guardada\" na ficha, sem custo e sem limite de data",
+      "category": "Maintenance"
     }
   ]
 }
