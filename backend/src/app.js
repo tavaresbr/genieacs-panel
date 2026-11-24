@@ -603,8 +603,9 @@ function serveFrontend(target, htmlFile) {
       return next();
     }
     if (!fs.existsSync(htmlPath)) {
-      // Texto puro: é uma frase, não uma página, e `send` de string sairia como HTML.
-      return res.status(503).type('text/plain').send(req.t('common.buildUnavailable'));
+      // JSON, no envelope de erro da API: é uma frase, não uma página. `send` de
+      // string sai como HTML, e a frase é traduzida pelo cabeçalho da requisição.
+      return res.status(503).json({ success: false, message: req.t('common.buildUnavailable'), code: 'build_unavailable' });
     }
     res.setHeader('Cache-Control', 'no-cache');
     // Com `root`, e não com um caminho absoluto.
