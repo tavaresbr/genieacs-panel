@@ -1,6 +1,7 @@
 import WaMetaTemplateService from '../services/waMetaTemplateService.js';
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
+import WhatsAppEmbeddedSignupService, { embeddedSignupAvailable } from '../services/whatsappEmbeddedSignupService.js';
 import MetaWebhookService from '../services/metaWebhookService.js';
 import MetaNumberHealthService from '../services/metaNumberHealthService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
@@ -297,6 +298,77 @@ class WhatsAppController {
         account: WhatsAppConfigService.publicAccount(account),
         qr,
         pending
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /**
+   * Abre o cadastro guiado: devolve ao painel o que o popup do Embedded Signup
+   * precisa (`appId`, `configId`, `state` de uso único). `available: false` é a
+   * resposta normal de uma plataforma sem o app da Meta — a tela cai no
+   * formulário manual; não é erro.
+   */
+  static async startEmbeddedSignup(req, res) {
+    try {
+      if (!embeddedSignupAvailable()) {
+        return res.json(createResponse(req.t('whatsapp.embeddedSignupUnavailable'), { available: false }));
+      }
+      const data = await WhatsAppEmbeddedSignupService.start({
+        userId: req.user?.id ?? null,
+        returnOrigin: req.body?.returnOrigin
+      });
+      return res.json(createResponse(req.t('whatsapp.embeddedSignupStarted'), { available: true, ...data }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /** Termina o cadastro: token, número, webhook, modelos e, na coexistência, a sincronização. */
+  static async completeEmbeddedSignup(req, res) {
+    try {
+      const body = req.body ?? {};
+      const { account, coexistence, reused } = await WhatsAppEmbeddedSignupService.complete({
+        state: body.state,
+        code: body.code,
+        wabaId: body.wabaId,
+        phoneNumberId: body.phoneNumberId,
+        event: body.event,
+        userId: req.user?.id ?? null,
+        label: body.label,
+        purpose: body.purpose,
+        baseUrl: body.baseUrl,
+        adminKey: body.adminKey
+      });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: account?.id != null ? String(account.id) : null,
+        detail: { op: 'embedded_signup', coexistence, reused }
+      });
+      return res.status(reused ? 200 : 201).json(createResponse(req.t('whatsapp.embeddedSignupDone'), {
+        account: WhatsAppConfigService.publicAccount(account),
+        coexistence,
+        reused
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /** Pede de novo a sincronização da coexistência (só o que a Meta ainda não aceitou). */
+  static async retryCoexistenceSync(req, res) {
+    try {
+      const account = await WhatsAppEmbeddedSignupService.retryCoexistenceSync(req.params?.id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: String(req.params?.id),
+        detail: { op: 'coexistence_sync' }
+      });
+      return res.json(createResponse(req.t('whatsapp.coexistenceSyncRetried'), {
+        account: WhatsAppConfigService.publicAccount(account)
       }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.accountActionFailed');

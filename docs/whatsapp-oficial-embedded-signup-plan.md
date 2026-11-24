@@ -1,6 +1,6 @@
 # Plano: conectar o WhatsApp API Oficial pelo painel (Evolution + Embedded Signup)
 
-Status: **proposta** — nada implementado ainda. Escrito a partir do código em `main` (v1.66.0).
+Status: **Fase 1 (backend) implementada**; Fases 0, 2, 3 e 4 pendentes. Escrito a partir do código em `main` (v1.66.0).
 
 ## O que já existe (não refazer)
 

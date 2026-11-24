@@ -74,6 +74,13 @@ webhook de entrada, que é público e tem credencial própria.
 | `meta_template_not_synced` | cópia local sem o id da Meta (409) | `whatsapp.error.metaTemplateNotSynced` |
 | `meta_waba_missing` | número sem ID da conta WABA ou sem token (409) | `whatsapp.error.metaWabaMissing` |
 | `meta_refused` | a Graph API recusou ou não respondeu (502, motivo na mensagem) | `whatsapp.error.metaRefused` |
+| `embedded_signup_unconfigured` | a plataforma não configurou `META_APP_ID`/`META_APP_SECRET`/`META_WA_CONFIG_ID` (503) | `whatsapp.error.embeddedSignupUnconfigured` |
+| `signup_return_origin_invalid` | origem do painel que não é `https:` (ou localhost) (400) | `whatsapp.error.signupReturnOriginInvalid` |
+| `signup_state_invalid` | `state` inexistente, vencido, já usado ou de outro usuário (400) | `whatsapp.error.signupStateInvalid` |
+| `signup_code_expired` | a Meta recusou o `code` (vale 30 s) (400) | `whatsapp.error.signupCodeExpired` |
+| `meta_phone_waba_mismatch` | o número não pertence à WABA devolvida (409) | `whatsapp.error.metaPhoneWabaMismatch` |
+| `meta_number_in_use` | o número já está ligado a outro provedor (409) | `whatsapp.error.metaNumberInUse` |
+| `not_coexistence` | sincronização de coexistência num número que não é de coexistência (409) | `whatsapp.error.notCoexistence` |
 | `meta_template_unavailable` | modelo da Meta não aprovado, não suportado ou com parâmetro faltando | `whatsapp.error.metaTemplateUnavailable` |
 | `meta_param_mismatch` | variáveis ligadas não batem com os parâmetros do modelo | `whatsapp.error.metaParamMismatch` |
 | `timeout` / `unreachable` | o Evolution não respondeu | `whatsapp.error.timeout` / `…unreachable` |
@@ -255,6 +262,41 @@ O create enviado ao servidor:
   respondem `409 not_applicable_cloud`; a remoção só apaga a instância.
 - A consulta "este número tem WhatsApp?" usa um número por QR; sem nenhum,
   `409 not_supported_cloud`.
+
+**Cadastro guiado (Embedded Signup).** Em vez de colar token e ids, o painel abre
+o popup do Embedded Signup e termina o cadastro no servidor. Precisa de
+`META_APP_ID`, `META_APP_SECRET` e `META_WA_CONFIG_ID` na plataforma; sem os
+três a tela cai no formulário manual (`available: false`, não é erro). Todas as
+rotas pedem `whatsapp.config` e têm teto próprio (12/min por usuário).
+
+- `POST /api/whatsapp/accounts/embedded-signup/start` com `{ "returnOrigin": "https://painel…" }`
+  → `{ available, appId, configId, state, returnOrigin, expiresInSec }`. O `state`
+  é de uso único, vale 10 min e fica preso ao provedor e ao usuário que o pediu.
+  `returnOrigin` tem de ser `https:` (ou `http://localhost`): é o `targetOrigin`
+  do `postMessage` do popup, e `*` vazaria o `code`.
+- `POST /api/whatsapp/accounts/embedded-signup/complete` com
+  `{ state, code, wabaId, phoneNumberId, event, label?, purpose? }` (e
+  `baseUrl`/`adminKey` só no self-host, como em `POST /accounts`). Ordem: valida o
+  formato e o `event` (`FINISH` = número novo; `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING`
+  = coexistência) → consome o `state` → troca o `code` pelo token **no servidor**
+  → reconfere na Graph (`GET /{waba}/phone_numbers`) que o número é da WABA →
+  recusa número de outro provedor → cria a conta pelo mesmo `createAccount` do
+  cadastro manual (ou, se o número já é deste provedor, `updateCloudToken`:
+  `200` com `reused: true`, sem duplicar). Resposta `201`:
+  `{ account, coexistence, reused }`. Nada do token, do `code` ou do segredo do
+  app volta ao navegador.
+- `POST /api/whatsapp/accounts/:id/coexistence-sync` — "tentar de novo".
+
+**Coexistência.** Depois de criar o número, o painel pede à Meta
+`POST /{phone}/smb_app_data` com `sync_type` `smb_app_state_sync` e depois
+`history`, **uma vez cada**: o `request_id` de cada um é gravado
+(`meta_sync_request_ids`, não sai para a tela) e o que já tem `request_id` nunca é
+pedido de novo. Uma recusa para no passo e grava `metaSyncError` (`<tipo>: (<código>) <motivo>`);
+"tentar de novo" retoma só o que faltou, e passado o prazo (`metaCoexistenceDeadlineAt`,
+24 h) responde `metaSyncError: coexistence_deadline_passed` sem chamar a Meta.
+`/register` **nunca** é chamado. `publicAccount` ganhou `metaOnboarding`
+(`embedded|manual|null`), `metaCoexistence`, `metaSyncState` (`pending|ok|error|null`),
+`metaSyncError` e `metaCoexistenceDeadlineAt`.
 
 **Trocar o token.** `POST /api/whatsapp/accounts/:id/meta-token` com
 `{ "metaToken": "<token novo>", "adminKey": "<chave global, só no self-host>" }`

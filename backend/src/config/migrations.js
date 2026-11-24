@@ -1847,6 +1847,27 @@ const WA_CONVERSATION_LEARNED_COLUMNS = [
   ['lead_learned_at', (t) => t.timestamp('lead_learned_at').nullable()]
 ];
 
+/**
+ * O cadastro guiado do número oficial (Embedded Signup, 0151).
+ *
+ * `meta_onboarding` diz como o número entrou (`embedded`, pelo botão do painel,
+ * ou `manual`, colando o token); `meta_coexistence` marca o número que
+ * continua no app WhatsApp Business do celular. A sincronização de contatos e
+ * de histórico da coexistência só pode ser pedida UMA vez por tipo e tem 24 h
+ * de prazo: `meta_sync_state` (`pending`, `ok`, `error`) e `meta_sync_error`
+ * guardam o resultado, `meta_sync_request_ids` os `request_id` devolvidos pela
+ * Meta (JSON) — é ele que impede o painel de repetir uma chamada que a Meta
+ * não aceita duas vezes — e `meta_coexistence_deadline_at` o fim do prazo.
+ */
+const WA_ACCOUNT_EMBEDDED_SIGNUP_COLUMNS = [
+  ['meta_onboarding', (t) => t.string('meta_onboarding', 16).nullable()],
+  ['meta_coexistence', (t) => t.boolean('meta_coexistence').notNullable().defaultTo(false)],
+  ['meta_sync_state', (t) => t.string('meta_sync_state', 8).nullable()],
+  ['meta_sync_error', (t) => t.string('meta_sync_error', 255).nullable()],
+  ['meta_sync_request_ids', (t) => t.string('meta_sync_request_ids', 255).nullable()],
+  ['meta_coexistence_deadline_at', (t) => t.timestamp('meta_coexistence_deadline_at').nullable()]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -8464,6 +8485,22 @@ export const migrations = [
       const missing = await missingColumns(db, 'messenger_messages', MESSENGER_ATTACHMENT_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('messenger_messages', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** O cadastro guiado do número oficial — ver `WA_ACCOUNT_EMBEDDED_SIGNUP_COLUMNS`. */
+    id: '0151_wa_embedded_signup',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_EMBEDDED_SIGNUP_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const missing = await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_EMBEDDED_SIGNUP_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
         for (const add of missing) add(t);
       });
     }
