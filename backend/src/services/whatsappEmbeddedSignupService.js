@@ -61,6 +61,22 @@ function configId() {
   return /^\d{5,32}$/.test(id) ? id : '';
 }
 
+/**
+ * A página do popup. O SDK da Meta só roda no domínio cadastrado no app, que não
+ * é o do painel do provedor — por isso o painel recebe a URL daqui. Só `https:`
+ * e sem credencial: o painel abre esta URL e confia no que ela devolve.
+ */
+export function signupPageUrl() {
+  const fallback = 'https://tr69.com.br/whatsapp-signup.html';
+  try {
+    const url = new URL(String(process.env.META_WA_SIGNUP_URL ?? '').trim() || fallback);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return fallback;
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
+
 function appSecret() {
   return String(process.env.META_APP_SECRET ?? '').trim();
 }
@@ -131,7 +147,14 @@ class WhatsAppEmbeddedSignupService {
       origin,
       expiresAt: Date.now() + STATE_TTL_MS
     }));
-    return { appId: appId(), configId: configId(), state, returnOrigin: origin, expiresInSec: STATE_TTL_MS / 1000 };
+    return {
+      appId: appId(),
+      configId: configId(),
+      state,
+      returnOrigin: origin,
+      signupUrl: signupPageUrl(),
+      expiresInSec: STATE_TTL_MS / 1000
+    };
   }
 
   /**

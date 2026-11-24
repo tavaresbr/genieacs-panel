@@ -56,7 +56,11 @@ e o fluxo tem que ser refeito.
    curl -sI https://tr69.com.br/whatsapp-signup.html | grep -iE '^(HTTP|content-security-policy)'
    ```
 
-   A CSP dessa URL (e só dela) libera `connect.facebook.net`, os iframes do SDK e a
+   O painel abre essa página sozinho pelo botão **Conectar número oficial** (a URL
+   vem de `META_WA_SIGNUP_URL`, padrão `https://tr69.com.br/whatsapp-signup.html`) e
+   recebe o resultado por `postMessage`; para conferir à mão, abra
+   `/whatsapp-signup.html?app=<APP_ID>&config=<CONFIG_ID>&mode=coexistence` (sem
+   `state`/`return` ela mostra os ids na tela, como antes). A CSP dessa URL (e só dela) libera `connect.facebook.net`, os iframes do SDK e a
    Graph (`backend/src/app.js`, rota `/whatsapp-signup.html`).
 
 ## Rodar o cadastro

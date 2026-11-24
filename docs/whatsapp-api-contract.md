@@ -270,10 +270,18 @@ três a tela cai no formulário manual (`available: false`, não é erro). Todas
 rotas pedem `whatsapp.config` e têm teto próprio (12/min por usuário).
 
 - `POST /api/whatsapp/accounts/embedded-signup/start` com `{ "returnOrigin": "https://painel…" }`
-  → `{ available, appId, configId, state, returnOrigin, expiresInSec }`. O `state`
+  → `{ available, appId, configId, state, returnOrigin, signupUrl, expiresInSec }`.
+  `signupUrl` é a página do popup (`META_WA_SIGNUP_URL`, só `https:`; padrão
+  `https://tr69.com.br/whatsapp-signup.html`). O `state`
   é de uso único, vale 10 min e fica preso ao provedor e ao usuário que o pediu.
   `returnOrigin` tem de ser `https:` (ou `http://localhost`): é o `targetOrigin`
   do `postMessage` do popup, e `*` vazaria o `code`.
+- **O popup** (`frontend/public/whatsapp-signup.js`) abre em `signupUrl` com
+  `?app&config&state&return=<origem>[&mode=coexistence]`, sem ids fixos no código. Devolve
+  ao opener, UMA vez e só para `return`, `{ type: 'wa-embedded-signup', state, event,
+  code, wabaId, phoneNumberId, businessId }` — ou `{ error: 'cancelled'|'error', event,
+  step }`. O painel (`lib/wa-embedded-signup.ts`) só aceita a mensagem da origem de
+  `signupUrl`, da janela que abriu e com o `state` esperado.
 - `POST /api/whatsapp/accounts/embedded-signup/complete` com
   `{ state, code, wabaId, phoneNumberId, event, label?, purpose? }` (e
   `baseUrl`/`adminKey` só no self-host, como em `POST /accounts`). Ordem: valida o

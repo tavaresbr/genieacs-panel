@@ -183,6 +183,7 @@ describe('start', () => {
     assert.equal(data.configId, '1477066904263675');
     assert.match(data.state, /^[a-f0-9]{64}$/);
     assert.equal(data.returnOrigin, ORIGIN);
+    assert.equal(data.signupUrl, 'https://tr69.com.br/whatsapp-signup.html');
     assert.ok(!JSON.stringify(data).includes(APP_SECRET));
   });
 
