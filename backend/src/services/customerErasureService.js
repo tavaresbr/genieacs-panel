@@ -144,6 +144,9 @@ class CustomerErasureService {
       messenger_link_tokens: linksMessenger.length,
       telegram_conversations: telegramConversaIds.length,
       telegram_link_tokens: linksTelegram.length,
+      telegram_notices: telegramConversaIds.length
+        ? await contar('telegram_notices', (q) => q.whereIn('conversation_id', telegramConversaIds))
+        : 0,
       telegram_messages: telegramConversaIds.length
         ? await contar('telegram_messages', (q) => q.whereIn('conversation_id', telegramConversaIds))
         : 0,
@@ -253,6 +256,7 @@ class CustomerErasureService {
         await tdb('telegram_link_tokens', trx).whereIn('id', linksTelegram.map((l) => l.id)).del();
       }
       if (telegramConversaIds.length) {
+        await tdb('telegram_notices', trx).whereIn('conversation_id', telegramConversaIds).del();
         await tdb('telegram_messages', trx).whereIn('conversation_id', telegramConversaIds).del();
         await tdb('telegram_conversations', trx).whereIn('id', telegramConversaIds).del();
       }

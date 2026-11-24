@@ -48,10 +48,11 @@ export function decryptBotToken(stored) {
 
 /** O bot como o navegador pode vê-lo: sem o token e sem o hash do segredo. */
 export function publicBot(row) {
-  if (!row) return { configured: false, enabled: false, botUsername: null, botName: null, webhookError: null };
+  if (!row) return { configured: false, enabled: false, autoReply: false, botUsername: null, botName: null, webhookError: null };
   return {
     configured: Boolean(row.token),
     enabled: row.enabled === true || row.enabled === 1,
+    autoReply: row.auto_reply === true || row.auto_reply === 1,
     botUsername: row.bot_username || null,
     botName: row.bot_name || null,
     webhookError: row.webhook_error || null
@@ -126,6 +127,16 @@ class TelegramCustomerBotService {
     if (!bot) return null;
     await this.disable();
     return TelegramCustomerBot.update(bot.id, { token: null, bot_id: null, bot_username: null, bot_name: null });
+  }
+
+  /**
+   * Liga ou desliga as respostas automáticas (fatura, conexão, menu). Só com o
+   * bot guardado: sem token não há com quem conversar.
+   */
+  static async setAutoReply(enabled) {
+    const bot = await TelegramCustomerBot.get();
+    if (!bot?.token) throw new TelegramChatError('bot_not_configured', 'save the bot token first', 409);
+    return TelegramCustomerBot.update(bot.id, { auto_reply: enabled === true });
   }
 
   /** O header do Telegram contra o hash guardado. Fail-closed. */

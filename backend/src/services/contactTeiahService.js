@@ -6,6 +6,7 @@ import ContactProfileService, { ContactProfileError, shownValue, whatsappPhoneOf
 import WaContactService, { contactKey } from './waContactService.js';
 import { personTypeOf } from './contactOnboardingService.js';
 import AuditLog from '../models/AuditLog.js';
+import TeiahConsultation from '../models/TeiahConsultation.js';
 import WaAlertService from './waAlertService.js';
 
 /** One scan reads this many clients: each is a paid call to the TeiaH. */
@@ -104,6 +105,34 @@ class ContactTeiahService {
     await SgpClient.setTeiah(client.id, teiah);
     const worsened = await this.noteWorsening(key, existing, row, teiah);
     return { teiah, cached: consulted.cached, worsened };
+  }
+
+  /**
+   * Files on the record a consultation the panel ALREADY paid for, whatever its
+   * age — the "Ver consulta guardada" button.
+   *
+   * Unlike `consult` it never reaches the TeiaH: no `requireReady` (it costs
+   * nothing, so it works with the integration off), no monthly-limit check, no
+   * usage count and no worsening alert (there is nothing new to say; the alert
+   * went out when the answer was first paid for). The memory is by CPF/CNPJ, so
+   * a consultation made from "Novo cliente" or the bulk run counts too.
+   *
+   * @returns {Promise<{ teiah: object, cached: true, stored: true }>}
+   */
+  static async useStored(key) {
+    const row = await ContactProfileService.rowFor(key);
+    if (!row) throw new ContactProfileError('contacts.error.notFound', { code: 'not_found', status: 404 });
+    const existing = await ContactProfileService.clientFor(row);
+    const document = digitsOf(shownValue('document', existing, row));
+    if (!personTypeOf(document)) {
+      throw new ContactProfileError('contacts.error.invalidDocument', { code: 'invalid_document' });
+    }
+    const stored = await TeiahConsultation.get(document);
+    if (!stored) throw new ContactProfileError('contacts.error.teiahNoStored', { code: 'teiah_no_stored', status: 404 });
+    const client = await ContactProfileService.ensureClient(row);
+    const teiah = snapshotOf(stored.data, stored.consultedAt.toISOString());
+    await SgpClient.setTeiah(client.id, teiah);
+    return { teiah, cached: true, stored: true };
   }
 
   /**

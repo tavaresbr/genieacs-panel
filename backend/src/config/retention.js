@@ -288,6 +288,7 @@ export const SEM_PRAZO = Object.freeze({
   messenger_messages: 'o texto trocado no Messenger e o arquivo do anexo recebido (em `messenger-media/`, no disco do painel); nenhuma rotina os apaga por idade — saem junto com a conversa, e o arquivo é apagado do disco ao desconectar a Página e na exclusão do art. 18',
   // Atendimento (Telegram dos clientes)
   telegram_conversations: 'a conversa e o id do chat da pessoa no Telegram; nenhuma rotina a apaga por idade — sai pela exclusão do art. 18 ou junto com o provedor',
+  telegram_notices: 'o registro de que um aviso (fatura, queda, manutenção, campanha) já foi mandado àquela conversa; nenhuma rotina o apaga por idade — sai junto com a conversa',
   telegram_messages: 'o texto trocado no Telegram; nenhuma rotina o apaga por idade — sai junto com a conversa',
   wa_opt_outs: 'quem pediu para não receber mensagens; nenhuma rotina o apaga',
   wa_marketing_opt_outs: 'quem pediu para não receber promoções, e quando voltou; nenhuma rotina o apaga — apagar seria desfazer o pedido',

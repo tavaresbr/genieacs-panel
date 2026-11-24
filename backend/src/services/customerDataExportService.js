@@ -536,6 +536,9 @@ class CustomerDataExportService {
     guardar('messenger_link_tokens', linksMessenger);
     guardar('telegram_conversations', conversasTelegram);
     guardar('telegram_link_tokens', linksTelegram);
+    guardar('telegram_notices', telegramConversaIds.length
+      ? await tdb('telegram_notices').whereIn('conversation_id', telegramConversaIds).orderBy('id')
+      : []);
     guardar('telegram_messages', telegramConversaIds.length
       ? await tdb('telegram_messages').whereIn('conversation_id', telegramConversaIds).orderBy('id')
       : []);

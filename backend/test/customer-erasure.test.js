@@ -78,7 +78,7 @@ after(async () => {
 async function semear() {
   const db = getDb();
   for (const tabela of [
-    'telegram_messages', 'telegram_link_tokens', 'telegram_conversations', 'telegram_customer_bots',
+    'telegram_notices', 'telegram_messages', 'telegram_link_tokens', 'telegram_conversations', 'telegram_customer_bots',
     'wa_messages', 'wa_conversations', 'wa_opt_outs', 'wa_broadcast_recipients',
     'wa_broadcasts', 'whatsapp_accounts', 'sgp_events', 'sgp_links',
     'device_samples', 'device_sample_hours', 'device_swaps',
@@ -175,6 +175,7 @@ async function semear() {
     await tinsertReturningId('telegram_messages', {
       conversation_id: conversaTgId, direction: 'in', external_id: `tg-${slug}`, body: `Oi, sou a Fulana do ${slug}`
     });
+    await tinsertReturningId('telegram_notices', { conversation_id: conversaTgId, kind: 'outage', ref_key: `incidente:${slug}` });
     await tinsertReturningId('wa_opt_outs', {
       wa_phone_e164: `551199999000${slug === 'meu' ? 1 : 2}`,
       conversation_id: conversaId,
@@ -287,6 +288,8 @@ describe('o que a exclusão destrói', () => {
     assert.equal((await apagar()).status, 200);
     assert.equal(await cru('telegram_messages', { tenant_id: meu }), undefined, 'a mensagem do Telegram ficou');
     assert.equal(await cru('telegram_conversations', { tenant_id: meu }), undefined, 'a conversa do Telegram ficou');
+    assert.equal(await cru('telegram_notices', { tenant_id: meu }), undefined, 'o registro de aviso do Telegram ficou');
+    assert.ok(await cru('telegram_notices', { tenant_id: vizinho }), 'o aviso do vizinho foi apagado');
     assert.ok(await cru('telegram_conversations', { tenant_id: vizinho }), 'a conversa do vizinho foi apagada');
     assert.ok(await cru('telegram_customer_bots', { tenant_id: meu }), 'o bot do provedor foi apagado');
   });

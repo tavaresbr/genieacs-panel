@@ -645,6 +645,14 @@ class WaBotService {
   static textoPassagem = textoDePassagem;
   static contratoBloqueado = contratoBloqueado;
 
+  // Para o bot do Telegram dos clientes (`telegramBotRouter.js`), que responde
+  // com os MESMOS construtores e as mesmas travas de conteúdo: o menu, a dica do
+  // portal e "o assinante pediu o menu". Só leitura — nada daqui muda o bot do
+  // WhatsApp.
+  static menu = menuPara;
+  static textoPortal = responderPortal;
+  static pedeMenu = pedeMenu;
+
   static TETO_POR_HORA = TETO_POR_HORA;
 
   static PAUSA_ATENDENTE_MS = PAUSA_ATENDENTE_MS;

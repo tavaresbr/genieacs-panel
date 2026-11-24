@@ -48,6 +48,7 @@ export function telegramRefusal(status, description = '') {
   const texto = String(description || '').toLowerCase();
   if (status === 401) return 'telegram_invalid_token';
   if (status === 403) return 'telegram_bot_not_in_chat';
+  if (status === 429) return 'telegram_rate_limited';
   if (status === 400 && texto.includes('chat not found')) return 'telegram_chat_not_found';
   return 'telegram_failed';
 }
@@ -81,7 +82,14 @@ export async function callTelegram(token, method, payload = {}) {
   }
   if (resposta.ok && dados?.ok) return { ok: true, result: dados.result ?? null };
   const description = typeof dados?.description === 'string' ? dados.description.slice(0, 200) : null;
-  return { ok: false, code: telegramRefusal(resposta.status, description), description };
+  const retryAfter = Number(dados?.parameters?.retry_after);
+  return {
+    ok: false,
+    code: telegramRefusal(resposta.status, description),
+    description,
+    // 429: o Telegram diz em segundos quanto esperar. A fila respeita.
+    ...(resposta.status === 429 && Number.isFinite(retryAfter) ? { retryAfter } : {})
+  };
 }
 
 /**

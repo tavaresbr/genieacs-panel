@@ -5,13 +5,14 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 
 interface Props {
-  /** Abre a aba da integração (`sgp`, `teiah`, `whatsapp`, `chatbot`, `telegram`). */
+  /** Abre a aba da integração (`sgp`, `teiah`, `whatsapp`, `chatbot`, `telegram`, `messenger`). */
   onOpen: (tab: string) => void
   canTeiah: boolean
   canAsaas: boolean
   canFocusChat: boolean
   canChatbot: boolean
   canTelegram: boolean
+  canMessenger: boolean
 }
 
 interface Card {
@@ -26,7 +27,7 @@ interface Card {
  * tela de cada um. As telas são as mesmas de antes — só saíram da trilha de
  * abas, que já não cabia numa linha.
  */
-export function IntegrationsHub({ onOpen, canTeiah, canAsaas, canFocusChat, canChatbot, canTelegram }: Props) {
+export function IntegrationsHub({ onOpen, canTeiah, canAsaas, canFocusChat, canChatbot, canTelegram, canMessenger }: Props) {
   const { t } = useTranslation()
 
   const cards: Card[] = [
@@ -43,6 +44,9 @@ export function IntegrationsHub({ onOpen, canTeiah, canAsaas, canFocusChat, canC
     { tab: 'whatsapp', icon: 'chat', title: 'sidebar.nav.whatsapp', description: 'settings.integrations.whatsappDesc' },
     ...(canTelegram
       ? [{ tab: 'telegram', icon: 'chat', title: 'settings.tab.telegram', description: 'settings.integrations.telegramDesc' } as Card]
+      : []),
+    ...(canMessenger
+      ? [{ tab: 'messenger', icon: 'chat', title: 'sidebar.nav.messenger', description: 'settings.integrations.messengerDesc' } as Card]
       : []),
     ...(canChatbot
       ? [{ tab: 'chatbot', icon: 'terminal', title: 'settings.tab.chatbot', description: 'settings.integrations.chatbotDesc' } as Card]
