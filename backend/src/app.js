@@ -603,7 +603,8 @@ function serveFrontend(target, htmlFile) {
       return next();
     }
     if (!fs.existsSync(htmlPath)) {
-      return res.status(503).send(req.t('common.buildUnavailable'));
+      // Texto puro: é uma frase, não uma página, e `send` de string sairia como HTML.
+      return res.status(503).type('text/plain').send(req.t('common.buildUnavailable'));
     }
     res.setHeader('Cache-Control', 'no-cache');
     // Com `root`, e não com um caminho absoluto.
