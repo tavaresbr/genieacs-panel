@@ -9,6 +9,7 @@ import {
   type WhatsAppStatus
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { CoexistenceSync, EmbeddedSignup } from '@/components/whatsapp/embedded-signup'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -94,6 +95,14 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   meta_template_not_synced: 'whatsapp.error.metaTemplateNotSynced',
   meta_waba_missing: 'whatsapp.error.metaWabaMissing',
   meta_refused: 'whatsapp.error.metaRefused',
+  // O cadastro guiado (Embedded Signup).
+  embedded_signup_unconfigured: 'whatsapp.error.embeddedSignupUnconfigured',
+  signup_return_origin_invalid: 'whatsapp.error.signupReturnOriginInvalid',
+  signup_state_invalid: 'whatsapp.error.signupStateInvalid',
+  signup_code_expired: 'whatsapp.error.signupCodeExpired',
+  meta_phone_waba_mismatch: 'whatsapp.error.metaPhoneWabaMismatch',
+  meta_number_in_use: 'whatsapp.error.metaNumberInUse',
+  not_coexistence: 'whatsapp.error.notCoexistence',
   invalid_meta_price: 'whatsapp.error.invalidMetaPrice',
   // Both reachable only from the inbox, and both were missing until the screen
   // that provokes them was built: an unknown code degrades to the generic
@@ -766,6 +775,13 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
     wabaId: ''
   }
   const [form, setForm] = useState(emptyForm)
+  /**
+   * O cadastro guiado da Meta: `null` até o servidor dizer se a plataforma tem o
+   * app configurado. Com ele, colar token e IDs vira a opção "avançada".
+   */
+  const [guided, setGuided] = useState<boolean | null>(null)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [coexistence, setCoexistence] = useState(false)
   const [edit, setEdit] = useState<{ label: string; purpose: WhatsAppPurpose; color: WaAccountColor }>({
     label: '',
     purpose: 'general',
@@ -1101,6 +1117,37 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
 
           {form.kind === 'cloud' && (
             <>
+              <EmbeddedSignup
+                coexistence={coexistence}
+                onCoexistenceChange={setCoexistence}
+                label={form.label}
+                purpose={form.purpose}
+                server={managed ? null : { baseUrl: form.baseUrl, adminKey: form.adminKey }}
+                errorText={(code) => whatsappErrorMessage(t, code)}
+                onAvailableChange={setGuided}
+                onConnected={(account) => {
+                  // Reconectar um número que já era deste provedor devolve a mesma conta.
+                  setAccounts((current) => (current.some((row) => row.id === account.id)
+                    ? current.map((row) => (row.id === account.id ? account : row))
+                    : [...current, account]))
+                  setAdding(false)
+                  setForm(emptyForm)
+                  setManualOpen(false)
+                  setCoexistence(false)
+                }}
+              />
+              {guided && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                  aria-expanded={manualOpen}
+                  onClick={() => setManualOpen((open) => !open)}
+                >
+                  {t(manualOpen ? 'whatsapp.cloud.signup.manualHide' : 'whatsapp.cloud.signup.manual')}
+                </button>
+              )}
+              {(!guided || manualOpen) && (
+            <>
               <div>
                 <label htmlFor="wa-new-meta-token" className="field-label">
                   {t('whatsapp.cloud.token')}
@@ -1150,9 +1197,13 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                 auto={metaAuto}
               />
             </>
+              )}
+            </>
           )}
 
           <div className="flex flex-wrap gap-3">
+            {/* No cadastro guiado quem conecta é o botão da Meta; este é o do formulário manual. */}
+            {!(form.kind === 'cloud' && guided && !manualOpen) && (
             <button
               type="button"
               className="modern-button"
@@ -1162,6 +1213,7 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
             >
               {creating ? t('common.saving') : t(form.kind === 'cloud' ? 'whatsapp.cloud.connect' : 'whatsapp.actions.connect')}
             </button>
+            )}
             <button
               type="button"
               className="modern-button-secondary"
@@ -1292,6 +1344,8 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                     onRefresh={() => void refreshMetaHealth(account)}
                   />
                 )}
+
+                {cloud && <CoexistenceSync account={account} onChange={mergeAccount} />}
 
                 {editing === account.id ? (
                   <div className="mt-3 grid gap-4 sm:grid-cols-2">

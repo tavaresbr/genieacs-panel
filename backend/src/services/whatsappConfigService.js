@@ -602,6 +602,15 @@ class WhatsAppConfigService {
       metaThroughput: row.meta_throughput || null,
       metaHealthAt: row.meta_health_at || null,
       metaHealthError: row.meta_health_error || null,
+      // O cadastro guiado (Embedded Signup) e a sincronização da coexistência:
+      // só estado e prazo, nunca token nem `request_id`.
+      metaOnboarding: row.meta_onboarding === 'embedded' || row.meta_onboarding === 'manual'
+        ? row.meta_onboarding
+        : null,
+      metaCoexistence: Boolean(row.meta_coexistence),
+      metaSyncState: ['pending', 'ok', 'error'].includes(row.meta_sync_state) ? row.meta_sync_state : null,
+      metaSyncError: row.meta_sync_error || null,
+      metaCoexistenceDeadlineAt: row.meta_coexistence_deadline_at || null,
       baseUrl: row.base_url,
       status: row.status,
       // O QR NÃO sai daqui.

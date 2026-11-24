@@ -493,6 +493,19 @@ export const whatsappTestLimiter = limiter({
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
+/**
+ * O cadastro guiado do número oficial. Cada `complete` faz o painel falar com a
+ * Meta várias vezes e gasta um `code` que vale 30 segundos; ninguém conecta mais
+ * que um punhado de números por minuto, então o teto é baixo — mas não o do
+ * diagnóstico, que é de outro ato e tem o próprio balde.
+ */
+export const whatsappSignupLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 12,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 /** A fleet sync calls the provider once per ONT, so it is rarer still. */
 export const sgpSyncLimiter = limiter({
   windowMs: 60 * 60 * 1000,

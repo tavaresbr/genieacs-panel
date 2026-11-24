@@ -528,6 +528,18 @@ export const casos = [
     controleSoNaoAchou: true
   },
   {
+    // "Tentar de novo" da sincronização da coexistência. A conta é carregada
+    // antes de qualquer chamada à Meta, então o id do vizinho dá 404; no
+    // controle, o número semeado (por QR) dá 409 `not_coexistence` — achado,
+    // recusado, sem falar com a Meta.
+    chave: 'account',
+    label: 'POST /api/whatsapp/accounts/:id/coexistence-sync',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/accounts/${id}/coexistence-sync`,
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
     // Criar modelo na Meta. A conta é carregada antes de validar o corpo, então
     // o id do vizinho dá 404 mesmo com corpo válido; no controle, o número
     // semeado (por QR) dá 409 `meta_templates_cloud_only` — achado, recusado.

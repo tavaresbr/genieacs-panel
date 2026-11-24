@@ -5504,6 +5504,14 @@ export interface WhatsAppAccount {
   metaThroughput?: string | null
   metaHealthAt?: string | null
   metaHealthError?: string | null
+  /** Como o número entrou: pelo cadastro guiado da Meta ou colando o token. */
+  metaOnboarding?: 'embedded' | 'manual' | null
+  /** O número continua no app WhatsApp Business do celular (coexistência). */
+  metaCoexistence?: boolean
+  /** A sincronização de contatos e histórico: a Meta só a aceita uma vez, e em até 24 h. */
+  metaSyncState?: 'pending' | 'ok' | 'error' | null
+  metaSyncError?: string | null
+  metaCoexistenceDeadlineAt?: string | null
   baseUrl: string
   status: WhatsAppStatus
   /**
@@ -7208,6 +7216,46 @@ export const whatsappAPI = {
       metaToken,
       ...(adminKey ? { adminKey } : {})
     }),
+
+  /**
+   * O cadastro guiado do número oficial (Embedded Signup). `start` entrega ao
+   * popup o que ele precisa e um `state` de uso único; `complete` recebe o que o
+   * popup devolveu e termina o serviço no servidor, que é quem troca o `code` pelo
+   * token — o token e o segredo do app nunca passam pelo navegador.
+   */
+  startEmbeddedSignup: (returnOrigin: string) =>
+    apiClient.post<
+      | { available: false }
+      | {
+        available: true
+        appId: string
+        configId: string
+        state: string
+        returnOrigin: string
+        signupUrl: string
+        expiresInSec: number
+      }
+    >('/whatsapp/accounts/embedded-signup/start', { returnOrigin }),
+
+  completeEmbeddedSignup: (payload: {
+    state: string
+    code: string
+    wabaId: string
+    phoneNumberId: string
+    event: string
+    label?: string
+    purpose?: WhatsAppPurpose
+    baseUrl?: string
+    adminKey?: string
+  }) =>
+    apiClient.post<{ account: WhatsAppAccount; coexistence: boolean; reused: boolean }>(
+      '/whatsapp/accounts/embedded-signup/complete',
+      payload
+    ),
+
+  /** Pede de novo a sincronização da coexistência — só o que a Meta ainda não aceitou. */
+  retryCoexistenceSync: (id: number) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/coexistence-sync`, {}),
 
   /** Registra de novo o webhook da conta WABA na Meta, pelo servidor do painel. */
   registerMetaWebhook: (id: number) =>

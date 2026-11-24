@@ -1,7 +1,7 @@
 import express from 'express';
 import WhatsAppController from '../controllers/whatsappController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { whatsappSendLimiter, whatsappTestLimiter } from '../middleware/rateLimit.js';
+import { whatsappSendLimiter, whatsappSignupLimiter, whatsappTestLimiter } from '../middleware/rateLimit.js';
 import { requireAddon } from '../middleware/addonGate.js';
 
 const router = express.Router();
@@ -45,6 +45,12 @@ router.post('/test', authenticateToken, requirePermission('whatsapp.config'), wh
 // declared with the other reads and stays as cheap as they are.
 router.get('/health', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getHealth);
 router.post('/accounts', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.createAccount);
+// O cadastro guiado do número oficial (Embedded Signup). As duas rotas fixas
+// vêm antes das `:id`, e as duas levam o limitador: cada `complete` faz o
+// painel falar com a Meta e gasta um `code` que vale 30 segundos.
+router.post('/accounts/embedded-signup/start', authenticateToken, requirePermission('whatsapp.config'), whatsappSignupLimiter, WhatsAppController.startEmbeddedSignup);
+router.post('/accounts/embedded-signup/complete', authenticateToken, requirePermission('whatsapp.config'), whatsappSignupLimiter, WhatsAppController.completeEmbeddedSignup);
+router.post('/accounts/:id/coexistence-sync', authenticateToken, requirePermission('whatsapp.config'), whatsappSignupLimiter, WhatsAppController.retryCoexistenceSync);
 
 // Declared before the `:id` routes so the matcher can never read
 // `check-number` as an account id.
