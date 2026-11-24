@@ -7,6 +7,16 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.68.0] - 2026-11-24
+
+### New
+
+- Página estática pública de Termos de Serviço (`dff6b3b4`)
+- A página de status vira a de instruções de exclusão de dados quando não há código (`1013fc5b`)
+- Link da página de exclusão de dados na aba Sobre (`36a855f1`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/86aa781f9d01...cb9e1c7ee03c)
+
 ## [1.67.0] - 2026-11-24
 
 ### New
