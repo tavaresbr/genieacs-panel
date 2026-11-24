@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  WA_COEXISTENCE_EVENT, WA_EMBEDDED_SIGNUP_MESSAGE, isSignupSuccess, parseSignupMessage, signupPopupUrl
+  SIGNUP_POPUP_FEATURES, SIGNUP_STATE_REFRESH_MS, WA_COEXISTENCE_EVENT, WA_EMBEDDED_SIGNUP_MESSAGE,
+  canRetryCoexistenceSync, coexistenceStatus, isSignupSuccess, parseSignupMessage, signupFailureKey, signupPopupUrl
 } from '@/lib/wa-embedded-signup'
 
 const SIGNUP = 'https://tr69.com.br/whatsapp-signup.html'
@@ -61,5 +62,67 @@ describe('parseSignupMessage', () => {
     expect(parseSignupMessage(msg(data), popup, SIGNUP, STATE)).toEqual({ error: 'cancelled', event: 'CANCEL', step: 'PHONE_NUMBER_SETUP' })
     expect(parseSignupMessage(msg({ code: undefined, error: undefined, event: undefined }), popup, SIGNUP, STATE))
       .toEqual({ error: 'cancelled', event: null, step: null })
+  })
+})
+
+describe('coexistenceStatus', () => {
+  const NOW = Date.parse('2026-11-24T12:00:00Z')
+  const inHours = (h: number) => new Date(NOW + h * 3_600_000).toISOString()
+
+  it('número que não é de coexistência não tem o que mostrar', () => {
+    expect(coexistenceStatus({ metaCoexistence: false }, NOW)).toBeNull()
+    expect(coexistenceStatus({}, NOW)).toBeNull()
+  })
+
+  it('sincronizado é pronto, mesmo depois do prazo', () => {
+    expect(coexistenceStatus({ metaCoexistence: true, metaSyncState: 'ok', metaCoexistenceDeadlineAt: inHours(-5) }, NOW))
+      .toEqual({ state: 'ok' })
+  })
+
+  it('conta as horas que faltam, arredondando para cima e nunca mostrando zero', () => {
+    const at = (h: number) => coexistenceStatus({ metaCoexistence: true, metaSyncState: 'pending', metaCoexistenceDeadlineAt: inHours(h) }, NOW)
+    expect(at(23.2)).toMatchObject({ state: 'pending', hoursLeft: 24 })
+    expect(at(2)).toMatchObject({ hoursLeft: 2 })
+    expect(at(0.1)).toMatchObject({ hoursLeft: 1 })
+  })
+
+  it('passado o prazo sem sincronizar, expirou: a Meta já desconectou', () => {
+    expect(coexistenceStatus({ metaCoexistence: true, metaSyncState: 'error', metaCoexistenceDeadlineAt: inHours(-1) }, NOW))
+      .toEqual({ state: 'expired' })
+    expect(coexistenceStatus({ metaCoexistence: true, metaSyncState: 'pending', metaCoexistenceDeadlineAt: inHours(0) }, NOW))
+      .toEqual({ state: 'expired' })
+  })
+
+  it('erro traz o motivo e as horas, e sem prazo gravado assume as 24 h inteiras', () => {
+    expect(coexistenceStatus({ metaCoexistence: true, metaSyncState: 'error', metaSyncError: 'history: (80008) Throttled', metaCoexistenceDeadlineAt: inHours(5) }, NOW))
+      .toEqual({ state: 'error', hoursLeft: 5, reason: 'history: (80008) Throttled' })
+    expect(coexistenceStatus({ metaCoexistence: true, metaSyncState: null }, NOW))
+      .toEqual({ state: 'pending', hoursLeft: 24, reason: null })
+  })
+
+  it('só tenta de novo enquanto há o que pedir e prazo para pedir', () => {
+    expect(canRetryCoexistenceSync({ state: 'error', hoursLeft: 3, reason: null })).toBe(true)
+    expect(canRetryCoexistenceSync({ state: 'pending', hoursLeft: 3, reason: null })).toBe(true)
+    expect(canRetryCoexistenceSync({ state: 'ok' })).toBe(false)
+    expect(canRetryCoexistenceSync({ state: 'expired' })).toBe(false)
+    expect(canRetryCoexistenceSync(null)).toBe(false)
+  })
+})
+
+describe('signupFailureKey', () => {
+  it('cancelar é uma frase, qualquer outro desfecho é "não concluiu"', () => {
+    expect(signupFailureKey({ error: 'cancelled', event: 'CANCEL', step: null })).toBe('whatsapp.cloud.signup.cancelled')
+    expect(signupFailureKey({ error: 'error', event: 'ERROR', step: null })).toBe('whatsapp.cloud.signup.failed')
+    expect(signupFailureKey({ error: 'qualquer', event: null, step: null })).toBe('whatsapp.cloud.signup.failed')
+  })
+})
+
+describe('o ciclo do state', () => {
+  it('renova antes de os 10 minutos do servidor vencerem', () => {
+    expect(SIGNUP_STATE_REFRESH_MS).toBeLessThan(10 * 60 * 1000)
+  })
+
+  it('o popup não pode abrir com noopener, ou o resultado não volta', () => {
+    expect(SIGNUP_POPUP_FEATURES).not.toMatch(/noopener|noreferrer/)
   })
 })

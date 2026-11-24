@@ -94,3 +94,60 @@ export function parseSignupMessage(
   }
   return { error: text(data.error) || 'cancelled', event: text(data.event) || null, step: text(data.step) || null }
 }
+
+// ── Tela: estados do cadastro, prazo da coexistência ─────────────────────────
+
+/** Onde o cadastro guiado está, na ordem em que acontece. */
+export type SignupPhase = 'idle' | 'waiting' | 'connecting' | 'done' | 'error'
+
+/**
+ * O `state` vale 10 min no servidor. A tela o pede ANTES do clique (o popup tem
+ * de abrir dentro do gesto do usuário, e uma chamada de rede no meio o perderia
+ * — o navegador bloquearia a janela), então renova um pouco antes de vencer.
+ */
+export const SIGNUP_STATE_REFRESH_MS = 8 * 60 * 1000
+/** O popup fechado sem mensagem só vale como "cancelou" depois desta folga: a mensagem pode estar a caminho. */
+export const SIGNUP_CLOSE_GRACE_MS = 1500
+/** As dimensões do popup do cadastro. Sem `noopener`: o resultado volta por `window.opener`. */
+export const SIGNUP_POPUP_FEATURES = 'popup=yes,width=720,height=820,menubar=no,toolbar=no,location=yes'
+
+/** A chave de tradução do que o popup disse quando NÃO concluiu. */
+export function signupFailureKey(failure: SignupFailure): 'whatsapp.cloud.signup.cancelled' | 'whatsapp.cloud.signup.failed' {
+  return failure.error === 'cancelled' ? 'whatsapp.cloud.signup.cancelled' : 'whatsapp.cloud.signup.failed'
+}
+
+/** O que a tela precisa saber da conta para falar da sincronização da coexistência. */
+export type CoexistenceAccount = {
+  metaCoexistence?: boolean
+  metaSyncState?: 'pending' | 'ok' | 'error' | null
+  metaSyncError?: string | null
+  metaCoexistenceDeadlineAt?: string | null
+}
+
+export type CoexistenceStatus =
+  | { state: 'ok' }
+  | { state: 'expired' }
+  | { state: 'pending' | 'error'; hoursLeft: number; reason: string | null }
+
+/**
+ * Como está a sincronização de um número em coexistência. `null` para o número
+ * que não é de coexistência (nada a mostrar). Pronta é pronta, mesmo depois do
+ * prazo; sem ela, passado o prazo, a Meta já desconectou o número.
+ */
+export function coexistenceStatus(account: CoexistenceAccount, now: number): CoexistenceStatus | null {
+  if (!account.metaCoexistence) return null
+  if (account.metaSyncState === 'ok') return { state: 'ok' }
+  const deadline = account.metaCoexistenceDeadlineAt ? new Date(account.metaCoexistenceDeadlineAt).getTime() : NaN
+  if (Number.isFinite(deadline) && deadline <= now) return { state: 'expired' }
+  const hoursLeft = Number.isFinite(deadline) ? Math.max(1, Math.ceil((deadline - now) / 3_600_000)) : 24
+  return {
+    state: account.metaSyncState === 'error' ? 'error' : 'pending',
+    hoursLeft,
+    reason: account.metaSyncError || null
+  }
+}
+
+/** "Tentar de novo" só existe enquanto há o que pedir e prazo para pedir. */
+export function canRetryCoexistenceSync(status: CoexistenceStatus | null): boolean {
+  return status?.state === 'pending' || status?.state === 'error'
+}
