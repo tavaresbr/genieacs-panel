@@ -70,6 +70,25 @@ export function TeiahCard({ profile, onProfile, onReload }: {
     }
   }
 
+  // "Ver consulta guardada": what the panel already paid for, of any age. It never
+  // reaches the TeiaH, so there is no confirmation, no month's limit and no password.
+  const loadStored = async () => {
+    setBusy(true)
+    try {
+      const res = await contactsAPI.teiahStored(profile.key)
+      if (!res.success || !res.data) {
+        toast.error(res.code === 'teiah_no_stored' ? t('contacts.profile.teiahStoredNone') : (res.message || t('contacts.profile.teiahFailed')))
+        return
+      }
+      toast.success(t('contacts.profile.teiahStoredDone', { date: formatDateTime(res.data.teiah.consultedAt) }))
+      await onReload()
+    } catch {
+      toast.error(t('contacts.profile.teiahFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // One of the TeiaH's addresses kept on the record, among its other addresses.
   // The addresses on the record — the main one and the extra ones — each can be
   // checked on the TeiaH (a paid call, asked one by one).
@@ -132,6 +151,9 @@ export function TeiahCard({ profile, onProfile, onReload }: {
         )}
         <button type="button" className="modern-button" onClick={() => setReportOpen(true)} data-testid="teiah-report-open">
           <Icon name="document" size={16} /> {t('contacts.teiahReport.open')}
+        </button>
+        <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void loadStored()} data-testid="teiah-stored">
+          <Icon name="database" size={16} /> {t('contacts.profile.teiahStored')}
         </button>
         <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void consult()}>
           <Icon name="refresh" size={16} className={busy ? 'animate-spin' : ''} />

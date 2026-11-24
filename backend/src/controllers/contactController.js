@@ -307,6 +307,25 @@ class ContactController {
   }
 
   /**
+   * `POST /api/contacts/:key/teiah/stored` — files on the record the consultation
+   * the panel already paid for, of any age. Never reaches the TeiaH, costs nothing.
+   */
+  static async teiahStored(req, res) {
+    try {
+      const result = await ContactTeiahService.useStored(req.params.key);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_TEIAH_LOOKUP,
+        subjectType: 'contact',
+        subjectId: req.params.key,
+        detail: { found: result.teiah.found, origin: 'profile', cached: true, stored: true }
+      });
+      return res.json(createResponse(req.t('contacts.teiahStoredDone'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.lookupFailed');
+    }
+  }
+
+  /**
    * `GET /api/contacts/:key/teiah/report?mode=completo|resumo` — the TeiaH's
    * report PDF of this client, passed through: shown inline, never cached.
    */
