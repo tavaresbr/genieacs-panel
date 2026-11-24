@@ -23,6 +23,9 @@ interface Health {
   timestamp: string
 }
 
+/** A página pública de instruções de exclusão de dados (a que o app do Messenger cadastra na Meta). */
+const DATA_DELETION_PATH = '/api/messenger-webhook/deletion-status'
+
 function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
@@ -127,6 +130,12 @@ export function AboutTab({ appName }: { appName: string }) {
             <Link to="/privacidade" target="_blank" rel="noopener" className="text-primary underline hover:no-underline">
               /privacidade
             </Link>
+          </Linha>
+          <Linha rotulo={t('settings.about.dataDeletion')}>
+            {/* Rota do servidor (não do app de tela): <a> comum, e abre sempre — é o endereço que a Meta valida. */}
+            <a href={DATA_DELETION_PATH} target="_blank" rel="noopener" className="text-primary underline hover:no-underline">
+              {DATA_DELETION_PATH}
+            </a>
           </Linha>
         </dl>
       </section>

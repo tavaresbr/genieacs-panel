@@ -246,7 +246,7 @@ dados**. No painel do app (Configurações → Básico / Login do Facebook → C
 - **Exclusão de dados**: apaga o token e o id no app dessas Páginas (`facebook_data_deleted`; ficam sem assinatura até
   alguém reconectar). Responde `{ url, confirmation_code }`. As conversas **não** são apagadas: são do provedor e dos
   clientes dele, e o pedido de titular delas segue o fluxo LGPD do provedor.
-- A `url` aponta para `/api/messenger-webhook/deletion-status?code=…`: página de texto fixo que só confirma códigos
+- O endereço sem código, `/api/messenger-webhook/deletion-status`, é a **página de instruções** de exclusão (sempre abre, 200) — é o que se cola no campo "URL de instruções de exclusão de dados" do app na Meta, que valida o endereço ao salvar. A `url` devolvida no callback aponta para `/api/messenger-webhook/deletion-status?code=…`: página de texto fixo que só confirma códigos
   emitidos pelo painel (o código leva a data e um HMAC, sem guardar nada em banco) e nunca imprime o que veio na URL.
 
 ## Anexos recebidos

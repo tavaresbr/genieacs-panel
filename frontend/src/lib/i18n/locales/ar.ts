@@ -1369,6 +1369,7 @@ const ar: Dictionary = {
   'settings.about.commit': 'Commit',
   'settings.about.releasedAt': 'تاريخ الإصدار',
   'settings.about.edition': 'النسخة',
+  'settings.about.dataDeletion': 'حذف البيانات',
   'settings.about.editionSaas': 'مستضافة (SaaS)',
   'settings.about.editionSelfHosted': 'تثبيت ذاتي',
   'settings.about.serverTitle': 'الخادم',

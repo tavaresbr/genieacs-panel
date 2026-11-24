@@ -103,17 +103,31 @@ router.post('/data-deletion', waWebhookLimiter, async (req, res) => {
   }
 });
 
+/** O corpo das duas páginas é fixo: nada do que vem na URL é impresso. */
+const page = (body) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Exclusão de dados</title></head><body>${body}</body></html>`;
+
+const INSTRUCTIONS = `<h1>Como pedir a exclusão dos seus dados</h1>
+<p>Este painel é usado por provedores de internet para atender clientes pelo Messenger. Há dois tipos de dado, e cada um se pede de um jeito.</p>
+<h2>Se você conectou uma Página do Facebook ao painel</h2>
+<p>Guardamos apenas o acesso à Página (um token cifrado) e o seu identificador no aplicativo. Para apagar: no Facebook, abra Configurações &gt; Aplicativos e sites, escolha este aplicativo e use a opção de remover e excluir os dados. O Facebook avisa o painel, que apaga o token das Páginas que você conectou e gera um código de confirmação. Você também pode desconectar a Página no próprio painel, em Configuração &gt; Integrações &gt; Messenger.</p>
+<h2>Se você conversou com um provedor pelo Messenger</h2>
+<p>As mensagens pertencem ao provedor de internet com quem você falou, que é quem decide o que fazer com elas. Peça a exclusão diretamente a esse provedor; ele pode apagar a conversa pelo painel. A política de privacidade do painel explica quem é responsável por cada dado.</p>
+<p><a href="/privacidade">Política de privacidade</a></p>`;
+
 /**
- * A página que a pessoa abre pelo link do pedido. O código é verificável (sem
- * guardar nada): só o que o painel emitiu aparece como concluído, e o texto
- * é fixo — nada do que vem na URL é impresso.
+ * A página de instruções de exclusão de dados — o endereço que a Meta pede no
+ * app — e, com `?code=`, a de status de um pedido. Sem código ela SEMPRE
+ * abre (200): a Meta valida o endereço antes de aceitá-lo. Com código, o
+ * código é verificável (sem guardar nada): só o que o painel emitiu aparece
+ * como concluído.
  */
 router.get('/deletion-status', waWebhookLimiter, (req, res) => {
+  if (req.query.code === undefined) return res.type('html').send(page(INSTRUCTIONS));
   const issuedAt = readConfirmationCode(req.query.code, process.env.META_APP_SECRET);
   const body = issuedAt
     ? `<h1>Pedido de exclusão de dados</h1><p>Concluído em ${issuedAt.toISOString().slice(0, 10)}.</p><p>Removemos o acesso às Páginas que você conectou ao painel pelo login do Facebook (o token de cada Página e o seu identificador no aplicativo). O histórico de conversas pertence ao provedor de internet que usa o painel; para pedir a exclusão dele, fale com o provedor.</p>`
     : '<h1>Pedido de exclusão de dados</h1><p>Código não reconhecido.</p>';
-  res.status(issuedAt ? 200 : 404).type('html').send(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Exclusão de dados</title></head><body>${body}</body></html>`);
+  res.status(issuedAt ? 200 : 404).type('html').send(page(body));
 });
 
 export default router;

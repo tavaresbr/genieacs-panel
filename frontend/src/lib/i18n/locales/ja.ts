@@ -1377,6 +1377,7 @@ const ja: Dictionary = {
   'settings.about.commit': 'コミット',
   'settings.about.releasedAt': 'リリース日',
   'settings.about.edition': 'エディション',
+  'settings.about.dataDeletion': 'データの削除',
   'settings.about.editionSaas': 'ホスト型 (SaaS)',
   'settings.about.editionSelfHosted': 'セルフホスト',
   'settings.about.serverTitle': 'サーバー',

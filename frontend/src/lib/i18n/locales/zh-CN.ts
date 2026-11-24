@@ -1377,6 +1377,7 @@ const zhCN: Dictionary = {
   'settings.about.commit': '提交',
   'settings.about.releasedAt': '发布日期',
   'settings.about.edition': '版本类型',
+  'settings.about.dataDeletion': '数据删除',
   'settings.about.editionSaas': '托管版 (SaaS)',
   'settings.about.editionSelfHosted': '自托管',
   'settings.about.serverTitle': '服务器',

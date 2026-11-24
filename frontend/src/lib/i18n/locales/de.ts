@@ -1380,6 +1380,7 @@ const de: Dictionary = {
   'settings.about.commit': 'Commit',
   'settings.about.releasedAt': 'Veröffentlicht am',
   'settings.about.edition': 'Edition',
+  'settings.about.dataDeletion': 'Datenlöschung',
   'settings.about.editionSaas': 'Gehostet (SaaS)',
   'settings.about.editionSelfHosted': 'Selbst gehostet',
   'settings.about.serverTitle': 'Server',
