@@ -1,28 +1,58 @@
 {
-  "version": "1.68.0",
-  "build": 1923,
-  "sourceCommit": "cb9e1c7ee03c",
+  "version": "1.69.0",
+  "build": 1934,
+  "sourceCommit": "07c63d468d4b",
   "releasedAt": "2026-11-24",
-  "basedOnTag": "v1.67.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/86aa781f9d01...cb9e1c7ee03c",
+  "basedOnTag": "v1.68.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/f05c8e7507e6...07c63d468d4b",
   "changes": [
     {
-      "shortHash": "dff6b3b4",
+      "shortHash": "7b5ad290",
       "date": "2026-11-24",
-      "title": "Página estática pública de Termos de Serviço",
+      "title": "Plano do cadastro guiado da API oficial (Embedded Signup)",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ca0c5af2",
+      "date": "2026-11-24",
+      "title": "Cadastro guiado do número oficial no backend (Embedded Signup, fase 1)",
       "category": "New"
     },
     {
-      "shortHash": "1013fc5b",
+      "shortHash": "f5ba2010",
       "date": "2026-11-24",
-      "title": "A página de status vira a de instruções de exclusão de dados quando não há código",
+      "title": "Popup do Embedded Signup devolve o resultado ao painel (fase 2)",
       "category": "New"
     },
     {
-      "shortHash": "36a855f1",
+      "shortHash": "c0598c8c",
       "date": "2026-11-24",
-      "title": "Link da página de exclusão de dados na aba Sobre",
+      "title": "Guardas de escopo, varredura de ids e lista de compartilhamento",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "36826b1b",
+      "date": "2026-11-24",
+      "title": "Botão Conectar com a Meta e status da coexistência na tela (fase 3)",
       "category": "New"
+    },
+    {
+      "shortHash": "6c599609",
+      "date": "2026-11-24",
+      "title": "Cadastro guiado do número oficial na tela de verdade",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c0568520",
+      "date": "2026-11-24",
+      "title": "Corrige os 4 alertas do CodeQL (regex polinomial e HTML)",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "7ce4bf9e",
+      "date": "2026-11-24",
+      "title": "Build indisponível responde em JSON, não em HTML",
+      "category": "Fixed"
     }
   ]
 }

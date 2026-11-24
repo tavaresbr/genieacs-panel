@@ -7,6 +7,27 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.69.0] - 2026-11-24
+
+### New
+
+- Cadastro guiado do número oficial no backend (Embedded Signup, fase 1) (`ca0c5af2`)
+- Popup do Embedded Signup devolve o resultado ao painel (fase 2) (`f5ba2010`)
+- Botão Conectar com a Meta e status da coexistência na tela (fase 3) (`36826b1b`)
+
+### Fixed
+
+- Guardas de escopo, varredura de ids e lista de compartilhamento (`c0598c8c`)
+- Corrige os 4 alertas do CodeQL (regex polinomial e HTML) (`c0568520`)
+- Build indisponível responde em JSON, não em HTML (`7ce4bf9e`)
+
+### Maintenance
+
+- Plano do cadastro guiado da API oficial (Embedded Signup) (`7b5ad290`)
+- Cadastro guiado do número oficial na tela de verdade (`6c599609`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/f05c8e7507e6...07c63d468d4b)
+
 ## [1.68.0] - 2026-11-24
 
 ### New
