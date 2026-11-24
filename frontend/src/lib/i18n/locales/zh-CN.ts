@@ -2830,6 +2830,8 @@ const zhCN: Dictionary = {
   'settings.whatsapp.bulkPaceMax': '最长间隔（秒）',
   'settings.whatsapp.bulkPaceBurst': '每 N 条暂停',
   'settings.whatsapp.bulkPacePause': '暂停时长（分钟）',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '约每小时 {perHour} 条。适用于自动催缴、单次催缴和群发，每条之间随机等待，避免号码因群发被封；回复会立即发出。「每 N 条暂停」填 0 表示不暂停。',
   'settings.whatsapp.mediaRetention': '附件保留天数',
   'settings.whatsapp.mediaRetentionHint': '0 表示永久保留，也是默认值。超过这个天数文件会被删除，消息会显示附件已不在磁盘上——会话的文字内容不会被动到。',

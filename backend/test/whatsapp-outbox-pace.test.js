@@ -147,28 +147,31 @@ describe('a regra do ritmo', () => {
     const cfg = { ...CADENCIA_PADRAO };
     const menor = proximaVez({ agora: 0, sequencia: 0, cfg, sorteio: () => 0 });
     const maior = proximaVez({ agora: 0, sequencia: 0, cfg, sorteio: () => 1 });
-    assert.equal(menor.proximaEm, 20_000);
-    assert.equal(maior.proximaEm, 45_000);
+    assert.equal(menor.proximaEm, 40_000);
+    assert.equal(maior.proximaEm, 90_000);
     assert.equal(menor.sequencia, 1);
   });
 
-  it('faz a pausa longa na 30ª e recomeça a contagem', () => {
-    const pausa = proximaVez({ agora: 0, sequencia: 29, cfg: CADENCIA_PADRAO, sorteio: () => 0 });
-    assert.deepEqual(pausa, { proximaEm: 5 * 60_000, sequencia: 0 });
+  it('faz a pausa longa na 20ª e recomeça a contagem', () => {
+    const pausa = proximaVez({ agora: 0, sequencia: 19, cfg: CADENCIA_PADRAO, sorteio: () => 0 });
+    assert.deepEqual(pausa, { proximaEm: 10 * 60_000, sequencia: 0 });
   });
 
   it('sem pausa quando o lote é zero', () => {
     const cfg = { ...CADENCIA_PADRAO, bulkBurstSize: 0 };
     const vez = proximaVez({ agora: 0, sequencia: 499, cfg, sorteio: () => 0 });
-    assert.equal(vez.proximaEm, 20_000);
+    assert.equal(vez.proximaEm, 40_000);
     assert.equal(vez.sequencia, 500);
   });
 
   it('corrige o que vier fora dos limites', () => {
     assert.deepEqual(
       lerCadencia({ bulkIntervalMinSec: 40, bulkIntervalMaxSec: 10, bulkBurstSize: -3, bulkBurstPauseMin: 999 }),
-      { bulkIntervalMinSec: 40, bulkIntervalMaxSec: 40, bulkBurstSize: 0, bulkBurstPauseMin: 120 }
+      { bulkIntervalMinSec: 40, bulkIntervalMaxSec: 40, bulkBurstSize: 0, bulkBurstPauseMin: 120, bulkDailyLimit: 300 }
     );
+    assert.equal(lerCadencia({ bulkDailyLimit: -5 }).bulkDailyLimit, 0, 'negativo vira 0 (sem limite)');
+    assert.equal(lerCadencia({ bulkDailyLimit: 999999 }).bulkDailyLimit, 5000);
+    assert.equal(lerCadencia({ bulkDailyLimit: 0 }).bulkDailyLimit, 0);
     assert.deepEqual(lerCadencia({}), { ...CADENCIA_PADRAO });
   });
 });
@@ -222,12 +225,13 @@ describe('o worker no ritmo', () => {
 });
 
 describe('a configuração do ritmo', () => {
-  it('nasce com 20–45 s e pausa de 5 min a cada 30', async () => {
+  it('nasce com 40–90 s, pausa de 10 min a cada 20 e limite de 300 por dia', async () => {
     const config = await asTenant(() => WhatsAppConfigService.getPublicConfig());
-    assert.equal(config.bulkIntervalMinSec, 20);
-    assert.equal(config.bulkIntervalMaxSec, 45);
-    assert.equal(config.bulkBurstSize, 30);
-    assert.equal(config.bulkBurstPauseMin, 5);
+    assert.equal(config.bulkIntervalMinSec, 40);
+    assert.equal(config.bulkIntervalMaxSec, 90);
+    assert.equal(config.bulkBurstSize, 20);
+    assert.equal(config.bulkBurstPauseMin, 10);
+    assert.equal(config.bulkDailyLimit, 300);
   });
 
   it('grava o que a pessoa escolheu, campo a campo', async () => {
@@ -237,10 +241,82 @@ describe('a configuração do ritmo', () => {
     assert.equal(config.bulkIntervalMinSec, 60);
     assert.equal(config.bulkIntervalMaxSec, 60, 'máximo abaixo do mínimo vira o mínimo');
     assert.equal(config.bulkBurstSize, 0);
-    assert.equal(config.bulkBurstPauseMin, 5, 'o que não veio fica como estava');
+    assert.equal(config.bulkBurstPauseMin, 10, 'o que não veio fica como estava');
 
-    config = await asTenant(() => WhatsAppConfigService.saveConfig({ bulkBurstPauseMin: 10 }));
+    config = await asTenant(() => WhatsAppConfigService.saveConfig({ bulkBurstPauseMin: 15, bulkDailyLimit: 120 }));
     assert.equal(config.bulkIntervalMinSec, 60);
-    assert.equal(config.bulkBurstPauseMin, 10);
+    assert.equal(config.bulkBurstPauseMin, 15);
+    assert.equal(config.bulkDailyLimit, 120);
+  });
+});
+
+describe('o limite por dia', () => {
+  const salvar = (patch) => asTenant(() => WhatsAppConfigService.saveConfig(patch));
+  /** Uma automática que saiu há `horas`, como o worker deixa a linha depois de enviar. */
+  async function seedEnviada(horas) {
+    const at = new Date(Date.now() - horas * 3600_000);
+    const conversa = await seedMessage('campaign');
+    await getDb()('wa_messages').where({ id: conversa.id }).update({
+      delivery_status: 'sent', external_id: `ENV-${conversa.id}`, claimed_at: at
+    });
+  }
+
+  beforeEach(async () => {
+    WaOutboxWorker.dailyCounts.clear();
+    await salvar({ bulkDailyLimit: 300 });
+  });
+
+  it('passou do limite, a automática espera na fila e a do atendente sai', async () => {
+    await salvar({ bulkDailyLimit: 2 });
+    await seedEnviada(1);
+    await seedEnviada(2);
+    const espera = await seedMessage('campaign');
+    const operador = await seedMessage('operator');
+
+    const resultado = await WaOutboxWorker.tick();
+    assert.equal(await statusOf(operador.id), 'sent', 'resposta de atendente nunca é limitada');
+    assert.equal(await statusOf(espera.id), 'queued', 'a automática fica na fila');
+    assert.equal(resultado.skipped, 'daily_limit');
+  });
+
+  it('a mensagem de mais de 24 h não conta', async () => {
+    await salvar({ bulkDailyLimit: 2 });
+    await seedEnviada(1);
+    await seedEnviada(25);
+    const proxima = await seedMessage('campaign');
+    assert.equal((await WaOutboxWorker.tick()).sent, 1);
+    assert.equal(await statusOf(proxima.id), 'sent');
+  });
+
+  it('com limite 0 não há limite', async () => {
+    await salvar({ bulkDailyLimit: 0 });
+    for (let i = 0; i < 5; i += 1) await seedEnviada(1);
+    const proxima = await seedMessage('campaign');
+    assert.equal((await WaOutboxWorker.tick()).sent, 1);
+    assert.equal(await statusOf(proxima.id), 'sent');
+  });
+
+  it('o limite não gasta o ritmo: liberada a vaga, a automática sai na hora', async () => {
+    await salvar({ bulkDailyLimit: 1 });
+    await seedEnviada(1);
+    const proxima = await seedMessage('campaign');
+    assert.equal((await WaOutboxWorker.tick()).sent, 0);
+    assert.equal(await statusOf(proxima.id), 'queued');
+
+    await salvar({ bulkDailyLimit: 5 });
+    WaOutboxWorker.dailyCounts.clear();
+    assert.equal((await WaOutboxWorker.tick()).sent, 1);
+    assert.equal(await statusOf(proxima.id), 'sent');
+  });
+
+  it('conta o que sai durante o dia sem voltar ao banco a cada volta', async () => {
+    await salvar({ bulkDailyLimit: 2 });
+    const mensagens = [await seedMessage('campaign'), await seedMessage('campaign'), await seedMessage('campaign')];
+    assert.equal((await WaOutboxWorker.tick()).sent, 1);
+    passarOTempo();
+    assert.equal((await WaOutboxWorker.tick()).sent, 1);
+    passarOTempo();
+    assert.equal((await WaOutboxWorker.tick()).sent, 0, 'a terceira passa do limite de 2');
+    assert.equal(await statusOf(mensagens[2].id), 'queued');
   });
 });

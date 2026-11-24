@@ -11,17 +11,21 @@
  */
 
 export const CADENCIA_PADRAO = Object.freeze({
-  bulkIntervalMinSec: 20,
-  bulkIntervalMaxSec: 45,
-  bulkBurstSize: 30,
-  bulkBurstPauseMin: 5
+  bulkIntervalMinSec: 40,
+  bulkIntervalMaxSec: 90,
+  bulkBurstSize: 20,
+  bulkBurstPauseMin: 10,
+  // Quantas automáticas saem a cada 24 h (móveis). 0 desliga o limite. As que
+  // passam dele ficam na fila e saem quando as mais antigas saem da janela.
+  bulkDailyLimit: 300
 });
 
 const LIMITES = Object.freeze({
   bulkIntervalMinSec: [5, 600],
   bulkIntervalMaxSec: [5, 600],
   bulkBurstSize: [0, 500],
-  bulkBurstPauseMin: [1, 120]
+  bulkBurstPauseMin: [1, 120],
+  bulkDailyLimit: [0, 5000]
 });
 
 function inteiroEntre(valor, [min, max], padrao) {

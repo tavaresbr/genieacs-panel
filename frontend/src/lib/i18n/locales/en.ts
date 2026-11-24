@@ -2832,6 +2832,8 @@ const en = {
   'settings.whatsapp.bulkPaceMax': 'Maximum interval (s)',
   'settings.whatsapp.bulkPaceBurst': 'Pause every N messages',
   'settings.whatsapp.bulkPacePause': 'Pause length (min)',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '≈ {perHour} messages per hour. Applies to dunning, one-off billing and campaigns, with a random wait between each one so the number is not flagged for bulk sending; replies go out immediately. 0 in "Pause every" turns the pause off.',
   'settings.whatsapp.mediaRetention': 'Keep attachments for (days)',
   'settings.whatsapp.mediaRetentionHint': '0 keeps them forever, which is the default. Past that many days the file is deleted and the message says the attachment is no longer on disk — the words of the conversation are never touched.',

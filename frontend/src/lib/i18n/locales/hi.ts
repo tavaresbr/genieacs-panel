@@ -2807,6 +2807,8 @@ const hi: Dictionary = {
   'settings.whatsapp.bulkPaceMax': 'अधिकतम अंतराल (से.)',
   'settings.whatsapp.bulkPaceBurst': 'हर N संदेशों पर विराम',
   'settings.whatsapp.bulkPacePause': 'विराम की अवधि (मिनट)',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '≈ {perHour} संदेश प्रति घंटा। स्वचालित वसूली, एकल वसूली और अभियानों पर लागू, हर संदेश के बीच यादृच्छिक प्रतीक्षा के साथ ताकि नंबर थोक भेजने के कारण ब्लॉक न हो; जवाब तुरंत जाते हैं। "हर N पर विराम" में 0 विराम बंद करता है।',
   'settings.whatsapp.mediaRetention': 'अनुलग्नक रखने की अवधि (दिन)',
   'settings.whatsapp.mediaRetentionHint': '0 का अर्थ है हमेशा रखना, यही डिफ़ॉल्ट है। इतने दिनों के बाद फ़ाइल हटा दी जाती है और संदेश बताता है कि अनुलग्नक अब डिस्क पर नहीं है — बातचीत के शब्दों को कभी नहीं छुआ जाता।',

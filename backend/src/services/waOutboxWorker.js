@@ -145,6 +145,11 @@ class WaOutboxWorker {
    */
   static paces = new Map();
 
+  /** A conta do limite por dia, por provedor, guardada por pouco tempo: o worker roda a cada 5 s. */
+  static dailyCounts = new Map();
+
+  static DAILY_COUNT_TTL_MS = 60_000;
+
   static PACE_KEY = 'wa_outbox_bulk_pace';
 
   static start() {
@@ -168,6 +173,7 @@ class WaOutboxWorker {
     // valer e o teto ser um enfeite que todo deploy zera.
     this.windows.clear();
     this.paces.clear();
+    this.dailyCounts.clear();
     this.hydrated.clear();
   }
 
@@ -285,6 +291,15 @@ class WaOutboxWorker {
     const [id] = await WaMessage.listSendable(1, { bulk: true });
     if (!id) return;
 
+    // O limite por dia: passou dele, a automática espera na fila (sai quando as
+    // mais antigas saem das 24 h) e o ritmo não é gasto. Resposta de atendente
+    // nunca passa por aqui.
+    const limite = Number(config.bulkDailyLimit) || 0;
+    if (limite > 0 && (await this.bulkSentLastDay()) >= limite) {
+      summary.skipped = 'daily_limit';
+      return;
+    }
+
     // A régua decidiu horas antes: o cliente pode ter mandado o comprovante,
     // ou o SGP dado a baixa. Retirada, a vez não se gasta — a próxima
     // passada pega a seguinte.
@@ -306,8 +321,22 @@ class WaOutboxWorker {
       return;
     }
     const outcome = await this.deliver(id);
-    if (outcome === 'sent') summary.sent += 1;
-    else if (outcome !== 'claimed_elsewhere') summary.failed += 1;
+    if (outcome === 'sent') {
+      summary.sent += 1;
+      const conta = this.dailyCounts.get(tenantId);
+      if (conta) conta.count += 1;
+    } else if (outcome !== 'claimed_elsewhere') summary.failed += 1;
+  }
+
+  /** Quantas automáticas saíram nas últimas 24 h, com a conta guardada por um minuto. */
+  static async bulkSentLastDay() {
+    const tenantId = currentTenantId();
+    const agora = Date.now();
+    const guardada = this.dailyCounts.get(tenantId);
+    if (guardada && agora - guardada.at < this.DAILY_COUNT_TTL_MS) return guardada.count;
+    const count = await WaMessage.countBulkSentSince(new Date(agora - 24 * 3600_000));
+    this.dailyCounts.set(tenantId, { at: agora, count });
+    return count;
   }
 
   /**

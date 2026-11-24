@@ -231,6 +231,7 @@ class WhatsAppController {
         bulkIntervalMaxSec: body.bulkIntervalMaxSec,
         bulkBurstSize: body.bulkBurstSize,
         bulkBurstPauseMin: body.bulkBurstPauseMin,
+        bulkDailyLimit: body.bulkDailyLimit,
         mediaRetentionDays: body.mediaRetentionDays,
         messageRetentionDays: body.messageRetentionDays,
         managedUrl: body.managedUrl,

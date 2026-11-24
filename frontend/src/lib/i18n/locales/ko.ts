@@ -2834,6 +2834,8 @@ const ko: Dictionary = {
   'settings.whatsapp.bulkPaceMax': '최대 간격(초)',
   'settings.whatsapp.bulkPaceBurst': 'N개마다 휴지',
   'settings.whatsapp.bulkPacePause': '휴지 시간(분)',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '시간당 약 {perHour}개. 자동 독촉, 개별 독촉, 캠페인에 적용되며 대량 발송으로 번호가 차단되지 않도록 메시지 사이에 무작위 대기를 둡니다. 답장은 즉시 나갑니다. "N개마다 휴지"를 0으로 하면 휴지하지 않습니다.',
   'settings.whatsapp.mediaRetention': '첨부 파일 보관 기간(일)',
   'settings.whatsapp.mediaRetentionHint': '0은 무기한 보관이며 기본값입니다. 그 기간이 지나면 파일이 삭제되고 메시지에는 첨부가 더 이상 디스크에 없다고 표시됩니다. 대화의 글은 그대로 남습니다.',

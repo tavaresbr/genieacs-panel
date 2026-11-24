@@ -126,7 +126,9 @@ function padroes() {
     enabled: false,
     steps: [],
     maxPerInvoice: 6,
-    minIntervalHours: 24,
+    // 48 h entre duas mensagens para o mesmo contrato: cobrança demais vira
+    // denúncia, e denúncia é o que derruba o número.
+    minIntervalHours: 48,
     maxPerRun: 500,
     // Comprovante (imagem ou PDF) numa conversa com contrato: a régua para
     // esse contrato por tantos dias. 0 desliga.

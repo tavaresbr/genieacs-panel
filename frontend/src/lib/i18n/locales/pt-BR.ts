@@ -2830,6 +2830,8 @@ const ptBR: Dictionary = {
   'settings.whatsapp.bulkPaceMax': 'Intervalo máximo (s)',
   'settings.whatsapp.bulkPaceBurst': 'Pausa a cada N mensagens',
   'settings.whatsapp.bulkPacePause': 'Duração da pausa (min)',
+  'settings.whatsapp.bulkDailyLimit': 'Limite por dia (0 = sem limite)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Conta as mensagens automáticas das últimas 24 horas. As que passarem do limite ficam na fila e saem quando houver vaga. Respostas dos atendentes nunca são limitadas.',
   'settings.whatsapp.bulkPaceHint': '≈ {perHour} mensagens por hora. Vale para régua, cobrança avulsa e campanhas, com uma espera sorteada entre uma e outra para o número não ser bloqueado por disparo em massa; respostas saem na hora. 0 em "Pausa a cada" desliga a pausa.',
   'settings.whatsapp.mediaRetention': 'Guardar anexos por (dias)',
   'settings.whatsapp.mediaRetentionHint': '0 guarda para sempre, que é o padrão. Passado esse tempo o arquivo é apagado e a mensagem passa a dizer que o anexo não está mais em disco — o texto da conversa nunca é tocado.',
