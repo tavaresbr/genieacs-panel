@@ -1380,6 +1380,7 @@ const ru: Dictionary = {
   'settings.about.commit': 'Коммит',
   'settings.about.releasedAt': 'Выпущена',
   'settings.about.edition': 'Редакция',
+  'settings.about.dataDeletion': 'Удаление данных',
   'settings.about.editionSaas': 'Облачная (SaaS)',
   'settings.about.editionSelfHosted': 'Собственная установка',
   'settings.about.serverTitle': 'Сервер',

@@ -1379,6 +1379,7 @@ const en = {
   'settings.about.commit': 'Commit',
   'settings.about.releasedAt': 'Released on',
   'settings.about.edition': 'Edition',
+  'settings.about.dataDeletion': 'Data deletion',
   'settings.about.editionSaas': 'Hosted (SaaS)',
   'settings.about.editionSelfHosted': 'Self-hosted',
   'settings.about.serverTitle': 'Server',

@@ -1377,6 +1377,7 @@ const zhTW: Dictionary = {
   'settings.about.commit': '提交',
   'settings.about.releasedAt': '發布日期',
   'settings.about.edition': '版本類型',
+  'settings.about.dataDeletion': '資料刪除',
   'settings.about.editionSaas': '託管版 (SaaS)',
   'settings.about.editionSelfHosted': '自行架設',
   'settings.about.serverTitle': '伺服器',

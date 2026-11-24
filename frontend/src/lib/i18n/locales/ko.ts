@@ -1377,6 +1377,7 @@ const ko: Dictionary = {
   'settings.about.commit': '커밋',
   'settings.about.releasedAt': '출시일',
   'settings.about.edition': '에디션',
+  'settings.about.dataDeletion': '데이터 삭제',
   'settings.about.editionSaas': '호스팅 (SaaS)',
   'settings.about.editionSelfHosted': '자체 설치',
   'settings.about.serverTitle': '서버',

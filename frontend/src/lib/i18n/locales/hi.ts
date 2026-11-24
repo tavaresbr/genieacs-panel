@@ -1369,6 +1369,7 @@ const hi: Dictionary = {
   'settings.about.commit': 'Commit',
   'settings.about.releasedAt': 'जारी होने की तारीख',
   'settings.about.edition': 'संस्करण प्रकार',
+  'settings.about.dataDeletion': 'डेटा हटाना',
   'settings.about.editionSaas': 'होस्टेड (SaaS)',
   'settings.about.editionSelfHosted': 'स्व-होस्टेड',
   'settings.about.serverTitle': 'सर्वर',

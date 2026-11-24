@@ -1377,6 +1377,7 @@ const ptBR: Dictionary = {
   'settings.about.commit': 'Commit',
   'settings.about.releasedAt': 'Lançada em',
   'settings.about.edition': 'Edição',
+  'settings.about.dataDeletion': 'Exclusão de dados',
   'settings.about.editionSaas': 'Hospedada (SaaS)',
   'settings.about.editionSelfHosted': 'Instalação própria',
   'settings.about.serverTitle': 'Servidor',
