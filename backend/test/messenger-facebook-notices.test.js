@@ -121,4 +121,15 @@ describe('avisos da Meta sobre o usuário do Facebook', () => {
     assert.ok(!text.includes('onerror'));
     assert.match(text, /Código não reconhecido/);
   });
+
+  it('sem código a página de status vira a de instruções e SEMPRE abre (a Meta valida o endereço)', async () => {
+    const res = await fetch(hook('/deletion-status'));
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type'), /text\/html/);
+    const text = await res.text();
+    assert.match(text, /Como pedir a exclusão dos seus dados/);
+    assert.match(text, /provedor/);
+    // Com código ruim continua sendo 404 (só o painel emite códigos).
+    assert.equal((await fetch(`${hook('/deletion-status')}?code=x`)).status, 404);
+  });
 });
