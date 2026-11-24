@@ -43,6 +43,25 @@ class WhatsAppAccount {
   }
 
   /**
+   * Quem já tem este número oficial, em QUALQUER provedor.
+   *
+   * Um Phone Number ID da Meta só atende por um provedor; o cadastro guiado
+   * precisa saber se o número que acabou de chegar já é de outro antes de criar
+   * a conta, e por isso a consulta tem de enxergar todos. Devolve só o que a
+   * decisão usa (`id` e `tenant_id`), nunca a linha com os segredos.
+   *
+   * tenant-scope-exempt: a pergunta é justamente se OUTRO provedor tem o número.
+   */
+  static async getMetaPhoneOwner(phoneNumberId) {
+    return runUnscoped(
+      'a Meta number can only serve one provider; the lookup must see every provider',
+      async () => (await getDb()('whatsapp_accounts')
+        .where({ meta_phone_number_id: String(phoneNumberId) })
+        .first('id', 'tenant_id')) || null
+    );
+  }
+
+  /**
    * The number that should carry a given kind of traffic.
    *
    * Falls back to the default account, then to any connected one: a billing run

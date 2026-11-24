@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { getDb, tdb } from '../config/database.js';
-import { currentTenantId, hasTenantContext, runUnscoped } from '../config/tenantContext.js';
+import { tdb } from '../config/database.js';
+import { currentTenantId, hasTenantContext } from '../config/tenantContext.js';
 import AppState from '../models/AppState.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import EvolutionInstanceService from './evolutionInstanceService.js';
@@ -226,10 +226,7 @@ class WhatsAppEmbeddedSignupService {
   static async findExisting(phoneNumberId) {
     const mine = await tdb('whatsapp_accounts').where({ meta_phone_number_id: phoneNumberId }).first();
     if (mine) return mine;
-    const anyone = await runUnscoped(
-      'a Meta number can only serve one provider; the lookup must see every provider',
-      async () => getDb()('whatsapp_accounts').where({ meta_phone_number_id: phoneNumberId }).first()
-    );
+    const anyone = await WhatsAppAccount.getMetaPhoneOwner(phoneNumberId);
     if (anyone && (anyone.tenant_id ?? null) !== tenantNow()) {
       throw fail('metaNumberInUse', 'meta_number_in_use', 409);
     }
