@@ -3,6 +3,7 @@ import TelegramMessage from '../models/TelegramMessage.js';
 import TelegramCustomerBotService from './telegramCustomerBotService.js';
 import TelegramLinkTokenService, { TOKEN_FORMAT } from './telegramLinkTokenService.js';
 import TelegramSendService from './telegramSendService.js';
+import TelegramBotRouter from './telegramBotRouter.js';
 import { tdb } from '../config/database.js';
 
 const BODY_LIMIT = 4000;
@@ -15,7 +16,9 @@ const TEXT = Object.freeze({
   linked: 'Pronto, o seu Telegram foi vinculado ao seu cadastro. Pode escrever por aqui.',
   alreadyLinked: 'Este Telegram já está vinculado a um cadastro.',
   invalidLink: 'Este link não vale mais. Peça um novo à nossa equipe.',
-  unsupported: '[anexo ainda não suportado]'
+  unsupported: '[anexo ainda não suportado]',
+  stopped: 'Combinado: você não vai mais receber avisos por aqui (fatura, queda, manutenção). Para voltar a receber, envie /receber. Você ainda pode escrever para nós.',
+  resumed: 'Pronto, você volta a receber os avisos por aqui. Para parar, envie /parar.'
 });
 
 /** Limite por chat, em memória: basta para segurar um laço de quem só tem o @ do bot. */
@@ -46,6 +49,12 @@ function bodyOf(message) {
   if (typeof message.text === 'string') return message.text.slice(0, BODY_LIMIT);
   if (typeof message.caption === 'string') return message.caption.slice(0, BODY_LIMIT);
   return TEXT.unsupported;
+}
+
+/** `/parar` e `/receber` (o `@NomeDoBot` do atalho do Telegram é ignorado). */
+function parseNoticeCommand(text) {
+  const match = /^\/(parar|receber)(?:@\w+)?\s*$/i.exec(String(text ?? '').trim());
+  return match ? match[1].toLowerCase() : null;
 }
 
 /** `/start` e `/start <token>`; o `@NomeDoBot` do grupo/atalho é ignorado. */
@@ -94,7 +103,23 @@ async function handleMessage(message) {
     updated_at: new Date()
   });
 
-  if (!start) return;
+  const noticeCommand = start ? null : parseNoticeCommand(message.text);
+  if (noticeCommand) {
+    // Sair e voltar dos AVISOS (fatura, queda, manutenção): a conversa continua.
+    const stop = noticeCommand === 'parar';
+    await TelegramConversation.update(conversation.id, { notices_off_at: stop ? new Date() : null });
+    await TelegramSendService.sendText(conversation.id, stop ? TEXT.stopped : TEXT.resumed, null, { source: 'system' });
+    return;
+  }
+
+  // O bot que responde fatura, conexão e menu (desligado por padrão): só para
+  // texto, e depois de todos os comandos acima.
+  if (!start) {
+    if (typeof message.text === 'string') {
+      await TelegramBotRouter.answer({ conversation: await TelegramConversation.getById(conversation.id), text: message.text });
+    }
+    return;
+  }
   const fresh = await TelegramConversation.getById(conversation.id);
   if (start.token) {
     const redeemed = await TelegramLinkTokenService.redeem({ conversation: fresh, token: start.token });
@@ -114,8 +139,8 @@ class TelegramInboundService {
   static async process(update) {
     try {
       if (update?.message) await handleMessage(update.message);
-    } catch (error) {
-      console.error('[telegram-chat] could not handle update:', error.name || 'Error');
+    } catch {
+      console.error('[telegram-chat] could not handle update');
     }
   }
 }

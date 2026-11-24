@@ -6906,6 +6906,8 @@ export const messengerAPI = {
 export interface TelegramChatBot {
   configured: boolean
   enabled: boolean
+  /** Se o bot responde fatura, conexão e menu a quem está vinculado (desligado por padrão). */
+  autoReply: boolean
   botUsername: string | null
   botName: string | null
   webhookError: string | null
@@ -6915,7 +6917,7 @@ export interface TelegramChatBot {
 export interface TelegramChatPreview {
   direction: 'in' | 'out'
   text: string | null
-  deliveryStatus: 'sent' | 'failed' | null
+  deliveryStatus: 'queued' | 'sending' | 'sent' | 'failed' | null
   at: string
 }
 
@@ -6937,6 +6939,8 @@ export interface TelegramChatConversation {
   closedAt: string | null
   /** O cliente bloqueou o bot: nada sai até ele escrever de novo. */
   blocked: boolean
+  /** O cliente mandou /parar: não recebe avisos, mas continua conversando. */
+  noticesOff: boolean
   /** Só na lista de conversas; nas demais respostas, `null`. */
   lastMessage: TelegramChatPreview | null
 }
@@ -6946,19 +6950,28 @@ export interface TelegramChatMessage {
   conversationId: number
   direction: 'in' | 'out'
   body: string | null
-  /** `customer` = entrada; `system` = mensagem automática (a confirmação do vínculo). */
-  source: 'customer' | 'operator' | 'system'
-  deliveryStatus: 'sent' | 'failed' | null
+  /** `customer` = entrada; `system` = mensagem automática (a confirmação do vínculo); `notice` = aviso do provedor (fatura, queda, manutenção). */
+  source: 'customer' | 'operator' | 'system' | 'notice'
+  deliveryStatus: 'queued' | 'sending' | 'sent' | 'failed' | null
   deliveryError: string | null
   createdAt: string
 }
 
+/** Quais avisos saem também pelo Telegram dos clientes. */
+export type TelegramNoticeKind = 'billing' | 'outage' | 'maintenance' | 'campaign'
+export type TelegramNoticeSettings = Record<TelegramNoticeKind, boolean>
+
 export const telegramChatAPI = {
+  getNotices: () => apiClient.get<TelegramNoticeSettings>('/telegram-chat/notices'),
+  /** Só os tipos mandados mudam. */
+  saveNotices: (patch: Partial<TelegramNoticeSettings>) =>
+    apiClient.put<TelegramNoticeSettings>('/telegram-chat/notices', patch),
   getBot: () => apiClient.get<TelegramChatBot>('/telegram-chat/bot'),
   /** O Telegram confere o token; só entra confirmado. */
   saveBot: (token: string) => apiClient.put<TelegramChatBot>('/telegram-chat/bot', { token }),
   enable: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/enable', {}),
   disable: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/disable', {}),
+  setAutoReply: (enabled: boolean) => apiClient.post<TelegramChatBot>('/telegram-chat/bot/auto-reply', { enabled }),
   /** Esquece o token (e desliga); as conversas ficam. */
   disconnect: () => apiClient.post<TelegramChatBot>('/telegram-chat/bot/disconnect', {}),
   listConversations: (status: 'open' | 'closed' = 'open') =>

@@ -119,6 +119,8 @@ export const SCOPED_TABLES = new Set([
   'telegram_conversations',
   'telegram_messages',
   'telegram_link_tokens',
+  // O que já foi avisado a cada conversa (para não repetir o aviso).
+  'telegram_notices',
   // Os modelos aprovados na conta da Meta de cada número oficial.
   'wa_meta_templates',
   'wa_broadcasts',

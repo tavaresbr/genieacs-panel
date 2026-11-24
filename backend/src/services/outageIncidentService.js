@@ -1,3 +1,4 @@
+import SubscriberNoticeService from './subscriberNoticeService.js';
 import WaMetaTemplateService from './waMetaTemplateService.js';
 import SgpLink from '../models/SgpLink.js';
 import WaConversation from '../models/WaConversation.js';
@@ -124,6 +125,14 @@ class OutageIncidentService {
     await tdb('outage_incidents').where({ id: incidentId })
       .update({ status: 'resolved', resolved_at: agora, updated_at: agora });
 
+    // "Normalizado" também no Telegram, só a quem recebeu o aviso da queda.
+    await SubscriberNoticeService.notifyFollowUp({
+      kind: 'outage',
+      fromRefKey: `incidente:${incidentId}`,
+      refKey: `incidente:${incidentId}:fim`,
+      body: t('whatsapp.outage.recovered')
+    });
+
     const avisados = await tdb('outage_incident_devices')
       .where({ incident_id: incidentId })
       .whereNotNull('notified_at')
@@ -198,6 +207,16 @@ class OutageIncidentService {
         console.warn(`outage notify ${incidentId}:`, error?.message || error);
       }
     }
+
+    // O Telegram dos clientes, AO LADO do WhatsApp (que já saiu acima): quem
+    // vinculou o Telegram a um contrato afetado também é avisado, uma vez por
+    // incidente. Nunca lança.
+    const contratosAfetados = (await tdb('outage_incident_devices')
+      .where({ incident_id: incidentId }).whereNotNull('contract').select('contract'))
+      .map((row) => row.contract);
+    await SubscriberNoticeService.notifyTelegram({
+      contracts: contratosAfetados, kind: 'outage', refKey: `incidente:${incidentId}`, body: texto
+    });
 
     await tdb('outage_incidents').where({ id: incidentId }).update({
       eta_text: previsao,

@@ -4119,6 +4119,56 @@ const TELEGRAM_CHAT_TABLES = [
   ['telegram_link_tokens', telegramLinkTokensTable]
 ];
 
+/**
+ * Os avisos do Telegram dos clientes (0151).
+ *
+ * `telegram_messages` ganha a fila de saída (como `messenger_messages` na 0147):
+ * `attempts`, `claimed_at` e `next_attempt_at`. `telegram_conversations` ganha
+ * `notices_off_at` — o cliente mandou `/parar` e não recebe avisos do provedor,
+ * mas continua conversando. E `telegram_notices` lembra o que já foi avisado a
+ * cada conversa, para "Avisar de novo", a reexecução da régua e a reentrega não
+ * repetirem o aviso: único por (aviso, referência, conversa).
+ */
+const TELEGRAM_OUTBOX_COLUMNS = [
+  ['attempts', (t) => t.integer('attempts').notNullable().defaultTo(0)],
+  ['claimed_at', (t) => t.timestamp('claimed_at').nullable()],
+  ['next_attempt_at', (t) => t.timestamp('next_attempt_at').nullable()]
+];
+
+const TELEGRAM_CONVERSATION_NOTICE_COLUMNS = [
+  ['notices_off_at', (t) => t.timestamp('notices_off_at').nullable()]
+];
+
+const telegramNoticesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('conversation_id').unsigned().notNullable()
+    .references('id').inTable('telegram_conversations').onDelete('CASCADE');
+  // billing | outage | maintenance | campaign
+  t.string('kind', 16).notNullable();
+  // O que foi avisado: `incidente:12`, `manutencao:3:aviso`, `CONTRATO:fatura:etapa`…
+  t.string('ref_key', 128).notNullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['conversation_id', 'kind', 'ref_key'], 'telegram_notices_uq');
+  t.index(['tenant_id', 'kind', 'ref_key'], 'telegram_notices_ref_idx');
+};
+
+const TELEGRAM_NOTICE_TABLES = [['telegram_notices', telegramNoticesTable]];
+
+/**
+ * As respostas automáticas do Telegram dos clientes (0152): `auto_reply` liga o
+ * bot que responde fatura, conexão e menu (DESLIGADO por padrão: responder o
+ * cliente por conta própria é decisão do provedor), e `bot_paused_until` cala o
+ * bot numa conversa depois de o cliente pedir um atendente.
+ */
+const TELEGRAM_BOT_AUTOREPLY_COLUMNS = [
+  ['auto_reply', (t) => t.boolean('auto_reply').notNullable().defaultTo(false)]
+];
+const TELEGRAM_CONVERSATION_BOT_COLUMNS = [
+  ['bot_paused_until', (t) => t.timestamp('bot_paused_until').nullable()]
+];
+
 const PUSH_TABLES = [
   ['push_subscriptions', pushSubscriptionsTable],
   ['push_preferences', pushPreferencesTable]
@@ -4276,7 +4326,8 @@ export const SCHEMA_TABLES = [
   ...WA_AI_USAGE_TABLES,
   ...MESSENGER_TABLES,
   ...MESSENGER_LINK_TOKEN_TABLES,
-  ...TELEGRAM_CHAT_TABLES
+  ...TELEGRAM_CHAT_TABLES,
+  ...TELEGRAM_NOTICE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -8466,6 +8517,55 @@ export const migrations = [
       await db.schema.alterTable('messenger_messages', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** Os avisos do Telegram dos clientes — ver `TELEGRAM_OUTBOX_COLUMNS`. */
+    id: '0151_telegram_customer_notices',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('telegram_messages'))) return true;
+      if (!(await db.schema.hasTable('telegram_notices'))) return false;
+      return (await missingColumns(db, 'telegram_messages', TELEGRAM_OUTBOX_COLUMNS)).length === 0
+        && (await missingColumns(db, 'telegram_conversations', TELEGRAM_CONVERSATION_NOTICE_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('telegram_messages'))) return;
+      const outbox = await missingColumns(db, 'telegram_messages', TELEGRAM_OUTBOX_COLUMNS);
+      if (outbox.length) {
+        await db.schema.alterTable('telegram_messages', (t) => {
+          for (const add of outbox) add(t);
+          t.index(['delivery_status', 'next_attempt_at'], 'telegram_msg_outbox_idx');
+        });
+      }
+      const conv = await missingColumns(db, 'telegram_conversations', TELEGRAM_CONVERSATION_NOTICE_COLUMNS);
+      if (conv.length) {
+        await db.schema.alterTable('telegram_conversations', (t) => {
+          for (const add of conv) add(t);
+        });
+      }
+      for (const [name, builder] of TELEGRAM_NOTICE_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
+    }
+  },
+  {
+    /** As respostas automáticas do Telegram dos clientes — ver `TELEGRAM_BOT_AUTOREPLY_COLUMNS`. */
+    id: '0152_telegram_customer_autoreply',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('telegram_customer_bots'))) return true;
+      return (await missingColumns(db, 'telegram_customer_bots', TELEGRAM_BOT_AUTOREPLY_COLUMNS)).length === 0
+        && (await missingColumns(db, 'telegram_conversations', TELEGRAM_CONVERSATION_BOT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('telegram_customer_bots'))) return;
+      const bots = await missingColumns(db, 'telegram_customer_bots', TELEGRAM_BOT_AUTOREPLY_COLUMNS);
+      if (bots.length) {
+        await db.schema.alterTable('telegram_customer_bots', (t) => { for (const add of bots) add(t); });
+      }
+      const conv = await missingColumns(db, 'telegram_conversations', TELEGRAM_CONVERSATION_BOT_COLUMNS);
+      if (conv.length) {
+        await db.schema.alterTable('telegram_conversations', (t) => { for (const add of conv) add(t); });
+      }
     }
   }
 ];

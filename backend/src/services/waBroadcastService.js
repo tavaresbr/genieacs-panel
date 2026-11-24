@@ -1,3 +1,4 @@
+import SubscriberNoticeService from './subscriberNoticeService.js';
 import { isAsaasContract } from './asaasBillingSource.js';
 import WaBroadcast, { MAX_ATTEMPTS } from '../models/WaBroadcast.js';
 import { retryDelayMs } from './waOutboxWorker.js';
@@ -530,6 +531,17 @@ class WaBroadcastService {
         // no origin on the row the bot read a dunning message as one of its own
         // three replies and went quiet on the person it had just charged.
         source: 'campaign'
+      });
+
+      // O Telegram dos clientes, AO LADO do WhatsApp e desligado por padrão: o
+      // mesmo texto, uma vez por campanha, a quem vinculou o Telegram ao contrato.
+      // Promoção ('general') e cobrança são tipos separados nos ajustes.
+      // Nunca lança.
+      await SubscriberNoticeService.notifyTelegram({
+        contracts: [recipient.contract],
+        kind: broadcast?.kind === 'general' ? 'campaign' : 'billing',
+        refKey: `campanha:${recipient.broadcast_id}`,
+        body: recipient.rendered_body
       });
 
       // ── Ponto de não-retorno ────────────────────────────────────────────
