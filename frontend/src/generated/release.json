@@ -1,58 +1,16 @@
 {
-  "version": "1.69.0",
-  "build": 1934,
-  "sourceCommit": "07c63d468d4b",
-  "releasedAt": "2026-11-24",
-  "basedOnTag": "v1.68.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/f05c8e7507e6...07c63d468d4b",
+  "version": "1.69.1",
+  "build": 1937,
+  "sourceCommit": "4deb5d86c352",
+  "releasedAt": "2026-11-25",
+  "basedOnTag": "v1.69.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/8678a91dba5b...4deb5d86c352",
   "changes": [
     {
-      "shortHash": "7b5ad290",
+      "shortHash": "04767a0d",
       "date": "2026-11-24",
-      "title": "Plano do cadastro guiado da API oficial (Embedded Signup)",
+      "title": "Limite diário de mensagens automáticas e ritmos padrão mais lentos",
       "category": "Maintenance"
-    },
-    {
-      "shortHash": "ca0c5af2",
-      "date": "2026-11-24",
-      "title": "Cadastro guiado do número oficial no backend (Embedded Signup, fase 1)",
-      "category": "New"
-    },
-    {
-      "shortHash": "f5ba2010",
-      "date": "2026-11-24",
-      "title": "Popup do Embedded Signup devolve o resultado ao painel (fase 2)",
-      "category": "New"
-    },
-    {
-      "shortHash": "c0598c8c",
-      "date": "2026-11-24",
-      "title": "Guardas de escopo, varredura de ids e lista de compartilhamento",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "36826b1b",
-      "date": "2026-11-24",
-      "title": "Botão Conectar com a Meta e status da coexistência na tela (fase 3)",
-      "category": "New"
-    },
-    {
-      "shortHash": "6c599609",
-      "date": "2026-11-24",
-      "title": "Cadastro guiado do número oficial na tela de verdade",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "c0568520",
-      "date": "2026-11-24",
-      "title": "Corrige os 4 alertas do CodeQL (regex polinomial e HTML)",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "7ce4bf9e",
-      "date": "2026-11-24",
-      "title": "Build indisponível responde em JSON, não em HTML",
-      "category": "Fixed"
     }
   ]
 }
