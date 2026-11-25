@@ -2837,6 +2837,8 @@ const ru: Dictionary = {
   'settings.whatsapp.bulkPaceMax': 'Максимальный интервал (с)',
   'settings.whatsapp.bulkPaceBurst': 'Пауза каждые N сообщений',
   'settings.whatsapp.bulkPacePause': 'Длительность паузы (мин)',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '≈ {perHour} сообщений в час. Действует для автоматического взыскания, разовых напоминаний и рассылок: между сообщениями случайная пауза, чтобы номер не заблокировали за массовую рассылку; ответы уходят сразу. 0 в «Пауза каждые» отключает паузу.',
   'settings.whatsapp.mediaRetention': 'Хранить вложения (дней)',
   'settings.whatsapp.mediaRetentionHint': '0 — хранить всегда, это значение по умолчанию. По истечении указанного числа дней файл удаляется, и в сообщении появляется отметка, что вложения больше нет на диске; текст переписки при этом не затрагивается.',

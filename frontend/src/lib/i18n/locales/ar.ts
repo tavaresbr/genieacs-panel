@@ -2807,6 +2807,8 @@ const ar: Dictionary = {
   'settings.whatsapp.bulkPaceMax': 'الفاصل الأقصى (ث)',
   'settings.whatsapp.bulkPaceBurst': 'استراحة كل N رسالة',
   'settings.whatsapp.bulkPacePause': 'مدة الاستراحة (دقيقة)',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '≈ {perHour} رسالة في الساعة. ينطبق على التحصيل التلقائي والتحصيل الفردي والحملات، مع انتظار عشوائي بين كل رسالة وأخرى حتى لا يُحظر الرقم بسبب الإرسال الجماعي؛ الردود تُرسل فورًا. القيمة 0 في "استراحة كل" تعطّل الاستراحة.',
   'settings.whatsapp.mediaRetention': 'مدة الاحتفاظ بالمرفقات (بالأيام)',
   'settings.whatsapp.mediaRetentionHint': 'القيمة 0 تعني الاحتفاظ بها دائمًا، وهي القيمة الافتراضية. وبعد هذا العدد من الأيام يُحذف الملف وتشير الرسالة إلى أن المرفق لم يعد موجودًا على القرص — أما نص المحادثة فلا يُمَسّ أبدًا.',

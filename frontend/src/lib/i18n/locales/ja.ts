@@ -2829,6 +2829,8 @@ const ja: Dictionary = {
   'settings.whatsapp.bulkPaceMax': '最大間隔（秒）',
   'settings.whatsapp.bulkPaceBurst': 'N 通ごとに休止',
   'settings.whatsapp.bulkPacePause': '休止の長さ（分）',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '1 時間あたり約 {perHour} 通。自動督促・個別督促・キャンペーンに適用され、一斉送信で番号がブロックされないよう各メッセージの間にランダムな待ち時間を入れます。返信はすぐに送信されます。「N 通ごとに休止」を 0 にすると休止しません。',
   'settings.whatsapp.mediaRetention': '添付ファイルの保存期間（日）',
   'settings.whatsapp.mediaRetentionHint': '0 は無期限で、これが既定です。その日数を過ぎるとファイルは削除され、メッセージには添付がもうディスクにないと表示されます。会話の文面には触れません。',

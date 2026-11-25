@@ -2830,6 +2830,8 @@ const zhTW: Dictionary = {
   'settings.whatsapp.bulkPaceMax': '最長間隔（秒）',
   'settings.whatsapp.bulkPaceBurst': '每 N 則暫停',
   'settings.whatsapp.bulkPacePause': '暫停時長（分鐘）',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '約每小時 {perHour} 則。適用於自動催繳、單次催繳與群發，每則之間隨機等待，避免號碼因群發被封鎖；回覆會立即送出。「每 N 則暫停」填 0 表示不暫停。',
   'settings.whatsapp.mediaRetention': '附件保留天數',
   'settings.whatsapp.mediaRetentionHint': '0 表示永久保留，也是預設值。超過這個天數檔案會被刪除，訊息會顯示附件已不在磁碟上——會話的文字內容不會被動到。',

@@ -145,10 +145,10 @@ export function CampaignForm({ onClose, onCreated, editing }: {
       }
       if (config.success && config.data) {
         setPerHour(bulkPerHour({
-          bulkIntervalMinSec: config.data.bulkIntervalMinSec ?? 20,
-          bulkIntervalMaxSec: config.data.bulkIntervalMaxSec ?? 45,
-          bulkBurstSize: config.data.bulkBurstSize ?? 30,
-          bulkBurstPauseMin: config.data.bulkBurstPauseMin ?? 5
+          bulkIntervalMinSec: config.data.bulkIntervalMinSec ?? 40,
+          bulkIntervalMaxSec: config.data.bulkIntervalMaxSec ?? 90,
+          bulkBurstSize: config.data.bulkBurstSize ?? 20,
+          bulkBurstPauseMin: config.data.bulkBurstPauseMin ?? 10
         }))
       }
     })()

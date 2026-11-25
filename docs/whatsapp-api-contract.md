@@ -109,10 +109,11 @@ webhook de entrada, que é público e tem credencial própria.
   rejectCallMessage: string
   portalPublicUrl: string       // onde o portal do cliente responde, de fora
   rateLimitPerMin: number       // 1..120
-  bulkIntervalMinSec: number    // 5..600, padrão 20 — ritmo das automáticas
-  bulkIntervalMaxSec: number    // mínimo..600, padrão 45 (abaixo do mínimo vira o mínimo)
-  bulkBurstSize: number         // 0..500, padrão 30; 0 desliga a pausa longa
-  bulkBurstPauseMin: number     // 1..120, padrão 5
+  bulkIntervalMinSec: number    // 5..600, padrão 40 — ritmo das automáticas
+  bulkIntervalMaxSec: number    // mínimo..600, padrão 90 (abaixo do mínimo vira o mínimo)
+  bulkBurstSize: number         // 0..500, padrão 20; 0 desliga a pausa longa
+  bulkBurstPauseMin: number     // 1..120, padrão 10
+  bulkDailyLimit: number        // 0..5000, padrão 300; automáticas por 24 h móveis, 0 = sem limite
   managedUrl: string
   managed: boolean              // derivado: managedUrl preenchido
   managedAdminKeyConfigured: boolean

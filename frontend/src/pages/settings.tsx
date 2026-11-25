@@ -330,10 +330,11 @@ export default function Settings() {
     cloudVerifyToken: '',
     rejectCallMessage: '',
     rateLimitPerMin: 20,
-    bulkIntervalMinSec: 20,
-    bulkIntervalMaxSec: 45,
-    bulkBurstSize: 30,
-    bulkBurstPauseMin: 5,
+    bulkIntervalMinSec: 40,
+    bulkIntervalMaxSec: 90,
+    bulkBurstSize: 20,
+    bulkBurstPauseMin: 10,
+    bulkDailyLimit: 300,
     // 0 is forever, and it is what an installation that never touches this
     // field keeps. Anything else is a day count after which a stored
     // attachment is deleted off the disk.
@@ -513,10 +514,11 @@ export default function Settings() {
         rateLimitPerMin: config.rateLimitPerMin,
         // Mesmo cuidado dos campos de retenção: um backend anterior ao ritmo
         // responde sem eles, e o padrão aqui é o mesmo do servidor.
-        bulkIntervalMinSec: config.bulkIntervalMinSec ?? 20,
-        bulkIntervalMaxSec: config.bulkIntervalMaxSec ?? 45,
-        bulkBurstSize: config.bulkBurstSize ?? 30,
-        bulkBurstPauseMin: config.bulkBurstPauseMin ?? 5,
+        bulkIntervalMinSec: config.bulkIntervalMinSec ?? 40,
+        bulkIntervalMaxSec: config.bulkIntervalMaxSec ?? 90,
+        bulkBurstSize: config.bulkBurstSize ?? 20,
+        bulkBurstPauseMin: config.bulkBurstPauseMin ?? 10,
+        bulkDailyLimit: config.bulkDailyLimit ?? 300,
         // Defaulted here rather than trusted: a panel talking to a backend
         // from before this field existed answers without it, and `undefined`
         // in a number input makes it uncontrolled from that point on. The
@@ -673,6 +675,7 @@ export default function Settings() {
         bulkIntervalMaxSec: waForm.bulkIntervalMaxSec,
         bulkBurstSize: waForm.bulkBurstSize,
         bulkBurstPauseMin: waForm.bulkBurstPauseMin,
+        bulkDailyLimit: waForm.bulkDailyLimit,
         mediaRetentionDays: waForm.mediaRetentionDays,
         messageRetentionDays: waForm.messageRetentionDays,
         // Same rule as the SGP token: only send a key the operator typed.
@@ -3122,6 +3125,27 @@ export default function Settings() {
                                   }))}
                                 />
                               </div>
+                            </div>
+                            <div className="mt-3">
+                              <label htmlFor="wa-bulkDailyLimit" className="field-label">
+                                {t('settings.whatsapp.bulkDailyLimit')}
+                              </label>
+                              <input
+                                id="wa-bulkDailyLimit"
+                                type="number"
+                                min={0}
+                                max={5000}
+                                className="modern-input w-full sm:max-w-48"
+                                value={waForm.bulkDailyLimit}
+                                aria-describedby="wa-bulkDailyLimit-hint"
+                                onChange={(event) => setWaForm((current) => ({
+                                  ...current,
+                                  bulkDailyLimit: Math.min(Math.max(Math.round(Number(event.target.value)) || 0, 0), 5000)
+                                }))}
+                              />
+                              <p id="wa-bulkDailyLimit-hint" className="field-hint">
+                                {t('settings.whatsapp.bulkDailyLimitHint')}
+                              </p>
                             </div>
                             <p className="field-hint">
                               {t('settings.whatsapp.bulkPaceHint', { perHour: bulkPerHour(waForm) })}

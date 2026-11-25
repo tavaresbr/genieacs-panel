@@ -2713,6 +2713,8 @@ const de: Dictionary = {
   'settings.whatsapp.bulkPaceMax': 'Höchstabstand (s)',
   'settings.whatsapp.bulkPaceBurst': 'Pause alle N Nachrichten',
   'settings.whatsapp.bulkPacePause': 'Pausendauer (min)',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '≈ {perHour} Nachrichten pro Stunde. Gilt für Mahnlauf, Einzelmahnung und Kampagnen, mit einer zufälligen Wartezeit zwischen den Nachrichten, damit die Nummer nicht wegen Massenversand gesperrt wird; Antworten gehen sofort raus. 0 bei „Pause alle“ schaltet die Pause ab.',
   'settings.whatsapp.mediaRetention': 'Anhänge aufbewahren für (Tage)',
   'settings.whatsapp.mediaRetentionHint': '0 behält sie für immer, und das ist die Voreinstellung. Danach wird die Datei gelöscht und die Nachricht sagt, der Anhang liege nicht mehr auf der Platte — der Text der Unterhaltung bleibt unberührt.',

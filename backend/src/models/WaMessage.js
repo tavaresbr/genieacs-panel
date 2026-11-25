@@ -291,6 +291,23 @@ class WaMessage {
   }
 
   /**
+   * Quantas automáticas (`source='campaign'`: régua, cobrança avulsa e campanhas)
+   * já saíram desde `since` — a conta do limite por dia.
+   *
+   * `claimed_at` é o instante da última tentativa, e uma linha enviada não é
+   * mais tentada, então é a hora do envio. Só conta o que de fato saiu.
+   */
+  static async countBulkSentSince(since) {
+    const row = await tdb('wa_messages')
+      .where({ source: 'campaign', direction: 'out' })
+      .whereIn('delivery_status', ['sent', 'delivered', 'read'])
+      .where('claimed_at', '>=', since)
+      .count({ n: '*' })
+      .first();
+    return Number(row?.n) || 0;
+  }
+
+  /**
    * Takes ownership of one message, or reports that someone else already has it.
    *
    * This is a conditional UPDATE checked by affected-row count rather than

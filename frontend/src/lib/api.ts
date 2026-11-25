@@ -5445,6 +5445,8 @@ export interface WhatsAppConfig {
   bulkIntervalMaxSec: number
   bulkBurstSize: number
   bulkBurstPauseMin: number
+  /** Automáticas por 24 h móveis; as que passam ficam na fila. 0 = sem limite. */
+  bulkDailyLimit: number
   managedUrl: string
   managed: boolean
   managedAdminKeyConfigured: boolean

@@ -2824,6 +2824,8 @@ const fr: Dictionary = {
   'settings.whatsapp.bulkPaceMax': 'Intervalle maximum (s)',
   'settings.whatsapp.bulkPaceBurst': 'Pause toutes les N messages',
   'settings.whatsapp.bulkPacePause': 'Durée de la pause (min)',
+  'settings.whatsapp.bulkDailyLimit': 'Limit per day (0 = no limit)',
+  'settings.whatsapp.bulkDailyLimitHint': 'Counts the automatic messages of the last 24 hours. Those over the limit wait in the queue and go out when there is room. Agents\' replies are never limited.',
   'settings.whatsapp.bulkPaceHint': '≈ {perHour} messages par heure. S\'applique aux relances, à la facturation ponctuelle et aux campagnes, avec une attente aléatoire entre chaque message pour que le numéro ne soit pas bloqué pour envoi de masse ; les réponses partent immédiatement. 0 dans « Pause toutes les » désactive la pause.',
   'settings.whatsapp.mediaRetention': 'Conserver les pièces jointes (jours)',
   'settings.whatsapp.mediaRetentionHint': '0 les conserve indéfiniment, ce qui est la valeur par défaut. Passé ce délai le fichier est supprimé et le message indique que la pièce jointe n’est plus sur le disque — le texte de la conversation n’est jamais touché.',
