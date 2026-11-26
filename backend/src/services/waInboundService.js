@@ -446,6 +446,8 @@ async function gravarMensagem(account, item) {
       // contrário do que a lista existe para fazer. Só na ENTRADA: um eco de
       // saída é o operador digitando, e não é notícia do cliente.
       if (conversation.closed_at) patch.closed_at = null;
+      // Quem escreve libera a conversa encerrada "sem enviar nada".
+      if (conversation.no_contact_at) { patch.no_contact_at = null; patch.no_contact_by = null; }
       // Incremento no banco, não `lido + 1` em memória: dois eventos do mesmo
       // contato chegam concorrentes e um leria o contador antes do outro escrever.
       patch.unread_count = getDb().raw('unread_count + 1');

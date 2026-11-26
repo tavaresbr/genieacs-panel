@@ -110,6 +110,14 @@ router.post(
   WhatsAppMessageController.setStatus
 );
 
+// "Liberar mensagens": desfaz o "encerrar sem enviar nada" desta conversa.
+router.post(
+  '/conversations/:id/allow-contact',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  WhatsAppMessageController.allowContact
+);
+
 // Which subscriber a thread belongs to, said by hand — for the number the SGP
 // does not know. Asking to save that number on the contract is checked again
 // in the controller, against the billing screen's own permission.

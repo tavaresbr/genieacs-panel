@@ -915,6 +915,7 @@ export default {
   'whatsapp.error.tagNotFound': 'Etiqueta não encontrada.',
   'whatsapp.error.invalidAssignee': 'Escolha alguém da equipe que atende o WhatsApp.',
   'whatsapp.conversationReopened': 'Conversa reaberta',
+  'whatsapp.contactAllowed': 'Mensagens liberadas para este cliente',
   'whatsapp.conversationStatusFailed': 'Não foi possível atualizar a conversa',
   'whatsapp.error.invalidConversationStatus': 'Uma conversa está aberta ou encerrada',
   'whatsapp.bot.portalHint': 'Para a senha do WiFi e para trocar o nome da rede, entre no portal do cliente: {link}',

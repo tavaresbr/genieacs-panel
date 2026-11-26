@@ -28,7 +28,7 @@ export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
   survey: boolean
   /** A conversa é uma venda entregue pela IA e ainda sem resultado. */
   sale: boolean
-  onChoose: (survey: boolean, lead?: SaleResult) => void
+  onChoose: (survey: boolean, lead?: SaleResult, noContact?: boolean) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation()
@@ -76,8 +76,9 @@ export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
       <section className="modern-card relative w-full max-w-md space-y-4 p-5">
         <div>
           <h2 id="close-survey-title" className="text-lg font-semibold text-foreground">
-            {survey ? t('whatsapp.closeSurvey.title') : t('whatsapp.closeSale.title')}
+            {t('whatsapp.closeNoContact.title')}
           </h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t('whatsapp.closeNoContact.hint')}</p>
           {survey && <p className="mt-1 text-sm text-muted-foreground">{t('whatsapp.closeSurvey.hint')}</p>}
         </div>
 
@@ -126,20 +127,17 @@ export function CloseSurveyDialog({ busy, survey, sale, onChoose, onCancel }: {
           <button type="button" className="modern-button-secondary" onClick={onCancel} disabled={busy}>
             {t('common.cancel')}
           </button>
-          {survey ? (
-            <>
-              <button type="button" className="modern-button-secondary" onClick={() => onChoose(false, result())} disabled={busy || incomplete}>
-                {t('whatsapp.closeSurvey.skip')}
-              </button>
-              <button ref={first} type="button" className="modern-button" onClick={() => onChoose(true, result())} disabled={busy || incomplete}>
-                {t('whatsapp.closeSurvey.send')}
-              </button>
-            </>
-          ) : (
-            <button ref={first} type="button" className="modern-button" onClick={() => onChoose(false, result())} disabled={busy || incomplete}>
-              {t('whatsapp.closeSale.close')}
+          <button type="button" className="modern-button-secondary" onClick={() => onChoose(false, result(), false)} disabled={busy || incomplete}>
+            {t('whatsapp.closeNoContact.justClose')}
+          </button>
+          {survey && (
+            <button type="button" className="modern-button-secondary" onClick={() => onChoose(true, result(), false)} disabled={busy || incomplete}>
+              {t('whatsapp.closeSurvey.send')}
             </button>
           )}
+          <button ref={first} type="button" className="modern-button" onClick={() => onChoose(false, result(), true)} disabled={busy || incomplete}>
+            {t('whatsapp.closeNoContact.confirm')}
+          </button>
         </div>
       </section>
     </div>,

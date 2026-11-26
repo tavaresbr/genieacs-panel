@@ -918,6 +918,7 @@ export default {
   'whatsapp.error.tagNotFound': 'Tag not found.',
   'whatsapp.error.invalidAssignee': 'Choose someone on the team who answers WhatsApp.',
   'whatsapp.conversationReopened': 'Conversation reopened',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': 'The conversation could not be updated',
   'whatsapp.error.invalidConversationStatus': 'A conversation is either open or closed',
   'whatsapp.bot.portalHint': 'For your WiFi password and to change the network name, sign in to the customer portal: {link}',

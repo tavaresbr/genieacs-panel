@@ -8,6 +8,7 @@ import SgpContact from '../models/SgpContact.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
+import WaNoContactService from './waNoContactService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
 import WaAiLearningService from './waAiLearningService.js';
 import WaAssignmentService from './waAssignmentService.js';
@@ -414,6 +415,9 @@ class WaConversationService {
       aiUrgency: row.ai_urgency || null,
       aiMood: row.ai_mood || null,
       aiClassifiedAt: row.ai_classified_at || null,
+      // Encerrada com "sem enviar nada": só cobrança, ou resposta a quem escreve.
+      noContact: Boolean(row.no_contact_at),
+      noContactAt: row.no_contact_at || null,
       optedOut: extra.optedOut ?? false,
       // Só quando o bloqueio é parcial: os tipos que ele cobre.
       optOutCategories: extra.optOutCategories ?? null,
@@ -730,7 +734,14 @@ class WaConversationService {
     return { lead_outcome: 'won', lead_lost_reason: null, lead_plan_id: planId };
   }
 
-  static async setStatus(id, status, { userId = null, survey = true, lead = null } = {}) {
+  /** "Liberar mensagens": tira a marca de "sem enviar nada" e o bloqueio que ela criou. */
+  static async allowContact(id, { userId = null } = {}) {
+    const conversation = await this.get(id);
+    await WaNoContactService.allowContact(conversation, userId);
+    return this.decorate(await this.get(conversation.id));
+  }
+
+  static async setStatus(id, status, { userId = null, survey = true, lead = null, noContact = false } = {}) {
     const conversation = await this.get(id);
     // Valida antes de encerrar: um resultado inválido não pode deixar a conversa encerrada sem registro.
     const resultado = status === 'closed' && !conversation.closed_at ? await this.lerResultadoDaVenda(conversation, lead) : null;
@@ -743,8 +754,17 @@ class WaConversationService {
       closed_at: closing ? new Date() : null,
       // Encerrada não espera ninguém: sai da fila da distribuição.
       ...(closing ? { waiting_since: null } : {}),
+      // Reabrir libera: quem reabre decidiu falar com o cliente de novo.
+      ...(closing ? {} : { no_contact_at: null, no_contact_by: null }),
       ...(resultado ?? {})
     });
+    // "Encerrar sem enviar nada": marca, "não perturbe" parcial e fila limpa.
+    // A pesquisa nunca sai junto.
+    const semContato = closing && wasOpen && noContact === true;
+    if (semContato) {
+      survey = false;
+      await WaNoContactService.apply(updated, userId);
+    }
     // Encerrar de verdade (não o segundo clique) é o momento da pesquisa de
     // satisfação. Ela decide sozinha se pergunta e nunca lança.
     // `survey: false` é o atendente escolhendo não mandar: o cliente respondia
@@ -752,7 +772,7 @@ class WaConversationService {
     if (closing && wasOpen && survey !== false) await WaSatisfactionService.onClosed(updated, { userId });
     // A venda terminou: a IA propõe itens para a base (inativos, a equipe aprova). Segue sozinho; nunca lança.
     if (resultado) void WaAiLearningService.sugerir(updated.id);
-    return this.decorate(updated);
+    return this.decorate(semContato ? await this.get(updated.id) : updated);
   }
 
   /**

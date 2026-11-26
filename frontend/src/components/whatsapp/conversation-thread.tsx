@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/icon'
 import { ContactLink } from '@/components/whatsapp/contact-link'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
+import { whatsappAPI } from '@/lib/api'
 import { AccountChip, conversationAddress, conversationTitle } from '@/components/whatsapp/conversation-list'
 import { accountTag } from '@/lib/wa-account-color'
 import { BILLING_BADGE, billingLabel } from '@/lib/wa-billing-status'
@@ -305,6 +306,21 @@ export function ConversationThread({
               <TagPicker conversation={conversation} onChange={onLinked} />
               <MarketingOptOutControl conversation={conversation} onChange={onLinked} />
               <AiChips conversation={conversation} />
+              {closed && conversation.noContact && can('whatsapp.send') && (
+                <button
+                  type="button"
+                  className="modern-badge-warning"
+                  title={t('whatsapp.closeNoContact.bannerHint')}
+                  onClick={async () => {
+                    const res = await whatsappAPI.allowConversationContact(conversation.id)
+                    if (res.success && res.data) onLinked(res.data)
+                    else toast.error(res.message || t('api.requestFailed'))
+                  }}
+                >
+                  <Icon name="bell" size={12} />
+                  {t('whatsapp.closeNoContact.banner')} · {t('whatsapp.closeNoContact.allow')}
+                </button>
+              )}
               {closed && (
                 <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
                   <Icon name="check" size={12} />

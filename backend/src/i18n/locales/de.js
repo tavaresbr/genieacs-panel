@@ -919,6 +919,7 @@ export default {
   'whatsapp.error.tagNotFound': 'Label nicht gefunden.',
   'whatsapp.error.invalidAssignee': 'Wählen Sie jemanden aus dem Team, der WhatsApp beantwortet.',
   'whatsapp.conversationReopened': 'Unterhaltung wieder geöffnet',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': 'Die Unterhaltung konnte nicht aktualisiert werden',
   'whatsapp.error.invalidConversationStatus': 'Eine Unterhaltung ist entweder offen oder geschlossen',
   'whatsapp.bot.portalHint': 'Für dein WLAN-Passwort und zum Ändern des Netzwerknamens melde dich im Kundenportal an: {link}',

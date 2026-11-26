@@ -309,6 +309,22 @@ class WhatsAppMessageController {
     }
   }
 
+  /** `POST /conversations/:id/allow-contact` — "Liberar mensagens" numa conversa encerrada sem enviar nada. */
+  static async allowContact(req, res) {
+    try {
+      const conversation = await WaConversationService.allowContact(req.params?.id, { userId: req.user?.userId ?? null });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CONVERSATION_ALLOW_CONTACT,
+        subjectType: 'conversation',
+        subjectId: String(conversation.id),
+        detail: {}
+      });
+      return res.json(createResponse(req.t('whatsapp.contactAllowed'), conversation));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
+    }
+  }
+
   static async setStatus(req, res) {
     const status = req.body?.status;
     if (status !== 'open' && status !== 'closed') {
@@ -326,8 +342,17 @@ class WhatsAppMessageController {
         userId: req.user?.userId ?? null,
         // Só `false` dispensa a pesquisa; omitido continua como sempre.
         survey: req.body?.survey !== false,
-        lead: req.body?.lead ?? null
+        lead: req.body?.lead ?? null,
+        noContact: req.body?.noContact === true
       });
+      if (status === 'closed' && req.body?.noContact === true && conversation?.noContact) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.WHATSAPP_CONVERSATION_NO_CONTACT,
+          subjectType: 'conversation',
+          subjectId: String(conversation.id),
+          detail: { noContact: true }
+        });
+      }
       if (status === 'closed' && req.body?.lead?.outcome && req.body.lead.outcome !== 'unknown' && conversation?.leadOutcome) {
         await AuditLog.fromRequest(req, {
           action: AuditLog.ACTIONS.WHATSAPP_LEAD_OUTCOME,

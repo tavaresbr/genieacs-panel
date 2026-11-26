@@ -95,6 +95,7 @@ class WaSendService {
     metaTemplate = null,
     replyToId = null,
     marketing = false,
+    billing = false,
     answersMessageId = null
   } = {}) {
     // Defaulting to 'operator' rather than to the caller's intent: a sender
@@ -174,6 +175,8 @@ class WaSendService {
       is_note: note,
       // Promoção: o envio confere de novo o pedido de parar na hora de sair.
       marketing: promocional,
+      // Cobrança: única saída que passa por uma conversa encerrada sem mensagens.
+      billing: billing === true,
       // A note has no delivery state at all. 'queued' would hand it to the
       // worker, and the one thing a note must never do is reach the customer.
       delivery_status: note ? null : 'queued',

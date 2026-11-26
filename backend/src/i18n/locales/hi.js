@@ -919,6 +919,7 @@ export default {
   'whatsapp.error.tagNotFound': 'टैग नहीं मिला।',
   'whatsapp.error.invalidAssignee': 'टीम में से कोई ऐसा व्यक्ति चुनें जो WhatsApp पर जवाब देता है।',
   'whatsapp.conversationReopened': 'बातचीत फिर से खोली गई',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': 'बातचीत अपडेट नहीं हो सकी',
   'whatsapp.error.invalidConversationStatus': 'बातचीत या तो खुली होती है या बंद',
   'whatsapp.bot.portalHint': 'अपना WiFi पासवर्ड देखने और नेटवर्क का नाम बदलने के लिए ग्राहक पोर्टल में साइन इन करें: {link}',

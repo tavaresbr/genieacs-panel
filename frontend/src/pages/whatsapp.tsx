@@ -673,12 +673,12 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
    * the list is asked again rather than patched, since only the server knows
    * whether the row still belongs under the filter on screen.
    */
-  const file = useCallback(async (next: 'open' | 'closed', survey?: boolean, lead?: SaleResult) => {
+  const file = useCallback(async (next: 'open' | 'closed', survey?: boolean, lead?: SaleResult, noContact?: boolean) => {
     const id = selectedIdRef.current
     if (id === null) return
     setFiling(true)
     try {
-      const res = await whatsappAPI.setConversationStatus(id, next, { survey, lead })
+      const res = await whatsappAPI.setConversationStatus(id, next, { survey, lead, noContact })
       if (!alive.current) return
       if (!res.success || !res.data) {
         toast.error(res.message || whatsappErrorMessage(t, res.code))
@@ -704,14 +704,16 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       const res = await whatsappAPI.getConversation(id)
       const survey = Boolean(res.data?.surveyOnClose)
       const sale = Boolean(res.data?.leadAt && !res.data?.leadOutcome)
-      if (alive.current && selectedIdRef.current === id && res.success && (survey || sale)) {
+      // A janela abre em todo encerramento: é nela que se diz se o cliente
+      // ainda recebe mensagem do painel.
+      if (alive.current && selectedIdRef.current === id && res.success) {
         setAskClose({ survey, sale })
         return
       }
     } catch {
-      // sem a resposta, encerra como sempre: a pesquisa é acessória
+      // sem a resposta, a janela abre mesmo assim, sem pesquisa nem venda
     }
-    void file('closed')
+    if (alive.current) setAskClose({ survey: false, sale: false })
   }, [file])
 
   // ── Sending ────────────────────────────────────────────────────────────────
@@ -1393,7 +1395,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
           survey={askClose.survey}
           sale={askClose.sale}
           onCancel={() => setAskClose(null)}
-          onChoose={(survey, lead) => { setAskClose(null); void file('closed', askClose.survey ? survey : undefined, lead) }}
+          onChoose={(survey, lead, noContact) => { setAskClose(null); void file('closed', askClose.survey ? survey : undefined, lead, noContact) }}
         />
       )}
       {forwarding && (
