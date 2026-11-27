@@ -164,6 +164,26 @@ describe('encerrar sem enviar nada', () => {
     assert.ok(await asTenant(() => WaOptOut.findActive({ waPhone: outra.wa_phone_e164 })));
   });
 
+  it('o que o cliente pediu na hora (essential) passa; o número de alertas da equipe não é marcado', async () => {
+    const conv = await novaConversa();
+    await encerra(conv, { noContact: true });
+    const otp = await enfileira(conv, { source: 'alert', essential: true });
+    assert.equal(await asTenant(() => WaOutboxWorker.deliver(otp.id)), 'sent');
+    const alerta = await enfileira(conv, { source: 'alert' });
+    assert.equal(await asTenant(() => WaOutboxWorker.deliver(alerta.id)), 'no_contact');
+
+    const equipe = await novaConversa();
+    const { default: WaAlertService } = await import('../src/services/waAlertService.js');
+    const original = WaAlertService.getSettings;
+    WaAlertService.getSettings = async () => ({ recipients: [equipe.wa_phone_e164] });
+    try {
+      const r = await encerra(equipe, { noContact: true });
+      assert.equal(r.body.data.noContact, false);
+    } finally {
+      WaAlertService.getSettings = original;
+    }
+  });
+
   it('a regra pura: nota e cobrança passam, bot não', () => {
     const marca = { no_contact_at: new Date() };
     const velho = new Date(Date.now() - 3600_000);

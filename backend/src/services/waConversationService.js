@@ -734,6 +734,21 @@ class WaConversationService {
     return { lead_outcome: 'won', lead_lost_reason: null, lead_plan_id: planId };
   }
 
+  /**
+   * O número é de quem recebe os alertas técnicos (equipe)? Marcá-lo "sem
+   * enviar nada" calaria os alertas sem aviso, então a marca não se aplica.
+   */
+  static async isAlertNumber(conversation) {
+    try {
+      const { default: WaAlertService } = await import('./waAlertService.js');
+      const { recipients } = await WaAlertService.getSettings();
+      const phone = normalizarTelefoneBr(conversation.wa_phone_e164);
+      return Boolean(phone) && recipients.includes(phone);
+    } catch {
+      return false;
+    }
+  }
+
   /** "Liberar mensagens": tira a marca de "sem enviar nada" e o bloqueio que ela criou. */
   static async allowContact(id, { userId = null } = {}) {
     const conversation = await this.get(id);
@@ -760,7 +775,7 @@ class WaConversationService {
     });
     // "Encerrar sem enviar nada": marca, "não perturbe" parcial e fila limpa.
     // A pesquisa nunca sai junto.
-    const semContato = closing && wasOpen && noContact === true;
+    const semContato = closing && wasOpen && noContact === true && !(await this.isAlertNumber(updated));
     if (semContato) {
       survey = false;
       await WaNoContactService.apply(updated, userId);

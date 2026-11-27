@@ -45,7 +45,7 @@ export async function notifyWifiChanged({ accountId, deviceId, now = Date.now() 
       pushName: null
     });
     const body = translate(DEFAULT_LOCALE, 'whatsapp.portal.wifiChanged');
-    await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert' });
+    await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert', essential: true });
     lastSent.set(key, now);
     return true;
   } catch (error) {
