@@ -7,6 +7,16 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.69.2] - 2026-11-27
+
+### Maintenance
+
+- "Encerrar sem enviar nada" — cliente só recebe cobrança ou resposta se escrever (`19e72028`)
+- Rota allow-contact entra na varredura de ids (`9e9158e1`)
+- Botões do Módulo SGP (Abrir no SGP, equipamento, chamado) em verde (`71e63122`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/f20355715509...85a8ab3c8e3d)
+
 ## [1.69.1] - 2026-11-25
 
 ### Maintenance
