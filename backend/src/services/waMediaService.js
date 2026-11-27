@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DATA_DIR } from '../config/paths.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { lerMidiaBase64, urlBaixavel } from '../utils/wa/waMidia.js';
+import { hasRule, matchesDeclaredType } from '../utils/wa/sniffAttachment.js';
 import { safeFetch } from '../utils/wa/ssrfGuard.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import { clientForAccount } from './evolutionClient.js';
@@ -353,7 +354,14 @@ class WaMediaService {
     // O id externo entra no nome do arquivo, então é higienizado como o resto:
     // ele vem do payload, não da nossa numeração.
     const idSeguro = String(externalId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || 'sem-id';
-    const nome = nomeSeguro(bytes.fileName || midia.fileName, midia.tipo, bytes.mimetype || midia.mimetype);
+    // O tipo vem do celular de quem escreveu. Quando o tipo tem regra de
+    // reconhecimento e os bytes não batem (HTML dito como imagem, por exemplo),
+    // o arquivo é guardado como binário genérico: nunca aberto inline.
+    const declarado = String(bytes.mimetype || midia.mimetype || '').split(';')[0].trim().toLowerCase();
+    const desmentido = hasRule(declarado) && !matchesDeclaredType(bytes.buf, declarado);
+    if (desmentido) console.warn(`[wa] mídia recebida (conversa ${Number(conversationId) || 0}): bytes não batem com ${JSON.stringify(declarado.slice(0, 64))}; guardada como binário`);
+    const mimetypeFinal = desmentido ? 'application/octet-stream' : (bytes.mimetype || midia.mimetype);
+    const nome = nomeSeguro(desmentido ? '' : (bytes.fileName || midia.fileName), desmentido ? 'document' : midia.tipo, mimetypeFinal);
     const relativo = path.posix.join(tenantMediaDir(), String(conversationId), `${idSeguro}-${nome}`);
     if (relativo.length > 255) return null;
 
@@ -371,7 +379,7 @@ class WaMediaService {
       // máquina do provedor e o container, e um caminho absoluto gravado no
       // banco quebraria calado na migração.
       attachment_path: relativo,
-      attachment_type: String(bytes.mimetype || midia.mimetype || '').slice(0, 128) || null,
+      attachment_type: String(mimetypeFinal || '').slice(0, 128) || null,
       attachment_name: nome.slice(0, 255)
     };
   }
