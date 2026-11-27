@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.69.4] - 2026-11-27
+
+### Maintenance
+
+- Mídia recebida confere os bytes; IA pausa após tempo esgotado (`ca889861`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/98166028e406...d3ff41c3902d)
+
 ## [1.69.3] - 2026-11-27
 
 ### Maintenance
