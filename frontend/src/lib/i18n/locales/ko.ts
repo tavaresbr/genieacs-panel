@@ -453,6 +453,7 @@ const ko: Dictionary = {
   'login.submitting': '계정을 확인하는 중…',
   'login.helpText': '접근이 거부되면 패널 관리자에게 문의하여 인증 정보를 재설정하십시오.',
   'login.privacyLink': "개인정보 처리방침",
+  'login.termsLink': "이용약관",
   'login.platform.helpText': '플랫폼 계정의 비밀번호는 서버에서 scripts/reset-password.js 로 재설정합니다.',
   'console.header': '플랫폼',
   'login.error.invalidCredentials': '사용자 이름 또는 이메일과 비밀번호가 일치하지 않습니다. 인증 정보를 확인하십시오.',

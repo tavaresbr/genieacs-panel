@@ -450,6 +450,7 @@ const hi: Dictionary = {
   'login.submitting': 'खाता सत्यापित किया जा रहा है…',
   'login.helpText': 'यदि पहुँच अस्वीकृत हो, तो अपने क्रेडेंशियल रीसेट कराने के लिए पैनल प्रशासक से संपर्क करें।',
   'login.privacyLink': "गोपनीयता नीति",
+  'login.termsLink': "सेवा की शर्तें",
   'login.platform.helpText': 'प्लेटफ़ॉर्म खाते का पासवर्ड सर्वर पर scripts/reset-password.js से रीसेट किया जाता है।',
   'console.header': 'प्लेटफ़ॉर्म',
   'login.error.invalidCredentials': 'उपयोगकर्ता नाम या पासवर्ड मेल नहीं खाता। प्रशासक क्रेडेंशियल जाँचें।',

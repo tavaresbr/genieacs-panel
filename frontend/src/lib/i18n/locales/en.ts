@@ -455,6 +455,7 @@ const en = {
   'login.submitting': 'Verifying account…',
   'login.helpText': 'If access is denied, contact the panel administrator to reset your credentials.',
   'login.privacyLink': "Privacy policy",
+  'login.termsLink': "Terms of service",
   'login.platform.helpText': 'A platform account\'s password is reset on the server, with scripts/reset-password.js.',
   'console.header': 'Platform',
   'login.error.invalidCredentials': 'The username or email and the password do not match. Check the credentials.',

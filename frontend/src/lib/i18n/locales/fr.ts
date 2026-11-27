@@ -453,6 +453,7 @@ const fr: Dictionary = {
   'login.submitting': 'Vérification du compte…',
   'login.helpText': 'Si l’accès est refusé, contactez l’administrateur du panneau pour réinitialiser vos identifiants.',
   'login.privacyLink': "Politique de confidentialité",
+  'login.termsLink': "Conditions d'utilisation",
   'login.platform.helpText': 'Le mot de passe d\'un compte de plateforme se réinitialise sur le serveur, avec scripts/reset-password.js.',
   'console.header': 'Plateforme',
   'login.error.invalidCredentials': 'Le nom d’utilisateur ou l’e-mail et le mot de passe ne correspondent pas. Vérifiez les identifiants.',

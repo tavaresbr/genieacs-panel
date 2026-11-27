@@ -453,6 +453,7 @@ const ja: Dictionary = {
   'login.submitting': 'アカウントを確認しています…',
   'login.helpText': 'アクセスを拒否された場合は、パネル管理者に連絡して認証情報をリセットしてもらってください。',
   'login.privacyLink': "プライバシーポリシー",
+  'login.termsLink': "利用規約",
   'login.platform.helpText': 'プラットフォームアカウントのパスワードは、サーバー上で scripts/reset-password.js により再設定します。',
   'console.header': 'プラットフォーム',
   'login.error.invalidCredentials': 'ユーザー名またはメールアドレスとパスワードが一致しません。認証情報を確認してください。',

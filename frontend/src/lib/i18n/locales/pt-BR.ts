@@ -453,6 +453,7 @@ const ptBR: Dictionary = {
   'login.submitting': 'Verificando conta…',
   'login.helpText': 'Se o acesso for negado, fale com o administrador do painel para redefinir as credenciais.',
   'login.privacyLink': "Política de privacidade",
+  'login.termsLink': "Termos de serviço",
   'login.platform.helpText': 'A senha de uma conta de plataforma se redefine pelo servidor, com scripts/reset-password.js.',
   'console.header': 'Plataforma',
   'login.error.invalidCredentials': 'Usuário ou e-mail e senha não conferem. Verifique as credenciais.',

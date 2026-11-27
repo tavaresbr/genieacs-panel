@@ -453,6 +453,7 @@ const ru: Dictionary = {
   'login.submitting': 'Проверка учётной записи…',
   'login.helpText': 'Если в доступе отказано, обратитесь к администратору панели для сброса учётных данных.',
   'login.privacyLink': "Политика конфиденциальности",
+  'login.termsLink': "Условия использования",
   'login.platform.helpText': 'Пароль учётной записи платформы сбрасывается на сервере, с помощью scripts/reset-password.js.',
   'console.header': 'Платформа',
   'login.error.invalidCredentials': 'Имя пользователя или адрес эл. почты и пароль не совпадают. Проверьте учётные данные.',
