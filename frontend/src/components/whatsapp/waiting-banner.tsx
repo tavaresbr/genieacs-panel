@@ -2,18 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { whatsappAPI, type WaitingReport } from '@/lib/api'
-import { useAuth } from '@/contexts/auth-context'
-import { useTranslation } from '@/contexts/language-context'
-import { Icon } from '@/components/ui/icon'
 import { useVisibleInterval } from '@/lib/visible-interval'
 
 const POLL_MS = 60_000
 
 /**
  * Quem espera gente há mais que o limite da regra "Cliente esperando" —
- * lido a cada minuto com a aba à vista. A página usa o mapa para o selo das
- * linhas e esta faixa para o resumo, com o atalho que lista só as conversas
- * que esperam (de qualquer atendente), as mais antigas primeiro.
+ * lido a cada minuto com a aba à vista. A página usa o mapa para o selo
+ * vermelho "Esperando N min" de cada linha.
  */
 export function useWaiting() {
   const [report, setReport] = useState<WaitingReport | null>(null)
@@ -36,35 +32,4 @@ export function useWaiting() {
   useVisibleInterval(() => void load(), POLL_MS)
 
   return report
-}
-
-export function WaitingBanner({ report, onShow }: {
-  report: WaitingReport | null
-  /** Mostra só as conversas que esperam, de qualquer atendente. */
-  onShow: () => void
-}) {
-  const { t } = useTranslation()
-  const { user } = useAuth()
-  if (!report || !report.withinHours || report.items.length === 0) return null
-  const minhas = report.items.filter((i) => user && i.assignedUserId === user.id).length
-  const semDono = report.items.filter((i) => i.assignedUserId === null).length
-  const maisAntiga = report.items[0]?.minutes ?? 0
-
-  return (
-    <button
-      type="button"
-      className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 border-b border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 px-3 py-2 text-start text-xs text-foreground transition-colors hover:bg-[hsl(var(--status-warning))]/20"
-      onClick={onShow}
-    >
-      <Icon name="warning" size={14} className="shrink-0 text-[hsl(var(--status-warning))]" />
-      <span className="font-semibold">
-        {t('whatsapp.waiting.banner', { count: report.items.length, minutes: report.thresholdMinutes })}
-      </span>
-      <span className="text-muted-foreground">
-        {t('whatsapp.waiting.oldest', { minutes: maisAntiga })}
-        {minhas + semDono > 0 && ` · ${t('whatsapp.waiting.yours', { count: minhas + semDono })}`}
-      </span>
-      <span className="ml-auto font-semibold text-primary underline">{t('whatsapp.waiting.show')}</span>
-    </button>
-  )
 }

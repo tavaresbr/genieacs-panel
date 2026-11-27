@@ -71,9 +71,19 @@ class WhatsAppMessageController {
         status: req.query?.status,
         assignee: req.query?.assignee,
         tagId: req.query?.tag,
+        unread: req.query?.unread,
         userId: req.user?.userId ?? null
       });
       return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: rows.length }), rows));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationsLoadFailed');
+    }
+  }
+
+  /** `GET /conversations/unread-count` — quantas conversas abertas têm mensagem não lida (o ícone da lista). */
+  static async unreadCount(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: 0 }), { unread: await WaConversationService.unreadCount() }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.conversationsLoadFailed');
     }

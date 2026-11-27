@@ -2893,6 +2893,7 @@ const ar: Dictionary = {
   'whatsapp.inbox.closed': 'منتهية',
   'whatsapp.inbox.closeHint': 'أرشفة لا حذف. يبقى السجل، وأي رسالة جديدة من الطرف الآخر تعيد فتحها.',
   'whatsapp.inbox.filterOpen': 'مفتوحة',
+  'whatsapp.inbox.filterUnread': 'Unread',
   'whatsapp.inbox.filterNoReply': 'بدون رد',
   'whatsapp.inbox.filterClosed': 'منتهية',
   'whatsapp.inbox.filterAll': 'الكل',

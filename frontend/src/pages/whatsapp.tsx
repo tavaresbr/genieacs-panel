@@ -44,7 +44,7 @@ import { HealthBell } from '@/components/whatsapp/health-strip'
 import { AvailabilityToggle } from '@/components/whatsapp/assignment'
 import { NotifyToggle } from '@/components/whatsapp/message-notifier'
 import { focusedConversation } from '@/lib/wa-notify'
-import { WaitingBanner, useWaiting } from '@/components/whatsapp/waiting-banner'
+import { useWaiting } from '@/components/whatsapp/waiting-banner'
 import { CloseSurveyDialog } from '@/components/whatsapp/close-survey-dialog'
 import { setMobileBarHidden, setMobileBarUnread, subscribeMobileBar } from '@/lib/mobile-bar'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
@@ -100,10 +100,12 @@ const BACKOFF_CAP = 6
  */
 const SEARCH_DEBOUNCE_MS = 350
 
-type ConversationStatus = 'open' | 'noreply' | 'closed' | 'all'
+type ConversationStatus = 'open' | 'unread' | 'noreply' | 'closed' | 'all'
 /** The piles, in the order an operator reaches for them. */
 const FILTERS = [
   ['open', 'whatsapp.inbox.filterOpen', 'chat'],
+  // Conversas abertas com mensagem do cliente ainda não vista (como no WhatsApp).
+  ['unread', 'whatsapp.inbox.filterUnread', 'mail'],
   // Conversas que só receberam envio automático (régua, campanha, alerta):
   // ficam fora de "Abertas" até o cliente responder.
   ['noreply', 'whatsapp.inbox.filterNoReply', 'bell'],
@@ -123,6 +125,15 @@ const MESSAGE_PAGE = 60
  * to `read` — comes back in its new shape rather than pinned to the one this
  * browser first saw.
  */
+/** O número de conversas não lidas, em selo verde ("99+" acima de 99). */
+function UnreadCount({ count, className = '' }: { count: number; className?: string }) {
+  return (
+    <span className={`inline-flex min-w-4 items-center justify-center rounded-full bg-[hsl(var(--status-success))] px-1 text-[10px] font-bold leading-4 text-white ${className}`}>
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
+
 function mergeNewest(page: WhatsAppMessage[], current: WhatsAppMessage[]): WhatsAppMessage[] {
   if (current.length === 0) return page
   const fresh = new Set(page.map((message) => message.id))
@@ -247,29 +258,22 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
   const [assignee, setAssignee] = useState<AssigneeFilter>('all')
   const [tagFilter, setTagFilter] = useState<number | null>(null)
   // "Ver" na faixa de quem espera: só as conversas que passaram do limite, as mais antigas primeiro.
-  const [onlyWaiting, setOnlyWaiting] = useState(false)
   // A mensagem que a próxima resposta cita, e a que está sendo encaminhada.
   const [replyTo, setReplyTo] = useState<WhatsAppMessage | null>(null)
   const replyToRef = useRef<WhatsAppMessage | null>(null)
   useEffect(() => { replyToRef.current = replyTo }, [replyTo])
   const [forwarding, setForwarding] = useState<WhatsAppMessage | null>(null)
   const [tagOptions, setTagOptions] = useState<WhatsAppTag[]>([])
-  // Quem espera gente além do limite: o selo das linhas e a faixa da lista.
+  // Quem espera gente além do limite: o selo vermelho de cada linha.
   const waitingReport = useWaiting()
   const waitingMap = useMemo(
     () => new Map((waitingReport?.items ?? []).map((item) => [item.conversationId, item.minutes])),
     [waitingReport]
   )
-  const shownConversations = useMemo(
-    () => (onlyWaiting
-      ? conversations
-        .filter((row) => waitingMap.has(row.id))
-        .sort((a, b) => (waitingMap.get(b.id) ?? 0) - (waitingMap.get(a.id) ?? 0))
-      : conversations),
-    [conversations, onlyWaiting, waitingMap]
-  )
+  const shownConversations = conversations
 
   const [loadingList, setLoadingList] = useState(true)
+  const [unreadConversations, setUnreadConversations] = useState(0)
   const [loadingThread, setLoadingThread] = useState(false)
   const [sending, setSending] = useState(false)
   const [filing, setFiling] = useState(false)
@@ -396,7 +400,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       const filtroDoPedido = JSON.stringify(filterRef.current)
       const res = await whatsappAPI.listConversations({
         limit: LIST_LIMIT,
-        status: pile,
+        status: pile === 'unread' ? 'open' : pile,
+        ...(pile === 'unread' ? { unread: true } : {}),
         ...(dono === 'all' ? {} : { assignee: dono }),
         ...(tag ? { tag } : {}),
         ...(term ? { search: term } : {})
@@ -430,6 +435,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
       // The open row's own count is written down as read here too: the server
       // cleared it when the thread was opened, and a row that re-grows a badge
       // for a second on every poll is worse than no badge at all.
+      void whatsappAPI.getUnreadCount().then((r) => { if (alive.current && r.success && r.data) setUnreadConversations(r.data.unread) }).catch(() => {})
       setConversations(openId === null
         ? rows
         : rows.map((row) => (row.id === openId ? { ...row, unreadCount: 0 } : row)))
@@ -895,7 +901,8 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
     }
   }, [t, toast])
 
-  const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
+  // Conversas com mensagem não lida, contadas no servidor (a lista carrega só 50).
+  const unreadTotal = unreadConversations
   // No celular, lista OU conversa; no computador, as duas (`lib/wa-inbox-pane.ts`).
   const panes = inboxPanes(conversation !== null)
   // A barra de atalhos do celular: some com a conversa aberta (o chat usa a
@@ -1206,50 +1213,18 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
                         aria-label={t(labelKey)}
                         title={t(labelKey)}
                       >
-                        <Icon name={icon} size={18} className="shrink-0 @min-[26rem]:hidden" />
+                        <span className="relative inline-flex shrink-0 @min-[26rem]:hidden">
+                          <Icon name={icon} size={18} />
+                          {id === 'unread' && unreadTotal > 0 && <UnreadCount count={unreadTotal} className="absolute -right-2 -top-2" />}
+                        </span>
                         <span className="truncate @max-[26rem]:sr-only">{t(labelKey)}</span>
+                        {id === 'unread' && unreadTotal > 0 && <UnreadCount count={unreadTotal} className="ml-1 @max-[26rem]:hidden" />}
                       </button>
                     ))}
                   </div>
-                  {unreadTotal > 0 && (
-                    <button
-                      type="button"
-                      className="modern-badge-success shrink-0 cursor-pointer hover:brightness-110"
-                      title={t('whatsapp.inbox.openUnread')}
-                      onClick={() => {
-                        const next = conversations.find((row) => row.unreadCount > 0)
-                        if (next) select(next)
-                      }}
-                    >
-                      {t('whatsapp.inbox.unread', { count: unreadTotal })}
-                    </button>
-                  )}
                 </div>
                 <InboxFilterChips assignee={assignee} tagId={tagFilter} tags={tagOptions} onAssignee={setAssignee} onTag={setTagFilter} />
               </div>
-              <WaitingBanner
-                report={waitingReport}
-                onShow={() => {
-                  setStatus('open')
-                  setAssignee('all')
-                  setTagFilter(null)
-                  setOnlyWaiting(true)
-                }}
-              />
-              {onlyWaiting && (
-                <div className="flex flex-wrap gap-1.5 px-3 pt-2">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-7 items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 text-xs font-medium text-primary"
-                    title={t('whatsapp.inbox.clearFilter')}
-                    aria-label={`${t('whatsapp.inbox.clearFilter')}: ${t('whatsapp.waiting.filterChip')}`}
-                    onClick={() => setOnlyWaiting(false)}
-                  >
-                    <span className="truncate">{t('whatsapp.waiting.filterChip')}</span>
-                    <Icon name="x" size={12} className="shrink-0" />
-                  </button>
-                </div>
-              )}
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {loadingList
                   ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -1262,7 +1237,7 @@ function InboxTab({ initialConversation = null, backToList = 0 }: InboxTabProps)
                       // An empty list under a search term is a different fact
                       // from an empty inbox, and only one of the two is worth
                       // clearing the box for.
-                      filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null || onlyWaiting}
+                      filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null}
                       waiting={waitingMap}
                       canOpenSgp={canSeeSgp}
                     />

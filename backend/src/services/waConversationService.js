@@ -489,11 +489,17 @@ class WaConversationService {
    * started — a list nobody can read past its first hundred rows. Closing is
    * still not deletion, so `closed` and `all` are one parameter away.
    */
-  static async list({ limit = 50, offset = 0, search = '', status = 'open', assignee = null, userId = null, tagId = null } = {}) {
+  /** Conversas abertas com mensagem não lida (para o ícone da lista). */
+  static unreadCount() {
+    return WaConversation.countUnread();
+  }
+
+  static async list({ limit = 50, offset = 0, search = '', status = 'open', assignee = null, userId = null, tagId = null, unread = false } = {}) {
     const term = String(search ?? '').trim();
     const etiqueta = Number.parseInt(String(tagId ?? ''), 10);
     const rows = await WaConversation.listRecent({
       tagId: Number.isInteger(etiqueta) && etiqueta > 0 ? etiqueta : null,
+      unread: unread === true || unread === '1' || unread === 'true',
       assignee: assignee === 'me' ? { userId } : (assignee === 'unassigned' ? 'unassigned' : null),
       limit: Math.min(Math.max(Number(limit) || 50, 1), 200),
       offset: Math.max(Number(offset) || 0, 0),

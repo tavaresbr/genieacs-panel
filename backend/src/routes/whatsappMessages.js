@@ -23,6 +23,13 @@ router.get(
   WhatsAppMessageController.listConversations
 );
 
+router.get(
+  '/conversations/unread-count',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  WhatsAppMessageController.unreadCount
+);
+
 // Reading a thread clears its unread count, which is why this is a GET that
 // writes: the operator looking at it is the only thing "read" can mean.
 router.get(

@@ -114,10 +114,19 @@ class WaConversation {
    * `sgp_links`, so the caller resolves it to `searchContracts` in one batched
    * query and hands the result down; matching it here would mean a join per row.
    */
+  /** Quantas conversas abertas têm mensagem não lida (conversas, não mensagens). */
+  static async countUnread() {
+    const [row] = await tdb('wa_conversations').whereNull('closed_at').where('unread_count', '>', 0).count({ total: '*' });
+    return Number(row?.total || 0);
+  }
+
   static async listRecent({
-    limit = 50, offset = 0, status = 'open', search = '', searchContracts = [], searchContactIds = [], assignee = null, tagId = null
+    limit = 50, offset = 0, status = 'open', search = '', searchContracts = [], searchContactIds = [], assignee = null, tagId = null, unread = false
   } = {}) {
     const query = tdb('wa_conversations');
+
+    // "Não lidas": só conversas abertas com mensagem do cliente ainda não vista.
+    if (unread) query.whereNull('closed_at').where('unread_count', '>', 0);
 
     // Uma etiqueta: subconsulta no vínculo, também escopada, e não junção.
     if (tagId) {

@@ -7481,6 +7481,9 @@ export const whatsappAPI = {
   // and does not know which the panel stores. `status` defaults to the open
   // ones: a closed thread is done, and an inbox that shows everything forever
   // stops being a list of what needs answering.
+  /** Quantas conversas abertas têm mensagem não lida (o ícone da lista). */
+  getUnreadCount: () => apiClient.get<{ unread: number }>('/whatsapp/conversations/unread-count'),
+
   listConversations: (params: {
     limit?: number
     offset?: number
@@ -7491,6 +7494,8 @@ export const whatsappAPI = {
     assignee?: 'me' | 'unassigned'
     /** Só as conversas com esta etiqueta. */
     tag?: number
+    /** Só as abertas com mensagem do cliente ainda não vista. */
+    unread?: boolean
   } = {}) => {
     const query = new URLSearchParams()
     if (params.limit) query.set('limit', String(params.limit))
@@ -7498,6 +7503,7 @@ export const whatsappAPI = {
     if (params.search) query.set('search', params.search)
     if (params.status) query.set('status', params.status)
     if (params.assignee) query.set('assignee', params.assignee)
+    if (params.unread) query.set('unread', '1')
     if (params.tag) query.set('tag', String(params.tag))
     const suffix = query.toString()
     return apiClient.get<WhatsAppConversation[]>(`/whatsapp/conversations${suffix ? `?${suffix}` : ''}`)
