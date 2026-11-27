@@ -96,6 +96,7 @@ class WaSendService {
     replyToId = null,
     marketing = false,
     billing = false,
+    essential = false,
     answersMessageId = null
   } = {}) {
     // Defaulting to 'operator' rather than to the caller's intent: a sender
@@ -176,7 +177,10 @@ class WaSendService {
       // Promoção: o envio confere de novo o pedido de parar na hora de sair.
       marketing: promocional,
       // Cobrança: única saída que passa por uma conversa encerrada sem mensagens.
-      billing: billing === true,
+      // `essential`: o que o cliente pediu na hora (código de acesso ao portal,
+      // aviso da própria troca de Wi-Fi) — também passa por conversa encerrada
+      // "sem enviar nada". Mesma coluna da cobrança: "passa pela marca".
+      billing: billing === true || essential === true,
       // A note has no delivery state at all. 'queued' would hand it to the
       // worker, and the one thing a note must never do is reach the customer.
       delivery_status: note ? null : 'queued',

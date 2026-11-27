@@ -62,7 +62,7 @@ class PortalTwoFactorService {
         pushName: null
       });
       const body = translate(DEFAULT_LOCALE, 'whatsapp.portal.otp', { code });
-      await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert' });
+      await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert', essential: true });
     } catch (error) {
       console.warn(`[portal] código 2FA não enfileirado: ${String(error?.code || error?.message).replace(/[\r\n]+/g, ' ').slice(0, 200)}`);
       return { status: 'unavailable' };
