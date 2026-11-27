@@ -2893,6 +2893,7 @@ const hi: Dictionary = {
   'whatsapp.inbox.closed': 'बंद',
   'whatsapp.inbox.closeHint': 'यह संग्रह है, हटाना नहीं। इतिहास बना रहता है, और उनका नया संदेश आते ही यह फिर खुल जाती है।',
   'whatsapp.inbox.filterOpen': 'खुली',
+  'whatsapp.inbox.filterUnread': 'Unread',
   'whatsapp.inbox.filterNoReply': 'बिना जवाब',
   'whatsapp.inbox.filterClosed': 'बंद',
   'whatsapp.inbox.filterAll': 'सभी',

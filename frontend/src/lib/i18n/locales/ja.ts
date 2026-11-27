@@ -2915,6 +2915,7 @@ const ja: Dictionary = {
   'whatsapp.inbox.closed': '完了',
   'whatsapp.inbox.closeHint': '削除ではなく整理です。履歴は残り、新しいメッセージが届けば再び開きます。',
   'whatsapp.inbox.filterOpen': '対応中',
+  'whatsapp.inbox.filterUnread': 'Unread',
   'whatsapp.inbox.filterNoReply': '返信なし',
   'whatsapp.inbox.filterClosed': '完了',
   'whatsapp.inbox.filterAll': 'すべて',

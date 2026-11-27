@@ -2916,6 +2916,7 @@ const ptBR: Dictionary = {
   'whatsapp.inbox.closed': 'Encerrada',
   'whatsapp.inbox.closeHint': 'Arquivada, não apagada. O histórico fica, e uma mensagem nova dele reabre.',
   'whatsapp.inbox.filterOpen': 'Abertas',
+  'whatsapp.inbox.filterUnread': 'Não lidas',
   'whatsapp.inbox.filterNoReply': 'Sem resposta',
   'whatsapp.inbox.filterClosed': 'Encerradas',
   'whatsapp.inbox.filterAll': 'Todas',

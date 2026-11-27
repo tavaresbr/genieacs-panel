@@ -2799,6 +2799,7 @@ const de: Dictionary = {
   'whatsapp.inbox.closed': 'Geschlossen',
   'whatsapp.inbox.closeHint': 'Abgelegt, nicht gelöscht. Der Verlauf bleibt, und eine neue Nachricht öffnet sie wieder.',
   'whatsapp.inbox.filterOpen': 'Offen',
+  'whatsapp.inbox.filterUnread': 'Unread',
   'whatsapp.inbox.filterNoReply': 'Ohne Antwort',
   'whatsapp.inbox.filterClosed': 'Geschlossen',
   'whatsapp.inbox.filterAll': 'Alle',

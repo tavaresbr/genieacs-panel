@@ -2923,6 +2923,7 @@ const ru: Dictionary = {
   'whatsapp.inbox.closed': 'Завершён',
   'whatsapp.inbox.closeHint': 'Это архивирование, а не удаление. История сохраняется, и новое сообщение от абонента откроет диалог снова.',
   'whatsapp.inbox.filterOpen': 'Открытые',
+  'whatsapp.inbox.filterUnread': 'Unread',
   'whatsapp.inbox.filterNoReply': 'Без ответа',
   'whatsapp.inbox.filterClosed': 'Завершённые',
   'whatsapp.inbox.filterAll': 'Все',

@@ -2916,6 +2916,7 @@ const zhCN: Dictionary = {
   'whatsapp.inbox.closed': '已结束',
   'whatsapp.inbox.closeHint': '是归档而不是删除。历史记录会保留，对方再发消息就会重新打开。',
   'whatsapp.inbox.filterOpen': '进行中',
+  'whatsapp.inbox.filterUnread': 'Unread',
   'whatsapp.inbox.filterNoReply': '未回复',
   'whatsapp.inbox.filterClosed': '已结束',
   'whatsapp.inbox.filterAll': '全部',
