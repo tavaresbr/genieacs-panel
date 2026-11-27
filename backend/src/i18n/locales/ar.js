@@ -916,6 +916,7 @@ export default {
   'whatsapp.error.tagNotFound': 'الوسم غير موجود.',
   'whatsapp.error.invalidAssignee': 'اختر شخصًا من الفريق يرد على واتساب.',
   'whatsapp.conversationReopened': 'أُعيد فتح المحادثة',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': 'تعذّر تحديث المحادثة',
   'whatsapp.error.invalidConversationStatus': 'المحادثة إمّا مفتوحة أو منتهية',
   'whatsapp.bot.portalHint': 'لمعرفة كلمة مرور Wi-Fi ولتغيير اسم الشبكة، سجّل الدخول إلى بوابة المشترك: {link}',

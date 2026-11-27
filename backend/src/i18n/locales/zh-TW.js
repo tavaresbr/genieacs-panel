@@ -917,6 +917,7 @@ export default {
   'whatsapp.error.tagNotFound': '找不到標籤。',
   'whatsapp.error.invalidAssignee': '請選擇負責回覆 WhatsApp 的團隊成員。',
   'whatsapp.conversationReopened': '對話已重新開啟',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': '無法更新對話',
   'whatsapp.error.invalidConversationStatus': '對話只能是開啟或結束狀態',
   'whatsapp.bot.portalHint': '如需查看 Wi-Fi 密碼或變更網路名稱，請登入客戶入口網站：{link}',

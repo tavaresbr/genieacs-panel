@@ -721,7 +721,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                   <PartError error={panel.router.error} />
                   {isSafeExternalUrl(panel.sgpUrl) && (
                     <a
-                      className="modern-button-secondary mt-2"
+                      className="modern-button mt-2"
                       href={panel.sgpUrl}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -767,7 +767,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                   <div className="flex flex-wrap gap-2">
                     {isSafeExternalUrl(panel.sgpUrl) && (
                       <a
-                        className="modern-button-secondary"
+                        className="modern-button"
                         href={panel.sgpUrl}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -778,7 +778,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                     )}
                     <Link
                       to={`/devices/detail?id=${encodeURIComponent(panel.router.deviceId)}`}
-                      className="modern-button-secondary"
+                      className="modern-button"
                     >
                       <Icon name="server" size={15} />
                       {t('whatsapp.inbox.openDevice')}
@@ -808,7 +808,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                 {panel.ticketEnabled && (
                   <div className="mt-2">
                     {!ticketOpen ? (
-                      <button type="button" className="modern-button-secondary w-full" disabled={unbound} onClick={() => setTicketOpen(true)}>
+                      <button type="button" className="modern-button w-full" disabled={unbound} onClick={() => setTicketOpen(true)}>
                         <Icon name="chat" size={15} />
                         {t('detail.sgp.ticket')}
                       </button>

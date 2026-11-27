@@ -2,6 +2,7 @@ import AppState from '../models/AppState.js';
 import WaMessage from '../models/WaMessage.js';
 import WaSendService from './waSendService.js';
 import WaDunningService from './waDunningService.js';
+import WaNoContactService from './waNoContactService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import { isPermanentFailure } from './waSendFailure.js';
 import { forEachTenant } from '../config/tenantJobs.js';
@@ -352,6 +353,13 @@ class WaOutboxWorker {
     if (!message) return 'claimed_elsewhere';
 
     try {
+      // Conversa encerrada "sem enviar nada": nada velho sai (fila antiga,
+      // retentativa, "Reenviar falhas"). Só cobrança e o que o atendente
+      // digitou depois. Fica `failed` terminal, sem tentar o provedor.
+      if (!(await WaNoContactService.mayDeliver(message))) {
+        await WaNoContactService.block(message);
+        return 'no_contact';
+      }
       const { externalId, sentAs = null } = await WaSendService.dispatch(message);
 
       // ── Ponto de não-retorno ────────────────────────────────────────────

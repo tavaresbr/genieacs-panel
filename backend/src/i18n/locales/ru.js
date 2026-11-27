@@ -919,6 +919,7 @@ export default {
   'whatsapp.error.tagNotFound': 'Метка не найдена.',
   'whatsapp.error.invalidAssignee': 'Выберите сотрудника, который отвечает в WhatsApp.',
   'whatsapp.conversationReopened': 'Диалог открыт снова',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': 'Не удалось обновить диалог',
   'whatsapp.error.invalidConversationStatus': 'Диалог может быть только открытым или завершённым',
   'whatsapp.bot.portalHint': 'Чтобы узнать пароль Wi-Fi и изменить название сети, войдите в портал абонента: {link}',

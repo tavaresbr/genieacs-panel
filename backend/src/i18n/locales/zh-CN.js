@@ -918,6 +918,7 @@ export default {
   'whatsapp.error.tagNotFound': '未找到标签。',
   'whatsapp.error.invalidAssignee': '请选择负责回复 WhatsApp 的团队成员。',
   'whatsapp.conversationReopened': '会话已重新打开',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': '无法更新该会话',
   'whatsapp.error.invalidConversationStatus': '会话只有进行中或已结束两种状态',
   'whatsapp.bot.portalHint': '如需查看 Wi-Fi 密码或修改网络名称，请登录客户门户：{link}',

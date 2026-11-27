@@ -900,6 +900,7 @@ export default {
   'whatsapp.error.tagNotFound': 'タグが見つかりません。',
   'whatsapp.error.invalidAssignee': 'WhatsAppに対応するチームメンバーを選んでください。',
   'whatsapp.conversationReopened': '会話を再開しました',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': '会話を更新できませんでした',
   'whatsapp.error.invalidConversationStatus': '会話は「対応中」か「完了」のどちらかです',
   'whatsapp.bot.portalHint': 'Wi-Fi のパスワードの確認やネットワーク名の変更は、顧客ポータルにログインしてお手続きください: {link}',

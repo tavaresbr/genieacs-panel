@@ -916,6 +916,7 @@ export default {
   'whatsapp.error.tagNotFound': '태그를 찾을 수 없습니다.',
   'whatsapp.error.invalidAssignee': 'WhatsApp에 응답하는 팀원을 선택하세요.',
   'whatsapp.conversationReopened': '대화를 다시 열었습니다',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': '대화를 업데이트하지 못했습니다',
   'whatsapp.error.invalidConversationStatus': '대화는 열림 또는 종료 상태만 가질 수 있습니다',
   'whatsapp.bot.portalHint': 'Wi-Fi 비밀번호 확인과 네트워크 이름 변경은 고객 포털에 로그인해 이용하십시오: {link}',

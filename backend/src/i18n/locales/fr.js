@@ -711,6 +711,7 @@ export default {
   'whatsapp.error.tagNotFound': 'Étiquette introuvable.',
   'whatsapp.error.invalidAssignee': 'Choisissez une personne de l\'équipe qui répond sur WhatsApp.',
   'whatsapp.conversationReopened': 'Conversation rouverte',
+  'whatsapp.contactAllowed': 'Messages allowed for this customer',
   'whatsapp.conversationStatusFailed': 'La conversation n’a pas pu être mise à jour',
   'whatsapp.error.invalidConversationStatus': 'Une conversation est ouverte ou clôturée',
   'whatsapp.billing.overdueLoaded': '{count} abonné(s) trouvé(s)',

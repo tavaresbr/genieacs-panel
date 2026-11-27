@@ -6227,6 +6227,9 @@ export interface WhatsAppConversation {
   clientName: string | null
   /** Closing now would send the satisfaction survey (detail only). */
   surveyOnClose?: boolean
+  /** Encerrada "sem enviar nada": só cobrança, ou resposta se o cliente escrever. */
+  noContact?: boolean
+  noContactAt?: string | null
   /** A IA entregou esta conversa como venda (interesse registrado). */
   leadAt?: string | null
   /** Como a venda terminou, quando o atendente já disse. */
@@ -7503,13 +7506,18 @@ export const whatsappAPI = {
   // Closing is a filing decision, not a deletion: the thread and its history
   // stay, and an inbound message reopens it — a customer who writes again is
   // not answered by an archive.
-  setConversationStatus: (conversationId: number, status: 'open' | 'closed', options: { survey?: boolean; lead?: SaleResult } = {}) =>
+  setConversationStatus: (conversationId: number, status: 'open' | 'closed', options: { survey?: boolean; lead?: SaleResult; noContact?: boolean } = {}) =>
     apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/status`, {
       status,
       // Só `false` dispensa a pesquisa de satisfação ao encerrar.
       ...(options.survey === false ? { survey: false } : {}),
-      ...(options.lead ? { lead: options.lead } : {})
+      ...(options.lead ? { lead: options.lead } : {}),
+      ...(options.noContact ? { noContact: true } : {})
     }),
+
+  /** "Liberar mensagens": desfaz o "encerrar sem enviar nada" desta conversa. */
+  allowConversationContact: (conversationId: number) =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/allow-contact`, {}),
 
   /** Assumir (o próprio id), transferir para um colega, ou `null` para soltar. */
   assignConversation: (conversationId: number, userId: number | null) =>

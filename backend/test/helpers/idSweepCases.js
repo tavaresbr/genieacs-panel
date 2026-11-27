@@ -820,6 +820,15 @@ export const casos = [
     body: { status: 'closed' },
     tabela: 'wa_conversations'
   },
+  {
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/allow-contact',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/allow-contact`,
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
   // O módulo SGP ao lado da conversa. A conversa é lida escopada ANTES de
   // qualquer consulta ao ERP, então o id do vizinho é 404 e o ERP nem é
   // chamado. Com o id próprio a resposta depende do SGP estar configurado aqui

@@ -1868,6 +1868,21 @@ const WA_ACCOUNT_EMBEDDED_SIGNUP_COLUMNS = [
   ['meta_coexistence_deadline_at', (t) => t.timestamp('meta_coexistence_deadline_at').nullable()]
 ];
 
+/**
+ * "Encerrar sem enviar nada" (0154): `no_contact_at` marca a conversa que o
+ * atendente encerrou dizendo que o cliente não recebe mais mensagem do painel —
+ * só cobrança, ou resposta quando ele mesmo escreve. `billing` marca a saída
+ * que é cobrança (régua e cobrança avulsa): é a única que passa pela marca.
+ */
+const WA_CONVERSATION_NO_CONTACT_COLUMNS = [
+  ['no_contact_at', (t) => t.timestamp('no_contact_at').nullable()],
+  ['no_contact_by', (t) => t.integer('no_contact_by').unsigned().nullable()]
+];
+
+const WA_MESSAGE_BILLING_COLUMNS = [
+  ['billing', (t) => t.boolean('billing').notNullable().defaultTo(false)]
+];
+
 const WA_CLOUD_TABLES = [
   ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
   ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
@@ -8603,6 +8618,22 @@ export const migrations = [
       await db.schema.alterTable('whatsapp_accounts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /** "Encerrar sem enviar nada" — ver `WA_CONVERSATION_NO_CONTACT_COLUMNS`. */
+    id: '0154_wa_no_contact',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations')) || !(await db.schema.hasTable('wa_messages'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_CONVERSATION_NO_CONTACT_COLUMNS)).length === 0
+        && (await missingColumns(db, 'wa_messages', WA_MESSAGE_BILLING_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations')) || !(await db.schema.hasTable('wa_messages'))) return;
+      const conv = await missingColumns(db, 'wa_conversations', WA_CONVERSATION_NO_CONTACT_COLUMNS);
+      if (conv.length) await db.schema.alterTable('wa_conversations', (t) => { for (const add of conv) add(t); });
+      const msg = await missingColumns(db, 'wa_messages', WA_MESSAGE_BILLING_COLUMNS);
+      if (msg.length) await db.schema.alterTable('wa_messages', (t) => { for (const add of msg) add(t); });
     }
   }
 ];

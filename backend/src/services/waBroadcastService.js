@@ -522,6 +522,8 @@ class WaBroadcastService {
         metaTemplate: modelo,
         // Promoção: o envio confere o pedido de parar de novo na hora de sair.
         marketing: promocional,
+        // Cobrança avulsa passa por uma conversa encerrada sem mensagens.
+        billing: broadcast?.kind !== 'general',
         // O anexo da campanha (um só arquivo para todos). O caminho passa de
         // novo pelo confinamento de `normalizeAttachment` dentro do enqueue.
         attachment: broadcast?.attachment_path

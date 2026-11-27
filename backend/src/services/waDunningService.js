@@ -869,7 +869,7 @@ class WaDunningService {
     }
     // 'campaign' e não um valor novo: é o que diz ao teto do bot que esta
     // mensagem não é resposta dele.
-    return WaSendService.enqueue({ conversationId: conversation.id, body, source: 'campaign', metaTemplate });
+    return WaSendService.enqueue({ conversationId: conversation.id, body, source: 'campaign', metaTemplate, billing: true });
   }
 
   static async sentRecently(contract, hours, now) {
