@@ -370,6 +370,24 @@ describe('o motivo da recusa', () => {
     assert.equal(pedidosIa.length, 1, 'passada a pausa, a IA volta');
   });
 
+  it('tempo esgotado: a IA fica quieta por um tempo, em vez de insistir durante a queda', async () => {
+    await limparFio(ASSINANTE);
+    const { default: WaAiClient } = await import('../src/services/waAiClient.js');
+    const { WaError } = await import('../src/services/whatsappConfigService.js');
+    const original = WaAiClient.chat;
+    let chamadas = 0;
+    WaAiClient.chat = async () => { chamadas += 1; throw new WaError('whatsapp.ai.error.timeout', { code: 'ai_timeout', status: 504 }); };
+    try {
+      await receber(ASSINANTE, 'oi');
+      assert.equal(chamadas, 1);
+      await receber(ASSINANTE, 'alguém aí?');
+      assert.equal(chamadas, 1, 'pausada: nenhuma nova chamada');
+    } finally {
+      WaAiClient.chat = original;
+      WaAiService.reiniciarPausa();
+    }
+  });
+
   it('a falha no atendimento fica com o motivo para a tela', async () => {
     await limparFio(ASSINANTE);
     recusa = { status: 401, body: { error: { code: '1000', message: 'Authentication failed' } } };

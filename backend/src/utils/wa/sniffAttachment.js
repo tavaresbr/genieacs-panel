@@ -93,4 +93,9 @@ export function matchesDeclaredType(buffer, type) {
   return rule ? rule(buffer) : false;
 }
 
-export default { matchesDeclaredType, ftypBrand, HEIC_BRANDS, TEXT_SNIFF_BYTES };
+/** Se o tipo tem regra de reconhecimento (sem regra, não dá para desmentir o remetente). */
+export function hasRule(type) {
+  return Object.hasOwn(RULES, type);
+}
+
+export default { hasRule, matchesDeclaredType, ftypBrand, HEIC_BRANDS, TEXT_SNIFF_BYTES };

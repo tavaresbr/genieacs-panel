@@ -443,7 +443,7 @@ class WaAiService {
     } catch (error) {
       const code = error?.code && String(error.code).startsWith('ai_') ? error.code : 'ai_failed';
       console.warn(`[wa] IA: conversa ${conversation.id}: ${code}${code === 'ai_failed' ? ` (${JSON.stringify(logSafe(error?.message, 200))})` : ''}`);
-      if (code === 'ai_unauthorized' || code === 'ai_no_balance') iaPausadaAte.set(`${conversation?.tenant_id ?? ''}:${ai.apiKey}`, Date.now() + IA_PAUSADA_MS);
+      if (['ai_unauthorized', 'ai_no_balance', 'ai_timeout', 'ai_unreachable'].includes(code)) iaPausadaAte.set(`${conversation?.tenant_id ?? ''}:${ai.apiKey}`, Date.now() + IA_PAUSADA_MS);
       await WaBotConfigService.recordAiError(code, error?.details, { automatico: true });
       return null;
     }
