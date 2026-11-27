@@ -7,6 +7,14 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.69.3] - 2026-11-27
+
+### Maintenance
+
+- Código 2FA e aviso de Wi-Fi do portal passam por conversa sem contato; número de alertas não é marcado (`774b028f`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/b457f6918de6...9bd91f971f7b)
+
 ## [1.69.2] - 2026-11-27
 
 ### Maintenance

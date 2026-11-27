@@ -1,27 +1,15 @@
 {
-  "version": "1.69.2",
-  "build": 1942,
-  "sourceCommit": "85a8ab3c8e3d",
+  "version": "1.69.3",
+  "build": 1945,
+  "sourceCommit": "9bd91f971f7b",
   "releasedAt": "2026-11-27",
-  "basedOnTag": "v1.69.1",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/f20355715509...85a8ab3c8e3d",
+  "basedOnTag": "v1.69.2",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/b457f6918de6...9bd91f971f7b",
   "changes": [
     {
-      "shortHash": "19e72028",
-      "date": "2026-11-26",
-      "title": "\"Encerrar sem enviar nada\" — cliente só recebe cobrança ou resposta se escrever",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "9e9158e1",
-      "date": "2026-11-26",
-      "title": "Rota allow-contact entra na varredura de ids",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "71e63122",
-      "date": "2026-11-26",
-      "title": "Botões do Módulo SGP (Abrir no SGP, equipamento, chamado) em verde",
+      "shortHash": "774b028f",
+      "date": "2026-11-27",
+      "title": "Código 2FA e aviso de Wi-Fi do portal passam por conversa sem contato; número de alertas não é marcado",
       "category": "Maintenance"
     }
   ]
