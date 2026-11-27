@@ -115,6 +115,9 @@ roda em **outro** domínio (e, na SaaS, em subdomínios). Portanto:
 
 ### Fase 4 — Lacunas do Evolution (validar antes de prometer)
 
+> **Resultado da leitura do código do Evolution e o desenho da solução:** `whatsapp-coexistencia-ponte-plan.md`
+> (o Evolution ignora `smb_message_echoes`, `history`, `smb_app_state_sync` e `account_update`; a ponte do painel os trata).
+
 - Testar numa conta real se o `/webhook/meta` do Evolution repassa `smb_message_echoes` e `history`.
   Se **não**, escolher entre: (a) correção/versão do Evolution; (b) o painel assinar esses campos
   direto da Meta (`/webhook/meta` próprio do painel só para eco/histórico) e gravar em `wa_messages`
