@@ -625,6 +625,7 @@ export default function Landing() {
             <span>© {new Date().getFullYear()} {info?.legalName || produto}. {copy.footer.rights}</span>
             <span className="flex items-center gap-4">
               <Link to="/privacidade" className="inline-flex min-h-10 items-center hover:text-slate-300 sm:min-h-0">{copy.footer.privacy}</Link>
+              <a href="/termos-de-servico.html" className="inline-flex min-h-10 items-center hover:text-slate-300 sm:min-h-0">{copy.footer.terms}</a>
               <Link to="/login" className="inline-flex min-h-10 items-center hover:text-slate-300 sm:min-h-0">{copy.footer.console}</Link>
             </span>
           </div>
