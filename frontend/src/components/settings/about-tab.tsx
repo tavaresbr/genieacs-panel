@@ -131,6 +131,11 @@ export function AboutTab({ appName }: { appName: string }) {
               /privacidade
             </Link>
           </Linha>
+          <Linha rotulo={t('login.termsLink')}>
+            <a href="/termos-de-servico.html" target="_blank" rel="noopener" className="text-primary underline hover:no-underline">
+              /termos-de-servico.html
+            </a>
+          </Linha>
           <Linha rotulo={t('settings.about.dataDeletion')}>
             {/* Rota do servidor (não do app de tela): <a> comum, e abre sempre — é o endereço que a Meta valida. */}
             <a href={DATA_DELETION_PATH} target="_blank" rel="noopener" className="text-primary underline hover:no-underline">
