@@ -139,4 +139,4 @@ conta, com "registrar de novo" na tela.
 | `CANCEL` com `current_step` | o provedor fechou o popup; a etapa diz onde |
 | `smb_app_data` responde erro de "já sincronizado" | cada `sync_type` só vale uma vez; refazer exige desconectar e repetir o cadastro |
 | número desconectou sozinho | passaram 24 h sem sincronizar, ou o provedor trocou de aparelho (`ACCOUNT_OFFBOARDED`; a reconexão é automática no novo aparelho, `ACCOUNT_RECONNECTED`) |
-| mensagens do celular não aparecem no painel | o Evolution não processa `smb_message_echoes` (limitação a validar) |
+| mensagens do celular não aparecem no painel | o Evolution não processa `smb_message_echoes` (confirmado pela leitura do código dele); a solução desenhada é a ponte do painel — ver `whatsapp-coexistencia-ponte-plan.md` |
