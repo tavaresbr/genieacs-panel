@@ -44,7 +44,7 @@ export interface LandingCopy {
     privacyNotice: string; privacyLink: string
   }
   footer: {
-    rights: string; console: string; tagline: string; product: string; contact: string; company: string; privacy: string
+    rights: string; console: string; tagline: string; product: string; contact: string; company: string; privacy: string; terms: string
     taxId: string; whatsapp: string; email: string
   }
 }
@@ -165,6 +165,7 @@ const ptBR: LandingCopy = {
   footer: {
     rights: 'Todos os direitos reservados.',
     privacy: 'Política de privacidade',
+    terms: 'Termos de serviço',
     console: 'Console da plataforma',
     tagline: 'Gestão TR-069 para provedores de internet: ACS, painel, portal do assinante e WhatsApp.',
     product: 'Produto',
@@ -292,6 +293,7 @@ const en: LandingCopy = {
   footer: {
     rights: 'All rights reserved.',
     privacy: 'Privacy policy',
+    terms: 'Terms of service',
     console: 'Platform console',
     tagline: 'TR-069 management for internet providers: ACS, panel, subscriber portal and WhatsApp.',
     product: 'Product',
