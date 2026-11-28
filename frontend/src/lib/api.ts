@@ -5514,6 +5514,9 @@ export interface WhatsAppAccount {
   metaSyncState?: 'pending' | 'ok' | 'error' | null
   metaSyncError?: string | null
   metaCoexistenceDeadlineAt?: string | null
+  /** O callback do número aponta para o painel (a ponte de eventos da Meta), e não para o Evolution. */
+  metaBridge?: boolean
+  metaBridgeAt?: string | null
   baseUrl: string
   status: WhatsAppStatus
   /**
@@ -6130,6 +6133,17 @@ export interface WhatsAppHealth {
    * decisão.
    */
   retention: { mediaDays: number; messageDays: number }
+  /**
+   * A ponte de eventos da Meta, por número que a liga: quantas entregas o Evolution
+   * aceitou ou recusou nas últimas 24 h e quando foi a última. `enabled: 0` é o normal.
+   */
+  metaBridge?: {
+    enabled: number
+    ok24h: number
+    failed24h: number
+    lastEventAt: string | null
+    accounts: { id: number; lastEventAt: string | null; ok: number; failed: number }[]
+  }
   /**
    * A metade que faltava de "nunca chegou nada".
    *

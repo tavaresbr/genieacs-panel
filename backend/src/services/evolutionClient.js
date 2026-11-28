@@ -143,8 +143,10 @@ export class EvolutionClient {
    * diante; e o teto de corpo agora é aplicado pelo transporte, antes de o
    * corpo inteiro estar na memória.
    */
-  async open(path, { method, headers, body, maxBytes }) {
-    const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  async open(path, { method, headers, body, maxBytes, timeoutMs }) {
+    // `timeoutMs` é para quem NÃO pode esperar quinze segundos: a ponte da Meta
+    // encaminha uma entrega que a Meta reenvia se demorarmos.
+    const signal = AbortSignal.timeout(timeoutMs ?? REQUEST_TIMEOUT_MS);
     const url = new URL(`${this.baseUrl}${path}`);
     const hostname = bareHostname(url.hostname);
     const addresses = await PinnedTransport.vetTarget(hostname, {

@@ -71,6 +71,7 @@ export const SEM_DADO_DE_ASSINANTE = Object.freeze({
   tenant_invites: 'convites da equipe do provedor',
   provisioning_profiles: 'perfis de provisionamento',
   whatsapp_accounts: 'instâncias de WhatsApp do provedor',
+  wa_meta_events: 'metadados das entregas que a ponte da Meta encaminhou ao Evolution (campos, tamanho, resultado); o corpo, com texto e telefone, nunca é guardado',
   wa_templates: 'modelos de mensagem',
   wa_ai_usage: 'contadores de uso da IA por dia e tarefa (sem texto, sem assinante)',
   messenger_pages: 'as Páginas do Facebook que o provedor conectou (token cifrado), nenhum assinante — a conversa sai em messenger_conversations',

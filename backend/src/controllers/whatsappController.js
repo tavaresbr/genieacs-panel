@@ -358,6 +358,32 @@ class WhatsAppController {
     }
   }
 
+  /**
+   * Liga ou desliga a ponte de eventos da Meta num número oficial (registra o
+   * callback na Meta apontando para o painel, ou de volta para o Evolution).
+   * `{ "enabled": true|false }`, exatamente um booleano.
+   */
+  static async setMetaBridge(req, res) {
+    try {
+      const enabled = req.body?.enabled;
+      if (typeof enabled !== 'boolean') {
+        throw new WaError('whatsapp.error.metaBridgeInvalid', { code: 'meta_bridge_invalid', status: 400 });
+      }
+      const { account } = await MetaWebhookService.setBridge(req.params?.id, enabled);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_ACCOUNT_CHANGED,
+        subjectType: 'wa_account',
+        subjectId: String(req.params?.id),
+        detail: { op: 'meta_bridge', enabled }
+      });
+      return res.json(createResponse(req.t('whatsapp.metaBridge.updated'), {
+        account: WhatsAppConfigService.publicAccount(account)
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
   /** Pede de novo a sincronização da coexistência (só o que a Meta ainda não aceitou). */
   static async retryCoexistenceSync(req, res) {
     try {

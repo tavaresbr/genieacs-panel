@@ -4193,6 +4193,47 @@ const telegramNoticesTable = (db) => (t) => {
 const TELEGRAM_NOTICE_TABLES = [['telegram_notices', telegramNoticesTable]];
 
 /**
+ * A ponte de eventos da Meta (0155) — ver `services/metaBridgeService.js`.
+ *
+ * `wa_meta_events` é UMA linha por entrega que a ponte encaminhou ao Evolution:
+ * quando chegou, que campos trazia, quanto pesava, e se o Evolution aceitou. Só
+ * METADADOS: o corpo da entrega (texto de mensagem, telefone) não é guardado, e é
+ * isso que a deixa fora do dado de assinante. É a única observabilidade da ponte
+ * — sem ela, "a Meta parou de chamar" e "o Evolution parou de responder" são o
+ * mesmo silêncio.
+ *
+ * `meta_bridge` na conta liga a ponte POR NÚMERO: só o número cujo callback foi
+ * registrado na Meta apontando para o painel passa por ela.
+ */
+const waMetaEventsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('account_id').unsigned().nullable()
+    .references('id').inTable('whatsapp_accounts').onDelete('SET NULL');
+  // Os `field` das mudanças da entrega, separados por vírgula (`messages,statuses`).
+  t.string('fields', 200).notNullable().defaultTo('');
+  t.integer('changes').notNullable().defaultTo(0);
+  t.integer('bytes').notNullable().defaultTo(0);
+  // ok | failed
+  t.string('forward_status', 16).notNullable();
+  t.integer('forward_http').nullable();
+  t.integer('forward_ms').nullable();
+  // Um motivo curto e fixo (`timeout`, `unreachable`, `http_502`), nunca o texto do servidor.
+  t.string('forward_error', 64).nullable();
+  t.timestamp('received_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'received_at'], 'wa_meta_events_recent_idx');
+  t.index(['account_id', 'received_at'], 'wa_meta_events_account_idx');
+};
+
+const WA_META_EVENT_TABLES = [['wa_meta_events', waMetaEventsTable]];
+
+const WA_ACCOUNT_BRIDGE_COLUMNS = [
+  ['meta_bridge', (t) => t.boolean('meta_bridge').notNullable().defaultTo(false)],
+  ['meta_bridge_at', (t) => t.timestamp('meta_bridge_at').nullable()]
+];
+
+/**
  * As respostas automáticas do Telegram dos clientes (0152): `auto_reply` liga o
  * bot que responde fatura, conexão e menu (DESLIGADO por padrão: responder o
  * cliente por conta própria é decisão do provedor), e `bot_paused_until` cala o
@@ -4363,7 +4404,8 @@ export const SCHEMA_TABLES = [
   ...MESSENGER_TABLES,
   ...MESSENGER_LINK_TOKEN_TABLES,
   ...TELEGRAM_CHAT_TABLES,
-  ...TELEGRAM_NOTICE_TABLES
+  ...TELEGRAM_NOTICE_TABLES,
+  ...WA_META_EVENT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -8634,6 +8676,28 @@ export const migrations = [
       if (conv.length) await db.schema.alterTable('wa_conversations', (t) => { for (const add of conv) add(t); });
       const msg = await missingColumns(db, 'wa_messages', WA_MESSAGE_BILLING_COLUMNS);
       if (msg.length) await db.schema.alterTable('wa_messages', (t) => { for (const add of msg) add(t); });
+    }
+  },
+  {
+    /** A ponte de eventos da Meta — ver `waMetaEventsTable` e `WA_ACCOUNT_BRIDGE_COLUMNS`. */
+    id: '0155_wa_meta_bridge',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      if (!(await db.schema.hasTable('wa_meta_events'))) return false;
+      return (await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_BRIDGE_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const missing = await missingColumns(db, 'whatsapp_accounts', WA_ACCOUNT_BRIDGE_COLUMNS);
+      if (missing.length) {
+        await db.schema.alterTable('whatsapp_accounts', (t) => {
+          for (const add of missing) add(t);
+        });
+      }
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [name, builder] of WA_META_EVENT_TABLES) {
+        await createTableIfMissing(db, name, builder(db));
+      }
     }
   }
 ];

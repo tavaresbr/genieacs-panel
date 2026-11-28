@@ -668,6 +668,19 @@ export const waWebhookLimiter = limiter({
 });
 
 /**
+ * A ponte de eventos da Meta: pública, e a Meta chama de muitos endereços, em
+ * rajada (o histórico da coexistência vem em pedaços). A assinatura é a
+ * autenticação — este teto só segura quem finge ser a Meta —, então é folgado e
+ * por endereço de origem. Uma entrega recusada por assinatura também conta aqui.
+ */
+export const metaWebhookLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 3000,
+  keyGenerator: ipKey,
+  message: { success: false, error: 'too many webhook deliveries' }
+});
+
+/**
  * O webhook do bot do Telegram: público, sem sessão. A chave é o endereço de
  * origem (os servidores do Telegram), com teto folgado para uma sala movimentada
  * e curto o bastante para segurar quem finge ser o Telegram.

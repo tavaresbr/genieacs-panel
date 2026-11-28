@@ -1,5 +1,6 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import WaMetaEvent from '../models/WaMetaEvent.js';
 import { tdb } from '../config/database.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { DATA_DIR } from '../config/paths.js';
@@ -161,7 +162,8 @@ class WaHealthService {
     const media = await this.mediaUsage();
     const webhook = await this.webhook();
     const retention = await this.retention();
-    return { accounts, outbox, inbox, lastInboundAt, lastOutboundAt, media, retention, webhook };
+    const metaBridge = await this.metaBridge();
+    return { accounts, outbox, inbox, lastInboundAt, lastOutboundAt, media, retention, webhook, metaBridge };
   }
 
   /**
@@ -267,6 +269,32 @@ class WaHealthService {
       if (quando && (!refusedAt || quando > refusedAt)) refusedAt = quando;
     }
     return { broken, unchecked, unverifiable, unreachable, refusedAt };
+  }
+
+  /**
+   * A ponte de eventos da Meta (`metaBridgeService.js`), por número que a liga.
+   *
+   * Responde o que o "nunca chegou nada" do webhook do Evolution não consegue
+   * quando a Meta fala com o painel: ELA chamou? e o Evolution aceitou? Sem número
+   * ligado devolve `enabled: 0` e zeros. Só metadados — as contagens das últimas
+   * 24 horas e quando foi a última entrega, por número e no total.
+   */
+  static async metaBridge() {
+    const rows = await tdb('whatsapp_accounts').where({ meta_bridge: true }).select('id').orderBy('id');
+    if (!rows.length) return { enabled: 0, ok24h: 0, failed24h: 0, lastEventAt: null, accounts: [] };
+    const summary = await WaMetaEvent.summarize({ hours: 24 });
+    const accounts = rows.map(({ id }) => {
+      const mine = summary.get(id) ?? { lastEventAt: null, ok: 0, failed: 0 };
+      return { id, lastEventAt: asIso(mine.lastEventAt), ok: mine.ok, failed: mine.failed };
+    });
+    const lastEventAt = accounts.map((a) => a.lastEventAt).filter(Boolean).sort().pop() ?? null;
+    return {
+      enabled: accounts.length,
+      ok24h: accounts.reduce((sum, a) => sum + a.ok, 0),
+      failed24h: accounts.reduce((sum, a) => sum + a.failed, 0),
+      lastEventAt,
+      accounts
+    };
   }
 
   /**

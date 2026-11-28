@@ -528,6 +528,18 @@ export const casos = [
     controleSoNaoAchou: true
   },
   {
+    // Ligar/desligar a ponte de eventos da Meta. A conta é carregada antes de
+    // qualquer chamada à Meta, então o id do vizinho dá 404; no controle, o número
+    // semeado (por QR) dá 409 `not_cloud` — achado, recusado, sem falar com a Meta.
+    chave: 'account',
+    label: 'POST /api/whatsapp/accounts/:id/meta-bridge',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/accounts/${id}/meta-bridge`,
+    body: { enabled: false },
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
     // "Tentar de novo" da sincronização da coexistência. A conta é carregada
     // antes de qualquer chamada à Meta, então o id do vizinho dá 404; no
     // controle, o número semeado (por QR) dá 409 `not_coexistence` — achado,
