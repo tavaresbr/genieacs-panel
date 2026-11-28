@@ -7,6 +7,18 @@ Releases are cut automatically: once CI passes on `main`, the Release workflow
 (`scripts/auto-release.sh`) adds the next section here, bumps the version, tags
 the release commit and publishes it on the Releases page.
 
+## [1.70.0] - 2026-11-28
+
+### New
+
+- Link dos Termos de Serviço na aba Sobre e no cadastro (`42fd112f`)
+
+### Maintenance
+
+- Desenho da ponte de eventos da Meta para a coexistência (`e270c48c`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/de3cc1f2a690...e1f24f52542d)
+
 ## [1.69.4] - 2026-11-27
 
 ### Maintenance
