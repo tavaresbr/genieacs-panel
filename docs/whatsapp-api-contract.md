@@ -296,6 +296,39 @@ rotas pedem `whatsapp.config` e têm teto próprio (12/min por usuário).
   app volta ao navegador.
 - `POST /api/whatsapp/accounts/:id/coexistence-sync` — "tentar de novo".
 
+**Ponte de eventos da Meta (fase B1, modo sombra).** Para a coexistência, o painel pode
+ficar no meio do caminho entre a Meta e o Evolution (desenho e fases:
+`docs/whatsapp-coexistencia-ponte-plan.md`). Na B1 ela **não trata evento nenhum**: entrega
+ao Evolution do número o corpo que a Meta mandou, byte a byte e com a assinatura original, e
+mede. Ligar a ponte, portanto, não muda nada do que o painel grava.
+
+- **Ambiente** (plataforma): `META_WA_BRIDGE=1`, `META_APP_SECRET` (confere a assinatura),
+  `META_WA_VERIFY_TOKEN` (o da ponte; **não** é o do Evolution) e `PUBLIC_BASE_URL` em https
+  (ou `META_WA_BRIDGE_URL`). Falta qualquer um e a rota responde **404**.
+  `META_WA_BRIDGE_BODY_LIMIT` (2mb) e `META_WA_BRIDGE_FORWARD_TIMEOUT_MS` (5000, de 100 a 15000).
+  O nginx precisa aceitar o mesmo corpo (`deploy/proxy/nginx-saas.conf.example`).
+- `GET /api/meta-webhook`: a verificação do callback (`hub.verify_token`); devolve só dígitos do `hub.challenge`.
+- `POST /api/meta-webhook`: público; `X-Hub-Signature-256` do corpo **bruto** é a credencial (sem ela, 401 e
+  nada é lido). O provedor sai do `phone_number_id` de cada mudança (ou da WABA, em `account_update`).
+  Cada mudança vai ao `/webhook/meta` do Evolution **da conta dela**; o corpo original segue inteiro quando um
+  destino leva tudo, e uma entrega que se parte entre destinos é remontada e **assinada de novo** com o
+  segredo do app. Resposta: `200` (todos aceitaram, ou nada a fazer: `skipped: invalid_json|no_changes|unknown_account`),
+  `500` se algum Evolution recusou (5xx), não respondeu no prazo ou não pôde ser usado — **a Meta reenvia**, e a
+  duplicata que isso cause é absorvida pelo `external_id` único das mensagens. Número que o painel não conhece
+  **não** é encaminhado (não há Evolution a quem entregar) e responde 200, porque 4xx/5xx a cada entrega faria a
+  Meta desativar o callback de todos.
+- `POST /api/whatsapp/accounts/:id/meta-bridge` com `{ "enabled": true|false }` (`whatsapp.config`): registra na Meta o
+  callback **do painel** (e o token da ponte) ou o devolve ao Evolution (com o `cloudVerifyToken` dele). Só número do
+  cadastro guiado (`meta_onboarding = 'embedded'`): é o app da plataforma que tem o segredo que confere a assinatura.
+  Códigos: `meta_bridge_invalid` (400, o corpo tem de ser exatamente um booleano), `not_cloud`,
+  `meta_bridge_unconfigured` e `meta_bridge_requires_embedded` (409), `meta_webhook_failed` (502: a Meta recusou, e o
+  número **não** muda de lado). `meta_bridge` na conta diz onde o callback está e é regravado a cada registro bem-sucedido,
+  então "registrar de novo" respeita a escolha.
+- **Medida:** `wa_meta_events` (uma linha por entrega encaminhada: quando, `fields`, `changes`, `bytes`, resultado e um
+  motivo curto — `timeout`, `unreachable`, `http_502`…). **Nunca o corpo** (texto e telefone ficam de fora); apagada
+  com 14 dias. `GET /api/whatsapp/health` ganha `metaBridge: { enabled, ok24h, failed24h, lastEventAt, accounts[] }`
+  (`enabled: 0` e zeros sem número ligado). `publicAccount` ganha `metaBridge` e `metaBridgeAt`.
+
 **Coexistência.** Depois de criar o número, o painel pede à Meta
 `POST /{phone}/smb_app_data` com `sync_type` `smb_app_state_sync` e depois
 `history`, **uma vez cada**: o `request_id` de cada um é gravado
@@ -1710,8 +1743,14 @@ reclamando.
   lastInboundAt: string | null
   lastOutboundAt: string | null
   media: { files, bytes, oldestAt }
+  retention: { mediaDays, messageDays }
+  webhook: { broken, unchecked, unverifiable, unreachable, refusedAt }
+  metaBridge: { enabled, ok24h, failed24h, lastEventAt, accounts: [{ id, lastEventAt, ok, failed }] }
 }
 ```
+
+`metaBridge` mede a ponte de eventos da Meta (ver acima): quantas entregas o Evolution aceitou ou recusou nas últimas
+24 horas, por número que a liga.
 
 `oldestQueuedAt` é o número que importa: uma fila que só cresce, com a mais
 antiga de ontem, é o painel calado sem ninguém saber. `lastInboundAt` é o par

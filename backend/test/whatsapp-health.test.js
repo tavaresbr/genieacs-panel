@@ -718,8 +718,9 @@ describe('the route', () => {
 
     const data = body.data;
     assert.deepEqual(Object.keys(data).sort(), [
-      'accounts', 'inbox', 'lastInboundAt', 'lastOutboundAt', 'media', 'outbox', 'retention', 'webhook'
+      'accounts', 'inbox', 'lastInboundAt', 'lastOutboundAt', 'media', 'metaBridge', 'outbox', 'retention', 'webhook'
     ]);
+    assert.deepEqual(Object.keys(data.metaBridge).sort(), ['accounts', 'enabled', 'failed24h', 'lastEventAt', 'ok24h']);
     assert.deepEqual(Object.keys(data.accounts).sort(), ['connected', 'disconnected', 'total']);
     assert.deepEqual(Object.keys(data.outbox).sort(), ['failed24h', 'oldestQueuedAt', 'queued', 'retrying', 'sending']);
     assert.deepEqual(Object.keys(data.inbox).sort(), ['openConversations', 'unread']);

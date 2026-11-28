@@ -1,6 +1,6 @@
 # Plano: a ponte de eventos da Meta (coexistência com mensagens do celular)
 
-Status: **desenho**, nada implementado. Continua `whatsapp-oficial-embedded-signup-plan.md` (Fase 4)
+Status: **B1 (modo sombra) implementada**; B0, B2 a B5 pendentes. Continua `whatsapp-oficial-embedded-signup-plan.md` (Fase 4)
 e `whatsapp-coexistencia.md`. Escrito a partir do código em `main` (v1.69.4).
 
 ## O problema, com a evidência
@@ -205,6 +205,24 @@ Cada fase é um PR independente e reversível. B1 sozinha já entrega as métric
 | Identificador do cliente que não é telefone | o tradutor pula com motivo; nunca grava como telefone |
 | Prazo da Meta no encaminhamento | prazo curto de 5 s e 500 para reentrega, em vez de segurar a conexão |
 | Número `manual` sem o recurso | declarado na tela e na documentação; o cadastro guiado é o caminho |
+
+## Como ficou a B1 (e o que mudou em relação ao desenho)
+
+Implementada em modo sombra: rota, assinatura, resolução do provedor, encaminhamento e medida. Contrato e ambiente em
+`whatsapp-api-contract.md` (seção "Ponte de eventos da Meta"). Desvios do que está acima, e o porquê:
+
+- **Número desconhecido não é encaminhado** (D5 dizia que sim). Sem conta no painel não há Evolution conhecido a quem
+  entregar, e o único caso real é o de uma conta apagada cujo callback ainda aponta para a ponte; responde 200 e registra
+  `unknown_account`. Responder 4xx/5xx a cada uma dessas entregas faria a Meta desativar o callback de todos.
+- **`wa_meta_events` guarda só metadados** (D4/D12 previam o corpo): na B1 nada é tratado localmente, então guardar texto e
+  telefone seria dado de assinante sem finalidade. O corpo só passa a ser guardado quando a B2 precisar tratar uma mudança de
+  forma durável — e aí entram retenção e inventário LGPD.
+- **Sem alerta de falhas seguidas ainda.** A medida existe (`metaBridge` na saúde) e o alerta técnico fica para a B2, que é
+  quando a ponte passa a carregar coisa que o Evolution não tratava.
+- **Sem tela ainda.** Liga-se por `POST /accounts/:id/meta-bridge` (o botão e o selo "enviada pelo celular" chegam com a B2).
+- **Pré-requisito para ligar num número:** `META_WA_BRIDGE=1`, o app da plataforma (`META_APP_SECRET`), `META_WA_VERIFY_TOKEN`,
+  o nginx com o `location = /api/meta-webhook` e o número vindo do cadastro guiado. **Reverter:** `enabled: false` no número
+  (devolve o callback ao Evolution); `META_WA_BRIDGE=0` esconde a rota (404) e o painel volta a registrar sempre para o Evolution.
 
 ## Decisões que precisam de você
 

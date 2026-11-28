@@ -3,6 +3,7 @@ import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import {
   GRAPH_ERROR_LIMIT, META_GRAPH_VERSION, META_ID, graphRefusal, graphRequest, setMetaGraphFetcher
 } from './metaGraphClient.js';
+import { bridgeCallbackUrl, bridgeConfigured, bridgeVerifyToken } from '../utils/wa/metaBridgeConfig.js';
 
 /**
  * O webhook de um número oficial registrado pelo próprio painel na Meta.
@@ -106,10 +107,21 @@ class MetaWebhookService {
    * quem chama é a criação e a troca de token, e nenhuma das duas pode ser
    * desfeita porque a Meta recusou o webhook.
    *
+   * PARA ONDE a Meta chama é decidido aqui: para o `/webhook/meta` do Evolution
+   * (o padrão, e o que todo número sempre teve) ou, com a ponte ligada no
+   * número, para o painel (`metaBridgeService.js`). `meta_bridge` na linha diz
+   * onde o callback ESTÁ — é regravado a cada registro bem-sucedido, então "registrar
+   * de novo" nunca desfaz a escolha e uma falha da Meta nunca a muda.
+   *
    * @param {object} account a linha de `whatsapp_accounts`
    * @param {string} [metaToken] o token da Meta já em mãos; sem ele, o cifrado da linha
+   * @param {{ bridge?: boolean }} [options] `bridge` força o destino; sem ele vale o da linha
    */
-  static async register(account, metaToken) {
+  static async register(account, metaToken, { bridge } = {}) {
+    // A ponte só vale com tudo no lugar e para número do cadastro guiado (o app da
+    // plataforma é o que tem o segredo que confere a assinatura). Fora disso, Evolution.
+    const wantsBridge = bridge ?? Boolean(account.meta_bridge);
+    const useBridge = wantsBridge && bridgeConfigured() && account.meta_onboarding === 'embedded';
     let result;
     try {
       const config = await WhatsAppConfigService.getConfig();
@@ -118,8 +130,8 @@ class MetaWebhookService {
         metaToken: metaToken || WhatsAppConfigService.decryptInstanceToken(account),
         // A instância mora em `account.base_url`: é o `/webhook/meta` DELE que
         // a Meta tem de chamar, salvo URL publicada na configuração.
-        callbackUrl: WhatsAppConfigService.cloudCallbackUrl(config, account.base_url),
-        verifyToken: config.cloudVerifyToken || ''
+        callbackUrl: useBridge ? bridgeCallbackUrl() : WhatsAppConfigService.cloudCallbackUrl(config, account.base_url),
+        verifyToken: useBridge ? bridgeVerifyToken() : (config.cloudVerifyToken || '')
       });
     } catch {
       result = { ok: false, error: 'meta_webhook_failed' };
@@ -129,12 +141,46 @@ class MetaWebhookService {
       updated = await WhatsAppAccount.update(account.id, {
         meta_webhook_status: result.ok ? 'ok' : 'error',
         meta_webhook_error: result.ok ? null : String(result.error).slice(0, ERROR_LIMIT),
-        meta_webhook_at: new Date()
+        meta_webhook_at: new Date(),
+        ...(result.ok && Boolean(account.meta_bridge) !== useBridge
+          ? { meta_bridge: useBridge, meta_bridge_at: new Date() }
+          : {})
       });
     } catch {
       // A linha fica como estava; o resultado ainda volta para quem chamou.
     }
-    return { ...result, account: updated };
+    return { ...result, account: updated, bridge: useBridge };
+  }
+
+  /**
+   * Liga ou desliga a ponte de eventos num número: registra o callback na Meta
+   * apontando para o painel (ou de volta para o Evolution). Reverter é o mesmo
+   * gesto ao contrário. 404 de outro provedor, 409 de número por QR, sem a ponte
+   * configurada ou sem ser do cadastro guiado.
+   */
+  static async setBridge(id, enabled) {
+    const { default: EvolutionInstanceService } = await import('./evolutionInstanceService.js');
+    const account = await EvolutionInstanceService.loadAccount(id);
+    if (!WhatsAppAccount.isCloud(account)) {
+      throw new WaError('whatsapp.error.notCloud', { code: 'not_cloud', status: 409 });
+    }
+    if (enabled) {
+      if (!bridgeConfigured()) {
+        throw new WaError('whatsapp.error.metaBridgeUnconfigured', { code: 'meta_bridge_unconfigured', status: 409 });
+      }
+      if (account.meta_onboarding !== 'embedded') {
+        throw new WaError('whatsapp.error.metaBridgeRequiresEmbedded', { code: 'meta_bridge_requires_embedded', status: 409 });
+      }
+    }
+    const result = await this.register(account, undefined, { bridge: enabled });
+    if (!result.ok) {
+      throw new WaError('whatsapp.metaWebhook.failed', {
+        code: 'meta_webhook_failed',
+        status: 502,
+        vars: { reason: result.error }
+      });
+    }
+    return { account: result.account };
   }
 
   /** "Registrar de novo", pela tela. 404 de outro provedor, 409 de número por QR. */

@@ -50,6 +50,8 @@ router.post('/accounts', authenticateToken, requirePermission('whatsapp.config')
 // painel falar com a Meta e gasta um `code` que vale 30 segundos.
 router.post('/accounts/embedded-signup/start', authenticateToken, requirePermission('whatsapp.config'), whatsappSignupLimiter, WhatsAppController.startEmbeddedSignup);
 router.post('/accounts/embedded-signup/complete', authenticateToken, requirePermission('whatsapp.config'), whatsappSignupLimiter, WhatsAppController.completeEmbeddedSignup);
+// A ponte de eventos da Meta, por número: muda para onde a Meta chama (painel ou Evolution).
+router.post('/accounts/:id/meta-bridge', authenticateToken, requirePermission('whatsapp.config'), whatsappSignupLimiter, WhatsAppController.setMetaBridge);
 router.post('/accounts/:id/coexistence-sync', authenticateToken, requirePermission('whatsapp.config'), whatsappSignupLimiter, WhatsAppController.retryCoexistenceSync);
 
 // Declared before the `:id` routes so the matcher can never read

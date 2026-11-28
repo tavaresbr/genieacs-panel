@@ -75,6 +75,9 @@ import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import messengerWebhookRoutes from './routes/messengerWebhook.js';
 import messengerRoutes from './routes/messenger.js';
 import { MESSENGER_WEBHOOK_PATH } from './config/messengerWebhookPath.js';
+import { META_WEBHOOK_PATH } from './config/metaWebhookPath.js';
+import { bridgeBodyLimit } from './utils/wa/metaBridgeConfig.js';
+import metaWebhookRoutes from './routes/metaWebhook.js';
 import { TELEGRAM_WEBHOOK_PATH } from './config/telegramWebhookPath.js';
 import { TELEGRAM_CUSTOMER_WEBHOOK_PATH } from './config/telegramCustomerWebhookPath.js';
 import telegramCustomerWebhookRoutes from './routes/telegramCustomerWebhook.js';
@@ -225,6 +228,10 @@ app.use(WEBHOOK_PATH, express.raw({ type: '*/*', limit: '64kb' }));
 // O webhook do Messenger: a assinatura da Meta é do corpo BRUTO, então ele é
 // reservado aqui, antes do parser de JSON, como o do SGP.
 app.use(MESSENGER_WEBHOOK_PATH, express.raw({ type: '*/*', limit: '256kb' }));
+// A ponte de eventos da Meta: a assinatura é do corpo BRUTO, e é esse mesmo corpo
+// que vai ao Evolution. O teto é maior que o das outras: o histórico da
+// coexistência vem em pedaços grandes (`META_WA_BRIDGE_BODY_LIMIT`).
+app.use(META_WEBHOOK_PATH, express.raw({ type: '*/*', limit: bridgeBodyLimit() }));
 // The operator's attachment upload, reserved here for the same reason and in
 // the same way: its body is the file itself, and the global parser below is
 // sized for JSON — a 12 MB photo posted past this line would fail as a parse
@@ -307,6 +314,7 @@ app.use(express.json({ limit: '1mb' }));
 // impedir.
 app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);
 app.use(MESSENGER_WEBHOOK_PATH, messengerWebhookRoutes);
+app.use(META_WEBHOOK_PATH, metaWebhookRoutes);
 
 // O bot de comandos do Telegram: público pelo mesmo motivo (quem chama é o
 // Telegram), autenticado pelo segredo do webhook no header, com teto próprio.

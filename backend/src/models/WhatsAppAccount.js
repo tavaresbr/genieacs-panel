@@ -62,6 +62,42 @@ class WhatsAppAccount {
   }
 
   /**
+   * A conta oficial deste Phone Number ID da Meta, em QUALQUER provedor.
+   *
+   * A ponte de eventos recebe a entrega da Meta sem sessão nenhuma: o
+   * `phone_number_id` do corpo é o que diz de quem ela é. Devolve a linha inteira
+   * (a ponte precisa do `tenant_id` e do `base_url`), e por isso só quem já
+   * verificou a assinatura da Meta deve chamar.
+   *
+   * tenant-scope-exempt: é assim que se descobre o provedor.
+   */
+  static async getByMetaPhoneNumberId(phoneNumberId) {
+    return runUnscoped(
+      'the Meta delivery arrives with no session; the phone number id names the provider',
+      async () => (await getDb()('whatsapp_accounts')
+        .where({ meta_phone_number_id: String(phoneNumberId), integration: 'cloud' })
+        .first()) || null
+    );
+  }
+
+  /**
+   * A conta oficial desta WABA da Meta, em qualquer provedor — para as mudanças
+   * que não trazem `metadata.phone_number_id` (`account_update`). Mais de um
+   * número da mesma WABA: o de menor id, que é determinístico.
+   *
+   * tenant-scope-exempt: é assim que se descobre o provedor.
+   */
+  static async getByMetaWabaId(wabaId) {
+    return runUnscoped(
+      'the Meta delivery arrives with no session; the WABA id names the provider',
+      async () => (await getDb()('whatsapp_accounts')
+        .where({ meta_waba_id: String(wabaId), integration: 'cloud' })
+        .orderBy('id')
+        .first()) || null
+    );
+  }
+
+  /**
    * The number that should carry a given kind of traffic.
    *
    * Falls back to the default account, then to any connected one: a billing run

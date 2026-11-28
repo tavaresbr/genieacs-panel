@@ -121,6 +121,9 @@ export const SCOPED_TABLES = new Set([
   'telegram_link_tokens',
   // O que já foi avisado a cada conversa (para não repetir o aviso).
   'telegram_notices',
+  // A ponte de eventos da Meta: uma linha por entrega encaminhada ao Evolution,
+  // só metadados (nenhum texto de mensagem nem telefone).
+  'wa_meta_events',
   // Os modelos aprovados na conta da Meta de cada número oficial.
   'wa_meta_templates',
   'wa_broadcasts',

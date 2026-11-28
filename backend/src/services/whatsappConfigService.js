@@ -611,6 +611,9 @@ class WhatsAppConfigService {
       metaSyncState: ['pending', 'ok', 'error'].includes(row.meta_sync_state) ? row.meta_sync_state : null,
       metaSyncError: row.meta_sync_error || null,
       metaCoexistenceDeadlineAt: row.meta_coexistence_deadline_at || null,
+      // A ponte de eventos da Meta (modo sombra): para onde o callback do número está apontado.
+      metaBridge: Boolean(row.meta_bridge),
+      metaBridgeAt: row.meta_bridge_at || null,
       baseUrl: row.base_url,
       status: row.status,
       // O QR NÃO sai daqui.

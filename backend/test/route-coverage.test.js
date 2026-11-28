@@ -67,6 +67,8 @@ const PUBLICAS = new Map([
   ['POST /api/invites/token/accept', 'idem: cria a conta nova de quem foi convidado'],
   ['POST /api/invites/token/join', 'idem, e a senha da pessoa é conferida: é a conta que já existe'],
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
+  ['GET /api/meta-webhook', 'a verificação do callback da ponte de eventos da Meta: devolve o desafio NUMÉRICO se o verify token da ponte bater, e nada mais; não lê dado de provedor; prova em meta-bridge.test.js'],
+  ['POST /api/meta-webhook', 'entrega da Meta pela ponte de eventos, montada antes do resolvedor; a assinatura X-Hub-Signature-256 do corpo bruto É a credencial (sem ela, 401 e nada é lido), e o provedor vem do phone_number_id do corpo; prova em meta-bridge.test.js'],
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor; duas credenciais, o token da instância e o bilhete da sonda de configuração, que só devolve o nonce recebido'],
   ['POST /api/billing-webhook', 'entrega do gateway de pagamento, montada antes do resolvedor e autenticada pelo token do deploy'],
   ['POST /api/asaas-webhook', 'entrega do Asaas da conta de um provedor, montada antes do resolvedor; o token do cabeçalho É a credencial e diz de qual provedor é — token repetido entre provedores é recusado; prova em asaas-webhook.test.js'],
@@ -387,6 +389,11 @@ describe('toda rota sem sessão', () => {
       // `signed_request` assinado conectou.
       'POST /api/messenger-webhook/data-deletion',
       'POST /api/messenger-webhook/deauthorize',
+      // A ponte de eventos da Meta: o provedor sai do `phone_number_id` (ou da WABA)
+      // do corpo, e só com a assinatura da Meta válida. Escreve em
+      // `wa_meta_events` DENTRO do escopo desse provedor (`runInTenant`) e só
+      // metadados; o que ela entrega ao Evolution é o corpo que a Meta mandou.
+      'POST /api/meta-webhook',
       'POST /api/public/leads',
       // A pesquisa de satisfação (0123): `answer` grava a nota na linha de
       // `platform_nps` que o hash do token acha — de UM provedor, o do token —,
@@ -911,6 +918,10 @@ describe('a ordem das montagens em app.js', () => {
       // A do Messenger: a Meta chama um endereço só, e o provedor é o dono da
       // Página que o evento nomeia. Autenticada pela assinatura do corpo bruto.
       'app.use(MESSENGER_WEBHOOK_PATH, messengerWebhookRoutes);',
+      // A ponte de eventos da Meta: a Meta chama um endereço só (o do app da
+      // plataforma), e o provedor é o dono do número que o corpo nomeia.
+      // Autenticada pela assinatura do corpo bruto; desligada, responde 404.
+      'app.use(META_WEBHOOK_PATH, metaWebhookRoutes);',
       // A do bot do Telegram de cada provedor: o provedor vem no caminho e o
       // segredo do cabeçalho é a credencial.
       'app.use(TELEGRAM_WEBHOOK_PATH, telegramWebhookRoutes);',
