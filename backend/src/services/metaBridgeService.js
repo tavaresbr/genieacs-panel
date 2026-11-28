@@ -212,7 +212,8 @@ class MetaBridgeService {
         sig = signBody(bytes);
       }
       const result = await forward(account, bytes, sig);
-      await record(account, mine, bytes.length, result);
+      // `byteLength` e não `.length`: devolve sempre um número, qualquer que seja o tipo do corpo.
+      await record(account, mine, Buffer.byteLength(bytes), result);
       return result;
     });
     const results = await Promise.all(jobs);

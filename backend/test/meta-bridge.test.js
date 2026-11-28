@@ -206,6 +206,23 @@ describe('GET /api/meta-webhook (verificação do callback)', () => {
     assert.ok(!(await res.text()).includes('<script>'));
   });
 
+  it('parâmetro repetido na query chega como lista e nunca confere nem vira desafio', async () => {
+    const raw = (qs) => fetch(`${panelUrl}/api/meta-webhook?${qs}`);
+    // O token certo MAIS um segundo valor: uma lista não é o token.
+    const twoTokens = await raw(`hub.mode=subscribe&hub.verify_token=${VERIFY}&hub.verify_token=${VERIFY}&hub.challenge=1`);
+    assert.equal(twoTokens.status, 403);
+    const twoModes = await raw(`hub.mode=subscribe&hub.mode=subscribe&hub.verify_token=${VERIFY}&hub.challenge=1`);
+    assert.equal(twoModes.status, 403);
+    const twoChallenges = await raw(`hub.mode=subscribe&hub.verify_token=${VERIFY}&hub.challenge=1&hub.challenge=2`);
+    assert.equal(twoChallenges.status, 400);
+    assert.ok(!(await twoChallenges.text()).includes('1'), 'nada do desafio é devolvido');
+  });
+
+  it('o modo errado recusa mesmo com o token certo', async () => {
+    const res = await verify({ 'hub.mode': 'unsubscribe', 'hub.verify_token': VERIFY, 'hub.challenge': '1' });
+    assert.equal(res.status, 403);
+  });
+
   it('desligada, responde 404 como se a rota não existisse', async () => {
     process.env.META_WA_BRIDGE = '0';
     const res = await verify({ 'hub.mode': 'subscribe', 'hub.verify_token': VERIFY, 'hub.challenge': '1' });

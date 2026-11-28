@@ -17,18 +17,31 @@ const router = express.Router();
 router.use((req, res, next) => (bridgeConfigured() ? next() : res.sendStatus(404)));
 
 /**
+ * Um parâmetro da query como TEXTO. Um parâmetro repetido (`?a=1&a=2`) chega como
+ * lista, e lista nunca é token nem desafio: vira texto vazio, que não confere.
+ */
+function queryText(req, name) {
+  const value = req.query[name];
+  return typeof value === 'string' ? value : '';
+}
+
+/**
  * Verificação do callback: a Meta faz um GET com `hub.verify_token` ao cadastrar
  * o endereço e espera o `hub.challenge` de volta, em texto puro. O token é o da
  * ponte (`META_WA_VERIFY_TOKEN`) e NÃO o do Evolution. Ele só prova que quem
  * cadastrou o endereço o conhece; quem autentica a ENTREGA é a assinatura.
  */
 router.get('/', metaWebhookLimiter, (req, res) => {
-  const ok = req.query['hub.mode'] === 'subscribe'
-    && safeEqual(req.query['hub.verify_token'], bridgeVerifyToken());
-  if (!ok) return res.sendStatus(403);
+  // As duas conferências são calculadas SEMPRE, antes de decidir nada: o token é
+  // comparado em tempo constante mesmo com o `hub.mode` errado, e nenhum valor da
+  // query escolhe se a comparação acontece (com `&&`, o `hub.mode` decidia se o
+  // segredo chegava a ser conferido).
+  const tokenOk = safeEqual(queryText(req, 'hub.verify_token'), bridgeVerifyToken());
+  const modeOk = queryText(req, 'hub.mode') === 'subscribe';
+  if (!tokenOk || !modeOk) return res.sendStatus(403);
   // O desafio da Meta é um número. Só dígitos voltam: devolver o valor cru da
   // query seria refletir texto do chamador na resposta (XSS refletido).
-  const challenge = String(req.query['hub.challenge'] ?? '');
+  const challenge = queryText(req, 'hub.challenge');
   if (!/^\d{1,32}$/.test(challenge)) return res.sendStatus(400);
   return res.type('text/plain').send(challenge);
 });
